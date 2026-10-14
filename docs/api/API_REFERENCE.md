@@ -20,6 +20,26 @@ Interactive documentation (generated from the NestJS controllers):
 | PATCH | `/v1/auth/profile` | bearer | Names and persisted theme/locale preference |
 | POST | `/v1/auth/change-password` | bearer | Revokes all sessions on success |
 | GET | `/v1/auth/sessions` | bearer | Active refresh-token sessions |
+| POST | `/v1/auth/mfa/verify-login` | public | Complete login with a TOTP or recovery code |
+| GET | `/v1/auth/mfa/status` | bearer | MFA enrollment status and remaining recovery codes |
+| POST | `/v1/auth/mfa/enroll` | bearer | Start TOTP enrollment; returns the QR data URL, provisioning URI and manual key |
+| POST | `/v1/auth/mfa/enroll/confirm` | bearer | Confirm enrollment with a code; returns ten recovery codes once |
+| POST | `/v1/auth/mfa/recovery-codes/regenerate` | bearer | Issue a new recovery-code set (requires a valid current code) |
+| POST | `/v1/auth/mfa/disable` | bearer | Disable MFA (requires a valid current code) |
+| POST | `/v1/auth/mfa/reset/:userId` | bearer, platform only | Administrative MFA reset for a locked-out account; revokes its sessions |
+
+### Session transport
+
+The refresh token is delivered in an **HttpOnly** cookie named `oryx_rt`, scoped
+to `/api/v1/auth`, so it is never readable by JavaScript and never appears in a
+response body. The `Secure` and `SameSite` attributes are derived from
+`NODE_ENV`, `COOKIE_SECURE` and `COOKIE_SAMESITE`.
+
+Because the cookie is sent automatically, every state-changing request that
+presents it must also echo the readable `oryx_csrf` cookie in the
+`x-oryx-csrf` header. A mismatch is rejected with
+`auth.csrf_token_invalid`. Non-browser clients may still pass `refreshToken` in
+the request body instead of using cookies.
 
 ### Context headers
 
@@ -141,6 +161,12 @@ SHA-256 hash. The public content route never exposes draft pages.
 | `auth.account_inactive` | 403 | Suspended/disabled account |
 | `auth.token_expired` / `auth.token_invalid` | 401 | Access token problem |
 | `auth.refresh_revoked` | 401 | Refresh token reused or expired |
+| `auth.csrf_token_invalid` | 403 | CSRF header missing or does not match the cookie |
+| `auth.mfa_required` | 403 | Account must enroll a second factor before use |
+| `auth.mfa_invalid_code` | 401/403 | TOTP or recovery code rejected |
+| `auth.mfa_already_enrolled` | 409 | MFA is already enabled |
+| `auth.mfa_not_enrolled` | 400 | No MFA enrollment in progress or enabled |
+| `auth.mfa_enrollment_expired` | 400 | The enrollment window elapsed |
 | `auth.invitation_invalid` / `auth.invitation_expired` | 401 | Invitation problem |
 | `authz.permission_denied` | 403 | Missing a required permission |
 | `authz.platform_only` | 403 | Platform-only operation |
