@@ -276,11 +276,17 @@ test.describe('functional audit', () => {
 
     const modules = await apiCall<{ items: Array<{ key: string; status: string }> }>(page, '/modules');
     expect(modules.body.items.length).toBeGreaterThanOrEqual(17);
-    // Availability flags must match what is actually implemented.
-    const accounting = modules.body.items.find((m) => m.key === 'financial_accounting');
-    expect(accounting!.status).toBe('PLANNED');
+    // Availability flags must match what is actually implemented. Execution 02
+    // shipped accounting, sales, purchasing, inventory and reports.
+    for (const key of ['financial_accounting', 'sales_pos', 'purchasing_procurement', 'warehouses_inventory', 'reports_analytics']) {
+      const mod = modules.body.items.find((m) => m.key === key);
+      expect(mod?.status, `${key} must be AVAILABLE`).toBe('AVAILABLE');
+    }
     const companyMgmt = modules.body.items.find((m) => m.key === 'company_management');
     expect(companyMgmt!.status).toBe('AVAILABLE');
+    // Modules owned by a later execution remain PLANNED.
+    const hr = modules.body.items.find((m) => m.key === 'human_resources');
+    expect(hr!.status).toBe('PLANNED');
   });
 
   test('7. subscription package creation and editing persist', async ({ page }) => {
