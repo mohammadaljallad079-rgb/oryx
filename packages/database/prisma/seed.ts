@@ -941,6 +941,225 @@ function buildSeedPeriods(start: Date, end: Date) {
   return periods;
 }
 
+/**
+ * Execution 03 — seed an operational baseline (HR, CRM, operations, automotive)
+ * for every company that has an active subscription, so the new modules have
+ * real reference data. Idempotent by natural key.
+ */
+async function seedExecution03Baseline(idByCode: Map<string, string>, superAdminId: string) {
+  const companies = await prisma.company.findMany({ where: { status: 'ACTIVE' } });
+  let departments = 0;
+  let jobTitles = 0;
+  let employees = 0;
+  let leaveTypes = 0;
+  let shifts = 0;
+  let leadSources = 0;
+  let pipelines = 0;
+  let inspectionServices = 0;
+  let bays = 0;
+  let providers = 0;
+
+  for (const company of companies) {
+    const branch = await prisma.branch.findFirst({ where: { companyId: company.id } });
+
+    // Departments and job titles.
+    const deptSpecs = [
+      { code: 'OPS', nameEn: 'Operations', nameAr: 'العمليات' },
+      { code: 'FIN', nameEn: 'Finance', nameAr: 'المالية' },
+      { code: 'WORKSHOP', nameEn: 'Workshop', nameAr: 'الورشة' },
+    ];
+    const deptIds: Record<string, string> = {};
+    for (const d of deptSpecs) {
+      const dept = await prisma.department.upsert({
+        where: { companyId_code: { companyId: company.id, code: d.code } },
+        update: {},
+        create: { companyId: company.id, code: d.code, nameEn: d.nameEn, nameAr: d.nameAr, branchId: branch?.id ?? null },
+      });
+      deptIds[d.code] = dept.id;
+      departments += 1;
+    }
+
+    const titleSpecs = [
+      { code: 'TECH', nameEn: 'Technician', nameAr: 'فني', dept: 'WORKSHOP' },
+      { code: 'SVCADV', nameEn: 'Service Advisor', nameAr: 'مستشار خدمة', dept: 'OPS' },
+      { code: 'ACCT', nameEn: 'Accountant', nameAr: 'محاسب', dept: 'FIN' },
+    ];
+    const titleIds: Record<string, string> = {};
+    for (const jt of titleSpecs) {
+      const title = await prisma.jobTitle.upsert({
+        where: { companyId_code: { companyId: company.id, code: jt.code } },
+        update: {},
+        create: { companyId: company.id, code: jt.code, nameEn: jt.nameEn, nameAr: jt.nameAr, departmentId: deptIds[jt.dept] },
+      });
+      titleIds[jt.code] = title.id;
+      jobTitles += 1;
+    }
+
+    // Employees.
+    const employeeSpecs = [
+      { code: 'EMP-001', fullNameEn: 'Ahmed Al Harbi', fullNameAr: 'أحمد الحربي', title: 'TECH', basic: 600000 },
+      { code: 'EMP-002', fullNameEn: 'Sara Al Otaibi', fullNameAr: 'سارة العتيبي', title: 'SVCADV', basic: 700000 },
+      { code: 'EMP-003', fullNameEn: 'Omar Nasser', fullNameAr: 'عمر ناصر', title: 'ACCT', basic: 800000 },
+    ];
+    for (const e of employeeSpecs) {
+      const existing = await prisma.employee.findUnique({ where: { companyId_code: { companyId: company.id, code: e.code } } });
+      if (existing) continue;
+      const employee = await prisma.employee.create({
+        data: {
+          companyId: company.id,
+          code: e.code,
+          fullNameEn: e.fullNameEn,
+          fullNameAr: e.fullNameAr,
+          jobTitleId: titleIds[e.title],
+          departmentId: deptIds[e.title === 'TECH' ? 'WORKSHOP' : e.title === 'ACCT' ? 'FIN' : 'OPS'],
+          branchId: branch?.id ?? null,
+          status: 'ACTIVE',
+          hireDate: new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1)),
+        },
+      });
+      // Effective salary structure with a housing allowance.
+      await prisma.salaryStructure.create({
+        data: {
+          companyId: company.id,
+          employeeId: employee.id,
+          effectiveFrom: new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1)),
+          basicMinor: e.basic,
+          components: {
+            create: [
+              { companyId: company.id, type: 'ALLOWANCE', code: 'HOUSING', nameEn: 'Housing allowance', nameAr: 'بدل سكن', isPercentage: true, percentBp: 2500, sortOrder: 0 },
+            ],
+          },
+        },
+      });
+      await prisma.employeeLifecycle.create({
+        data: {
+          companyId: company.id,
+          employeeId: employee.id,
+          type: 'ONBOARDING',
+          status: 'COMPLETED',
+          completedAt: new Date(),
+          items: { create: [{ label: 'Contract on file', isDone: true, sortOrder: 0 }, { label: 'Access issued', isDone: true, sortOrder: 1 }] },
+        },
+      });
+      employees += 1;
+    }
+
+    // Leave types.
+    const leaveSpecs = [
+      { code: 'ANNUAL', nameEn: 'Annual leave', nameAr: 'إجازة سنوية', days: 3000 },
+      { code: 'SICK', nameEn: 'Sick leave', nameAr: 'إجازة مرضية', days: 1500 },
+    ];
+    for (const l of leaveSpecs) {
+      await prisma.leaveType.upsert({
+        where: { companyId_code: { companyId: company.id, code: l.code } },
+        update: {},
+        create: { companyId: company.id, code: l.code, nameEn: l.nameEn, nameAr: l.nameAr, annualEntitlementDays: l.days },
+      });
+      leaveTypes += 1;
+    }
+
+    // Shifts.
+    await prisma.shift.upsert({
+      where: { companyId_code: { companyId: company.id, code: 'DAY' } },
+      update: {},
+      create: { companyId: company.id, code: 'DAY', nameEn: 'Day shift', nameAr: 'الوردية النهارية', startTime: '08:00', endTime: '17:00', breakMinutes: 60 },
+    });
+    shifts += 1;
+
+    // CRM lead sources and a default pipeline.
+    for (const s of [
+      { code: 'WEB', nameEn: 'Website', nameAr: 'الموقع' },
+      { code: 'WALKIN', nameEn: 'Walk-in', nameAr: 'حضور مباشر' },
+      { code: 'REFERRAL', nameEn: 'Referral', nameAr: 'توصية' },
+    ]) {
+      await prisma.leadSource.upsert({ where: { companyId_code: { companyId: company.id, code: s.code } }, update: {}, create: { companyId: company.id, code: s.code, nameEn: s.nameEn, nameAr: s.nameAr } });
+      leadSources += 1;
+    }
+    const pipeline = await prisma.pipeline.upsert({
+      where: { companyId_code: { companyId: company.id, code: 'DEFAULT' } },
+      update: {},
+      create: { companyId: company.id, code: 'DEFAULT', nameEn: 'Default pipeline', nameAr: 'المسار الافتراضي', isDefault: true },
+    });
+    if ((await prisma.pipelineStage.count({ where: { pipelineId: pipeline.id } })) === 0) {
+      await prisma.pipelineStage.createMany({
+        data: [
+          { companyId: company.id, pipelineId: pipeline.id, code: 'NEW', nameEn: 'New', nameAr: 'جديد', sortOrder: 1, probabilityBp: 1000 },
+          { companyId: company.id, pipelineId: pipeline.id, code: 'QUALIFIED', nameEn: 'Qualified', nameAr: 'مؤهل', sortOrder: 2, probabilityBp: 3000 },
+          { companyId: company.id, pipelineId: pipeline.id, code: 'PROPOSAL', nameEn: 'Proposal', nameAr: 'عرض', sortOrder: 3, probabilityBp: 6000 },
+          { companyId: company.id, pipelineId: pipeline.id, code: 'WON', nameEn: 'Won', nameAr: 'مكسوب', sortOrder: 4, probabilityBp: 10000, isWon: true },
+          { companyId: company.id, pipelineId: pipeline.id, code: 'LOST', nameEn: 'Lost', nameAr: 'مفقود', sortOrder: 5, probabilityBp: 0, isLost: true },
+        ],
+      });
+    }
+    pipelines += 1;
+
+    // Inspection services with a checklist.
+    const svcSpecs = [
+      { code: 'BASIC', nameEn: 'Basic vehicle inspection', nameAr: 'فحص مركبة أساسي', price: 25000 },
+      { code: 'FULL', nameEn: 'Comprehensive inspection', nameAr: 'فحص شامل', price: 45000 },
+    ];
+    for (const s of svcSpecs) {
+      const service = await prisma.inspectionService.upsert({
+        where: { companyId_code: { companyId: company.id, code: s.code } },
+        update: {},
+        create: { companyId: company.id, code: s.code, nameEn: s.nameEn, nameAr: s.nameAr, priceMinor: s.price, taxPercentBp: 1500 },
+      });
+      if ((await prisma.inspectionChecklistItem.count({ where: { serviceId: service.id } })) === 0) {
+        await prisma.inspectionChecklistItem.createMany({
+          data: [
+            { companyId: company.id, serviceId: service.id, code: 'BRAKES', labelEn: 'Brakes', labelAr: 'الفرامل', category: 'SAFETY', sortOrder: 0 },
+            { companyId: company.id, serviceId: service.id, code: 'TIRES', labelEn: 'Tyres', labelAr: 'الإطارات', category: 'SAFETY', sortOrder: 1 },
+            { companyId: company.id, serviceId: service.id, code: 'LIGHTS', labelEn: 'Lights', labelAr: 'الإضاءة', category: 'ELECTRICAL', sortOrder: 2 },
+            { companyId: company.id, serviceId: service.id, code: 'FLUIDS', labelEn: 'Fluids', labelAr: 'السوائل', category: 'MECHANICAL', sortOrder: 3 },
+          ],
+        });
+      }
+      inspectionServices += 1;
+    }
+
+    // Workshop bays.
+    for (const b of [
+      { code: 'BAY-1', nameEn: 'Bay 1', nameAr: 'الورشة 1' },
+      { code: 'BAY-2', nameEn: 'Bay 2', nameAr: 'الورشة 2' },
+    ]) {
+      await prisma.workshopBay.upsert({
+        where: { companyId_code: { companyId: company.id, code: b.code } },
+        update: {},
+        create: { companyId: company.id, code: b.code, nameEn: b.nameEn, nameAr: b.nameAr, branchId: branch?.id ?? null },
+      });
+      bays += 1;
+    }
+
+    // Marketplace provider (approved) with a listing.
+    const provider = await prisma.marketplaceProvider.upsert({
+      where: { code: `${company.code}-P1` },
+      update: {},
+      create: {
+        code: `${company.code}-P1`,
+        nameEn: 'City Auto Care',
+        nameAr: 'رعاية السيارات المدينة',
+        categoryKey: 'WORKSHOP',
+        providerCompanyId: company.id,
+        commissionPercentBp: 1000,
+        status: 'APPROVED',
+        approvedAt: new Date(),
+      },
+    });
+    if ((await prisma.providerServiceListing.count({ where: { providerId: provider.id } })) === 0) {
+      await prisma.providerServiceListing.create({
+        data: { providerId: provider.id, categoryKey: 'WORKSHOP', nameEn: 'General repair', nameAr: 'إصلاح عام', priceMinor: 30000 },
+      });
+    }
+    providers += 1;
+  }
+
+  console.log(
+    `  e03 baseline: ${departments} departments, ${jobTitles} job titles, ${employees} employees, ` +
+      `${leaveTypes} leave types, ${shifts} shifts, ${leadSources} lead sources, ${pipelines} pipelines, ` +
+      `${inspectionServices} inspection services, ${bays} bays, ${providers} providers`,
+  );
+}
+
 async function main() {
   console.log('ORYX seed — start');
   await seedModules();
@@ -952,6 +1171,7 @@ async function main() {
   await seedCompanyAdmins(superAdmin.id, idByCode);
   await seedCms();
   await seedErpBaseline(idByCode, superAdmin.id);
+  await seedExecution03Baseline(idByCode, superAdmin.id);
   await seedAuditBaseline(superAdmin.id, idByCode);
   console.log('ORYX seed — done');
 }

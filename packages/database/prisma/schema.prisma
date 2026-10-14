@@ -746,6 +746,8 @@ enum JournalSourceType {
   POS_SALE
   STOCK_ADJUSTMENT
   OPENING_BALANCE
+  WORKSHOP_INVOICE
+  INSPECTION_INVOICE
 }
 
 enum PaymentDirection {
