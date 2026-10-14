@@ -10,6 +10,7 @@ import {
 import { actorFrom } from '../common/erp-context.service';
 import { PurchasingService } from './purchasing.service';
 import {
+  ConvertRequisitionDto,
   CreateGoodsReceiptDto,
   CreatePurchaseOrderDto,
   CreatePurchaseReturnDto,
@@ -23,10 +24,6 @@ import {
 interface RequestLike {
   ip?: string;
   headers: Record<string, string | string[] | undefined>;
-}
-
-class ConvertRequisitionDto {
-  supplierId!: string;
 }
 
 @ApiTags('purchasing')

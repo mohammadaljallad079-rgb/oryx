@@ -46,6 +46,7 @@ const STANDARD_CHART: Array<{
   { code: '5000', nameEn: 'Cost of goods sold', nameAr: 'تكلفة البضاعة المباعة', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: SYSTEM_ROLES.COGS },
   { code: '5900', nameEn: 'Cash over / short', nameAr: 'فروق الصندوق', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: SYSTEM_ROLES.CASH_OVER_SHORT },
   { code: '5910', nameEn: 'Inventory adjustment', nameAr: 'تسوية المخزون', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: SYSTEM_ROLES.STOCK_ADJUSTMENT },
+  { code: '5920', nameEn: 'Purchase price variance', nameAr: 'فروق أسعار الشراء', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: SYSTEM_ROLES.PURCHASE_PRICE_VARIANCE },
 ];
 
 const DEBIT_TYPES = new Set(['ASSET', 'EXPENSE']);
@@ -419,12 +420,16 @@ export class AccountingService {
         companyId,
         accountId: { in: accounts.map((a) => a.id) },
         entry: {
-          status: 'POSTED',
+          // Both POSTED and REVERSED entries count: a reversal is a new POSTED
+          // entry that mirrors the original, and the original is only *marked*
+          // REVERSED. Excluding it would leave the mirror half in the ledger and
+          // break the trial balance.
+          status: { not: 'DRAFT' },
           ...(from || to
             ? { entryDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }
             : {}),
         },
-        ...(query.branchId ? { entry: { branchId: query.branchId, status: 'POSTED' } } : {}),
+        ...(query.branchId ? { entry: { branchId: query.branchId, status: { not: 'DRAFT' } } } : {}),
       },
       include: { entry: { select: { entryNumber: true, entryDate: true, memo: true } } },
       orderBy: [{ accountId: 'asc' }, { entry: { entryDate: 'asc' } }],
@@ -483,7 +488,7 @@ export class AccountingService {
       where: {
         companyId,
         entry: {
-          status: 'POSTED',
+          status: { not: 'DRAFT' },
           ...(from || to ? { entryDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
           ...(query.branchId ? { branchId: query.branchId } : {}),
         },

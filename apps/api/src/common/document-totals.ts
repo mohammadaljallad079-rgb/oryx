@@ -1,4 +1,4 @@
-import { lineAmountMinor, percentOfMinor, sumMinor } from '@oryx/shared';
+import { basisPointsOfMinor, lineAmountMinor, sumMinor } from '@oryx/shared';
 
 /**
  * A priced document line before rounding.
@@ -42,9 +42,9 @@ export function computeDocumentTotals(lines: PricedLineInput[]): DocumentTotals 
     const discountPercentBp = line.discountPercentBp ?? 0;
     const taxPercentBp = line.taxPercentBp ?? 0;
     const lineSubtotalMinor = lineAmountMinor(line.quantity, line.unitPriceMinor);
-    const discountMinor = percentOfMinor(lineSubtotalMinor, discountPercentBp, 4);
+    const discountMinor = basisPointsOfMinor(lineSubtotalMinor, discountPercentBp);
     const net = lineSubtotalMinor - discountMinor;
-    const taxMinor = percentOfMinor(net, taxPercentBp, 4);
+    const taxMinor = basisPointsOfMinor(net, taxPercentBp);
     return {
       quantity: line.quantity,
       unitPriceMinor: line.unitPriceMinor,

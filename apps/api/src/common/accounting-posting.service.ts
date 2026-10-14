@@ -296,10 +296,40 @@ export class AccountingPostingService {
     };
   }
 
-  /** Run `fn` inside a serialisable transaction, retrying on write conflicts. */
-  async withTransaction<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
-    return this.prisma.$transaction(fn, { isolationLevel: 'Serializable' });
+  /**
+   * Run `fn` inside a transaction.
+   *
+   * The isolation level is READ COMMITTED, not SERIALIZABLE: the inventory
+   * ledger already serialises concurrent movements of the same SKU with an
+   * explicit `SELECT … FOR UPDATE` row lock, so READ COMMITTED is sufficient and
+   * avoids the spurious serialization aborts SERIALIZABLE would raise for
+   * unrelated concurrent work.
+   *
+   * A bounded retry still wraps the transaction so a genuine deadlock or a
+   * write-conflict (`40001`/`P2034`) is retried rather than surfaced as a 500.
+   */
+  async withTransaction<T>(fn: (tx: Tx) => Promise<T>, attempts = 3): Promise<T> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(fn, { isolationLevel: 'ReadCommitted' });
+      } catch (error) {
+        lastError = error;
+        if (!isRetryableTransactionError(error) || attempt === attempts) throw error;
+        // Small backoff so the competing transaction can finish.
+        await new Promise((resolve) => setTimeout(resolve, 25 * attempt));
+      }
+    }
+    throw lastError;
   }
+}
+
+/** True for PostgreSQL serialization/deadlock errors that a retry may resolve. */
+function isRetryableTransactionError(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code;
+  if (code === 'P2034' || code === '40001' || code === '40P01') return true;
+  const message = (error as { message?: string } | null)?.message ?? '';
+  return message.includes('could not serialize access') || message.includes('deadlock detected');
 }
 
 export type { Prisma };

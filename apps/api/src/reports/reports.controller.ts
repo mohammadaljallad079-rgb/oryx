@@ -7,13 +7,7 @@ import {
   type RequestPrincipal,
 } from '../auth/auth.decorators';
 import { ReportsService } from './reports.service';
-
-class ReportQueryDto {
-  companyId?: string;
-  branchId?: string;
-  from?: string;
-  to?: string;
-}
+import { ReportQueryDto } from './reports.dto';
 
 @ApiTags('reports')
 @ApiBearerAuth()

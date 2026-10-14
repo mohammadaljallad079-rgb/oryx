@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { lineAmountMinor, percentOfMinor, sumMinor } from '@oryx/shared';
+import { basisPointsOfMinor, lineAmountMinor, sumMinor } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccountingPostingService, SYSTEM_ROLES, type PostingLine } from '../common/accounting-posting.service';
@@ -613,9 +613,12 @@ export class PurchasingService {
         const inventoryAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.INVENTORY);
         const vatInput = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.VAT_INPUT);
         const expenseAccount = inventoryAccount;
+        // Only the part not already accrued by a goods receipt increases the
+        // payable; the VAT is always accrued by the invoice.
         const netToAccrue = totals.subtotalMinor - alreadyAccrued;
+        const apIncrease = netToAccrue + totals.taxMinor;
 
-        const journalLines: PostingLine[] = [{ accountId: apAccount, credit: totals.totalMinor }];
+        const journalLines: PostingLine[] = [{ accountId: apAccount, credit: apIncrease }];
         if (netToAccrue !== 0) {
           journalLines.push({ accountId: expenseAccount, debit: netToAccrue });
         }
@@ -731,7 +734,10 @@ export class PurchasingService {
         returnedValue += -movement.totalCostMinor;
       }
 
-      // Reverse the payable: Dr AP, Cr Inventory, and reverse input VAT.
+      // Reverse the payable at the invoiced value: Dr AP, Cr Inventory (at
+      // moving-average cost), Cr input VAT, and post any difference between the
+      // invoiced cost and the inventory valuation to a price-variance account so
+      // the entry always balances.
       const apAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.AP_CONTROL);
       const inventoryAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.INVENTORY);
       const journalLines: PostingLine[] = [{ accountId: apAccount, debit: totals.totalMinor }];
@@ -739,6 +745,15 @@ export class PurchasingService {
       if (totals.taxMinor > 0) {
         const vatInput = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.VAT_INPUT);
         journalLines.push({ accountId: vatInput, credit: totals.taxMinor });
+      }
+      const variance = totals.totalMinor - returnedValue - totals.taxMinor;
+      if (variance !== 0) {
+        const varianceAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.PURCHASE_PRICE_VARIANCE);
+        journalLines.push(
+          variance > 0
+            ? { accountId: varianceAccount, debit: variance }
+            : { accountId: varianceAccount, credit: -variance },
+        );
       }
       const journal = await this.posting.postJournal(tx, {
         companyId,
@@ -825,7 +840,7 @@ function multiplyMinor(quantity: number, unitCostMinor: number): number {
 }
 
 function percentOf(minor: number, rateBp: number): number {
-  return percentOfMinor(minor, rateBp, 4);
+  return basisPointsOfMinor(minor, rateBp);
 }
 
 function addDays(date: Date, days: number): Date {

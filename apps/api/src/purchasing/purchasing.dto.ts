@@ -360,6 +360,11 @@ export class CreateSupplierInvoiceDto {
   lines!: PurchaseLineDto[];
 }
 
+export class ConvertRequisitionDto {
+  @IsString()
+  supplierId!: string;
+}
+
 export class PurchaseReturnLineDto {
   @IsString()
   productId!: string;

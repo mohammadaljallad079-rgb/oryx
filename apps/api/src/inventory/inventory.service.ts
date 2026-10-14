@@ -24,6 +24,18 @@ import type {
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
+/**
+ * `StockLevel.averageCostMinor` is stored scaled by this factor so a moving
+ * average does not lose a whole minor unit on every receipt. It is divided back
+ * out whenever a cost is exposed through the API.
+ */
+const COST_SCALE = 100;
+
+/** Convert a stored scaled average cost back to whole minor units. */
+export function wholeAverageCost(scaled: number): number {
+  return Math.round(scaled / COST_SCALE);
+}
+
 export interface RecordMovementInput {
   companyId: string;
   branchId?: string | null;
@@ -134,19 +146,25 @@ export class InventoryService {
     }
 
     let unitCostMinor: number;
-    let averageCostMinor = level.averageCostMinor;
+    let averageCostScaled = level.averageCostMinor;
 
     if (input.quantity > 0) {
       // Inbound: blend the received cost into the moving average.
-      unitCostMinor = input.unitCostMinor ?? level.averageCostMinor;
+      unitCostMinor = input.unitCostMinor ?? wholeAverageCost(level.averageCostMinor);
       const newValue = sumMinor([
-        lineAmountMinor(level.quantity, level.averageCostMinor),
+        lineAmountMinor(level.quantity, wholeAverageCost(level.averageCostMinor)),
         lineAmountMinor(input.quantity, unitCostMinor),
       ]);
-      averageCostMinor = newQuantity === 0 ? unitCostMinor : Math.round(newValue / newQuantity);
+      // Average cost per whole unit, stored scaled by COST_SCALE. `quantity` is
+      // scaled by 10^4, so dividing the total value by the whole-unit count
+      // requires the quantity factor in the numerator.
+      averageCostScaled =
+        newQuantity === 0
+          ? unitCostMinor * COST_SCALE
+          : Math.round((newValue * QTY_FACTOR * COST_SCALE) / newQuantity);
     } else {
       // Outbound: value at the current moving average.
-      unitCostMinor = level.averageCostMinor;
+      unitCostMinor = wholeAverageCost(level.averageCostMinor);
     }
 
     const totalCostMinor =
@@ -156,7 +174,7 @@ export class InventoryService {
 
     await tx.stockLevel.update({
       where: { id: level.id },
-      data: { quantity: newQuantity, averageCostMinor },
+      data: { quantity: newQuantity, averageCostMinor: averageCostScaled },
     });
 
     const movement = await tx.stockMovement.create({
@@ -183,7 +201,7 @@ export class InventoryService {
       unitCostMinor,
       totalCostMinor,
       balanceAfter: newQuantity,
-      averageCostMinor,
+      averageCostMinor: wholeAverageCost(averageCostScaled),
     };
   }
 
@@ -641,18 +659,21 @@ export class InventoryService {
         warehouse: { select: { code: true, nameEn: true, nameAr: true } },
       },
     });
-    const rows = levels.map((l) => ({
-      warehouseId: l.warehouseId,
-      warehouseCode: l.warehouse.code,
-      productId: l.productId,
-      sku: l.product.sku,
-      nameEn: l.product.nameEn,
-      nameAr: l.product.nameAr,
-      quantity: l.quantity,
-      averageCostMinor: l.averageCostMinor,
-      valueMinor: lineAmountMinor(l.quantity, l.averageCostMinor),
-      reorderLevel: l.product.reorderLevel,
-    }));
+    const rows = levels.map((l) => {
+      const averageCostMinor = wholeAverageCost(l.averageCostMinor);
+      return {
+        warehouseId: l.warehouseId,
+        warehouseCode: l.warehouse.code,
+        productId: l.productId,
+        sku: l.product.sku,
+        nameEn: l.product.nameEn,
+        nameAr: l.product.nameAr,
+        quantity: l.quantity,
+        averageCostMinor,
+        valueMinor: lineAmountMinor(l.quantity, averageCostMinor),
+        reorderLevel: l.product.reorderLevel,
+      };
+    });
     return {
       rows,
       totalValueMinor: sumMinor(rows.map((r) => r.valueMinor)),

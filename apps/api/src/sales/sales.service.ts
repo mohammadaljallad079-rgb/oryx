@@ -189,7 +189,7 @@ export class SalesService {
           currency: dto.currency ?? 'SAR',
           notes: dto.notes ?? null,
           createdById: actor.userId,
-          lines: { create: buildLineRows(totals, dto.lines) },
+          lines: { create: buildSimpleLineRows(totals, dto.lines) },
         },
         include: { customer: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
       });
@@ -305,7 +305,7 @@ export class SalesService {
           currency: dto.currency ?? 'SAR',
           notes: dto.notes ?? null,
           createdById: actor.userId,
-          lines: { create: buildLineRows(totals, dto.lines) },
+          lines: { create: buildSimpleLineRows(totals, dto.lines) },
         },
         include: { customer: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
       });
@@ -1083,6 +1083,24 @@ async function computeDueDate(tx: Tx, companyId: string, customerId: string, inv
   return due;
 }
 
+/** Line rows for documents that store only totals (quotation, order, credit note). */
+function buildSimpleLineRows(
+  totals: ReturnType<typeof computeDocumentTotals>,
+  inputs: Array<{ productId?: string | null; description: string }>,
+) {
+  return totals.lines.map((l, i) => ({
+    productId: inputs[i].productId ?? null,
+    description: inputs[i].description,
+    quantity: l.quantity,
+    unitPriceMinor: l.unitPriceMinor,
+    discountPercentBp: l.discountPercentBp,
+    taxPercentBp: l.taxPercentBp,
+    lineTotalMinor: l.lineTotalMinor,
+    sortOrder: i,
+  }));
+}
+
+/** Line rows for invoices, which store the per-line subtotal/discount/tax. */
 function buildLineRows(
   totals: ReturnType<typeof computeDocumentTotals>,
   inputs: Array<{ productId?: string | null; description: string }>,

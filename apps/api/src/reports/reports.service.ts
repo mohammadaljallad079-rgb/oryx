@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { lineAmountMinor, sumMinor } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { ErpContextService } from '../common/erp-context.service';
+import { wholeAverageCost } from '../inventory/inventory.service';
 import type { RequestPrincipal } from '../auth/auth.decorators';
 
 export interface ReportQuery {
@@ -41,7 +42,8 @@ export class ReportsService {
     const entries = await this.prisma.journalEntry.findMany({
       where: {
         companyId,
-        status: 'POSTED',
+        // Reversed entries stay in the ledger alongside their reversal.
+        status: { not: 'DRAFT' },
         ...(dateFilter ? { entryDate: dateFilter } : {}),
         ...(query.branchId ? { branchId: query.branchId } : {}),
       },
@@ -225,17 +227,20 @@ export class ReportsService {
         warehouse: { select: { code: true, nameEn: true, nameAr: true } },
       },
     });
-    const rows = levels.map((l) => ({
-      warehouseId: l.warehouseId,
-      warehouseCode: l.warehouse.code,
-      productId: l.productId,
-      sku: l.product.sku,
-      nameEn: l.product.nameEn,
-      nameAr: l.product.nameAr,
-      quantity: l.quantity,
-      averageCostMinor: l.averageCostMinor,
-      valueMinor: lineAmountMinor(l.quantity, l.averageCostMinor),
-    }));
+    const rows = levels.map((l) => {
+      const averageCostMinor = wholeAverageCost(l.averageCostMinor);
+      return {
+        warehouseId: l.warehouseId,
+        warehouseCode: l.warehouse.code,
+        productId: l.productId,
+        sku: l.product.sku,
+        nameEn: l.product.nameEn,
+        nameAr: l.product.nameAr,
+        quantity: l.quantity,
+        averageCostMinor,
+        valueMinor: lineAmountMinor(l.quantity, averageCostMinor),
+      };
+    });
 
     const movements = await this.prisma.stockMovement.findMany({
       where: { companyId, ...(dateFilter ? { occurredAt: dateFilter } : {}), ...(query.branchId ? { branchId: query.branchId } : {}) },

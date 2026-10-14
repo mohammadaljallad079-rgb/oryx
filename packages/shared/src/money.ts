@@ -137,6 +137,18 @@ export function percentOfMinor(minor: number, ratePercent: number, rateScale = 2
 }
 
 /**
+ * Apply a rate expressed in **basis points** (1500 = 15.00%).
+ *
+ * Basis points are the unit the data model stores (`taxPercentBp`,
+ * `discountPercentBp`), so this is the helper the pricing code should use. It is
+ * `percentOfMinor` with the scale fixed at 2, which removes the ambiguity that
+ * caused a rate to be read as hundredths of a percent.
+ */
+export function basisPointsOfMinor(minor: number, rateBp: number): number {
+  return percentOfMinor(minor, rateBp, 2);
+}
+
+/**
  * Split an amount into parts that sum exactly to the original.
  *
  * The remainder after an even split is distributed one minor unit at a time to
