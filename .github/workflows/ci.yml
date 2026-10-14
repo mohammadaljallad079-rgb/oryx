@@ -8,7 +8,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, feature/execution-01-super-admin-foundation]
+    branches: [main, feature/execution-01-super-admin-foundation, feature/execution-02-erp-core]
   workflow_dispatch:
 
 # Cancel superseded runs on the same ref to conserve CI minutes.

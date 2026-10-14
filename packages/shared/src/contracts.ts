@@ -372,3 +372,531 @@ export interface ApiClientDto {
   /** Only returned once at creation. */
   secret?: string;
 }
+
+// ============================================================================
+// Execution 02 — ERP core contracts
+//
+// Money is integer minor units (halalas) throughout; quantities are scaled by
+// 10^4 and percentages are basis points (1500 = 15.00%). The admin app formats
+// these with the helpers in `money.ts` so the UI shows exactly what the API
+// posted.
+// ============================================================================
+
+export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
+export type AccountNormalBalance = 'DEBIT' | 'CREDIT';
+export type FiscalPeriodStatus = 'OPEN' | 'CLOSED' | 'LOCKED';
+export type JournalStatus = 'DRAFT' | 'POSTED' | 'REVERSED';
+
+export interface ErpAccountDto {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  type: AccountType;
+  normalBalance: AccountNormalBalance;
+  parentId: string | null;
+  level: number;
+  isPostable: boolean;
+  isSystem: boolean;
+  systemRole: string | null;
+  currency: string;
+  isActive: boolean;
+}
+
+export interface FiscalPeriodDto {
+  id: string;
+  periodNumber: number;
+  nameEn: string;
+  nameAr: string;
+  startDate: string;
+  endDate: string;
+  status: FiscalPeriodStatus;
+}
+
+export interface FiscalYearDto {
+  id: string;
+  code: string;
+  startDate: string;
+  endDate: string;
+  isClosed: boolean;
+  periods: FiscalPeriodDto[];
+}
+
+export interface JournalLineDto {
+  id: string;
+  lineNumber: number;
+  accountId: string;
+  accountCode: string;
+  accountNameEn: string;
+  accountNameAr: string;
+  description: string | null;
+  debitMinor: number;
+  creditMinor: number;
+}
+
+export interface JournalEntryDto {
+  id: string;
+  entryNumber: string;
+  entryDate: string;
+  status: JournalStatus;
+  sourceType: string;
+  sourceId: string | null;
+  memo: string | null;
+  currency: string;
+  totalDebitMinor: number;
+  totalCreditMinor: number;
+  reversalOfId: string | null;
+  lines: JournalLineDto[];
+}
+
+export interface LedgerLineDto {
+  entryId: string;
+  entryNumber: string;
+  entryDate: string;
+  description: string | null;
+  debitMinor: number;
+  creditMinor: number;
+  runningBalanceMinor: number;
+}
+
+export interface LedgerAccountDto {
+  accountId: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  type: AccountType;
+  normalBalance: AccountNormalBalance;
+  totalDebitMinor: number;
+  totalCreditMinor: number;
+  closingBalanceMinor: number;
+  lines: LedgerLineDto[];
+}
+
+export interface TrialBalanceRowDto {
+  accountId: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  type: AccountType;
+  debitMinor: number;
+  creditMinor: number;
+  balanceMinor: number;
+}
+
+export interface TrialBalanceDto {
+  from: string | null;
+  to: string | null;
+  rows: TrialBalanceRowDto[];
+  totalDebitMinor: number;
+  totalCreditMinor: number;
+  balanced: boolean;
+}
+
+export interface StatementLineDto {
+  accountId: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  debitMinor: number;
+  creditMinor: number;
+  balanceMinor: number;
+}
+
+export interface IncomeStatementDto {
+  from: string | null;
+  to: string | null;
+  revenue: StatementLineDto[];
+  expense: StatementLineDto[];
+  totalRevenueMinor: number;
+  totalExpenseMinor: number;
+  netIncomeMinor: number;
+}
+
+export interface BalanceSheetDto {
+  asOf: string | null;
+  assets: StatementLineDto[];
+  liabilities: StatementLineDto[];
+  equity: StatementLineDto[];
+  totalAssetsMinor: number;
+  totalLiabilitiesMinor: number;
+  totalEquityMinor: number;
+  netIncomeMinor: number;
+  totalLiabilitiesAndEquityMinor: number;
+  balanced: boolean;
+}
+
+export interface AgingRowDto {
+  id: string;
+  invoiceNumber: string;
+  customerId?: string;
+  customerNameEn?: string;
+  customerNameAr?: string;
+  supplierId?: string;
+  supplierNameEn?: string;
+  supplierNameAr?: string;
+  supplierInvoiceNumber?: string;
+  invoiceDate: string;
+  dueDate: string | null;
+  totalMinor: number;
+  paidMinor: number;
+  outstandingMinor: number;
+  daysOverdue: number;
+  bucket: string;
+}
+
+export interface PaymentAllocationDto {
+  id: string;
+  target: 'SALES_INVOICE' | 'SUPPLIER_INVOICE' | 'CREDIT_NOTE';
+  salesInvoiceId: string | null;
+  supplierInvoiceId: string | null;
+  creditNoteId: string | null;
+  amountMinor: number;
+}
+
+export interface PaymentDto {
+  id: string;
+  paymentNumber: string;
+  direction: 'RECEIPT' | 'PAYMENT';
+  partyType: 'CUSTOMER' | 'SUPPLIER';
+  customerId: string | null;
+  supplierId: string | null;
+  partyNameEn: string | null;
+  partyNameAr: string | null;
+  method: string;
+  amountMinor: number;
+  currency: string;
+  reference: string | null;
+  notes: string | null;
+  paidAt: string;
+  journalEntryId: string | null;
+  allocations: PaymentAllocationDto[];
+}
+
+export interface WarehouseDto {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  branchId: string | null;
+  branchNameEn: string | null;
+  branchNameAr: string | null;
+  addressLine: string | null;
+  inventoryAccountId: string | null;
+  isActive: boolean;
+}
+
+export interface ProductDto {
+  id: string;
+  sku: string;
+  nameEn: string;
+  nameAr: string;
+  type: 'PRODUCT' | 'SERVICE';
+  unit: string;
+  barcode: string | null;
+  salesPriceMinor: number;
+  costPriceMinor: number;
+  taxRateBp: number;
+  reorderLevel: number;
+  reorderQuantity: number;
+  trackStock: boolean;
+  salesAccountId: string | null;
+  inventoryAccountId: string | null;
+  cogsAccountId: string | null;
+  isActive: boolean;
+}
+
+export interface StockMovementDto {
+  id: string;
+  movementType: string;
+  quantity: number;
+  quantityText: string;
+  unitCostMinor: number;
+  totalCostMinor: number;
+  balanceAfter: number;
+  source: string;
+  sourceId: string | null;
+  memo: string | null;
+  occurredAt: string;
+  sku: string;
+  productNameEn: string;
+  productNameAr: string;
+  warehouseCode: string;
+  warehouseNameEn: string;
+  warehouseNameAr: string;
+}
+
+export interface StockTransferDto {
+  id: string;
+  transferNumber: string;
+  fromWarehouseId: string;
+  toWarehouseId: string;
+  status: 'DRAFT' | 'POSTED' | 'CANCELLED';
+  notes: string | null;
+  postedAt: string | null;
+  createdAt: string;
+  lines: Array<{ id: string; productId: string; quantity: number; quantityText: string }>;
+}
+
+export interface StockAdjustmentDto {
+  id: string;
+  adjustmentNumber: string;
+  warehouseId: string;
+  reason: string;
+  status: 'DRAFT' | 'POSTED' | 'CANCELLED';
+  postedAt: string | null;
+  createdAt: string;
+  lines: Array<{
+    id: string;
+    productId: string;
+    quantityDelta: number;
+    quantityDeltaText: string;
+    unitCostMinor: number;
+  }>;
+}
+
+export interface ValuationRowDto {
+  warehouseId: string;
+  warehouseCode: string;
+  productId: string;
+  sku: string;
+  nameEn: string;
+  nameAr: string;
+  quantity: number;
+  averageCostMinor: number;
+  valueMinor: number;
+  reorderLevel?: number;
+}
+
+export interface ReorderAlertDto {
+  productId: string;
+  sku: string;
+  nameEn: string;
+  nameAr: string;
+  onHand: number;
+  reorderLevel: number;
+  reorderQuantity: number;
+  belowReorderLevel: boolean;
+}
+
+export interface CustomerDto {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  email: string | null;
+  phone: string | null;
+  taxNumber: string | null;
+  addressLine: string | null;
+  city: string | null;
+  countryCode: string | null;
+  creditLimitMinor: number;
+  paymentTermsDays: number;
+  currency: string;
+  isActive: boolean;
+  notes: string | null;
+}
+
+export interface SupplierDto {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  email: string | null;
+  phone: string | null;
+  taxNumber: string | null;
+  addressLine: string | null;
+  city: string | null;
+  countryCode: string | null;
+  paymentTermsDays: number;
+  currency: string;
+  isActive: boolean;
+  notes: string | null;
+}
+
+/** Shared shape for quotations, orders, invoices and credit notes. */
+export interface SalesDocumentDto {
+  id: string;
+  quoteNumber?: string;
+  orderNumber?: string;
+  invoiceNumber?: string;
+  creditNoteNumber?: string;
+  customerId: string;
+  customerNameEn: string;
+  customerNameAr: string;
+  status: string;
+  issueDate?: string;
+  orderDate?: string;
+  invoiceDate?: string;
+  dueDate?: string | null;
+  validUntil?: string | null;
+  subtotalMinor: number;
+  discountMinor: number;
+  taxMinor: number;
+  totalMinor: number;
+  amountPaidMinor?: number;
+  outstandingMinor?: number;
+  currency: string;
+  notes: string | null;
+  journalEntryId?: string | null;
+  convertedOrderId?: string | null;
+  orderId?: string | null;
+  lines: Array<Record<string, unknown>>;
+}
+
+export interface CashierSessionDto {
+  id: string;
+  sessionNumber: string;
+  branchId: string;
+  branchNameEn: string;
+  branchNameAr: string;
+  warehouseId: string | null;
+  status: 'OPEN' | 'CLOSED';
+  openingFloatMinor: number;
+  expectedCashMinor: number;
+  countedCashMinor: number | null;
+  varianceMinor: number | null;
+  openedAt: string;
+  closedAt: string | null;
+  notes: string | null;
+  saleCount?: number;
+}
+
+export interface PosSaleDto {
+  id: string;
+  receiptNumber: string;
+  status: string;
+  subtotalMinor: number;
+  discountMinor: number;
+  taxMinor: number;
+  totalMinor: number;
+  paidMinor: number;
+  changeMinor: number;
+  paymentMethod: string;
+  currency: string;
+  createdAt: string;
+  lines: Array<Record<string, unknown>>;
+}
+
+export interface RequisitionDto {
+  id: string;
+  requisitionNumber: string;
+  status: string;
+  requestedById: string;
+  neededBy: string | null;
+  supplierId: string | null;
+  supplierNameEn: string | null;
+  supplierNameAr: string | null;
+  notes: string | null;
+  convertedOrderId: string | null;
+  createdAt: string;
+  lines: Array<Record<string, unknown>>;
+}
+
+/** Shared shape for purchase orders, receipts, invoices and returns. */
+export interface PurchaseDocumentDto {
+  id: string;
+  orderNumber?: string;
+  receiptNumber?: string;
+  invoiceNumber?: string;
+  returnNumber?: string;
+  supplierInvoiceNumber?: string;
+  supplierId: string;
+  supplierNameEn?: string;
+  supplierNameAr?: string;
+  purchaseOrderId?: string | null;
+  warehouseId?: string;
+  status: string;
+  orderDate?: string;
+  expectedDate?: string | null;
+  receivedAt?: string;
+  invoiceDate?: string;
+  returnDate?: string;
+  dueDate?: string | null;
+  subtotalMinor: number;
+  taxMinor: number;
+  totalMinor: number;
+  amountPaidMinor?: number;
+  outstandingMinor?: number;
+  currency: string;
+  notes?: string | null;
+  reason?: string | null;
+  journalEntryId?: string | null;
+  lines: Array<Record<string, unknown>>;
+}
+
+export interface AccountingReportDto {
+  from: string | null;
+  to: string | null;
+  journalCount: number;
+  totalDebitMinor: number;
+  totalCreditMinor: number;
+  balanced: boolean;
+  bySourceType: Array<{ sourceType: string; count: number; debitMinor: number; creditMinor: number }>;
+}
+
+export interface SalesReportDto {
+  from: string | null;
+  to: string | null;
+  invoiceCount: number;
+  totalSalesMinor: number;
+  totalTaxMinor: number;
+  totalPaidMinor: number;
+  totalOutstandingMinor: number;
+  posSaleCount: number;
+  posTotalMinor: number;
+  byCustomer: Array<{
+    customerId: string;
+    nameEn: string;
+    nameAr: string;
+    invoiceCount: number;
+    totalMinor: number;
+    paidMinor: number;
+    outstandingMinor: number;
+  }>;
+  byBranch: Array<{
+    branchId: string | null;
+    nameEn: string;
+    nameAr: string;
+    invoiceCount: number;
+    totalMinor: number;
+    taxMinor: number;
+  }>;
+}
+
+export interface PurchasingReportDto {
+  from: string | null;
+  to: string | null;
+  orderCount: number;
+  totalOrderedMinor: number;
+  invoiceCount: number;
+  totalInvoicedMinor: number;
+  totalPaidMinor: number;
+  totalOutstandingMinor: number;
+  bySupplier: Array<{
+    supplierId: string;
+    nameEn: string;
+    nameAr: string;
+    orderedMinor: number;
+    invoicedMinor: number;
+    paidMinor: number;
+    outstandingMinor: number;
+  }>;
+}
+
+export interface InventoryReportDto {
+  from: string | null;
+  to: string | null;
+  totalValueMinor: number;
+  totalQuantity: number;
+  valuation: ValuationRowDto[];
+  movementTotals: Array<{
+    productId: string;
+    sku: string;
+    nameEn: string;
+    nameAr: string;
+    quantityIn: number;
+    quantityOut: number;
+    netQuantity: number;
+  }>;
+  reorderAlerts: Array<{ sku: string; nameEn: string; nameAr: string; onHand: number; reorderLevel: number }>;
+}

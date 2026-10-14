@@ -303,13 +303,24 @@ test.describe('dashboard integrity', () => {
     }
   });
 
-  test('planned modules render an explicit not-implemented state', async ({ page }) => {
+  test('implemented ERP modules render their working interface', async ({ page }) => {
     await signIn(page);
     await setLocale(page, 'en');
+    // Accounting, sales, purchasing and inventory shipped in Execution 02.
     await page.goto('/accounting');
-    await expect(page.getByTestId('planned-financial_accounting')).toBeVisible();
+    await expect(page.getByTestId('accounting-page')).toBeVisible();
+    await page.goto('/sales');
+    await expect(page.getByTestId('sales-page')).toBeVisible();
+    await page.goto('/purchasing');
+    await expect(page.getByTestId('purchasing-page')).toBeVisible();
+    await page.goto('/inventory');
+    await expect(page.getByTestId('inventory-page')).toBeVisible();
+    await page.goto('/reports');
+    await expect(page.getByTestId('reports-page')).toBeVisible();
+    // Modules still owned by a later execution keep the explicit placeholder.
+    await page.goto('/hr');
+    await expect(page.getByTestId('planned-human_resources')).toBeVisible();
     await expect(page.getByTestId('planned-notice')).toBeVisible();
-    await expect(page.getByTestId('planned-notice')).toContainText(/Execution 01/i);
   });
 });
 

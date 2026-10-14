@@ -297,12 +297,31 @@ test.describe('required screenshots', () => {
     await page.screenshot({ path: `${OUT}/login-light.png` });
   });
 
+  test('execution 02 ERP modules', async ({ page }) => {
+    await signIn(page);
+    await setLocale(page, 'en');
+    await setTheme(page, 'dark');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    for (const [route, name] of [
+      ['/accounting', 'erp-accounting-dark'],
+      ['/inventory', 'erp-inventory-dark'],
+      ['/sales', 'erp-sales-dark'],
+      ['/purchasing', 'erp-purchasing-dark'],
+      ['/reports', 'erp-reports-dark'],
+    ] as const) {
+      await page.goto(route);
+      await page.waitForTimeout(700);
+      await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
+    }
+  });
+
   test('planned module state', async ({ page }) => {
     await signIn(page);
     await setLocale(page, 'en');
     await setTheme(page, 'dark');
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto('/accounting');
+    // A module still owned by a later execution keeps the explicit placeholder.
+    await page.goto('/hr');
     await page.waitForTimeout(700);
     await page.screenshot({ path: `${OUT}/planned-module-dark.png`, fullPage: true });
   });

@@ -16,6 +16,12 @@ import { AuditControllerModule } from './audit/audit.module';
 import { CmsModule } from './cms/cms.module';
 import { SupportModule } from './support/support.module';
 import { HealthModule } from './health/health.module';
+import { ErpCommonModule } from './common/erp-common.module';
+import { AccountingModule } from './accounting/accounting.module';
+import { InventoryModule } from './inventory/inventory.module';
+import { SalesModule } from './sales/sales.module';
+import { PurchasingModule } from './purchasing/purchasing.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -40,6 +46,12 @@ import { HealthModule } from './health/health.module';
     CmsModule,
     SupportModule,
     HealthModule,
+    ErpCommonModule,
+    AccountingModule,
+    InventoryModule,
+    SalesModule,
+    PurchasingModule,
+    ReportsModule,
   ],
   providers: [
     // Global rate limiting; sensitive auth routes override with @Throttle.

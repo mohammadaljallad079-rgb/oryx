@@ -39,11 +39,16 @@ export function SectionHeader({
 export function Badge({
   tone = 'neutral',
   children,
+  ...rest
 }: {
   tone?: 'neutral' | 'gold' | 'success' | 'warning' | 'danger' | 'info';
   children: ReactNode;
-}) {
-  return <span className={`oryx-badge oryx-badge--${tone}`}>{children}</span>;
+} & React.HTMLAttributes<HTMLSpanElement>) {
+  return (
+    <span className={`oryx-badge oryx-badge--${tone}`} {...rest}>
+      {children}
+    </span>
+  );
 }
 
 export function Button({

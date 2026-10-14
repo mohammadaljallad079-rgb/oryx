@@ -3,12 +3,14 @@
 Read **docs/ORYX_MASTER_REFERENCE.md**, **docs/architecture/ARCHITECTURE.md** and
 **docs/architecture/PERMISSION_MATRIX.md** before writing code.
 
-## Current state (Execution 01 + 01.1 complete)
+## Current state (Execution 01, 01.1 and 02 complete)
 
-Execution 01 delivered the working Super Admin foundation, and Execution 01.1
-hardened it: secure session transport, TOTP MFA, approved photography and
-mobile layout fixes. It is **not** a mock: a NestJS API, a Next.js admin app and
-a PostgreSQL database run locally and are covered by 181 automated tests.
+Execution 01 delivered the working Super Admin foundation, Execution 01.1
+hardened it (secure session transport, TOTP MFA, approved photography and
+mobile layout fixes), and Execution 02 added the enterprise ERP core. It is
+**not** a mock: a NestJS API, a Next.js admin app and a PostgreSQL database run
+locally and are covered by 238 automated tests (30 shared unit, 109 API
+integration, 99 browser).
 
 Security baseline (do not regress):
 - The refresh token lives in an HttpOnly cookie scoped to `/api/v1/auth`. It is
@@ -26,10 +28,18 @@ Security baseline (do not regress):
   and snapshot entitlements, company/branch/user/role/invitation management,
   DB-backed dashboard, website/application CMS, audit trail, support sessions,
   dark/light themes, Arabic RTL and English LTR.
-- **Scaffolded only:** every ERP operational module (accounting, sales,
-  purchasing, inventory, HR, CRM, operations, automotive). Routes exist and are
-  permission-protected, but the screens state plainly that the workflow is
-  unimplemented and show no fabricated data.
+- **Execution 02 (implemented and tested):** financial accounting (chart of
+  accounts, fiscal years/periods, balanced double-entry journals, general
+  ledger, trial balance, AR/AP aging, payments, reversals, period locking,
+  statements), sales/POS (customers, quotations, orders, invoices, credit notes,
+  cashier sessions, POS sales), procurement (suppliers, requisitions, purchase
+  orders, goods receipts, supplier invoices, returns), inventory (warehouses,
+  SKUs, moving-average stock ledger, transfers, adjustments, reorder alerts,
+  valuation) and permission-aware reports.
+- **Scaffolded only:** the ERP modules owned by later executions (HR, CRM,
+  operations, automotive). Routes exist and are permission-protected, but the
+  screens state plainly that the workflow is unimplemented and show no
+  fabricated data.
 - **Missing assets:** the official ORYX logo and the approved dashboard
   photography are not in the repository. The UI uses a neutral monogram
   placeholder and generated vector tile art. Do not invent brand marks.
@@ -105,6 +115,41 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   completion signal, not for the trigger.
 - **A company with no subscription has zero capacity.** Assign a plan before
   testing branch or user creation against a freshly provisioned tenant.
+- **Raise `REFRESH_THROTTLE_LIMIT` too when running UI tests.** Setting only
+  `AUTH_THROTTLE_LIMIT` is not enough: the suites rotate sessions heavily and the
+  refresh endpoint's default ceiling (120/min) will return 429, silently dropping
+  sessions and failing late tests with a login 403. Use
+  `AUTH_THROTTLE_LIMIT=100000 THROTTLE_LIMIT=1000000 REFRESH_THROTTLE_LIMIT=100000`.
+- **Rebuild the API before running UI tests after an API change.** `next start`
+  and the Node API serve compiled output; a stale `dist/main.js` will fail tests
+  with request-validation errors that the source no longer produces.
+
+### ERP core (Execution 02) gotchas
+
+- **Money is integer minor units, never a float.** Use `packages/shared/src/money.ts`
+  (`toMinor`, `lineAmountMinor`, `basisPointsOfMinor`, `allocateMinor`). Percentages
+  in the data model are **basis points** (1500 = 15%); `percentOfMinor`'s scale
+  argument is easy to get wrong, so prefer `basisPointsOfMinor`.
+- **Every posting goes through `AccountingPostingService.postJournal`.** It asserts
+  balance, resolves the open period, allocates the entry number and updates
+  account balances in one transaction. Never write journal rows directly.
+- **Reversed entries stay in the ledger.** A reversal is a new POSTED entry that
+  mirrors the original; the original is only marked `REVERSED`. Queries that sum
+  the ledger must include `status: { not: 'DRAFT' }`, not `status: 'POSTED'`, or
+  the trial balance will not balance.
+- **Stock changes go through `InventoryService.recordMovement`.** It locks the
+  level row with `SELECT … FOR UPDATE`; do not update `StockLevel` directly.
+  `StockLevel.averageCostMinor` is stored scaled by 100 and converted with
+  `wholeAverageCost`.
+- **Transactions are READ COMMITTED with a bounded retry**, not SERIALIZABLE. The
+  inventory row lock provides the serialisation that matters; SERIALIZABLE aborts
+  unrelated concurrent work.
+- **Idempotency is a unique key.** `JournalEntry(companyId, sourceType, sourceId)`
+  makes a retried posting a no-op; do not remove it.
+- **The accounting service and the seed both define the standard chart.** Keep
+  `STANDARD_CHART` in `apps/api/src/accounting/accounting.service.ts` and in
+  `packages/database/prisma/seed.ts` in step, or a new system role will be
+  missing in one path.
 
 ### Adding a new ERP module
 

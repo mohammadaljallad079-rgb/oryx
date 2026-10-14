@@ -1,22 +1,49 @@
 import type {
+  AccountingReportDto,
+  AgingRowDto,
   AppVersionDto,
-  LoginResult,
   AuditLogDto,
+  BalanceSheetDto,
   BranchDto,
+  CashierSessionDto,
   CmsBannerDto,
   CmsPageDto,
   CompanyDto,
   ContextResponse,
+  CustomerDto,
   DashboardResponse,
+  ErpAccountDto,
   FeatureFlagDto,
+  FiscalYearDto,
+  IncomeStatementDto,
+  InventoryReportDto,
   InvitationDto,
+  JournalEntryDto,
+  LedgerAccountDto,
   LoginResponse,
+  LoginResult,
   ModuleDto,
   Paginated,
+  PaymentDto,
   PlanDto,
+  PosSaleDto,
+  ProductDto,
+  PurchaseDocumentDto,
+  PurchasingReportDto,
+  ReorderAlertDto,
+  RequisitionDto,
   RoleDto,
+  SalesDocumentDto,
+  SalesReportDto,
+  StockAdjustmentDto,
+  StockMovementDto,
+  StockTransferDto,
   SubscriptionDto,
+  SupplierDto,
+  TrialBalanceDto,
   UserDto,
+  ValuationRowDto,
+  WarehouseDto,
 } from '@oryx/shared';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api';
@@ -454,6 +481,170 @@ export const api = {
     request<Record<string, unknown>>('/support-sessions', { method: 'POST', body }),
   endSupportSession: (id: string) =>
     request<{ ok: boolean }>(`/support-sessions/${id}/end`, { method: 'POST' }),
+
+  // ------------------------------------------------------- accounting (E02)
+  accountingAccounts: (params: { companyId?: string; search?: string } = {}) =>
+    request<Paginated<ErpAccountDto>>(`/accounting/accounts?${toQuery(params)}`),
+  createAccount: (body: Record<string, unknown>) =>
+    request<ErpAccountDto>('/accounting/accounts', { method: 'POST', body }),
+  updateAccount: (id: string, body: Record<string, unknown>) =>
+    request<ErpAccountDto>(`/accounting/accounts/${id}`, { method: 'PATCH', body }),
+  seedStandardChart: () =>
+    request<{ created: number }>('/accounting/accounts/seed-standard-chart', { method: 'POST', body: {} }),
+  fiscalYears: (companyId?: string) =>
+    request<FiscalYearDto[]>(`/accounting/fiscal-years${companyId ? `?companyId=${companyId}` : ''}`),
+  createFiscalYear: (body: Record<string, unknown>) =>
+    request<{ id: string; code: string; periods: number }>('/accounting/fiscal-years', { method: 'POST', body }),
+  setPeriodStatus: (id: string, status: string) =>
+    request<{ id: string; status: string }>(`/accounting/fiscal-periods/${id}/status`, {
+      method: 'PATCH',
+      body: { status },
+    }),
+  journals: (params: { companyId?: string; status?: string; search?: string; page?: number; pageSize?: number } = {}) =>
+    request<Paginated<JournalEntryDto>>(`/accounting/journals?${toQuery(params)}`),
+  createJournal: (body: Record<string, unknown>) =>
+    request<{ id: string; entryNumber: string }>('/accounting/journals', { method: 'POST', body }),
+  reverseJournal: (id: string, reason?: string) =>
+    request<{ entryNumber: string }>(`/accounting/journals/${id}/reverse`, {
+      method: 'POST',
+      body: { reason },
+    }),
+  generalLedger: (params: { accountId?: string; from?: string; to?: string; companyId?: string } = {}) =>
+    request<{ accounts: LedgerAccountDto[] }>(`/accounting/general-ledger?${toQuery(params)}`),
+  trialBalance: (params: { from?: string; to?: string; companyId?: string } = {}) =>
+    request<TrialBalanceDto>(`/accounting/trial-balance?${toQuery(params)}`),
+  incomeStatement: (params: { from?: string; to?: string; companyId?: string } = {}) =>
+    request<IncomeStatementDto>(`/accounting/income-statement?${toQuery(params)}`),
+  balanceSheet: (params: { asOf?: string; companyId?: string } = {}) =>
+    request<BalanceSheetDto>(`/accounting/balance-sheet?${toQuery(params)}`),
+  receivablesAging: (companyId?: string) =>
+    request<AgingRowDto[]>(`/accounting/receivables-aging${companyId ? `?companyId=${companyId}` : ''}`),
+  payablesAging: (companyId?: string) =>
+    request<AgingRowDto[]>(`/accounting/payables-aging${companyId ? `?companyId=${companyId}` : ''}`),
+  payments: (params: { companyId?: string; page?: number } = {}) =>
+    request<Paginated<PaymentDto>>(`/accounting/payments?${toQuery(params)}`),
+  recordPayment: (body: Record<string, unknown>) =>
+    request<PaymentDto>('/accounting/payments', { method: 'POST', body }),
+
+  // -------------------------------------------------------- inventory (E02)
+  warehouses: (params: { companyId?: string } = {}) =>
+    request<Paginated<WarehouseDto>>(`/inventory/warehouses?${toQuery(params)}`),
+  createWarehouse: (body: Record<string, unknown>) =>
+    request<WarehouseDto>('/inventory/warehouses', { method: 'POST', body }),
+  updateWarehouse: (id: string, body: Record<string, unknown>) =>
+    request<WarehouseDto>(`/inventory/warehouses/${id}`, { method: 'PATCH', body }),
+  products: (params: { companyId?: string; search?: string } = {}) =>
+    request<Paginated<ProductDto>>(`/inventory/products?${toQuery(params)}`),
+  createProduct: (body: Record<string, unknown>) =>
+    request<ProductDto>('/inventory/products', { method: 'POST', body }),
+  updateProduct: (id: string, body: Record<string, unknown>) =>
+    request<ProductDto>(`/inventory/products/${id}`, { method: 'PATCH', body }),
+  stockMovements: (params: { companyId?: string; page?: number } = {}) =>
+    request<Paginated<StockMovementDto>>(`/inventory/movements?${toQuery(params)}`),
+  recordStockMovement: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/inventory/movements', { method: 'POST', body }),
+  stockTransfers: (params: { companyId?: string } = {}) =>
+    request<Paginated<StockTransferDto>>(`/inventory/transfers?${toQuery(params)}`),
+  createStockTransfer: (body: Record<string, unknown>) =>
+    request<StockTransferDto>('/inventory/transfers', { method: 'POST', body }),
+  postStockTransfer: (id: string) =>
+    request<StockTransferDto>(`/inventory/transfers/${id}/post`, { method: 'POST', body: {} }),
+  stockAdjustments: (params: { companyId?: string } = {}) =>
+    request<Paginated<StockAdjustmentDto>>(`/inventory/adjustments?${toQuery(params)}`),
+  createStockAdjustment: (body: Record<string, unknown>) =>
+    request<StockAdjustmentDto>('/inventory/adjustments', { method: 'POST', body }),
+  postStockAdjustment: (id: string) =>
+    request<StockAdjustmentDto>(`/inventory/adjustments/${id}/post`, { method: 'POST', body: {} }),
+  inventoryValuation: (companyId?: string) =>
+    request<{ rows: ValuationRowDto[]; totalValueMinor: number; totalQuantity: number }>(
+      `/inventory/valuation${companyId ? `?companyId=${companyId}` : ''}`,
+    ),
+  reorderAlerts: (companyId?: string) =>
+    request<{ items: ReorderAlertDto[] }>(`/inventory/reorder-alerts${companyId ? `?companyId=${companyId}` : ''}`),
+
+  // ------------------------------------------------------------ sales (E02)
+  salesCustomers: (params: { companyId?: string; search?: string } = {}) =>
+    request<Paginated<CustomerDto>>(`/sales/customers?${toQuery(params)}`),
+  createCustomer: (body: Record<string, unknown>) =>
+    request<CustomerDto>('/sales/customers', { method: 'POST', body }),
+  updateCustomer: (id: string, body: Record<string, unknown>) =>
+    request<CustomerDto>(`/sales/customers/${id}`, { method: 'POST', body }),
+  quotations: (params: { companyId?: string; status?: string } = {}) =>
+    request<Paginated<SalesDocumentDto>>(`/sales/quotations?${toQuery(params)}`),
+  createQuotation: (body: Record<string, unknown>) =>
+    request<SalesDocumentDto>('/sales/quotations', { method: 'POST', body }),
+  convertQuotation: (id: string, warehouseId?: string) =>
+    request<SalesDocumentDto>(`/sales/quotations/${id}/convert`, { method: 'POST', body: { warehouseId } }),
+  salesOrders: (params: { companyId?: string; status?: string } = {}) =>
+    request<Paginated<SalesDocumentDto>>(`/sales/orders?${toQuery(params)}`),
+  createSalesOrder: (body: Record<string, unknown>) =>
+    request<SalesDocumentDto>('/sales/orders', { method: 'POST', body }),
+  salesInvoices: (params: { companyId?: string; status?: string; page?: number } = {}) =>
+    request<Paginated<SalesDocumentDto>>(`/sales/invoices?${toQuery(params)}`),
+  getSalesInvoice: (id: string) => request<SalesDocumentDto>(`/sales/invoices/${id}`),
+  createSalesInvoice: (body: Record<string, unknown>) =>
+    request<SalesDocumentDto>('/sales/invoices', { method: 'POST', body }),
+  creditNotes: (params: { companyId?: string } = {}) =>
+    request<Paginated<SalesDocumentDto>>(`/sales/credit-notes?${toQuery(params)}`),
+  createCreditNote: (body: Record<string, unknown>) =>
+    request<SalesDocumentDto>('/sales/credit-notes', { method: 'POST', body }),
+  cashierSessions: (params: { companyId?: string } = {}) =>
+    request<Paginated<CashierSessionDto>>(`/sales/cashier-sessions?${toQuery(params)}`),
+  openCashierSession: (body: Record<string, unknown>) =>
+    request<CashierSessionDto>('/sales/cashier-sessions', { method: 'POST', body }),
+  closeCashierSession: (id: string, countedCashMinor: number, notes?: string) =>
+    request<CashierSessionDto>(`/sales/cashier-sessions/${id}/close`, {
+      method: 'POST',
+      body: { countedCashMinor, notes },
+    }),
+  posSales: (params: { companyId?: string; page?: number } = {}) =>
+    request<Paginated<PosSaleDto>>(`/sales/pos-sales?${toQuery(params)}`),
+  createPosSale: (body: Record<string, unknown>) =>
+    request<PosSaleDto>('/sales/pos-sales', { method: 'POST', body }),
+
+  // ------------------------------------------------------- purchasing (E02)
+  suppliers: (params: { companyId?: string; search?: string } = {}) =>
+    request<Paginated<SupplierDto>>(`/purchasing/suppliers?${toQuery(params)}`),
+  createSupplier: (body: Record<string, unknown>) =>
+    request<SupplierDto>('/purchasing/suppliers', { method: 'POST', body }),
+  updateSupplier: (id: string, body: Record<string, unknown>) =>
+    request<SupplierDto>(`/purchasing/suppliers/${id}`, { method: 'POST', body }),
+  requisitions: (params: { companyId?: string; status?: string } = {}) =>
+    request<Paginated<RequisitionDto>>(`/purchasing/requisitions?${toQuery(params)}`),
+  createRequisition: (body: Record<string, unknown>) =>
+    request<RequisitionDto>('/purchasing/requisitions', { method: 'POST', body }),
+  approveRequisition: (id: string) =>
+    request<RequisitionDto>(`/purchasing/requisitions/${id}/approve`, { method: 'POST', body: {} }),
+  convertRequisition: (id: string, supplierId: string) =>
+    request<PurchaseDocumentDto>(`/purchasing/requisitions/${id}/convert`, { method: 'POST', body: { supplierId } }),
+  purchaseOrders: (params: { companyId?: string; status?: string } = {}) =>
+    request<Paginated<PurchaseDocumentDto>>(`/purchasing/orders?${toQuery(params)}`),
+  createPurchaseOrder: (body: Record<string, unknown>) =>
+    request<PurchaseDocumentDto>('/purchasing/orders', { method: 'POST', body }),
+  approvePurchaseOrder: (id: string) =>
+    request<PurchaseDocumentDto>(`/purchasing/orders/${id}/approve`, { method: 'POST', body: {} }),
+  goodsReceipts: (params: { companyId?: string } = {}) =>
+    request<Paginated<PurchaseDocumentDto>>(`/purchasing/receipts?${toQuery(params)}`),
+  createGoodsReceipt: (body: Record<string, unknown>) =>
+    request<PurchaseDocumentDto>('/purchasing/receipts', { method: 'POST', body }),
+  supplierInvoices: (params: { companyId?: string; status?: string } = {}) =>
+    request<Paginated<PurchaseDocumentDto>>(`/purchasing/supplier-invoices?${toQuery(params)}`),
+  createSupplierInvoice: (body: Record<string, unknown>) =>
+    request<PurchaseDocumentDto>('/purchasing/supplier-invoices', { method: 'POST', body }),
+  purchaseReturns: (params: { companyId?: string } = {}) =>
+    request<Paginated<PurchaseDocumentDto>>(`/purchasing/returns?${toQuery(params)}`),
+  createPurchaseReturn: (body: Record<string, unknown>) =>
+    request<PurchaseDocumentDto>('/purchasing/returns', { method: 'POST', body }),
+
+  // ---------------------------------------------------------- reports (E02)
+  reportAccounting: (params: Record<string, unknown> = {}) =>
+    request<AccountingReportDto>(`/reports/accounting?${toQuery(params)}`),
+  reportSales: (params: Record<string, unknown> = {}) =>
+    request<SalesReportDto>(`/reports/sales?${toQuery(params)}`),
+  reportPurchasing: (params: Record<string, unknown> = {}) =>
+    request<PurchasingReportDto>(`/reports/purchasing?${toQuery(params)}`),
+  reportInventory: (params: Record<string, unknown> = {}) =>
+    request<InventoryReportDto>(`/reports/inventory?${toQuery(params)}`),
 };
 
 function toQuery(params: Record<string, unknown>): string {

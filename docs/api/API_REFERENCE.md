@@ -1,4 +1,4 @@
-# ORYX Platform API — Execution 01
+# ORYX Platform API — Execution 01 & 02
 
 Base URL: `http://localhost:3001/api` · All routes are versioned under `/api/v1`.
 Interactive documentation (generated from the NestJS controllers):
@@ -180,6 +180,100 @@ SHA-256 hash. The public content route never exposes draft pages.
 | `resource.not_found` | 404 | Missing record |
 | `resource.conflict` | 409 | Duplicate record |
 | `request.validation_failed` | 400 | Input validation |
+| `accounting.period_not_open` | 403 | Posting into a closed/locked period |
+| `accounting.unbalanced_entry` | 400 | Debits do not equal credits |
+| `accounting.account_not_postable` | 400 | Account cannot receive postings |
+| `inventory.insufficient_stock` | 403 | Issue exceeds on-hand stock |
+| `pos.session_already_open` | 409 | Branch already has an open session |
+| `pos.session_closed` | 400 | Operation on a closed cashier session |
+| `sales.credit_limit_exceeded` | 403 | Customer credit limit exceeded |
+| `erp.over_allocation` | 400 | Allocation exceeds the outstanding balance |
+| `erp.document_already_posted` | 400 | Document cannot be posted twice |
+
+## ERP core (Execution 02)
+
+All routes below require the module to be licensed and the caller to hold the
+listed permission. `x-oryx-company-id` selects the company context; a company
+principal is always pinned to its own company.
+
+### Accounting — `/v1/accounting`
+
+| Method | Route | Permission |
+| --- | --- | --- |
+| GET | `/accounts` | `erp.accounting.read` / `erp.accounting.coa.manage` |
+| POST | `/accounts` | `erp.accounting.coa.manage` |
+| PATCH | `/accounts/:id` | `erp.accounting.coa.manage` |
+| POST | `/accounts/seed-standard-chart` | `erp.accounting.coa.manage` |
+| GET | `/fiscal-years` | `erp.accounting.read` / `erp.accounting.fiscal.manage` |
+| POST | `/fiscal-years` | `erp.accounting.fiscal.manage` |
+| PATCH | `/fiscal-periods/:id/status` | `erp.accounting.fiscal.manage` |
+| GET | `/journals` | `erp.accounting.read` / `erp.accounting.journal.post` |
+| POST | `/journals` | `erp.accounting.journal.post` |
+| POST | `/journals/:id/reverse` | `erp.accounting.journal.reverse` |
+| GET | `/general-ledger` | `erp.accounting.read` / `erp.accounting.statement.read` |
+| GET | `/trial-balance` | `erp.accounting.read` / `erp.accounting.statement.read` |
+| GET | `/income-statement` | `erp.accounting.read` / `erp.accounting.statement.read` |
+| GET | `/balance-sheet` | `erp.accounting.read` / `erp.accounting.statement.read` |
+| GET | `/receivables-aging` | `erp.accounting.read` / `erp.accounting.statement.read` |
+| GET | `/payables-aging` | `erp.accounting.read` / `erp.accounting.statement.read` |
+| GET | `/payments` | `erp.accounting.read` / `erp.accounting.payment.manage` |
+| POST | `/payments` | `erp.accounting.payment.manage` |
+
+### Inventory — `/v1/inventory`
+
+| Method | Route | Permission |
+| --- | --- | --- |
+| GET/POST | `/warehouses` | `erp.inventory.read` / `erp.inventory.warehouse.manage` |
+| PATCH | `/warehouses/:id` | `erp.inventory.warehouse.manage` |
+| GET/POST | `/products` | `erp.inventory.read` / `erp.inventory.item.manage` |
+| PATCH | `/products/:id` | `erp.inventory.item.manage` |
+| GET/POST | `/movements` | `erp.inventory.read` / `erp.inventory.movement.manage` |
+| GET/POST | `/transfers` | `erp.inventory.read` / `erp.inventory.transfer.manage` |
+| POST | `/transfers/:id/post` | `erp.inventory.transfer.manage` |
+| GET/POST | `/adjustments` | `erp.inventory.read` / `erp.inventory.adjustment.manage` |
+| POST | `/adjustments/:id/post` | `erp.inventory.adjustment.manage` |
+| GET | `/valuation` | `erp.inventory.read` / `erp.inventory.valuation.read` |
+| GET | `/reorder-alerts` | `erp.inventory.read` / `erp.inventory.valuation.read` |
+
+### Sales — `/v1/sales`
+
+| Method | Route | Permission |
+| --- | --- | --- |
+| GET/POST | `/customers` | `erp.sales.read` / `erp.sales.customer.manage` |
+| POST | `/customers/:id` | `erp.sales.customer.manage` |
+| GET/POST | `/quotations` | `erp.sales.read` / `erp.sales.order.manage` |
+| POST | `/quotations/:id/convert` | `erp.sales.order.manage` |
+| GET/POST | `/orders` | `erp.sales.read` / `erp.sales.order.manage` |
+| GET/POST | `/invoices` | `erp.sales.read` / `erp.sales.invoice.manage` |
+| GET | `/invoices/:id` | `erp.sales.read` / `erp.sales.invoice.manage` |
+| GET/POST | `/credit-notes` | `erp.sales.read` / `erp.sales.credit_note.manage` |
+| GET/POST | `/cashier-sessions` | `erp.sales.pos.operate` / `erp.sales.pos.manage` |
+| POST | `/cashier-sessions/:id/close` | `erp.sales.pos.manage` |
+| GET/POST | `/pos-sales` | `erp.sales.pos.operate` / `erp.sales.pos.manage` |
+
+### Purchasing — `/v1/purchasing`
+
+| Method | Route | Permission |
+| --- | --- | --- |
+| GET/POST | `/suppliers` | `erp.purchasing.read` / `erp.purchasing.supplier.manage` |
+| POST | `/suppliers/:id` | `erp.purchasing.supplier.manage` |
+| GET/POST | `/requisitions` | `erp.purchasing.read` / `erp.purchasing.requisition.manage` |
+| POST | `/requisitions/:id/approve` | `erp.purchasing.requisition.manage` |
+| POST | `/requisitions/:id/convert` | `erp.purchasing.order.manage` |
+| GET/POST | `/orders` | `erp.purchasing.read` / `erp.purchasing.order.manage` |
+| POST | `/orders/:id/approve` | `erp.purchasing.order.manage` |
+| GET/POST | `/receipts` | `erp.purchasing.read` / `erp.purchasing.receipt.manage` |
+| GET/POST | `/supplier-invoices` | `erp.purchasing.read` / `erp.purchasing.invoice.manage` |
+| GET/POST | `/returns` | `erp.purchasing.read` / `erp.purchasing.return.manage` |
+
+### Reports — `/v1/reports`
+
+| Method | Route | Permission |
+| --- | --- | --- |
+| GET | `/accounting` | `erp.reports.read` / `erp.reports.accounting.read` |
+| GET | `/sales` | `erp.reports.read` / `erp.reports.sales.read` |
+| GET | `/purchasing` | `erp.reports.read` / `erp.reports.purchasing.read` |
+| GET | `/inventory` | `erp.reports.read` / `erp.reports.inventory.read` |
 
 ## Rate limits
 

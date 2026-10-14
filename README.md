@@ -10,10 +10,22 @@ catalog, a configurable ERP module catalog, configurable SaaS plans with
 snapshot entitlements, and a functional DB-backed dashboard in the approved
 navy/gold design with dark and light themes and Arabic RTL / English LTR.
 
+**Execution 02 adds the enterprise ERP core, also implemented and tested:**
+financial accounting (chart of accounts, fiscal years and periods, balanced
+double-entry journals, general ledger, trial balance, AR/AP aging, receipts and
+payments, reversals and period locking, financial statements), sales and POS
+(customers, catalog, quotations, orders, invoices, customer payments, credit
+notes, cashier sessions, POS sales, accounting integration), procurement
+(suppliers, requisitions, purchase orders, goods receipts, supplier invoices,
+returns, payments), inventory (warehouses, SKUs, a moving-average stock ledger,
+transfers, adjustments, reorder alerts, valuation) and permission-aware reports
+for all four domains.
+
 ## Documentation
 
 | Document | Purpose |
 | --- | --- |
+| [Execution 02 report](docs/execution-reports/ORYX_EXECUTION_02_REPORT.md) | Enterprise ERP core: modules, migrations, endpoints, tests |
 | [Execution 01 report](docs/execution-reports/ORYX_EXECUTION_01_REPORT.md) | What was built, what was verified, what is missing |
 | [Local development runbook](docs/LOCAL_DEVELOPMENT.md) | Install, migrate, seed, run, test |
 | [Architecture](docs/architecture/ARCHITECTURE.md) | System design as built |
@@ -46,9 +58,9 @@ Seeded development accounts (change before any non-local use):
 ## Tests
 
 ```bash
-pnpm --filter @oryx/shared test    # 22 authorization invariants
-pnpm --filter @oryx/api test:e2e   # 45 API integration tests
-pnpm --filter @oryx/admin test:ui  # 29 Playwright acceptance + screenshot tests
+pnpm --filter @oryx/shared test    # 30 authorization + money invariants
+pnpm --filter @oryx/api test:e2e   # 109 API integration tests (79 E01 + 30 ERP)
+pnpm --filter @oryx/admin test:ui  # Playwright acceptance + ERP + screenshots
 ```
 
 ## Repository layout
@@ -67,12 +79,17 @@ docs/              architecture, api, execution reports, assets
   placeholder and no mark was invented.
 - Dashboard tile artwork is generated abstract vector art; the approved
   photography is not available.
-- ERP operational modules (accounting, sales, purchasing, inventory, HR, CRM,
-  operations, automotive) are routed and permission-protected but **not
-  implemented** — the screens say so and show no fabricated data.
+- ERP modules owned by later executions (HR, CRM, operations, automotive) are
+  routed and permission-protected but **not implemented** — the screens say so
+  and show no fabricated data. Accounting, sales/POS, purchasing, inventory and
+  reports are implemented and DB-backed (Execution 02).
+- Reports are operational summaries, not a full BI engine; there is no
+  custom-report builder.
+- Inventory uses moving-average valuation only; FIFO/LIFO are not offered.
 - No payment gateway and no email/SMS provider are integrated.
-- The consumer mobile application is not part of Execution 01.
+- The consumer mobile application is not part of Execution 01 or 02.
 - Nothing is deployed.
 
-See the [execution report](docs/execution-reports/ORYX_EXECUTION_01_REPORT.md)
+See the [Execution 02 report](docs/execution-reports/ORYX_EXECUTION_02_REPORT.md)
+and the [Execution 01 report](docs/execution-reports/ORYX_EXECUTION_01_REPORT.md)
 for the full breakdown.
