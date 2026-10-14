@@ -337,14 +337,27 @@ export class AuthService {
     if (record.revokedAt) {
       const age = Date.now() - record.revokedAt.getTime();
 
-      // Benign race: two tabs (or a retried request) presented the same token
-      // within the grace window. Answer with a fresh token from the same family
-      // instead of destroying the session. The presented token stays revoked,
-      // so a leaked copy is still useless once the window closes.
-      if (record.replacedBy && age <= this.rotationGraceMs()) {
-        const successor = await this.prisma.refreshToken.findUnique({
-          where: { id: record.replacedBy },
+      // A revocation older than the grace window is theft, not a race: the
+      // token was rotated long ago and is being replayed. Revoke the whole
+      // family so every descendant of this login stops working.
+      if (age > this.rotationGraceMs()) {
+        await this.revokeFamily(record.familyId);
+        await this.audit.record({
+          actorUserId: record.userId,
+          action: 'auth.refresh_reuse_detected',
+          targetType: 'USER',
+          targetId: record.userId,
+          summary: 'Revoked refresh token was replayed; the token family was invalidated.',
+          ipAddress: meta.ip ?? null,
         });
+        throw unauthorized(ERROR_CODES.AUTH_REFRESH_REVOKED, 'Refresh token is no longer valid.');
+      }
+
+      // Recent revocation. Only a *rotated* token (one with a successor) can be
+      // a benign concurrent refresh. A token revoked by logout, logout-all or
+      // family invalidation has no successor and must be refused here.
+      if (record.replacedBy) {
+        const successor = await this.prisma.refreshToken.findUnique({ where: { id: record.replacedBy } });
         if (successor && !successor.revokedAt && successor.expiresAt > new Date()) {
           await this.audit.record({
             actorUserId: record.userId,
@@ -354,25 +367,9 @@ export class AuthService {
             summary: 'Concurrent refresh handled within the rotation grace window.',
             ipAddress: meta.ip ?? null,
           });
-          // Issue a sibling token in the same family. The successor is left
-          // untouched so the other caller's cookie keeps working: both tabs end
-          // up with valid, independent sessions.
           return this.issueSibling(record.user, record.familyId, meta);
         }
       }
-
-      // Replay of a token that was rotated long ago, or of a token whose
-      // successor is gone: this is the compromise signal. Revoke the whole
-      // family so every descendant of this login stops working.
-      await this.revokeFamily(record.familyId);
-      await this.audit.record({
-        actorUserId: record.userId,
-        action: 'auth.refresh_reuse_detected',
-        targetType: 'USER',
-        targetId: record.userId,
-        summary: 'Revoked refresh token was replayed; the token family was invalidated.',
-        ipAddress: meta.ip ?? null,
-      });
       throw unauthorized(ERROR_CODES.AUTH_REFRESH_REVOKED, 'Refresh token is no longer valid.');
     }
 
@@ -398,38 +395,10 @@ export class AuthService {
       { secret: this.config.get<string>('JWT_REFRESH_SECRET'), expiresIn: this.refreshTtl() },
     );
 
-    const claimed = await this.prisma.refreshToken.updateMany({
-      where: { id: record.id, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
-
-    // Another caller won the race and already consumed this token. Answer with
-    // a sibling in the same family so both callers end up with a usable session.
-    //
-    // There is a narrow window where the winner has set `revokedAt` but has not
-    // yet written `replacedBy`, so a single read can miss the successor. Poll
-    // briefly for it; if it still does not appear, the revocation is recent
-    // enough that this is plainly a concurrent refresh rather than a replay, and
-    // a sibling is still the correct answer.
-    if (claimed.count === 0) {
-      for (let attempt = 0; attempt < 10; attempt += 1) {
-        const current = await this.prisma.refreshToken.findUnique({ where: { id: record.id } });
-        if (!current) break;
-        if (current.replacedBy) {
-          const successor = await this.prisma.refreshToken.findUnique({ where: { id: current.replacedBy } });
-          if (successor && !successor.revokedAt && successor.expiresAt > new Date()) {
-            return this.issueSibling(record.user, record.familyId, meta);
-          }
-        }
-        // A revocation older than the grace window is a replay, not a race.
-        if (current.revokedAt && Date.now() - current.revokedAt.getTime() > this.rotationGraceMs()) {
-          break;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 25));
-      }
-      throw unauthorized(ERROR_CODES.AUTH_REFRESH_REVOKED, 'Refresh token is no longer valid.');
-    }
-
+    // Create the successor first so the claim can set `revokedAt` and
+    // `replacedBy` in a single statement. Writing them together removes the
+    // window in which a concurrent caller would see a revoked token with no
+    // successor and wrongly conclude it had been replayed.
     const created = await this.prisma.refreshToken.create({
       data: {
         userId: record.userId,
@@ -441,10 +410,40 @@ export class AuthService {
       },
     });
 
-    await this.prisma.refreshToken.update({
-      where: { id: record.id },
-      data: { replacedBy: created.id },
+    const claimed = await this.prisma.refreshToken.updateMany({
+      where: { id: record.id, revokedAt: null },
+      data: { revokedAt: new Date(), replacedBy: created.id },
     });
+
+    // Another caller won the race. Because the claim is atomic, the winner has
+    // already written `replacedBy`, so a single read tells us whether this was a
+    // rotation (benign race) or a revocation by logout / family invalidation
+    // (which must be refused). Our own unused successor is discarded.
+    if (claimed.count === 0) {
+      await this.prisma.refreshToken.delete({ where: { id: created.id } }).catch(() => undefined);
+
+      const current = await this.prisma.refreshToken.findUnique({ where: { id: record.id } });
+      const successor = current?.replacedBy
+        ? await this.prisma.refreshToken.findUnique({ where: { id: current.replacedBy } })
+        : null;
+
+      // Only a token that was rotated has a live successor. A token revoked by
+      // logout, logout-all or family invalidation has none, and must be refused.
+      if (successor && !successor.revokedAt && successor.expiresAt > new Date()) {
+        await this.audit.record({
+          actorUserId: record.userId,
+          action: 'auth.refresh_concurrent_rotation',
+          targetType: 'USER',
+          targetId: record.userId,
+          summary: 'Concurrent refresh handled within the rotation grace window.',
+          ipAddress: meta.ip ?? null,
+        });
+        // A sibling token in the same family: the successor is left untouched,
+        // so the other caller's cookie keeps working.
+        return this.issueSibling(record.user, record.familyId, meta);
+      }
+      throw unauthorized(ERROR_CODES.AUTH_REFRESH_REVOKED, 'Refresh token is no longer valid.');
+    }
 
     const user = record.user;
     const memberships = await this.loadMemberships(user.id);
