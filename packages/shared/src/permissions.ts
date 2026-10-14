@@ -117,6 +117,47 @@ export const PERMISSIONS: PermissionDefinition[] = [
   P('erp.maintenance.write', 'ERP', 'Manage maintenance', 'إدارة الصيانة', 'COMPANY', true, 'Manage maintenance orders.', 'automotive_maintenance'),
   P('erp.spare_parts.read', 'ERP', 'View spare parts', 'عرض قطع الغيار', 'COMPANY', true, 'Read spare parts catalog.', 'spare_parts'),
   P('erp.spare_parts.write', 'ERP', 'Manage spare parts', 'إدارة قطع الغيار', 'COMPANY', true, 'Manage spare parts catalog and pricing.', 'spare_parts'),
+
+  // ------------------------------------------------- Execution 02 — Accounting
+  P('erp.accounting.coa.manage', 'ERP', 'Manage chart of accounts', 'إدارة دليل الحسابات', 'COMPANY', true, 'Create and edit accounts and the chart of accounts.', 'financial_accounting'),
+  P('erp.accounting.fiscal.manage', 'ERP', 'Manage fiscal years & periods', 'إدارة السنوات والفترات', 'COMPANY', true, 'Open, close and lock fiscal years and periods.', 'financial_accounting'),
+  P('erp.accounting.journal.post', 'ERP', 'Post journal entries', 'ترحيل القيود اليومية', 'COMPANY', true, 'Create and post balanced double-entry journals.', 'financial_accounting'),
+  P('erp.accounting.journal.reverse', 'ERP', 'Reverse journal entries', 'عكس القيود اليومية', 'COMPANY', true, 'Reverse a posted journal entry with a counter-entry.', 'financial_accounting'),
+  P('erp.accounting.payment.manage', 'ERP', 'Manage payments & receipts', 'إدارة المدفوعات والمقبوضات', 'COMPANY', true, 'Record payments and receipts against AR/AP.', 'financial_accounting'),
+  P('erp.accounting.statement.read', 'ERP', 'View financial statements', 'عرض القوائم المالية', 'COMPANY', true, 'Read the general ledger, trial balance and financial statements.', 'financial_accounting'),
+
+  // ------------------------------------------------------- Execution 02 — Sales
+  P('erp.sales.customer.manage', 'ERP', 'Manage customers', 'إدارة العملاء', 'COMPANY', true, 'Create and edit customer master data.', 'sales_pos'),
+  P('erp.sales.catalog.manage', 'ERP', 'Manage sales catalog', 'إدارة كتالوج البيع', 'COMPANY', true, 'Manage sellable products and services.', 'sales_pos'),
+  P('erp.sales.order.manage', 'ERP', 'Manage quotations & orders', 'إدارة العروض والأوامر', 'COMPANY', true, 'Create quotations and sales orders.', 'sales_pos'),
+  P('erp.sales.invoice.manage', 'ERP', 'Manage sales invoices', 'إدارة فواتير البيع', 'COMPANY', true, 'Issue sales invoices and post them to accounting.', 'sales_pos'),
+  P('erp.sales.payment.manage', 'ERP', 'Manage customer payments', 'إدارة مدفوعات العملاء', 'COMPANY', true, 'Record customer payments and allocations.', 'sales_pos'),
+  P('erp.sales.credit_note.manage', 'ERP', 'Manage credit notes & refunds', 'إدارة إشعارات الدائن', 'COMPANY', true, 'Issue credit notes and process refunds.', 'sales_pos'),
+  P('erp.sales.pos.operate', 'ERP', 'Operate POS', 'تشغيل نقاط البيع', 'COMPANY', true, 'Open cashier sessions and record POS sales.', 'sales_pos'),
+  P('erp.sales.pos.manage', 'ERP', 'Manage cashier sessions', 'إدارة جلسات الكاشير', 'COMPANY', true, 'Close, reconcile and review cashier sessions.', 'sales_pos'),
+
+  // -------------------------------------------------- Execution 02 — Purchasing
+  P('erp.purchasing.supplier.manage', 'ERP', 'Manage suppliers', 'إدارة الموردين', 'COMPANY', true, 'Create and edit supplier master data.', 'purchasing_procurement'),
+  P('erp.purchasing.requisition.manage', 'ERP', 'Manage purchase requisitions', 'إدارة طلبات الشراء', 'COMPANY', true, 'Raise and approve purchase requisitions.', 'purchasing_procurement'),
+  P('erp.purchasing.order.manage', 'ERP', 'Manage purchase orders', 'إدارة أوامر الشراء', 'COMPANY', true, 'Create and approve purchase orders.', 'purchasing_procurement'),
+  P('erp.purchasing.receipt.manage', 'ERP', 'Manage goods receipts', 'إدارة استلام البضائع', 'COMPANY', true, 'Receive goods against a purchase order.', 'purchasing_procurement'),
+  P('erp.purchasing.invoice.manage', 'ERP', 'Manage supplier invoices', 'إدارة فواتير الموردين', 'COMPANY', true, 'Record supplier invoices and post them to accounting.', 'purchasing_procurement'),
+  P('erp.purchasing.return.manage', 'ERP', 'Manage purchase returns', 'إدارة مرتجعات الشراء', 'COMPANY', true, 'Return goods to a supplier and reverse stock.', 'purchasing_procurement'),
+  P('erp.purchasing.payment.manage', 'ERP', 'Manage supplier payments', 'إدارة مدفوعات الموردين', 'COMPANY', true, 'Record payments to suppliers.', 'purchasing_procurement'),
+
+  // --------------------------------------------------- Execution 02 — Inventory
+  P('erp.inventory.warehouse.manage', 'ERP', 'Manage warehouses', 'إدارة المستودعات', 'COMPANY', true, 'Create and edit warehouses.', 'warehouses_inventory'),
+  P('erp.inventory.item.manage', 'ERP', 'Manage stock items', 'إدارة أصناف المخزون', 'COMPANY', true, 'Manage SKUs, units and reorder levels.', 'warehouses_inventory'),
+  P('erp.inventory.movement.manage', 'ERP', 'Record stock movements', 'تسجيل حركات المخزون', 'COMPANY', true, 'Record stock receipts and issues.', 'warehouses_inventory'),
+  P('erp.inventory.transfer.manage', 'ERP', 'Manage stock transfers', 'إدارة تحويلات المخزون', 'COMPANY', true, 'Transfer stock between warehouses.', 'warehouses_inventory'),
+  P('erp.inventory.adjustment.manage', 'ERP', 'Manage stock adjustments', 'إدارة تسويات المخزون', 'COMPANY', true, 'Adjust stock counts and valuation.', 'warehouses_inventory'),
+  P('erp.inventory.valuation.read', 'ERP', 'View inventory valuation', 'عرض تقييم المخزون', 'COMPANY', true, 'Read inventory valuation and stock reports.', 'warehouses_inventory'),
+
+  // ----------------------------------------------------- Execution 02 — Reports
+  P('erp.reports.accounting.read', 'ERP', 'View accounting reports', 'عرض التقارير المحاسبية', 'COMPANY', true, 'Read accounting and financial reports.', 'reports_analytics'),
+  P('erp.reports.sales.read', 'ERP', 'View sales reports', 'عرض تقارير المبيعات', 'COMPANY', true, 'Read sales and POS reports.', 'reports_analytics'),
+  P('erp.reports.purchasing.read', 'ERP', 'View purchasing reports', 'عرض تقارير المشتريات', 'COMPANY', true, 'Read purchasing and supplier reports.', 'reports_analytics'),
+  P('erp.reports.inventory.read', 'ERP', 'View inventory reports', 'عرض تقارير المخزون', 'COMPANY', true, 'Read inventory and stock reports.', 'reports_analytics'),
 ];
 
 export const PERMISSION_BY_CODE: ReadonlyMap<string, PermissionDefinition> = new Map(

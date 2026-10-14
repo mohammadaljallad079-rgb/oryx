@@ -17,11 +17,54 @@
 
 import { PrismaClient, type Prisma } from '@prisma/client';
 import * as argon2 from 'argon2';
-import { MODULES, PERMISSIONS } from '@oryx/shared';
+import { MODULES, PERMISSIONS, lineAmountMinor } from '@oryx/shared';
 
 const prisma = new PrismaClient();
 
 const DEMO_MARKER = 'SEED_DEMO_DATA';
+
+/** Standard chart of accounts mirrored from the accounting service. */
+const STANDARD_CHART: Array<{
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  type: string;
+  normalBalance: string;
+  systemRole?: string;
+}> = [
+  { code: '1000', nameEn: 'Cash on hand', nameAr: 'النقدية بالصندوق', type: 'ASSET', normalBalance: 'DEBIT', systemRole: 'CASH' },
+  { code: '1010', nameEn: 'Bank', nameAr: 'البنك', type: 'ASSET', normalBalance: 'DEBIT', systemRole: 'BANK' },
+  { code: '1100', nameEn: 'Accounts receivable', nameAr: 'الذمم المدينة', type: 'ASSET', normalBalance: 'DEBIT', systemRole: 'AR_CONTROL' },
+  { code: '1200', nameEn: 'Inventory', nameAr: 'المخزون', type: 'ASSET', normalBalance: 'DEBIT', systemRole: 'INVENTORY' },
+  { code: '2000', nameEn: 'Accounts payable', nameAr: 'الذمم الدائنة', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: 'AP_CONTROL' },
+  { code: '2100', nameEn: 'VAT payable (output)', nameAr: 'ضريبة القيمة المضافة المستحقة', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: 'VAT_OUTPUT' },
+  { code: '2110', nameEn: 'VAT recoverable (input)', nameAr: 'ضريبة القيمة المضافة القابلة للخصم', type: 'ASSET', normalBalance: 'DEBIT', systemRole: 'VAT_INPUT' },
+  { code: '3000', nameEn: 'Owner equity', nameAr: 'حقوق الملكية', type: 'EQUITY', normalBalance: 'CREDIT' },
+  { code: '4000', nameEn: 'Sales revenue', nameAr: 'إيرادات المبيعات', type: 'REVENUE', normalBalance: 'CREDIT', systemRole: 'SALES_REVENUE' },
+  { code: '4100', nameEn: 'Sales discounts', nameAr: 'خصومات المبيعات', type: 'REVENUE', normalBalance: 'DEBIT', systemRole: 'SALES_DISCOUNT' },
+  { code: '5000', nameEn: 'Cost of goods sold', nameAr: 'تكلفة البضاعة المباعة', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: 'COGS' },
+  { code: '5900', nameEn: 'Cash over / short', nameAr: 'فروق الصندوق', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: 'CASH_OVER_SHORT' },
+  { code: '5910', nameEn: 'Inventory adjustment', nameAr: 'تسوية المخزون', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: 'STOCK_ADJUSTMENT' },
+];
+
+/** Quantities are scaled by 10^4 (10000 = 1 unit). */
+const DEMO_PRODUCTS = [
+  { sku: 'OIL-5W30', nameEn: 'Engine oil 5W-30 (4L)', nameAr: 'زيت محرك 5W-30 (4 لتر)', unit: 'bottle', salesPriceMinor: 12500, costPriceMinor: 8800, reorderLevel: 200000, reorderQuantity: 500000, openingQuantity: 1200000 },
+  { sku: 'FILTER-AIR', nameEn: 'Air filter', nameAr: 'فلتر هواء', unit: 'piece', salesPriceMinor: 6500, costPriceMinor: 4000, reorderLevel: 100000, reorderQuantity: 300000, openingQuantity: 450000 },
+  { sku: 'BRAKE-PAD-F', nameEn: 'Front brake pad set', nameAr: 'طقم فحمات فرامل أمامية', unit: 'set', salesPriceMinor: 28000, costPriceMinor: 19000, reorderLevel: 80000, reorderQuantity: 200000, openingQuantity: 260000 },
+  { sku: 'SVC-INSPECT', nameEn: 'Vehicle inspection service', nameAr: 'خدمة فحص مركبة', unit: 'service', salesPriceMinor: 35000, costPriceMinor: 0, reorderLevel: 0, reorderQuantity: 0, openingQuantity: 0 },
+];
+
+const DEMO_CUSTOMERS = [
+  { code: 'CUST-001', nameEn: 'Al Noor Trading Est.', nameAr: 'مؤسسة النور التجارية', creditLimitMinor: 5000000 },
+  { code: 'CUST-002', nameEn: 'Gulf Motors LLC', nameAr: 'خليج موتورز ذ.م.م', creditLimitMinor: 8000000 },
+];
+
+const DEMO_SUPPLIERS = [
+  { code: 'SUP-001', nameEn: 'Arabian Parts Co.', nameAr: 'الشركة العربية لقطع الغيار' },
+  { code: 'SUP-002', nameEn: 'Lubricants Wholesale', nameAr: 'تجارة الزيوت بالجملة' },
+];
+
 
 async function seedModules() {
   for (const [index, m] of MODULES.entries()) {
@@ -687,6 +730,201 @@ async function seedAuditBaseline(superAdminId: string, idByCode: Map<string, str
   });
 }
 
+/**
+ * Execution 02 — seed a working ERP baseline for every company that has an
+ * active subscription, so the operational modules have real reference data.
+ *
+ * Idempotent: accounts, the fiscal year, warehouse, products, customers and
+ * suppliers are upserted by their natural keys.
+ */
+async function seedErpBaseline(idByCode: Map<string, string>, superAdminId: string) {
+  const companies = await prisma.company.findMany({ where: { status: 'ACTIVE' } });
+  let accounts = 0;
+  let years = 0;
+  let warehouses = 0;
+  let products = 0;
+  let customers = 0;
+  let suppliers = 0;
+
+  for (const company of companies) {
+    const existing = await prisma.account.count({ where: { companyId: company.id } });
+    if (existing === 0) {
+      await prisma.account.createMany({
+        data: STANDARD_CHART.map((a) => ({
+          companyId: company.id,
+          code: a.code,
+          nameEn: a.nameEn,
+          nameAr: a.nameAr,
+          type: a.type as never,
+          normalBalance: a.normalBalance as never,
+          isPostable: true,
+          isSystem: true,
+          systemRole: a.systemRole ?? null,
+          currency: company.currency,
+        })),
+      });
+      accounts += STANDARD_CHART.length;
+    }
+
+    // One open fiscal year covering the current calendar year.
+    const year = new Date().getUTCFullYear();
+    const code = String(year);
+    const existingYear = await prisma.fiscalYear.findUnique({
+      where: { companyId_code: { companyId: company.id, code } },
+    });
+    if (!existingYear) {
+      const start = new Date(Date.UTC(year, 0, 1));
+      const end = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
+      const periods = buildSeedPeriods(start, end);
+      await prisma.fiscalYear.create({
+        data: {
+          companyId: company.id,
+          code,
+          startDate: start,
+          endDate: end,
+          periods: {
+            create: periods.map((p, i) => ({
+              companyId: company.id,
+              periodNumber: i + 1,
+              nameEn: p.nameEn,
+              nameAr: p.nameAr,
+              startDate: p.start,
+              endDate: p.end,
+              status: 'OPEN',
+            })),
+          },
+        },
+      });
+      years += 1;
+    }
+
+    const branch = await prisma.branch.findFirst({ where: { companyId: company.id } });
+    const wh = await prisma.warehouse.upsert({
+      where: { companyId_code: { companyId: company.id, code: 'MAIN' } },
+      update: {},
+      create: {
+        companyId: company.id,
+        branchId: branch?.id ?? null,
+        code: 'MAIN',
+        nameEn: 'Main warehouse',
+        nameAr: 'المستودع الرئيسي',
+      },
+    });
+    warehouses += 1;
+
+    for (const p of DEMO_PRODUCTS) {
+      await prisma.product.upsert({
+        where: { companyId_sku: { companyId: company.id, sku: p.sku } },
+        update: {},
+        create: {
+          companyId: company.id,
+          sku: p.sku,
+          nameEn: p.nameEn,
+          nameAr: p.nameAr,
+          unit: p.unit,
+          salesPriceMinor: p.salesPriceMinor,
+          costPriceMinor: p.costPriceMinor,
+          taxRateBp: 1500,
+          reorderLevel: p.reorderLevel,
+          reorderQuantity: p.reorderQuantity,
+        },
+      });
+      products += 1;
+    }
+
+    for (const c of DEMO_CUSTOMERS) {
+      await prisma.customer.upsert({
+        where: { companyId_code: { companyId: company.id, code: c.code } },
+        update: {},
+        create: {
+          companyId: company.id,
+          code: c.code,
+          nameEn: c.nameEn,
+          nameAr: c.nameAr,
+          creditLimitMinor: c.creditLimitMinor,
+          paymentTermsDays: 30,
+        },
+      });
+      customers += 1;
+    }
+
+    for (const s of DEMO_SUPPLIERS) {
+      await prisma.supplier.upsert({
+        where: { companyId_code: { companyId: company.id, code: s.code } },
+        update: {},
+        create: {
+          companyId: company.id,
+          code: s.code,
+          nameEn: s.nameEn,
+          nameAr: s.nameAr,
+          paymentTermsDays: 30,
+        },
+      });
+      suppliers += 1;
+    }
+
+    // Opening stock so the warehouse is not empty.
+    for (const p of DEMO_PRODUCTS) {
+      const product = await prisma.product.findUnique({
+        where: { companyId_sku: { companyId: company.id, sku: p.sku } },
+      });
+      if (!product) continue;
+      const level = await prisma.stockLevel.findUnique({
+        where: { warehouseId_productId: { warehouseId: wh.id, productId: product.id } },
+      });
+      if (level) continue;
+      const qty = p.openingQuantity;
+      await prisma.stockLevel.create({
+        data: {
+          companyId: company.id,
+          warehouseId: wh.id,
+          productId: product.id,
+          quantity: qty,
+          averageCostMinor: p.costPriceMinor,
+        },
+      });
+      await prisma.stockMovement.create({
+        data: {
+          companyId: company.id,
+          warehouseId: wh.id,
+          productId: product.id,
+          movementType: 'OPENING',
+          quantity: qty,
+          unitCostMinor: p.costPriceMinor,
+          totalCostMinor: lineAmountMinor(qty, p.costPriceMinor),
+          balanceAfter: qty,
+          source: 'OPENING_BALANCE',
+          memo: 'Seeded opening stock',
+          occurredAt: new Date(),
+          createdById: superAdminId,
+        },
+      });
+    }
+  }
+
+  console.log(
+    `  erp baseline: ${accounts} accounts, ${years} fiscal years, ${warehouses} warehouses, ` +
+      `${products} products, ${customers} customers, ${suppliers} suppliers`,
+  );
+}
+
+function buildSeedPeriods(start: Date, end: Date) {
+  const periods: Array<{ nameEn: string; nameAr: string; start: Date; end: Date }> = [];
+  const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
+  while (cursor <= end) {
+    const periodStart = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), 1));
+    const monthEnd = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+    periods.push({
+      nameEn: cursor.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
+      nameAr: cursor.toLocaleString('ar-SA', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
+      start: periodStart < start ? start : periodStart,
+      end: monthEnd > end ? end : monthEnd,
+    });
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+  return periods;
+}
+
 async function main() {
   console.log('ORYX seed — start');
   await seedModules();
@@ -697,6 +935,7 @@ async function main() {
   await seedSubscriptions(idByCode);
   await seedCompanyAdmins(superAdmin.id, idByCode);
   await seedCms();
+  await seedErpBaseline(idByCode, superAdmin.id);
   await seedAuditBaseline(superAdmin.id, idByCode);
   console.log('ORYX seed — done');
 }

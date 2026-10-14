@@ -61,4 +61,18 @@ export const ERROR_CODES = {
   RESOURCE_NOT_FOUND: 'resource.not_found',
   RESOURCE_CONFLICT: 'resource.conflict',
   VALIDATION_FAILED: 'request.validation_failed',
+
+  // ------------------------------------------------------------ Execution 02
+  PERIOD_NOT_OPEN: 'accounting.period_not_open',
+  PERIOD_LOCKED: 'accounting.period_locked',
+  UNBALANCED_ENTRY: 'accounting.unbalanced_entry',
+  ACCOUNT_NOT_POSTABLE: 'accounting.account_not_postable',
+  DOCUMENT_IMMUTABLE: 'erp.document_immutable',
+  INSUFFICIENT_STOCK: 'inventory.insufficient_stock',
+  NEGATIVE_STOCK: 'inventory.negative_stock',
+  CASHIER_SESSION_CLOSED: 'pos.session_closed',
+  CASHIER_SESSION_ALREADY_OPEN: 'pos.session_already_open',
+  CREDIT_LIMIT_EXCEEDED: 'sales.credit_limit_exceeded',
+  DOCUMENT_ALREADY_POSTED: 'erp.document_already_posted',
+  OVER_ALLOCATION: 'erp.over_allocation',
 } as const;

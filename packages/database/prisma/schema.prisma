@@ -199,6 +199,36 @@ model Company {
   auditLogs    AuditLog[]
   supportSessions SupportSession[]
 
+  // Execution 02 — ERP core (all tenant-owned rows carry companyId).
+  documentSequences   DocumentSequence[]
+  accounts            Account[]
+  fiscalYears         FiscalYear[]
+  fiscalPeriods       FiscalPeriod[]
+  accountBalances     AccountBalance[]
+  journalEntries      JournalEntry[]
+  journalLines        JournalLine[]
+  payments            Payment[]
+  paymentAllocations  PaymentAllocation[]
+  customers           Customer[]
+  products            Product[]
+  warehouses          Warehouse[]
+  stockLevels         StockLevel[]
+  stockMovements      StockMovement[]
+  stockTransfers      StockTransfer[]
+  stockAdjustments    StockAdjustment[]
+  quotations          Quotation[]
+  salesOrders         SalesOrder[]
+  salesInvoices       SalesInvoice[]
+  creditNotes         CreditNote[]
+  cashierSessions     CashierSession[]
+  posSales            PosSale[]
+  suppliers           Supplier[]
+  purchaseRequisitions PurchaseRequisition[]
+  purchaseOrders      PurchaseOrder[]
+  goodsReceipts       GoodsReceipt[]
+  supplierInvoices    SupplierInvoice[]
+  purchaseReturns     PurchaseReturn[]
+
   @@index([type])
   @@index([status])
   @@index([parentCompanyId])
@@ -221,6 +251,17 @@ model Branch {
 
   company     Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   memberships MembershipBranch[]
+
+  // Execution 02 — branch-level operational scope.
+  warehouses        Warehouse[]
+  cashierSessions   CashierSession[]
+  posSales          PosSale[]
+  salesInvoices     SalesInvoice[]
+  purchaseOrders    PurchaseOrder[]
+  goodsReceipts     GoodsReceipt[]
+  supplierInvoices  SupplierInvoice[]
+  payments          Payment[]
+  journalEntries    JournalEntry[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -579,4 +620,1176 @@ model PlatformSetting {
   value     Json
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
+}
+
+// ============================================================================
+// EXECUTION 02 — ENTERPRISE ERP CORE
+//
+// Every operational table carries `companyId` so tenant isolation is expressible
+// in a query, never only in the UI. Monetary values are stored as integer minor
+// units (halalas); quantities are scaled by 10^4. Percentages are stored as
+// integer basis points (1500 = 15.00%). See packages/shared/src/money.ts.
+// ============================================================================
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum AccountNormalBalance {
+  DEBIT
+  CREDIT
+}
+
+enum FiscalPeriodStatus {
+  OPEN
+  CLOSED
+  LOCKED
+}
+
+enum JournalStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+enum JournalSourceType {
+  MANUAL
+  SALES_INVOICE
+  CREDIT_NOTE
+  CUSTOMER_RECEIPT
+  SUPPLIER_INVOICE
+  SUPPLIER_PAYMENT
+  GOODS_RECEIPT
+  PURCHASE_RETURN
+  POS_SALE
+  STOCK_ADJUSTMENT
+  OPENING_BALANCE
+}
+
+enum PaymentDirection {
+  RECEIPT
+  PAYMENT
+}
+
+enum PartyType {
+  CUSTOMER
+  SUPPLIER
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CARD
+  CHEQUE
+  WALLET
+  OTHER
+}
+
+enum AllocationTarget {
+  SALES_INVOICE
+  SUPPLIER_INVOICE
+  CREDIT_NOTE
+}
+
+enum ProductType {
+  PRODUCT
+  SERVICE
+}
+
+enum StockMovementType {
+  OPENING
+  RECEIPT
+  ISSUE
+  TRANSFER_IN
+  TRANSFER_OUT
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+}
+
+enum StockMovementSource {
+  MANUAL
+  OPENING_BALANCE
+  SALES_INVOICE
+  CREDIT_NOTE
+  GOODS_RECEIPT
+  PURCHASE_RETURN
+  TRANSFER
+  ADJUSTMENT
+  POS_SALE
+}
+
+enum TransferStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
+enum AdjustmentStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
+enum DocumentStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
+enum SalesOrderStatus {
+  DRAFT
+  CONFIRMED
+  PARTIALLY_INVOICED
+  INVOICED
+  CANCELLED
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}
+
+enum SalesInvoiceStatus {
+  DRAFT
+  POSTED
+  PARTIALLY_PAID
+  PAID
+  VOID
+}
+
+enum RequisitionStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CONVERTED
+  CANCELLED
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  APPROVED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum SupplierInvoiceStatus {
+  DRAFT
+  POSTED
+  PARTIALLY_PAID
+  PAID
+  VOID
+}
+
+enum CashierSessionStatus {
+  OPEN
+  CLOSED
+}
+
+enum PosSaleStatus {
+  COMPLETED
+  VOID
+}
+
+// ----------------------------------------------------------- document numbering
+
+/** Monotonic per-company, per-document-type sequence. Never reused. */
+model DocumentSequence {
+  id         String   @id @default(cuid())
+  companyId  String
+  key        String
+  prefix     String
+  nextNumber Int      @default(1)
+  padding    Int      @default(5)
+  updatedAt  DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, key])
+}
+
+// ------------------------------------------------------------------- accounting
+
+/** Chart-of-accounts node. `code` orders the tree; `parentId` nests it. */
+model Account {
+  id            String               @id @default(cuid())
+  companyId     String
+  code          String
+  nameEn        String
+  nameAr        String
+  type          AccountType
+  normalBalance AccountNormalBalance
+  parentId      String?
+  level         Int                  @default(1)
+  isPostable    Boolean              @default(true)
+  isSystem      Boolean              @default(false)
+  /** System role tag (e.g. AR_CONTROL, AP_CONTROL, CASH, SALES_REVENUE, VAT_OUTPUT). */
+  systemRole    String?
+  currency      String               @default("SAR")
+  isActive      Boolean              @default(true)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  parent   Account? @relation("AccountTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Account[] @relation("AccountTree")
+
+  journalLines      JournalLine[]
+  balances          AccountBalance[]
+  customers         Customer[]
+  suppliers         Supplier[]
+  productsSales     Product[]  @relation("ProductSalesAccount")
+  productsInventory Product[]  @relation("ProductInventoryAccount")
+  productsCogs      Product[]  @relation("ProductCogsAccount")
+  warehouses        Warehouse[]
+
+  @@unique([companyId, code])
+  @@index([companyId, type])
+  @@index([companyId, systemRole])
+  @@index([parentId])
+}
+
+/** Fiscal year. Only one year per company may be open at a time. */
+model FiscalYear {
+  id             String    @id @default(cuid())
+  companyId      String
+  code           String
+  startDate      DateTime
+  endDate        DateTime
+  isClosed       Boolean   @default(false)
+  closedAt       DateTime?
+  closedByUserId String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  company Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  periods FiscalPeriod[]
+
+  @@unique([companyId, code])
+  @@index([companyId, isClosed])
+}
+
+/** Accounting period inside a fiscal year. Posting is refused when not OPEN. */
+model FiscalPeriod {
+  id             String             @id @default(cuid())
+  companyId      String
+  fiscalYearId   String
+  periodNumber   Int
+  nameEn         String
+  nameAr         String
+  startDate      DateTime
+  endDate        DateTime
+  status         FiscalPeriodStatus @default(OPEN)
+  closedAt       DateTime?
+  closedByUserId String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  company    Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear FiscalYear        @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
+  balances   AccountBalance[]
+  entries    JournalEntry[]
+
+  @@unique([fiscalYearId, periodNumber])
+  @@index([companyId, status])
+}
+
+/** Balanced double-entry journal header. */
+model JournalEntry {
+  id               String            @id @default(cuid())
+  companyId        String
+  branchId         String?
+  fiscalPeriodId   String?
+  entryNumber      String
+  entryDate        DateTime
+  status           JournalStatus     @default(DRAFT)
+  sourceType       JournalSourceType @default(MANUAL)
+  /** Source document id, used to make posting idempotent. */
+  sourceId         String?
+  memo             String?
+  currency         String            @default("SAR")
+  totalDebitMinor  Int               @default(0)
+  totalCreditMinor Int               @default(0)
+  reversalOfId     String?
+  postedAt         DateTime?
+  postedByUserId   String?
+  createdById      String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch       Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  fiscalPeriod FiscalPeriod? @relation(fields: [fiscalPeriodId], references: [id], onDelete: SetNull)
+
+  lines      JournalLine[]
+  reversal   JournalEntry?   @relation("JournalReversal", fields: [reversalOfId], references: [id], onDelete: SetNull)
+  reversedBy JournalEntry[]  @relation("JournalReversal")
+
+  @@unique([companyId, entryNumber])
+  // Idempotency: one journal per source document. Manual entries have a null
+  // sourceId and are exempt (Postgres treats nulls as distinct in unique keys).
+  @@unique([companyId, sourceType, sourceId])
+  @@index([companyId, entryDate])
+  @@index([companyId, status])
+  @@index([branchId])
+}
+
+model JournalLine {
+  id          String  @id @default(cuid())
+  companyId   String
+  entryId     String
+  lineNumber  Int
+  accountId   String
+  branchId    String?
+  description String?
+  debitMinor  Int     @default(0)
+  creditMinor Int     @default(0)
+
+  company Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  entry   JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  account Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@unique([entryId, lineNumber])
+  @@index([companyId, accountId])
+}
+
+/** Per-account, per-period aggregate kept in step with posted entries. */
+model AccountBalance {
+  id             String   @id @default(cuid())
+  companyId      String
+  accountId      String
+  fiscalPeriodId String
+  debitMinor     Int      @default(0)
+  creditMinor    Int      @default(0)
+  updatedAt      DateTime @updatedAt
+
+  company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  account      Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  fiscalPeriod FiscalPeriod @relation(fields: [fiscalPeriodId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, fiscalPeriodId])
+  @@index([companyId])
+}
+
+/** Payment or receipt against a customer or supplier. */
+model Payment {
+  id             String           @id @default(cuid())
+  companyId      String
+  branchId       String?
+  direction      PaymentDirection
+  partyType      PartyType
+  customerId     String?
+  supplierId     String?
+  paymentNumber  String
+  method         PaymentMethod    @default(CASH)
+  amountMinor    Int
+  currency       String           @default("SAR")
+  reference      String?
+  notes          String?
+  paidAt         DateTime
+  journalEntryId String?
+  idempotencyKey String?
+  createdById    String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch   Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  supplier Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  allocations PaymentAllocation[]
+
+  @@unique([companyId, paymentNumber])
+  @@unique([companyId, idempotencyKey])
+  @@index([companyId, partyType])
+  @@index([companyId, paidAt])
+}
+
+model PaymentAllocation {
+  id                String          @id @default(cuid())
+  companyId         String
+  paymentId         String
+  target            AllocationTarget
+  salesInvoiceId    String?
+  supplierInvoiceId String?
+  creditNoteId      String?
+  amountMinor       Int
+  createdAt         DateTime        @default(now())
+
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  payment         Payment          @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  salesInvoice    SalesInvoice?    @relation(fields: [salesInvoiceId], references: [id], onDelete: SetNull)
+  supplierInvoice SupplierInvoice? @relation(fields: [supplierInvoiceId], references: [id], onDelete: SetNull)
+  creditNote      CreditNote?      @relation(fields: [creditNoteId], references: [id], onDelete: SetNull)
+
+  @@index([paymentId])
+  @@index([companyId])
+}
+
+// -------------------------------------------------------------------- inventory
+
+model Warehouse {
+  id                 String   @id @default(cuid())
+  companyId          String
+  branchId           String?
+  code               String
+  nameEn             String
+  nameAr             String
+  addressLine        String?
+  inventoryAccountId String?
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  company          Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch           Branch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  inventoryAccount Account?        @relation(fields: [inventoryAccountId], references: [id], onDelete: SetNull)
+  levels           StockLevel[]
+  movements        StockMovement[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+}
+
+/** Sellable / stockable item. Serves both the sales catalog and inventory. */
+model Product {
+  id                 String      @id @default(cuid())
+  companyId          String
+  sku                String
+  nameEn             String
+  nameAr             String
+  type               ProductType @default(PRODUCT)
+  unit               String      @default("unit")
+  barcode            String?
+  salesPriceMinor    Int         @default(0)
+  costPriceMinor     Int         @default(0)
+  /** Default VAT rate in basis points (1500 = 15.00%). */
+  taxRateBp          Int         @default(0)
+  /** Reorder threshold, scaled by 10^4. */
+  reorderLevel       Int         @default(0)
+  reorderQuantity    Int         @default(0)
+  trackStock         Boolean     @default(true)
+  salesAccountId     String?
+  inventoryAccountId String?
+  cogsAccountId      String?
+  isActive           Boolean     @default(true)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  salesAccount     Account? @relation("ProductSalesAccount", fields: [salesAccountId], references: [id], onDelete: SetNull)
+  inventoryAccount Account? @relation("ProductInventoryAccount", fields: [inventoryAccountId], references: [id], onDelete: SetNull)
+  cogsAccount      Account? @relation("ProductCogsAccount", fields: [cogsAccountId], references: [id], onDelete: SetNull)
+
+  levels    StockLevel[]
+  movements StockMovement[]
+
+  @@unique([companyId, sku])
+  @@index([companyId, isActive])
+}
+
+/** Current on-hand quantity and moving-average cost for a product in a warehouse. */
+model StockLevel {
+  id               String   @id @default(cuid())
+  companyId        String
+  warehouseId      String
+  productId        String
+  /** On-hand quantity, scaled by 10^4. */
+  quantity         Int      @default(0)
+  /** Moving-average unit cost in minor units. */
+  averageCostMinor Int      @default(0)
+  updatedAt        DateTime @updatedAt
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([warehouseId, productId])
+  @@index([companyId])
+  @@index([companyId, productId])
+}
+
+/** Append-only stock ledger. `balanceAfter` is the on-hand after this movement. */
+model StockMovement {
+  id             String              @id @default(cuid())
+  companyId      String
+  branchId       String?
+  warehouseId    String
+  productId      String
+  movementType   StockMovementType
+  /** Signed quantity, scaled by 10^4. */
+  quantity       Int
+  unitCostMinor  Int                 @default(0)
+  totalCostMinor Int                 @default(0)
+  balanceAfter   Int
+  source         StockMovementSource @default(MANUAL)
+  sourceId       String?
+  memo           String?
+  occurredAt     DateTime
+  createdById    String
+  createdAt      DateTime            @default(now())
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, warehouseId, productId])
+  @@index([companyId, occurredAt])
+  @@index([companyId, source, sourceId])
+}
+
+model StockTransfer {
+  id              String         @id @default(cuid())
+  companyId       String
+  branchId        String?
+  transferNumber  String
+  fromWarehouseId String
+  toWarehouseId   String
+  status          TransferStatus @default(DRAFT)
+  notes           String?
+  postedAt        DateTime?
+  createdById     String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  company Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lines   StockTransferLine[]
+
+  @@unique([companyId, transferNumber])
+  @@index([companyId, status])
+}
+
+model StockTransferLine {
+  id         String @id @default(cuid())
+  transferId String
+  productId  String
+  /** Quantity to move, scaled by 10^4. */
+  quantity   Int
+
+  transfer StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  @@unique([transferId, productId])
+}
+
+model StockAdjustment {
+  id               String           @id @default(cuid())
+  companyId        String
+  branchId         String?
+  adjustmentNumber String
+  warehouseId      String
+  reason           String
+  status           AdjustmentStatus @default(DRAFT)
+  postedAt         DateTime?
+  createdById      String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  company Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lines   StockAdjustmentLine[]
+
+  @@unique([companyId, adjustmentNumber])
+  @@index([companyId, status])
+}
+
+model StockAdjustmentLine {
+  id            String @id @default(cuid())
+  adjustmentId  String
+  productId     String
+  /** Signed delta, scaled by 10^4 (positive increases stock). */
+  quantityDelta Int
+  unitCostMinor Int    @default(0)
+
+  adjustment StockAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+
+  @@unique([adjustmentId, productId])
+}
+
+// ------------------------------------------------------------------------ sales
+
+model Customer {
+  id                  String   @id @default(cuid())
+  companyId           String
+  code                String
+  nameEn              String
+  nameAr              String
+  email               String?
+  phone               String?
+  taxNumber           String?
+  addressLine         String?
+  city                String?
+  countryCode         String?
+  creditLimitMinor    Int      @default(0)
+  paymentTermsDays    Int      @default(0)
+  /** Control account for this customer's receivable. */
+  receivableAccountId String?
+  currency            String   @default("SAR")
+  isActive            Boolean  @default(true)
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  company           Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  receivableAccount Account? @relation(fields: [receivableAccountId], references: [id], onDelete: SetNull)
+
+  quotations  Quotation[]
+  orders      SalesOrder[]
+  invoices    SalesInvoice[]
+  creditNotes CreditNote[]
+  posSales    PosSale[]
+  payments    Payment[]
+
+  @@unique([companyId, code])
+  @@index([companyId, isActive])
+}
+
+model Quotation {
+  id               String          @id @default(cuid())
+  companyId        String
+  branchId         String?
+  quoteNumber      String
+  customerId       String
+  status           QuotationStatus @default(DRAFT)
+  issueDate        DateTime        @default(now())
+  validUntil       DateTime?
+  subtotalMinor    Int             @default(0)
+  discountMinor    Int             @default(0)
+  taxMinor         Int             @default(0)
+  totalMinor       Int             @default(0)
+  currency         String          @default("SAR")
+  notes            String?
+  convertedOrderId String?
+  createdById      String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  company  Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer        @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  lines    QuotationLine[]
+
+  @@unique([companyId, quoteNumber])
+  @@index([companyId, status])
+}
+
+model QuotationLine {
+  id                String @id @default(cuid())
+  quotationId       String
+  productId         String?
+  description       String
+  quantity          Int
+  unitPriceMinor    Int
+  discountPercentBp Int    @default(0)
+  taxPercentBp      Int    @default(0)
+  lineTotalMinor    Int
+  sortOrder         Int    @default(0)
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@index([quotationId])
+}
+
+model SalesOrder {
+  id            String           @id @default(cuid())
+  companyId     String
+  branchId      String?
+  orderNumber   String
+  customerId    String
+  quotationId   String?
+  warehouseId   String?
+  status        SalesOrderStatus @default(DRAFT)
+  orderDate     DateTime         @default(now())
+  subtotalMinor Int              @default(0)
+  discountMinor Int              @default(0)
+  taxMinor      Int              @default(0)
+  totalMinor    Int              @default(0)
+  currency      String           @default("SAR")
+  notes         String?
+  createdById   String
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  company  Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  lines    SalesOrderLine[]
+  invoices SalesInvoice[]
+
+  @@unique([companyId, orderNumber])
+  @@index([companyId, status])
+}
+
+model SalesOrderLine {
+  id                String @id @default(cuid())
+  orderId           String
+  productId         String?
+  description       String
+  quantity          Int
+  quantityInvoiced  Int    @default(0)
+  unitPriceMinor    Int
+  discountPercentBp Int    @default(0)
+  taxPercentBp      Int    @default(0)
+  lineTotalMinor    Int
+  sortOrder         Int    @default(0)
+
+  order SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model SalesInvoice {
+  id              String             @id @default(cuid())
+  companyId       String
+  branchId        String?
+  invoiceNumber   String
+  customerId      String
+  orderId         String?
+  warehouseId     String?
+  status          SalesInvoiceStatus @default(DRAFT)
+  invoiceDate     DateTime           @default(now())
+  dueDate         DateTime?
+  subtotalMinor   Int                @default(0)
+  discountMinor   Int                @default(0)
+  taxMinor        Int                @default(0)
+  totalMinor      Int                @default(0)
+  amountPaidMinor Int                @default(0)
+  currency        String             @default("SAR")
+  notes           String?
+  journalEntryId  String?
+  createdById     String
+  postedAt        DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  company     Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch      Branch?              @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  customer    Customer             @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  order       SalesOrder?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  lines       SalesInvoiceLine[]
+  allocations PaymentAllocation[]
+  creditNotes CreditNote[]
+
+  @@unique([companyId, invoiceNumber])
+  @@unique([companyId, orderId])
+  @@index([companyId, status])
+  @@index([companyId, customerId])
+  @@index([branchId])
+}
+
+model SalesInvoiceLine {
+  id                String @id @default(cuid())
+  invoiceId         String
+  productId         String?
+  description       String
+  quantity          Int
+  unitPriceMinor    Int
+  discountPercentBp Int    @default(0)
+  taxPercentBp      Int    @default(0)
+  lineSubtotalMinor Int
+  discountMinor     Int    @default(0)
+  taxMinor          Int    @default(0)
+  lineTotalMinor    Int
+  sortOrder         Int    @default(0)
+
+  invoice SalesInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model CreditNote {
+  id               String         @id @default(cuid())
+  companyId        String
+  branchId         String?
+  creditNoteNumber String
+  customerId       String
+  invoiceId        String?
+  warehouseId      String?
+  status           DocumentStatus @default(DRAFT)
+  issueDate        DateTime       @default(now())
+  subtotalMinor    Int            @default(0)
+  taxMinor         Int            @default(0)
+  totalMinor       Int            @default(0)
+  reason           String?
+  currency         String         @default("SAR")
+  restockInventory Boolean        @default(false)
+  journalEntryId   String?
+  createdById      String
+  postedAt         DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  company     Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer    Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  invoice     SalesInvoice?       @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  lines       CreditNoteLine[]
+  allocations PaymentAllocation[]
+
+  @@unique([companyId, creditNoteNumber])
+  @@index([companyId, status])
+}
+
+model CreditNoteLine {
+  id             String @id @default(cuid())
+  creditNoteId   String
+  productId      String?
+  description    String
+  quantity       Int
+  unitPriceMinor Int
+  taxPercentBp   Int    @default(0)
+  lineTotalMinor Int
+  sortOrder      Int    @default(0)
+
+  creditNote CreditNote @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
+
+  @@index([creditNoteId])
+}
+
+/** Cashier shift for a POS terminal. Expected cash is derived from POS sales. */
+model CashierSession {
+  id                String               @id @default(cuid())
+  companyId         String
+  branchId          String
+  warehouseId       String?
+  sessionNumber     String
+  status            CashierSessionStatus @default(OPEN)
+  openingFloatMinor Int                  @default(0)
+  expectedCashMinor Int                  @default(0)
+  countedCashMinor  Int?
+  varianceMinor     Int?
+  openedById        String
+  openedAt          DateTime             @default(now())
+  closedById        String?
+  closedAt          DateTime?
+  notes             String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  company Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch  Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  sales   PosSale[]
+
+  @@unique([companyId, sessionNumber])
+  @@index([companyId, status])
+  @@index([branchId])
+}
+
+model PosSale {
+  id               String        @id @default(cuid())
+  companyId        String
+  branchId         String
+  cashierSessionId String
+  receiptNumber    String
+  customerId       String?
+  warehouseId      String?
+  status           PosSaleStatus @default(COMPLETED)
+  subtotalMinor    Int           @default(0)
+  discountMinor    Int           @default(0)
+  taxMinor         Int           @default(0)
+  totalMinor       Int           @default(0)
+  paidMinor        Int           @default(0)
+  changeMinor      Int           @default(0)
+  paymentMethod    PaymentMethod @default(CASH)
+  currency         String        @default("SAR")
+  salesInvoiceId   String?
+  journalEntryId   String?
+  createdById      String
+  createdAt        DateTime      @default(now())
+
+  company        Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch         Branch         @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  cashierSession CashierSession @relation(fields: [cashierSessionId], references: [id], onDelete: Restrict)
+  customer       Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  lines          PosSaleLine[]
+
+  @@unique([companyId, receiptNumber])
+  @@index([companyId, createdAt])
+  @@index([cashierSessionId])
+}
+
+model PosSaleLine {
+  id             String @id @default(cuid())
+  posSaleId      String
+  productId      String?
+  description    String
+  quantity       Int
+  unitPriceMinor Int
+  discountMinor  Int    @default(0)
+  taxPercentBp   Int    @default(0)
+  taxMinor       Int    @default(0)
+  lineTotalMinor Int
+
+  posSale PosSale @relation(fields: [posSaleId], references: [id], onDelete: Cascade)
+
+  @@index([posSaleId])
+}
+
+// ------------------------------------------------------------------ procurement
+
+model Supplier {
+  id               String   @id @default(cuid())
+  companyId        String
+  code             String
+  nameEn           String
+  nameAr           String
+  email            String?
+  phone            String?
+  taxNumber        String?
+  addressLine      String?
+  city             String?
+  countryCode      String?
+  paymentTermsDays Int      @default(0)
+  /** Control account for this supplier's payable. */
+  payableAccountId String?
+  currency         String   @default("SAR")
+  isActive         Boolean  @default(true)
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  payableAccount Account? @relation(fields: [payableAccountId], references: [id], onDelete: SetNull)
+
+  requisitions PurchaseRequisition[]
+  orders       PurchaseOrder[]
+  receipts     GoodsReceipt[]
+  invoices     SupplierInvoice[]
+  returns      PurchaseReturn[]
+  payments     Payment[]
+
+  @@unique([companyId, code])
+  @@index([companyId, isActive])
+}
+
+model PurchaseRequisition {
+  id                String            @id @default(cuid())
+  companyId         String
+  branchId          String?
+  requisitionNumber String
+  status            RequisitionStatus @default(DRAFT)
+  requestedById     String
+  neededBy          DateTime?
+  supplierId        String?
+  notes             String?
+  approvedById      String?
+  approvedAt        DateTime?
+  convertedOrderId  String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  company  Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  supplier Supplier?                 @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  lines    PurchaseRequisitionLine[]
+
+  @@unique([companyId, requisitionNumber])
+  @@index([companyId, status])
+}
+
+model PurchaseRequisitionLine {
+  id                     String @id @default(cuid())
+  requisitionId          String
+  productId              String?
+  description            String
+  quantity               Int
+  estimatedUnitCostMinor Int    @default(0)
+  sortOrder              Int    @default(0)
+
+  requisition PurchaseRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+
+  @@index([requisitionId])
+}
+
+model PurchaseOrder {
+  id            String              @id @default(cuid())
+  companyId     String
+  branchId      String?
+  orderNumber   String
+  supplierId    String
+  requisitionId String?
+  warehouseId   String?
+  status        PurchaseOrderStatus @default(DRAFT)
+  orderDate     DateTime            @default(now())
+  expectedDate  DateTime?
+  subtotalMinor Int                 @default(0)
+  taxMinor      Int                 @default(0)
+  totalMinor    Int                 @default(0)
+  currency      String              @default("SAR")
+  notes         String?
+  approvedById  String?
+  approvedAt    DateTime?
+  createdById   String
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  company  Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch   Branch?              @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  supplier Supplier             @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  lines    PurchaseOrderLine[]
+  receipts GoodsReceipt[]
+  invoices SupplierInvoice[]
+
+  @@unique([companyId, orderNumber])
+  @@index([companyId, status])
+  @@index([branchId])
+}
+
+model PurchaseOrderLine {
+  id               String @id @default(cuid())
+  orderId          String
+  productId        String?
+  description      String
+  quantity         Int
+  quantityReceived Int    @default(0)
+  unitCostMinor    Int
+  taxPercentBp     Int    @default(0)
+  lineTotalMinor   Int
+  sortOrder        Int    @default(0)
+
+  order PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model GoodsReceipt {
+  id              String         @id @default(cuid())
+  companyId       String
+  branchId        String?
+  receiptNumber   String
+  purchaseOrderId String
+  supplierId      String
+  warehouseId     String
+  status          DocumentStatus @default(DRAFT)
+  receivedAt      DateTime       @default(now())
+  notes           String?
+  journalEntryId  String?
+  receivedById    String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  company       Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch        Branch?            @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  purchaseOrder PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  supplier      Supplier           @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  lines         GoodsReceiptLine[]
+
+  @@unique([companyId, receiptNumber])
+  @@index([companyId, status])
+}
+
+model GoodsReceiptLine {
+  id            String @id @default(cuid())
+  receiptId     String
+  productId     String
+  description   String
+  quantity      Int
+  unitCostMinor Int
+  sortOrder     Int    @default(0)
+
+  receipt GoodsReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+
+  @@index([receiptId])
+}
+
+model SupplierInvoice {
+  id                    String                @id @default(cuid())
+  companyId             String
+  branchId              String?
+  invoiceNumber         String
+  supplierInvoiceNumber String
+  supplierId            String
+  purchaseOrderId       String?
+  status                SupplierInvoiceStatus @default(DRAFT)
+  invoiceDate           DateTime              @default(now())
+  dueDate               DateTime?
+  subtotalMinor         Int                   @default(0)
+  taxMinor              Int                   @default(0)
+  totalMinor            Int                   @default(0)
+  amountPaidMinor       Int                   @default(0)
+  currency              String                @default("SAR")
+  notes                 String?
+  journalEntryId        String?
+  createdById           String
+  postedAt              DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  company       Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch        Branch?            @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  supplier      Supplier           @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  purchaseOrder PurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  lines         SupplierInvoiceLine[]
+  allocations   PaymentAllocation[]
+
+  @@unique([companyId, invoiceNumber])
+  @@unique([companyId, supplierId, supplierInvoiceNumber])
+  @@index([companyId, status])
+}
+
+model SupplierInvoiceLine {
+  id                String @id @default(cuid())
+  invoiceId         String
+  productId         String?
+  description       String
+  quantity          Int
+  unitCostMinor     Int
+  taxPercentBp      Int    @default(0)
+  lineSubtotalMinor Int
+  taxMinor          Int    @default(0)
+  lineTotalMinor    Int
+  sortOrder         Int    @default(0)
+
+  invoice SupplierInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model PurchaseReturn {
+  id              String         @id @default(cuid())
+  companyId       String
+  branchId        String?
+  returnNumber    String
+  supplierId      String
+  purchaseOrderId String?
+  warehouseId     String
+  status          DocumentStatus @default(DRAFT)
+  returnDate      DateTime       @default(now())
+  subtotalMinor   Int            @default(0)
+  taxMinor        Int            @default(0)
+  totalMinor      Int            @default(0)
+  reason          String?
+  currency        String         @default("SAR")
+  journalEntryId  String?
+  createdById     String
+  postedAt        DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  company  Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  supplier Supplier             @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  lines    PurchaseReturnLine[]
+
+  @@unique([companyId, returnNumber])
+  @@index([companyId, status])
+}
+
+model PurchaseReturnLine {
+  id             String @id @default(cuid())
+  returnId       String
+  productId      String
+  description    String
+  quantity       Int
+  unitCostMinor  Int
+  taxPercentBp   Int    @default(0)
+  lineTotalMinor Int
+  sortOrder      Int    @default(0)
+
+  purchaseReturn PurchaseReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+
+  @@index([returnId])
 }
