@@ -26,6 +26,19 @@ export const DOCUMENT_SEQUENCE_KEYS = {
   purchaseReturn: { key: 'PURCHASE_RETURN', prefix: 'RTN' },
   stockTransfer: { key: 'STOCK_TRANSFER', prefix: 'TR' },
   stockAdjustment: { key: 'STOCK_ADJUSTMENT', prefix: 'ADJ' },
+  // Execution 03
+  payrollRun: { key: 'PAYROLL_RUN', prefix: 'PR' },
+  employeeAdvance: { key: 'EMPLOYEE_ADVANCE', prefix: 'ADV' },
+  lead: { key: 'LEAD', prefix: 'LD' },
+  opportunity: { key: 'OPPORTUNITY', prefix: 'OPP' },
+  supportTicket: { key: 'SUPPORT_TICKET', prefix: 'TKT' },
+  workOrder: { key: 'WORK_ORDER', prefix: 'WO' },
+  project: { key: 'PROJECT', prefix: 'PRJ' },
+  inspectionBooking: { key: 'INSPECTION_BOOKING', prefix: 'INS' },
+  maintenanceBooking: { key: 'MAINTENANCE_BOOKING', prefix: 'MB' },
+  jobCard: { key: 'JOB_CARD', prefix: 'JC' },
+  repairEstimate: { key: 'REPAIR_ESTIMATE', prefix: 'EST' },
+  serviceRequest: { key: 'SERVICE_REQUEST', prefix: 'SR' },
 } as const;
 
 export type DocumentSequenceName = keyof typeof DOCUMENT_SEQUENCE_KEYS;

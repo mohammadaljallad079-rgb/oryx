@@ -75,4 +75,22 @@ export const ERROR_CODES = {
   CREDIT_LIMIT_EXCEEDED: 'sales.credit_limit_exceeded',
   DOCUMENT_ALREADY_POSTED: 'erp.document_already_posted',
   OVER_ALLOCATION: 'erp.over_allocation',
+
+  // ------------------------------------------------------------ Execution 03
+  PAYROLL_ALREADY_POSTED: 'payroll.already_posted',
+  PAYROLL_PERIOD_LOCKED: 'payroll.period_locked',
+  PAYROLL_NO_EMPLOYEES: 'payroll.no_employees',
+  PAYROLL_ALREADY_APPROVED: 'payroll.already_approved',
+  LEAVE_INSUFFICIENT_BALANCE: 'hr.leave_insufficient_balance',
+  LEAVE_OVERLAP: 'hr.leave_overlap',
+  VEHICLE_VIN_EXISTS: 'automotive.vin_exists',
+  VEHICLE_VIN_INVALID: 'automotive.vin_invalid',
+  INSPECTION_ALREADY_APPROVED: 'automotive.inspection_already_approved',
+  INSPECTION_NOT_COMPLETE: 'automotive.inspection_not_complete',
+  JOB_CARD_STATE: 'automotive.job_card_state',
+  ESTIMATE_NOT_APPROVED: 'automotive.estimate_not_approved',
+  RESERVATION_ALREADY_ISSUED: 'automotive.reservation_already_issued',
+  PROVIDER_NOT_APPROVED: 'marketplace.provider_not_approved',
+  OPPORTUNITY_ALREADY_CONVERTED: 'crm.opportunity_already_converted',
+  DUPLICATE_CUSTOMER: 'crm.duplicate_customer',
 } as const;

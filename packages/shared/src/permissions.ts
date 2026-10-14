@@ -158,6 +158,69 @@ export const PERMISSIONS: PermissionDefinition[] = [
   P('erp.reports.sales.read', 'ERP', 'View sales reports', 'عرض تقارير المبيعات', 'COMPANY', true, 'Read sales and POS reports.', 'reports_analytics'),
   P('erp.reports.purchasing.read', 'ERP', 'View purchasing reports', 'عرض تقارير المشتريات', 'COMPANY', true, 'Read purchasing and supplier reports.', 'reports_analytics'),
   P('erp.reports.inventory.read', 'ERP', 'View inventory reports', 'عرض تقارير المخزون', 'COMPANY', true, 'Read inventory and stock reports.', 'reports_analytics'),
+
+  // ------------------------------------------------ Execution 03 — HR & payroll
+  P('erp.hr.department.manage', 'ERP', 'Manage departments & job titles', 'إدارة الأقسام والمسميات', 'COMPANY', true, 'Create and edit departments, job titles and reporting lines.', 'human_resources'),
+  P('erp.hr.employee.manage', 'ERP', 'Manage employee records', 'إدارة ملفات الموظفين', 'COMPANY', true, 'Create and edit employee profiles and employment records.', 'human_resources'),
+  P('erp.hr.document.read', 'ERP', 'View employee documents', 'عرض مستندات الموظفين', 'COMPANY', true, 'Read employee document records.', 'human_resources'),
+  P('erp.hr.document.confidential', 'ERP', 'View confidential employee documents', 'عرض المستندات السرية', 'COMPANY', true, 'Read documents flagged confidential.', 'human_resources'),
+  P('erp.hr.lifecycle.manage', 'ERP', 'Manage onboarding & offboarding', 'إدارة التعيين وإنهاء الخدمة', 'COMPANY', true, 'Run onboarding and offboarding checklists.', 'human_resources'),
+  P('erp.hr.leave.manage', 'ERP', 'Manage leave types & balances', 'إدارة أنواع الأرصدة', 'COMPANY', true, 'Configure leave types and adjust balances.', 'human_resources'),
+  P('erp.hr.leave.request', 'ERP', 'Request leave', 'تقديم طلب إجازة', 'COMPANY', true, 'Submit a leave request.', 'human_resources'),
+  P('erp.hr.leave.approve', 'ERP', 'Approve leave', 'اعتماد الإجازات', 'COMPANY', true, 'Approve or reject leave requests.', 'human_resources'),
+  P('erp.hr.attendance.manage', 'ERP', 'Manage attendance & shifts', 'إدارة الحضور والورديات', 'COMPANY', true, 'Record attendance, overtime and shift assignments.', 'human_resources'),
+  P('erp.hr.salary.manage', 'ERP', 'Manage salary structures', 'إدارة هياكل الرواتب', 'COMPANY', true, 'Define salary structures, allowances and deductions.', 'human_resources'),
+  P('erp.hr.payroll.run', 'ERP', 'Run payroll', 'تشغيل الرواتب', 'COMPANY', true, 'Create and calculate payroll runs.', 'human_resources'),
+  P('erp.hr.payroll.approve', 'ERP', 'Approve & post payroll', 'اعتماد وترحيل الرواتب', 'COMPANY', true, 'Approve, post and lock payroll runs.', 'human_resources'),
+  P('erp.hr.advance.manage', 'ERP', 'Manage employee advances', 'إدارة سلف الموظفين', 'COMPANY', true, 'Issue and settle employee advances.', 'human_resources'),
+  P('erp.hr.report.read', 'ERP', 'View HR reports', 'عرض تقارير الموارد البشرية', 'COMPANY', true, 'Read workforce dashboards and HR reports.', 'human_resources'),
+
+  // --------------------------------------------------------- Execution 03 — CRM
+  P('erp.crm.lead.manage', 'ERP', 'Manage leads', 'إدارة العملاء المحتملين', 'COMPANY', true, 'Create and edit leads and lead sources.', 'crm'),
+  P('erp.crm.opportunity.manage', 'ERP', 'Manage opportunities', 'إدارة الفرص', 'COMPANY', true, 'Manage pipelines, stages and opportunities.', 'crm'),
+  P('erp.crm.opportunity.convert', 'ERP', 'Convert opportunities', 'تحويل الفرص', 'COMPANY', true, 'Convert a won opportunity into a quotation or order.', 'crm'),
+  P('erp.crm.contact.manage', 'ERP', 'Manage contacts', 'إدارة جهات الاتصال', 'COMPANY', true, 'Manage customer contacts.', 'crm'),
+  P('erp.crm.activity.manage', 'ERP', 'Manage activities & tasks', 'إدارة الأنشطة والمهام', 'COMPANY', true, 'Record activities, follow-ups and reminders.', 'crm'),
+  P('erp.crm.segment.manage', 'ERP', 'Manage customer segments', 'إدارة شرائح العملاء', 'COMPANY', true, 'Create segments and manage membership.', 'crm'),
+  P('erp.crm.ticket.manage', 'ERP', 'Manage support tickets', 'إدارة تذاكر الدعم', 'COMPANY', true, 'Create, assign and resolve support tickets.', 'crm'),
+  P('erp.crm.sla.manage', 'ERP', 'Manage SLA policies', 'إدارة اتفاقيات الخدمة', 'COMPANY', true, 'Configure service-level targets.', 'crm'),
+  P('erp.crm.report.read', 'ERP', 'View CRM reports', 'عرض تقارير العملاء', 'COMPANY', true, 'Read CRM dashboards and reports.', 'crm'),
+
+  // -------------------------------------------------- Execution 03 — Operations
+  P('erp.operations.project.manage', 'ERP', 'Manage projects', 'إدارة المشاريع', 'COMPANY', true, 'Create and edit projects and workspaces.', 'operations'),
+  P('erp.operations.task.manage', 'ERP', 'Manage tasks', 'إدارة المهام', 'COMPANY', true, 'Create and assign tasks and subtasks.', 'operations'),
+  P('erp.operations.work_order.manage', 'ERP', 'Manage work orders', 'إدارة أوامر العمل', 'COMPANY', true, 'Create, assign and progress work orders.', 'operations'),
+  P('erp.operations.approval.manage', 'ERP', 'Manage approval workflows', 'إدارة الاعتمادات', 'COMPANY', true, 'Raise and decide approval requests.', 'operations'),
+  P('erp.operations.report.read', 'ERP', 'View operations reports', 'عرض تقارير العمليات', 'COMPANY', true, 'Read operational performance reports.', 'operations'),
+
+  // ---------------------------------------------- Execution 03 — Vehicle registry
+  P('erp.vehicle.read', 'ERP', 'View vehicles', 'عرض المركبات', 'COMPANY', true, 'Read the vehicle registry and service history.', 'automotive_inspections'),
+  P('erp.vehicle.manage', 'ERP', 'Manage vehicles', 'إدارة المركبات', 'COMPANY', true, 'Register and edit vehicles, mileage and documents.', 'automotive_inspections'),
+
+  // ------------------------------------------------- Execution 03 — Inspections
+  P('erp.inspection.service.manage', 'ERP', 'Manage inspection services', 'إدارة خدمات الفحص', 'COMPANY', true, 'Manage the inspection service catalog and checklists.', 'automotive_inspections'),
+  P('erp.inspection.booking.manage', 'ERP', 'Manage inspection bookings', 'إدارة حجوزات الفحص', 'COMPANY', true, 'Book, schedule and run inspections.', 'automotive_inspections'),
+  P('erp.inspection.report.approve', 'ERP', 'Approve inspection reports', 'اعتماد تقارير الفحص', 'COMPANY', true, 'Approve or reject an inspection report.', 'automotive_inspections'),
+  P('erp.inspection.invoice', 'ERP', 'Invoice inspections', 'فوترة الفحوصات', 'COMPANY', true, 'Raise a sales invoice for an approved inspection.', 'automotive_inspections'),
+
+  // ------------------------------------------------ Execution 03 — Maintenance
+  P('erp.maintenance.booking.manage', 'ERP', 'Manage maintenance bookings', 'إدارة حجوزات الصيانة', 'COMPANY', true, 'Book and schedule maintenance work.', 'automotive_maintenance'),
+  P('erp.maintenance.jobcard.manage', 'ERP', 'Manage job cards', 'إدارة بطاقات العمل', 'COMPANY', true, 'Create job cards, labour operations and diagnoses.', 'automotive_maintenance'),
+  P('erp.maintenance.estimate.manage', 'ERP', 'Manage repair estimates', 'إدارة تقديرات الإصلاح', 'COMPANY', true, 'Prepare estimates and record customer approval.', 'automotive_maintenance'),
+  P('erp.maintenance.invoice', 'ERP', 'Invoice workshop jobs', 'فوترة أعمال الورشة', 'COMPANY', true, 'Raise a sales invoice for a completed job card.', 'automotive_maintenance'),
+  P('erp.maintenance.warranty.manage', 'ERP', 'Manage warranty records', 'إدارة الضمانات', 'COMPANY', true, 'Record and track vehicle warranties.', 'automotive_maintenance'),
+
+  // --------------------------------------------------- Execution 03 — Spare parts
+  P('erp.parts.reference.manage', 'ERP', 'Manage part numbers', 'إدارة أرقام القطع', 'COMPANY', true, 'Manage OEM, aftermarket and cross-reference numbers.', 'spare_parts'),
+  P('erp.parts.compatibility.manage', 'ERP', 'Manage compatibility', 'إدارة التوافق', 'COMPANY', true, 'Map parts to vehicle make, model and year.', 'spare_parts'),
+  P('erp.parts.reserve', 'ERP', 'Reserve parts', 'حجز القطع', 'COMPANY', true, 'Reserve stock for a job card.', 'spare_parts'),
+  P('erp.parts.issue', 'ERP', 'Issue parts', 'صرف القطع', 'COMPANY', true, 'Issue reserved parts and consume the stock ledger.', 'spare_parts'),
+
+  // ---------------------------------------------------- Execution 03 — Marketplace
+  P('erp.marketplace.provider.manage', 'ERP', 'Manage service providers', 'إدارة مزودي الخدمة', 'COMPANY', true, 'Create, approve and suspend marketplace providers.', 'automotive_maintenance'),
+  P('erp.marketplace.listing.manage', 'ERP', 'Manage service listings', 'إدارة قوائم الخدمات', 'COMPANY', true, 'Manage provider service listings and pricing.', 'automotive_maintenance'),
+  P('erp.marketplace.request.manage', 'ERP', 'Manage service requests', 'إدارة طلبات الخدمة', 'COMPANY', true, 'Create and assign marketplace service requests.', 'automotive_maintenance'),
+  P('erp.marketplace.commission.manage', 'ERP', 'Manage commissions & settlements', 'إدارة العمولات والتسويات', 'COMPANY', true, 'Configure commissions and prepare provider settlements.', 'automotive_maintenance'),
 ];
 
 export const PERMISSION_BY_CODE: ReadonlyMap<string, PermissionDefinition> = new Map(

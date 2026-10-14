@@ -22,6 +22,7 @@ import { InventoryModule } from './inventory/inventory.module';
 import { SalesModule } from './sales/sales.module';
 import { PurchasingModule } from './purchasing/purchasing.module';
 import { ReportsModule } from './reports/reports.module';
+import { HrModule } from './hr/hr.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { ReportsModule } from './reports/reports.module';
     SalesModule,
     PurchasingModule,
     ReportsModule,
+    HrModule,
   ],
   providers: [
     // Global rate limiting; sensitive auth routes override with @Throttle.

@@ -229,6 +229,72 @@ model Company {
   supplierInvoices    SupplierInvoice[]
   purchaseReturns     PurchaseReturn[]
 
+  // Execution 03 — HR, CRM, operations and automotive services.
+  departments         Department[]
+  jobTitles           JobTitle[]
+  employees           Employee[]
+  employmentContracts EmploymentContract[]
+  employeeDocuments   EmployeeDocument[]
+  employeeLifecycles  EmployeeLifecycle[]
+  leaveTypes          LeaveType[]
+  leaveBalances       LeaveBalance[]
+  leaveRequests       LeaveRequest[]
+  shifts              Shift[]
+  employeeShifts      EmployeeShift[]
+  attendanceRecords   AttendanceRecord[]
+  salaryStructures    SalaryStructure[]
+  salaryComponents    SalaryComponent[]
+  payrollPeriods      PayrollPeriod[]
+  payrollRuns         PayrollRun[]
+  payslips            Payslip[]
+  employeeAdvances    EmployeeAdvance[]
+  advanceSettlements  AdvanceSettlement[]
+
+  leadSources         LeadSource[]
+  leads               Lead[]
+  pipelines           Pipeline[]
+  pipelineStages      PipelineStage[]
+  opportunities       Opportunity[]
+  customerContacts    CustomerContact[]
+  crmActivities       CrmActivity[]
+  slaPolicies         SlaPolicy[]
+  supportTickets      SupportTicket[]
+  ticketMessages      TicketMessage[]
+  customerSegments    CustomerSegment[]
+  customerSegmentMembers CustomerSegmentMember[]
+
+  projects            Project[]
+  projectTasks        ProjectTask[]
+  workOrders          WorkOrder[]
+  workOrderChecklistItems WorkOrderChecklistItem[]
+  approvalRequests    ApprovalRequest[]
+  entityComments      EntityComment[]
+  entityAttachments   EntityAttachment[]
+  notifications       Notification[]
+  calendarEvents      OperationalCalendarEvent[]
+
+  vehicles            Vehicle[]
+  vehicleMileageRecords VehicleMileageRecord[]
+  vehicleDocuments    VehicleDocument[]
+  inspectionServices  InspectionService[]
+  inspectionChecklistItems InspectionChecklistItem[]
+  inspectionBookings  InspectionBooking[]
+  inspectionFindings  InspectionFinding[]
+  inspectionReports   InspectionReport[]
+  workshopBays        WorkshopBay[]
+  maintenanceBookings MaintenanceBooking[]
+  jobCards            JobCard[]
+  labourOperations    LabourOperation[]
+  repairEstimates     RepairEstimate[]
+  repairEstimateLines RepairEstimateLine[]
+  partsReservations   PartsReservation[]
+  partsReservationLines PartsReservationLine[]
+  partReferences      PartReference[]
+  partCompatibilities PartCompatibility[]
+  warrantyRecords     WarrantyRecord[]
+  serviceRequests     ServiceRequest[]
+  marketplaceCommissions MarketplaceCommission[]
+
   @@index([type])
   @@index([status])
   @@index([parentCompanyId])
@@ -262,6 +328,18 @@ model Branch {
   supplierInvoices  SupplierInvoice[]
   payments          Payment[]
   journalEntries    JournalEntry[]
+
+  // Execution 03 — branch scope for HR, operations and automotive.
+  departments       Department[]
+  employees         Employee[]
+  projects          Project[]
+  projectTasks      ProjectTask[]
+  workOrders        WorkOrder[]
+  calendarEvents    OperationalCalendarEvent[]
+  inspectionBookings InspectionBooking[]
+  maintenanceBookings MaintenanceBooking[]
+  jobCards          JobCard[]
+  workshopBays      WorkshopBay[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -1094,6 +1172,11 @@ model Product {
   levels    StockLevel[]
   movements StockMovement[]
 
+  // Execution 03
+  partReferences   PartReference[]
+  partCompatibilities PartCompatibility[]
+  reservationLines PartsReservationLine[]
+
   @@unique([companyId, sku])
   @@index([companyId, isActive])
 }
@@ -1247,6 +1330,11 @@ model Customer {
   creditNotes CreditNote[]
   posSales    PosSale[]
   payments    Payment[]
+
+  // Execution 03
+  contacts          CustomerContact[]
+  vehicles          Vehicle[]
+  segmentMemberships CustomerSegmentMember[]
 
   @@unique([companyId, code])
   @@index([companyId, isActive])
@@ -1792,4 +1880,1751 @@ model PurchaseReturnLine {
   purchaseReturn PurchaseReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
 
   @@index([returnId])
+}
+
+// ============================================================================
+// EXECUTION 03 — HR & PAYROLL, CRM, OPERATIONS, AUTOMOTIVE SERVICES
+//
+// Every tenant-owned row carries `companyId`. Money is integer minor units;
+// quantities are scaled by 10^4; hours and leave days are scaled by 100
+// (hundredths); percentages are basis points (1500 = 15.00%). Payroll and
+// workshop postings go through the Execution 02 double-entry engine, so there is
+// one ledger and one accounting system, never a parallel one.
+// ============================================================================
+
+// ------------------------------------------------------------------- HR enums
+
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  SUSPENDED
+  TERMINATED
+}
+
+enum ContractType {
+  PERMANENT
+  FIXED_TERM
+  PART_TIME
+  CONTRACTOR
+}
+
+enum ContractStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  TERMINATED
+}
+
+enum EmployeeDocumentCategory {
+  IDENTITY
+  CONTRACT
+  CERTIFICATE
+  MEDICAL
+  OTHER
+}
+
+enum LifecycleType {
+  ONBOARDING
+  OFFBOARDING
+}
+
+enum LifecycleStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
+}
+
+enum LeaveRequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  LEAVE
+  HOLIDAY
+}
+
+enum SalaryComponentType {
+  ALLOWANCE
+  DEDUCTION
+}
+
+enum PayrollPeriodStatus {
+  OPEN
+  CLOSED
+  LOCKED
+}
+
+enum PayrollRunStatus {
+  DRAFT
+  APPROVED
+  POSTED
+  LOCKED
+  CANCELLED
+}
+
+enum AdvanceStatus {
+  OPEN
+  PARTIALLY_SETTLED
+  SETTLED
+  CANCELLED
+}
+
+// ------------------------------------------------------------------ CRM enums
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  CONVERTED
+  LOST
+}
+
+enum OpportunityStatus {
+  OPEN
+  WON
+  LOST
+}
+
+enum ActivityType {
+  CALL
+  MEETING
+  EMAIL
+  NOTE
+  TASK
+  FOLLOW_UP
+}
+
+enum ActivityStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  NEW
+  OPEN
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+// ----------------------------------------------------------- Operations enums
+
+enum ProjectStatus {
+  PLANNED
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum WorkOrderStatus {
+  DRAFT
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum NotificationType {
+  INFO
+  TASK
+  APPROVAL
+  ALERT
+}
+
+// ----------------------------------------------------------- Automotive enums
+
+enum VehicleStatus {
+  ACTIVE
+  INACTIVE
+  SOLD
+}
+
+enum InspectionBookingStatus {
+  REQUESTED
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum FindingSeverity {
+  INFO
+  MINOR
+  MAJOR
+  CRITICAL
+}
+
+enum InspectionReportStatus {
+  DRAFT
+  APPROVED
+  REJECTED
+}
+
+enum MaintenanceBookingStatus {
+  REQUESTED
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum JobCardStatus {
+  DRAFT
+  OPEN
+  AWAITING_APPROVAL
+  APPROVED
+  IN_PROGRESS
+  COMPLETED
+  INVOICED
+  CANCELLED
+}
+
+enum EstimateStatus {
+  DRAFT
+  SENT
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum EstimateLineType {
+  LABOUR
+  PART
+  SERVICE
+}
+
+enum ReservationStatus {
+  RESERVED
+  PARTIALLY_ISSUED
+  ISSUED
+  CANCELLED
+}
+
+enum PartNumberType {
+  OEM
+  AFTERMARKET
+  CROSS_REFERENCE
+}
+
+enum ProviderStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+  REJECTED
+}
+
+enum ServiceRequestStatus {
+  NEW
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum CommissionStatus {
+  PENDING
+  INVOICED
+  SETTLED
+  CANCELLED
+}
+
+enum SettlementStatus {
+  DRAFT
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+// ============================================================================
+// PHASE 2 — HUMAN RESOURCES & PAYROLL
+// ============================================================================
+
+model Department {
+  id         String   @id @default(cuid())
+  companyId  String
+  code       String
+  nameEn     String
+  nameAr     String
+  parentId   String?
+  branchId   String?
+  managerEmployeeId String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company  Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  parent   Department? @relation("DepartmentTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Department[] @relation("DepartmentTree")
+
+  jobTitles JobTitle[]
+  employees Employee[]
+  workOrders WorkOrder[]
+
+  @@unique([companyId, code])
+  @@index([companyId, isActive])
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+}
+
+model JobTitle {
+  id           String   @id @default(cuid())
+  companyId    String
+  code         String
+  nameEn       String
+  nameAr       String
+  departmentId String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  employees  Employee[]
+
+  @@unique([companyId, code])
+  @@index([companyId, isActive])
+}
+
+model Employee {
+  id             String         @id @default(cuid())
+  companyId      String
+  code           String
+  fullNameEn     String
+  fullNameAr     String
+  email          String?
+  phone          String?
+  nationalId     String?
+  /** Optional link to a platform user account. */
+  userId         String?
+  departmentId   String?
+  jobTitleId     String?
+  branchId       String?
+  /** Reporting line. */
+  managerId      String?
+  status         EmployeeStatus @default(ACTIVE)
+  hireDate       DateTime
+  terminationDate DateTime?
+  dateOfBirth    DateTime?
+  gender         String?
+  addressLine    String?
+  notes          String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  jobTitle   JobTitle?   @relation(fields: [jobTitleId], references: [id], onDelete: SetNull)
+  branch     Branch?     @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  manager    Employee?   @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
+  reports    Employee[]  @relation("EmployeeManager")
+
+  contracts      EmploymentContract[]
+  documents      EmployeeDocument[]
+  lifecycle      EmployeeLifecycle[]
+  leaveBalances  LeaveBalance[]
+  leaveRequests  LeaveRequest[]
+  attendance     AttendanceRecord[]
+  shiftAssignments EmployeeShift[]
+  salaryStructures SalaryStructure[]
+  payslips       Payslip[]
+  advances       EmployeeAdvance[]
+
+  @@unique([companyId, code])
+  @@index([companyId, status])
+  @@index([companyId, departmentId])
+  @@index([managerId])
+}
+
+model EmploymentContract {
+  id            String         @id @default(cuid())
+  companyId     String
+  employeeId    String
+  contractNumber String
+  type          ContractType   @default(PERMANENT)
+  status        ContractStatus @default(DRAFT)
+  startDate     DateTime
+  endDate       DateTime?
+  /** Contracted base salary at signing, in minor units. */
+  baseSalaryMinor Int
+  currency      String         @default("SAR")
+  probationDays Int            @default(0)
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, contractNumber])
+  @@index([companyId, employeeId])
+}
+
+model EmployeeDocument {
+  id         String                  @id @default(cuid())
+  companyId  String
+  employeeId String
+  category   EmployeeDocumentCategory @default(OTHER)
+  title      String
+  fileRef    String?
+  issuedAt   DateTime?
+  expiresAt  DateTime?
+  /** When true only a principal holding the confidential-documents permission may read it. */
+  isConfidential Boolean            @default(false)
+  notes      String?
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, employeeId])
+}
+
+/** Onboarding or offboarding checklist for an employee. */
+model EmployeeLifecycle {
+  id         String          @id @default(cuid())
+  companyId  String
+  employeeId String
+  type       LifecycleType
+  status     LifecycleStatus @default(OPEN)
+  startedAt  DateTime        @default(now())
+  completedAt DateTime?
+  notes      String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  items    EmployeeLifecycleItem[]
+
+  @@index([companyId, employeeId])
+}
+
+model EmployeeLifecycleItem {
+  id          String  @id @default(cuid())
+  lifecycleId String
+  label       String
+  isDone      Boolean @default(false)
+  doneAt      DateTime?
+  sortOrder   Int     @default(0)
+
+  lifecycle EmployeeLifecycle @relation(fields: [lifecycleId], references: [id], onDelete: Cascade)
+
+  @@index([lifecycleId])
+}
+
+model LeaveType {
+  id        String   @id @default(cuid())
+  companyId String
+  code      String
+  nameEn    String
+  nameAr    String
+  /** Annual entitlement in hundredths of a day (2500 = 25 days). */
+  annualEntitlementDays Int @default(0)
+  isPaid    Boolean  @default(true)
+  requiresApproval Boolean @default(true)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  balances LeaveBalance[]
+  requests LeaveRequest[]
+
+  @@unique([companyId, code])
+}
+
+model LeaveBalance {
+  id          String   @id @default(cuid())
+  companyId   String
+  employeeId  String
+  leaveTypeId String
+  year        Int
+  /** All in hundredths of a day. */
+  entitledDays Int     @default(0)
+  accruedDays  Int     @default(0)
+  usedDays     Int     @default(0)
+  pendingDays  Int     @default(0)
+  updatedAt   DateTime @updatedAt
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee  Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, leaveTypeId, year])
+  @@index([companyId])
+}
+
+model LeaveRequest {
+  id          String            @id @default(cuid())
+  companyId   String
+  employeeId  String
+  leaveTypeId String
+  startDate   DateTime
+  endDate     DateTime
+  /** Total days requested in hundredths of a day. */
+  days        Int
+  status      LeaveRequestStatus @default(DRAFT)
+  reason      String?
+  approvedById String?
+  decidedAt   DateTime?
+  decisionNote String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee  Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, status])
+  @@index([companyId, employeeId])
+}
+
+model Shift {
+  id          String   @id @default(cuid())
+  companyId   String
+  code        String
+  nameEn      String
+  nameAr      String
+  startTime   String
+  endTime     String
+  breakMinutes Int     @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company     Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignments EmployeeShift[]
+  attendance  AttendanceRecord[]
+
+  @@unique([companyId, code])
+}
+
+model EmployeeShift {
+  id         String   @id @default(cuid())
+  companyId  String
+  employeeId String
+  shiftId    String
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  createdAt  DateTime @default(now())
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  shift    Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, employeeId])
+}
+
+model AttendanceRecord {
+  id             String           @id @default(cuid())
+  companyId      String
+  employeeId     String
+  shiftId        String?
+  workDate       DateTime
+  checkInAt      DateTime?
+  checkOutAt     DateTime?
+  workedMinutes  Int              @default(0)
+  overtimeMinutes Int             @default(0)
+  status         AttendanceStatus @default(PRESENT)
+  notes          String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  shift    Shift?   @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+
+  @@unique([employeeId, workDate])
+  @@index([companyId, workDate])
+}
+
+/** Effective-dated salary structure. A payroll run snapshots it. */
+model SalaryStructure {
+  id            String   @id @default(cuid())
+  companyId     String
+  employeeId    String
+  effectiveFrom DateTime
+  /** Base monthly salary in minor units. */
+  basicMinor    Int
+  currency      String   @default("SAR")
+  isActive      Boolean  @default(true)
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  components SalaryComponent[]
+
+  @@index([companyId, employeeId, effectiveFrom])
+}
+
+model SalaryComponent {
+  id                String             @id @default(cuid())
+  companyId         String
+  salaryStructureId String
+  type              SalaryComponentType
+  code              String
+  nameEn            String
+  nameAr            String
+  /** Fixed amount in minor units when isPercentage is false. */
+  amountMinor       Int                @default(0)
+  isPercentage      Boolean            @default(false)
+  /** Percentage of basic in basis points when isPercentage is true. */
+  percentBp         Int                @default(0)
+  sortOrder         Int                @default(0)
+
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  salaryStructure SalaryStructure @relation(fields: [salaryStructureId], references: [id], onDelete: Cascade)
+
+  @@unique([salaryStructureId, code])
+  @@index([companyId])
+}
+
+model PayrollPeriod {
+  id        String              @id @default(cuid())
+  companyId String
+  code      String
+  nameEn    String
+  nameAr    String
+  startDate DateTime
+  endDate   DateTime
+  status    PayrollPeriodStatus @default(OPEN)
+  closedAt  DateTime?
+  closedByUserId String?
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  company Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  runs    PayrollRun[]
+
+  @@unique([companyId, code])
+  @@index([companyId, status])
+}
+
+model PayrollRun {
+  id             String           @id @default(cuid())
+  companyId      String
+  periodId       String
+  runNumber      String
+  status         PayrollRunStatus @default(DRAFT)
+  employeeCount  Int              @default(0)
+  grossMinor     Int              @default(0)
+  allowancesMinor Int             @default(0)
+  deductionsMinor Int             @default(0)
+  netMinor       Int              @default(0)
+  currency       String           @default("SAR")
+  journalEntryId String?
+  approvedById   String?
+  approvedAt     DateTime?
+  postedAt       DateTime?
+  createdById    String
+  notes          String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  company Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  period  PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  payslips Payslip[]
+
+  @@unique([companyId, runNumber])
+  @@index([companyId, status])
+  @@index([companyId, periodId])
+}
+
+/** Immutable result of one employee in one run. Snapshots the structure. */
+model Payslip {
+  id            String   @id @default(cuid())
+  companyId     String
+  payrollRunId  String
+  employeeId    String
+  employeeCode  String
+  employeeNameEn String
+  employeeNameAr String
+  basicMinor    Int
+  allowancesMinor Int    @default(0)
+  deductionsMinor Int    @default(0)
+  grossMinor    Int      @default(0)
+  netMinor      Int      @default(0)
+  currency      String   @default("SAR")
+  advanceDeductionMinor Int @default(0)
+  /** Full snapshot of the salary structure and computed components at run time. */
+  snapshot      Json?
+  createdAt     DateTime @default(now())
+
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  payrollRun PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  lines      PayslipLine[]
+
+  @@unique([payrollRunId, employeeId])
+  @@index([companyId, employeeId])
+}
+
+model PayslipLine {
+  id           String             @id @default(cuid())
+  payslipId    String
+  type         SalaryComponentType
+  code         String
+  nameEn       String
+  nameAr       String
+  amountMinor  Int
+  sortOrder    Int                @default(0)
+
+  payslip Payslip @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+
+  @@index([payslipId])
+}
+
+model EmployeeAdvance {
+  id            String        @id @default(cuid())
+  companyId     String
+  employeeId    String
+  advanceNumber String
+  amountMinor   Int
+  installments  Int           @default(1)
+  settledMinor  Int           @default(0)
+  currency      String        @default("SAR")
+  status        AdvanceStatus @default(OPEN)
+  issuedAt      DateTime
+  reason        String?
+  createdById   String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee  Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  settlements AdvanceSettlement[]
+
+  @@unique([companyId, advanceNumber])
+  @@index([companyId, employeeId])
+}
+
+model AdvanceSettlement {
+  id            String   @id @default(cuid())
+  companyId     String
+  advanceId     String
+  payrollRunId  String?
+  amountMinor   Int
+  settledAt     DateTime @default(now())
+  note          String?
+
+  company Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  advance EmployeeAdvance @relation(fields: [advanceId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, advanceId])
+}
+
+// ============================================================================
+// PHASE 3 — CRM & CUSTOMER SERVICE
+// ============================================================================
+
+model LeadSource {
+  id        String   @id @default(cuid())
+  companyId String
+  code      String
+  nameEn    String
+  nameAr    String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leads   Lead[]
+
+  @@unique([companyId, code])
+}
+
+model Lead {
+  id            String     @id @default(cuid())
+  companyId     String
+  code          String
+  nameEn        String
+  nameAr        String
+  contactName   String?
+  email         String?
+  phone         String?
+  sourceId      String?
+  status        LeadStatus @default(NEW)
+  ownerUserId   String?
+  estimatedValueMinor Int  @default(0)
+  currency      String     @default("SAR")
+  notes         String?
+  /** Set when the lead is converted to a customer. */
+  customerId    String?
+  convertedOpportunityId String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  company  Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  source   LeadSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  opportunities Opportunity[]
+
+  @@unique([companyId, code])
+  @@index([companyId, status])
+}
+
+model Pipeline {
+  id        String   @id @default(cuid())
+  companyId String
+  code      String
+  nameEn    String
+  nameAr    String
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  stages  PipelineStage[]
+  opportunities Opportunity[]
+
+  @@unique([companyId, code])
+}
+
+model PipelineStage {
+  id           String   @id @default(cuid())
+  companyId    String
+  pipelineId   String
+  code         String
+  nameEn       String
+  nameAr       String
+  sortOrder    Int      @default(0)
+  /** Win probability in basis points. */
+  probabilityBp Int     @default(0)
+  isWon        Boolean  @default(false)
+  isLost       Boolean  @default(false)
+
+  company      Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  pipeline     Pipeline        @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  opportunities Opportunity[]
+
+  @@unique([pipelineId, code])
+  @@index([companyId])
+}
+
+model Opportunity {
+  id            String            @id @default(cuid())
+  companyId     String
+  code          String
+  title         String
+  pipelineId    String
+  stageId       String
+  customerId    String?
+  leadId        String?
+  ownerUserId   String?
+  amountMinor   Int               @default(0)
+  currency      String            @default("SAR")
+  expectedCloseDate DateTime?
+  status        OpportunityStatus @default(OPEN)
+  /** Set when converted into a quotation. */
+  quotationId   String?
+  notes         String?
+  closedAt      DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  company  Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  pipeline Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Restrict)
+  stage    PipelineStage @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  lead     Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, code])
+  @@index([companyId, status])
+  @@index([companyId, stageId])
+}
+
+model CustomerContact {
+  id         String   @id @default(cuid())
+  companyId  String
+  customerId String
+  nameEn     String
+  nameAr     String
+  email      String?
+  phone      String?
+  role       String?
+  isPrimary  Boolean  @default(false)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, customerId])
+}
+
+model CrmActivity {
+  id            String         @id @default(cuid())
+  companyId     String
+  type          ActivityType
+  status        ActivityStatus @default(OPEN)
+  subject       String
+  notes         String?
+  dueAt         DateTime?
+  completedAt   DateTime?
+  ownerUserId   String?
+  customerId    String?
+  leadId        String?
+  opportunityId String?
+  ticketId      String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, status])
+  @@index([companyId, ownerUserId])
+  @@index([companyId, dueAt])
+}
+
+model SlaPolicy {
+  id                String          @id @default(cuid())
+  companyId         String
+  name              String
+  priority          TicketPriority
+  responseMinutes   Int
+  resolutionMinutes Int
+  isActive          Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, priority])
+}
+
+model SupportTicket {
+  id             String         @id @default(cuid())
+  companyId      String
+  ticketNumber   String
+  subject        String
+  description    String?
+  customerId     String?
+  contactId      String?
+  category       String?
+  priority       TicketPriority @default(NORMAL)
+  status         TicketStatus   @default(NEW)
+  assignedToUserId String?
+  /** Response/resolution targets derived from the SLA policy at creation. */
+  responseDueAt  DateTime?
+  resolutionDueAt DateTime?
+  firstResponseAt DateTime?
+  resolvedAt     DateTime?
+  closedAt       DateTime?
+  satisfactionScore Int?
+  createdById    String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  company Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  messages TicketMessage[]
+
+  @@unique([companyId, ticketNumber])
+  @@index([companyId, status])
+  @@index([companyId, assignedToUserId])
+}
+
+model TicketMessage {
+  id           String   @id @default(cuid())
+  companyId    String
+  ticketId     String
+  authorUserId String?
+  body         String
+  isInternal   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  company Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  ticket  SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model CustomerSegment {
+  id        String   @id @default(cuid())
+  companyId String
+  code      String
+  nameEn    String
+  nameAr    String
+  description String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  members CustomerSegmentMember[]
+
+  @@unique([companyId, code])
+}
+
+model CustomerSegmentMember {
+  id         String   @id @default(cuid())
+  companyId  String
+  segmentId  String
+  customerId String
+  addedAt    DateTime @default(now())
+
+  company  Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  segment  CustomerSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+
+  @@unique([segmentId, customerId])
+  @@index([companyId])
+}
+
+// ============================================================================
+// PHASE 4 — OPERATIONS & WORK MANAGEMENT
+// ============================================================================
+
+model Project {
+  id          String        @id @default(cuid())
+  companyId   String
+  code        String
+  nameEn      String
+  nameAr      String
+  branchId    String?
+  departmentId String?
+  status      ProjectStatus @default(PLANNED)
+  ownerUserId String?
+  startDate   DateTime?
+  endDate     DateTime?
+  description String?
+  createdById String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  company Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tasks   ProjectTask[]
+
+  @@unique([companyId, code])
+  @@index([companyId, status])
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+}
+
+model ProjectTask {
+  id           String       @id @default(cuid())
+  companyId    String
+  projectId    String?
+  parentTaskId String?
+  title        String
+  description  String?
+  status       TaskStatus   @default(TODO)
+  priority     TaskPriority @default(NORMAL)
+  assigneeUserId String?
+  branchId     String?
+  dueDate      DateTime?
+  completedAt  DateTime?
+  createdById  String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  company  Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  project  Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent   ProjectTask?  @relation("TaskTree", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  children ProjectTask[] @relation("TaskTree")
+
+  @@index([companyId, status])
+  @@index([companyId, assigneeUserId])
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+}
+
+model WorkOrder {
+  id            String          @id @default(cuid())
+  companyId     String
+  orderNumber   String
+  title         String
+  description   String?
+  type          String          @default("GENERAL")
+  branchId      String?
+  departmentId  String?
+  status        WorkOrderStatus @default(DRAFT)
+  priority      TaskPriority    @default(NORMAL)
+  requestedById String?
+  assigneeUserId String?
+  dueDate       DateTime?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  /** Optional link to a CRM service request or an automotive job card. */
+  sourceType    String?
+  sourceId      String?
+  createdById   String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  checklist  WorkOrderChecklistItem[]
+
+  @@unique([companyId, orderNumber])
+  @@index([companyId, status])
+  @@index([companyId, assigneeUserId])
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+}
+
+model WorkOrderChecklistItem {
+  id          String   @id @default(cuid())
+  companyId   String
+  workOrderId String
+  label       String
+  isDone      Boolean  @default(false)
+  doneAt      DateTime?
+  sortOrder   Int      @default(0)
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([workOrderId])
+}
+
+model ApprovalRequest {
+  id            String         @id @default(cuid())
+  companyId     String
+  entityType    String
+  entityId      String
+  status        ApprovalStatus @default(PENDING)
+  requestedById String
+  approverUserId String?
+  decidedAt     DateTime?
+  note          String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, entityType, entityId])
+  @@index([companyId, status])
+}
+
+/** A comment on any operational entity, addressed by type + id. */
+model EntityComment {
+  id           String   @id @default(cuid())
+  companyId    String
+  entityType   String
+  entityId     String
+  authorUserId String?
+  body         String
+  createdAt    DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, entityType, entityId])
+}
+
+model EntityAttachment {
+  id         String   @id @default(cuid())
+  companyId  String
+  entityType String
+  entityId   String
+  fileName   String
+  mimeType   String?
+  sizeBytes  Int      @default(0)
+  /** Opaque storage reference; no binary is stored in the database. */
+  storageRef String?
+  uploadedById String?
+  createdAt  DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, entityType, entityId])
+}
+
+/** Internal, database-persisted notification. No external provider is claimed. */
+model Notification {
+  id         String           @id @default(cuid())
+  companyId  String
+  userId     String
+  type       NotificationType @default(INFO)
+  title      String
+  body       String?
+  entityType String?
+  entityId   String?
+  readAt     DateTime?
+  createdAt  DateTime         @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, userId, readAt])
+}
+
+model OperationalCalendarEvent {
+  id         String   @id @default(cuid())
+  companyId  String
+  branchId   String?
+  title      String
+  description String?
+  startAt    DateTime
+  endAt      DateTime
+  allDay     Boolean  @default(false)
+  entityType String?
+  entityId   String?
+  createdById String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, startAt])
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+}
+
+// ============================================================================
+// PHASE 5 — AUTOMOTIVE SERVICE MANAGEMENT
+// ============================================================================
+
+model Vehicle {
+  id           String        @id @default(cuid())
+  companyId    String
+  customerId   String
+  /** VIN/chassis number, unique per company. */
+  vin          String
+  plateNumber  String?
+  make         String
+  model        String
+  modelYear    Int
+  color        String?
+  mileage      Int           @default(0)
+  status       VehicleStatus @default(ACTIVE)
+  registrationExpiresAt DateTime?
+  notes        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  mileageRecords VehicleMileageRecord[]
+  documents      VehicleDocument[]
+  inspections    InspectionBooking[]
+  maintenance    MaintenanceBooking[]
+  jobCards       JobCard[]
+  warranties     WarrantyRecord[]
+
+  @@unique([companyId, vin])
+  @@index([companyId, customerId])
+  @@index([companyId, status])
+}
+
+model VehicleMileageRecord {
+  id         String   @id @default(cuid())
+  companyId  String
+  vehicleId  String
+  mileage    Int
+  source     String   @default("MANUAL")
+  recordedAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, vehicleId])
+}
+
+model VehicleDocument {
+  id         String   @id @default(cuid())
+  companyId  String
+  vehicleId  String
+  category   String
+  number     String?
+  expiresAt  DateTime?
+  fileRef    String?
+  createdAt  DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, vehicleId])
+}
+
+model InspectionService {
+  id              String   @id @default(cuid())
+  companyId       String
+  code            String
+  nameEn          String
+  nameAr          String
+  description     String?
+  priceMinor      Int      @default(0)
+  taxPercentBp    Int      @default(0)
+  durationMinutes Int      @default(60)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  company  Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  items    InspectionChecklistItem[]
+  bookings InspectionBooking[]
+
+  @@unique([companyId, code])
+}
+
+model InspectionChecklistItem {
+  id         String   @id @default(cuid())
+  companyId  String
+  serviceId  String?
+  code       String
+  labelEn    String
+  labelAr    String
+  category   String
+  sortOrder  Int      @default(0)
+  isActive   Boolean  @default(true)
+
+  company  Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  service  InspectionService? @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  findings InspectionFinding[]
+
+  @@index([companyId, serviceId])
+}
+
+model InspectionBooking {
+  id            String                  @id @default(cuid())
+  companyId     String
+  bookingNumber String
+  vehicleId     String
+  customerId    String
+  serviceId     String
+  branchId      String?
+  scheduledAt   DateTime
+  status        InspectionBookingStatus @default(REQUESTED)
+  inspectorUserId String?
+  odometer      Int?
+  notes         String?
+  createdById   String
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  company  Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicle  Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  service  InspectionService @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  findings InspectionFinding[]
+  report   InspectionReport?
+
+  @@unique([companyId, bookingNumber])
+  @@index([companyId, status])
+  @@index([companyId, vehicleId])
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+}
+
+model InspectionFinding {
+  id           String          @id @default(cuid())
+  companyId    String
+  bookingId    String
+  checklistItemId String?
+  category     String
+  severity     FindingSeverity @default(INFO)
+  description  String
+  isDefect     Boolean         @default(false)
+  recommendation String?
+  createdAt    DateTime        @default(now())
+
+  company  Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  booking  InspectionBooking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  checklistItem InspectionChecklistItem? @relation(fields: [checklistItemId], references: [id], onDelete: SetNull)
+
+  @@index([bookingId])
+}
+
+model InspectionReport {
+  id            String                 @id @default(cuid())
+  companyId     String
+  bookingId     String                 @unique
+  summary       String?
+  overallCondition String?
+  status        InspectionReportStatus @default(DRAFT)
+  approvedById  String?
+  approvedAt    DateTime?
+  /** Sales invoice created from the inspection, when invoiced. */
+  invoiceId     String?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  company Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  booking InspectionBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, status])
+}
+
+model WorkshopBay {
+  id        String   @id @default(cuid())
+  companyId String
+  branchId  String?
+  code      String
+  nameEn    String
+  nameAr    String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, code])
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+}
+
+model MaintenanceBooking {
+  id            String                   @id @default(cuid())
+  companyId     String
+  bookingNumber String
+  vehicleId     String
+  customerId    String
+  branchId      String?
+  bayId         String?
+  scheduledAt   DateTime
+  status        MaintenanceBookingStatus @default(REQUESTED)
+  complaint     String?
+  notes         String?
+  createdById   String
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+
+  jobCards JobCard[]
+
+  @@unique([companyId, bookingNumber])
+  @@index([companyId, status])
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+}
+
+model JobCard {
+  id            String        @id @default(cuid())
+  companyId     String
+  jobNumber     String
+  vehicleId     String
+  bookingId     String?
+  customerId    String
+  branchId      String?
+  bayId         String?
+  technicianUserId String?
+  status        JobCardStatus @default(DRAFT)
+  odometer      Int?
+  complaint     String?
+  diagnosis     String?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  /** Sales invoice raised for the completed job. */
+  invoiceId     String?
+  createdById   String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  company   Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicle   Vehicle             @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  booking   MaintenanceBooking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  labour        LabourOperation[]
+  estimates     RepairEstimate[]
+  reservations  PartsReservation[]
+  warranties    WarrantyRecord[]
+
+  @@unique([companyId, jobNumber])
+  @@index([companyId, status])
+  @@index([companyId, vehicleId])
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+}
+
+model LabourOperation {
+  id           String   @id @default(cuid())
+  companyId    String
+  jobCardId    String
+  description  String
+  /** Hours in hundredths of an hour (250 = 2.5 h). */
+  hours        Int
+  rateMinor    Int      @default(0)
+  amountMinor  Int      @default(0)
+  sortOrder    Int      @default(0)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobCard JobCard @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+
+  @@index([jobCardId])
+}
+
+model RepairEstimate {
+  id            String        @id @default(cuid())
+  companyId     String
+  jobCardId     String
+  estimateNumber String
+  status        EstimateStatus @default(DRAFT)
+  subtotalMinor Int           @default(0)
+  taxMinor      Int           @default(0)
+  totalMinor    Int           @default(0)
+  currency      String        @default("SAR")
+  customerApprovedById String?
+  approvedAt    DateTime?
+  expiresAt     DateTime?
+  notes         String?
+  createdById   String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  company Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobCard JobCard         @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  lines   RepairEstimateLine[]
+
+  @@unique([companyId, estimateNumber])
+  @@index([companyId, status])
+}
+
+model RepairEstimateLine {
+  id             String           @id @default(cuid())
+  companyId      String
+  estimateId     String
+  type           EstimateLineType @default(PART)
+  productId      String?
+  description    String
+  quantity       Int
+  unitPriceMinor Int
+  taxPercentBp   Int              @default(0)
+  lineTotalMinor Int
+  sortOrder      Int              @default(0)
+
+  company  Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  estimate RepairEstimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+
+  @@index([estimateId])
+}
+
+/** Reservation of stock for a job card. Issuing it moves the shared stock ledger. */
+model PartsReservation {
+  id          String            @id @default(cuid())
+  companyId   String
+  jobCardId   String
+  warehouseId String
+  status      ReservationStatus @default(RESERVED)
+  reservedAt  DateTime          @default(now())
+  issuedAt    DateTime?
+  createdById String
+
+  company Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobCard JobCard               @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  lines   PartsReservationLine[]
+
+  @@index([companyId, status])
+  @@index([jobCardId])
+}
+
+model PartsReservationLine {
+  id           String @id @default(cuid())
+  companyId    String
+  reservationId String
+  productId    String
+  /** Reserved quantity, scaled by 10^4. */
+  quantity     Int
+  issuedQuantity Int  @default(0)
+
+  company     Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  reservation PartsReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  product     Product          @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([reservationId, productId])
+  @@index([companyId])
+}
+
+/** OEM / aftermarket / cross-reference part numbers for a product. */
+model PartReference {
+  id         String        @id @default(cuid())
+  companyId  String
+  productId  String
+  partNumber String
+  type       PartNumberType @default(OEM)
+  brand      String?
+  isActive   Boolean       @default(true)
+  createdAt  DateTime      @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, partNumber, type])
+  @@index([companyId, productId])
+}
+
+/** Vehicle compatibility mapping for a product. */
+model PartCompatibility {
+  id        String   @id @default(cuid())
+  companyId String
+  productId String
+  make      String
+  model     String
+  yearFrom  Int
+  yearTo    Int?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, productId])
+  @@index([companyId, make, model])
+}
+
+model WarrantyRecord {
+  id         String   @id @default(cuid())
+  companyId  String
+  vehicleId  String
+  jobCardId  String?
+  description String
+  terms      String?
+  startsAt   DateTime @default(now())
+  expiresAt  DateTime?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  jobCard JobCard? @relation(fields: [jobCardId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, vehicleId])
+}
+
+// ------------------------------------------------- marketplace foundations
+
+model MarketplaceProvider {
+  id                String         @id @default(cuid())
+  code              String         @unique
+  nameEn            String
+  nameAr            String
+  /** Set when the provider is itself an ORYX tenant company. */
+  providerCompanyId String?
+  categoryKey       String?
+  email             String?
+  phone             String?
+  status            ProviderStatus @default(PENDING)
+  /** Platform commission in basis points. */
+  commissionPercentBp Int          @default(0)
+  approvedAt        DateTime?
+  notes             String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  listings     ProviderServiceListing[]
+  requests     ServiceRequest[]
+  commissions  MarketplaceCommission[]
+  settlements  ProviderSettlement[]
+
+  @@index([status])
+}
+
+model ProviderServiceListing {
+  id          String   @id @default(cuid())
+  providerId  String
+  categoryKey String
+  nameEn      String
+  nameAr      String
+  description String?
+  priceMinor  Int      @default(0)
+  currency    String   @default("SAR")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  provider MarketplaceProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+  @@index([categoryKey])
+}
+
+model ServiceRequest {
+  id            String               @id @default(cuid())
+  companyId     String
+  requestNumber String
+  customerId    String?
+  vehicleId     String?
+  categoryKey   String
+  description   String?
+  status        ServiceRequestStatus @default(NEW)
+  providerId    String?
+  assignedAt    DateTime?
+  completedAt   DateTime?
+  createdById   String
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  company  Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  provider MarketplaceProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+
+  commissions MarketplaceCommission[]
+
+  @@unique([companyId, requestNumber])
+  @@index([companyId, status])
+}
+
+model MarketplaceCommission {
+  id               String           @id @default(cuid())
+  companyId        String?
+  serviceRequestId String?
+  providerId       String
+  baseMinor        Int
+  rateBp           Int
+  commissionMinor  Int
+  currency         String           @default("SAR")
+  status           CommissionStatus @default(PENDING)
+  createdAt        DateTime         @default(now())
+
+  company        Company?           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  provider       MarketplaceProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  serviceRequest ServiceRequest?     @relation(fields: [serviceRequestId], references: [id], onDelete: SetNull)
+
+  @@index([providerId, status])
+}
+
+model ProviderSettlement {
+  id              String           @id @default(cuid())
+  providerId      String
+  periodStart     DateTime
+  periodEnd       DateTime
+  grossMinor      Int              @default(0)
+  commissionMinor Int              @default(0)
+  netMinor        Int              @default(0)
+  currency        String           @default("SAR")
+  status          SettlementStatus @default(DRAFT)
+  approvedById    String?
+  paidAt          DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  provider MarketplaceProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId, status])
 }
