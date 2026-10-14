@@ -363,8 +363,8 @@ application at 1440 px (desktop) and 390 × 844 (mobile).
 | # | Deliverable | Status |
 | --- | --- | --- |
 | 1 | Source committed to a dedicated feature branch | Done |
-| 2 | Branch pushed to GitHub | Done |
-| 3 | Pull request against `main` | Opened |
+| 2 | Branch pushed to GitHub | Done — `feature/execution-01-super-admin-foundation` |
+| 3 | Pull request against `main` | Opened — https://github.com/mohammadaljallad079-rgb/oryx/pull/1 |
 | 4 | Database migrations and seed scripts | Done — 2 migrations, idempotent seed |
 | 5 | `.env.example` without secrets | Done |
 | 6 | Local development runbook | `docs/LOCAL_DEVELOPMENT.md` |
