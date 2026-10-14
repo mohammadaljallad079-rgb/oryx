@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { COMPANY_ADMIN, setLocale, signIn } from './helpers';
+import { COMPANY_ADMIN, apiToken, setLocale, signIn } from './helpers';
 
 /**
  * Functional acceptance audit.
@@ -21,10 +21,13 @@ async function apiCall<T>(
   path: string,
   init: { method?: string; body?: unknown } = {},
 ): Promise<{ status: number; body: T }> {
+  // The app never persists a token, so obtain one through a real login for the
+  // duration of this call.
+  const bearer = await apiToken(page);
   return page.evaluate(
-    async ({ api, path: p, method, body }) => {
+    async ({ api, path: p, method, body, token }) => {
       const csrf = decodeURIComponent(document.cookie.match(/oryx_csrf=([^;]*)/)?.[1] ?? '');
-      const auth = `Bearer ${window.localStorage.getItem('oryx.accessToken') ?? ''}`;
+      const auth = `Bearer ${token}`;
       const res = await fetch(`${api}${p}`, {
         method: method ?? 'GET',
         credentials: 'include',
@@ -38,7 +41,7 @@ async function apiCall<T>(
       const text = await res.text();
       return { status: res.status, body: (text ? JSON.parse(text) : null) as T };
     },
-    { api: API, path, method: init.method, body: init.body },
+    { api: API, path, method: init.method, body: init.body, token: bearer },
   );
 }
 

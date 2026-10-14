@@ -21,13 +21,21 @@ import type {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api';
 
-const ACCESS_KEY = 'oryx.accessToken';
+/**
+ * Only non-secret UI preferences are persisted.
+ *
+ * No authentication token is ever written to localStorage, sessionStorage or
+ * any other JavaScript-accessible persistent storage:
+ *   - the refresh token lives in an HttpOnly cookie the browser never exposes;
+ *   - the access token is held in memory for the lifetime of the tab and is
+ *     re-acquired from the refresh cookie after a reload.
+ */
 const COMPANY_KEY = 'oryx.companyId';
 const BRANCH_KEY = 'oryx.branchId';
 /**
  * CSRF cookie name set by the API. It is intentionally readable by JavaScript
- * so the double-submit pattern works; the refresh token itself lives in an
- * HttpOnly cookie and is never accessible here.
+ * so the double-submit pattern works; it is not a credential on its own and is
+ * useless without the HttpOnly refresh cookie.
  */
 const CSRF_COOKIE = 'oryx_csrf';
 const CSRF_HEADER = 'x-oryx-csrf';
@@ -51,16 +59,30 @@ function readCookie(name: string): string | null {
 }
 
 /**
- * Client-side session store.
+ * In-memory access token.
  *
- * Only the short-lived access token is kept in memory/localStorage. The refresh
- * token is held by the API in an HttpOnly cookie, so it is never exposed to
- * JavaScript and cannot be stolen by an XSS payload.
+ * Deliberately not backed by any storage API: a module-scoped variable is
+ * discarded on navigation away from the app and on tab close, so an XSS payload
+ * cannot read a persisted token from a later session. It survives client-side
+ * route changes because the module instance does.
+ *
+ * On reload the token is gone, and the first authenticated request transparently
+ * restores the session through the HttpOnly refresh cookie.
  */
+let accessToken: string | null = null;
+
+/** True when a session may exist and should be restored from the cookie. */
+let sessionHinted = false;
+
+/** Subscribers notified when the session is lost, so the UI can redirect. */
+const sessionLossListeners = new Set<() => void>();
+
 export const tokenStore = {
   get access(): string | null {
-    if (typeof window === 'undefined') return null;
-    return window.localStorage.getItem(ACCESS_KEY);
+    return accessToken;
+  },
+  get hasSessionHint(): boolean {
+    return sessionHinted;
   },
   get companyId(): string | null {
     if (typeof window === 'undefined') return null;
@@ -70,9 +92,13 @@ export const tokenStore = {
     if (typeof window === 'undefined') return null;
     return window.localStorage.getItem(BRANCH_KEY);
   },
-  setAccessToken(access: string) {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(ACCESS_KEY, access);
+  setAccessToken(token: string) {
+    accessToken = token;
+    sessionHinted = true;
+  },
+  /** Record that a session is expected, without storing any token. */
+  markSessionHint() {
+    sessionHinted = true;
   },
   setContext(companyId: string | null, branchId: string | null) {
     if (typeof window === 'undefined') return;
@@ -81,11 +107,26 @@ export const tokenStore = {
     if (branchId) window.localStorage.setItem(BRANCH_KEY, branchId);
     else window.localStorage.removeItem(BRANCH_KEY);
   },
+  /** Drop the in-memory token and the session hint. */
   clear() {
+    accessToken = null;
+    sessionHinted = false;
     if (typeof window === 'undefined') return;
-    window.localStorage.removeItem(ACCESS_KEY);
     window.localStorage.removeItem(COMPANY_KEY);
     window.localStorage.removeItem(BRANCH_KEY);
+  },
+  /** Remove only the in-memory token, keeping UI context. */
+  clearAccessToken() {
+    accessToken = null;
+  },
+  onSessionLost(listener: () => void): () => void {
+    sessionLossListeners.add(listener);
+    return () => sessionLossListeners.delete(listener);
+  },
+  notifySessionLost() {
+    sessionHinted = false;
+    accessToken = null;
+    for (const listener of sessionLossListeners) listener();
   },
 };
 
@@ -98,6 +139,13 @@ interface RequestOptions {
   noRetry?: boolean;
 }
 
+/**
+ * Single-flight refresh.
+ *
+ * Every caller that needs a new access token awaits the same promise, so
+ * concurrent 401s across widgets produce exactly one rotation request. This is
+ * what prevents a refresh storm and the token-family revocation it would cause.
+ */
 let refreshInFlight: Promise<boolean> | null = null;
 
 /**
@@ -136,6 +184,17 @@ async function refreshSession(): Promise<boolean> {
   return refreshInFlight;
 }
 
+/**
+ * Restore a session after a reload.
+ *
+ * Called once when the app mounts. It performs a single refresh so the tab has
+ * an access token again; a failure simply means there is no session.
+ */
+export async function restoreSession(): Promise<boolean> {
+  if (accessToken) return true;
+  return refreshSession();
+}
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? 'GET';
   const headers: Record<string, string> = {};
@@ -165,6 +224,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   if (res.status === 401 && !options.anonymous && !options.noRetry) {
     const refreshed = await refreshSession();
     if (refreshed) return request<T>(path, { ...options, noRetry: true });
+    // The session is genuinely gone: tell the shell so it can redirect.
+    tokenStore.notifySessionLost();
   }
 
   if (!res.ok) {
@@ -384,6 +445,8 @@ export const api = {
   apiClients: () => request<Array<Record<string, unknown>>>('/cms/api-clients'),
   createApiClient: (body: Record<string, unknown>) =>
     request<Record<string, unknown>>('/cms/api-clients', { method: 'POST', body }),
+  revokeApiClient: (id: string) =>
+    request<{ ok: boolean }>(`/cms/api-clients/${id}/revoke`, { method: 'POST', body: {} }),
 
   // ----------------------------------------------------------------- support
   supportSessions: () => request<Array<Record<string, unknown>>>('/support-sessions'),

@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { test } from '@playwright/test';
-import { COMPANY_ADMIN, setLocale, setTheme, signIn } from './helpers';
+import { COMPANY_ADMIN, apiToken, setLocale, setTheme, signIn } from './helpers';
 
 /** Generate a TOTP code for a base32 secret (RFC 6238, SHA-1, 6 digits). */
 function totp(secret: string, atMs: number = Date.now()): string {
@@ -167,33 +167,35 @@ test.describe('required screenshots', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
 
     // Enable MFA through the API (enroll AND confirm), then sign out to reach
-    // the challenge step.
-    const secret = await page.evaluate(async () => {
-      const api = 'http://localhost:3001/api/v1';
-      const csrf = decodeURIComponent(document.cookie.match(/oryx_csrf=([^;]*)/)?.[1] ?? '');
-      const auth = `Bearer ${window.localStorage.getItem('oryx.accessToken') ?? ''}`;
-      const res = await fetch(`${api}/auth/mfa/enroll`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'x-oryx-csrf': csrf, Authorization: auth },
-        body: '{}',
-      });
-      return ((await res.json()) as { secret: string }).secret;
-    });
+    // the challenge step. The app never persists a token, so obtain one from a
+    // real login for these calls.
+    const bearer = await apiToken(page);
+    const secret = await page.evaluate(
+      async ({ api, token }) => {
+        const csrf = decodeURIComponent(document.cookie.match(/oryx_csrf=([^;]*)/)?.[1] ?? '');
+        const res = await fetch(`${api}/auth/mfa/enroll`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', 'x-oryx-csrf': csrf, Authorization: `Bearer ${token}` },
+          body: '{}',
+        });
+        return ((await res.json()) as { secret: string }).secret;
+      },
+      { api: 'http://localhost:3001/api/v1', token: bearer },
+    );
 
     const confirmed = await page.evaluate(
-      async ({ api, code }) => {
+      async ({ api, code, token }) => {
         const csrf = decodeURIComponent(document.cookie.match(/oryx_csrf=([^;]*)/)?.[1] ?? '');
-        const auth = `Bearer ${window.localStorage.getItem('oryx.accessToken') ?? ''}`;
         const res = await fetch(`${api}/auth/mfa/enroll/confirm`, {
           method: 'POST',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json', 'x-oryx-csrf': csrf, Authorization: auth },
+          headers: { 'Content-Type': 'application/json', 'x-oryx-csrf': csrf, Authorization: `Bearer ${token}` },
           body: JSON.stringify({ code }),
         });
         return res.status;
       },
-      { api: 'http://localhost:3001/api/v1', code: totp(secret) },
+      { api: 'http://localhost:3001/api/v1', code: totp(secret), token: bearer },
     );
     if (confirmed !== 200) throw new Error(`MFA enrollment failed with status ${confirmed}`);
 
@@ -214,19 +216,22 @@ test.describe('required screenshots', () => {
     await page.getByTestId('mfa-code').fill(totp(secret, Date.now() + 31_000));
     await page.getByTestId('login-submit').click();
     await page.waitForURL('**/dashboard', { timeout: 25_000 });
-    await page.evaluate(async () => {
-      const api = 'http://localhost:3001/api/v1';
-      const csrf = decodeURIComponent(document.cookie.match(/oryx_csrf=([^;]*)/)?.[1] ?? '');
-      const auth = `Bearer ${window.localStorage.getItem('oryx.accessToken') ?? ''}`;
-      const me = await fetch(`${api}/auth/me`, { credentials: 'include', headers: { Authorization: auth } });
-      const { user } = (await me.json()) as { user: { id: string } };
-      await fetch(`${api}/auth/mfa/reset/${user.id}`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'x-oryx-csrf': csrf, Authorization: auth },
-        body: '{}',
-      });
-    });
+    const cleanupToken = await apiToken(page);
+    await page.evaluate(
+      async ({ api, token }) => {
+        const csrf = decodeURIComponent(document.cookie.match(/oryx_csrf=([^;]*)/)?.[1] ?? '');
+        const auth = `Bearer ${token}`;
+        const me = await fetch(`${api}/auth/me`, { credentials: 'include', headers: { Authorization: auth } });
+        const { user } = (await me.json()) as { user: { id: string } };
+        await fetch(`${api}/auth/mfa/reset/${user.id}`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', 'x-oryx-csrf': csrf, Authorization: auth },
+          body: '{}',
+        });
+      },
+      { api: 'http://localhost:3001/api/v1', token: cleanupToken },
+    );
   });
 
   test('company administrator restricted view', async ({ page }) => {

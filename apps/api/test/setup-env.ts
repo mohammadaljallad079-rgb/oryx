@@ -9,6 +9,8 @@
 process.env.NODE_ENV = process.env.NODE_ENV ?? 'test';
 process.env.AUTH_THROTTLE_LIMIT = '100000';
 process.env.THROTTLE_LIMIT = '1000000';
+// Refresh is exercised heavily by the session-lifecycle suite.
+process.env.REFRESH_THROTTLE_LIMIT = '100000';
 
 // Required so the MFA secret cipher can be constructed at boot.
 process.env.MFA_ENCRYPTION_KEY =

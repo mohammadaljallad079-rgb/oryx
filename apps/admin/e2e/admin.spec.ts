@@ -1,5 +1,13 @@
 import { expect, test } from '@playwright/test';
-import { COMPANY_ADMIN, SUPER_ADMIN, expectNoServerError, setLocale, setTheme, signIn } from './helpers';
+import {
+  COMPANY_ADMIN,
+  SUPER_ADMIN,
+  apiToken,
+  expectNoServerError,
+  setLocale,
+  setTheme,
+  signIn,
+} from './helpers';
 
 /**
  * UI acceptance tests for Execution 01. Each test exercises a real workflow
@@ -94,9 +102,9 @@ test.describe('company and branch management', () => {
     // Provision a dedicated Starter tenant (maxBranches = 2) so the assertion
     // is independent of other data and safe to re-run.
     const suffix = Date.now().toString().slice(-6);
-    const companyId = await page.evaluate(async (sfx) => {
+    const bearer = await apiToken(page);
+    const companyId = await page.evaluate(async ({ sfx, token }) => {
       const base = 'http://localhost:3001/api/v1';
-      const token = window.localStorage.getItem('oryx.accessToken');
       const plans = await fetch(`${base}/plans`, { headers: { Authorization: `Bearer ${token}` } });
       const planList = (await plans.json()) as Array<{ id: string; code: string }>;
       const starter = planList.find((pl) => pl.code === 'starter')!;
@@ -113,7 +121,7 @@ test.describe('company and branch management', () => {
       });
       const body = (await res.json()) as { company: { id: string } };
       return body.company.id;
-    }, suffix);
+    }, { sfx: suffix, token: bearer });
 
     await page.goto(`/branches?companyId=${companyId}`);
     await expect(page.getByTestId('branches-page')).toBeVisible();
@@ -304,15 +312,15 @@ test.describe('dashboard integrity', () => {
 
 /** Looks up a company id through the authenticated API from the page context. */
 async function companyIdByCode(page: import('@playwright/test').Page, code: string): Promise<string> {
-  const id = await page.evaluate(async (companyCode) => {
+  const bearer = await apiToken(page);
+  const id = await page.evaluate(async ({ companyCode, token }) => {
     const base = 'http://localhost:3001/api/v1';
-    const token = window.localStorage.getItem('oryx.accessToken');
-    const res = await fetch(`${base}/companies?pageSize=100`, {
+    const res = await fetch(`${base}/companies?pageSize=100&search=${companyCode}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const body = (await res.json()) as { items: Array<{ id: string; code: string }> };
     return body.items.find((c) => c.code === companyCode)?.id ?? '';
-  }, code);
+  }, { companyCode: code, token: bearer });
   expect(id).not.toBe('');
   return id;
 }

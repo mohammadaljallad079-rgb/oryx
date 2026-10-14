@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
-import { COMPANY_ADMIN, SUPER_ADMIN, setLocale, setTheme, signIn } from './helpers';
+import { COMPANY_ADMIN, SUPER_ADMIN, apiToken, setLocale, setTheme, signIn } from './helpers';
 
 /**
  * MFA and session-transport UI acceptance tests.
@@ -53,21 +53,25 @@ async function cookies(page: Page) {
  * Returns the active secret, or null when MFA was already enabled.
  */
 async function enrollMfa(page: Page): Promise<string | null> {
-  return page.evaluate(async (api) => {
-    const csrf = decodeURIComponent(document.cookie.match(/oryx_csrf=([^;]*)/)?.[1] ?? '');
-    const auth = `Bearer ${window.localStorage.getItem('oryx.accessToken') ?? ''}`;
-    const status = await fetch(`${api}/auth/mfa/status`, { credentials: 'include', headers: { Authorization: auth } });
-    if (((await status.json()) as { enabled: boolean }).enabled) return null;
+  const token = await apiToken(page);
+  return page.evaluate(
+    async ({ api, bearer }) => {
+      const csrf = decodeURIComponent(document.cookie.match(/oryx_csrf=([^;]*)/)?.[1] ?? '');
+      const auth = `Bearer ${bearer}`;
+      const status = await fetch(`${api}/auth/mfa/status`, { credentials: 'include', headers: { Authorization: auth } });
+      if (((await status.json()) as { enabled: boolean }).enabled) return null;
 
-    const start = await fetch(`${api}/auth/mfa/enroll`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json', 'x-oryx-csrf': csrf, Authorization: auth },
-      body: '{}',
-    });
-    const { secret } = (await start.json()) as { secret: string };
-    return secret;
-  }, API);
+      const start = await fetch(`${api}/auth/mfa/enroll`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'x-oryx-csrf': csrf, Authorization: auth },
+        body: '{}',
+      });
+      const { secret } = (await start.json()) as { secret: string };
+      return secret;
+    },
+    { api: API, bearer: token },
+  );
 }
 
 /**
@@ -77,10 +81,11 @@ async function enrollMfa(page: Page): Promise<string | null> {
  * consuming another TOTP step (which replay protection would reject).
  */
 async function confirmMfa(page: Page, secret: string): Promise<{ status: number; recoveryCodes: string[] }> {
+  const token = await apiToken(page);
   return page.evaluate(
-    async ({ api, code }) => {
+    async ({ api, code, bearer }) => {
       const csrf = decodeURIComponent(document.cookie.match(/oryx_csrf=([^;]*)/)?.[1] ?? '');
-      const auth = `Bearer ${window.localStorage.getItem('oryx.accessToken') ?? ''}`;
+      const auth = `Bearer ${bearer}`;
       const res = await fetch(`${api}/auth/mfa/enroll/confirm`, {
         method: 'POST',
         credentials: 'include',
@@ -91,7 +96,7 @@ async function confirmMfa(page: Page, secret: string): Promise<{ status: number;
         res.status === 200 ? ((await res.json()) as { recoveryCodes: string[] }) : { recoveryCodes: [] };
       return { status: res.status, recoveryCodes: body.recoveryCodes ?? [] };
     },
-    { api: API, code: totp(secret) },
+    { api: API, code: totp(secret), bearer: token },
   );
 }
 
@@ -101,18 +106,22 @@ async function confirmMfa(page: Page, secret: string): Promise<{ status: number;
  */
 async function signInWithMfa(page: Page): Promise<{ secret: string; recoveryCode: string }> {
   await signIn(page);
-  await page.evaluate(async (api) => {
-    const csrf = decodeURIComponent(document.cookie.match(/oryx_csrf=([^;]*)/)?.[1] ?? '');
-    const auth = `Bearer ${window.localStorage.getItem('oryx.accessToken') ?? ''}`;
-    const me = await fetch(`${api}/auth/me`, { credentials: 'include', headers: { Authorization: auth } });
-    const { user } = (await me.json()) as { user: { id: string } };
-    await fetch(`${api}/auth/mfa/reset/${user.id}`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json', 'x-oryx-csrf': csrf, Authorization: auth },
-      body: '{}',
-    });
-  }, API);
+  const resetToken = await apiToken(page);
+  await page.evaluate(
+    async ({ api, bearer }) => {
+      const csrf = decodeURIComponent(document.cookie.match(/oryx_csrf=([^;]*)/)?.[1] ?? '');
+      const auth = `Bearer ${bearer}`;
+      const me = await fetch(`${api}/auth/me`, { credentials: 'include', headers: { Authorization: auth } });
+      const { user } = (await me.json()) as { user: { id: string } };
+      await fetch(`${api}/auth/mfa/reset/${user.id}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'x-oryx-csrf': csrf, Authorization: auth },
+        body: '{}',
+      });
+    },
+    { api: API, bearer: resetToken },
+  );
 
   // The reset revoked every session. Clear the stale client state before
   // signing in again, otherwise the login form is replaced by a redirect.
@@ -138,18 +147,22 @@ async function signInWithMfa(page: Page): Promise<{ secret: string; recoveryCode
  * locked-out account and does not consume a TOTP step.
  */
 async function disableMfa(page: Page): Promise<void> {
-  await page.evaluate(async (api) => {
-    const csrf = decodeURIComponent(document.cookie.match(/oryx_csrf=([^;]*)/)?.[1] ?? '');
-    const auth = `Bearer ${window.localStorage.getItem('oryx.accessToken') ?? ''}`;
-    const me = await fetch(`${api}/auth/me`, { credentials: 'include', headers: { Authorization: auth } });
-    const { user } = (await me.json()) as { user: { id: string } };
-    await fetch(`${api}/auth/mfa/reset/${user.id}`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json', 'x-oryx-csrf': csrf, Authorization: auth },
-      body: '{}',
-    });
-  }, API);
+  const token = await apiToken(page);
+  await page.evaluate(
+    async ({ api, bearer }) => {
+      const csrf = decodeURIComponent(document.cookie.match(/oryx_csrf=([^;]*)/)?.[1] ?? '');
+      const auth = `Bearer ${bearer}`;
+      const me = await fetch(`${api}/auth/me`, { credentials: 'include', headers: { Authorization: auth } });
+      const { user } = (await me.json()) as { user: { id: string } };
+      await fetch(`${api}/auth/mfa/reset/${user.id}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'x-oryx-csrf': csrf, Authorization: auth },
+        body: '{}',
+      });
+    },
+    { api: API, bearer: token },
+  );
 }
 
 test.describe('session transport', () => {

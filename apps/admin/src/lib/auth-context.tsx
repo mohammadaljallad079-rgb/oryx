@@ -15,7 +15,7 @@ import {
   type MembershipSummary,
   type SessionUser,
 } from '@oryx/shared';
-import { api, ApiError, tokenStore } from './api';
+import { api, ApiError, restoreSession, tokenStore } from './api';
 
 interface AuthState {
   user: SessionUser | null;
@@ -61,12 +61,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ready: false,
   });
 
+  /**
+   * Resolve the current session.
+   *
+   * The access token is in memory only, so after a reload it is absent. In that
+   * case we attempt one cookie-based restore before concluding there is no
+   * session. `api.me()` itself also retries through the refresh cookie on a 401,
+   * so a stale in-memory token is recovered transparently.
+   */
   const loadSession = useCallback(async () => {
-    if (!tokenStore.access) {
-      setState((p) => ({ ...p, ready: true, user: null, permissions: [] }));
-      return;
-    }
     try {
+      if (!tokenStore.access) {
+        const restored = await restoreSession();
+        if (!restored) {
+          setState((p) => ({ ...p, ready: true, user: null, permissions: [], memberships: [] }));
+          return;
+        }
+      }
       const me = await api.me();
       setState((p) => ({
         ...p,
@@ -91,13 +102,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }));
     } catch {
       tokenStore.clear();
-      setState((p) => ({ ...p, ready: true, user: null, permissions: [] }));
+      setState((p) => ({ ...p, ready: true, user: null, permissions: [], memberships: [] }));
     }
   }, []);
 
   useEffect(() => {
     void loadSession();
   }, [loadSession]);
+
+  // When a request proves the session is gone (refresh failed), drop local state
+  // so the shell redirects to sign-in rather than showing a broken screen.
+  useEffect(() => {
+    return tokenStore.onSessionLost(() => {
+      setState((p) => ({ ...p, user: null, permissions: [], memberships: [], ready: true }));
+    });
+  }, []);
+
+  /**
+   * Keep tabs in step.
+   *
+   * A refresh token is single-use, so two tabs refreshing at once is exactly the
+   * race the server's rotation grace window handles. Within a tab the refresh is
+   * single-flight. Across tabs we additionally react to a sign-out performed in
+   * another tab, and drop the in-memory token when storage changes so the next
+   * request restores from the cookie instead of presenting a token another tab
+   * may have already rotated.
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === 'oryx.sessionEnded') {
+        tokenStore.clear();
+        setState((p) => ({ ...p, user: null, permissions: [], memberships: [], ready: true }));
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const applySession = useCallback(
     (res: LoginResponse) => {
@@ -150,6 +191,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       /* best effort: the cookies are cleared server-side on success */
     }
     tokenStore.clear();
+    // Tell other tabs the session ended. The key is written then removed so a
+    // repeated sign-out still fires a storage event.
+    try {
+      window.localStorage.setItem('oryx.sessionEnded', String(Date.now()));
+      window.localStorage.removeItem('oryx.sessionEnded');
+    } catch {
+      /* storage may be unavailable in private modes; sign-out still applies here */
+    }
     setState({
       ready: true,
       user: null,

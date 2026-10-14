@@ -112,7 +112,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Throttle({ default: { limit: Number(process.env.REFRESH_THROTTLE_LIMIT ?? 120), ttl: 60_000 } })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Rotate the refresh token and issue a new access token' })
@@ -125,7 +125,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Throttle({ default: { limit: Number(process.env.INVITATION_THROTTLE_LIMIT ?? 20), ttl: 60_000 } })
   @Post('accept-invitation')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Accept an invitation and activate the invited account' })

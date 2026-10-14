@@ -106,15 +106,9 @@ function ApiManagementPageInner() {
                       variant="danger"
                       disabled={!c.isActive}
                       onClick={async () => {
-                        await fetch(
-                          `${process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api'}/v1/cms/api-clients/${String(c.id)}/revoke`,
-                          {
-                            method: 'POST',
-                            headers: {
-                              Authorization: `Bearer ${window.localStorage.getItem('oryx.accessToken') ?? ''}`,
-                            },
-                          },
-                        );
+                        // Routed through the API client so it carries the
+                        // Authorization header and the CSRF token.
+                        await api.revokeApiClient(String(c.id));
                         await clients.reload();
                       }}
                     >

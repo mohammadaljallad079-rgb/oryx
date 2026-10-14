@@ -25,6 +25,18 @@ export interface RefreshTokenPayload {
   jti: string;
 }
 
+/** The subset of the user record the session issuer needs. */
+interface UserRecord {
+  id: string;
+  email: string;
+  fullNameEn: string;
+  fullNameAr: string;
+  status: string;
+  preferredLocale: string;
+  preferredTheme: string;
+  isSuperAdmin: boolean;
+}
+
 const MAX_FAILED_LOGINS = 8;
 const LOCK_MINUTES = 15;
 
@@ -57,6 +69,19 @@ export class AuthService {
   /** MFA challenge tokens are intentionally very short lived. */
   private mfaChallengeTtl(): number {
     return Number(this.config.get('MFA_CHALLENGE_TTL') ?? 300);
+  }
+
+  /**
+   * Grace window during which a just-rotated token may be presented again
+   * without being treated as a compromise.
+   *
+   * Two tabs (or a retried request) can race the same rotation: the loser sees
+   * a token that was revoked milliseconds ago and is not an attacker. Inside
+   * this window we answer with a freshly minted token from the same family
+   * instead of revoking the family. Outside it, replay is treated as theft.
+   */
+  private rotationGraceMs(): number {
+    return Number(this.config.get('REFRESH_ROTATION_GRACE_MS') ?? 30_000);
   }
 
   async validateCredentials(email: string, password: string) {
@@ -288,32 +313,124 @@ export class AuthService {
       throw unauthorized(ERROR_CODES.AUTH_TOKEN_INVALID, 'Refresh token is invalid or expired.');
     }
 
+    const tokenHash = this.hashToken(refreshToken);
     const record = await this.prisma.refreshToken.findUnique({
-      where: { tokenHash: this.hashToken(refreshToken) },
+      where: { tokenHash },
       include: { user: true },
     });
-    if (!record || record.revokedAt || record.expiresAt < new Date()) {
-      // Reuse of a rotated/revoked token is treated as a compromise signal.
-      if (record?.userId) {
-        await this.prisma.refreshToken.updateMany({
-          where: { userId: record.userId, revokedAt: null },
-          data: { revokedAt: new Date() },
+
+    // ------------------------------------------------------------- unknown token
+    // A well-signed token that is not in the store can only mean the row was
+    // purged. Treat it as invalid rather than as a compromise signal, because
+    // there is no family to revoke.
+    if (!record) {
+      throw unauthorized(ERROR_CODES.AUTH_REFRESH_REVOKED, 'Refresh token is no longer valid.');
+    }
+
+    // ------------------------------------------------------------- hard expiry
+    if (record.expiresAt < new Date()) {
+      await this.revokeFamily(record.familyId);
+      throw unauthorized(ERROR_CODES.AUTH_REFRESH_REVOKED, 'Refresh token has expired.');
+    }
+
+    // ---------------------------------------------------------- rotated token
+    if (record.revokedAt) {
+      const age = Date.now() - record.revokedAt.getTime();
+
+      // Benign race: two tabs (or a retried request) presented the same token
+      // within the grace window. Answer with a fresh token from the same family
+      // instead of destroying the session. The presented token stays revoked,
+      // so a leaked copy is still useless once the window closes.
+      if (record.replacedBy && age <= this.rotationGraceMs()) {
+        const successor = await this.prisma.refreshToken.findUnique({
+          where: { id: record.replacedBy },
         });
-        await this.audit.record({
-          actorUserId: record.userId,
-          action: 'auth.refresh_reuse_detected',
-          targetType: 'USER',
-          targetId: record.userId,
-          summary: 'Revoked refresh token was replayed; all sessions invalidated.',
-          ipAddress: meta.ip ?? null,
-        });
+        if (successor && !successor.revokedAt && successor.expiresAt > new Date()) {
+          await this.audit.record({
+            actorUserId: record.userId,
+            action: 'auth.refresh_concurrent_rotation',
+            targetType: 'USER',
+            targetId: record.userId,
+            summary: 'Concurrent refresh handled within the rotation grace window.',
+            ipAddress: meta.ip ?? null,
+          });
+          // Issue a sibling token in the same family. The successor is left
+          // untouched so the other caller's cookie keeps working: both tabs end
+          // up with valid, independent sessions.
+          return this.issueSibling(record.user, record.familyId, meta);
+        }
+      }
+
+      // Replay of a token that was rotated long ago, or of a token whose
+      // successor is gone: this is the compromise signal. Revoke the whole
+      // family so every descendant of this login stops working.
+      await this.revokeFamily(record.familyId);
+      await this.audit.record({
+        actorUserId: record.userId,
+        action: 'auth.refresh_reuse_detected',
+        targetType: 'USER',
+        targetId: record.userId,
+        summary: 'Revoked refresh token was replayed; the token family was invalidated.',
+        ipAddress: meta.ip ?? null,
+      });
+      throw unauthorized(ERROR_CODES.AUTH_REFRESH_REVOKED, 'Refresh token is no longer valid.');
+    }
+
+    // ------------------------------------------------------------ valid rotation
+    return this.rotateFrom(record, meta);
+  }
+
+  /**
+   * Atomically consume a refresh token and issue its successor.
+   *
+   * The `updateMany` is guarded on `revokedAt: null`, so exactly one concurrent
+   * caller wins the race; the loser sees a count of 0 and falls through to the
+   * reuse path above, which the grace window handles.
+   */
+  private async rotateFrom(
+    record: { id: string; userId: string; familyId: string; user: UserRecord },
+    meta: { ip?: string; userAgent?: string },
+  ): Promise<LoginResponse> {
+    const sessionId = randomBytes(16).toString('hex');
+    const newJti = randomBytes(24).toString('hex');
+    const newRefresh = await this.jwt.signAsync(
+      { sub: record.userId, sid: sessionId, jti: newJti } satisfies RefreshTokenPayload,
+      { secret: this.config.get<string>('JWT_REFRESH_SECRET'), expiresIn: this.refreshTtl() },
+    );
+
+    const claimed = await this.prisma.refreshToken.updateMany({
+      where: { id: record.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    // Another caller won the race and already consumed this token. It has a
+    // successor, so answer with a sibling in the same family rather than
+    // failing: the other caller's cookie stays valid.
+    if (claimed.count === 0) {
+      const current = await this.prisma.refreshToken.findUnique({ where: { id: record.id } });
+      if (current?.replacedBy) {
+        const successor = await this.prisma.refreshToken.findUnique({ where: { id: current.replacedBy } });
+        if (successor && !successor.revokedAt && successor.expiresAt > new Date()) {
+          return this.issueSibling(record.user, record.familyId, meta);
+        }
       }
       throw unauthorized(ERROR_CODES.AUTH_REFRESH_REVOKED, 'Refresh token is no longer valid.');
     }
 
+    const created = await this.prisma.refreshToken.create({
+      data: {
+        userId: record.userId,
+        tokenHash: this.hashToken(newRefresh),
+        expiresAt: new Date(Date.now() + this.refreshTtl() * 1000),
+        familyId: record.familyId,
+        ipAddress: meta.ip ?? null,
+        userAgent: meta.userAgent ?? null,
+      },
+    });
+
     await this.prisma.refreshToken.update({
       where: { id: record.id },
-      data: { revokedAt: new Date() },
+      data: { replacedBy: created.id },
     });
 
     const user = record.user;
@@ -325,7 +442,6 @@ export class AuthService {
       throw forbidden(ERROR_CODES.AUTH_ACCOUNT_INACTIVE, 'No active company membership for this account.');
     }
 
-    const sessionId = randomBytes(16).toString('hex');
     const accessToken = await this.jwt.signAsync(
       {
         sub: user.id,
@@ -337,21 +453,6 @@ export class AuthService {
       } satisfies AccessTokenPayload,
       { secret: this.config.get<string>('JWT_ACCESS_SECRET'), expiresIn: this.accessTtl() },
     );
-
-    const newJti = randomBytes(24).toString('hex');
-    const newRefresh = await this.jwt.signAsync(
-      { sub: user.id, sid: sessionId, jti: newJti } satisfies RefreshTokenPayload,
-      { secret: this.config.get<string>('JWT_REFRESH_SECRET'), expiresIn: this.refreshTtl() },
-    );
-    await this.prisma.refreshToken.create({
-      data: {
-        userId: user.id,
-        tokenHash: this.hashToken(newRefresh),
-        expiresAt: new Date(Date.now() + this.refreshTtl() * 1000),
-        ipAddress: meta.ip ?? null,
-        userAgent: meta.userAgent ?? null,
-      },
-    });
 
     const permissions = await this.effectivePermissionCodes(user.id, primary?.membershipId);
 
@@ -373,6 +474,86 @@ export class AuthService {
       })),
       permissions,
     };
+  }
+
+  /**
+   * Issue an additional valid token in an existing family.
+   *
+   * Used when a refresh races another refresh of the same token. Unlike a
+   * rotation, nothing is revoked: the caller gets its own session alongside the
+   * one the winning caller already received.
+   */
+  private async issueSibling(
+    user: UserRecord,
+    familyId: string,
+    meta: { ip?: string; userAgent?: string },
+  ): Promise<LoginResponse> {
+    const sessionId = randomBytes(16).toString('hex');
+    const jti = randomBytes(24).toString('hex');
+    const refreshToken = await this.jwt.signAsync(
+      { sub: user.id, sid: sessionId, jti } satisfies RefreshTokenPayload,
+      { secret: this.config.get<string>('JWT_REFRESH_SECRET'), expiresIn: this.refreshTtl() },
+    );
+
+    await this.prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: this.hashToken(refreshToken),
+        expiresAt: new Date(Date.now() + this.refreshTtl() * 1000),
+        familyId,
+        ipAddress: meta.ip ?? null,
+        userAgent: meta.userAgent ?? null,
+      },
+    });
+
+    const memberships = await this.loadMemberships(user.id);
+    const activeMemberships = memberships.filter((m) => m.companyStatus === 'ACTIVE');
+    const kind: 'PLATFORM' | 'COMPANY' = user.isSuperAdmin ? 'PLATFORM' : 'COMPANY';
+    const primary = activeMemberships[0];
+    if (kind === 'COMPANY' && !primary) {
+      throw forbidden(ERROR_CODES.AUTH_ACCOUNT_INACTIVE, 'No active company membership for this account.');
+    }
+
+    const accessToken = await this.jwt.signAsync(
+      {
+        sub: user.id,
+        email: user.email,
+        kind,
+        companyId: kind === 'COMPANY' ? primary?.companyId : undefined,
+        membershipId: kind === 'COMPANY' ? primary?.membershipId : undefined,
+        sessionId,
+      } satisfies AccessTokenPayload,
+      { secret: this.config.get<string>('JWT_ACCESS_SECRET'), expiresIn: this.accessTtl() },
+    );
+
+    const permissions = await this.effectivePermissionCodes(user.id, primary?.membershipId);
+
+    return {
+      accessToken,
+      refreshToken,
+      expiresIn: this.accessTtl(),
+      user: this.toSessionUser(user, kind),
+      memberships: memberships.map((m) => ({
+        companyId: m.companyId,
+        companyNameEn: m.companyNameEn,
+        companyNameAr: m.companyNameAr,
+        companyType: m.companyType as MembershipSummary['companyType'],
+        companyStatus: m.companyStatus as MembershipSummary['companyStatus'],
+        roleId: m.roleId,
+        roleNameEn: m.roleNameEn,
+        roleNameAr: m.roleNameAr,
+        branchIds: m.branchIds,
+      })),
+      permissions,
+    };
+  }
+
+  /** Revoke every token in a rotation family. */
+  private async revokeFamily(familyId: string): Promise<void> {
+    await this.prisma.refreshToken.updateMany({
+      where: { familyId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
   }
 
   async logout(refreshToken: string | undefined, userId: string | undefined): Promise<void> {
