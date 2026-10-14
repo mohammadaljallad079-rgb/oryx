@@ -229,13 +229,16 @@ test.describe('company administrator delegation', () => {
     await page.goto('/automotive/inspections');
     await expect(page.getByTestId('planned-automotive_inspections')).toBeVisible();
 
-    // Invite flow only offers roles inside the delegable set.
+    // Invite flow only offers roles inside the delegable set. The modal loads
+    // the role list asynchronously, so poll until the options arrive rather than
+    // reading the count the instant the select appears.
     await page.goto('/users');
     await expect(page.getByTestId('users-page')).toBeVisible();
     await page.getByTestId('invite-user').click();
     await expect(page.getByTestId('invite-role')).toBeVisible();
-    const roleCount = await page.getByTestId('invite-role').locator('option').count();
-    expect(roleCount).toBeGreaterThan(1);
+    await expect
+      .poll(async () => page.getByTestId('invite-role').locator('option').count(), { timeout: 20_000 })
+      .toBeGreaterThan(1);
   });
 
   test('company admin cannot reach platform-only governance screens', async ({ page }) => {

@@ -85,6 +85,35 @@ describe('ORYX API session lifecycle (e2e)', () => {
       expect(second.body.accessToken).toBeTruthy();
     });
 
+    it('keeps both callers usable when two requests race the same token', async () => {
+      // The genuine concurrency case: two requests present the identical token
+      // at the same moment. Exactly one wins the guarded claim; the loser must
+      // still receive a usable session rather than a failure.
+      const jar = await login();
+      const shared = jar.get('oryx_rt')!;
+      const csrf = jar.get('oryx_csrf')!;
+
+      const [a, b] = await Promise.all([
+        jarCall<{ accessToken?: string }>(ctx.base, '/auth/refresh', {
+          method: 'POST',
+          body: { refreshToken: shared },
+          jar: new CookieJar(),
+          csrf,
+        }),
+        jarCall<{ accessToken?: string }>(ctx.base, '/auth/refresh', {
+          method: 'POST',
+          body: { refreshToken: shared },
+          jar: new CookieJar(),
+          csrf,
+        }),
+      ]);
+
+      expect(a.status).toBe(200);
+      expect(b.status).toBe(200);
+      expect(a.body.accessToken).toBeTruthy();
+      expect(b.body.accessToken).toBeTruthy();
+    });
+
     it('keeps both callers usable when the same token is presented twice', async () => {
       const jar = await login();
       const shared = jar.get('oryx_rt')!;

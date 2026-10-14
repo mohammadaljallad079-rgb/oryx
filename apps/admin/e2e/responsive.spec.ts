@@ -115,10 +115,18 @@ test.describe('bilingual and themed rendering', () => {
       await expect(page.getByTestId('module-tiles')).toBeVisible();
 
       // Charts must remain rendered (not blank) in every combination. The
-      // branch chart is a div-based bar chart; the module chart is SVG.
-      const bars = await page.locator('[data-testid="chart-branches"] .rounded-t-\\[6px\\]').count();
-      const donut = await page.locator('[data-testid="chart-modules"] svg').count();
-      expect(bars + donut).toBeGreaterThan(0);
+      // branch chart is a div-based bar chart; the module chart is SVG. The data
+      // arrives asynchronously, so poll rather than sampling immediately.
+      await expect
+        .poll(
+          async () => {
+            const bars = await page.locator('[data-testid="chart-branches"] .rounded-t-\\[6px\\]').count();
+            const donut = await page.locator('[data-testid="chart-modules"] svg').count();
+            return bars + donut;
+          },
+          { timeout: 20_000 },
+        )
+        .toBeGreaterThan(0);
     });
   }
 

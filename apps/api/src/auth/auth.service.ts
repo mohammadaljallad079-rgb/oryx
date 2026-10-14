@@ -403,16 +403,29 @@ export class AuthService {
       data: { revokedAt: new Date() },
     });
 
-    // Another caller won the race and already consumed this token. It has a
-    // successor, so answer with a sibling in the same family rather than
-    // failing: the other caller's cookie stays valid.
+    // Another caller won the race and already consumed this token. Answer with
+    // a sibling in the same family so both callers end up with a usable session.
+    //
+    // There is a narrow window where the winner has set `revokedAt` but has not
+    // yet written `replacedBy`, so a single read can miss the successor. Poll
+    // briefly for it; if it still does not appear, the revocation is recent
+    // enough that this is plainly a concurrent refresh rather than a replay, and
+    // a sibling is still the correct answer.
     if (claimed.count === 0) {
-      const current = await this.prisma.refreshToken.findUnique({ where: { id: record.id } });
-      if (current?.replacedBy) {
-        const successor = await this.prisma.refreshToken.findUnique({ where: { id: current.replacedBy } });
-        if (successor && !successor.revokedAt && successor.expiresAt > new Date()) {
-          return this.issueSibling(record.user, record.familyId, meta);
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        const current = await this.prisma.refreshToken.findUnique({ where: { id: record.id } });
+        if (!current) break;
+        if (current.replacedBy) {
+          const successor = await this.prisma.refreshToken.findUnique({ where: { id: current.replacedBy } });
+          if (successor && !successor.revokedAt && successor.expiresAt > new Date()) {
+            return this.issueSibling(record.user, record.familyId, meta);
+          }
         }
+        // A revocation older than the grace window is a replay, not a race.
+        if (current.revokedAt && Date.now() - current.revokedAt.getTime() > this.rotationGraceMs()) {
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 25));
       }
       throw unauthorized(ERROR_CODES.AUTH_REFRESH_REVOKED, 'Refresh token is no longer valid.');
     }
