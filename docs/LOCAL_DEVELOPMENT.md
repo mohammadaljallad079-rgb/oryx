@@ -130,12 +130,17 @@ Screenshots are written to `docs/execution-reports/screenshots/`.
 
 ## 8. Build
 
+Build the workspace packages before the apps — they resolve each other from
+their compiled `dist/`:
+
 ```bash
 pnpm --filter @oryx/shared build
 pnpm --filter @oryx/database build
 pnpm --filter @oryx/api build
 pnpm --filter @oryx/admin build
 ```
+
+`pnpm build` at the repository root runs all four in the correct order.
 
 ## 9. Useful commands
 

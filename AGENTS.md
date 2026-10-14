@@ -59,6 +59,11 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 
 ### Gotchas learned the hard way
 
+- **Build the workspace packages first.** `apps/api` and `apps/admin` resolve
+  `@oryx/shared` and `@oryx/database` from their compiled `dist/`. After a clean
+  checkout run `pnpm --filter @oryx/shared build && pnpm --filter @oryx/database build`
+  before typechecking or building the apps, or you will see hundreds of
+  "Cannot find module '@oryx/shared'" errors.
 - **API build:** `pnpm --filter @oryx/api build` clears a stale
   `tsconfig.build.tsbuildinfo` first. Without that, `nest build` can silently
   emit nothing and `dist/main.js` goes missing.
