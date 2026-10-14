@@ -488,6 +488,9 @@ body::before {
   position: sticky;
   top: 0;
   z-index: 30;
+  /* Never let header content widen the page on narrow screens. */
+  min-width: 0;
+  overflow: hidden;
 }
 
 .oryx-sidebar {

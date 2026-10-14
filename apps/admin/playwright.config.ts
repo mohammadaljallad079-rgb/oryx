@@ -10,6 +10,8 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './e2e',
+  // Restores the documented MFA baseline before the suites run.
+  globalSetup: './e2e/global-setup.ts',
   timeout: 90_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,

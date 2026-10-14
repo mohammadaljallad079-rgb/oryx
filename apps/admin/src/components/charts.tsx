@@ -33,8 +33,8 @@ export function MiniBarChart({
   const top = data.slice(0, 12);
 
   return (
-    <div className="w-full overflow-hidden" style={{ height }}>
-      <div className="flex h-full items-end gap-2">
+    <div className="w-full min-w-0 overflow-hidden" style={{ height }}>
+      <div className="flex h-full min-w-0 items-end gap-2">
         {top.map((d, i) => {
           const pct = max === 0 ? 0 : Math.max(2, Math.round((d.value / max) * 100));
           return (

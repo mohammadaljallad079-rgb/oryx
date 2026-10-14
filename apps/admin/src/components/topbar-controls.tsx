@@ -38,13 +38,13 @@ export function ContextSelector() {
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="context-selector">
       {isPlatform ? (
-        <label className="flex items-center gap-2">
-          <span className="oryx-faint text-[11.5px] font-semibold uppercase tracking-wide">
+        <label className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="oryx-faint hidden text-[11.5px] font-semibold uppercase tracking-wide md:inline">
             {t('context.company')}
           </span>
           <select
             className="oryx-select"
-            style={{ minWidth: 190, height: 34, minHeight: 34 }}
+            style={{ width: '100%', maxWidth: 220, height: 34, minHeight: 34 }}
             value={companyId ?? ''}
             onChange={(e) => setCompanyContext(e.target.value || null, null)}
             aria-label={t('context.company')}
@@ -59,13 +59,13 @@ export function ContextSelector() {
         </label>
       ) : null}
 
-      <label className="flex items-center gap-2">
-        <span className="oryx-faint text-[11.5px] font-semibold uppercase tracking-wide">
+      <label className="flex min-w-0 items-center gap-2">
+        <span className="oryx-faint hidden text-[11.5px] font-semibold uppercase tracking-wide md:inline">
           {t('context.branch')}
         </span>
         <select
           className="oryx-select"
-          style={{ minWidth: 160, height: 34, minHeight: 34 }}
+          style={{ width: '100%', maxWidth: 190, height: 34, minHeight: 34 }}
           value={branchId ?? ''}
           disabled={!companyId}
           onChange={(e) => setCompanyContext(companyId, e.target.value || null)}

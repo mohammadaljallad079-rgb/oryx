@@ -96,7 +96,7 @@ export default function DashboardPage() {
       ) : null}
 
       {/* KPI row */}
-      <section className="grid grid-cols-2 gap-4 lg:grid-cols-4" data-testid="kpi-row">
+      <section className="grid grid-cols-2 gap-4 lg:grid-cols-4 [&>*]:min-w-0" data-testid="kpi-row">
         {loading || !k ? (
           Array.from({ length: 4 }).map((_, i) => (
             <Card key={i} className="p-4">
@@ -143,7 +143,7 @@ export default function DashboardPage() {
       </section>
 
       {/* Analytics */}
-      <section className="grid gap-4 lg:grid-cols-3">
+      <section className="grid gap-4 lg:grid-cols-3 [&>*]:min-w-0">
         <Card className="p-5 lg:col-span-2" data-testid="chart-branches">
           <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
             <div>
@@ -183,7 +183,7 @@ export default function DashboardPage() {
         </Card>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
+      <section className="grid gap-4 lg:grid-cols-3 [&>*]:min-w-0">
         <Card className="p-5 lg:col-span-2">
           <p className="oryx-panel-title m-0 mb-3">{t('dash.moduleAdoptionHint')}</p>
           {loading ? (
@@ -233,13 +233,13 @@ export default function DashboardPage() {
         </div>
 
         {loading ? (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0">
             {Array.from({ length: 6 }).map((_, i) => (
               <Skeleton key={i} height={186} />
             ))}
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0">
             {(data?.tiles ?? []).map((tile) => (
               <Link
                 key={tile.moduleKey}

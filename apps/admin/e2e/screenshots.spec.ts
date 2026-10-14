@@ -1,138 +1,266 @@
+import { createHmac } from 'node:crypto';
 import { test } from '@playwright/test';
 import { COMPANY_ADMIN, setLocale, setTheme, signIn } from './helpers';
 
+/** Generate a TOTP code for a base32 secret (RFC 6238, SHA-1, 6 digits). */
+function totp(secret: string, atMs: number = Date.now()): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const clean = secret.replace(/=+$/, '').toUpperCase();
+  let bits = 0;
+  let value = 0;
+  const bytes: number[] = [];
+  for (const ch of clean) {
+    const idx = alphabet.indexOf(ch);
+    if (idx === -1) continue;
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      bytes.push((value >>> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(atMs / 1000 / 30)));
+  const hmac = createHmac('sha1', Buffer.from(bytes)).update(counter).digest();
+  const offset = hmac[hmac.length - 1] & 0x0f;
+  const binary =
+    ((hmac[offset] & 0x7f) << 24) |
+    ((hmac[offset + 1] & 0xff) << 16) |
+    ((hmac[offset + 2] & 0xff) << 8) |
+    (hmac[offset + 3] & 0xff);
+  return String(binary % 1_000_000).padStart(6, '0');
+}
+
 /**
- * Screenshot capture for the execution report. Output goes to
- * docs/execution-reports/screenshots/ (resolved relative to the repo root).
+ * Screenshot capture for the execution report.
  *
- * These are real renders of the running application — dark and light themes,
- * Arabic RTL and English LTR, desktop and mobile viewports.
+ * Output: docs/execution-reports/screenshots/ (resolved from the repo root).
+ * These are real renders of the running application in both themes and both
+ * directions, at desktop, tablet and mobile widths.
  */
 
 const OUT = '../../docs/execution-reports/screenshots';
 
-test.describe('screenshots', () => {
-  test('desktop dark theme dashboard', async ({ page }) => {
+test.describe('required screenshots', () => {
+  test('dashboard - arabic dark', async ({ page }) => {
     await signIn(page);
-    await setTheme(page, 'dark');
-    await setLocale(page, 'en');
-    await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.goto('/dashboard');
-    await page.waitForTimeout(1200);
-    await page.screenshot({ path: `${OUT}/desktop-dark-dashboard.png`, fullPage: false });
-    await page.screenshot({ path: `${OUT}/desktop-dark-dashboard-full.png`, fullPage: true });
-  });
-
-  test('desktop light theme dashboard', async ({ page }) => {
-    await signIn(page);
-    await setTheme(page, 'light');
-    await setLocale(page, 'en');
-    await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.goto('/dashboard');
-    await page.waitForTimeout(1200);
-    await page.screenshot({ path: `${OUT}/desktop-light-dashboard.png`, fullPage: false });
-    await page.screenshot({ path: `${OUT}/desktop-light-dashboard-full.png`, fullPage: true });
-  });
-
-  test('desktop arabic RTL dashboard', async ({ page }) => {
-    await signIn(page);
-    await setTheme(page, 'dark');
     await setLocale(page, 'ar');
+    await setTheme(page, 'dark');
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto('/dashboard');
     await page.waitForTimeout(1200);
-    await page.screenshot({ path: `${OUT}/desktop-dark-ar-dashboard.png`, fullPage: false });
+    await page.screenshot({ path: `${OUT}/dashboard-ar-dark.png` });
+    await page.screenshot({ path: `${OUT}/dashboard-ar-dark-full.png`, fullPage: true });
   });
 
-  test('mobile dark and light dashboards', async ({ page }) => {
+  test('dashboard - arabic light', async ({ page }) => {
+    await signIn(page);
+    await setLocale(page, 'ar');
+    await setTheme(page, 'light');
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto('/dashboard');
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${OUT}/dashboard-ar-light.png` });
+  });
+
+  test('dashboard - english dark', async ({ page }) => {
+    await signIn(page);
+    await setLocale(page, 'en');
+    await setTheme(page, 'dark');
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto('/dashboard');
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${OUT}/dashboard-en-dark.png` });
+    await page.screenshot({ path: `${OUT}/dashboard-en-dark-full.png`, fullPage: true });
+  });
+
+  test('dashboard - english light', async ({ page }) => {
+    await signIn(page);
+    await setLocale(page, 'en');
+    await setTheme(page, 'light');
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto('/dashboard');
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${OUT}/dashboard-en-light.png` });
+  });
+
+  test('dashboard - mobile dark and light', async ({ page }) => {
     await signIn(page);
     await page.setViewportSize({ width: 390, height: 844 });
-    await setTheme(page, 'dark');
     await setLocale(page, 'en');
+
+    await setTheme(page, 'dark');
     await page.goto('/dashboard');
     await page.waitForTimeout(1000);
-    await page.screenshot({ path: `${OUT}/mobile-dark-dashboard.png`, fullPage: true });
+    await page.screenshot({ path: `${OUT}/dashboard-mobile-dark.png`, fullPage: true });
 
     await setTheme(page, 'light');
     await page.goto('/dashboard');
     await page.waitForTimeout(1000);
-    await page.screenshot({ path: `${OUT}/mobile-light-dashboard.png`, fullPage: true });
+    await page.screenshot({ path: `${OUT}/dashboard-mobile-light.png`, fullPage: true });
   });
 
-  test('company management screen', async ({ page }) => {
+  test('dashboard - tablet dark', async ({ page }) => {
     await signIn(page);
-    await setTheme(page, 'dark');
     await setLocale(page, 'en');
+    await setTheme(page, 'dark');
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await page.goto('/dashboard');
+    await page.waitForTimeout(1000);
+    await page.screenshot({ path: `${OUT}/dashboard-tablet-dark.png`, fullPage: true });
+  });
+
+  test('company management', async ({ page }) => {
+    await signIn(page);
+    await setLocale(page, 'en');
+    await setTheme(page, 'dark');
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto('/companies');
     await page.waitForTimeout(900);
-    await page.screenshot({ path: `${OUT}/desktop-dark-companies.png`, fullPage: false });
+    await page.screenshot({ path: `${OUT}/companies-dark.png` });
+
+    await setTheme(page, 'light');
+    await page.goto('/companies');
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: `${OUT}/companies-light.png` });
   });
 
-  test('subscription packages screen', async ({ page }) => {
+  test('subscription packages', async ({ page }) => {
     await signIn(page);
-    await setTheme(page, 'dark');
     await setLocale(page, 'en');
-    await page.setViewportSize({ width: 1440, height: 1000 });
+    await setTheme(page, 'dark');
+    await page.setViewportSize({ width: 1440, height: 1100 });
     await page.goto('/plans');
     await page.waitForTimeout(900);
-    await page.screenshot({ path: `${OUT}/desktop-dark-plans.png`, fullPage: true });
+    await page.screenshot({ path: `${OUT}/plans-dark.png`, fullPage: true });
   });
 
-  test('roles and permissions screen', async ({ page }) => {
+  test('roles and permissions', async ({ page }) => {
     await signIn(page);
-    await setTheme(page, 'dark');
     await setLocale(page, 'en');
+    await setTheme(page, 'dark');
     await page.setViewportSize({ width: 1440, height: 1100 });
     await page.goto('/roles');
     await page.waitForTimeout(900);
-    await page.screenshot({ path: `${OUT}/desktop-dark-roles.png`, fullPage: true });
+    await page.screenshot({ path: `${OUT}/roles-dark.png`, fullPage: true });
   });
 
-  test('light theme company management', async ({ page }) => {
+  test('mfa enrollment', async ({ page }) => {
     await signIn(page);
-    await setTheme(page, 'light');
     await setLocale(page, 'en');
+    await setTheme(page, 'dark');
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.goto('/companies');
-    await page.waitForTimeout(900);
-    await page.screenshot({ path: `${OUT}/desktop-light-companies.png`, fullPage: false });
+    await page.goto('/security');
+    await page.waitForTimeout(700);
+    await page.screenshot({ path: `${OUT}/mfa-settings-dark.png` });
+
+    await page.getByTestId('mfa-enroll').click();
+    await page.getByTestId('mfa-qr').waitFor({ timeout: 20_000 });
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${OUT}/mfa-enrollment-dark.png` });
   });
 
-  test('login screen dark and light', async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    // localStorage is only available once a document is loaded, so visit the
-    // page first and then apply the persisted preferences.
-    await page.goto('/login');
-    await setTheme(page, 'dark');
+  test('mfa login challenge', async ({ page }) => {
+    await signIn(page);
     await setLocale(page, 'en');
-    await page.goto('/login');
-    await page.waitForTimeout(600);
-    await page.screenshot({ path: `${OUT}/desktop-dark-login.png`, fullPage: false });
+    await setTheme(page, 'dark');
+    await page.setViewportSize({ width: 1440, height: 900 });
 
-    await setTheme(page, 'light');
-    await page.goto('/login');
-    await page.waitForTimeout(600);
-    await page.screenshot({ path: `${OUT}/desktop-light-login.png`, fullPage: false });
+    // Enable MFA through the API (enroll AND confirm), then sign out to reach
+    // the challenge step.
+    const secret = await page.evaluate(async () => {
+      const api = 'http://localhost:3001/api/v1';
+      const csrf = decodeURIComponent(document.cookie.match(/oryx_csrf=([^;]*)/)?.[1] ?? '');
+      const auth = `Bearer ${window.localStorage.getItem('oryx.accessToken') ?? ''}`;
+      const res = await fetch(`${api}/auth/mfa/enroll`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'x-oryx-csrf': csrf, Authorization: auth },
+        body: '{}',
+      });
+      return ((await res.json()) as { secret: string }).secret;
+    });
+
+    const confirmed = await page.evaluate(
+      async ({ api, code }) => {
+        const csrf = decodeURIComponent(document.cookie.match(/oryx_csrf=([^;]*)/)?.[1] ?? '');
+        const auth = `Bearer ${window.localStorage.getItem('oryx.accessToken') ?? ''}`;
+        const res = await fetch(`${api}/auth/mfa/enroll/confirm`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', 'x-oryx-csrf': csrf, Authorization: auth },
+          body: JSON.stringify({ code }),
+        });
+        return res.status;
+      },
+      { api: 'http://localhost:3001/api/v1', code: totp(secret) },
+    );
+    if (confirmed !== 200) throw new Error(`MFA enrollment failed with status ${confirmed}`);
+
+    await page.getByTestId('user-menu').click();
+    await page.getByTestId('logout').click();
+    await page.waitForURL('**/login');
+    await setLocale(page, 'en');
+
+    await page.getByTestId('login-email').fill('superadmin@oryx.local');
+    await page.getByTestId('login-password').fill('ChangeMe!Oryx2026');
+    await page.getByTestId('login-submit').click();
+    await page.getByTestId('mfa-challenge-notice').waitFor({ timeout: 20_000 });
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${OUT}/mfa-login-challenge-dark.png` });
+
+    // Complete the challenge so the account is usable, then leave it without
+    // MFA so the remaining captures are unaffected.
+    await page.getByTestId('mfa-code').fill(totp(secret, Date.now() + 31_000));
+    await page.getByTestId('login-submit').click();
+    await page.waitForURL('**/dashboard', { timeout: 25_000 });
+    await page.evaluate(async () => {
+      const api = 'http://localhost:3001/api/v1';
+      const csrf = decodeURIComponent(document.cookie.match(/oryx_csrf=([^;]*)/)?.[1] ?? '');
+      const auth = `Bearer ${window.localStorage.getItem('oryx.accessToken') ?? ''}`;
+      const me = await fetch(`${api}/auth/me`, { credentials: 'include', headers: { Authorization: auth } });
+      const { user } = (await me.json()) as { user: { id: string } };
+      await fetch(`${api}/auth/mfa/reset/${user.id}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'x-oryx-csrf': csrf, Authorization: auth },
+        body: '{}',
+      });
+    });
   });
 
   test('company administrator restricted view', async ({ page }) => {
     await signIn(page, COMPANY_ADMIN);
-    await setTheme(page, 'dark');
     await setLocale(page, 'en');
+    await setTheme(page, 'dark');
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto('/dashboard');
     await page.waitForTimeout(1000);
-    await page.screenshot({ path: `${OUT}/desktop-dark-company-admin.png`, fullPage: true });
+    await page.screenshot({ path: `${OUT}/company-admin-dark.png`, fullPage: true });
+  });
+
+  test('login screen dark and light', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/login');
+    await setTheme(page, 'dark');
+    await setLocale(page, 'en');
+    await page.goto('/login');
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: `${OUT}/login-dark.png` });
+
+    await setTheme(page, 'light');
+    await page.goto('/login');
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: `${OUT}/login-light.png` });
   });
 
   test('planned module state', async ({ page }) => {
     await signIn(page);
-    await setTheme(page, 'dark');
     await setLocale(page, 'en');
+    await setTheme(page, 'dark');
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/accounting');
     await page.waitForTimeout(700);
-    await page.screenshot({ path: `${OUT}/desktop-dark-planned-module.png`, fullPage: true });
+    await page.screenshot({ path: `${OUT}/planned-module-dark.png`, fullPage: true });
   });
 });

@@ -69,7 +69,7 @@ function RolesInner() {
 
   if (!scopeCompanyId) {
     return (
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-5" data-testid="roles-page">
         <SectionHeader title={t('roles.title')} subtitle={t('roles.subtitle')} />
         <Card>
           <EmptyState title={t('common.selectCompany')} />
