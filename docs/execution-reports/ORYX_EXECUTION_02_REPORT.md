@@ -213,5 +213,11 @@ no brand mark was invented.
 
 ## 11. Pull request
 
-Opened against `main` from `feature/execution-02-erp-core`. It is **not** to be
-merged or deployed without owner approval.
+| Item | Value |
+| --- | --- |
+| PR | https://github.com/mohammadaljallad079-rgb/oryx/pull/2 |
+| Base | `main` |
+| Head | `feature/execution-02-erp-core` |
+| CI | GitHub Actions run on the branch (`ci.yml`) |
+
+It is **not** to be merged or deployed without owner approval.
