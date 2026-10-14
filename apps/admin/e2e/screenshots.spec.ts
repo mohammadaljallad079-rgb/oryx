@@ -245,7 +245,13 @@ test.describe('required screenshots', () => {
 
     // Complete the challenge so the account is usable, then leave it without
     // MFA so the remaining captures are unaffected.
-    await page.getByTestId('mfa-code').fill(totp(secret, Date.now() + 31_000));
+    //
+    // The enrollment confirmation consumed the current step, so replay
+    // protection requires the next one. +30s is exactly one step ahead whatever
+    // the offset within the current step, and stays inside the server's +/-1
+    // tolerance. (+31s could land two steps ahead and be rejected near a
+    // boundary.)
+    await page.getByTestId('mfa-code').fill(totp(secret, Date.now() + 30_000));
     await page.getByTestId('login-submit').click();
     await page.waitForURL('**/dashboard', { timeout: 25_000 });
     const cleanupToken = await apiToken(page);

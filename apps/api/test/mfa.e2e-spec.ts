@@ -36,14 +36,21 @@ describe('ORYX API MFA (e2e)', () => {
     return { jar, res };
   }
 
-  /** Complete login using the known TOTP secret on a fresh time step. */
-  async function loginWithTotp(offsetSeconds = 0) {
+  /**
+   * Complete login with the known TOTP secret.
+   *
+   * The replay counter is cleared first so a current-step code is always
+   * accepted. Advancing the clock instead would straddle a step boundary and
+   * make the test fail whenever it ran near a 30-second edge.
+   */
+  async function loginWithTotp() {
+    await resetReplayCounter();
     const { jar, res } = await passwordStep();
     const verified = await jarCall<{ accessToken: string }>(ctx.base, '/auth/mfa/verify-login', {
       method: 'POST',
       body: {
         challengeToken: res.body.challengeToken,
-        code: generateTotp(secret, Date.now() + offsetSeconds * 1000),
+        code: generateTotp(secret),
       },
       jar,
     });
@@ -167,7 +174,7 @@ describe('ORYX API MFA (e2e)', () => {
     });
 
     it('issues a session for a valid code', async () => {
-      const { verified } = await loginWithTotp(31);
+      const { verified } = await loginWithTotp();
       expect(verified.status).toBe(200);
       expect(verified.body.accessToken).toBeTruthy();
     });
