@@ -63,6 +63,18 @@ test.describe('required screenshots', () => {
     await page.screenshot({ path: `${OUT}/dashboard-ar-light.png` });
   });
 
+  test('dashboard - reference viewport (arabic dark, 1536x1024)', async ({ page }) => {
+    await signIn(page);
+    await setLocale(page, 'ar');
+    await setTheme(page, 'dark');
+    // The approved reference is 1536x1024, so capture at the same size for a
+    // like-for-like comparison.
+    await page.setViewportSize({ width: 1536, height: 1024 });
+    await page.goto('/dashboard');
+    await page.waitForTimeout(1400);
+    await page.screenshot({ path: `${OUT}/dashboard-reference-viewport-ar-dark.png` });
+  });
+
   test('dashboard - english dark', async ({ page }) => {
     await signIn(page);
     await setLocale(page, 'en');
@@ -84,20 +96,38 @@ test.describe('required screenshots', () => {
     await page.screenshot({ path: `${OUT}/dashboard-en-light.png` });
   });
 
-  test('dashboard - mobile dark and light', async ({ page }) => {
+  test('dashboard - arabic mobile dark and light', async ({ page }) => {
+    await signIn(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    // The approved reference is an Arabic RTL dashboard, so the mobile captures
+    // use Arabic to match it.
+    await setLocale(page, 'ar');
+
+    await setTheme(page, 'dark');
+    await page.goto('/dashboard');
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${OUT}/dashboard-mobile-ar-dark.png`, fullPage: true });
+
+    await setTheme(page, 'light');
+    await page.goto('/dashboard');
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${OUT}/dashboard-mobile-ar-light.png`, fullPage: true });
+  });
+
+  test('dashboard - english mobile dark and light', async ({ page }) => {
     await signIn(page);
     await page.setViewportSize({ width: 390, height: 844 });
     await setLocale(page, 'en');
 
     await setTheme(page, 'dark');
     await page.goto('/dashboard');
-    await page.waitForTimeout(1000);
-    await page.screenshot({ path: `${OUT}/dashboard-mobile-dark.png`, fullPage: true });
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${OUT}/dashboard-mobile-en-dark.png`, fullPage: true });
 
     await setTheme(page, 'light');
     await page.goto('/dashboard');
-    await page.waitForTimeout(1000);
-    await page.screenshot({ path: `${OUT}/dashboard-mobile-light.png`, fullPage: true });
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${OUT}/dashboard-mobile-en-light.png`, fullPage: true });
   });
 
   test('dashboard - tablet dark', async ({ page }) => {
