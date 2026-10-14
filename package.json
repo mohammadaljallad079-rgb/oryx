@@ -1,0 +1,27 @@
+{
+  "name": "oryx",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ORYX — Holding ERP, Business SaaS ERP and Automotive Ecosystem (Execution 01 foundation)",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "db:generate": "pnpm --filter @oryx/database generate",
+    "db:migrate": "pnpm --filter @oryx/database migrate:deploy",
+    "db:migrate:dev": "pnpm --filter @oryx/database migrate:dev",
+    "db:seed": "pnpm --filter @oryx/database seed",
+    "db:reset": "pnpm --filter @oryx/database reset",
+    "build": "pnpm -r --filter @oryx/shared build && pnpm --filter @oryx/database build && pnpm --filter @oryx/api build && pnpm --filter @oryx/admin build",
+    "dev:api": "pnpm --filter @oryx/api dev",
+    "dev:admin": "pnpm --filter @oryx/admin dev",
+    "test": "pnpm -r test",
+    "test:api": "pnpm --filter @oryx/api test",
+    "test:shared": "pnpm --filter @oryx/shared test",
+    "test:e2e": "pnpm --filter @oryx/api test:e2e",
+    "test:ui": "pnpm --filter @oryx/admin test:ui",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  }
+}

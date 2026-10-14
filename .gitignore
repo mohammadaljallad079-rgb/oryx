@@ -1,0 +1,24 @@
+node_modules/
+dist/
+build/
+.next/
+out/
+coverage/
+*.log
+.env
+.env.local
+.env.*.local
+!.env.example
+.DS_Store
+.agent_tmp/
+test-results/
+playwright-report/
+packages/database/prisma/migrations/dev.db*
+*.tsbuildinfo
+.oryx-tmp/
+tsconfig.build.tsbuildinfo
+
+# Local test artifacts
+apps/admin/test-results/
+apps/admin/playwright-report/
+.env.local

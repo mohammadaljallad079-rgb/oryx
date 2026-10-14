@@ -1,0 +1,674 @@
+@import 'tailwindcss';
+
+/*
+ * ORYX design system.
+ *
+ * Palette derived from the owner-approved reference:
+ * docs/assets/ORYX Auto Services Dashboard.png — deep navy (#00162b family),
+ * layered navy panels, restrained gold accents, premium hairline borders.
+ *
+ * Theme switching sets data-theme="dark|light" on <html>.
+ * Direction is set by data-dir="rtl|ltr". Every component style below consumes
+ * these variables, so both themes and both directions work everywhere.
+ */
+
+:root {
+  --oryx-font-sans: 'Segoe UI', 'Noto Sans Arabic', Tahoma, system-ui, -apple-system,
+    'Helvetica Neue', Arial, sans-serif;
+
+  /* Dark theme (default) — matches the approved reference. */
+  --bg: #00162b;
+  --bg-deep: #000f1e;
+  --surface: #021f3a;
+  --surface-raised: #072a4a;
+  --surface-hover: #0b3459;
+  --border: rgba(212, 175, 55, 0.18);
+  --border-soft: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(212, 175, 55, 0.55);
+  --text: #eef3f9;
+  --text-muted: #9fb3c8;
+  --text-faint: #6f8598;
+  --text-inverse: #00121f;
+  --navy: #00162b;
+  --gold: #d4af37;
+  --gold-soft: #e8c766;
+  --gold-deep: #a9861f;
+  --success: #3ecf8e;
+  --warning: #f0b429;
+  --danger: #f2555a;
+  --info: #4aa8ff;
+  --tile-overlay: linear-gradient(
+    180deg,
+    rgba(0, 12, 24, 0.15) 0%,
+    rgba(0, 15, 30, 0.72) 55%,
+    rgba(0, 18, 34, 0.94) 100%
+  );
+  --shadow-card: 0 18px 40px -24px rgba(0, 0, 0, 0.85);
+  --header-h: 68px;
+  --sidebar-w: 268px;
+}
+
+:root[data-theme='light'] {
+  --bg: #f5f6f8;
+  --bg-deep: #eceef2;
+  --surface: #ffffff;
+  --surface-raised: #f0f2f6;
+  --surface-hover: #e8ecf2;
+  --border: rgba(0, 22, 43, 0.12);
+  --border-soft: rgba(0, 22, 43, 0.08);
+  --border-strong: rgba(169, 134, 31, 0.55);
+  --text: #0d2338;
+  --text-muted: #5b6b7d;
+  --text-faint: #8794a3;
+  --text-inverse: #ffffff;
+  --navy: #00162b;
+  --gold: #b8912a;
+  --gold-soft: #d4af37;
+  --gold-deep: #8f6f18;
+  --success: #1f9d63;
+  --warning: #b7791f;
+  --danger: #c53030;
+  --info: #2b6cb0;
+  --tile-overlay: linear-gradient(
+    180deg,
+    rgba(0, 12, 24, 0.1) 0%,
+    rgba(0, 22, 43, 0.62) 55%,
+    rgba(0, 22, 43, 0.9) 100%
+  );
+  --shadow-card: 0 16px 36px -26px rgba(0, 22, 43, 0.45);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--oryx-font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Ambient navy/gold wash behind the app shell, as in the reference. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.09), transparent 62%),
+    radial-gradient(900px 460px at 6% 4%, rgba(74, 168, 255, 0.06), transparent 58%);
+}
+
+:root[data-theme='light'] body::before {
+  background:
+    radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.16), transparent 62%),
+    radial-gradient(900px 460px at 6% 4%, rgba(0, 22, 43, 0.05), transparent 58%);
+}
+
+/* ------------------------------------------------------------- primitives */
+
+.oryx-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+}
+
+.oryx-card--flat {
+  box-shadow: none;
+}
+
+.oryx-panel-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.oryx-muted {
+  color: var(--text-muted);
+}
+
+.oryx-faint {
+  color: var(--text-faint);
+}
+
+.oryx-gold {
+  color: var(--gold);
+}
+
+.oryx-divider {
+  height: 1px;
+  background: var(--border-soft);
+  border: 0;
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+.oryx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+  white-space: nowrap;
+}
+
+.oryx-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+
+.oryx-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.oryx-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.oryx-btn--primary {
+  background: linear-gradient(180deg, var(--gold-soft), var(--gold));
+  border-color: var(--gold-deep);
+  color: var(--text-inverse);
+}
+
+.oryx-btn--primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, var(--gold), var(--gold-deep));
+  border-color: var(--gold-deep);
+}
+
+.oryx-btn--ghost {
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.oryx-btn--ghost:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.oryx-btn--danger {
+  border-color: rgba(242, 85, 90, 0.5);
+  color: var(--danger);
+}
+
+.oryx-btn--sm {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+/* ----------------------------------------------------------------- inputs */
+
+.oryx-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.oryx-input,
+.oryx-select,
+.oryx-textarea {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text);
+  font: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.oryx-textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.oryx-input:focus,
+.oryx-select:focus,
+.oryx-textarea:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18);
+}
+
+.oryx-input::placeholder,
+.oryx-textarea::placeholder {
+  color: var(--text-faint);
+}
+
+.oryx-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------------ badges */
+
+.oryx-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.oryx-badge--success {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+}
+
+.oryx-badge--warning {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+}
+
+.oryx-badge--danger {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+}
+
+.oryx-badge--info {
+  color: var(--info);
+  background: color-mix(in srgb, var(--info) 14%, transparent);
+  border-color: color-mix(in srgb, var(--info) 35%, transparent);
+}
+
+.oryx-badge--gold {
+  color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 15%, transparent);
+  border-color: color-mix(in srgb, var(--gold) 40%, transparent);
+}
+
+.oryx-badge--neutral {
+  color: var(--text-muted);
+  background: var(--surface-raised);
+  border-color: var(--border);
+}
+
+/* ------------------------------------------------------------------ tables */
+
+.oryx-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13.5px;
+}
+
+.oryx-table thead th {
+  text-align: start;
+  padding: 11px 14px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.oryx-table tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: middle;
+}
+
+.oryx-table tbody tr:hover {
+  background: color-mix(in srgb, var(--surface-raised) 70%, transparent);
+}
+
+/* ------------------------------------------------------------------- tiles */
+
+/*
+ * Image-led module tile. The photograph sits behind a navy gradient so the
+ * caption keeps contrast in both themes, matching the reference dashboard.
+ */
+.oryx-tile {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  min-height: 186px;
+  text-decoration: none;
+  color: #fff;
+  isolation: isolate;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.oryx-tile:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-strong);
+  box-shadow: 0 24px 48px -26px rgba(0, 0, 0, 0.9);
+}
+
+.oryx-tile__media {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background-size: cover;
+  background-position: center;
+}
+
+.oryx-tile__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--tile-overlay);
+}
+
+.oryx-tile__body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+  min-height: 186px;
+  padding: 18px;
+}
+
+.oryx-tile__icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  margin-bottom: auto;
+  border-radius: 11px;
+  background: rgba(0, 15, 30, 0.55);
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  color: var(--gold-soft);
+  backdrop-filter: blur(3px);
+}
+
+.oryx-tile__title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
+}
+
+.oryx-tile__desc {
+  font-size: 12.5px;
+  color: rgba(233, 240, 248, 0.82);
+  line-height: 1.5;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.75);
+}
+
+.oryx-tile--planned .oryx-tile__media {
+  filter: grayscale(0.7) brightness(0.55);
+}
+
+/* ------------------------------------------------------------------- charts */
+
+.oryx-chart-grid line {
+  stroke: var(--border-soft);
+}
+
+.oryx-chart-axis {
+  fill: var(--text-faint);
+  font-size: 11px;
+}
+
+/* --------------------------------------------------------------- skeleton */
+
+.oryx-skeleton {
+  background: linear-gradient(90deg, var(--surface-raised) 25%, var(--surface-hover) 50%, var(--surface-raised) 75%);
+  background-size: 200% 100%;
+  animation: oryx-shimmer 1.4s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+@keyframes oryx-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ------------------------------------------------------------------ layout */
+
+.oryx-shell {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-rows: var(--header-h) 1fr;
+  grid-template-areas: 'sidebar header' 'sidebar main';
+}
+
+:root[data-dir='rtl'] .oryx-shell {
+  grid-template-columns: 1fr var(--sidebar-w);
+  grid-template-areas: 'header sidebar' 'main sidebar';
+}
+
+.oryx-header {
+  grid-area: header;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 20px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.oryx-sidebar {
+  grid-area: sidebar;
+  background: color-mix(in srgb, var(--bg-deep) 92%, transparent);
+  border-inline-end: 1px solid var(--border);
+  padding: 16px 12px 28px;
+  overflow-y: auto;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.oryx-main {
+  grid-area: main;
+  padding: 22px;
+  min-width: 0;
+}
+
+.oryx-nav-group-label {
+  padding: 16px 12px 6px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.oryx-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  margin-bottom: 2px;
+  border-radius: 10px;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+
+.oryx-nav-item:hover {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.oryx-nav-item[aria-current='page'] {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 20%, transparent), transparent);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+:root[data-dir='rtl'] .oryx-nav-item[aria-current='page'] {
+  background: linear-gradient(270deg, color-mix(in srgb, var(--gold) 20%, transparent), transparent);
+}
+
+.oryx-nav-item__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+  flex: none;
+}
+
+/* ------------------------------------------------------------------- modal */
+
+.oryx-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 10, 20, 0.66);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.oryx-modal {
+  width: min(720px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 40px 80px -40px rgba(0, 0, 0, 0.9);
+}
+
+/* -------------------------------------------------------------------- misc */
+
+.oryx-kpi-value {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.oryx-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  min-height: 208px;
+  display: flex;
+  align-items: flex-end;
+  color: #fff;
+  isolation: isolate;
+}
+
+.oryx-hero__media {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background-size: cover;
+  background-position: center;
+}
+
+.oryx-hero__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    100deg,
+    rgba(0, 15, 30, 0.95) 6%,
+    rgba(0, 18, 34, 0.78) 46%,
+    rgba(0, 22, 43, 0.42) 100%
+  );
+}
+
+:root[data-dir='rtl'] .oryx-hero__scrim {
+  background: linear-gradient(
+    260deg,
+    rgba(0, 15, 30, 0.95) 6%,
+    rgba(0, 18, 34, 0.78) 46%,
+    rgba(0, 22, 43, 0.42) 100%
+  );
+}
+
+.oryx-focus-ring:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------- responsive */
+
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-w: 232px;
+  }
+}
+
+@media (max-width: 860px) {
+  .oryx-shell,
+  :root[data-dir='rtl'] .oryx-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: var(--header-h) 1fr;
+    grid-template-areas: 'header' 'main';
+  }
+
+  .oryx-sidebar {
+    position: fixed;
+    top: var(--header-h);
+    bottom: 0;
+    inset-inline-start: 0;
+    width: 272px;
+    z-index: 40;
+    transform: translateX(-105%);
+    transition: transform 0.22s ease;
+    height: auto;
+  }
+
+  :root[data-dir='rtl'] .oryx-sidebar {
+    transform: translateX(105%);
+  }
+
+  .oryx-sidebar[data-open='true'] {
+    transform: translateX(0) !important;
+  }
+
+  .oryx-main {
+    padding: 16px;
+  }
+}
