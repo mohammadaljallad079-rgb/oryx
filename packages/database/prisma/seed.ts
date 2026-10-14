@@ -748,10 +748,20 @@ async function seedErpBaseline(idByCode: Map<string, string>, superAdminId: stri
   let suppliers = 0;
 
   for (const company of companies) {
-    const existing = await prisma.account.count({ where: { companyId: company.id } });
-    if (existing === 0) {
-      await prisma.account.createMany({
-        data: STANDARD_CHART.map((a) => ({
+    // Upsert every standard account by code so a chart that predates a new
+    // system account is completed without disturbing custom accounts.
+    for (const a of STANDARD_CHART) {
+      const existing = await prisma.account.findUnique({
+        where: { companyId_code: { companyId: company.id, code: a.code } },
+      });
+      if (existing) {
+        if (!existing.systemRole && a.systemRole) {
+          await prisma.account.update({ where: { id: existing.id }, data: { systemRole: a.systemRole } });
+        }
+        continue;
+      }
+      await prisma.account.create({
+        data: {
           companyId: company.id,
           code: a.code,
           nameEn: a.nameEn,
@@ -762,9 +772,9 @@ async function seedErpBaseline(idByCode: Map<string, string>, superAdminId: stri
           isSystem: true,
           systemRole: a.systemRole ?? null,
           currency: company.currency,
-        })),
+        },
       });
-      accounts += STANDARD_CHART.length;
+      accounts += 1;
     }
 
     // One open fiscal year covering the current calendar year.
