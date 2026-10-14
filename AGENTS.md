@@ -3,11 +3,22 @@
 Read **docs/ORYX_MASTER_REFERENCE.md**, **docs/architecture/ARCHITECTURE.md** and
 **docs/architecture/PERMISSION_MATRIX.md** before writing code.
 
-## Current state (Execution 01 complete)
+## Current state (Execution 01 + 01.1 complete)
 
-Execution 01 delivered the working Super Admin foundation. It is **not** a mock:
-a NestJS API, a Next.js admin app and a PostgreSQL database run locally and are
-covered by automated tests.
+Execution 01 delivered the working Super Admin foundation, and Execution 01.1
+hardened it: secure session transport, TOTP MFA, approved photography and
+mobile layout fixes. It is **not** a mock: a NestJS API, a Next.js admin app and
+a PostgreSQL database run locally and are covered by 181 automated tests.
+
+Security baseline (do not regress):
+- The refresh token lives in an HttpOnly cookie scoped to `/api/v1/auth`. It is
+  never returned in a response body and never stored client-side.
+- Every non-GET request that presents the refresh cookie must echo the readable
+  `oryx_csrf` cookie in the `x-oryx-csrf` header (double-submit). `CsrfGuard`
+  runs first in the global guard pipeline.
+- MFA is TOTP with AES-256-GCM secret encryption under `MFA_ENCRYPTION_KEY`,
+  replay protection, and hashed single-use recovery codes.
+- Set `MFA_REQUIRE_SUPER_ADMIN=true` in production.
 
 - **Implemented and tested:** authentication and sessions, organization
   hierarchy (platform → company → branch), tenant isolation, RBAC with a
@@ -59,6 +70,15 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 
 ### Gotchas learned the hard way
 
+- **Refresh cookies change the test shape.** API tests that exercise sessions
+  need the `CookieJar` helper in `apps/api/test/test-app.ts`; the refresh token
+  is no longer in the JSON body.
+- **MFA tests mutate shared accounts.** Always reset MFA state afterwards. The
+  Playwright global setup calls `scripts/reset-seed-mfa.mjs`, and the Jest
+  harness resets it in `cleanupFixtures`. Never leave a seeded account behind a
+  second factor, or every later password login fails.
+- **otplib ships ESM.** Jest needs
+  `transformIgnorePatterns: ['node_modules/(?!(otplib|@otplib|@scure|@noble)/)']`.
 - **Build the workspace packages first.** `apps/api` and `apps/admin` resolve
   `@oryx/shared` and `@oryx/database` from their compiled `dist/`. After a clean
   checkout run `pnpm --filter @oryx/shared build && pnpm --filter @oryx/database build`
@@ -80,6 +100,11 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   after a rebuild — the old server keeps serving stale chunks and logins hang.
 - **Locale switching** must happen after a page has loaded; `localStorage` is
   unavailable on `about:blank`.
+- **Modals stay in the DOM.** A trigger button behind an open modal is still
+  "visible" to Playwright, so wait for `.oryx-modal` to have count 0 as the
+  completion signal, not for the trigger.
+- **A company with no subscription has zero capacity.** Assign a plan before
+  testing branch or user creation against a freshly provisioned tenant.
 
 ### Adding a new ERP module
 
