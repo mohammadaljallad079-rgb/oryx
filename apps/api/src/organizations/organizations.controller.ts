@@ -71,7 +71,7 @@ export class CompaniesController {
   }
 
   @Patch(':id')
-  @RequirePermissions('company.update')
+  @RequireAnyPermission('platform.company.update', 'company.update')
   @ApiOperation({ summary: 'Update company profile' })
   update(
     @Param('id') id: string,
