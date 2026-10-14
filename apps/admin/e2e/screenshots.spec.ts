@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { test } from '@playwright/test';
-import { COMPANY_ADMIN, apiToken, setLocale, setTheme, signIn } from './helpers';
+import { COMPANY_ADMIN, SUPER_ADMIN, apiToken, setLocale, setTheme, signIn } from './helpers';
 
 /** Generate a TOTP code for a base32 secret (RFC 6238, SHA-1, 6 digits). */
 function totp(secret: string, atMs: number = Date.now()): string {
@@ -204,8 +204,10 @@ test.describe('required screenshots', () => {
     await page.waitForURL('**/login');
     await setLocale(page, 'en');
 
-    await page.getByTestId('login-email').fill('superadmin@oryx.local');
-    await page.getByTestId('login-password').fill('ChangeMe!Oryx2026');
+    // Use the configured test credentials rather than hard-coded values, so the
+    // suite runs against any environment.
+    await page.getByTestId('login-email').fill(SUPER_ADMIN.email);
+    await page.getByTestId('login-password').fill(SUPER_ADMIN.password);
     await page.getByTestId('login-submit').click();
     await page.getByTestId('mfa-challenge-notice').waitFor({ timeout: 20_000 });
     await page.waitForTimeout(400);
