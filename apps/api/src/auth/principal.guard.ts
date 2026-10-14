@@ -79,6 +79,16 @@ export class PrincipalGuard implements CanActivate {
       throw unauthorized(ERROR_CODES.AUTH_ACCOUNT_INACTIVE, 'Account is not active.');
     }
 
+    // Privileged platform accounts must complete a second factor. The login
+    // flow already refuses to issue a session without it; this is a defence in
+    // depth check for tokens minted before the requirement existed.
+    if (user.isSuperAdmin && !user.mfaEnabled && process.env.MFA_REQUIRE_SUPER_ADMIN === 'true') {
+      throw forbidden(
+        ERROR_CODES.MFA_REQUIRED,
+        'This account must complete two-factor authentication enrollment before use.',
+      );
+    }
+
     const requestedCompanyId = headerValue(req, COMPANY_HEADER);
     const requestedBranchId = headerValue(req, BRANCH_HEADER);
     const supportToken = headerValue(req, SUPPORT_HEADER);

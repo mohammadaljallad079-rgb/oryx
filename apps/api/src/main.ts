@@ -17,6 +17,7 @@ export async function createApp(): Promise<INestApplication> {
     .filter(Boolean);
   app.enableCors({
     origin: origins,
+    // Required so the browser sends and stores the HttpOnly refresh cookie.
     credentials: true,
     allowedHeaders: [
       'Content-Type',
@@ -24,6 +25,7 @@ export async function createApp(): Promise<INestApplication> {
       'x-oryx-company-id',
       'x-oryx-branch-id',
       'x-oryx-support-session',
+      'x-oryx-csrf',
     ],
   });
 

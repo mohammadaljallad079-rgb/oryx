@@ -18,7 +18,11 @@ export interface ModuleDefinition {
   /** Navigation group used by the admin shell. */
   group: string;
   icon: string;
-  /** Image used by the dashboard module tile. */
+  /**
+   * Base name of the tile image. Resolves to an approved photographic asset at
+   * `/tiles/<tileImage>.jpg`, cropped from the owner-approved dashboard
+   * reference (see scripts/extract-approved-assets.py).
+   */
   tileImage: string;
   /** Route inside the admin app. */
   route: string;
@@ -74,7 +78,7 @@ const M = (
 });
 
 export const MODULES: ModuleDefinition[] = [
-  M('dashboard', 'Dashboard', 'لوحة المعلومات', 'Operational overview for the selected company and branch.', 'نظرة تشغيلية للشركة والفرع المحدد.', 'core', 'gauge', 'dashboard-hero', '/dashboard', 'AVAILABLE', 'erp.dashboard.read', 'execution-01'),
+  M('dashboard', 'Dashboard', 'لوحة المعلومات', 'Operational overview for the selected company and branch.', 'نظرة تشغيلية للشركة والفرع المحدد.', 'core', 'gauge', 'hero-automotive', '/dashboard', 'AVAILABLE', 'erp.dashboard.read', 'execution-01'),
   M('company_management', 'Company Management', 'إدارة الشركات', 'Companies, subsidiaries, hierarchy and lifecycle.', 'الشركات والشركات التابعة والهيكل ودورة الحياة.', 'core', 'building', 'tile-company', '/companies', 'AVAILABLE', 'erp.company.manage', 'execution-01'),
   M('branch_management', 'Branch Management', 'إدارة الفروع', 'Branches, locations and branch-level scoping.', 'الفروع والمواقع ونطاق الفرع.', 'core', 'map-pin', 'tile-branch', '/branches', 'AVAILABLE', 'erp.branch.manage', 'execution-01'),
   M('financial_accounting', 'Financial Accounting', 'المحاسبة المالية', 'Chart of accounts, journals, AR/AP and VAT.', 'دليل الحسابات والقيود والمدينون والدائنون والضريبة.', 'finance', 'calculator', 'tile-accounting', '/accounting', 'PLANNED', 'erp.accounting.read', 'execution-02', 'erp.accounting.write'),
@@ -113,6 +117,16 @@ export function isKnownModule(key: string): boolean {
 
 export function getModule(key: string): ModuleDefinition | undefined {
   return MODULE_BY_KEY.get(key);
+}
+
+/**
+ * Resolve a module's tile image to a servable URL.
+ *
+ * Assets are JPEG photographs extracted from the owner-approved reference, not
+ * generated artwork. See `scripts/extract-approved-assets.py`.
+ */
+export function tileImageUrl(tileImage: string): string {
+  return `/tiles/${tileImage}.jpg`;
 }
 
 export function modulesForPermission(permissionCodes: readonly string[]): ModuleDefinition[] {

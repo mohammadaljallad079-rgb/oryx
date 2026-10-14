@@ -3,6 +3,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { CookieService } from './cookie.service';
+import { MfaEnrollmentService } from './mfa-enrollment.service';
+import { MfaService, SecretCipher } from './mfa.service';
+import { CsrfGuard } from './csrf.guard';
 import { PrincipalGuard } from './principal.guard';
 import { ModuleEntitlementGuard, PermissionsGuard } from './permissions.guard';
 
@@ -19,7 +23,27 @@ import { ModuleEntitlementGuard, PermissionsGuard } from './permissions.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, PrincipalGuard, PermissionsGuard, ModuleEntitlementGuard],
-  exports: [AuthService, PrincipalGuard, PermissionsGuard, ModuleEntitlementGuard, JwtModule],
+  providers: [
+    AuthService,
+    CookieService,
+    SecretCipher,
+    MfaService,
+    MfaEnrollmentService,
+    CsrfGuard,
+    PrincipalGuard,
+    PermissionsGuard,
+    ModuleEntitlementGuard,
+  ],
+  exports: [
+    AuthService,
+    CookieService,
+    MfaService,
+    MfaEnrollmentService,
+    CsrfGuard,
+    PrincipalGuard,
+    PermissionsGuard,
+    ModuleEntitlementGuard,
+    JwtModule,
+  ],
 })
 export class AuthModule {}

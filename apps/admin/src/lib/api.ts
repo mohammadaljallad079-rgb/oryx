@@ -1,5 +1,6 @@
 import type {
   AppVersionDto,
+  LoginResult,
   AuditLogDto,
   BranchDto,
   CmsBannerDto,
@@ -21,9 +22,15 @@ import type {
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api';
 
 const ACCESS_KEY = 'oryx.accessToken';
-const REFRESH_KEY = 'oryx.refreshToken';
 const COMPANY_KEY = 'oryx.companyId';
 const BRANCH_KEY = 'oryx.branchId';
+/**
+ * CSRF cookie name set by the API. It is intentionally readable by JavaScript
+ * so the double-submit pattern works; the refresh token itself lives in an
+ * HttpOnly cookie and is never accessible here.
+ */
+const CSRF_COOKIE = 'oryx_csrf';
+const CSRF_HEADER = 'x-oryx-csrf';
 
 export class ApiError extends Error {
   constructor(
@@ -37,14 +44,23 @@ export class ApiError extends Error {
   }
 }
 
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+/**
+ * Client-side session store.
+ *
+ * Only the short-lived access token is kept in memory/localStorage. The refresh
+ * token is held by the API in an HttpOnly cookie, so it is never exposed to
+ * JavaScript and cannot be stolen by an XSS payload.
+ */
 export const tokenStore = {
   get access(): string | null {
     if (typeof window === 'undefined') return null;
     return window.localStorage.getItem(ACCESS_KEY);
-  },
-  get refresh(): string | null {
-    if (typeof window === 'undefined') return null;
-    return window.localStorage.getItem(REFRESH_KEY);
   },
   get companyId(): string | null {
     if (typeof window === 'undefined') return null;
@@ -54,10 +70,9 @@ export const tokenStore = {
     if (typeof window === 'undefined') return null;
     return window.localStorage.getItem(BRANCH_KEY);
   },
-  setTokens(access: string, refresh: string) {
+  setAccessToken(access: string) {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(ACCESS_KEY, access);
-    window.localStorage.setItem(REFRESH_KEY, refresh);
   },
   setContext(companyId: string | null, branchId: string | null) {
     if (typeof window === 'undefined') return;
@@ -69,7 +84,6 @@ export const tokenStore = {
   clear() {
     if (typeof window === 'undefined') return;
     window.localStorage.removeItem(ACCESS_KEY);
-    window.localStorage.removeItem(REFRESH_KEY);
     window.localStorage.removeItem(COMPANY_KEY);
     window.localStorage.removeItem(BRANCH_KEY);
   },
@@ -86,23 +100,31 @@ interface RequestOptions {
 
 let refreshInFlight: Promise<boolean> | null = null;
 
-async function refreshTokens(): Promise<boolean> {
-  const refresh = tokenStore.refresh;
-  if (!refresh) return false;
+/**
+ * Rotate the session using the HttpOnly refresh cookie. The CSRF header must
+ * accompany the request, which is why it is read from the readable cookie.
+ */
+async function refreshSession(): Promise<boolean> {
   if (!refreshInFlight) {
     refreshInFlight = (async () => {
       try {
+        const csrf = readCookie(CSRF_COOKIE);
         const res = await fetch(`${API_BASE}/v1/auth/refresh`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken: refresh }),
+          // Send and receive the session cookies.
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(csrf ? { [CSRF_HEADER]: csrf } : {}),
+          },
+          body: JSON.stringify({}),
         });
         if (!res.ok) {
           tokenStore.clear();
           return false;
         }
         const data = (await res.json()) as LoginResponse;
-        tokenStore.setTokens(data.accessToken, data.refreshToken);
+        tokenStore.setAccessToken(data.accessToken);
         return true;
       } catch {
         return false;
@@ -115,6 +137,7 @@ async function refreshTokens(): Promise<boolean> {
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const method = options.method ?? 'GET';
   const headers: Record<string, string> = {};
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (!options.anonymous) {
@@ -125,16 +148,22 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     if (companyId) headers['x-oryx-company-id'] = companyId;
     if (branchId) headers['x-oryx-branch-id'] = branchId;
   }
+  // Echo the CSRF cookie on state-changing requests (double-submit).
+  if (method !== 'GET') {
+    const csrf = readCookie(CSRF_COOKIE);
+    if (csrf) headers[CSRF_HEADER] = csrf;
+  }
 
   const res = await fetch(`${API_BASE}/v1${path}`, {
-    method: options.method ?? 'GET',
+    method,
     headers,
+    credentials: 'include',
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     cache: 'no-store',
   });
 
   if (res.status === 401 && !options.anonymous && !options.noRetry) {
-    const refreshed = await refreshTokens();
+    const refreshed = await refreshSession();
     if (refreshed) return request<T>(path, { ...options, noRetry: true });
   }
 
@@ -158,7 +187,13 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 export const api = {
   // ------------------------------------------------------------------- auth
   login: (email: string, password: string) =>
-    request<LoginResponse>('/auth/login', { method: 'POST', body: { email, password }, anonymous: true }),
+    request<LoginResult>('/auth/login', { method: 'POST', body: { email, password }, anonymous: true }),
+  verifyMfaLogin: (challengeToken: string, code: string) =>
+    request<LoginResponse>('/auth/mfa/verify-login', {
+      method: 'POST',
+      body: { challengeToken, code },
+      anonymous: true,
+    }),
   me: () =>
     request<{
       user: {
@@ -173,6 +208,7 @@ export const api = {
       };
       memberships: unknown[];
       permissions: string[];
+      mfa: { enabled: boolean; enrolledAt: string | null; recoveryCodesRemaining: number };
       context: {
         companyId: string | null;
         branchId: string | null;
@@ -181,8 +217,7 @@ export const api = {
       };
     }>('/auth/me'),
   context: () => request<ContextResponse>('/auth/context'),
-  logout: (refreshToken: string) =>
-    request<{ ok: boolean }>('/auth/logout', { method: 'POST', body: { refreshToken } }),
+  logout: () => request<{ ok: boolean }>('/auth/logout', { method: 'POST', body: {} }),
   updateProfile: (body: {
     fullNameEn?: string;
     fullNameAr?: string;
@@ -197,7 +232,26 @@ export const api = {
     fullNameEn: string;
     fullNameAr: string;
     password: string;
-  }) => request<LoginResponse>('/auth/accept-invitation', { method: 'POST', body, anonymous: true }),
+  }) => request<LoginResult>('/auth/accept-invitation', { method: 'POST', body, anonymous: true }),
+
+  // -------------------------------------------------------------------- MFA
+  mfaStatus: () =>
+    request<{ enabled: boolean; enrolledAt: string | null; recoveryCodesRemaining: number }>('/auth/mfa/status'),
+  mfaStartEnrollment: () =>
+    request<{ otpauthUri: string; qrDataUrl: string; secret: string; expiresAt: string }>('/auth/mfa/enroll', {
+      method: 'POST',
+      body: {},
+    }),
+  mfaConfirmEnrollment: (code: string) =>
+    request<{ recoveryCodes: string[] }>('/auth/mfa/enroll/confirm', { method: 'POST', body: { code } }),
+  mfaRegenerateRecoveryCodes: (code: string) =>
+    request<{ recoveryCodes: string[] }>('/auth/mfa/recovery-codes/regenerate', {
+      method: 'POST',
+      body: { code },
+    }),
+  mfaDisable: (code: string) => request<{ ok: boolean }>('/auth/mfa/disable', { method: 'POST', body: { code } }),
+  mfaAdminReset: (userId: string) =>
+    request<{ ok: boolean }>(`/auth/mfa/reset/${userId}`, { method: 'POST', body: {} }),
 
   // ---------------------------------------------------------------- dashboard
   dashboard: (params: { companyId?: string | null; branchId?: string | null } = {}) => {

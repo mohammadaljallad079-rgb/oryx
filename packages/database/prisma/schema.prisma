@@ -102,6 +102,15 @@ model User {
   lastLoginAt    DateTime?
   failedLoginCount Int      @default(0)
   lockedUntil    DateTime?
+  /** TOTP MFA: secret is stored encrypted at rest, never in plaintext. */
+  mfaEnabled     Boolean    @default(false)
+  mfaSecretEncrypted String?
+  /** Short-lived, single-use enrollment secret pending verification. */
+  mfaPendingSecretEncrypted String?
+  mfaPendingExpiresAt DateTime?
+  /** Monotonic counter that rejects replay of an already-accepted TOTP step. */
+  mfaLastUsedStep BigInt?
+  mfaEnrolledAt  DateTime?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
@@ -110,8 +119,26 @@ model User {
   invitationsSent   Invitation[]     @relation("InvitationInviter")
   auditLogs         AuditLog[]
   supportSessions   SupportSession[] @relation("SupportSessionActor")
+  mfaRecoveryCodes  MfaRecoveryCode[]
 
   @@index([status])
+}
+
+/**
+ * Single-use MFA recovery codes. Only a hash of each code is stored, and a
+ * code is marked used the first time it is redeemed.
+ */
+model MfaRecoveryCode {
+  id         String    @id @default(cuid())
+  userId     String
+  codeHash   String
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([codeHash])
 }
 
 model RefreshToken {

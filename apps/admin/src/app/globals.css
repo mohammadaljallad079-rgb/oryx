@@ -361,7 +361,7 @@ body::before {
   overflow: hidden;
   border-radius: 16px;
   border: 1px solid var(--border);
-  min-height: 186px;
+  min-height: 178px;
   text-decoration: none;
   color: #fff;
   isolation: isolate;
@@ -395,8 +395,8 @@ body::before {
   flex-direction: column;
   justify-content: flex-end;
   gap: 6px;
-  min-height: 186px;
-  padding: 18px;
+  min-height: 178px;
+  padding: 17px;
 }
 
 .oryx-tile__icon {
@@ -591,7 +591,7 @@ body::before {
   overflow: hidden;
   border-radius: 18px;
   border: 1px solid var(--border);
-  min-height: 208px;
+  min-height: 232px;
   display: flex;
   align-items: flex-end;
   color: #fff;

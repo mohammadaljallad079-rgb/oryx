@@ -10,12 +10,15 @@ import { LocaleToggle, ThemeToggle } from '@/components/topbar-controls';
 
 export default function LoginPage() {
   const { t } = useUi();
-  const { login, isAuthenticated, ready } = useAuth();
+  const { login, completeMfaLogin, isAuthenticated, ready } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Set once the password step succeeds and a second factor is required. */
+  const [challengeToken, setChallengeToken] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
 
   useEffect(() => {
     if (ready && isAuthenticated) router.replace('/dashboard');
@@ -26,10 +29,30 @@ export default function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      await login(email, password);
+      const result = await login(email, password);
+      if (result && result.mfaRequired) {
+        // Password accepted; a second factor is required before a session exists.
+        setChallengeToken(result.challengeToken);
+        return;
+      }
       router.replace('/dashboard');
     } catch {
       setError(t('auth.invalid'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onVerifyMfa(e: React.FormEvent) {
+    e.preventDefault();
+    if (!challengeToken) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await completeMfaLogin(challengeToken, mfaCode);
+      router.replace('/dashboard');
+    } catch {
+      setError(t('mfa.invalidCode'));
     } finally {
       setBusy(false);
     }
@@ -103,31 +126,66 @@ export default function LoginPage() {
             <h1 className="m-0 text-[22px] font-extrabold">{t('auth.welcome')}</h1>
             <p className="oryx-muted mt-1 mb-6 text-[13px]">{t('auth.subtitle')}</p>
 
-            <form onSubmit={onSubmit} className="flex flex-col gap-4" data-testid="login-form">
-              <Field label={t('auth.email')} required>
-                <input
-                  className="oryx-input"
-                  type="email"
-                  name="email"
-                  autoComplete="username"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  data-testid="login-email"
-                />
-              </Field>
-              <Field label={t('auth.password')} required>
-                <input
-                  className="oryx-input"
-                  type="password"
-                  name="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  data-testid="login-password"
-                />
-              </Field>
+            <form
+              onSubmit={challengeToken ? onVerifyMfa : onSubmit}
+              className="flex flex-col gap-4"
+              data-testid="login-form"
+            >
+              {challengeToken ? (
+                <>
+                  <p
+                    className="m-0 flex items-center gap-2 rounded-lg px-3 py-2 text-[12.5px]"
+                    style={{
+                      color: 'var(--gold)',
+                      background: 'color-mix(in srgb, var(--gold) 12%, transparent)',
+                      border: '1px solid color-mix(in srgb, var(--gold) 35%, transparent)',
+                    }}
+                    data-testid="mfa-challenge-notice"
+                  >
+                    <Icon name="shield" size={15} />
+                    {t('mfa.challengeBody')}
+                  </p>
+                  <Field label={t('mfa.code')} required hint={t('mfa.codeHint')}>
+                    <input
+                      className="oryx-input"
+                      inputMode="text"
+                      autoComplete="one-time-code"
+                      autoFocus
+                      required
+                      value={mfaCode}
+                      onChange={(e) => setMfaCode(e.target.value)}
+                      data-testid="mfa-code"
+                    />
+                  </Field>
+                </>
+              ) : (
+                <>
+                  <Field label={t('auth.email')} required>
+                    <input
+                      className="oryx-input"
+                      type="email"
+                      name="email"
+                      autoComplete="username"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      data-testid="login-email"
+                    />
+                  </Field>
+                  <Field label={t('auth.password')} required>
+                    <input
+                      className="oryx-input"
+                      type="password"
+                      name="password"
+                      autoComplete="current-password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      data-testid="login-password"
+                    />
+                  </Field>
+                </>
+              )}
 
               {error ? (
                 <p
@@ -146,13 +204,28 @@ export default function LoginPage() {
               ) : null}
 
               <Button type="submit" variant="primary" disabled={busy} data-testid="login-submit">
-                {busy ? t('auth.signingIn') : t('auth.signInCta')}
+                {busy ? t('auth.signingIn') : challengeToken ? t('mfa.verify') : t('auth.signInCta')}
               </Button>
+
+              {challengeToken ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setChallengeToken(null);
+                    setMfaCode('');
+                    setError(null);
+                  }}
+                  data-testid="mfa-cancel"
+                >
+                  {t('common.cancel')}
+                </Button>
+              ) : null}
             </form>
 
             <p className="oryx-faint mt-6 text-[11.5px] leading-relaxed">
-              Execution 01 — Super Admin foundation. Seeded development accounts are documented in the
-              local runbook; no production credentials ship with this repository.
+              Execution 01.1 — sessions use HttpOnly cookies; privileged accounts require TOTP MFA.
+              Seeded development accounts are documented in the local runbook; no production
+              credentials ship with this repository.
             </p>
           </Card>
         </div>

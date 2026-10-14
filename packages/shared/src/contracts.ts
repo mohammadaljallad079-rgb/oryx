@@ -54,11 +54,32 @@ export interface MembershipSummary {
 
 export interface LoginResponse {
   accessToken: string;
-  refreshToken: string;
+  /**
+   * Only present in development when COOKIE_AUTH is disabled. With cookie
+   * transport enabled the refresh token is set as an HttpOnly cookie and this
+   * field is omitted, so it is never exposed to JavaScript.
+   */
+  refreshToken?: string;
+  /** CSRF token the client must echo in the `x-oryx-csrf` header. */
+  csrfToken?: string;
   expiresIn: number;
   user: SessionUser;
   memberships: MembershipSummary[];
   permissions: string[];
+}
+
+/** Returned when a password is correct but MFA must be completed first. */
+export interface MfaChallengeResponse {
+  mfaRequired: true;
+  /** Short-lived token that authorises only the MFA verification step. */
+  challengeToken: string;
+  expiresIn: number;
+}
+
+export type LoginResult = LoginResponse | MfaChallengeResponse;
+
+export function isMfaChallenge(result: LoginResult): result is MfaChallengeResponse {
+  return (result as MfaChallengeResponse).mfaRequired === true;
 }
 
 export interface CompanyContextOption {

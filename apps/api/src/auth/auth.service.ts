@@ -3,10 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { randomBytes, createHash } from 'node:crypto';
-import type { LoginResponse, MembershipSummary, SessionUser } from '@oryx/shared';
+import type { LoginResponse, LoginResult, MembershipSummary, SessionUser } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { ERROR_CODES, forbidden, unauthorized } from '../common/errors';
+import { MfaEnrollmentService } from './mfa-enrollment.service';
 
 export interface AccessTokenPayload {
   sub: string;
@@ -34,6 +35,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly audit: AuditService,
+    private readonly mfa: MfaEnrollmentService,
   ) {}
 
   private hashToken(token: string): string {
@@ -50,6 +52,11 @@ export class AuthService {
 
   private refreshTtl(): number {
     return Number(this.config.get('JWT_REFRESH_TTL') ?? 2592000);
+  }
+
+  /** MFA challenge tokens are intentionally very short lived. */
+  private mfaChallengeTtl(): number {
+    return Number(this.config.get('MFA_CHALLENGE_TTL') ?? 300);
   }
 
   async validateCredentials(email: string, password: string) {
@@ -86,9 +93,115 @@ export class AuthService {
     return user;
   }
 
-  async login(email: string, password: string, meta: { ip?: string; userAgent?: string }): Promise<LoginResponse> {
+  /**
+   * Password step of login.
+   *
+   * When the account has MFA enabled this returns an MFA challenge instead of a
+   * session: no tokens are issued until the second factor is verified, so a
+   * stolen password alone cannot obtain access.
+   */
+  async login(
+    email: string,
+    password: string,
+    meta: { ip?: string; userAgent?: string },
+  ): Promise<LoginResult> {
     const user = await this.validateCredentials(email, password);
 
+    if (user.mfaEnabled && user.mfaSecretEncrypted) {
+      const challengeToken = await this.jwt.signAsync(
+        { sub: user.id, mfa: 'pending' },
+        {
+          secret: this.config.get<string>('JWT_ACCESS_SECRET'),
+          expiresIn: this.mfaChallengeTtl(),
+        },
+      );
+      await this.audit.record({
+        actorUserId: user.id,
+        action: 'auth.mfa_challenge_issued',
+        targetType: 'USER',
+        targetId: user.id,
+        summary: `MFA challenge issued for ${user.email}`,
+        ipAddress: meta.ip ?? null,
+        userAgent: meta.userAgent ?? null,
+      });
+      return {
+        mfaRequired: true,
+        challengeToken,
+        expiresIn: this.mfaChallengeTtl(),
+      };
+    }
+
+    return this.issueSession(user, meta, 'auth.login');
+  }
+
+  /**
+   * Second step of login: verify a TOTP or recovery code against the challenge
+   * token and, on success, issue the session.
+   */
+  async loginWithMfa(
+    challengeToken: string,
+    code: string,
+    meta: { ip?: string; userAgent?: string },
+  ): Promise<LoginResponse> {
+    let payload: { sub: string; mfa?: string };
+    try {
+      payload = await this.jwt.verifyAsync<{ sub: string; mfa?: string }>(challengeToken, {
+        secret: this.config.get<string>('JWT_ACCESS_SECRET'),
+      });
+    } catch {
+      throw unauthorized(ERROR_CODES.AUTH_TOKEN_EXPIRED, 'The MFA challenge has expired. Sign in again.');
+    }
+    if (payload.mfa !== 'pending') {
+      throw unauthorized(ERROR_CODES.AUTH_TOKEN_INVALID, 'Invalid MFA challenge token.');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!user || user.status === 'SUSPENDED' || user.status === 'DISABLED') {
+      throw forbidden(ERROR_CODES.AUTH_ACCOUNT_INACTIVE, 'This account is not active.');
+    }
+
+    const ok = await this.mfa.verifyChallenge(user.id, code);
+    if (!ok) {
+      await this.audit.record({
+        actorUserId: user.id,
+        action: 'auth.mfa_failed',
+        targetType: 'USER',
+        targetId: user.id,
+        summary: `Failed MFA verification for ${user.email}`,
+        ipAddress: meta.ip ?? null,
+        userAgent: meta.userAgent ?? null,
+      });
+      throw unauthorized(ERROR_CODES.MFA_INVALID_CODE, 'The verification code is not valid.');
+    }
+
+    await this.audit.record({
+      actorUserId: user.id,
+      action: 'auth.mfa_verified',
+      targetType: 'USER',
+      targetId: user.id,
+      summary: `MFA verified for ${user.email}`,
+      ipAddress: meta.ip ?? null,
+      userAgent: meta.userAgent ?? null,
+    });
+
+    return this.issueSession(user, meta, 'auth.login_mfa');
+  }
+
+  /** Issue a full session (access token + refresh token + audit entry). */
+  private async issueSession(
+    user: {
+      id: string;
+      email: string;
+      fullNameEn: string;
+      fullNameAr: string;
+      status: string;
+      preferredLocale: string;
+      preferredTheme: string;
+      isSuperAdmin: boolean;
+    },
+    meta: { ip?: string; userAgent?: string },
+    auditAction: string,
+  ): Promise<LoginResponse> {
     const memberships = await this.loadMemberships(user.id);
     const activeMemberships = memberships.filter((m) => m.companyStatus === 'ACTIVE');
 
@@ -135,7 +248,7 @@ export class AuthService {
     await this.audit.record({
       actorUserId: user.id,
       companyId: kind === 'COMPANY' ? (primary?.companyId ?? null) : null,
-      action: 'auth.login',
+      action: auditAction,
       targetType: 'USER',
       targetId: user.id,
       summary: `Signed in as ${user.email}`,

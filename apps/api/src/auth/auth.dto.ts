@@ -11,9 +11,32 @@ export class LoginDto {
 }
 
 export class RefreshDto {
+  /**
+   * Optional: with cookie transport the refresh token is read from the
+   * HttpOnly cookie. The body field remains for non-browser clients.
+   */
+  @IsOptional()
   @IsString()
   @MinLength(10)
-  refreshToken!: string;
+  refreshToken?: string;
+}
+
+export class MfaVerifyLoginDto {
+  @IsString()
+  @MinLength(10)
+  challengeToken!: string;
+
+  @IsString()
+  @MinLength(6)
+  @MaxLength(20)
+  code!: string;
+}
+
+export class MfaCodeDto {
+  @IsString()
+  @MinLength(6)
+  @MaxLength(20)
+  code!: string;
 }
 
 export class AcceptInvitationDto {

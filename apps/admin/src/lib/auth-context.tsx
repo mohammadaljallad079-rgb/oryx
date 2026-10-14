@@ -9,7 +9,12 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { resolveEffectivePermissions, type MembershipSummary, type SessionUser } from '@oryx/shared';
+import {
+  resolveEffectivePermissions,
+  type LoginResponse,
+  type MembershipSummary,
+  type SessionUser,
+} from '@oryx/shared';
 import { api, ApiError, tokenStore } from './api';
 
 interface AuthState {
@@ -30,7 +35,12 @@ interface AuthContextValue extends AuthState {
   can: (permission: string) => boolean;
   canAny: (...permissions: string[]) => boolean;
   hasModule: (moduleKey: string) => boolean;
-  login: (email: string, password: string) => Promise<void>;
+  /**
+   * Password step. Resolves to an MFA challenge when the account requires a
+   * second factor, in which case no session exists until `completeMfaLogin`.
+   */
+  login: (email: string, password: string) => Promise<{ mfaRequired: true; challengeToken: string } | void>;
+  completeMfaLogin: (challengeToken: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   setCompanyContext: (companyId: string | null, branchId?: string | null) => void;
   refreshSession: () => Promise<void>;
@@ -89,32 +99,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void loadSession();
   }, [loadSession]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await api.login(email, password);
-    tokenStore.setTokens(res.accessToken, res.refreshToken);
-    // A company principal starts in its first company; a platform principal
-    // starts unscoped ("All ORYX Companies").
-    const firstCompany = res.user.kind === 'COMPANY' ? (res.memberships[0]?.companyId ?? null) : null;
-    tokenStore.setContext(firstCompany, null);
-    setState({
-      ready: true,
-      user: res.user,
-      memberships: res.memberships,
-      permissions: res.permissions,
-      licensedModules: [],
-      companyId: firstCompany,
-      branchId: null,
-      supportSessionCompanyId: null,
-    });
-    await loadSession();
-  }, [loadSession]);
+  const applySession = useCallback(
+    (res: LoginResponse) => {
+      // Only the short-lived access token is stored client-side; the refresh
+      // token stays in the API's HttpOnly cookie.
+      tokenStore.setAccessToken(res.accessToken);
+      const firstCompany = res.user.kind === 'COMPANY' ? (res.memberships[0]?.companyId ?? null) : null;
+      tokenStore.setContext(firstCompany, null);
+      setState({
+        ready: true,
+        user: res.user,
+        memberships: res.memberships,
+        permissions: res.permissions,
+        licensedModules: [],
+        companyId: firstCompany,
+        branchId: null,
+        supportSessionCompanyId: null,
+      });
+    },
+    [],
+  );
+
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const res = await api.login(email, password);
+      if ('mfaRequired' in res && res.mfaRequired) {
+        // Password accepted but a second factor is required: no session yet.
+        return { mfaRequired: true as const, challengeToken: res.challengeToken };
+      }
+      applySession(res as LoginResponse);
+      await loadSession();
+      return undefined;
+    },
+    [applySession, loadSession],
+  );
+
+  const completeMfaLogin = useCallback(
+    async (challengeToken: string, code: string) => {
+      const res = await api.verifyMfaLogin(challengeToken, code);
+      applySession(res);
+      await loadSession();
+    },
+    [applySession, loadSession],
+  );
 
   const logout = useCallback(async () => {
-    const refresh = tokenStore.refresh;
     try {
-      if (refresh) await api.logout(refresh);
+      await api.logout();
     } catch {
-      /* best effort */
+      /* best effort: the cookies are cleared server-side on success */
     }
     tokenStore.clear();
     setState({
@@ -181,12 +214,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canAny,
       hasModule,
       login,
+      completeMfaLogin,
       logout,
       setCompanyContext,
       refreshSession: loadSession,
       updatePreferences,
     }),
-    [state, isPlatform, can, canAny, hasModule, login, logout, setCompanyContext, loadSession, updatePreferences],
+    [
+      state,
+      isPlatform,
+      can,
+      canAny,
+      hasModule,
+      login,
+      completeMfaLogin,
+      logout,
+      setCompanyContext,
+      loadSession,
+      updatePreferences,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

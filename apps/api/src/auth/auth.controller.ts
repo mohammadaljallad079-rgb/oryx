@@ -4,13 +4,21 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Patch,
   Post,
   Req,
+  Res,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import * as argon2 from 'argon2';
+import { createHash } from 'node:crypto';
+import type { Response } from 'express';
+import { isMfaChallenge } from '@oryx/shared';
 import { AuthService } from './auth.service';
+import { MfaEnrollmentService } from './mfa-enrollment.service';
+import { CookieService } from './cookie.service';
 import { AuditService } from '../common/audit.service';
 import { PrismaService } from '../common/prisma.service';
 import { EntitlementService } from '../common/entitlement.service';
@@ -19,16 +27,17 @@ import {
   AcceptInvitationDto,
   ChangePasswordDto,
   LoginDto,
+  MfaCodeDto,
+  MfaVerifyLoginDto,
   RefreshDto,
   UpdateProfileDto,
 } from './auth.dto';
 import { badRequest, ERROR_CODES, forbidden, unauthorized } from '../common/errors';
-import * as argon2 from 'argon2';
-import { createHash, randomBytes } from 'node:crypto';
 
 interface RequestLike {
   headers: Record<string, string | string[] | undefined>;
   ip?: string;
+  cookies?: Record<string, string>;
   principal?: RequestPrincipal;
 }
 
@@ -45,24 +54,74 @@ export class AuthController {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly entitlements: EntitlementService,
+    private readonly mfa: MfaEnrollmentService,
+    private readonly cookies: CookieService,
   ) {}
+
+  /**
+   * Attach the session cookies and strip the refresh token from the body.
+   *
+   * The refresh token is delivered in an HttpOnly cookie so it is never
+   * readable by JavaScript. The response carries only the short-lived access
+   * token plus a CSRF token the client echoes in the `x-oryx-csrf` header.
+   */
+  private completeLogin<T extends { refreshToken?: string; csrfToken?: string }>(
+    res: Response,
+    session: T,
+    refreshTtl: number,
+  ): Omit<T, 'refreshToken'> {
+    if (session.refreshToken) {
+      session.csrfToken = this.cookies.setSession(res, session.refreshToken, refreshTtl);
+      delete session.refreshToken;
+    }
+    return session as Omit<T, 'refreshToken'>;
+  }
+
+  private refreshTtlSeconds(): number {
+    return Number(process.env.JWT_REFRESH_TTL ?? 2592000);
+  }
 
   @Public()
   @Throttle({ default: { limit: Number(process.env.AUTH_THROTTLE_LIMIT ?? 10), ttl: 60_000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Authenticate and receive access + refresh tokens' })
-  async login(@Body() dto: LoginDto, @Req() req: RequestLike) {
-    return this.auth.login(dto.email, dto.password, meta(req));
+  @ApiOperation({
+    summary: 'Authenticate; returns an MFA challenge when the account requires a second factor',
+  })
+  async login(@Body() dto: LoginDto, @Req() req: RequestLike, @Res({ passthrough: true }) res: Response) {
+    const result = await this.auth.login(dto.email, dto.password, meta(req));
+    if (isMfaChallenge(result)) {
+      // No session yet: the caller must complete the MFA step.
+      return result;
+    }
+    return this.completeLogin(res, result, this.refreshTtlSeconds());
+  }
+
+  @Public()
+  @Throttle({ default: { limit: Number(process.env.AUTH_THROTTLE_LIMIT ?? 10), ttl: 60_000 } })
+  @Post('mfa/verify-login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Complete login by verifying a TOTP or recovery code' })
+  async verifyMfaLogin(
+    @Body() dto: MfaVerifyLoginDto,
+    @Req() req: RequestLike,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const session = await this.auth.loginWithMfa(dto.challengeToken, dto.code, meta(req));
+    return this.completeLogin(res, session, this.refreshTtlSeconds());
   }
 
   @Public()
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Rotate a refresh token and issue a new access token' })
-  async refresh(@Body() dto: RefreshDto, @Req() req: RequestLike) {
-    return this.auth.refresh(dto.refreshToken, meta(req));
+  @ApiOperation({ summary: 'Rotate the refresh token and issue a new access token' })
+  async refresh(@Body() dto: RefreshDto, @Req() req: RequestLike, @Res({ passthrough: true }) res: Response) {
+    // Prefer the HttpOnly cookie; fall back to the body for API clients.
+    const token = this.cookies.readRefreshToken(req as never) ?? dto.refreshToken;
+    if (!token) throw unauthorized(ERROR_CODES.AUTH_TOKEN_INVALID, 'No refresh token was presented.');
+    const session = await this.auth.refresh(token, meta(req));
+    return this.completeLogin(res, session, this.refreshTtlSeconds());
   }
 
   @Public()
@@ -70,7 +129,11 @@ export class AuthController {
   @Post('accept-invitation')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Accept an invitation and activate the invited account' })
-  async acceptInvitation(@Body() dto: AcceptInvitationDto, @Req() req: RequestLike) {
+  async acceptInvitation(
+    @Body() dto: AcceptInvitationDto,
+    @Req() req: RequestLike,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const tokenHash = createHash('sha256').update(dto.token).digest('hex');
     const invitation = await this.prisma.invitation.findUnique({
       where: { tokenHash },
@@ -80,10 +143,7 @@ export class AuthController {
       throw unauthorized(ERROR_CODES.AUTH_INVITATION_INVALID, 'Invitation is not valid.');
     }
     if (invitation.expiresAt < new Date()) {
-      await this.prisma.invitation.update({
-        where: { id: invitation.id },
-        data: { status: 'EXPIRED' },
-      });
+      await this.prisma.invitation.update({ where: { id: invitation.id }, data: { status: 'EXPIRED' } });
       throw unauthorized(ERROR_CODES.AUTH_INVITATION_EXPIRED, 'Invitation has expired.');
     }
 
@@ -97,12 +157,7 @@ export class AuthController {
       const created = existing
         ? await tx.user.update({
             where: { id: existing.id },
-            data: {
-              passwordHash,
-              status: 'ACTIVE',
-              fullNameEn: dto.fullNameEn,
-              fullNameAr: dto.fullNameAr,
-            },
+            data: { passwordHash, status: 'ACTIVE', fullNameEn: dto.fullNameEn, fullNameAr: dto.fullNameAr },
           })
         : await tx.user.create({
             data: {
@@ -156,15 +211,24 @@ export class AuthController {
       ...meta(req),
     });
 
-    return this.auth.login(user.email, dto.password, meta(req));
+    const session = await this.auth.login(user.email, dto.password, meta(req));
+    if (isMfaChallenge(session)) return session;
+    return this.completeLogin(res, session, this.refreshTtlSeconds());
   }
 
   @ApiBearerAuth()
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Revoke the presented refresh token' })
-  async logout(@Body() dto: RefreshDto, @CurrentPrincipal() principal: RequestPrincipal) {
-    await this.auth.logout(dto.refreshToken, principal.userId);
+  @ApiOperation({ summary: 'Revoke the presented refresh token and clear the session cookies' })
+  async logout(
+    @Body() dto: RefreshDto,
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Req() req: RequestLike,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const token = this.cookies.readRefreshToken(req as never) ?? dto.refreshToken;
+    await this.auth.logout(token, principal.userId);
+    this.cookies.clearSession(res);
     return { ok: true };
   }
 
@@ -172,7 +236,7 @@ export class AuthController {
   @Post('logout-all')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Revoke every session for the current user' })
-  async logoutAll(@CurrentPrincipal() principal: RequestPrincipal) {
+  async logoutAll(@CurrentPrincipal() principal: RequestPrincipal, @Res({ passthrough: true }) res: Response) {
     await this.auth.revokeAllSessions(principal.userId);
     await this.audit.record({
       actorUserId: principal.userId,
@@ -181,15 +245,17 @@ export class AuthController {
       targetId: principal.userId,
       summary: 'All sessions revoked',
     });
+    this.cookies.clearSession(res);
     return { ok: true };
   }
 
   @ApiBearerAuth()
   @Get('me')
-  @ApiOperation({ summary: 'Current user, memberships and effective permissions' })
+  @ApiOperation({ summary: 'Current user, memberships, effective permissions and MFA status' })
   async me(@CurrentPrincipal() principal: RequestPrincipal) {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: principal.userId } });
     const memberships = await this.auth.loadMemberships(user.id);
+    const mfaStatus = await this.mfa.status(user.id);
     return {
       user: {
         id: user.id,
@@ -203,6 +269,7 @@ export class AuthController {
       },
       memberships,
       permissions: principal.grantedPermissions,
+      mfa: mfaStatus,
       context: {
         companyId: principal.company?.companyId ?? principal.activeCompanyId ?? null,
         branchId: principal.activeBranchId ?? null,
@@ -296,7 +363,11 @@ export class AuthController {
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Change the current user password and revoke other sessions' })
-  async changePassword(@Body() dto: ChangePasswordDto, @CurrentPrincipal() principal: RequestPrincipal) {
+  async changePassword(
+    @Body() dto: ChangePasswordDto,
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: principal.userId } });
     const ok = await argon2.verify(user.passwordHash, dto.currentPassword).catch(() => false);
     if (!ok) throw unauthorized(ERROR_CODES.AUTH_INVALID_CREDENTIALS, 'Current password is incorrect.');
@@ -309,6 +380,7 @@ export class AuthController {
       data: { passwordHash, failedLoginCount: 0, lockedUntil: null },
     });
     await this.auth.revokeAllSessions(user.id);
+    this.cookies.clearSession(res);
     await this.audit.record({
       actorUserId: user.id,
       action: 'auth.password_changed',
@@ -329,5 +401,83 @@ export class AuthController {
       select: { id: true, createdAt: true, expiresAt: true, ipAddress: true, userAgent: true },
     });
     return { sessions };
+  }
+
+  // -------------------------------------------------------------------- MFA
+
+  @ApiBearerAuth()
+  @Get('mfa/status')
+  @ApiOperation({ summary: 'MFA enrollment status for the current account' })
+  mfaStatus(@CurrentPrincipal() principal: RequestPrincipal) {
+    return this.mfa.status(principal.userId);
+  }
+
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('mfa/enroll')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Start TOTP enrollment and return the provisioning QR code' })
+  startEnrollment(@CurrentPrincipal() principal: RequestPrincipal, @Req() req: RequestLike) {
+    return this.mfa.beginEnrollment(principal.userId, { userId: principal.userId, ip: req.ip });
+  }
+
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('mfa/enroll/confirm')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Confirm enrollment with a TOTP code and receive recovery codes once' })
+  confirmEnrollment(
+    @Body() dto: MfaCodeDto,
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.mfa.confirmEnrollment(principal.userId, dto.code, { userId: principal.userId, ip: req.ip });
+  }
+
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('mfa/recovery-codes/regenerate')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Regenerate recovery codes (requires a valid current code)' })
+  regenerateRecoveryCodes(
+    @Body() dto: MfaCodeDto,
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.mfa.regenerateRecoveryCodes(principal.userId, dto.code, {
+      userId: principal.userId,
+      ip: req.ip,
+    });
+  }
+
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('mfa/disable')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Disable MFA (requires a valid current code)' })
+  async disableMfa(
+    @Body() dto: MfaCodeDto,
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    await this.mfa.disable(principal.userId, dto.code, { userId: principal.userId, ip: req.ip });
+    return { ok: true };
+  }
+
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('mfa/reset/:userId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Administrative MFA reset for a locked-out account (platform only)' })
+  async adminReset(
+    @Param('userId') userId: string,
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    if (principal.kind !== 'PLATFORM') {
+      throw forbidden(ERROR_CODES.FORBIDDEN_PLATFORM_ONLY, 'Only a platform administrator may reset MFA.');
+    }
+    await this.mfa.adminReset(userId, { userId: principal.userId, ip: req.ip });
+    return { ok: true };
   }
 }

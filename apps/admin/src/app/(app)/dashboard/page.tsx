@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import type { DashboardResponse } from '@oryx/shared';
+import { tileImageUrl, type DashboardResponse } from '@oryx/shared';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -54,7 +54,7 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-5" data-testid="dashboard">
       {/* Hero — automotive-led banner mirroring the approved reference. */}
       <section className="oryx-hero" data-testid="dashboard-hero">
-        <div className="oryx-hero__media" style={{ backgroundImage: 'url(/tiles/dashboard-hero.svg)' }} />
+        <div className="oryx-hero__media" style={{ backgroundImage: 'url(/tiles/hero-automotive.jpg)' }} />
         <div className="oryx-hero__scrim" />
         <div className="relative flex w-full flex-wrap items-end justify-between gap-5 p-6">
           <div className="max-w-[54ch]">
@@ -249,7 +249,7 @@ export default function DashboardPage() {
               >
                 <span
                   className="oryx-tile__media"
-                  style={{ backgroundImage: `url(/tiles/${tile.tileImage}.svg)` }}
+                  style={{ backgroundImage: `url(${tileImageUrl(tile.tileImage)})` }}
                 />
                 <span className="oryx-tile__scrim" />
                 <span className="oryx-tile__body">

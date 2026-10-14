@@ -74,6 +74,7 @@ export const PLATFORM_NAV: NavGroup = {
     { key: 'subscriptions', labelKey: 'nav.subscriptions', href: '/subscriptions', icon: 'scroll', permission: 'platform.subscription.manage', platformOnly: true },
     { key: 'roles', labelKey: 'nav.roles', href: '/roles', icon: 'shield', permission: 'platform.company.read', platformOnly: true },
     { key: 'audit', labelKey: 'nav.audit', href: '/audit', icon: 'scroll', permission: 'platform.audit.read', platformOnly: true },
+    { key: 'security', labelKey: 'mfa.title', href: '/security', icon: 'shield', platformOnly: false },
     { key: 'support', labelKey: 'nav.support', href: '/support', icon: 'lifeBuoy', permission: 'platform.support.access', platformOnly: true },
   ],
 };

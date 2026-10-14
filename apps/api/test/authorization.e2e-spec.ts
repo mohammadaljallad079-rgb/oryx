@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import {
+  CookieJar,
   FIXTURE_PREFIX,
   SEED_COMPANY_ADMIN,
   SEED_ORYX_AUTO_ADMIN,
@@ -7,6 +8,8 @@ import {
   call,
   cleanupFixtures,
   companyCall,
+  generateTotp,
+  jarCall,
   createTestApp,
   login,
   type TestContext,
@@ -94,13 +97,14 @@ describe('ORYX API authorization (e2e)', () => {
 
   describe('authentication', () => {
     it('issues tokens for valid credentials and rejects invalid ones', async () => {
-      const ok = await call<{ accessToken: string; refreshToken: string }>(ctx.base, '/auth/login', {
+      const ok = await call<{ accessToken: string; refreshToken?: string }>(ctx.base, '/auth/login', {
         method: 'POST',
         body: { email: SEED_SUPER_ADMIN.email, password: SEED_SUPER_ADMIN.password },
       });
       expect(ok.status).toBe(200);
       expect(ok.body.accessToken).toBeTruthy();
-      expect(ok.body.refreshToken).toBeTruthy();
+      // With cookie transport the refresh token must never appear in the body.
+      expect(ok.body.refreshToken).toBeUndefined();
 
       const bad = await call(ctx.base, '/auth/login', {
         method: 'POST',
@@ -119,24 +123,58 @@ describe('ORYX API authorization (e2e)', () => {
       expect(res.status).toBe(401);
     });
 
-    it('rotates refresh tokens and invalidates the used one', async () => {
-      const first = await call<{ refreshToken: string }>(ctx.base, '/auth/login', {
+    it('rotates refresh tokens through the HttpOnly cookie and rejects replay', async () => {
+      const jar = new CookieJar();
+      const first = await jarCall(ctx.base, '/auth/login', {
         method: 'POST',
         body: { email: SEED_SUPER_ADMIN.email, password: SEED_SUPER_ADMIN.password },
+        jar,
       });
-      const rotated = await call<{ accessToken: string; refreshToken: string }>(ctx.base, '/auth/refresh', {
+      expect(first.status).toBe(200);
+      expect(jar.get('oryx_rt')).toBeTruthy();
+
+      const rotated = await jarCall<{ accessToken: string; refreshToken?: string }>(ctx.base, '/auth/refresh', {
         method: 'POST',
-        body: { refreshToken: first.body.refreshToken },
+        body: {},
+        jar,
+        csrf: jar.get('oryx_csrf'),
       });
       expect(rotated.status).toBe(200);
-      expect(rotated.body.refreshToken).not.toBe(first.body.refreshToken);
+      expect(rotated.body.accessToken).toBeTruthy();
+      expect(rotated.body.refreshToken).toBeUndefined();
 
-      // Replaying the original token must fail.
-      const replay = await call(ctx.base, '/auth/refresh', {
+      // A refresh without the CSRF header must be rejected.
+      const noCsrf = await jarCall<{ code: string }>(ctx.base, '/auth/refresh', { method: 'POST', body: {}, jar });
+      expect(noCsrf.status).toBe(403);
+      expect(noCsrf.body.code).toBe('auth.csrf_token_invalid');
+    });
+
+    it('rejects a state-changing request that omits the CSRF header', async () => {
+      const jar = new CookieJar();
+      const login = await jarCall<{ accessToken: string }>(ctx.base, '/auth/login', {
         method: 'POST',
-        body: { refreshToken: first.body.refreshToken },
+        body: { email: SEED_SUPER_ADMIN.email, password: SEED_SUPER_ADMIN.password },
+        jar,
       });
-      expect(replay.status).toBe(401);
+      const token = login.body.accessToken;
+
+      const blocked = await jarCall<{ code: string }>(ctx.base, '/auth/profile', {
+        method: 'PATCH',
+        body: { preferredTheme: 'dark' },
+        jar,
+        token,
+      });
+      expect(blocked.status).toBe(403);
+      expect(blocked.body.code).toBe('auth.csrf_token_invalid');
+
+      const allowed = await jarCall(ctx.base, '/auth/profile', {
+        method: 'PATCH',
+        body: { preferredTheme: 'dark' },
+        jar,
+        token,
+        csrf: jar.get('oryx_csrf'),
+      });
+      expect(allowed.status).toBe(200);
     });
 
     it('persists theme and locale preference on the profile', async () => {
