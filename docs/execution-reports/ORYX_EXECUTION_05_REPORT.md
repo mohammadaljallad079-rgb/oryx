@@ -25,7 +25,7 @@ force-pushed.
 | --- | --- |
 | Branch | `feature/execution-05-platform-completion` |
 | Base | `main` @ `33ee5579644d88ae6a1763e7d778ba944831912a` (the Execution 04 merge) |
-| Head | `5bc4ba8` |
+| Code head | `5bc4ba8` (this report is committed on top) |
 | Pull request | [#5](https://github.com/mohammadaljallad079-rgb/oryx/pull/5) (draft, open) |
 
 ## 3. Baseline verification (before this session's changes)
