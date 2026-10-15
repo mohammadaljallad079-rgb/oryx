@@ -14,6 +14,9 @@ import { CustomerPlane, RequirePermissions } from '../auth/auth.decorators';
 import { PrincipalGuard } from '../auth/principal.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { CurrentPrincipal, type RequestPrincipal } from '../auth/auth.decorators';
+import { PrismaService } from '../common/prisma.service';
+import { TenantCompanyService } from '../common/tenant-company.service';
+import { ERROR_CODES, forbidden } from '../common/errors';
 import { BookingService } from './booking.service';
 import { CustomerAuthGuard, CurrentCustomer, type CustomerPrincipal } from './customer-auth.guard';
 import {
@@ -77,7 +80,7 @@ export class BookingController {
 
     // Validate against opening hours and existing bookings first, so the common
     // rejection is a clear conflict rather than a database error.
-    await this.bookings.assertSlotBookable({
+    const { resourceId } = await this.bookings.assertSlotBookable({
       companyId,
       branchId: dto.branchId ?? null,
       resourceId: dto.resourceId ?? null,
@@ -89,7 +92,7 @@ export class BookingController {
     return this.bookings.createBooking({
       companyId,
       branchId: dto.branchId ?? null,
-      resourceId: dto.resourceId ?? null,
+      resourceId,
       bookingType: dto.bookingType,
       serviceRef: dto.serviceRef ?? null,
       startsAt,
@@ -279,7 +282,11 @@ export class BookingController {
 @Controller('customer/bookings')
 @UseGuards(CustomerAuthGuard)
 export class CustomerBookingController {
-  constructor(private readonly bookings: BookingService) {}
+  constructor(
+    private readonly bookings: BookingService,
+    private readonly prisma: PrismaService,
+    private readonly tenants: TenantCompanyService,
+  ) {}
 
   @Get('availability')
   @ApiOperation({ summary: 'List bookable slots for a day' })
@@ -288,7 +295,7 @@ export class CustomerBookingController {
     @CurrentCustomer() customer: CustomerPrincipal,
   ) {
     return this.bookings.availableSlots({
-      companyId: customer.defaultCompanyId ?? '',
+      companyId: await this.tenants.resolveForCustomer(customer.defaultCompanyId),
       branchId: query.branchId ?? null,
       resourceId: query.resourceId ?? null,
       serviceRef: query.serviceRef ?? null,
@@ -303,10 +310,24 @@ export class CustomerBookingController {
   @Post()
   @ApiOperation({ summary: 'Book an inspection or maintenance slot' })
   async create(@Body() dto: CreateBookingDto, @CurrentCustomer() customer: CustomerPrincipal) {
-    const companyId = dto.companyId ?? customer.defaultCompanyId ?? '';
+    const companyId = await this.tenants.resolveForCustomer(
+      dto.companyId ?? customer.defaultCompanyId,
+    );
     const startsAt = new Date(dto.startsAt);
 
-    await this.bookings.assertSlotBookable({
+    // A booking names a vehicle; it must be one this account owns, or the
+    // booking would attach another customer's car to this account's history.
+    if (dto.vehicleId) {
+      const vehicle = await this.prisma.vehicle.findFirst({
+        where: { id: dto.vehicleId, customerAccountId: customer.accountId },
+        select: { id: true },
+      });
+      if (!vehicle) {
+        throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'That vehicle is not in your garage.');
+      }
+    }
+
+    const { resourceId } = await this.bookings.assertSlotBookable({
       companyId,
       branchId: dto.branchId ?? null,
       resourceId: dto.resourceId ?? null,
@@ -320,7 +341,7 @@ export class CustomerBookingController {
     return this.bookings.createBooking({
       companyId,
       branchId: dto.branchId ?? null,
-      resourceId: dto.resourceId ?? null,
+      resourceId,
       bookingType: dto.bookingType,
       serviceRef: dto.serviceRef ?? null,
       startsAt,

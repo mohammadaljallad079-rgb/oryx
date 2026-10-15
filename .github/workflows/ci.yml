@@ -68,6 +68,14 @@ jobs:
         env:
           NEXT_PUBLIC_API_BASE_URL: http://localhost:3001/api
 
+      - name: Typecheck customer app
+        run: pnpm --filter @oryx/customer typecheck
+
+      - name: Build customer app
+        run: pnpm --filter @oryx/customer build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:3001/api
+
   # ------------------------------------------------------- unit + API suites
   test-api:
     name: Unit and API integration tests
@@ -97,7 +105,7 @@ jobs:
       JWT_REFRESH_SECRET: ci-refresh-secret-not-used-outside-ci-000000000
       MFA_ENCRYPTION_KEY: ci-mfa-encryption-key-not-used-outside-ci-0000000
       MFA_ISSUER: ORYX CI
-      CORS_ORIGINS: http://localhost:3000
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3002
       SEED_SUPER_ADMIN_EMAIL: superadmin@oryx.local
       SEED_SUPER_ADMIN_PASSWORD: CiTestPassword!2026
       NODE_ENV: test
@@ -178,7 +186,7 @@ jobs:
       JWT_REFRESH_SECRET: ci-refresh-secret-not-used-outside-ci-000000000
       MFA_ENCRYPTION_KEY: ci-mfa-encryption-key-not-used-outside-ci-0000000
       MFA_ISSUER: ORYX CI
-      CORS_ORIGINS: http://localhost:3000
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3002
       SEED_SUPER_ADMIN_EMAIL: superadmin@oryx.local
       SEED_SUPER_ADMIN_PASSWORD: CiTestPassword!2026
       NODE_ENV: test

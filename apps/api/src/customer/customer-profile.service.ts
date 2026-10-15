@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
+import { TenantCompanyService } from '../common/tenant-company.service';
 import { ERROR_CODES, badRequest, conflict, notFound } from '../common/errors';
 
 /**
@@ -30,6 +31,7 @@ export class CustomerProfileService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly tenants: TenantCompanyService,
   ) {}
 
   // ------------------------------------------------------------------ addresses
@@ -310,21 +312,36 @@ export class CustomerProfileService {
     // The vehicle is owned by a tenant customer record so the ERP sees it too.
     const customer = await this.resolveTenantCustomer(companyId, account);
 
-    const vehicle = await this.prisma.vehicle.create({
-      data: {
-        companyId,
-        customerId: customer.id,
-        customerAccountId: accountId,
-        vin,
-        plateNumber: input.plateNumber?.trim() ?? null,
-        make: input.make.trim(),
-        model: input.model.trim(),
-        modelYear: input.modelYear,
-        color: input.color?.trim() ?? null,
-        mileage: input.mileage ?? 0,
-        notes: input.notes ?? null,
-      },
-    });
+    let vehicle;
+    try {
+      vehicle = await this.prisma.vehicle.create({
+        data: {
+          companyId,
+          customerId: customer.id,
+          customerAccountId: accountId,
+          vin,
+          plateNumber: input.plateNumber?.trim() ?? null,
+          make: input.make.trim(),
+          model: input.model.trim(),
+          modelYear: input.modelYear,
+          color: input.color?.trim() ?? null,
+          mileage: input.mileage ?? 0,
+          notes: input.notes ?? null,
+        },
+      });
+    } catch (error) {
+      // `(companyId, vin)` is unique across the whole tenant, not per account, so
+      // a VIN another customer already registered reaches the insert. Answer with
+      // a conflict rather than letting the constraint surface as a 500; the
+      // message deliberately does not reveal whose record holds the VIN.
+      if (this.isUniqueViolation(error)) {
+        throw conflict(
+          ERROR_CODES.VEHICLE_VIN_EXISTS,
+          'A vehicle with this VIN is already registered.',
+        );
+      }
+      throw error;
+    }
 
     await this.audit.record({
       action: 'customer.vehicle_added',
@@ -368,21 +385,9 @@ export class CustomerProfileService {
     });
   }
 
-  /** Fall back to the first active company when the account has no default. */
-  private async resolveCompanyForAccount(defaultCompanyId: string | null): Promise<string> {
-    if (defaultCompanyId) return defaultCompanyId;
-    const company = await this.prisma.company.findFirst({
-      where: { status: 'ACTIVE' },
-      orderBy: { createdAt: 'asc' },
-      select: { id: true },
-    });
-    if (!company) {
-      throw badRequest(
-        ERROR_CODES.RESOURCE_NOT_FOUND,
-        'No active company is available to register this vehicle.',
-      );
-    }
-    return company.id;
+  /** Fall back to a company that can actually serve a consumer. */
+  private resolveCompanyForAccount(defaultCompanyId: string | null): Promise<string> {
+    return this.tenants.resolveForCustomer(defaultCompanyId);
   }
 
   async updateVehicle(
@@ -507,5 +512,15 @@ export class CustomerProfileService {
     ]);
 
     return { vehicle, inspections, maintenance, jobCards, warranties };
+  }
+
+  /** Prisma reports a unique-constraint failure as P2002. */
+  private isUniqueViolation(error: unknown): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: string }).code === 'P2002'
+    );
   }
 }

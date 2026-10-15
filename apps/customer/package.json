@@ -1,0 +1,31 @@
+{
+  "name": "@oryx/customer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3002",
+    "build": "next build",
+    "start": "next start -p 3002",
+    "typecheck": "tsc --noEmit",
+    "lint": "next lint --max-warnings=0"
+  },
+  "dependencies": {
+    "@oryx/shared": "workspace:*",
+    "clsx": "2.1.1",
+    "next": "15.5.27",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "22.20.5",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.1",
+    "autoprefixer": "10.4.21",
+    "eslint": "9.39.5",
+    "eslint-config-next": "15.5.27",
+    "postcss": "8.5.6",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3"
+  }
+}

@@ -140,19 +140,75 @@ export class BookingService {
       throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'A service must last at least one minute.');
     }
 
+    // A caller that names a resource gets that resource's own calendar.
+    if (input.resourceId) {
+      return this.slotsFor(input.resourceId, input);
+    }
+
+    // Otherwise the answer is "when could this company take the vehicle at all".
+    // Working hours are usually configured per resource, so looking only at
+    // company-level rows reports an empty day for a tenant that is in fact open.
+    // Every active resource is consulted and the openings are merged, which is
+    // also what a provider directory needs to show.
+    const resources = await this.prisma.bookingResource.findMany({
+      where: {
+        companyId: input.companyId,
+        isActive: true,
+        ...(input.branchId ? { branchId: input.branchId } : {}),
+      },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (resources.length === 0) {
+      // No bookable resource is configured; fall back to company-level hours so a
+      // tenant that models availability without resources still works.
+      return this.slotsFor(null, input);
+    }
+
+    const merged = new Map<string, AvailableSlot>();
+    for (const resource of resources) {
+      const slots = await this.slotsFor(resource.id, input);
+      for (const slot of slots) {
+        if (!merged.has(slot.startsAt)) merged.set(slot.startsAt, slot);
+      }
+    }
+
+    const ordered = [...merged.values()].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    return input.maxSlots ? ordered.slice(0, input.maxSlots) : ordered;
+  }
+
+  /**
+   * Generate the slots a single resource (or the company calendar, when
+   * `resourceId` is null) offers on the requested day.
+   */
+  private async slotsFor(
+    resourceId: string | null,
+    input: {
+      companyId: string;
+      branchId?: string | null;
+      serviceRef?: string | null;
+      dayStart: Date;
+      durationMinutes: number;
+      stepMinutes?: number;
+      minimumNoticeMinutes?: number;
+      bufferMinutes?: number;
+      maxSlots?: number;
+    },
+  ): Promise<AvailableSlot[]> {
     const dayStart = input.dayStart;
     const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
     // `getUTCDay()` is correct here because dayStart is already the local
     // midnight expressed as an instant.
     const dayOfWeek = dayStart.getUTCDay();
 
-    const hours = await this.resolveWorkingHours(input.companyId, input.resourceId, input.branchId);
+    const hours = await this.resolveWorkingHours(input.companyId, resourceId, input.branchId);
 
     let exception: { isClosed: boolean; opensMinute: number | null; closesMinute: number | null } | null =
       null;
-    if (input.resourceId) {
+    if (resourceId) {
       const row = await this.prisma.bookingResourceException.findFirst({
-        where: { resourceId: input.resourceId, date: { gte: dayStart, lt: dayEnd } },
+        where: { resourceId, date: { gte: dayStart, lt: dayEnd } },
       });
       if (row) {
         exception = {
@@ -167,7 +223,7 @@ export class BookingService {
     if (windows.length === 0) return [];
 
     const resourceKey = bookingResourceKey({
-      resourceId: input.resourceId,
+      resourceId,
       branchId: input.branchId,
       serviceRef: input.serviceRef,
     });
@@ -285,7 +341,7 @@ export class BookingService {
     serviceRef?: string | null;
     startsAt: Date;
     durationMinutes: number;
-  }): Promise<void> {
+  }): Promise<{ resourceId: string | null }> {
     const dayStart = new Date(
       Date.UTC(
         input.startsAt.getUTCFullYear(),
@@ -296,14 +352,64 @@ export class BookingService {
     const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
     const dayOfWeek = dayStart.getUTCDay();
 
-    const hours = await this.resolveWorkingHours(input.companyId, input.resourceId, input.branchId);
+    // When the caller names no resource, pick one that is actually free. The
+    // opening hours usually live on the resource, so testing only company-level
+    // hours would both reject valid times and report a day as closed when a
+    // resource is open. Every candidate is tried and the first that accepts the
+    // time is chosen, so the booking is attached to a real resource and the
+    // concurrency key is that resource rather than a shared placeholder.
+    const candidates: (string | null)[] = input.resourceId
+      ? [input.resourceId]
+      : await this.bookableResourceIds(input.companyId, input.branchId);
+
+    if (candidates.length === 0) candidates.push(null);
+
+    let lastError: unknown = null;
+    for (const resourceId of candidates) {
+      try {
+        await this.assertResourceSlot(resourceId, input, dayStart, dayEnd, dayOfWeek);
+        return { resourceId };
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError ?? conflict(ERROR_CODES.BOOKING_CLOSED, 'The selected day is not open for bookings.');
+  }
+
+  /** Active resources of a company, oldest first, as booking candidates. */
+  private async bookableResourceIds(
+    companyId: string,
+    branchId?: string | null,
+  ): Promise<string[]> {
+    const rows = await this.prisma.bookingResource.findMany({
+      where: { companyId, isActive: true, ...(branchId ? { branchId } : {}) },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return rows.map((row) => row.id);
+  }
+
+  private async assertResourceSlot(
+    resourceId: string | null,
+    input: {
+      companyId: string;
+      branchId?: string | null;
+      serviceRef?: string | null;
+      startsAt: Date;
+      durationMinutes: number;
+    },
+    dayStart: Date,
+    dayEnd: Date,
+    dayOfWeek: number,
+  ): Promise<void> {
+    const hours = await this.resolveWorkingHours(input.companyId, resourceId, input.branchId);
     const windows = windowsForDay(hours, dayOfWeek);
     if (windows.length === 0) {
       throw conflict(ERROR_CODES.BOOKING_CLOSED, 'The selected day is not open for bookings.');
     }
 
     const resourceKey = bookingResourceKey({
-      resourceId: input.resourceId,
+      resourceId,
       branchId: input.branchId,
       serviceRef: input.serviceRef,
     });
