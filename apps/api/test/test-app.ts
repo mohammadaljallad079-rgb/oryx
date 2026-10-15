@@ -294,12 +294,87 @@ export async function cleanupFixtures(prisma: PrismaService): Promise<void> {
   await prisma.accountBalance.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.fiscalPeriod.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.fiscalYear.deleteMany({ where: { companyId: { in: ids } } });
-  await prisma.customer.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.supplier.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.documentSequence.deleteMany({ where: { companyId: { in: ids } } });
+
+  // Execution 03 — delete children before parents so foreign keys hold.
+  await prisma.advanceSettlement.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.employeeAdvance.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.payslipLine.deleteMany({ where: { payslip: { companyId: { in: ids } } } });
+  await prisma.payslip.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.payrollRun.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.payrollPeriod.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.salaryComponent.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.salaryStructure.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.attendanceRecord.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.employeeShift.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.shift.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.leaveRequest.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.leaveBalance.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.leaveType.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.employeeLifecycleItem.deleteMany({ where: { lifecycle: { companyId: { in: ids } } } });
+  await prisma.employeeLifecycle.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.employeeDocument.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.employmentContract.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.employee.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.jobTitle.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.department.deleteMany({ where: { companyId: { in: ids } } });
+
+  await prisma.customerSegmentMember.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.customerSegment.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.ticketMessage.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.supportTicket.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.slaPolicy.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.crmActivity.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.customerContact.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.opportunity.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.pipelineStage.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.pipeline.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.lead.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.leadSource.deleteMany({ where: { companyId: { in: ids } } });
+
+  await prisma.notification.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.operationalCalendarEvent.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.entityAttachment.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.entityComment.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.approvalRequest.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.workOrderChecklistItem.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.workOrder.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.projectTask.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.project.deleteMany({ where: { companyId: { in: ids } } });
+
+  // Providers created by tests are identified by their code prefix, since a
+  // fixture provider may not be linked to a tenant company.
+  await prisma.providerSettlement.deleteMany({ where: { provider: { OR: [{ providerCompanyId: { in: ids } }, { code: { startsWith: FIXTURE_PREFIX } }] } } });
+  await prisma.marketplaceCommission.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.serviceRequest.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.providerServiceListing.deleteMany({ where: { provider: { OR: [{ providerCompanyId: { in: ids } }, { code: { startsWith: FIXTURE_PREFIX } }] } } });
+  await prisma.marketplaceProvider.deleteMany({ where: { OR: [{ providerCompanyId: { in: ids } }, { code: { startsWith: FIXTURE_PREFIX } }] } });
+  await prisma.warrantyRecord.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.partsReservationLine.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.partsReservation.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.repairEstimateLine.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.repairEstimate.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.labourOperation.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.jobCard.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.maintenanceBooking.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.workshopBay.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.inspectionFinding.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.inspectionReport.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.inspectionBooking.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.inspectionChecklistItem.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.inspectionService.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.partCompatibility.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.partReference.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.vehicleMileageRecord.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.vehicleDocument.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.vehicle.deleteMany({ where: { companyId: { in: ids } } });
+  // Customers are deleted only after every table that references them.
+  await prisma.customer.deleteMany({ where: { companyId: { in: ids } } });
+  // Products and warehouses are referenced by E03 parts tables, so they go last.
   await prisma.product.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.warehouse.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.account.deleteMany({ where: { companyId: { in: ids } } });
-  await prisma.documentSequence.deleteMany({ where: { companyId: { in: ids } } });
 
   await prisma.branch.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.auditLog.deleteMany({ where: { companyId: { in: ids } } });

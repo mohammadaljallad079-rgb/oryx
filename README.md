@@ -21,10 +21,26 @@ returns, payments), inventory (warehouses, SKUs, a moving-average stock ledger,
 transfers, adjustments, reorder alerts, valuation) and permission-aware reports
 for all four domains.
 
+**Execution 03 adds HR, CRM, operations and automotive services, also
+implemented and tested:** HR and payroll (employees with onboarding and
+offboarding, departments and job titles, contracts, documents with confidential
+access control, leave with balance enforcement, attendance and shifts with
+overtime, effective-dated salary structures, payroll runs that snapshot each
+structure and post to the ledger atomically and idempotently, run locking,
+payslips and employee advances), CRM (leads, pipelines and opportunities that
+convert into a sales quotation, contacts, activities, SLA-tracked support
+tickets, segments), operations (projects, tasks, work orders with an enforced
+state machine and checklists, approvals, comments, attachments, calendar and
+persisted internal notifications) and the automotive ecosystem (a vehicle
+registry with VIN validation, inspections with findings and approved reports,
+a workshop with job cards, estimates and parts that move the shared stock
+ledger, warranties, and marketplace provider foundations).
+
 ## Documentation
 
 | Document | Purpose |
 | --- | --- |
+| [Execution 03 report](docs/execution-reports/ORYX_EXECUTION_03_REPORT.md) | HR, CRM, operations, automotive: modules, migrations, endpoints, tests |
 | [Execution 02 report](docs/execution-reports/ORYX_EXECUTION_02_REPORT.md) | Enterprise ERP core: modules, migrations, endpoints, tests |
 | [Execution 01 report](docs/execution-reports/ORYX_EXECUTION_01_REPORT.md) | What was built, what was verified, what is missing |
 | [Local development runbook](docs/LOCAL_DEVELOPMENT.md) | Install, migrate, seed, run, test |
@@ -59,8 +75,8 @@ Seeded development accounts (change before any non-local use):
 
 ```bash
 pnpm --filter @oryx/shared test    # 30 authorization + money invariants
-pnpm --filter @oryx/api test:e2e   # 109 API integration tests (79 E01 + 30 ERP)
-pnpm --filter @oryx/admin test:ui  # Playwright acceptance + ERP + screenshots
+pnpm --filter @oryx/api test:e2e   # 132 API integration tests (79 E01 + 30 E02 + 23 E03)
+pnpm --filter @oryx/admin test:ui  # 108 Playwright acceptance + screenshots
 ```
 
 ## Repository layout
@@ -79,17 +95,24 @@ docs/              architecture, api, execution reports, assets
   placeholder and no mark was invented.
 - Dashboard tile artwork is generated abstract vector art; the approved
   photography is not available.
-- ERP modules owned by later executions (HR, CRM, operations, automotive) are
-  routed and permission-protected but **not implemented** — the screens say so
-  and show no fabricated data. Accounting, sales/POS, purchasing, inventory and
-  reports are implemented and DB-backed (Execution 02).
+- Every ERP module catalog entry is now implemented and DB-backed (Executions 01,
+  02 and 03). No module remains a placeholder.
+- Payroll calculates from configured salary structures and posts to the ledger;
+  it does **not** implement any jurisdiction's labour law, social insurance or
+  wage-protection rules. Those must be configured and verified before any
+  compliance claim.
+- Vehicle inspection is an internal ORYX workflow; it is **not** a government
+  certification or an officially accredited inspection.
 - Reports are operational summaries, not a full BI engine; there is no
   custom-report builder.
 - Inventory uses moving-average valuation only; FIFO/LIFO are not offered.
-- No payment gateway and no email/SMS provider are integrated.
-- The consumer mobile application is not part of Execution 01 or 02.
+- Notifications are persisted internally; no email/SMS/push provider is
+  connected, so no external delivery is claimed.
+- The automotive marketplace provides administrative and backend foundations
+  only. The consumer mobile application is not part of Executions 01–03.
 - Nothing is deployed.
 
-See the [Execution 02 report](docs/execution-reports/ORYX_EXECUTION_02_REPORT.md)
+See the [Execution 03 report](docs/execution-reports/ORYX_EXECUTION_03_REPORT.md),
+the [Execution 02 report](docs/execution-reports/ORYX_EXECUTION_02_REPORT.md)
 and the [Execution 01 report](docs/execution-reports/ORYX_EXECUTION_01_REPORT.md)
 for the full breakdown.

@@ -36,10 +36,31 @@ interface InvoiceSource {
   currency: string;
   lines: Array<PricedLineInput & { productId: string | null; description: string }>;
   entryDate: Date;
-  sourceType: 'SALES_INVOICE' | 'POS_SALE';
+  sourceType: 'SALES_INVOICE' | 'POS_SALE' | 'WORKSHOP_INVOICE' | 'INSPECTION_INVOICE';
   sourceId: string;
   actorUserId: string;
   /** When false, stock is not issued (services / untracked items). */
+  issueStock: boolean;
+}
+
+/**
+ * A request to issue a posted invoice from another module (workshop, inspection).
+ * The caller supplies the priced lines; this module owns the ledger and stock.
+ */
+export interface IssueInvoiceInput {
+  companyId: string;
+  branchId?: string | null;
+  customerId: string;
+  warehouseId?: string | null;
+  currency?: string;
+  entryDate: Date;
+  sourceType: 'WORKSHOP_INVOICE' | 'INSPECTION_INVOICE';
+  /** Stable id of the source document; used for idempotency. */
+  sourceId: string;
+  actorUserId: string;
+  notes?: string;
+  lines: Array<PricedLineInput & { productId: string | null; description: string }>;
+  /** Parts are issued from stock; labour and services are not. */
   issueStock: boolean;
 }
 
@@ -585,6 +606,51 @@ export class SalesService {
       include: { customer: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
     });
     return toInvoiceDto(fresh);
+  }
+
+  /**
+   * Issue and post a sales invoice on behalf of another module (workshop,
+   * inspection). The caller runs inside its own transaction and passes `tx`, so
+   * the invoice, its ledger entry, its stock issue and the calling document all
+   * commit or roll back together. Posting is idempotent per source document.
+   */
+  async issueInvoice(tx: Tx, input: IssueInvoiceInput) {
+    const totals = computeDocumentTotals(input.lines);
+    const invoiceNumber = await this.sequences.next(tx, input.companyId, 'salesInvoice');
+    const invoice = await tx.salesInvoice.create({
+      data: {
+        companyId: input.companyId,
+        branchId: input.branchId ?? null,
+        invoiceNumber,
+        customerId: input.customerId,
+        warehouseId: input.warehouseId ?? null,
+        status: 'DRAFT',
+        invoiceDate: input.entryDate,
+        subtotalMinor: totals.subtotalMinor,
+        discountMinor: totals.discountMinor,
+        taxMinor: totals.taxMinor,
+        totalMinor: totals.totalMinor,
+        currency: input.currency ?? 'SAR',
+        notes: input.notes ?? null,
+        createdById: input.actorUserId,
+        lines: { create: buildLineRows(totals, input.lines) },
+      },
+    });
+
+    const posted = await this.postSalesInvoice(tx, {
+      companyId: input.companyId,
+      branchId: input.branchId ?? null,
+      customerId: input.customerId,
+      warehouseId: input.warehouseId ?? null,
+      currency: input.currency ?? 'SAR',
+      lines: input.lines,
+      entryDate: input.entryDate,
+      sourceType: input.sourceType,
+      sourceId: invoice.id,
+      actorUserId: input.actorUserId,
+      issueStock: input.issueStock,
+    });
+    return posted;
   }
 
   // ------------------------------------------------------------ credit notes

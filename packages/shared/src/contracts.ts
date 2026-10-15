@@ -900,3 +900,423 @@ export interface InventoryReportDto {
   }>;
   reorderAlerts: Array<{ sku: string; nameEn: string; nameAr: string; onHand: number; reorderLevel: number }>;
 }
+
+// ============================================================================
+// Execution 03 — HR, CRM, operations and automotive contracts
+//
+// Money is integer minor units; hours and leave days are hundredths of a unit.
+// ============================================================================
+
+export interface DepartmentDto {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  parentId: string | null;
+  branchId: string | null;
+  employeeCount?: number;
+}
+
+export interface JobTitleDto {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  departmentId: string | null;
+}
+
+export interface EmployeeDto {
+  id: string;
+  code: string;
+  fullNameEn: string;
+  fullNameAr: string;
+  email: string | null;
+  phone: string | null;
+  status: string;
+  hireDate: string;
+  departmentId: string | null;
+  departmentNameEn: string | null;
+  departmentNameAr: string | null;
+  jobTitleId: string | null;
+  jobTitleNameEn: string | null;
+  jobTitleNameAr: string | null;
+  managerId: string | null;
+  managerNameEn: string | null;
+}
+
+export interface LeaveTypeDto {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  annualEntitlementDays: number;
+  isPaid: boolean;
+  requiresApproval: boolean;
+}
+
+export interface LeaveRequestDto {
+  id: string;
+  employeeId: string;
+  employeeCode: string | null;
+  employeeNameEn: string | null;
+  employeeNameAr: string | null;
+  leaveTypeId: string;
+  leaveTypeNameEn: string | null;
+  leaveTypeNameAr: string | null;
+  startDate: string;
+  endDate: string;
+  days: number;
+  status: string;
+  reason: string | null;
+  decisionNote: string | null;
+}
+
+export interface ShiftDto {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  startTime: string;
+  endTime: string;
+  breakMinutes: number;
+}
+
+export interface AttendanceDto {
+  id: string;
+  employeeId: string;
+  employeeCode: string | null;
+  employeeNameEn: string | null;
+  workDate: string;
+  workedMinutes: number;
+  overtimeMinutes: number;
+  status: string;
+}
+
+export interface PayrollPeriodDto {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  startDate: string;
+  endDate: string;
+  status: 'OPEN' | 'CLOSED' | 'LOCKED';
+}
+
+export interface PayrollRunDto {
+  id: string;
+  runNumber: string;
+  status: string;
+  employeeCount: number;
+  grossMinor: number;
+  allowancesMinor: number;
+  deductionsMinor: number;
+  netMinor: number;
+  currency: string;
+  journalEntryId: string | null;
+  periodCode: string | null;
+  periodNameEn: string | null;
+  periodNameAr: string | null;
+  payslipCount?: number;
+  periodStart?: string;
+  periodEnd?: string;
+  payslips?: Array<Record<string, unknown>>;
+  createdAt: string;
+}
+
+export interface EmployeeAdvanceDto {
+  id: string;
+  advanceNumber: string;
+  employeeId: string;
+  employeeCode: string | null;
+  employeeNameEn: string | null;
+  amountMinor: number;
+  settledMinor: number;
+  outstandingMinor: number;
+  installments: number;
+  status: string;
+  currency: string;
+  issuedAt: string;
+  reason: string | null;
+}
+
+export interface HrDashboardDto {
+  totalEmployees: number;
+  activeEmployees: number;
+  onLeaveEmployees: number;
+  pendingLeaveRequests: number;
+  departmentCount: number;
+  headcountByDepartment: Array<{ departmentId: string | null; count: number }>;
+  latestPayroll: { id: string; runNumber: string; status: string; netMinor: number; employeeCount: number } | null;
+}
+
+// ---------------------------------------------------------------------- CRM
+
+export interface LeadDto {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  contactName: string | null;
+  email: string | null;
+  phone: string | null;
+  status: string;
+  estimatedValueMinor: number;
+  currency: string;
+  ownerUserId: string | null;
+  sourceNameEn: string | null;
+  sourceNameAr: string | null;
+  createdAt: string;
+}
+
+export interface PipelineStageDto {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  sortOrder: number;
+  probabilityBp: number;
+  isWon: boolean;
+  isLost: boolean;
+}
+
+export interface PipelineDto {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  isDefault: boolean;
+  stages: PipelineStageDto[];
+}
+
+export interface OpportunityDto {
+  id: string;
+  code: string;
+  title: string;
+  pipelineId: string;
+  pipelineNameEn: string | null;
+  stageId: string;
+  stageNameEn: string | null;
+  stageNameAr: string | null;
+  probabilityBp: number;
+  customerId: string | null;
+  ownerUserId: string | null;
+  amountMinor: number;
+  currency: string;
+  expectedCloseDate: string | null;
+  status: string;
+  quotationId: string | null;
+  closedAt: string | null;
+}
+
+export interface SupportTicketDto {
+  id: string;
+  ticketNumber: string;
+  subject: string;
+  status: string;
+  priority: string;
+  customerId: string | null;
+  assignedToUserId: string | null;
+  responseDueAt: string | null;
+  resolutionDueAt: string | null;
+  firstResponseAt: string | null;
+  satisfactionScore: number | null;
+  messageCount?: number;
+  createdAt: string;
+}
+
+export interface CrmActivityDto {
+  id: string;
+  type: string;
+  status: string;
+  subject: string;
+  notes: string | null;
+  dueAt: string | null;
+  completedAt: string | null;
+  ownerUserId: string | null;
+}
+
+export interface CrmDashboardDto {
+  totalLeads: number;
+  openOpportunities: number;
+  wonOpportunities: number;
+  pipelineValueMinor: number;
+  totalTickets: number;
+  openTickets: number;
+  overdueActivities: number;
+  segmentCount: number;
+  averageSatisfaction: number | null;
+}
+
+// --------------------------------------------------------------- Operations
+
+export interface ProjectDto {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  status: string;
+  ownerUserId: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  taskCount?: number;
+}
+
+export interface ProjectTaskDto {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  assigneeUserId: string | null;
+  dueDate: string | null;
+  completedAt: string | null;
+}
+
+export interface WorkOrderChecklistItemDto {
+  id: string;
+  label: string;
+  isDone: boolean;
+  sortOrder: number;
+}
+
+export interface WorkOrderDto {
+  id: string;
+  orderNumber: string;
+  title: string;
+  status: string;
+  priority: string;
+  type: string;
+  assigneeUserId: string | null;
+  dueDate: string | null;
+  checklist: WorkOrderChecklistItemDto[];
+  comments?: Array<Record<string, unknown>>;
+  attachments?: Array<Record<string, unknown>>;
+  approvals?: Array<Record<string, unknown>>;
+}
+
+export interface OperationsDashboardDto {
+  totalProjects: number;
+  activeProjects: number;
+  totalTasks: number;
+  openTasks: number;
+  overdueTasks: number;
+  totalWorkOrders: number;
+  workOrdersByStatus: Array<{ status: string; count: number }>;
+  pendingApprovals: number;
+  upcomingEvents: number;
+}
+
+// --------------------------------------------------------------- Automotive
+
+export interface VehicleDto {
+  id: string;
+  customerId: string;
+  customerCode: string | null;
+  customerNameEn: string | null;
+  customerNameAr: string | null;
+  vin: string;
+  plateNumber: string | null;
+  make: string;
+  model: string;
+  modelYear: number;
+  color: string | null;
+  mileage: number;
+  status: string;
+  registrationExpiresAt: string | null;
+}
+
+export interface InspectionServiceDto {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  priceMinor: number;
+  taxPercentBp: number;
+  durationMinutes: number;
+}
+
+export interface InspectionBookingDto {
+  id: string;
+  bookingNumber: string;
+  vehicleId: string;
+  vin: string | null;
+  make: string | null;
+  model: string | null;
+  plateNumber: string | null;
+  customerId: string;
+  serviceId: string;
+  serviceNameEn: string | null;
+  serviceNameAr: string | null;
+  status: string;
+  scheduledAt: string;
+  inspectorUserId: string | null;
+  odometer: number | null;
+  reportStatus: string | null;
+  invoiceId: string | null;
+  findingCount?: number;
+}
+
+export interface JobCardDto {
+  id: string;
+  jobNumber: string;
+  vehicleId: string;
+  vin: string | null;
+  make: string | null;
+  model: string | null;
+  plateNumber: string | null;
+  customerId: string;
+  status: string;
+  technicianUserId: string | null;
+  odometer: number | null;
+  complaint: string | null;
+  invoiceId: string | null;
+  labourCount?: number;
+  estimateCount?: number;
+  reservationCount?: number;
+  createdAt: string;
+}
+
+export interface PartsReservationDto {
+  id: string;
+  jobCardId: string;
+  warehouseId: string;
+  status: string;
+  reservedAt: string;
+  issuedAt: string | null;
+  lines: Array<{ id: string; productId: string; quantity: number; issuedQuantity: number }>;
+}
+
+export interface MarketplaceProviderDto {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  categoryKey: string | null;
+  status: string;
+  commissionPercentBp: number;
+  approvedAt: string | null;
+  _count?: { listings: number; requests: number };
+}
+
+export interface ServiceRequestDto {
+  id: string;
+  requestNumber: string;
+  categoryKey: string;
+  status: string;
+  providerId: string | null;
+  provider?: { code: string; nameEn: string; nameAr: string; status: string } | null;
+  createdAt: string;
+}
+
+export interface ProviderSettlementDto {
+  id: string;
+  providerId: string;
+  periodStart: string;
+  periodEnd: string;
+  grossMinor: number;
+  commissionMinor: number;
+  netMinor: number;
+  currency: string;
+  status: string;
+  provider?: { code: string; nameEn: string } | null;
+}

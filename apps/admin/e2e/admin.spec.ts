@@ -225,9 +225,13 @@ test.describe('company administrator delegation', () => {
     await setLocale(page, 'en');
     await expect(page.getByTestId('dashboard')).toBeVisible();
 
-    // The Starter/Professional demo tenant does not license automotive modules.
+    // The Professional demo tenant licenses HR, CRM and operations but not the
+    // automotive modules. The automotive permissions are suppressed by
+    // entitlement, so the API refuses the request and the page shows the denial
+    // rather than fabricated data.
     await page.goto('/automotive/inspections');
-    await expect(page.getByTestId('planned-automotive_inspections')).toBeVisible();
+    await expect(page.getByTestId('inspections-page')).toBeVisible();
+    await expect(page.getByText('You do not have permission to do that.')).toBeVisible({ timeout: 20_000 });
 
     // Invite flow only offers roles inside the delegable set. The modal loads
     // the role list asynchronously, so poll until the options arrive rather than
@@ -317,10 +321,19 @@ test.describe('dashboard integrity', () => {
     await expect(page.getByTestId('inventory-page')).toBeVisible();
     await page.goto('/reports');
     await expect(page.getByTestId('reports-page')).toBeVisible();
-    // Modules still owned by a later execution keep the explicit placeholder.
+    // Execution 03 shipped HR, CRM, operations and the automotive modules.
     await page.goto('/hr');
-    await expect(page.getByTestId('planned-human_resources')).toBeVisible();
-    await expect(page.getByTestId('planned-notice')).toBeVisible();
+    await expect(page.getByTestId('hr-page')).toBeVisible();
+    await page.goto('/crm');
+    await expect(page.getByTestId('crm-page')).toBeVisible();
+    await page.goto('/operations');
+    await expect(page.getByTestId('operations-page')).toBeVisible();
+    await page.goto('/automotive/inspections');
+    await expect(page.getByTestId('inspections-page')).toBeVisible();
+    await page.goto('/automotive/maintenance');
+    await expect(page.getByTestId('maintenance-page')).toBeVisible();
+    await page.goto('/automotive/spare-parts');
+    await expect(page.getByTestId('spare-parts-page')).toBeVisible();
   });
 });
 

@@ -275,6 +275,112 @@ principal is always pinned to its own company.
 | GET | `/purchasing` | `erp.reports.read` / `erp.reports.purchasing.read` |
 | GET | `/inventory` | `erp.reports.read` / `erp.reports.inventory.read` |
 
+## HR, CRM, operations and automotive (Execution 03)
+
+All routes require the module to be licensed and the caller to hold the listed
+permission, and are company-scoped server-side.
+
+### HR — `/v1/hr` (module `human_resources`)
+
+| Method | Route | Permission |
+| --- | --- | --- |
+| GET/POST | `/departments` | `erp.hr.read` / `erp.hr.department.manage` |
+| GET/POST | `/job-titles` | `erp.hr.read` / `erp.hr.department.manage` |
+| GET | `/employees`, `/employees/:id` | `erp.hr.read` / `erp.hr.employee.manage` |
+| POST/PATCH | `/employees`, `/employees/:id` | `erp.hr.employee.manage` |
+| POST | `/employees/:id/contracts` | `erp.hr.employee.manage` |
+| GET/POST | `/employees/:id/documents` | `erp.hr.document.read` (+ `erp.hr.document.confidential` for confidential) |
+| POST | `/employees/:id/lifecycle` | `erp.hr.lifecycle.manage` |
+| PATCH | `/lifecycle-items/:id` | `erp.hr.lifecycle.manage` |
+| GET/POST | `/leave-types` | `erp.hr.read` / `erp.hr.leave.manage` |
+| POST | `/leave-balances/adjust` | `erp.hr.leave.manage` |
+| GET | `/leave-requests` | `erp.hr.read` / `erp.hr.leave.approve` / `erp.hr.leave.request` |
+| POST | `/leave-requests` | `erp.hr.leave.request` |
+| POST | `/leave-requests/:id/decide` | `erp.hr.leave.approve` |
+| GET/POST | `/shifts` | `erp.hr.read` / `erp.hr.attendance.manage` |
+| GET/POST | `/attendance` | `erp.hr.read` / `erp.hr.attendance.manage` |
+| POST | `/salary-structures` | `erp.hr.salary.manage` |
+| GET/POST | `/payroll-periods` | `erp.hr.read` / `erp.hr.payroll.run` |
+| GET | `/payroll-runs`, `/payroll-runs/:id`, `/payroll-runs/:id/payslips` | `erp.hr.read` / `erp.hr.payroll.run` / `erp.hr.payroll.approve` |
+| POST | `/payroll-runs` | `erp.hr.payroll.run` |
+| POST | `/payroll-runs/:id/approve`, `/payroll-runs/:id/lock` | `erp.hr.payroll.approve` |
+| GET/POST | `/advances` | `erp.hr.read` / `erp.hr.advance.manage` |
+| POST | `/advances/:id/settle` | `erp.hr.advance.manage` |
+| GET | `/dashboard` | `erp.hr.read` / `erp.hr.report.read` |
+
+### CRM — `/v1/crm` (module `crm`)
+
+| Method | Route | Permission |
+| --- | --- | --- |
+| GET/POST | `/lead-sources` | `erp.crm.read` / `erp.crm.lead.manage` |
+| GET/POST | `/leads` | `erp.crm.read` / `erp.crm.lead.manage` |
+| PATCH | `/leads/:id` | `erp.crm.lead.manage` |
+| GET/POST | `/pipelines` | `erp.crm.read` / `erp.crm.opportunity.manage` |
+| POST | `/pipelines/:id/stages` | `erp.crm.opportunity.manage` |
+| GET/POST | `/opportunities` | `erp.crm.read` / `erp.crm.opportunity.manage` |
+| POST | `/opportunities/:id/stage` | `erp.crm.opportunity.manage` |
+| POST | `/opportunities/:id/convert` | `erp.crm.opportunity.convert` |
+| POST | `/customers` | `erp.crm.contact.manage` |
+| GET/POST | `/customers/:id/contacts` | `erp.crm.read` / `erp.crm.contact.manage` |
+| GET/POST | `/activities` | `erp.crm.read` / `erp.crm.activity.manage` |
+| POST | `/activities/:id/complete` | `erp.crm.activity.manage` |
+| GET/POST | `/sla-policies` | `erp.crm.read` / `erp.crm.sla.manage` |
+| GET | `/tickets`, `/tickets/:id` | `erp.crm.read` / `erp.crm.ticket.manage` |
+| POST | `/tickets`, `/tickets/:id/messages` | `erp.crm.ticket.manage` |
+| PATCH | `/tickets/:id` | `erp.crm.ticket.manage` |
+| GET/POST | `/segments` | `erp.crm.read` / `erp.crm.segment.manage` |
+| POST | `/segments/:id/members` | `erp.crm.segment.manage` |
+| GET | `/dashboard` | `erp.crm.read` / `erp.crm.report.read` |
+
+### Operations — `/v1/operations` (module `operations`)
+
+| Method | Route | Permission |
+| --- | --- | --- |
+| GET/POST | `/projects` | `erp.operations.read` / `erp.operations.project.manage` |
+| PATCH | `/projects/:id` | `erp.operations.project.manage` |
+| GET/POST | `/tasks` | `erp.operations.read` / `erp.operations.task.manage` |
+| PATCH | `/tasks/:id` | `erp.operations.task.manage` |
+| GET | `/work-orders`, `/work-orders/:id` | `erp.operations.read` / `erp.operations.work_order.manage` |
+| POST | `/work-orders`, `/work-orders/:id/assign` | `erp.operations.work_order.manage` |
+| PATCH | `/work-orders/:id`, `/checklist-items/:id` | `erp.operations.work_order.manage` |
+| GET/POST | `/approvals` | `erp.operations.read` / `erp.operations.approval.manage` |
+| POST | `/approvals/:id/decide` | `erp.operations.approval.manage` |
+| GET | `/:entityType/:entityId/comments`, `/:entityType/:entityId/attachments` | `erp.operations.read` |
+| POST | `/comments`, `/attachments` | `erp.operations.work_order.manage` / `erp.operations.task.manage` |
+| GET/POST | `/calendar` | `erp.operations.read` / `erp.operations.work_order.manage` |
+| GET | `/notifications` | authenticated |
+| POST | `/notifications/read`, `/notifications` | authenticated / `erp.operations.work_order.manage` |
+| GET | `/dashboard` | `erp.operations.read` / `erp.operations.report.read` |
+
+### Automotive — `/v1/automotive` (`automotive_inspections`, `automotive_maintenance`, `spare_parts`)
+
+| Method | Route | Permission |
+| --- | --- | --- |
+| GET/POST | `/vehicles`, `/vehicles/:id` | `erp.vehicle.read` / `erp.vehicle.manage` |
+| POST | `/vehicles/:id/mileage`, `/vehicles/:id/documents` | `erp.vehicle.manage` |
+| GET | `/vehicles/:id/documents` | `erp.vehicle.read` |
+| GET/POST | `/inspection-services` | `erp.inspection.read` / `erp.inspection.service.manage` |
+| POST | `/inspection-checklist-items` | `erp.inspection.service.manage` |
+| GET/POST | `/inspection-bookings` | `erp.inspection.read` / `erp.inspection.booking.manage` |
+| PATCH | `/inspection-bookings/:id`, `POST .../findings`, `POST .../report/submit` | `erp.inspection.booking.manage` |
+| GET | `/inspection-bookings/:id/report` | `erp.inspection.read` |
+| POST | `/inspection-bookings/:id/report/decide` | `erp.inspection.report.approve` |
+| POST | `/inspection-bookings/:id/invoice` | `erp.inspection.invoice` |
+| GET/POST | `/bays`, `/maintenance-bookings` | `erp.maintenance.read` / `erp.maintenance.booking.manage` |
+| GET/POST | `/job-cards`, `/job-cards/:id/labour`, PATCH `/job-cards/:id` | `erp.maintenance.read` / `erp.maintenance.jobcard.manage` |
+| POST | `/job-cards/:id/estimates`, `/estimates/:id/approve`, `/estimates/:id/reject` | `erp.maintenance.estimate.manage` |
+| POST | `/job-cards/:id/invoice` | `erp.maintenance.invoice` |
+| GET/POST | `/warranties` | `erp.maintenance.read` / `erp.maintenance.warranty.manage` |
+| GET/POST | `/reservations` | `erp.spare_parts.read` / `erp.parts.reserve` |
+| POST | `/reservations/:id/issue` | `erp.parts.issue` |
+| GET/POST | `/part-references`, `/compatibility` | `erp.spare_parts.read` / `erp.parts.reference.manage` / `erp.parts.compatibility.manage` |
+| GET | `/compatible-parts` | `erp.spare_parts.read` |
+| GET/POST | `/providers`, POST `/providers/:id/decide` | `erp.marketplace.provider.manage` |
+| GET/POST | `/providers/:id/listings` | `erp.marketplace.listing.manage` |
+| GET/POST | `/service-requests`, POST `/service-requests/:id/assign`, PATCH `/service-requests/:id` | `erp.marketplace.request.manage` |
+| GET/POST | `/settlements` | `erp.marketplace.commission.manage` |
+| GET | `/dashboard` | `erp.vehicle.read` / `erp.inspection.read` |
+
 ## Rate limits
 
 | Scope | Default | Variable |

@@ -25,12 +25,12 @@ seed, and drives three things at once:
 | `purchasing_procurement` | commerce | execution-02 | AVAILABLE | `erp.purchasing.read` |
 | `reports_analytics` | analytics | execution-02 | AVAILABLE | `erp.reports.read` |
 | `warehouses_inventory` | operations | execution-02 | AVAILABLE | `erp.inventory.read` |
-| `human_resources` | operations | execution-03 | PLANNED | `erp.hr.read` |
-| `crm` | commerce | execution-03 | PLANNED | `erp.crm.read` |
-| `operations` | operations | execution-03 | PLANNED | `erp.operations.read` |
-| `automotive_inspections` | automotive | execution-04 | PLANNED | `erp.inspection.read` |
-| `automotive_maintenance` | automotive | execution-04 | PLANNED | `erp.maintenance.read` |
-| `spare_parts` | automotive | execution-04 | PLANNED | `erp.spare_parts.read` |
+| `human_resources` | operations | execution-03 | AVAILABLE | `erp.hr.read` |
+| `crm` | commerce | execution-03 | AVAILABLE | `erp.crm.read` |
+| `operations` | operations | execution-03 | AVAILABLE | `erp.operations.read` |
+| `automotive_inspections` | automotive | execution-03 | AVAILABLE | `erp.inspection.read` |
+| `automotive_maintenance` | automotive | execution-03 | AVAILABLE | `erp.maintenance.read` |
+| `spare_parts` | automotive | execution-03 | AVAILABLE | `erp.spare_parts.read` |
 
 **AVAILABLE** means the workflow is genuinely implemented, database-backed and
 covered by tests. **PLANNED** means the route exists and is permission-protected,
