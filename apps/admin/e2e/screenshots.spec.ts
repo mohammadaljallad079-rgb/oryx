@@ -315,14 +315,22 @@ test.describe('required screenshots', () => {
     }
   });
 
-  test('planned module state', async ({ page }) => {
+  test('execution 03 HR, CRM, operations and automotive modules', async ({ page }) => {
     await signIn(page);
     await setLocale(page, 'en');
     await setTheme(page, 'dark');
     await page.setViewportSize({ width: 1440, height: 900 });
-    // A module still owned by a later execution keeps the explicit placeholder.
-    await page.goto('/hr');
-    await page.waitForTimeout(700);
-    await page.screenshot({ path: `${OUT}/planned-module-dark.png`, fullPage: true });
+    for (const [route, name] of [
+      ['/hr', 'e03-hr-dark'],
+      ['/crm', 'e03-crm-dark'],
+      ['/operations', 'e03-operations-dark'],
+      ['/automotive/inspections', 'e03-inspections-dark'],
+      ['/automotive/maintenance', 'e03-maintenance-dark'],
+      ['/automotive/spare-parts', 'e03-spare-parts-dark'],
+    ] as const) {
+      await page.goto(route);
+      await page.waitForTimeout(700);
+      await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
+    }
   });
 });

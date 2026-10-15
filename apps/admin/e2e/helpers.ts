@@ -10,6 +10,15 @@ export const COMPANY_ADMIN = {
   password: process.env.SEED_SUPER_ADMIN_PASSWORD ?? 'ChangeMe!Oryx2026',
 };
 
+/**
+ * Administrator of the ORYX-AUTO internal company, which is on the Enterprise
+ * plan and therefore licenses every module including automotive.
+ */
+export const ENTERPRISE_ADMIN = {
+  email: 'admin@oryx-auto.local',
+  password: process.env.SEED_SUPER_ADMIN_PASSWORD ?? 'ChangeMe!Oryx2026',
+};
+
 const API = process.env.ORYX_API ?? 'http://localhost:3001/api/v1';
 
 /**
