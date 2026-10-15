@@ -3,14 +3,15 @@
 Read **docs/ORYX_MASTER_REFERENCE.md**, **docs/architecture/ARCHITECTURE.md** and
 **docs/architecture/PERMISSION_MATRIX.md** before writing code.
 
-## Current state (Execution 01, 01.1 and 02 complete)
+## Current state (Execution 01, 01.1, 02 and 03 complete)
 
 Execution 01 delivered the working Super Admin foundation, Execution 01.1
 hardened it (secure session transport, TOTP MFA, approved photography and
-mobile layout fixes), and Execution 02 added the enterprise ERP core. It is
-**not** a mock: a NestJS API, a Next.js admin app and a PostgreSQL database run
-locally and are covered by 238 automated tests (30 shared unit, 109 API
-integration, 99 browser).
+mobile layout fixes), Execution 02 added the enterprise ERP core, and Execution
+03 added HR and payroll, CRM, operations and automotive services. It is **not** a
+mock: a NestJS API, a Next.js admin app and a PostgreSQL database run locally
+and are covered by 270 automated tests (30 shared unit, 132 API integration,
+108 browser).
 
 Security baseline (do not regress):
 - The refresh token lives in an HttpOnly cookie scoped to `/api/v1/auth`. It is
@@ -36,10 +37,18 @@ Security baseline (do not regress):
   orders, goods receipts, supplier invoices, returns), inventory (warehouses,
   SKUs, moving-average stock ledger, transfers, adjustments, reorder alerts,
   valuation) and permission-aware reports.
-- **Scaffolded only:** the ERP modules owned by later executions (HR, CRM,
-  operations, automotive). Routes exist and are permission-protected, but the
-  screens state plainly that the workflow is unimplemented and show no
-  fabricated data.
+- **Execution 03 (implemented and tested):** HR and payroll (employees,
+  departments, contracts, documents, leave, attendance, salary structures,
+  payroll runs with atomic and idempotent ledger posting, payslips, advances),
+  CRM (leads, pipelines, opportunities that convert to a quotation, contacts,
+  activities, SLA-tracked support tickets, segments), operations (projects,
+  tasks, work orders with an enforced state machine, approvals, comments,
+  attachments, calendar, internal notifications) and automotive (vehicle
+  registry, inspections with approved reports, workshop job cards with estimates
+  and parts that move the shared stock ledger, warranties, marketplace
+  foundations).
+- **Scaffolded only:** nothing. Every ERP module catalog entry is now
+  implemented and DB-backed across Executions 01–03.
 - **Missing assets:** the official ORYX logo and the approved dashboard
   photography are not in the repository. The UI uses a neutral monogram
   placeholder and generated vector tile art. Do not invent brand marks.
@@ -150,6 +159,33 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `STANDARD_CHART` in `apps/api/src/accounting/accounting.service.ts` and in
   `packages/database/prisma/seed.ts` in step, or a new system role will be
   missing in one path.
+
+### Execution 03 gotchas
+
+- **Payroll is a snapshot.** A payroll run copies each employee's active salary
+  structure and its components into the payslip, so editing a salary later never
+  changes a historical run. Never read the live structure for a posted payslip.
+- **Payroll posting is idempotent through the source key.** The run posting uses
+  `sourceId: \`payroll:<runId>\`` so a retried approval cannot double-post. Keep
+  that key when touching the payroll posting path.
+- **A payroll period must be OPEN and a fiscal period must cover the run's end
+  date.** Payroll posts to the ledger, so an open fiscal year is a prerequisite.
+  Tests that post payroll must create a fiscal year first.
+- **The workshop and inspection modules reuse the shared stock ledger and the
+  shared sales invoice path.** Parts issues go through
+  `InventoryService.recordMovement`; workshop and inspection invoices go through
+  `SalesService.issueInvoice` inside the caller's transaction. Never create a
+  second stock ledger or a second ledger for automotive.
+- **State machines are enforced server-side.** Work orders and job cards have an
+  explicit transition graph; a job card cannot be completed without an approved
+  estimate. Do not add a status write that bypasses it.
+- **The automotive modules are licensed to the Enterprise plan.** The
+  Professional demo tenant does not license them, so a UI test that exercises
+  automotive must sign in as `admin@oryx-auto.local` (Enterprise), not the demo
+  tenant.
+- **`cleanupFixtures` must delete children before parents.** The Execution 03
+  tables reference customers, products and each other; the cleanup order is
+  deliberate. A new table needs adding in the right place.
 
 ### Adding a new ERP module
 
