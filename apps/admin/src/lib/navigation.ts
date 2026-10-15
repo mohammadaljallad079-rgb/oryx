@@ -24,11 +24,17 @@ export interface NavGroup {
 
 /** ERP navigation mirrors the module catalog so the two cannot diverge. */
 function erpItem(m: ModuleDefinition): NavItem {
+  const iconMap: Record<string, string> = {
+    'shopping-cart': 'cart',
+    'bar-chart': 'barChart',
+    'heart-handshake': 'heart',
+    'clipboard-check': 'clipboardCheck',
+  };
   return {
     key: m.key,
     labelKey: `nav.${navKeyFor(m.key)}`,
     href: m.route,
-    icon: m.icon === 'shopping-cart' ? 'cart' : m.icon === 'bar-chart' ? 'barChart' : m.icon,
+    icon: iconMap[m.icon] ?? m.icon,
     permission: m.readPermission,
     moduleKey: m.key,
     planned: m.status === 'PLANNED',
@@ -49,6 +55,18 @@ function navKeyFor(moduleKey: string): string {
       return 'subscription';
     case 'settings':
       return 'settings';
+    case 'human_resources':
+      return 'human_resources';
+    case 'crm':
+      return 'crm';
+    case 'operations':
+      return 'operations';
+    case 'automotive_inspections':
+      return 'automotive_inspections';
+    case 'automotive_maintenance':
+      return 'automotive_maintenance';
+    case 'spare_parts':
+      return 'spare_parts';
     default:
       return moduleKey;
   }

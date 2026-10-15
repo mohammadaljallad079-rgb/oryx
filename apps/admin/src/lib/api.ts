@@ -43,6 +43,36 @@ import type {
   TrialBalanceDto,
   UserDto,
   ValuationRowDto,
+  DepartmentDto,
+  JobTitleDto,
+  EmployeeDto,
+  LeaveTypeDto,
+  LeaveRequestDto,
+  ShiftDto,
+  AttendanceDto,
+  PayrollPeriodDto,
+  PayrollRunDto,
+  EmployeeAdvanceDto,
+  HrDashboardDto,
+  LeadDto,
+  PipelineDto,
+  OpportunityDto,
+  SupportTicketDto,
+  CrmActivityDto,
+  CrmDashboardDto,
+  ProjectDto,
+  ProjectTaskDto,
+  WorkOrderDto,
+  WorkOrderChecklistItemDto,
+  OperationsDashboardDto,
+  VehicleDto,
+  InspectionServiceDto,
+  InspectionBookingDto,
+  JobCardDto,
+  PartsReservationDto,
+  MarketplaceProviderDto,
+  ServiceRequestDto,
+  ProviderSettlementDto,
   WarehouseDto,
 } from '@oryx/shared';
 
@@ -645,6 +675,224 @@ export const api = {
     request<PurchasingReportDto>(`/reports/purchasing?${toQuery(params)}`),
   reportInventory: (params: Record<string, unknown> = {}) =>
     request<InventoryReportDto>(`/reports/inventory?${toQuery(params)}`),
+
+  // ------------------------------------------------------------- HR (E03)
+  hrDepartments: (params: { companyId?: string } = {}) =>
+    request<Paginated<DepartmentDto>>(`/hr/departments?${toQuery(params)}`),
+  createDepartment: (body: Record<string, unknown>) => request<DepartmentDto>('/hr/departments', { method: 'POST', body }),
+  hrJobTitles: (params: { companyId?: string } = {}) =>
+    request<Paginated<JobTitleDto>>(`/hr/job-titles?${toQuery(params)}`),
+  createJobTitle: (body: Record<string, unknown>) => request<JobTitleDto>('/hr/job-titles', { method: 'POST', body }),
+  hrEmployees: (params: { companyId?: string; search?: string; status?: string; page?: number } = {}) =>
+    request<Paginated<EmployeeDto>>(`/hr/employees?${toQuery(params)}`),
+  hrEmployee: (id: string) => request<Record<string, unknown>>(`/hr/employees/${id}`),
+  createEmployee: (body: Record<string, unknown>) => request<EmployeeDto>('/hr/employees', { method: 'POST', body }),
+  updateEmployee: (id: string, body: Record<string, unknown>) =>
+    request<EmployeeDto>(`/hr/employees/${id}`, { method: 'PATCH', body }),
+  createContract: (employeeId: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/hr/employees/${employeeId}/contracts`, { method: 'POST', body }),
+  employeeDocuments: (employeeId: string) =>
+    request<Paginated<Record<string, unknown>>>(`/hr/employees/${employeeId}/documents`),
+  createEmployeeDocument: (employeeId: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/hr/employees/${employeeId}/documents`, { method: 'POST', body }),
+  leaveTypes: (params: { companyId?: string } = {}) =>
+    request<Paginated<LeaveTypeDto>>(`/hr/leave-types?${toQuery(params)}`),
+  createLeaveType: (body: Record<string, unknown>) => request<LeaveTypeDto>('/hr/leave-types', { method: 'POST', body }),
+  leaveRequests: (params: { companyId?: string; status?: string } = {}) =>
+    request<Paginated<LeaveRequestDto>>(`/hr/leave-requests?${toQuery(params)}`),
+  requestLeave: (body: Record<string, unknown>) => request<LeaveRequestDto>('/hr/leave-requests', { method: 'POST', body }),
+  decideLeave: (id: string, decision: string, note?: string) =>
+    request<LeaveRequestDto>(`/hr/leave-requests/${id}/decide`, { method: 'POST', body: { decision, note } }),
+  hrShifts: (params: { companyId?: string } = {}) => request<Paginated<ShiftDto>>(`/hr/shifts?${toQuery(params)}`),
+  createShift: (body: Record<string, unknown>) => request<ShiftDto>('/hr/shifts', { method: 'POST', body }),
+  hrAttendance: (params: { companyId?: string } = {}) =>
+    request<Paginated<AttendanceDto>>(`/hr/attendance?${toQuery(params)}`),
+  recordAttendance: (body: Record<string, unknown>) =>
+    request<AttendanceDto>('/hr/attendance', { method: 'POST', body }),
+  createSalaryStructure: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/hr/salary-structures', { method: 'POST', body }),
+  payrollPeriods: (params: { companyId?: string } = {}) =>
+    request<Paginated<PayrollPeriodDto>>(`/hr/payroll-periods?${toQuery(params)}`),
+  createPayrollPeriod: (body: Record<string, unknown>) =>
+    request<PayrollPeriodDto>('/hr/payroll-periods', { method: 'POST', body }),
+  payrollRuns: (params: { companyId?: string; status?: string } = {}) =>
+    request<Paginated<PayrollRunDto>>(`/hr/payroll-runs?${toQuery(params)}`),
+  payrollRun: (id: string) => request<PayrollRunDto>(`/hr/payroll-runs/${id}`),
+  createPayrollRun: (body: Record<string, unknown>) => request<PayrollRunDto>('/hr/payroll-runs', { method: 'POST', body }),
+  approvePayrollRun: (id: string) => request<Record<string, unknown>>(`/hr/payroll-runs/${id}/approve`, { method: 'POST', body: {} }),
+  lockPayrollRun: (id: string) => request<Record<string, unknown>>(`/hr/payroll-runs/${id}/lock`, { method: 'POST', body: {} }),
+  payslips: (runId: string) => request<Paginated<Record<string, unknown>>>(`/hr/payroll-runs/${runId}/payslips`),
+  hrAdvances: (params: { companyId?: string } = {}) =>
+    request<Paginated<EmployeeAdvanceDto>>(`/hr/advances?${toQuery(params)}`),
+  createAdvance: (body: Record<string, unknown>) => request<EmployeeAdvanceDto>('/hr/advances', { method: 'POST', body }),
+  settleAdvance: (id: string, amountMinor: number, note?: string) =>
+    request<EmployeeAdvanceDto>(`/hr/advances/${id}/settle`, { method: 'POST', body: { amountMinor, note } }),
+  hrDashboard: (companyId?: string) =>
+    request<HrDashboardDto>(`/hr/dashboard${companyId ? `?companyId=${companyId}` : ''}`),
+
+  // ------------------------------------------------------------ CRM (E03)
+  crmLeadSources: (params: { companyId?: string } = {}) =>
+    request<Paginated<Record<string, unknown>>>(`/crm/lead-sources?${toQuery(params)}`),
+  createLeadSource: (body: Record<string, unknown>) => request<Record<string, unknown>>('/crm/lead-sources', { method: 'POST', body }),
+  crmLeads: (params: { companyId?: string; search?: string; status?: string; page?: number } = {}) =>
+    request<Paginated<LeadDto>>(`/crm/leads?${toQuery(params)}`),
+  createLead: (body: Record<string, unknown>) => request<LeadDto>('/crm/leads', { method: 'POST', body }),
+  updateLead: (id: string, body: Record<string, unknown>) => request<LeadDto>(`/crm/leads/${id}`, { method: 'PATCH', body }),
+  crmPipelines: (params: { companyId?: string } = {}) =>
+    request<Paginated<PipelineDto>>(`/crm/pipelines?${toQuery(params)}`),
+  createPipeline: (body: Record<string, unknown>) => request<PipelineDto>('/crm/pipelines', { method: 'POST', body }),
+  crmOpportunities: (params: { companyId?: string; status?: string; page?: number } = {}) =>
+    request<Paginated<OpportunityDto>>(`/crm/opportunities?${toQuery(params)}`),
+  createOpportunity: (body: Record<string, unknown>) => request<OpportunityDto>('/crm/opportunities', { method: 'POST', body }),
+  moveOpportunityStage: (id: string, stageId: string, note?: string) =>
+    request<OpportunityDto>(`/crm/opportunities/${id}/stage`, { method: 'POST', body: { stageId, note } }),
+  convertOpportunity: (id: string, body: Record<string, unknown> = {}) =>
+    request<{ id: string; quoteNumber: string; totalMinor: number }>(`/crm/opportunities/${id}/convert`, { method: 'POST', body }),
+  createCrmCustomer: (body: Record<string, unknown>) => request<Record<string, unknown>>('/crm/customers', { method: 'POST', body }),
+  crmTickets: (params: { companyId?: string; status?: string; search?: string; page?: number } = {}) =>
+    request<Paginated<SupportTicketDto>>(`/crm/tickets?${toQuery(params)}`),
+  crmTicket: (id: string) => request<Record<string, unknown>>(`/crm/tickets/${id}`),
+  createTicket: (body: Record<string, unknown>) => request<SupportTicketDto>('/crm/tickets', { method: 'POST', body }),
+  addTicketMessage: (id: string, body: string, isInternal = false) =>
+    request<Record<string, unknown>>(`/crm/tickets/${id}/messages`, { method: 'POST', body: { body, isInternal } }),
+  updateTicket: (id: string, body: Record<string, unknown>) => request<SupportTicketDto>(`/crm/tickets/${id}`, { method: 'PATCH', body }),
+  crmActivities: (params: { companyId?: string; status?: string } = {}) =>
+    request<Paginated<CrmActivityDto>>(`/crm/activities?${toQuery(params)}`),
+  createActivity: (body: Record<string, unknown>) => request<CrmActivityDto>('/crm/activities', { method: 'POST', body }),
+  completeActivity: (id: string) => request<CrmActivityDto>(`/crm/activities/${id}/complete`, { method: 'POST', body: {} }),
+  crmSlaPolicies: (params: { companyId?: string } = {}) =>
+    request<Paginated<Record<string, unknown>>>(`/crm/sla-policies?${toQuery(params)}`),
+  setSlaPolicy: (body: Record<string, unknown>) => request<Record<string, unknown>>('/crm/sla-policies', { method: 'POST', body }),
+  crmSegments: (params: { companyId?: string } = {}) =>
+    request<Paginated<Record<string, unknown>>>(`/crm/segments?${toQuery(params)}`),
+  createSegment: (body: Record<string, unknown>) => request<Record<string, unknown>>('/crm/segments', { method: 'POST', body }),
+  crmDashboard: (companyId?: string) => request<CrmDashboardDto>(`/crm/dashboard${companyId ? `?companyId=${companyId}` : ''}`),
+
+  // ----------------------------------------------------- Operations (E03)
+  operationsProjects: (params: { companyId?: string; status?: string; page?: number } = {}) =>
+    request<Paginated<ProjectDto>>(`/operations/projects?${toQuery(params)}`),
+  createOperationsProject: (body: Record<string, unknown>) => request<ProjectDto>('/operations/projects', { method: 'POST', body }),
+  updateOperationsProject: (id: string, body: Record<string, unknown>) =>
+    request<ProjectDto>(`/operations/projects/${id}`, { method: 'PATCH', body }),
+  operationsTasks: (params: { companyId?: string; status?: string; page?: number } = {}) =>
+    request<Paginated<ProjectTaskDto>>(`/operations/tasks?${toQuery(params)}`),
+  createOperationsTask: (body: Record<string, unknown>) => request<ProjectTaskDto>('/operations/tasks', { method: 'POST', body }),
+  updateOperationsTask: (id: string, body: Record<string, unknown>) =>
+    request<ProjectTaskDto>(`/operations/tasks/${id}`, { method: 'PATCH', body }),
+  workOrders: (params: { companyId?: string; status?: string; page?: number } = {}) =>
+    request<Paginated<WorkOrderDto>>(`/operations/work-orders?${toQuery(params)}`),
+  workOrder: (id: string) => request<WorkOrderDto>(`/operations/work-orders/${id}`),
+  createWorkOrder: (body: Record<string, unknown>) => request<WorkOrderDto>('/operations/work-orders', { method: 'POST', body }),
+  assignWorkOrder: (id: string, body: Record<string, unknown>) =>
+    request<WorkOrderDto>(`/operations/work-orders/${id}/assign`, { method: 'POST', body }),
+  updateWorkOrder: (id: string, body: Record<string, unknown>) =>
+    request<WorkOrderDto>(`/operations/work-orders/${id}`, { method: 'PATCH', body }),
+  toggleWorkOrderChecklist: (id: string, isDone: boolean) =>
+    request<WorkOrderChecklistItemDto>(`/operations/checklist-items/${id}`, { method: 'PATCH', body: { isDone } }),
+  operationsApprovals: (params: { companyId?: string; status?: string } = {}) =>
+    request<Paginated<Record<string, unknown>>>(`/operations/approvals?${toQuery(params)}`),
+  createApproval: (body: Record<string, unknown>) => request<Record<string, unknown>>('/operations/approvals', { method: 'POST', body }),
+  decideApproval: (id: string, decision: string, note?: string) =>
+    request<Record<string, unknown>>(`/operations/approvals/${id}/decide`, { method: 'POST', body: { decision, note } }),
+  operationsCalendar: (params: { companyId?: string } = {}) =>
+    request<Paginated<Record<string, unknown>>>(`/operations/calendar?${toQuery(params)}`),
+  createCalendarEvent: (body: Record<string, unknown>) => request<Record<string, unknown>>('/operations/calendar', { method: 'POST', body }),
+  operationsNotifications: (unreadOnly = false) =>
+    request<Paginated<Record<string, unknown>>>(`/operations/notifications?unreadOnly=${unreadOnly}`),
+  markNotificationsRead: () => request<{ updated: number }>('/operations/notifications/read', { method: 'POST', body: { all: true } }),
+  operationsDashboard: (companyId?: string) =>
+    request<OperationsDashboardDto>(`/operations/dashboard${companyId ? `?companyId=${companyId}` : ''}`),
+
+  // ----------------------------------------------------- Automotive (E03)
+  vehicles: (params: { companyId?: string; search?: string; status?: string; customerId?: string; page?: number } = {}) =>
+    request<Paginated<VehicleDto>>(`/automotive/vehicles?${toQuery(params)}`),
+  vehicle: (id: string) => request<Record<string, unknown>>(`/automotive/vehicles/${id}`),
+  createVehicle: (body: Record<string, unknown>) => request<VehicleDto>('/automotive/vehicles', { method: 'POST', body }),
+  updateVehicle: (id: string, body: Record<string, unknown>) => request<VehicleDto>(`/automotive/vehicles/${id}`, { method: 'PATCH', body }),
+  recordMileage: (id: string, mileage: number) =>
+    request<Record<string, unknown>>(`/automotive/vehicles/${id}/mileage`, { method: 'POST', body: { mileage } }),
+  inspectionServices: (params: { companyId?: string } = {}) =>
+    request<Paginated<InspectionServiceDto>>(`/automotive/inspection-services?${toQuery(params)}`),
+  createInspectionService: (body: Record<string, unknown>) =>
+    request<InspectionServiceDto>('/automotive/inspection-services', { method: 'POST', body }),
+  inspectionBookings: (params: { companyId?: string; status?: string; page?: number } = {}) =>
+    request<Paginated<InspectionBookingDto>>(`/automotive/inspection-bookings?${toQuery(params)}`),
+  createInspectionBooking: (body: Record<string, unknown>) =>
+    request<InspectionBookingDto>('/automotive/inspection-bookings', { method: 'POST', body }),
+  updateInspectionBooking: (id: string, body: Record<string, unknown>) =>
+    request<InspectionBookingDto>(`/automotive/inspection-bookings/${id}`, { method: 'PATCH', body }),
+  recordInspectionFindings: (id: string, findings: Array<Record<string, unknown>>) =>
+    request<Record<string, unknown>>(`/automotive/inspection-bookings/${id}/findings`, { method: 'POST', body: { findings } }),
+  inspectionReport: (id: string) => request<Record<string, unknown>>(`/automotive/inspection-bookings/${id}/report`),
+  submitInspectionReport: (id: string, body: Record<string, unknown> = {}) =>
+    request<Record<string, unknown>>(`/automotive/inspection-bookings/${id}/report/submit`, { method: 'POST', body }),
+  decideInspectionReport: (id: string, decision: string) =>
+    request<Record<string, unknown>>(`/automotive/inspection-bookings/${id}/report/decide`, { method: 'POST', body: { decision } }),
+  invoiceInspection: (id: string, body: Record<string, unknown> = {}) =>
+    request<{ invoiceNumber: string; totalMinor: number }>(`/automotive/inspection-bookings/${id}/invoice`, { method: 'POST', body }),
+  workshopBays: (params: { companyId?: string } = {}) =>
+    request<Paginated<Record<string, unknown>>>(`/automotive/bays?${toQuery(params)}`),
+  createWorkshopBay: (body: Record<string, unknown>) => request<Record<string, unknown>>('/automotive/bays', { method: 'POST', body }),
+  maintenanceBookings: (params: { companyId?: string; status?: string } = {}) =>
+    request<Paginated<Record<string, unknown>>>(`/automotive/maintenance-bookings?${toQuery(params)}`),
+  createMaintenanceBooking: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/automotive/maintenance-bookings', { method: 'POST', body }),
+  jobCards: (params: { companyId?: string; status?: string; page?: number } = {}) =>
+    request<Paginated<JobCardDto>>(`/automotive/job-cards?${toQuery(params)}`),
+  jobCard: (id: string) => request<Record<string, unknown>>(`/automotive/job-cards/${id}`),
+  createJobCard: (body: Record<string, unknown>) => request<JobCardDto>('/automotive/job-cards', { method: 'POST', body }),
+  updateJobCard: (id: string, body: Record<string, unknown>) => request<JobCardDto>(`/automotive/job-cards/${id}`, { method: 'PATCH', body }),
+  addLabour: (id: string, operations: Array<Record<string, unknown>>) =>
+    request<Record<string, unknown>>(`/automotive/job-cards/${id}/labour`, { method: 'POST', body: { operations } }),
+  createEstimate: (id: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/automotive/job-cards/${id}/estimates`, { method: 'POST', body }),
+  approveEstimate: (id: string) => request<Record<string, unknown>>(`/automotive/estimates/${id}/approve`, { method: 'POST', body: {} }),
+  rejectEstimate: (id: string) => request<Record<string, unknown>>(`/automotive/estimates/${id}/reject`, { method: 'POST', body: {} }),
+  invoiceJobCard: (id: string, body: Record<string, unknown> = {}) =>
+    request<{ invoiceNumber: string; totalMinor: number }>(`/automotive/job-cards/${id}/invoice`, { method: 'POST', body }),
+  partReservations: (params: { companyId?: string; status?: string } = {}) =>
+    request<Paginated<PartsReservationDto>>(`/automotive/reservations?${toQuery(params)}`),
+  createPartReservation: (body: Record<string, unknown>) =>
+    request<PartsReservationDto>('/automotive/reservations', { method: 'POST', body }),
+  issuePartReservation: (id: string, body: Record<string, unknown> = {}) =>
+    request<PartsReservationDto>(`/automotive/reservations/${id}/issue`, { method: 'POST', body }),
+  warranties: (params: { companyId?: string; vehicleId?: string } = {}) =>
+    request<Paginated<Record<string, unknown>>>(`/automotive/warranties?${toQuery(params)}`),
+  createWarranty: (body: Record<string, unknown>) => request<Record<string, unknown>>('/automotive/warranties', { method: 'POST', body }),
+  partReferences: (params: { companyId?: string } = {}) =>
+    request<Paginated<Record<string, unknown>>>(`/automotive/part-references?${toQuery(params)}`),
+  createPartReference: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/automotive/part-references', { method: 'POST', body }),
+  partCompatibility: (params: { companyId?: string } = {}) =>
+    request<Paginated<Record<string, unknown>>>(`/automotive/compatibility?${toQuery(params)}`),
+  createPartCompatibility: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/automotive/compatibility', { method: 'POST', body }),
+  compatibleParts: (make: string, model: string, year: number, companyId?: string) =>
+    request<Paginated<Record<string, unknown>>>(
+      `/automotive/compatible-parts?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year=${year}${companyId ? `&companyId=${companyId}` : ''}`,
+    ),
+  marketplaceProviders: (params: { status?: string } = {}) =>
+    request<Paginated<MarketplaceProviderDto>>(`/automotive/providers?${toQuery(params)}`),
+  createProvider: (body: Record<string, unknown>) =>
+    request<MarketplaceProviderDto>('/automotive/providers', { method: 'POST', body }),
+  decideProvider: (id: string, decision: string, note?: string) =>
+    request<MarketplaceProviderDto>(`/automotive/providers/${id}/decide`, { method: 'POST', body: { decision, note } }),
+  providerListings: (providerId: string) =>
+    request<Paginated<Record<string, unknown>>>(`/automotive/providers/${providerId}/listings`),
+  createProviderListing: (providerId: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/automotive/providers/${providerId}/listings`, { method: 'POST', body }),
+  serviceRequests: (params: { companyId?: string; status?: string } = {}) =>
+    request<Paginated<ServiceRequestDto>>(`/automotive/service-requests?${toQuery(params)}`),
+  createServiceRequest: (body: Record<string, unknown>) =>
+    request<ServiceRequestDto>('/automotive/service-requests', { method: 'POST', body }),
+  assignServiceRequest: (id: string, providerId: string) =>
+    request<ServiceRequestDto>(`/automotive/service-requests/${id}/assign`, { method: 'POST', body: { providerId } }),
+  settlements: (params: { status?: string } = {}) =>
+    request<Paginated<ProviderSettlementDto>>(`/automotive/settlements?${toQuery(params)}`),
+  createSettlement: (body: Record<string, unknown>) =>
+    request<ProviderSettlementDto>('/automotive/settlements', { method: 'POST', body }),
+  automotiveDashboard: (companyId?: string) =>
+    request<Record<string, number>>(`/automotive/dashboard${companyId ? `?companyId=${companyId}` : ''}`),
 };
 
 function toQuery(params: Record<string, unknown>): string {
