@@ -19,7 +19,7 @@ export const ENTERPRISE_ADMIN = {
   password: process.env.SEED_SUPER_ADMIN_PASSWORD ?? 'ChangeMe!Oryx2026',
 };
 
-export const API = process.env.ORYX_API ?? 'http://localhost:3001/api/v1';
+const API = process.env.ORYX_API ?? 'http://localhost:3001/api/v1';
 
 /**
  * Obtain a bearer token for API assertions from inside the page.
@@ -55,10 +55,17 @@ export async function apiToken(
         if (rotated.accessToken) return rotated.accessToken;
       }
 
+      // The login fallback still presents the refresh cookie that `signIn`
+      // established, and CsrfGuard rejects any unsafe method carrying that
+      // cookie without a matching header. Echo it here too, or the fallback
+      // can never succeed and fails with a 403 instead.
       const login = await fetch(`${api}/auth/login`, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(csrfFromCookie ? { 'x-oryx-csrf': csrfFromCookie } : {}),
+        },
         body: JSON.stringify({ email, password }),
       });
       const body = (await login.json()) as {

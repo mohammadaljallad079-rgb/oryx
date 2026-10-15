@@ -1,13 +1,73 @@
-import { expect, test } from '@playwright/test';
-import {
-  API,
-  SUPER_ADMIN,
-  apiToken,
-  expectNoServerError,
-  setLocale,
-  setTheme,
-  signIn,
-} from './helpers';
+import { expect, request, test } from '@playwright/test';
+import { SUPER_ADMIN, expectNoServerError, setLocale, setTheme, signIn } from './helpers';
+
+/**
+ * Store or clear BenefitPay credentials through the real API.
+ *
+ * This runs from Node in a cookie-less context: the request carries only the
+ * bearer token, so CsrfGuard has no ambient cookie to protect and the call is
+ * deterministic. Doing it from inside the page instead would race the page's
+ * own refresh rotation.
+ */
+async function setBenefitPayCredentials(values: {
+  merchantId: string;
+  apiKey: string;
+  apiSecret: string;
+  baseUrl: string;
+  webhookSecret: string;
+}): Promise<void> {
+  // Build absolute URLs: Playwright resolves a leading-slash path against the
+  // baseURL's origin, which would silently drop the /api/v1 prefix.
+  const api = (process.env.ORYX_API ?? 'http://localhost:3001/api/v1').replace(/\/$/, '');
+
+  const loginCtx = await request.newContext();
+  let token: string;
+  try {
+    const login = await loginCtx.post(`${api}/auth/login`, {
+      data: { email: SUPER_ADMIN.email, password: SUPER_ADMIN.password },
+    });
+    expect(login.ok(), `login failed with ${login.status()}`).toBe(true);
+    token = ((await login.json()) as { accessToken: string }).accessToken;
+  } finally {
+    await loginCtx.dispose();
+  }
+
+  const ctx = await request.newContext();
+  try {
+    const res = await ctx.put(`${api}/integrations/BENEFITPAY/credentials`, {
+      headers: { Authorization: `Bearer ${token}` },
+      data: {
+        credentials: [
+          { key: 'BENEFITPAY_MERCHANT_ID', value: values.merchantId },
+          { key: 'BENEFITPAY_API_KEY', value: values.apiKey },
+          { key: 'BENEFITPAY_API_SECRET', value: values.apiSecret },
+          { key: 'BENEFITPAY_BASE_URL', value: values.baseUrl },
+          { key: 'BENEFITPAY_WEBHOOK_SECRET', value: values.webhookSecret },
+        ],
+      },
+    });
+    expect(res.ok(), `credential write failed with ${res.status()}`).toBe(true);
+  } finally {
+    await ctx.dispose();
+  }
+}
+
+/** Throwaway sandbox strings, not live bank credentials. */
+const BENEFITPAY_TEST_CREDENTIALS = {
+  merchantId: 'MERCHANT-E2E-0001',
+  apiKey: 'key-e2e-00000001',
+  apiSecret: 'secret-e2e-00000001',
+  baseUrl: 'https://sandbox.benefitpay.example',
+  webhookSecret: 'whsec-e2e-00000001',
+};
+
+const BENEFITPAY_CLEARED = {
+  merchantId: '',
+  apiKey: '',
+  apiSecret: '',
+  baseUrl: '',
+  webhookSecret: '',
+};
 
 /**
  * Execution 05 — External Integrations Center acceptance.
@@ -78,78 +138,27 @@ test.describe('Execution 05 — external integrations center', () => {
   });
 
   test('5. runs a connection test and records the honest result', async ({ page }) => {
-    await page.goto('/integrations');
+    // Seed every required credential so the verify call reaches the adapter
+    // instead of stopping at the missing-credential guard.
+    await setBenefitPayCredentials(BENEFITPAY_TEST_CREDENTIALS);
+    try {
+      await page.goto('/integrations');
+      await page.getByTestId('integration-row-BENEFITPAY').getByRole('button').click();
+      await expect(page.getByTestId('integration-verify')).toBeVisible({ timeout: 20_000 });
+      await page.getByTestId('integration-verify').click();
 
-    // Seed every required credential through the real API so the verify call
-    // reaches the adapter instead of stopping at the missing-credential guard.
-    // The values are throwaway sandbox strings, not live bank credentials.
-    const token = await apiToken(page);
-    const saved = await page.evaluate(
-      async ({ api, token }) => {
-        const csrf = decodeURIComponent(document.cookie.match(/oryx_csrf=([^;]*)/)?.[1] ?? '');
-        const res = await fetch(`${api}/integrations/BENEFITPAY/credentials`, {
-          method: 'PUT',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-            ...(csrf ? { 'x-oryx-csrf': csrf } : {}),
-          },
-          body: JSON.stringify({
-            credentials: [
-              { key: 'BENEFITPAY_MERCHANT_ID', value: 'MERCHANT-E2E-0001' },
-              { key: 'BENEFITPAY_API_KEY', value: 'key-e2e-00000001' },
-              { key: 'BENEFITPAY_API_SECRET', value: 'secret-e2e-00000001' },
-              { key: 'BENEFITPAY_BASE_URL', value: 'https://sandbox.benefitpay.example' },
-              { key: 'BENEFITPAY_WEBHOOK_SECRET', value: 'whsec-e2e-00000001' },
-            ],
-          }),
-        });
-        return { ok: res.ok, status: res.status };
-      },
-      { api: API, token },
-    );
-    expect(saved.ok, `credential seed failed with ${saved.status}`).toBe(true);
-
-    await page.goto('/integrations');
-    await page.getByTestId('integration-row-BENEFITPAY').getByRole('button').click();
-    await expect(page.getByTestId('integration-verify')).toBeVisible({ timeout: 20_000 });
-    await page.getByTestId('integration-verify').click();
-
-    // The adapter exists but the vendor call is not implemented, so the check
-    // must report that plainly rather than claiming success.
-    await expect(page.getByTestId('integration-checks')).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByTestId('integration-checks')).toContainText(/not implemented/i);
-    await expectNoServerError(page);
-
-    // Remove the throwaway credentials again: an empty value deletes the row.
-    // Leaving them behind would flip BENEFITPAY to CONFIGURED for every later
-    // test in the suite, which is exactly the state the other tests assert
-    // against.
-    await page.evaluate(
-      async ({ api, token }) => {
-        const csrf = decodeURIComponent(document.cookie.match(/oryx_csrf=([^;]*)/)?.[1] ?? '');
-        await fetch(`${api}/integrations/BENEFITPAY/credentials`, {
-          method: 'PUT',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-            ...(csrf ? { 'x-oryx-csrf': csrf } : {}),
-          },
-          body: JSON.stringify({
-            credentials: [
-              { key: 'BENEFITPAY_MERCHANT_ID', value: '' },
-              { key: 'BENEFITPAY_API_KEY', value: '' },
-              { key: 'BENEFITPAY_API_SECRET', value: '' },
-              { key: 'BENEFITPAY_BASE_URL', value: '' },
-              { key: 'BENEFITPAY_WEBHOOK_SECRET', value: '' },
-            ],
-          }),
-        });
-      },
-      { api: API, token },
-    );
+      // The adapter exists but the vendor call is not implemented, so the check
+      // must report that plainly rather than claiming success.
+      await expect(page.getByTestId('integration-checks')).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByTestId('integration-checks')).toContainText(/not implemented/i);
+      await expectNoServerError(page);
+    } finally {
+      // Remove the throwaway credentials again: an empty value deletes the row.
+      // Leaving them behind would flip BENEFITPAY to CONFIGURED for every later
+      // test in the suite, which is exactly the state the other tests assert
+      // against.
+      await setBenefitPayCredentials(BENEFITPAY_CLEARED);
+    }
   });
 
   test('6. renders in both languages and both themes', async ({ page }) => {

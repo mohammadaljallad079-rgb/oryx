@@ -25,7 +25,8 @@ force-pushed.
 | --- | --- |
 | Branch | `feature/execution-05-platform-completion` |
 | Base | `main` @ `33ee5579644d88ae6a1763e7d778ba944831912a` (the Execution 04 merge) |
-| Pull request | see the PR link in section 12 |
+| Head | `e68f45c` |
+| Pull request | [#5](https://github.com/mohammadaljallad079-rgb/oryx/pull/5) (draft, open) |
 
 ## 3. Baseline verification (before this session's changes)
 
@@ -268,7 +269,7 @@ owner-supplied credentials are outstanding.
 
 ## 13. Pull request
 
-See the PR opened against `main` from
-`feature/execution-05-platform-completion` for the exact head commit and diff.
+[#5](https://github.com/mohammadaljallad079-rgb/oryx/pull/5) against `main`
+from `feature/execution-05-platform-completion`, head `e68f45c`.
 
 **Do not merge or deploy without owner approval.**
