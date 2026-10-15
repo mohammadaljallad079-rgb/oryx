@@ -3,15 +3,18 @@
 Read **docs/ORYX_MASTER_REFERENCE.md**, **docs/architecture/ARCHITECTURE.md** and
 **docs/architecture/PERMISSION_MATRIX.md** before writing code.
 
-## Current state (Execution 01, 01.1, 02 and 03 complete)
+## Current state (Execution 01, 01.1, 02, 03 and 04 complete)
 
 Execution 01 delivered the working Super Admin foundation, Execution 01.1
 hardened it (secure session transport, TOTP MFA, approved photography and
-mobile layout fixes), Execution 02 added the enterprise ERP core, and Execution
-03 added HR and payroll, CRM, operations and automotive services. It is **not** a
-mock: a NestJS API, a Next.js admin app and a PostgreSQL database run locally
-and are covered by 270 automated tests (30 shared unit, 132 API integration,
-108 browser).
+mobile layout fixes), Execution 02 added the enterprise ERP core, Execution 03
+added HR and payroll, CRM, operations and automotive services, and Execution 04
+added the customer platform, the automotive marketplace, the shared booking
+engine, payments, notifications and the ORYX customer mobile application. It is
+**not** a mock: a NestJS API, a Next.js admin app, a Next.js customer site, an
+Expo/React Native mobile app and a PostgreSQL database run locally and are
+covered by 408 automated tests (85 shared unit, 196 API integration, 113
+browser, 14 mobile).
 
 Security baseline (do not regress):
 - The refresh token lives in an HttpOnly cookie scoped to `/api/v1/auth`. It is
@@ -47,8 +50,23 @@ Security baseline (do not regress):
   registry, inspections with approved reports, workshop job cards with estimates
   and parts that move the shared stock ledger, warranties, marketplace
   foundations).
-- **Scaffolded only:** nothing. Every ERP module catalog entry is now
-  implemented and DB-backed across Executions 01–03.
+- **Execution 04 (implemented and tested):** the customer platform (consumer
+  identity and sessions, profiles, vehicle garage with per-owner isolation,
+  addresses, notification preferences, privacy and data-export/deletion
+  requests), the customer website (`apps/customer`), the automotive marketplace
+  (provider onboarding and approval, listings and pricing, availability, service
+  requests, acceptance and assignment, completion, moderated reviews and
+  ratings, complaints, commissions and ledger-posted settlements), the shared
+  booking engine (resources, working hours and exceptions, slot generation,
+  confirmation, rescheduling, cancellation, reminders and database-backed
+  double-booking prevention), payments (cash, card terminal and bank transfer
+  records, an online-gateway adapter architecture, idempotent intents and
+  webhooks, verified confirmations, refunds, reconciliation, commissions and
+  settlements), notifications (in-app plus email, SMS, WhatsApp and push
+  adapters that report themselves unconfigured without credentials) and the
+  ORYX customer mobile application (`apps/mobile`, Expo/React Native).
+- **Scaffolded only:** nothing. Every ERP module catalog entry is implemented and
+  DB-backed across Executions 01–04.
 - **Missing assets:** the official ORYX logo and the approved dashboard
   photography are not in the repository. The UI uses a neutral monogram
   placeholder and generated vector tile art. Do not invent brand marks.
@@ -186,6 +204,44 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 - **`cleanupFixtures` must delete children before parents.** The Execution 03
   tables reference customers, products and each other; the cleanup order is
   deliberate. A new table needs adding in the right place.
+
+### Execution 04 gotchas
+
+- **React must resolve to one version across the workspace.** The repository uses
+  `node-linker=hoisted`. A workspace that pins a different React minor (the
+  mobile app originally pinned `19.1.0`) hoists that copy to the root, pairs it
+  with the other `react-dom`, and `next build` then fails at prerender with
+  `Cannot read properties of null (reading 'useRef')`. Keep `react` aligned
+  across `apps/admin`, `apps/customer` and `apps/mobile`; react-native's peer
+  range is `^19.1.0`, so `19.3.0` satisfies it.
+- **The consumer identity plane is separate from staff auth.** A consumer access
+  token carries `audience: customer`. It is refused on a staff route and a staff
+  token is refused on a consumer route; do not relax either check to make a test
+  pass.
+- **Booking concurrency is enforced by the database.** A unique constraint plus a
+  transactional row lock make the second booking for the same resource and time
+  fail. A cancelled booking releases its slot, so do not make the constraint
+  unconditional.
+- **Payments must never claim money moved.** `CASH` and `CARD_TERMINAL` are
+  always configured (the receipt is the confirmation); `BANK_TRANSFER` stays
+  awaiting confirmation until an operator confirms it; `BENEFITPAY` and
+  `CARD_ONLINE` report themselves unconfigured without credentials and leave the
+  intent unpaid. Do not add a path that marks an intent paid without a verified
+  provider confirmation.
+- **Webhooks are idempotent and signature-verified.** A redelivered signed event
+  must be a no-op. Do not remove the signature check to simplify a test.
+- **Provider scope comes from membership, not permission.** A peer administrator
+  who is not linked to a provider must not read or act on that provider's work.
+- **Reuse the Execution 02/03 ledgers.** Invoices go through
+  `SalesService.issueInvoice`, parts through `InventoryService.recordMovement`
+  and every posting through `AccountingPostingService.postJournal`. Do not create
+  a second stock or accounting ledger for the marketplace.
+- **Playwright browsers must be reinstalled after a dependency change.**
+  `pnpm install` can update the Playwright build, and the suites then fail with
+  `Executable doesn't exist ... headless_shell` until
+  `pnpm --filter @oryx/admin exec playwright install chromium` runs again.
+- **`apps/admin` has no ESLint config.** `pnpm -r lint` cannot run admin lint and
+  CI does not run it either; this predates Execution 04.
 
 ### Adding a new ERP module
 

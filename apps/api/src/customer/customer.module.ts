@@ -9,6 +9,8 @@ import { CustomerProfileService } from './customer-profile.service';
 import { CustomerAuthGuard } from './customer-auth.guard';
 import { BookingService } from './booking.service';
 import { BookingController, CustomerBookingController } from './booking.controller';
+import { CustomerPlatformController } from './customer-platform.controller';
+import { CustomerPlatformService } from './customer-platform.service';
 
 /**
  * The customer identity plane.
@@ -35,18 +37,21 @@ import { BookingController, CustomerBookingController } from './booking.controll
     CustomerProfileController,
     BookingController,
     CustomerBookingController,
+    CustomerPlatformController,
   ],
   providers: [
     CustomerAuthService,
     CustomerProfileService,
     CustomerAuthGuard,
     BookingService,
+    CustomerPlatformService,
   ],
   exports: [
     CustomerAuthService,
     CustomerProfileService,
     CustomerAuthGuard,
     BookingService,
+    CustomerPlatformService,
     JwtModule,
   ],
 })

@@ -76,6 +76,23 @@ jobs:
         env:
           NEXT_PUBLIC_API_BASE_URL: http://localhost:3001/api
 
+      - name: Typecheck mobile app
+        run: pnpm --filter @oryx/mobile typecheck
+
+      - name: Lint mobile app
+        run: pnpm --filter @oryx/mobile lint
+
+      - name: Unit test mobile app
+        run: pnpm --filter @oryx/mobile test
+
+      # Bundling is the cheapest real proof that the app resolves and links: it
+      # runs Metro over every screen for both platforms without needing Xcode or
+      # the Android SDK. A missing module or a broken import fails here.
+      - name: Bundle the mobile app for Android and iOS
+        run: |
+          pnpm --filter @oryx/mobile exec expo export --platform android --output-dir /tmp/oryx-mobile-android
+          pnpm --filter @oryx/mobile exec expo export --platform ios --output-dir /tmp/oryx-mobile-ios
+
   # ------------------------------------------------------- unit + API suites
   test-api:
     name: Unit and API integration tests

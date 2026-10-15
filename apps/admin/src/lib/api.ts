@@ -875,7 +875,7 @@ export const api = {
     request<Paginated<MarketplaceProviderDto>>(`/automotive/providers?${toQuery(params)}`),
   createProvider: (body: Record<string, unknown>) =>
     request<MarketplaceProviderDto>('/automotive/providers', { method: 'POST', body }),
-  decideProvider: (id: string, decision: string, note?: string) =>
+  decideProvider: (id: string, decision: 'APPROVED' | 'SUSPENDED' | 'REJECTED', note?: string) =>
     request<MarketplaceProviderDto>(`/automotive/providers/${id}/decide`, { method: 'POST', body: { decision, note } }),
   providerListings: (providerId: string) =>
     request<Paginated<Record<string, unknown>>>(`/automotive/providers/${providerId}/listings`),
@@ -893,6 +893,64 @@ export const api = {
     request<ProviderSettlementDto>('/automotive/settlements', { method: 'POST', body }),
   automotiveDashboard: (companyId?: string) =>
     request<Record<string, number>>(`/automotive/dashboard${companyId ? `?companyId=${companyId}` : ''}`),
+
+  // ------------------------------------------------- Execution 04: customer platform
+  customerPlatformSummary: () => request<Record<string, number>>('/customer-platform/summary'),
+  customerAccounts: (params: { search?: string; status?: string; page?: number; pageSize?: number } = {}) =>
+    request<Paginated<Record<string, unknown>>>(`/customer-platform/accounts?${toQuery(params)}`),
+  customerAccount: (id: string) => request<Record<string, unknown>>(`/customer-platform/accounts/${id}`),
+  linkCustomerAccount: (id: string, customerId: string) =>
+    request<Record<string, unknown>>(`/customer-platform/accounts/${id}/link`, { method: 'POST', body: { customerId } }),
+  setCustomerAccountStatus: (id: string, status: 'ACTIVE' | 'SUSPENDED', reason: string) =>
+    request<Record<string, unknown>>(`/customer-platform/accounts/${id}/status`, { method: 'POST', body: { status, reason } }),
+
+  // ------------------------------------------------- Execution 04: booking engine
+  bookingAvailability: (params: { date: string; resourceId?: string; serviceRef?: string; durationMinutes?: number }) =>
+    request<{ slots: Array<{ startsAt: string; endsAt: string; resourceId: string; resourceName?: string }> }>(
+      `/bookings/availability?${toQuery(params)}`,
+    ),
+  bookings: (params: { status?: string; bookingType?: string; page?: number; pageSize?: number } = {}) =>
+    request<Paginated<Record<string, unknown>>>(`/bookings?${toQuery(params)}`),
+  bookingCalendar: (from: string, to: string, resourceId?: string) =>
+    request<Array<{ date: string; items: Array<Record<string, unknown>> }>>(
+      `/bookings/calendar?from=${from}&to=${to}${resourceId ? `&resourceId=${resourceId}` : ''}`,
+    ),
+  booking: (id: string) => request<Record<string, unknown>>(`/bookings/${id}`),
+  createBooking: (body: Record<string, unknown>) => request<Record<string, unknown>>('/bookings', { method: 'POST', body }),
+  confirmBooking: (id: string) => request<Record<string, unknown>>(`/bookings/${id}/confirm`, { method: 'POST', body: {} }),
+  startBooking: (id: string) => request<Record<string, unknown>>(`/bookings/${id}/start`, { method: 'POST', body: {} }),
+  completeBooking: (id: string) => request<Record<string, unknown>>(`/bookings/${id}/complete`, { method: 'POST', body: {} }),
+  markBookingNoShow: (id: string) => request<Record<string, unknown>>(`/bookings/${id}/no-show`, { method: 'POST', body: {} }),
+  rescheduleBooking: (id: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/bookings/${id}/reschedule`, { method: 'POST', body }),
+  cancelBooking: (id: string, reason: string) =>
+    request<Record<string, unknown>>(`/bookings/${id}/cancel`, { method: 'POST', body: { reason } }),
+  bookingResources: (branchId?: string) =>
+    request<Array<Record<string, unknown>>>(`/bookings/resources/list${branchId ? `?branchId=${branchId}` : ''}`),
+  createBookingResource: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/bookings/resources', { method: 'POST', body }),
+  setBookingResourceHours: (id: string, hours: Array<Record<string, unknown>>) =>
+    request<Record<string, unknown>>(`/bookings/resources/${id}/hours`, { method: 'POST', body: { hours } }),
+
+  // ------------------------------------------------- Execution 04: payments
+  paymentProviders: () => request<Array<Record<string, unknown>>>('/payments/providers'),
+  paymentIntents: (params: { targetType?: string; status?: string } = {}) =>
+    request<Paginated<Record<string, unknown>>>(`/payments/intents?${toQuery(params)}`),
+  createPaymentIntent: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/payments/intents', { method: 'POST', body }),
+  paymentIntent: (id: string) => request<Record<string, unknown>>(`/payments/intents/${id}`),
+  confirmPaymentIntent: (id: string, providerReference: string) =>
+    request<Record<string, unknown>>(`/payments/intents/${id}/confirm`, { method: 'POST', body: { providerReference } }),
+  cancelPaymentIntent: (id: string, reason: string) =>
+    request<Record<string, unknown>>(`/payments/intents/${id}/cancel`, { method: 'POST', body: { reason } }),
+  requestRefund: (intentId: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/payments/intents/${intentId}/refunds`, { method: 'POST', body }),
+  approveRefund: (refundId: string) =>
+    request<Record<string, unknown>>(`/payments/refunds/${refundId}/approve`, { method: 'POST', body: {} }),
+  reconcilePayments: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/payments/reconciliations', { method: 'POST', body }),
+  paymentReconciliations: (onlyUnmatched = false) =>
+    request<Array<Record<string, unknown>>>(`/payments/reconciliations?onlyUnmatched=${onlyUnmatched}`),
 };
 
 function toQuery(params: Record<string, unknown>): string {

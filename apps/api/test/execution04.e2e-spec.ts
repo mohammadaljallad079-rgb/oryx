@@ -756,6 +756,22 @@ describe('Execution 04 — customer platform, marketplace and payments', () => {
       expect(intent.status).toBe('SUCCEEDED');
     });
 
+    it('lists payment intents for the tenant and hides another company intents', async () => {
+      const res = await companyCall(base, demoCompanyId, '/payments/intents?page=1&pageSize=25', {
+        token: demoAdminToken,
+      });
+      expect(res.status).toBe(200);
+      const page = unwrap<{ items: Array<{ id: string; intentNumber: string }>; total: number }>(res.body);
+      expect(Array.isArray(page.items)).toBe(true);
+      expect(page.items.some((x) => x.id === intentId)).toBe(true);
+
+      // The list is scoped to the caller's company, which is taken from the
+      // principal. A platform principal carries no tenant scope until it opens
+      // a support session, so it cannot read tenant intents at all.
+      const platform = await call(base, '/payments/intents', { token: superToken });
+      expect(platform.status).toBe(403);
+    });
+
     it('returns the original intent for a repeated idempotency key', async () => {
       const res = await companyCall(base, demoCompanyId, '/payments/intents', {
         method: 'POST',

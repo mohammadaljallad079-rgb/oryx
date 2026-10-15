@@ -741,6 +741,43 @@ export class PaymentService {
 
   // ------------------------------------------------------------------ queries
 
+  /** Paginated payment intents for the staff payments console. */
+  async listIntents(
+    companyId: string,
+    params: { page: number; pageSize: number; targetType?: string; status?: string },
+  ) {
+    const where = {
+      companyId,
+      ...(params.targetType ? { targetType: params.targetType as never } : {}),
+      ...(params.status ? { status: params.status as never } : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.paymentIntent.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (params.page - 1) * params.pageSize,
+        take: params.pageSize,
+        select: {
+          id: true,
+          intentNumber: true,
+          targetType: true,
+          targetId: true,
+          amountMinor: true,
+          currency: true,
+          currencyScale: true,
+          status: true,
+          provider: true,
+          description: true,
+          succeededAt: true,
+          createdAt: true,
+          refunds: { select: { id: true, refundNumber: true, amountMinor: true, status: true } },
+        },
+      }),
+      this.prisma.paymentIntent.count({ where }),
+    ]);
+    return { items, total };
+  }
+
   async getIntent(companyId: string, intentId: string) {
     const intent = await this.prisma.paymentIntent.findFirst({
       where: { id: intentId, companyId },

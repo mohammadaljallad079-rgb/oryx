@@ -73,6 +73,24 @@ export class PaymentController {
     });
   }
 
+  @Get('intents')
+  @RequirePermissions('erp.payments.read')
+  @ApiOperation({ summary: 'List payment intents with optional status and target filters' })
+  async listIntents(
+    @Query('page') page = '1',
+    @Query('pageSize') pageSize = '25',
+    @Query('targetType') targetType?: string,
+    @Query('status') status?: string,
+    @CurrentPrincipal() principal?: RequestPrincipal,
+  ) {
+    return this.payments.listIntents(principal?.company?.companyId ?? '', {
+      page: Math.max(1, Number(page) || 1),
+      pageSize: Math.min(100, Math.max(1, Number(pageSize) || 25)),
+      targetType,
+      status,
+    });
+  }
+
   @Get('intents/:id')
   @RequirePermissions('erp.payments.read')
   @ApiOperation({ summary: 'Read a payment intent with its transactions and refunds' })
