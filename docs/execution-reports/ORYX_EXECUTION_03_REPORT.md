@@ -271,7 +271,7 @@ monogram placeholder remains and no brand mark was invented.
 
 | Item | Value |
 | --- | --- |
-| PR | see the linked pull request against `main` |
+| PR | https://github.com/mohammadaljallad079-rgb/oryx/pull/3 |
 | Base | `main` |
 | Head | `feature/execution-03-hr-crm-automotive` |
 | CI | GitHub Actions run on the branch (`ci.yml`) |
