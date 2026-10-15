@@ -25,7 +25,7 @@ force-pushed.
 | --- | --- |
 | Branch | `feature/execution-05-platform-completion` |
 | Base | `main` @ `33ee5579644d88ae6a1763e7d778ba944831912a` (the Execution 04 merge) |
-| Head | `e68f45c` |
+| Head | `5bc4ba8` |
 | Pull request | [#5](https://github.com/mohammadaljallad079-rgb/oryx/pull/5) (draft, open) |
 
 ## 3. Baseline verification (before this session's changes)
@@ -226,6 +226,37 @@ which made `pnpm -r lint` hang) to `eslint . --max-warnings=0` against new flat
 configs. `eslint` and `@eslint/eslintrc` were already in the lockfile, so
 **`pnpm-lock.yaml` and the root `package.json` are unchanged** and
 `pnpm install --frozen-lockfile` still succeeds.
+
+All three CI jobs — typecheck and build, unit and API integration, browser
+acceptance — pass on the final commit `5bc4ba8`.
+
+### A CI failure that was worth having
+
+The first CI run failed the browser job on the new Execution 05 test with a
+login `403`, while the *same commit* passed the identical job on the pull-request
+trigger. That split is the signature of a race, and it exposed two real defects
+in the test plumbing:
+
+1. **`apiToken`'s login fallback omitted the `x-oryx-csrf` header.** `signIn`
+   has already established the refresh cookie, and `CsrfGuard` rejects any
+   unsafe method that carries that cookie without a matching header — so the
+   fallback could never succeed once a session existed. It now echoes the cookie
+   exactly as the refresh call above it does.
+2. **The test stored credentials through the page**, racing the page's own
+   refresh rotation. It now seeds and clears them from Node in a cookie-less
+   Playwright request context, so the request carries only the bearer token and
+   no ambient cookie. The credentials are still written and removed through the
+   real API, and a `finally` block guarantees removal so later tests still see
+   `AWAITING_CREDENTIALS`.
+
+A third, quieter bug surfaced while fixing the above: Playwright resolves a
+leading-slash path against the `baseURL`'s **origin** and discards the path
+prefix, which silently turned the login call into a `404`. The helper now builds
+absolute URLs.
+
+The fix is confirmed by the database: after the suite runs,
+`IntegrationCredential` holds 0 rows and only the single default provider row
+remains, so the cleanup genuinely works.
 
 ## 11. Remaining external integrations
 
