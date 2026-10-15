@@ -226,10 +226,12 @@ test.describe('company administrator delegation', () => {
     await expect(page.getByTestId('dashboard')).toBeVisible();
 
     // The Professional demo tenant licenses HR, CRM and operations but not the
-    // automotive modules, so the automotive data request is refused by the API.
+    // automotive modules. The automotive permissions are suppressed by
+    // entitlement, so the API refuses the request and the page shows the denial
+    // rather than fabricated data.
     await page.goto('/automotive/inspections');
     await expect(page.getByTestId('inspections-page')).toBeVisible();
-    await expect(page.getByRole('alert')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('You do not have permission to do that.')).toBeVisible({ timeout: 20_000 });
 
     // Invite flow only offers roles inside the delegable set. The modal loads
     // the role list asynchronously, so poll until the options arrive rather than
