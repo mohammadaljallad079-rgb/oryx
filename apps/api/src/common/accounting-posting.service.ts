@@ -58,6 +58,9 @@ export const SYSTEM_ROLES = {
   EMPLOYEE_ADVANCE: 'EMPLOYEE_ADVANCE',
   PAYROLL_DEDUCTIONS: 'PAYROLL_DEDUCTIONS',
   EMPLOYEE_PAYABLE: 'EMPLOYEE_PAYABLE',
+  // Execution 04 — marketplace commissions and provider settlements
+  MARKETPLACE_COMMISSION: 'MARKETPLACE_COMMISSION',
+  PROVIDER_PAYABLE: 'PROVIDER_PAYABLE',
 } as const;
 
 export type SystemRole = (typeof SYSTEM_ROLES)[keyof typeof SYSTEM_ROLES];
@@ -339,3 +342,4 @@ function isRetryableTransactionError(error: unknown): boolean {
 }
 
 export type { Prisma };
+export type { Tx };

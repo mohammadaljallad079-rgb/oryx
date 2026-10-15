@@ -1,0 +1,5 @@
+{
+  "CFBundleDisplayName": "أوريكس",
+  "NSMicrophoneUsageDescription": "أوريكس لا يستخدم الميكروفون.",
+  "NSLocationWhenInUseUsageDescription": "يُستخدم موقعك لعرض المزودين الأقرب إليك."
+}

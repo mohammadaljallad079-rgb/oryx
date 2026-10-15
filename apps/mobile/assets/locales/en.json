@@ -1,0 +1,5 @@
+{
+  "CFBundleDisplayName": "ORYX",
+  "NSMicrophoneUsageDescription": "ORYX does not use the microphone.",
+  "NSLocationWhenInUseUsageDescription": "Your location is used to show the nearest providers."
+}

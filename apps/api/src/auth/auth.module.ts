@@ -37,6 +37,7 @@ import { ModuleEntitlementGuard, PermissionsGuard } from './permissions.guard';
   exports: [
     AuthService,
     CookieService,
+    SecretCipher,
     MfaService,
     MfaEnrollmentService,
     CsrfGuard,

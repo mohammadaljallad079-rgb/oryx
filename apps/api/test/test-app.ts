@@ -376,8 +376,74 @@ export async function cleanupFixtures(prisma: PrismaService): Promise<void> {
   await prisma.warehouse.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.account.deleteMany({ where: { companyId: { in: ids } } });
 
+  // Execution 04 — payments, bookings and the marketplace. A refund restricts
+  // the deletion of its intent, so the payment rows go before the company.
+  await prisma.refund.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.paymentTransaction.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.paymentIntent.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.paymentReconciliation.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.paymentWebhookEvent.deleteMany({ where: { eventId: { startsWith: FIXTURE_PREFIX } } });
+  await prisma.notificationDelivery.deleteMany({ where: { companyId: { in: ids } } });
+
+  await prisma.bookingEvent.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.bookingSlot.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.workingHours.deleteMany({ where: { resource: { companyId: { in: ids } } } });
+  await prisma.bookingResourceException.deleteMany({
+    where: { resource: { companyId: { in: ids } } },
+  });
+  await prisma.bookingResource.deleteMany({ where: { companyId: { in: ids } } });
+
   await prisma.branch.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.auditLog.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.company.deleteMany({ where: { id: { in: ids } } });
   await prisma.plan.deleteMany({ where: { code: { startsWith: FIXTURE_PREFIX.toLowerCase() } } });
+
+  // The marketplace and the consumer identity plane are not company-scoped, so
+  // they are matched on the fixture prefix and the consumer email instead.
+  await prisma.providerReview.deleteMany({
+    where: { provider: { code: { startsWith: FIXTURE_PREFIX } } },
+  });
+  await prisma.disputeMessage.deleteMany({
+    where: { dispute: { provider: { code: { startsWith: FIXTURE_PREFIX } } } },
+  });
+  await prisma.marketplaceDispute.deleteMany({
+    where: { provider: { code: { startsWith: FIXTURE_PREFIX } } },
+  });
+  await prisma.marketplaceApplication.deleteMany({
+    where: { OR: [{ code: { startsWith: FIXTURE_PREFIX } }, { contactEmail: { contains: 'e04-' } }] },
+  });
+  await prisma.providerUser.deleteMany({
+    where: { provider: { code: { startsWith: FIXTURE_PREFIX } } },
+  });
+  await prisma.providerAvailability.deleteMany({
+    where: { provider: { code: { startsWith: FIXTURE_PREFIX } } },
+  });
+  await prisma.providerServiceListing.deleteMany({
+    where: { provider: { code: { startsWith: FIXTURE_PREFIX } } },
+  });
+  await prisma.serviceRequest.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.marketplaceCommission.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.providerSettlement.deleteMany({
+    where: { provider: { code: { startsWith: FIXTURE_PREFIX } } },
+  });
+  await prisma.marketplaceProvider.deleteMany({
+    where: { OR: [{ providerCompanyId: { in: ids } }, { code: { startsWith: FIXTURE_PREFIX } }] },
+  });
+
+  await prisma.customerAddress.deleteMany({
+    where: { account: { email: { contains: 'e04-' } } },
+  });
+  await prisma.customerPrivacySetting.deleteMany({
+    where: { account: { email: { contains: 'e04-' } } },
+  });
+  await prisma.customerNotificationPreference.deleteMany({
+    where: { account: { email: { contains: 'e04-' } } },
+  });
+  await prisma.customerRefreshToken.deleteMany({
+    where: { account: { email: { contains: 'e04-' } } },
+  });
+  await prisma.customerPasswordResetToken.deleteMany({
+    where: { account: { email: { contains: 'e04-' } } },
+  });
+  await prisma.customerAccount.deleteMany({ where: { email: { contains: 'e04-' } } });
 }

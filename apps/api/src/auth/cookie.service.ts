@@ -21,8 +21,20 @@ export const REFRESH_COOKIE = 'oryx_rt';
 export const CSRF_COOKIE = 'oryx_csrf';
 export const CSRF_HEADER = 'x-oryx-csrf';
 
+/**
+ * Customer session cookies.
+ *
+ * Separate names from the staff pair on purpose: one browser may hold a staff
+ * session for the ERP and a consumer session for the website at the same time.
+ * Sharing a name would make signing out of one silently drop the other's
+ * refresh token.
+ */
+export const CUSTOMER_REFRESH_COOKIE = 'oryx_crt';
+export const CUSTOMER_CSRF_COOKIE = 'oryx_ccsrf';
+
 /** Path is scoped to the auth routes that actually need the refresh cookie. */
 const REFRESH_COOKIE_PATH = '/api/v1/auth';
+const CUSTOMER_REFRESH_COOKIE_PATH = '/api/v1/customer';
 
 export interface CookieOptions {
   httpOnly: boolean;
@@ -112,6 +124,43 @@ export class CookieService {
   readRefreshToken(req: Request): string | undefined {
     const cookies = (req as Request & { cookies?: Record<string, string> }).cookies;
     return cookies?.[REFRESH_COOKIE];
+  }
+
+  // -------------------------------------------------------------- customer plane
+
+  /** HttpOnly refresh cookie for the customer website and mobile web. */
+  setCustomerSession(res: Response, refreshToken: string, ttlSeconds: number): string {
+    const csrfToken = randomBytes(32).toString('base64url');
+    res.cookie(CUSTOMER_REFRESH_COOKIE, refreshToken, {
+      ...this.refreshCookieOptions(ttlSeconds),
+      path: CUSTOMER_REFRESH_COOKIE_PATH,
+    });
+    res.cookie(CUSTOMER_CSRF_COOKIE, csrfToken, this.csrfCookieOptions(ttlSeconds));
+    return csrfToken;
+  }
+
+  clearCustomerSession(res: Response): void {
+    res.clearCookie(CUSTOMER_REFRESH_COOKIE, {
+      path: CUSTOMER_REFRESH_COOKIE_PATH,
+      domain: this.domain(),
+    });
+    res.clearCookie(CUSTOMER_CSRF_COOKIE, { path: '/', domain: this.domain() });
+  }
+
+  readCustomerRefreshToken(req: Request): string | undefined {
+    const cookies = (req as Request & { cookies?: Record<string, string> }).cookies;
+    return cookies?.[CUSTOMER_REFRESH_COOKIE];
+  }
+
+  verifyCustomerCsrf(req: Request): boolean {
+    const cookies = (req as Request & { cookies?: Record<string, string> }).cookies;
+    const cookieToken = cookies?.[CUSTOMER_CSRF_COOKIE];
+    const raw = req.headers[CSRF_HEADER];
+    const headerToken = Array.isArray(raw) ? raw[0] : raw;
+    if (!cookieToken || !headerToken) return false;
+    const a = createHash('sha256').update(cookieToken).digest();
+    const b = createHash('sha256').update(headerToken).digest();
+    return a.equals(b);
   }
 
   /**

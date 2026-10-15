@@ -67,6 +67,14 @@ function navKeyFor(moduleKey: string): string {
       return 'automotive_maintenance';
     case 'spare_parts':
       return 'spare_parts';
+    case 'customer_portal':
+      return 'customer_portal';
+    case 'booking_engine':
+      return 'booking_engine';
+    case 'provider_portal':
+      return 'provider_portal';
+    case 'payments':
+      return 'payments';
     default:
       return moduleKey;
   }
@@ -76,6 +84,7 @@ const CORE = MODULES.filter((m) => m.group === 'core');
 const FINANCE = MODULES.filter((m) => m.group === 'finance');
 const COMMERCE = MODULES.filter((m) => m.group === 'commerce');
 const OPERATIONS = MODULES.filter((m) => m.group === 'operations');
+const CUSTOMER = MODULES.filter((m) => m.group === 'customer');
 const AUTOMOTIVE = MODULES.filter((m) => m.group === 'automotive');
 const ANALYTICS = MODULES.filter((m) => m.group === 'analytics');
 const ADMIN = MODULES.filter((m) => m.group === 'administration');
@@ -116,6 +125,7 @@ export const ERP_NAV: NavGroup[] = [
   { key: 'finance', labelKey: 'nav.group.finance', items: FINANCE.map(erpItem) },
   { key: 'commerce', labelKey: 'nav.group.commerce', items: COMMERCE.map(erpItem) },
   { key: 'operations', labelKey: 'nav.group.operations', items: OPERATIONS.map(erpItem) },
+  { key: 'customer', labelKey: 'nav.group.customer', items: CUSTOMER.map(erpItem) },
   { key: 'automotive', labelKey: 'nav.group.automotive', items: AUTOMOTIVE.map(erpItem) },
   { key: 'analytics', labelKey: 'nav.group.analytics', items: ANALYTICS.map(erpItem) },
   { key: 'administration', labelKey: 'nav.group.administration', items: ADMIN.map(erpItem) },

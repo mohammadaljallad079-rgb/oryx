@@ -6,7 +6,9 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
 export async function createApp(): Promise<INestApplication> {
-  const app = await NestFactory.create(AppModule, { cors: false });
+  // `rawBody` is retained so a payment webhook can verify its HMAC over the
+  // exact bytes received; re-serialising parsed JSON would change them.
+  const app = await NestFactory.create(AppModule, { cors: false, rawBody: true });
 
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(cookieParser());

@@ -381,6 +381,120 @@ permission, and are company-scoped server-side.
 | GET/POST | `/settlements` | `erp.marketplace.commission.manage` |
 | GET | `/dashboard` | `erp.vehicle.read` / `erp.inspection.read` |
 
+## Customer platform, marketplace, bookings and payments (Execution 04)
+
+Consumer routes authenticate with a **consumer** access token (`audience:
+customer`). A staff token is refused on a consumer route and a consumer token is
+refused on a staff route. Consumer ownership is enforced server-side: a customer
+can only read its own vehicles, addresses, bookings, invoices and payments.
+
+### Customer identity — `/v1/customer/auth`
+
+| Method | Route | Notes |
+| --- | --- | --- |
+| POST | `/register`, `/login` | Public. Returns an access token; the refresh token is an HttpOnly cookie. |
+| POST | `/mfa/verify-login` | Completes a login when the account has TOTP enabled. |
+| POST | `/refresh`, `/logout`, `/logout-all` | Session lifecycle. |
+| POST | `/forgot-password`, `/reset-password` | Single-use, hashed, expiring reset token. |
+| GET | `/me`, `/sessions` | Current consumer and its sessions. |
+| POST | `/change-password` | Requires the current password. |
+| POST | `/mfa/enroll`, `/mfa/confirm`, `/mfa/disable` | Optional consumer TOTP. |
+| POST | `/profile` | Updates the consumer profile. |
+
+### Customer profile — `/v1/customer`
+
+| Method | Route | Notes |
+| --- | --- | --- |
+| GET/POST | `/addresses` | List and create. |
+| PATCH/DELETE | `/addresses/:id` | Owner-only. |
+| GET/PATCH | `/privacy` | Privacy controls. |
+| POST | `/privacy/data-export`, `/privacy/deletion` | Records a pending request; does not export inline. |
+| GET/PATCH | `/notification-preferences` | Per-channel preferences. |
+| GET/POST | `/vehicles` | Garage. VIN is unique; owner-only. |
+| GET/PATCH/DELETE | `/vehicles/:id` | Owner-only. |
+| GET | `/vehicles/:id/history` | Service history across inspections, job cards and invoices. |
+
+### Staff console — `/v1/customer-platform` (module `customer_portal`)
+
+| Method | Route | Permission |
+| --- | --- | --- |
+| GET | `/summary` | `erp.customer_portal.read` |
+| GET | `/accounts`, `/accounts/:id` | `erp.customer_portal.read` |
+| POST | `/accounts/:id/link`, `/accounts/:id/status` | `erp.customer_portal.manage` |
+
+### Booking engine — `/v1/bookings` (module `booking_engine`)
+
+| Method | Route | Permission |
+| --- | --- | --- |
+| GET | `/availability` | `erp.booking.read` |
+| GET | `/`, `/calendar` | `erp.booking.read` |
+| POST | `/` | `erp.booking.manage` |
+| GET | `/:id` | `erp.booking.read` |
+| POST | `/:id/confirm`, `/reschedule`, `/cancel`, `/start`, `/complete`, `/no-show` | `erp.booking.manage` |
+| GET | `/resources/list` | `erp.booking.read` |
+| POST | `/resources`, `/resources/:id/hours`, `/resources/:id/exceptions` | `erp.booking.manage` |
+
+Concurrency: a unique constraint plus a transactional row lock make a second
+booking for the same resource and time fail; a cancelled slot is released.
+
+### Consumer bookings and payments
+
+| Method | Route | Notes |
+| --- | --- | --- |
+| GET | `/v1/customer/bookings/availability` | Consumer slot lookup. |
+| POST | `/v1/customer/bookings` | Creates a booking owned by the consumer. |
+| GET | `/v1/customer/bookings` | The consumer's own bookings. |
+| POST | `/v1/customer/bookings/:id/cancel` | Owner-only. |
+| GET | `/v1/customer/payments` | The consumer's own payment history. |
+
+### Payments — `/v1/payments` (module `payments`)
+
+| Method | Route | Permission |
+| --- | --- | --- |
+| GET | `/providers` | `erp.payments.read` — readiness of each adapter. |
+| GET/POST | `/intents` | `erp.payments.read` / `erp.payments.manage` — paginated list; creation is idempotent. |
+| GET | `/intents/:id` | `erp.payments.read` |
+| POST | `/refunds` | `erp.payments.manage` |
+| POST | `/refunds/:id/approve` | `erp.payments.approve` |
+| GET | `/reconciliation` | `erp.payments.read` |
+| POST | `/webhooks/:provider` | Public; signature verified, idempotent. |
+
+Adapters: `CASH` and `CARD_TERMINAL` are always configured (the receipt is the
+confirmation); `BANK_TRANSFER` is manual; `BENEFITPAY` and `CARD_ONLINE` are
+`REDIRECT` adapters that report themselves **unconfigured** until their
+credentials exist, and an unconfigured online gateway leaves the intent unpaid.
+
+### Marketplace — `/v1/automotive`
+
+| Method | Route | Permission |
+| --- | --- | --- |
+| GET/POST | `/provider-applications` | public apply / `erp.provider_portal.read` |
+| POST | `/providers/:id/decide` | `erp.marketplace.provider.manage` — approve with commission |
+| GET/POST | `/provider-listings` | `erp.provider_portal.read` / `erp.provider_portal.manage` |
+| GET/POST | `/provider-availability` | `erp.provider_portal.read` / `erp.provider_portal.manage` |
+| GET/POST | `/service-requests` | `erp.provider_portal.read` / `erp.provider_portal.manage` |
+| POST | `/service-requests/:id/accept`, `/reject`, `/assign`, `/complete` | `erp.provider_portal.manage` |
+| GET/POST | `/reviews` | `erp.provider_portal.read` / consumer |
+| POST | `/reviews/:id/moderate` | `erp.provider_portal.manage` |
+| GET/POST | `/complaints` | `erp.provider_portal.read` / consumer |
+| GET/POST | `/settlements` | `erp.provider_portal.read` / `erp.provider_portal.manage` |
+
+Provider isolation comes from membership, not permission alone: a peer
+administrator who is not linked to a provider cannot read or act on that
+provider's work.
+
+### Notifications
+
+| Method | Route | Notes |
+| --- | --- | --- |
+| GET | `/v1/notifications` | In-app notifications for the principal. |
+| POST | `/v1/notifications/:id/read` | Marks one read. |
+| GET/PATCH | `/v1/customer/notification-preferences` | Per-channel consumer preferences. |
+
+Email, SMS, WhatsApp and push adapters report themselves **configured** only when
+their provider credentials are present; otherwise they transmit nothing and
+record the reason.
+
 ## Rate limits
 
 | Scope | Default | Variable |

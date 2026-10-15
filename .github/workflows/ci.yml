@@ -8,7 +8,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, feature/execution-01-super-admin-foundation, feature/execution-02-erp-core, feature/execution-03-hr-crm-automotive]
+    branches: [main, feature/execution-01-super-admin-foundation, feature/execution-02-erp-core, feature/execution-03-hr-crm-automotive, feature/execution-04-customer-marketplace-mobile]
   workflow_dispatch:
 
 # Cancel superseded runs on the same ref to conserve CI minutes.
@@ -68,6 +68,31 @@ jobs:
         env:
           NEXT_PUBLIC_API_BASE_URL: http://localhost:3001/api
 
+      - name: Typecheck customer app
+        run: pnpm --filter @oryx/customer typecheck
+
+      - name: Build customer app
+        run: pnpm --filter @oryx/customer build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:3001/api
+
+      - name: Typecheck mobile app
+        run: pnpm --filter @oryx/mobile typecheck
+
+      - name: Lint mobile app
+        run: pnpm --filter @oryx/mobile lint
+
+      - name: Unit test mobile app
+        run: pnpm --filter @oryx/mobile test
+
+      # Bundling is the cheapest real proof that the app resolves and links: it
+      # runs Metro over every screen for both platforms without needing Xcode or
+      # the Android SDK. A missing module or a broken import fails here.
+      - name: Bundle the mobile app for Android and iOS
+        run: |
+          pnpm --filter @oryx/mobile exec expo export --platform android --output-dir /tmp/oryx-mobile-android
+          pnpm --filter @oryx/mobile exec expo export --platform ios --output-dir /tmp/oryx-mobile-ios
+
   # ------------------------------------------------------- unit + API suites
   test-api:
     name: Unit and API integration tests
@@ -97,7 +122,7 @@ jobs:
       JWT_REFRESH_SECRET: ci-refresh-secret-not-used-outside-ci-000000000
       MFA_ENCRYPTION_KEY: ci-mfa-encryption-key-not-used-outside-ci-0000000
       MFA_ISSUER: ORYX CI
-      CORS_ORIGINS: http://localhost:3000
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3002
       SEED_SUPER_ADMIN_EMAIL: superadmin@oryx.local
       SEED_SUPER_ADMIN_PASSWORD: CiTestPassword!2026
       NODE_ENV: test
@@ -178,7 +203,7 @@ jobs:
       JWT_REFRESH_SECRET: ci-refresh-secret-not-used-outside-ci-000000000
       MFA_ENCRYPTION_KEY: ci-mfa-encryption-key-not-used-outside-ci-0000000
       MFA_ISSUER: ORYX CI
-      CORS_ORIGINS: http://localhost:3000
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3002
       SEED_SUPER_ADMIN_EMAIL: superadmin@oryx.local
       SEED_SUPER_ADMIN_PASSWORD: CiTestPassword!2026
       NODE_ENV: test

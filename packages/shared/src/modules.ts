@@ -41,6 +41,7 @@ export const MODULE_GROUPS = [
   'commerce',
   'operations',
   'automotive',
+  'customer',
   'analytics',
   'administration',
 ] as const;
@@ -95,6 +96,12 @@ export const MODULES: ModuleDefinition[] = [
   M('users_permissions', 'Users & Permissions', 'المستخدمون والصلاحيات', 'Company users, roles and delegated permissions.', 'مستخدمو الشركة والأدوار والصلاحيات المفوضة.', 'administration', 'shield', 'tile-users', '/users', 'AVAILABLE', 'company.user.read', 'execution-01'),
   M('subscription_management', 'Subscription Management', 'إدارة الاشتراك', 'Plan, entitlements, limits and billing history.', 'الخطة والاستحقاقات والحدود وسجل الفواتير.', 'administration', 'credit-card', 'tile-subscription', '/subscription', 'AVAILABLE', 'company.subscription.read', 'execution-01'),
   M('settings', 'Settings', 'الإعدادات', 'Company settings, localization and preferences.', 'إعدادات الشركة واللغة والتفضيلات.', 'administration', 'sliders', 'tile-settings', '/settings', 'AVAILABLE', 'company.settings.update', 'execution-01'),
+
+  // ---------------------------------------------- Execution 04 — customer platform
+  M('customer_portal', 'Customer Platform', 'منصة العملاء', 'Consumer website and mobile application: garage, bookings, invoices and support.', 'موقع وتطبيق العملاء: المركبات والحجوزات والفواتير والدعم.', 'customer', 'car', 'tile-app', '/customer', 'AVAILABLE', 'erp.customer_portal.read', 'execution-04', 'erp.customer_portal.manage'),
+  M('booking_engine', 'Booking & Scheduling', 'الحجوزات والجدولة', 'Shared scheduling engine for inspections, workshops and providers.', 'محرك جدولة موحّد للفحوصات والورش ومزودي الخدمة.', 'customer', 'calendar', 'tile-inspection', '/bookings', 'AVAILABLE', 'erp.booking.read', 'execution-04', 'erp.booking.manage'),
+  M('provider_portal', 'Provider Portal', 'بوابة مزودي الخدمة', 'Provider onboarding, listings, bookings, reviews and settlements.', 'تسجيل المزودين والقوائم والحجوزات والتقييمات والتسويات.', 'customer', 'store', 'tile-parts', '/providers', 'AVAILABLE', 'erp.provider_portal.read', 'execution-04', 'erp.provider_portal.manage'),
+  M('payments', 'Payments & Settlements', 'المدفوعات والتسويات', 'Payment records, intents, refunds, webhooks and reconciliation.', 'سجلات الدفع والنوايا والاسترداد والويب هوك والمطابقة.', 'finance', 'credit-card', 'tile-accounting', '/payments', 'AVAILABLE', 'erp.payments.read', 'execution-04', 'erp.payments.manage'),
 ];
 
 export const MODULE_BY_KEY: ReadonlyMap<string, ModuleDefinition> = new Map(MODULES.map((m) => [m.key, m]));

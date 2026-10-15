@@ -51,6 +51,9 @@ const STANDARD_CHART: Array<{
   { code: '2210', nameEn: 'Payroll deductions payable', nameAr: 'استقطاعات الرواتب المستحقة', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: 'PAYROLL_DEDUCTIONS' },
   { code: '1300', nameEn: 'Employee advances receivable', nameAr: 'سلف الموظفين', type: 'ASSET', normalBalance: 'DEBIT', systemRole: 'EMPLOYEE_ADVANCE' },
   { code: '2220', nameEn: 'Employee payable', nameAr: 'مستحقات الموظفين', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: 'EMPLOYEE_PAYABLE' },
+  // Execution 04 — marketplace commissions and provider settlements
+  { code: '4200', nameEn: 'Marketplace commission revenue', nameAr: 'إيرادات عمولة السوق', type: 'REVENUE', normalBalance: 'CREDIT', systemRole: 'MARKETPLACE_COMMISSION' },
+  { code: '2230', nameEn: 'Service provider payable', nameAr: 'مستحقات مزودي الخدمة', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: 'PROVIDER_PAYABLE' },
 ];
 
 /** Quantities are scaled by 10^4 (10000 = 1 unit). */
@@ -160,6 +163,10 @@ const PLANS = [
       'warehouses_inventory',
       'human_resources',
       'operations',
+      // Execution 04 — the scheduling engine and payment records are useful to
+      // any tenant that runs operations, so they are licensed from Professional.
+      'booking_engine',
+      'payments',
     ],
   },
   {

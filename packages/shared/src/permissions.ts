@@ -221,6 +221,19 @@ export const PERMISSIONS: PermissionDefinition[] = [
   P('erp.marketplace.listing.manage', 'ERP', 'Manage service listings', 'إدارة قوائم الخدمات', 'COMPANY', true, 'Manage provider service listings and pricing.', 'automotive_maintenance'),
   P('erp.marketplace.request.manage', 'ERP', 'Manage service requests', 'إدارة طلبات الخدمة', 'COMPANY', true, 'Create and assign marketplace service requests.', 'automotive_maintenance'),
   P('erp.marketplace.commission.manage', 'ERP', 'Manage commissions & settlements', 'إدارة العمولات والتسويات', 'COMPANY', true, 'Configure commissions and prepare provider settlements.', 'automotive_maintenance'),
+
+  // ------------------------------- Execution 04 — customer platform & marketplace
+  P('erp.customer_portal.read', 'ERP', 'View customer platform', 'عرض منصة العملاء', 'COMPANY', true, 'Read consumer accounts, garage and customer activity.', 'customer_portal'),
+  P('erp.customer_portal.manage', 'ERP', 'Manage customer platform', 'إدارة منصة العملاء', 'COMPANY', true, 'Link consumer accounts to tenant customers and manage their data.', 'customer_portal'),
+  P('erp.booking.read', 'ERP', 'View bookings', 'عرض الحجوزات', 'COMPANY', true, 'Read the shared booking calendar and availability.', 'booking_engine'),
+  P('erp.booking.manage', 'ERP', 'Manage bookings', 'إدارة الحجوزات', 'COMPANY', true, 'Create, reschedule, confirm and cancel bookings.', 'booking_engine'),
+  P('erp.booking.resource.manage', 'ERP', 'Manage bookable resources', 'إدارة الموارد القابلة للحجز', 'COMPANY', true, 'Manage inspectors, bays, technicians and their working hours.', 'booking_engine'),
+  P('erp.provider_portal.read', 'ERP', 'View provider portal', 'عرض بوابة المزودين', 'COMPANY', true, 'Read provider profiles, listings, reviews and settlements.', 'provider_portal'),
+  P('erp.provider_portal.manage', 'ERP', 'Manage provider portal', 'إدارة بوابة المزودين', 'COMPANY', true, 'Approve provider onboarding, moderate reviews and settle providers.', 'provider_portal'),
+  P('erp.payments.read', 'ERP', 'View payments', 'عرض المدفوعات', 'COMPANY', true, 'Read payment intents, transactions, refunds and reconciliation.', 'payments'),
+  P('erp.payments.manage', 'ERP', 'Manage payments', 'إدارة المدفوعات', 'COMPANY', true, 'Create payment intents, confirm payments and process refunds.', 'payments'),
+  P('erp.payments.reconcile', 'ERP', 'Reconcile payments', 'مطابقة المدفوعات', 'COMPANY', true, 'Run and resolve provider reconciliation.', 'payments'),
+  P('erp.notifications.manage', 'ERP', 'Manage notifications', 'إدارة الإشعارات', 'COMPANY', true, 'Manage notification templates and delivery channels.', 'customer_portal'),
 ];
 
 export const PERMISSION_BY_CODE: ReadonlyMap<string, PermissionDefinition> = new Map(

@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { test } from '@playwright/test';
-import { COMPANY_ADMIN, SUPER_ADMIN, apiToken, setLocale, setTheme, signIn } from './helpers';
+import { COMPANY_ADMIN, ENTERPRISE_ADMIN, SUPER_ADMIN, apiToken, setLocale, setTheme, signIn } from './helpers';
 
 /** Generate a TOTP code for a base32 secret (RFC 6238, SHA-1, 6 digits). */
 function totp(secret: string, atMs: number = Date.now()): string {
@@ -330,6 +330,23 @@ test.describe('required screenshots', () => {
     ] as const) {
       await page.goto(route);
       await page.waitForTimeout(700);
+      await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
+    }
+  });
+
+  test('execution 04 customer platform, bookings, providers and payments', async ({ page }) => {
+    await signIn(page, ENTERPRISE_ADMIN);
+    await setLocale(page, 'en');
+    await setTheme(page, 'dark');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    for (const [route, name] of [
+      ['/customer', 'e04-customer-dark'],
+      ['/bookings', 'e04-bookings-dark'],
+      ['/providers', 'e04-providers-dark'],
+      ['/payments', 'e04-payments-dark'],
+    ] as const) {
+      await page.goto(route);
+      await page.waitForTimeout(900);
       await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
     }
   });

@@ -17,12 +17,28 @@ import {
 import { PrismaService } from '../common/prisma.service';
 import { EntitlementService } from '../common/entitlement.service';
 import { ERROR_CODES, forbidden, unauthorized } from '../common/errors';
-import { IS_PUBLIC_KEY, type RequestPrincipal } from './auth.decorators';
+import { IS_PUBLIC_KEY, CUSTOMER_PLANE_KEY, type RequestPrincipal } from './auth.decorators';
 import type { AccessTokenPayload } from './auth.service';
 
 export const COMPANY_HEADER = 'x-oryx-company-id';
 export const BRANCH_HEADER = 'x-oryx-branch-id';
 export const SUPPORT_HEADER = 'x-oryx-support-session';
+
+/**
+ * True when the route belongs to the customer identity plane.
+ *
+ * Shared by every global staff guard so the skip rule is defined once. A route
+ * is in the customer plane only when it is explicitly marked; nothing is
+ * inferred from its path.
+ */
+export function isCustomerPlane(reflector: Reflector, context: ExecutionContext): boolean {
+  return (
+    reflector.getAllAndOverride<boolean>(CUSTOMER_PLANE_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]) === true
+  );
+}
 
 interface RequestLike {
   headers: Record<string, string | string[] | undefined>;
@@ -52,6 +68,12 @@ export class PrincipalGuard implements CanActivate {
       context.getClass(),
     ]);
     const req = context.switchToHttp().getRequest<RequestLike>();
+
+    // Customer-plane routes are owned by CustomerAuthGuard. The staff pipeline
+    // must not touch them: it would reject a consumer token, and a consumer
+    // token presented here could otherwise be resolved as a staff identity.
+    if (isCustomerPlane(this.reflector, context)) return true;
+
     const token = extractBearer(req);
     if (!token) {
       if (isPublic) return true;
@@ -74,6 +96,16 @@ export class PrincipalGuard implements CanActivate {
   }
 
   private async buildPrincipal(payload: AccessTokenPayload, req: RequestLike): Promise<RequestPrincipal> {
+    // A consumer token is a different identity plane entirely. Rejecting it here
+    // is what keeps the customer website and mobile app from ever reaching a
+    // staff or platform route, regardless of the id it carries.
+    if (payload.typ === 'customer') {
+      throw unauthorized(
+        ERROR_CODES.AUTH_TOKEN_INVALID,
+        'This endpoint is not available to customer accounts.',
+      );
+    }
+
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user || user.status === 'SUSPENDED' || user.status === 'DISABLED') {
       throw unauthorized(ERROR_CODES.AUTH_ACCOUNT_INACTIVE, 'Account is not active.');
