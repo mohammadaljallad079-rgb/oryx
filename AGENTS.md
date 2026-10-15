@@ -286,6 +286,20 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   credentials must remove them again, or the later tests that assert
   `AWAITING_CREDENTIALS` fail. `execution05.spec.ts` seeds and clears
   BenefitPay credentials inside test 5 for exactly this reason.
+- **Seed state from Node, not from the page.** Storing credentials with
+  `page.evaluate` races the page's own refresh rotation, which produced a login
+  `403` on one CI trigger and a pass on another for the same commit. A
+  `request.newContext()` call carries no ambient cookie, so `CsrfGuard` has
+  nothing to reject and the call is deterministic. Remove the state in a
+  `finally` block.
+- **Playwright drops the path prefix of a `baseURL`.** A request to `'/auth/login'`
+  against `baseURL: 'http://localhost:3001/api/v1'` resolves to
+  `http://localhost:3001/auth/login` — a `404` that looks like a routing bug.
+  Build absolute URLs, or set the baseURL to the origin only.
+- **`apiToken`'s login fallback needs the CSRF header.** `signIn` has already
+  set the refresh cookie, and `CsrfGuard` rejects any unsafe method carrying that
+  cookie without a matching `x-oryx-csrf` header. The refresh branch above it
+  echoes the cookie; the login branch must too.
 
 ### Adding a new ERP module
 
