@@ -25,7 +25,8 @@ not restarted.
 | --- | --- |
 | Branch | `feature/execution-04-customer-marketplace-mobile` |
 | Base | `main` @ `20dd8b471103d138011dd8be8381027a586d85aa` |
-| Head at time of writing | see the PR; the branch is not force-pushed |
+| Head at time of writing | `1cf9051a95305f1d4effe7567f6476e29082014d` |
+| Pull request | [#4](https://github.com/mohammadaljallad079-rgb/oryx/pull/4) (draft, open) |
 
 ## 3. Baseline verification (before this session's changes)
 
@@ -302,5 +303,11 @@ These are **not** operational and are not claimed to be:
 
 ## 15. Pull request
 
-The Execution 04 pull request targets `main` and is opened for owner review.
+The Execution 04 pull request targets `main`:
+**https://github.com/mohammadaljallad079-rgb/oryx/pull/4** (draft, open for owner
+review).
+
+All six CI checks pass on both the push and the pull-request runs: typecheck and
+build, unit and API integration tests, and browser acceptance tests.
+
 **It is not merged and nothing is deployed.**
