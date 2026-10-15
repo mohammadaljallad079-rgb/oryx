@@ -3,18 +3,19 @@
 Read **docs/ORYX_MASTER_REFERENCE.md**, **docs/architecture/ARCHITECTURE.md** and
 **docs/architecture/PERMISSION_MATRIX.md** before writing code.
 
-## Current state (Execution 01, 01.1, 02, 03 and 04 complete)
+## Current state (Execution 01, 01.1, 02, 03, 04 and 05 complete)
 
 Execution 01 delivered the working Super Admin foundation, Execution 01.1
 hardened it (secure session transport, TOTP MFA, approved photography and
 mobile layout fixes), Execution 02 added the enterprise ERP core, Execution 03
-added HR and payroll, CRM, operations and automotive services, and Execution 04
+added HR and payroll, CRM, operations and automotive services, Execution 04
 added the customer platform, the automotive marketplace, the shared booking
-engine, payments, notifications and the ORYX customer mobile application. It is
-**not** a mock: a NestJS API, a Next.js admin app, a Next.js customer site, an
-Expo/React Native mobile app and a PostgreSQL database run locally and are
-covered by 408 automated tests (85 shared unit, 196 API integration, 113
-browser, 14 mobile).
+engine, payments, notifications and the ORYX customer mobile application, and
+Execution 05 added the External Integrations Center and platform-completion
+work. It is **not** a mock: a NestJS API, a Next.js admin app, a Next.js
+customer site, an Expo/React Native mobile app and a PostgreSQL database run
+locally and are covered by 445 automated tests (93 shared unit, 218 API
+integration, 120 browser, 14 mobile).
 
 Security baseline (do not regress):
 - The refresh token lives in an HttpOnly cookie scoped to `/api/v1/auth`. It is
@@ -65,8 +66,15 @@ Security baseline (do not regress):
   settlements), notifications (in-app plus email, SMS, WhatsApp and push
   adapters that report themselves unconfigured without credentials) and the
   ORYX customer mobile application (`apps/mobile`, Expo/React Native).
+- **Execution 05 (implemented and tested):** the External Integrations Center
+  (a 20-provider catalogue declared once in `packages/shared/src/integrations.ts`,
+  AES-256-GCM sealed credentials, a company-scope override, an enablement guard
+  that refuses to enable a provider with a missing required credential, a real
+  connection-test path with append-only check history, audit logging by key and
+  never by value, and a customer capabilities endpoint that advertises only
+  operational providers) plus platform-completion work.
 - **Scaffolded only:** nothing. Every ERP module catalog entry is implemented and
-  DB-backed across Executions 01–04.
+  DB-backed across Executions 01–05.
 - **Missing assets:** the official ORYX logo and the approved dashboard
   photography are not in the repository. The UI uses a neutral monogram
   placeholder and generated vector tile art. Do not invent brand marks.
@@ -240,8 +248,44 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `pnpm install` can update the Playwright build, and the suites then fail with
   `Executable doesn't exist ... headless_shell` until
   `pnpm --filter @oryx/admin exec playwright install chromium` runs again.
-- **`apps/admin` has no ESLint config.** `pnpm -r lint` cannot run admin lint and
-  CI does not run it either; this predates Execution 04.
+- **ESLint runs through flat configs, not `next lint`.** `apps/admin`,
+  `apps/customer` and `apps/mobile` each have an `eslint.config.mjs` and their
+  `lint` script is `eslint . --max-warnings=0`. `next lint` is deprecated in
+  Next 15 and prompts interactively when no config exists, which made
+  `pnpm -r lint` hang in CI. CI runs admin and customer lint.
+
+### Execution 05 gotchas
+
+- **`OPERATIONAL` means it works, nothing weaker.** `deriveState` in
+  `apps/api/src/integrations/integrations.service.ts` is the single place that
+  decides a provider's state, and `AWAITING_CREDENTIALS` must be checked before
+  a stored `verificationStatus` is trusted. Only `OPERATIONAL` may be advertised
+  through `GET /customer/capabilities`. A gateway holding credentials that have
+  never produced a verified call is `CONFIGURED`, not operational. Do not widen
+  that rule to make a screen look better.
+- **The catalogue lives once.** `INTEGRATION_PROVIDERS` in
+  `packages/shared/src/integrations.ts` feeds the API, the admin page and the
+  customer capabilities endpoint. Add a provider there, not in a second list.
+- **Prisma cannot `upsert` a nullable unique key.** The
+  `(providerKey, scope, companyId)` compound unique does not accept `null`, and
+  Postgres treats `NULL` as distinct anyway, so a platform row is created with
+  `findFirst` + `create`. The `IntegrationProvider_platform_key` partial index
+  (hand-written in the migration, not expressible in the Prisma schema) is what
+  actually enforces one platform row per provider — keep it.
+- **Credential values never leave the API.** Reads return `hint` only. An empty
+  value in `PUT /integrations/:key/credentials` deletes the row. Never add a
+  response field that echoes a sealed value, and never put a value into the
+  audit trail — audit by credential key.
+- **Changing a credential clears the verification.** Otherwise a "Verified"
+  badge survives a key rotation and misrepresents the deployment.
+- **Internal providers are `IMPLEMENTED`, external ones are `ADAPTER_ONLY`.**
+  `IMPLEMENTED` means no credentials are needed and the work is real (cash, card
+  terminal). `ADAPTER_ONLY` means the adapter exists but the vendor call is not
+  implemented, so `verify` must report "not implemented" rather than a success.
+- **The browser suite mutates integration state.** A test that stores
+  credentials must remove them again, or the later tests that assert
+  `AWAITING_CREDENTIALS` fail. `execution05.spec.ts` seeds and clears
+  BenefitPay credentials inside test 5 for exactly this reason.
 
 ### Adding a new ERP module
 

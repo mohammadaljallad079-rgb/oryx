@@ -16,6 +16,8 @@ import type {
   FeatureFlagDto,
   FiscalYearDto,
   IncomeStatementDto,
+  IntegrationCenterResponse,
+  IntegrationDetailResponse,
   InventoryReportDto,
   InvitationDto,
   JournalEntryDto,
@@ -951,6 +953,22 @@ export const api = {
     request<Record<string, unknown>>('/payments/reconciliations', { method: 'POST', body }),
   paymentReconciliations: (onlyUnmatched = false) =>
     request<Array<Record<string, unknown>>>(`/payments/reconciliations?onlyUnmatched=${onlyUnmatched}`),
+
+  // ------------------------------------------------------- integrations center
+  integrations: () => request<IntegrationCenterResponse>('/integrations'),
+  integration: (key: string) => request<IntegrationDetailResponse>(`/integrations/${key}`),
+  saveIntegrationCredentials: (key: string, credentials: Array<{ key: string; value: string }>) =>
+    request<IntegrationDetailResponse>(`/integrations/${key}/credentials`, {
+      method: 'PUT',
+      body: { credentials },
+    }),
+  setIntegrationEnabled: (key: string, enabled: boolean, reason?: string) =>
+    request<IntegrationDetailResponse>(`/integrations/${key}/enabled`, {
+      method: 'PUT',
+      body: { enabled, reason },
+    }),
+  verifyIntegration: (key: string) =>
+    request<IntegrationDetailResponse>(`/integrations/${key}/verify`, { method: 'POST', body: {} }),
 };
 
 function toQuery(params: Record<string, unknown>): string {

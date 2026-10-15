@@ -12,7 +12,7 @@ import { Badge, Button, Card, ErrorBanner, SectionHeader, Skeleton } from '@/com
 
 function ModulesPageInner() {
   const { t, locale } = useUi();
-  const { hasModule, isPlatform, companyId } = useAuth();
+  const { isPlatform, companyId } = useAuth();
   const modules = useAsync(() => api.listModules(), [companyId]);
   const [group, setGroup] = useState('');
 

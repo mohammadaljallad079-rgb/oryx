@@ -350,4 +350,37 @@ test.describe('required screenshots', () => {
       await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
     }
   });
+
+  test('execution 05 external integrations center', async ({ page }) => {
+    await signIn(page, SUPER_ADMIN);
+    await setTheme(page, 'dark');
+    await page.setViewportSize({ width: 1440, height: 1000 });
+
+    await setLocale(page, 'en');
+    await page.goto('/integrations');
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${OUT}/e05-integrations-en-dark.png`, fullPage: true });
+
+    await setLocale(page, 'ar');
+    await page.goto('/integrations');
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${OUT}/e05-integrations-ar-dark.png`, fullPage: true });
+
+    await setLocale(page, 'en');
+    await setTheme(page, 'light');
+    await page.goto('/integrations');
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${OUT}/e05-integrations-en-light.png`, fullPage: true });
+
+    // The provider dialog, showing the credential form and the connection test
+    // history — the two places the honesty rule is visible to an operator.
+    await page.getByTestId('integration-row-BENEFITPAY').getByRole('button').click();
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: `${OUT}/e05-integration-dialog-en-light.png` });
+
+    await page.setViewportSize({ width: 420, height: 900 });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: `${OUT}/e05-integrations-mobile-en-light.png`, fullPage: true });
+  });
 });

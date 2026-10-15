@@ -15,6 +15,5 @@ export default function globalSetup() {
     env: process.env,
     encoding: 'utf8',
   });
-  // eslint-disable-next-line no-console
   console.log(output.trim());
 }

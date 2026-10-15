@@ -26,7 +26,7 @@ import { space, typography } from '../../lib/theme';
  * the caller's own rows.
  */
 export default function GarageScreen() {
-  const { t, theme } = useApp();
+  const { t } = useApp();
   const router = useRouter();
   const vehicles = useAsync(() => api.vehicles(), []);
   const [adding, setAdding] = useState(false);

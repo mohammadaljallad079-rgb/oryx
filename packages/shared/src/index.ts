@@ -5,4 +5,5 @@ export * from './currency';
 export * from './scheduling';
 export * from './tokens';
 export * from './authorization';
+export * from './integrations';
 export * from './contracts';

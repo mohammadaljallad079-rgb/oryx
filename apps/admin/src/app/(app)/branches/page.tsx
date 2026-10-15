@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import type { BranchDto } from '@oryx/shared';
+
 import { api } from '@/lib/api';
 import { errorMessageKey, useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';

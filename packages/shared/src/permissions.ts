@@ -64,6 +64,9 @@ export const PERMISSIONS: PermissionDefinition[] = [
   P('platform.audit.read', 'Platform', 'Read platform audit log', 'قراءة سجل التدقيق', 'PLATFORM', false, 'Read the full audit trail.'),
   P('platform.cms.manage', 'Platform', 'Manage website & app CMS', 'إدارة الموقع والتطبيق', 'PLATFORM', false, 'Manage website and application content.'),
   P('platform.api.manage', 'Platform', 'Manage API & integrations', 'إدارة الواجهات والتكاملات', 'PLATFORM', false, 'Manage versioned APIs, keys and integrations.'),
+  P('platform.integration.read', 'Platform', 'View integration center', 'عرض مركز التكاملات', 'PLATFORM', false, 'Read external provider status and configured credentials (secrets masked).'),
+  P('platform.integration.manage', 'Platform', 'Manage integrations', 'إدارة التكاملات', 'PLATFORM', false, 'Configure, enable and disable external provider credentials.'),
+  P('platform.integration.verify', 'Platform', 'Verify integrations', 'التحقق من التكاملات', 'PLATFORM', false, 'Run a live connection test against an external provider.'),
   P('platform.support.access', 'Platform', 'Support access to a tenant', 'الدخول الدعم لشركة', 'PLATFORM', false, 'Open an explicit, audited, time-bounded support session into a tenant.'),
 
   // ----------------------------------------------------------------- company

@@ -16,9 +16,9 @@ import { Badge, Card, SectionHeader } from '@/components/ui';
 export function PlannedModulePage({ moduleKey }: { moduleKey: string }) {
   const { t, locale } = useUi();
   const { hasModule } = useAuth();
-  const module = getModule(moduleKey);
+  const definition = getModule(moduleKey);
 
-  if (!module) {
+  if (!definition) {
     return <SectionHeader title={t('common.error')} />;
   }
 
@@ -27,8 +27,8 @@ export function PlannedModulePage({ moduleKey }: { moduleKey: string }) {
   return (
     <div className="flex flex-col gap-5" data-testid={`planned-${moduleKey}`}>
       <SectionHeader
-        title={locale === 'ar' ? module.nameAr : module.nameEn}
-        subtitle={locale === 'ar' ? module.descriptionAr : module.descriptionEn}
+        title={locale === 'ar' ? definition.nameAr : definition.nameEn}
+        subtitle={locale === 'ar' ? definition.descriptionAr : definition.descriptionEn}
         actions={
           <div className="flex gap-2">
             <Badge tone="warning">{t('modules.planned')}</Badge>
@@ -55,20 +55,20 @@ export function PlannedModulePage({ moduleKey }: { moduleKey: string }) {
             <dl className="m-0 grid gap-x-8 gap-y-2 text-[12.5px] sm:grid-cols-2">
               <div className="flex gap-2">
                 <dt className="oryx-faint">{t('planned.phase')}:</dt>
-                <dd className="m-0 font-semibold">{module.deliveryPhase}</dd>
+                <dd className="m-0 font-semibold">{definition.deliveryPhase}</dd>
               </div>
               <div className="flex gap-2">
                 <dt className="oryx-faint">{t('modules.group')}:</dt>
-                <dd className="m-0 font-semibold">{module.group}</dd>
+                <dd className="m-0 font-semibold">{definition.group}</dd>
               </div>
               <div className="flex gap-2">
                 <dt className="oryx-faint">Read permission:</dt>
-                <dd className="m-0 font-mono text-[11.5px]">{module.readPermission}</dd>
+                <dd className="m-0 font-mono text-[11.5px]">{definition.readPermission}</dd>
               </div>
-              {module.writePermission ? (
+              {definition.writePermission ? (
                 <div className="flex gap-2">
                   <dt className="oryx-faint">Write permission:</dt>
-                  <dd className="m-0 font-mono text-[11.5px]">{module.writePermission}</dd>
+                  <dd className="m-0 font-mono text-[11.5px]">{definition.writePermission}</dd>
                 </div>
               ) : null}
             </dl>

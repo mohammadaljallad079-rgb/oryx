@@ -1,3 +1,9 @@
+import type {
+  IntegrationCategory,
+  IntegrationImplementation,
+  IntegrationProviderState,
+} from './integrations';
+
 /** Shared API contracts between the ORYX API and the admin app. */
 
 export type CompanyType = 'INTERNAL' | 'SAAS_TENANT';
@@ -1319,4 +1325,100 @@ export interface ProviderSettlementDto {
   currency: string;
   status: string;
   provider?: { code: string; nameEn: string } | null;
+}
+
+// ============================================================================
+// EXECUTION 05 — External Integrations Center
+// ============================================================================
+
+/** A credential as it may be shown to a client: never the real value. */
+export interface IntegrationCredentialView {
+  key: string;
+  labelEn: string;
+  labelAr: string;
+  secret: boolean;
+  required: boolean;
+  /** True when a value is stored for this key. */
+  configured: boolean;
+  /** Last four characters of the stored value, when it is safe to show one. */
+  hint: string | null;
+  /** When the stored value was last changed. */
+  updatedAt: string | null;
+}
+
+/** A provider plus the state of this deployment's configuration for it. */
+export interface IntegrationProviderView {
+  key: string;
+  nameEn: string;
+  nameAr: string;
+  category: IntegrationCategory;
+  descriptionEn: string;
+  descriptionAr: string;
+  implementation: IntegrationImplementation;
+  configurable: boolean;
+  perCompany: boolean;
+  enabled: boolean;
+  disabledReason: string | null;
+  state: IntegrationProviderState;
+  verificationStatus: IntegrationVerificationStatusDto;
+  lastCheckedAt: string | null;
+  lastCheckMessage: string | null;
+  /** Credential keys that are required but have no stored value. */
+  missingCredentials: string[];
+  credentials: IntegrationCredentialView[];
+  activationRequirementEn: string;
+  activationRequirementAr: string;
+}
+
+export type IntegrationVerificationStatusDto = 'UNVERIFIED' | 'VERIFIED' | 'FAILED' | 'INCOMPLETE';
+
+export interface IntegrationSummary {
+  total: number;
+  operational: number;
+  configured: number;
+  awaitingCredentials: number;
+  disabled: number;
+  error: number;
+  /** Providers a customer-facing surface depends on that are not operational. */
+  blockingForProduction: string[];
+}
+
+export interface IntegrationCenterResponse {
+  providers: IntegrationProviderView[];
+  summary: IntegrationSummary;
+  /** Plain-language statement of what is and is not live. */
+  noticeEn: string;
+  noticeAr: string;
+}
+
+/** One provider plus its verification history. */
+export interface IntegrationDetailResponse {
+  provider: IntegrationProviderView;
+  checks: IntegrationCheckDto[];
+}
+
+export interface IntegrationCheckDto {
+  id: string;
+  status: IntegrationVerificationStatusDto;
+  message: string;
+  durationMs: number;
+  createdAt: string;
+}
+
+/** What a signed-in customer may actually choose, derived from provider state. */
+export interface CustomerCapabilitiesResponse {
+  payments: {
+    cash: boolean;
+    bankTransfer: boolean;
+    benefitPay: boolean;
+    cardOnline: boolean;
+    cardTerminal: boolean;
+  };
+  channels: {
+    inApp: boolean;
+    email: boolean;
+    sms: boolean;
+    whatsapp: boolean;
+    push: boolean;
+  };
 }

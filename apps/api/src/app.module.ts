@@ -30,6 +30,7 @@ import { CustomerModule } from './customer/customer.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
 import { PaymentsModule } from './payments/payments.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { PaymentsModule } from './payments/payments.module';
     NotificationsModule,
     MarketplaceModule,
     PaymentsModule,
+    IntegrationsModule,
   ],
   providers: [
     // Global rate limiting; sensitive auth routes override with @Throttle.

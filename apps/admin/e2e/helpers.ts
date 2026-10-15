@@ -19,7 +19,7 @@ export const ENTERPRISE_ADMIN = {
   password: process.env.SEED_SUPER_ADMIN_PASSWORD ?? 'ChangeMe!Oryx2026',
 };
 
-const API = process.env.ORYX_API ?? 'http://localhost:3001/api/v1';
+export const API = process.env.ORYX_API ?? 'http://localhost:3001/api/v1';
 
 /**
  * Obtain a bearer token for API assertions from inside the page.

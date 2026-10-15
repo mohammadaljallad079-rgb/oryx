@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import type { CompanyDto, PlanDto } from '@oryx/shared';
+import type { PlanDto } from '@oryx/shared';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';

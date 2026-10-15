@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useApp } from '../../../lib/app-context';
@@ -77,5 +77,3 @@ export default function VehicleHistoryScreen() {
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({});
