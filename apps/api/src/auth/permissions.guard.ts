@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { getPermission, isKnownModule } from '@oryx/shared';
 import { EntitlementService } from '../common/entitlement.service';
 import { ERROR_CODES, forbidden } from '../common/errors';
+import { isCustomerPlane } from './principal.guard';
 import {
   MODULE_KEY,
   PERMISSIONS_KEY,
@@ -41,6 +42,11 @@ export class PermissionsGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
+
+    // Customer-plane routes carry no staff permissions; CustomerAuthGuard has
+    // already established the consumer identity and the controllers scope every
+    // query by the resolved account id.
+    if (isCustomerPlane(this.reflector, context)) return true;
 
     const req = context.switchToHttp().getRequest<RequestLike>();
     const principal = req.principal;
@@ -105,6 +111,7 @@ export class ModuleEntitlementGuard implements CanActivate {
       context.getClass(),
     ]);
     if (!moduleKey) return true;
+    if (isCustomerPlane(this.reflector, context)) return true;
     if (!isKnownModule(moduleKey)) {
       throw forbidden(ERROR_CODES.FORBIDDEN_PERMISSION, `Unknown module: ${moduleKey}`);
     }

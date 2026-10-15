@@ -52,6 +52,9 @@ const STANDARD_CHART: Array<{
   { code: '2210', nameEn: 'Payroll deductions payable', nameAr: 'استقطاعات الرواتب المستحقة', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: SYSTEM_ROLES.PAYROLL_DEDUCTIONS },
   { code: '1300', nameEn: 'Employee advances receivable', nameAr: 'سلف الموظفين', type: 'ASSET', normalBalance: 'DEBIT', systemRole: SYSTEM_ROLES.EMPLOYEE_ADVANCE },
   { code: '2220', nameEn: 'Employee payable', nameAr: 'مستحقات الموظفين', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: SYSTEM_ROLES.EMPLOYEE_PAYABLE },
+  // Execution 04 — marketplace
+  { code: '4200', nameEn: 'Marketplace commission revenue', nameAr: 'إيرادات عمولة السوق', type: 'REVENUE', normalBalance: 'CREDIT', systemRole: SYSTEM_ROLES.MARKETPLACE_COMMISSION },
+  { code: '2230', nameEn: 'Service provider payable', nameAr: 'مستحقات مزودي الخدمة', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: SYSTEM_ROLES.PROVIDER_PAYABLE },
 ];
 
 const DEBIT_TYPES = new Set(['ASSET', 'EXPENSE']);

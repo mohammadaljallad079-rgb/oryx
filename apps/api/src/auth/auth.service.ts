@@ -17,6 +17,16 @@ export interface AccessTokenPayload {
   membershipId?: string;
   supportSessionCompanyId?: string;
   sessionId: string;
+  /**
+   * Token audience discriminator.
+   *
+   * Staff tokens omit this (treated as `'staff'`) so tokens minted before
+   * Execution 04 remain valid. A consumer token carries `'customer'`, and
+   * `PrincipalGuard` refuses it outright. Without this check the two identity
+   * planes would share one token shape, and a consumer account could be
+   * presented to a staff route.
+   */
+  typ?: 'staff' | 'customer';
 }
 
 export interface RefreshTokenPayload {

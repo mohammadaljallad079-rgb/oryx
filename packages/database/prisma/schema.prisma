@@ -295,6 +295,19 @@ model Company {
   serviceRequests     ServiceRequest[]
   marketplaceCommissions MarketplaceCommission[]
 
+  // Execution 04 — customer platform, marketplace and mobile applications.
+  customerAccounts          CustomerAccount[]
+  bookingResources          BookingResource[]
+  workingHours              WorkingHours[]
+  bookingResourceExceptions BookingResourceException[]
+  bookingSlots              BookingSlot[]
+  bookingEvents             BookingEvent[]
+  paymentIntents            PaymentIntent[]
+  paymentTransactions       PaymentTransaction[]
+  refunds                   Refund[]
+  paymentReconciliations    PaymentReconciliation[]
+  notificationDeliveries    NotificationDelivery[]
+
   @@index([type])
   @@index([status])
   @@index([parentCompanyId])
@@ -340,6 +353,12 @@ model Branch {
   maintenanceBookings MaintenanceBooking[]
   jobCards          JobCard[]
   workshopBays      WorkshopBay[]
+
+  // Execution 04 — branch scope for the booking engine.
+  bookingResources  BookingResource[]
+  workingHours      WorkingHours[]
+  bookingSlots      BookingSlot[]
+  paymentIntents    PaymentIntent[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -748,6 +767,11 @@ enum JournalSourceType {
   OPENING_BALANCE
   WORKSHOP_INVOICE
   INSPECTION_INVOICE
+  // Execution 04 — customer payments and marketplace settlements
+  PAYMENT
+  REFUND
+  PROVIDER_COMMISSION
+  PROVIDER_SETTLEMENT
 }
 
 enum PaymentDirection {
@@ -1337,6 +1361,11 @@ model Customer {
   contacts          CustomerContact[]
   vehicles          Vehicle[]
   segmentMemberships CustomerSegmentMember[]
+
+  // Execution 04 — the same tenant customer record is reachable from a
+  // consumer account through the vehicle and booking relations.
+  bookingSlots      BookingSlot[]
+  paymentIntents    PaymentIntent[]
 
   @@unique([companyId, code])
   @@index([companyId, isActive])
@@ -2846,6 +2875,8 @@ model SupportTicket {
   description    String?
   customerId     String?
   contactId      String?
+  /** The consumer account that raised this ticket from the website or app. */
+  customerAccountId String?
   category       String?
   priority       TicketPriority @default(NORMAL)
   status         TicketStatus   @default(NEW)
@@ -2861,12 +2892,14 @@ model SupportTicket {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  company Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customerAccount CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
   messages TicketMessage[]
 
   @@unique([companyId, ticketNumber])
   @@index([companyId, status])
   @@index([companyId, assignedToUserId])
+  @@index([customerAccountId])
 }
 
 model TicketMessage {
@@ -3122,6 +3155,8 @@ model Vehicle {
   id           String        @id @default(cuid())
   companyId    String
   customerId   String
+  /** The consumer account that owns this vehicle, when registered from the app. */
+  customerAccountId String?
   /** VIN/chassis number, unique per company. */
   vin          String
   plateNumber  String?
@@ -3138,6 +3173,8 @@ model Vehicle {
 
   company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  /** Ownership link for the customer website and mobile garage. */
+  customerAccount CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
 
   mileageRecords VehicleMileageRecord[]
   documents      VehicleDocument[]
@@ -3145,10 +3182,12 @@ model Vehicle {
   maintenance    MaintenanceBooking[]
   jobCards       JobCard[]
   warranties     WarrantyRecord[]
+  bookingSlots   BookingSlot[]
 
   @@unique([companyId, vin])
   @@index([companyId, customerId])
   @@index([companyId, status])
+  @@index([customerAccountId])
 }
 
 model VehicleMileageRecord {
@@ -3548,6 +3587,14 @@ model MarketplaceProvider {
   commissions  MarketplaceCommission[]
   settlements  ProviderSettlement[]
 
+  // Execution 04 — onboarding, portal, availability, reviews and disputes.
+  applications    MarketplaceApplication[]
+  providerUsers   ProviderUser[]
+  availability    ProviderAvailability[]
+  reviews         ProviderReview[]
+  disputes        MarketplaceDispute[]
+  bookingResources BookingResource[]
+
   @@index([status])
 }
 
@@ -3576,6 +3623,8 @@ model ServiceRequest {
   requestNumber String
   customerId    String?
   vehicleId     String?
+  /** The consumer account that raised this request from the website or app. */
+  customerAccountId String?
   categoryKey   String
   description   String?
   status        ServiceRequestStatus @default(NEW)
@@ -3588,11 +3637,15 @@ model ServiceRequest {
 
   company  Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
   provider MarketplaceProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  customerAccount CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
 
   commissions MarketplaceCommission[]
+  reviews     ProviderReview[]
+  disputes    MarketplaceDispute[]
 
   @@unique([companyId, requestNumber])
   @@index([companyId, status])
+  @@index([customerAccountId])
 }
 
 model MarketplaceCommission {
@@ -3632,4 +3685,806 @@ model ProviderSettlement {
   provider MarketplaceProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
   @@index([providerId, status])
+}
+
+// ============================================================================
+// EXECUTION 04 — CUSTOMER PLATFORM, MARKETPLACE & MOBILE APPLICATIONS
+//
+// Three identity planes share one database:
+//   1. Platform principals  (User + Membership)      — ERP / Super Admin
+//   2. Provider principals  (User + ProviderUser)    — provider portal
+//   3. Customer principals  (CustomerAccount)        — website + mobile app
+//
+// A CustomerAccount is a consumer identity. It is deliberately NOT a User:
+// `User` carries tenant memberships and platform privileges, and conflating the
+// two would let a consumer identity inherit an ERP scope. A consumer owns
+// vehicles, addresses, bookings and payments through `CustomerAccount`, and the
+// ERP sees those consumers as ordinary `Customer` rows inside a tenant.
+// ============================================================================
+
+// ---------------------------------------------------------------- E04 enums
+
+enum CustomerAccountStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+/** Which automotive workflow a booking slot belongs to. */
+enum BookingType {
+  INSPECTION
+  MAINTENANCE
+  PROVIDER_SERVICE
+}
+
+enum BookingStatus {
+  /** Held while the customer completes checkout; released when it expires. */
+  HELD
+  CONFIRMED
+  RESCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum BookingResourceType {
+  INSPECTOR
+  BAY
+  TECHNICIAN
+  PROVIDER
+}
+
+enum ProviderApplicationStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+enum PaymentIntentStatus {
+  REQUIRES_METHOD
+  REQUIRES_ACTION
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentTransactionType {
+  CHARGE
+  AUTHORIZATION
+  CAPTURE
+  REFUND
+  CHARGEBACK
+}
+
+enum PaymentTransactionStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  VOIDED
+}
+
+enum RefundStatus {
+  REQUESTED
+  APPROVED
+  PROCESSED
+  REJECTED
+}
+
+enum ReviewStatus {
+  PENDING
+  PUBLISHED
+  HIDDEN
+  REJECTED
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  AWAITING_PROVIDER
+  RESOLVED
+  ESCALATED
+  CLOSED
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  WHATSAPP
+  PUSH
+}
+
+enum NotificationDeliveryStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  SKIPPED
+}
+
+/** Whether a delivery channel has working credentials or only an adapter. */
+enum NotificationProviderState {
+  /** Adapter implemented; no credentials configured. Nothing is transmitted. */
+  NOT_CONFIGURED
+  /** Credentials present; deliveries are attempted. */
+  CONFIGURED
+  /** Queued but not yet attempted. */
+  PENDING
+  /** The provider returned an error; retried until attempts are exhausted. */
+  ERROR
+  DISABLED
+}
+
+// ------------------------------------------------------ E04 customer identity
+
+model CustomerAccount {
+  id                 String                @id @default(cuid())
+  email              String                @unique
+  passwordHash       String
+  fullName           String
+  phone              String?
+  status             CustomerAccountStatus @default(PENDING)
+  preferredLocale    Locale                @default(ar)
+  preferredTheme     Theme                 @default(dark)
+  /** Set when the account is linked to a tenant customer record. */
+  defaultCompanyId   String?
+  emailVerifiedAt    DateTime?
+  phoneVerifiedAt    DateTime?
+  lastLoginAt        DateTime?
+  failedLoginCount   Int                   @default(0)
+  lockedUntil        DateTime?
+  /** Base32 TOTP secret, encrypted at rest; customers may opt in to MFA. */
+  mfaEnabled         Boolean               @default(false)
+  mfaSecretEncrypted String?
+  mfaLastUsedStep    BigInt?
+  mfaEnrolledAt      DateTime?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  defaultCompany Company? @relation(fields: [defaultCompanyId], references: [id], onDelete: SetNull)
+
+  addresses       CustomerAddress[]
+  privacy         CustomerPrivacySetting?
+  preferences     CustomerNotificationPreference[]
+  refreshTokens   CustomerRefreshToken[]
+  resetTokens     CustomerPasswordResetToken[]
+  /** Vehicles this consumer owns. Ownership is enforced server-side. */
+  vehicles        Vehicle[]
+  bookings        BookingSlot[]
+  paymentIntents  PaymentIntent[]
+  refunds         Refund[]
+  reviews         ProviderReview[]
+  disputes        MarketplaceDispute[]
+  supportTickets  SupportTicket[]
+  serviceRequests ServiceRequest[]
+  notificationDeliveries NotificationDelivery[]
+
+  @@index([status])
+  @@index([defaultCompanyId])
+}
+
+model CustomerAddress {
+  id           String   @id @default(cuid())
+  accountId    String
+  label        String?
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  area         String?
+  countryCode  String   @default("BH")
+  postalCode   String?
+  latitude     Decimal? @db.Decimal(10, 7)
+  longitude    Decimal? @db.Decimal(10, 7)
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  account CustomerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+}
+
+/**
+ * Account privacy controls. Every field defaults to the restrictive value so a
+ * newly registered consumer is never silently opted in to data sharing.
+ */
+model CustomerPrivacySetting {
+  id                       String    @id @default(cuid())
+  accountId                String    @unique
+  /** Allow providers to contact the customer directly about a booking. */
+  shareContactWithProvider Boolean   @default(true)
+  /** Include the vehicle in marketplace discovery / quote requests. */
+  allowVehicleDiscovery    Boolean   @default(false)
+  /** Marketing messages, separate from transactional messages. */
+  allowMarketingEmails     Boolean   @default(false)
+  allowMarketingSms        Boolean   @default(false)
+  allowMarketingWhatsapp   Boolean   @default(false)
+  /** Permit push notifications to this device set. */
+  allowPushNotifications   Boolean   @default(false)
+  /** Analytics/usage profiling. */
+  allowAnalytics           Boolean   @default(false)
+  /** Third-party data sharing beyond booking fulfilment. */
+  allowThirdPartySharing   Boolean   @default(false)
+  dataExportRequestedAt    DateTime?
+  deletionRequestedAt      DateTime?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  account CustomerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model CustomerNotificationPreference {
+  id        String              @id @default(cuid())
+  accountId String
+  channel   NotificationChannel
+  /** Category key, e.g. "booking", "invoice", "marketing", "support". */
+  category  String
+  enabled   Boolean             @default(true)
+  updatedAt DateTime            @updatedAt
+  createdAt DateTime            @default(now())
+
+  account CustomerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, channel, category])
+  @@index([accountId])
+}
+
+model CustomerRefreshToken {
+  id         String    @id @default(cuid())
+  accountId  String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  replacedBy String?
+  familyId   String    @default(cuid())
+  /** Distinguishes the web session from a mobile device session. */
+  deviceKind String    @default("WEB")
+  deviceName String?
+  userAgent  String?
+  ipAddress  String?
+  createdAt  DateTime  @default(now())
+
+  account CustomerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([expiresAt])
+  @@index([familyId])
+}
+
+/**
+ * Single-use password reset. Only the SHA-256 hash of the token is stored, so a
+ * database read cannot be replayed into a reset.
+ */
+model CustomerPasswordResetToken {
+  id        String    @id @default(cuid())
+  accountId String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  account CustomerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([expiresAt])
+}
+
+// --------------------------------------------------------- E04 booking engine
+
+/**
+ * A bookable resource: an inspector, a workshop bay, a technician or a
+ * marketplace provider. Resources are what the scheduling engine allocates, so
+ * inspections, workshop work and provider services share one calendar instead
+ * of three divergent ones.
+ */
+model BookingResource {
+  id           String              @id @default(cuid())
+  companyId    String
+  branchId     String?
+  resourceType BookingResourceType
+  code         String
+  nameEn       String
+  nameAr       String
+  /** Optional link to the staff user who operates the resource. */
+  userId       String?
+  /** Optional link when the resource is a marketplace provider. */
+  providerId   String?
+  capacity     Int                 @default(1)
+  isActive     Boolean             @default(true)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  company  Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch   Branch?              @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  provider MarketplaceProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+
+  workingHours WorkingHours[]
+  exceptions   BookingResourceException[]
+  slots        BookingSlot[]
+
+  @@unique([companyId, code])
+  @@index([companyId, resourceType])
+  @@index([companyId, branchId])
+}
+
+/** Recurring weekly opening hours for a resource (or a branch when resourceId is null). */
+model WorkingHours {
+  id           String   @id @default(cuid())
+  companyId    String
+  branchId     String?
+  resourceId   String?
+  /** 0 = Sunday … 6 = Saturday, matching the Gulf working week. */
+  dayOfWeek    Int
+  /** Minutes from midnight, local to the branch timezone. */
+  opensMinute  Int
+  closesMinute Int
+  isClosed     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company  Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch   Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  resource BookingResource? @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, dayOfWeek])
+  @@index([resourceId])
+}
+
+/** A dated exception: a holiday, a training day or an extended shift. */
+model BookingResourceException {
+  id           String   @id @default(cuid())
+  companyId    String
+  resourceId   String
+  date         DateTime
+  isClosed     Boolean  @default(true)
+  opensMinute  Int?
+  closesMinute Int?
+  reason       String?
+  createdAt    DateTime @default(now())
+
+  company  Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  resource BookingResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@unique([resourceId, date])
+  @@index([companyId, date])
+}
+
+/**
+ * The central scheduling reservation.
+ *
+ * Double-booking is prevented by a **partial unique index** on
+ * `(resourceKey, startsAt)` restricted to rows whose status is not CANCELLED
+ * (see the migration). That constraint lives in PostgreSQL, so two concurrent
+ * requests that both pass the availability pre-check still cannot both commit —
+ * the loser receives a unique violation and the API answers HTTP 409. The
+ * pre-check alone would be a race and is deliberately not relied upon.
+ *
+ * `resourceKey` is derived by the service: the resource id when one is chosen,
+ * otherwise a deterministic key (`branch:<id>|service:<ref>`) so resource-less
+ * bookings are serialised against each other too.
+ */
+model BookingSlot {
+  id                 String        @id @default(cuid())
+  companyId          String
+  branchId           String?
+  resourceId         String?
+  /** Non-null. See the model comment: this is the concurrency key. */
+  resourceKey        String
+  bookingType        BookingType
+  status             BookingStatus @default(HELD)
+  /** Service catalog id (inspection service, provider listing, …). */
+  serviceRef         String?
+  startsAt           DateTime
+  endsAt             DateTime
+  /** Whole minutes; a snapshot so later catalog edits do not move history. */
+  durationMinutes    Int
+  customerAccountId  String?
+  customerId         String?
+  vehicleId          String?
+  /** The module document this slot schedules (InspectionBooking, JobCard, …). */
+  entityType         String?
+  entityId           String?
+  /** Populated while status is HELD; an expired hold is released and reusable. */
+  holdExpiresAt      DateTime?
+  reference          String
+  notes              String?
+  cancellationReason String?
+  createdById        String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch          Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  resource        BookingResource? @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+  customerAccount CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
+  customer        Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  vehicle         Vehicle?         @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  events BookingEvent[]
+
+  @@unique([companyId, reference])
+  @@index([companyId, status])
+  @@index([companyId, startsAt])
+  @@index([resourceKey, startsAt])
+  @@index([customerAccountId, startsAt])
+  @@index([entityType, entityId])
+}
+
+/** Append-only booking lifecycle log; also drives reminders and delivery. */
+model BookingEvent {
+  id         String         @id @default(cuid())
+  companyId  String
+  slotId     String
+  kind       String
+  fromStatus BookingStatus?
+  toStatus   BookingStatus?
+  message    String?
+  actorKind  String         @default("SYSTEM")
+  actorId    String?
+  createdAt  DateTime       @default(now())
+
+  company Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  slot    BookingSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  @@index([slotId, createdAt])
+  @@index([companyId, kind])
+}
+
+// ------------------------------------------------- E04 marketplace lifecycle
+
+/** A provider's onboarding application, reviewed before any listing is live. */
+model MarketplaceApplication {
+  id                 String                    @id @default(cuid())
+  code               String                    @unique
+  legalNameEn        String
+  legalNameAr        String
+  contactEmail       String
+  contactPhone       String
+  /** Commercial registration / CR number supplied by the applicant. */
+  registrationNumber String?
+  taxNumber          String?
+  countryCode        String                    @default("BH")
+  city               String?
+  addressLine        String?
+  categoryKeys       String[]                  @default([])
+  status             ProviderApplicationStatus @default(SUBMITTED)
+  submittedAt        DateTime                  @default(now())
+  reviewedAt         DateTime?
+  reviewedById       String?
+  reviewNote         String?
+  /** Set when the application is approved and a provider record is created. */
+  providerId         String?                   @unique
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  provider MarketplaceProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([contactEmail])
+}
+
+/** Links a platform user to the provider it may administer. */
+model ProviderUser {
+  id         String   @id @default(cuid())
+  providerId String
+  userId     String
+  role       String   @default("OWNER")
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  provider MarketplaceProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, userId])
+  @@index([userId])
+}
+
+/** Provider-declared availability, merged with the shared booking engine. */
+model ProviderAvailability {
+  id                   String   @id @default(cuid())
+  providerId           String
+  dayOfWeek            Int
+  opensMinute          Int
+  closesMinute         Int
+  isClosed             Boolean  @default(false)
+  /** Lead time before a slot may be booked, in minutes. */
+  minimumNoticeMinutes Int      @default(60)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  provider MarketplaceProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, dayOfWeek])
+  @@index([providerId])
+}
+
+/** A customer review of a completed provider service. */
+model ProviderReview {
+  id                String       @id @default(cuid())
+  providerId        String
+  serviceRequestId  String?
+  bookingSlotId     String?
+  customerAccountId String
+  /** 1–5. Enforced in the service layer as well as the database. */
+  rating            Int
+  title             String?
+  comment           String?
+  status            ReviewStatus @default(PENDING)
+  /** Set when a provider replies to the review. */
+  providerReply     String?
+  providerRepliedAt DateTime?
+  publishedAt       DateTime?
+  moderatedById     String?
+  moderationNote    String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  provider        MarketplaceProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  serviceRequest  ServiceRequest?     @relation(fields: [serviceRequestId], references: [id], onDelete: SetNull)
+  customerAccount CustomerAccount     @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([customerAccountId, serviceRequestId])
+  @@index([providerId, status])
+}
+
+/** A customer complaint against a provider, with a resolution trail. */
+model MarketplaceDispute {
+  id                String          @id @default(cuid())
+  code              String          @unique
+  providerId        String
+  serviceRequestId  String?
+  bookingSlotId     String?
+  customerAccountId String
+  subject           String
+  description       String
+  status            DisputeStatus   @default(OPEN)
+  resolution        String?
+  /** Amount refunded or credited as a result of the dispute, in minor units. */
+  compensationMinor Int             @default(0)
+  resolvedAt        DateTime?
+  resolvedById      String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  provider        MarketplaceProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  serviceRequest  ServiceRequest?     @relation(fields: [serviceRequestId], references: [id], onDelete: SetNull)
+  customerAccount CustomerAccount     @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+
+  messages DisputeMessage[]
+
+  @@index([status])
+  @@index([providerId, status])
+  @@index([customerAccountId])
+}
+
+model DisputeMessage {
+  id         String   @id @default(cuid())
+  disputeId  String
+  /** CUSTOMER | PROVIDER | PLATFORM */
+  authorKind String
+  authorId   String?
+  body       String
+  /** Internal notes are never shown to the customer. */
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  dispute MarketplaceDispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  @@index([disputeId, createdAt])
+}
+
+// ---------------------------------------------------------------- E04 payments
+
+/**
+ * A payment attempt against a document (invoice, booking, settlement).
+ *
+ * The intent records what the customer is trying to pay; `PaymentTransaction`
+ * records what the provider actually reported. Nothing is ever marked paid from
+ * a client response: only a verified transaction or webhook may settle a
+ * document. Idempotency keys are unique per company, so a retried request
+ * returns the original intent rather than charging twice.
+ */
+model PaymentIntent {
+  id                String             @id @default(cuid())
+  companyId         String
+  branchId          String?
+  intentNumber      String
+  customerId        String?
+  customerAccountId String?
+  /** What is being paid: SALES_INVOICE | BOOKING | SERVICE_REQUEST | SETTLEMENT. */
+  targetType        String
+  targetId          String
+  amountMinor       Int
+  currency          String             @default("BHD")
+  /** 3 for BHD/KWD/OMR, 2 for most others. Stored so totals are unambiguous. */
+  currencyScale     Int                @default(3)
+  status            PaymentIntentStatus @default(REQUIRES_METHOD)
+  /** Adapter key: CASH | CARD_TERMINAL | BANK_TRANSFER | BENEFITPAY | MANUAL. */
+  provider          String             @default("MANUAL")
+  providerReference String?
+  idempotencyKey    String
+  description       String?
+  expiresAt         DateTime?
+  succeededAt       DateTime?
+  failedReason      String?
+  createdById       String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch          Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  customerAccount CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
+  customer        Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  transactions PaymentTransaction[]
+  refunds      Refund[]
+
+  @@unique([companyId, intentNumber])
+  @@unique([companyId, idempotencyKey])
+  @@index([companyId, status])
+  @@index([targetType, targetId])
+  @@index([customerAccountId])
+}
+
+model PaymentTransaction {
+  id                String                   @id @default(cuid())
+  companyId         String
+  intentId          String?
+  transactionType   PaymentTransactionType
+  status            PaymentTransactionStatus @default(PENDING)
+  amountMinor       Int
+  currency          String                   @default("BHD")
+  currencyScale     Int                      @default(3)
+  provider          String
+  /** The provider's own transaction id. Unique per provider when present. */
+  providerReference String?
+  /** Opaque gateway payload retained for reconciliation and dispute evidence. */
+  rawPayload        Json?
+  failureReason     String?
+  processedAt       DateTime?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  company Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  intent  PaymentIntent? @relation(fields: [intentId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, status])
+  @@index([provider, providerReference])
+  @@index([intentId])
+}
+
+model Refund {
+  id                String       @id @default(cuid())
+  companyId         String
+  intentId          String
+  customerAccountId String?
+  refundNumber      String
+  amountMinor       Int
+  currency          String       @default("BHD")
+  currencyScale     Int          @default(3)
+  reason            String
+  status            RefundStatus @default(REQUESTED)
+  /** Set when the reversal is written to the ledger. */
+  journalEntryId    String?
+  /** The gateway refund reference once the provider confirms it. */
+  providerReference String?
+  requestedById     String?
+  approvedById      String?
+  processedAt       DateTime?
+  failureReason     String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  intent          PaymentIntent    @relation(fields: [intentId], references: [id], onDelete: Restrict)
+  customerAccount CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, refundNumber])
+  @@index([companyId, status])
+  @@index([intentId])
+}
+
+/**
+ * Inbound webhook ledger.
+ *
+ * `(provider, eventId)` is unique, which is what makes webhook handling
+ * idempotent: a redelivered event is recognised and acknowledged without being
+ * applied a second time. The signature is verified before the row is written.
+ */
+model PaymentWebhookEvent {
+  id             String    @id @default(cuid())
+  provider       String
+  eventId        String
+  eventType      String
+  signatureValid Boolean   @default(false)
+  /** Raw body hash, retained so a payload cannot be silently swapped. */
+  payloadHash    String
+  payload        Json?
+  processedAt    DateTime?
+  processResult  String?
+  attempts       Int       @default(0)
+  error          String?
+  createdAt      DateTime  @default(now())
+
+  @@unique([provider, eventId])
+  @@index([provider, eventType])
+  @@index([processedAt])
+}
+
+/** A daily reconciliation run against a provider's settlement report. */
+model PaymentReconciliation {
+  id            String   @id @default(cuid())
+  companyId     String
+  provider      String
+  businessDate  DateTime
+  /** Totals computed from our own transaction table. */
+  internalCount Int      @default(0)
+  internalMinor Int      @default(0)
+  /** Totals reported by the provider. */
+  externalCount Int      @default(0)
+  externalMinor Int      @default(0)
+  /** internalMinor − externalMinor. Non-zero means a break to investigate. */
+  varianceMinor Int      @default(0)
+  matched       Boolean  @default(false)
+  notes         String?
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, provider, businessDate])
+  @@index([companyId, matched])
+}
+
+// ------------------------------------------------------------ E04 notifications
+
+/**
+ * One delivery attempt per channel for one logical notification.
+ *
+ * The in-app channel is genuinely functional (the row is the message). Email,
+ * SMS, WhatsApp and push rows record what an adapter did: when a channel has no
+ * credentials the row is SKIPPED with `providerState = NOT_CONFIGURED`, so the
+ * platform never claims a message was delivered when nothing was transmitted.
+ */
+model NotificationDelivery {
+  id                String                     @id @default(cuid())
+  companyId         String?
+  customerAccountId String?
+  userId            String?
+  channel           NotificationChannel
+  category          String                     @default("general")
+  templateKey       String?
+  locale            Locale                     @default(ar)
+  recipient         String?
+  subject           String?
+  body              String
+  status            NotificationDeliveryStatus @default(QUEUED)
+  providerState     NotificationProviderState  @default(NOT_CONFIGURED)
+  provider          String?
+  providerReference String?
+  attempts          Int                        @default(0)
+  maxAttempts       Int                        @default(3)
+  nextAttemptAt     DateTime?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  error             String?
+  /** Correlates a delivery with the document that produced it. */
+  entityType        String?
+  entityId          String?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+
+  company         Company?         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customerAccount CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([customerAccountId, createdAt])
+  @@index([companyId, category])
 }

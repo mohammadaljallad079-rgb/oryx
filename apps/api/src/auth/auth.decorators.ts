@@ -28,6 +28,19 @@ export const MODULE_KEY = 'oryx:requiredModule';
 /** Require the company's subscription to license this ERP module. */
 export const RequireModule = (moduleKey: string) => SetMetadata(MODULE_KEY, moduleKey);
 
+export const CUSTOMER_PLANE_KEY = 'oryx:customerPlane';
+
+/**
+ * Marks a route as belonging to the customer identity plane.
+ *
+ * The global staff guards (`CsrfGuard`, `PrincipalGuard`, `PermissionsGuard`,
+ * `ModuleEntitlementGuard`) skip such routes, and `CustomerAuthGuard` owns them
+ * instead. The marker is explicit rather than inferred from the URL so that
+ * moving a controller cannot silently expose a customer route to the staff
+ * pipeline or vice versa.
+ */
+export const CustomerPlane = () => SetMetadata(CUSTOMER_PLANE_KEY, true);
+
 export interface RequestPrincipal extends Principal {
   /** Populated when a platform user operates inside a tenant via support access. */
   supportSessionCompanyId?: string;

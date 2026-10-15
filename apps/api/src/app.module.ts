@@ -26,6 +26,10 @@ import { HrModule } from './hr/hr.module';
 import { CrmModule } from './crm/crm.module';
 import { OperationsModule } from './operations/operations.module';
 import { AutomotiveModule } from './automotive/automotive.module';
+import { CustomerModule } from './customer/customer.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { MarketplaceModule } from './marketplace/marketplace.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -60,6 +64,10 @@ import { AutomotiveModule } from './automotive/automotive.module';
     CrmModule,
     OperationsModule,
     AutomotiveModule,
+    CustomerModule,
+    NotificationsModule,
+    MarketplaceModule,
+    PaymentsModule,
   ],
   providers: [
     // Global rate limiting; sensitive auth routes override with @Throttle.

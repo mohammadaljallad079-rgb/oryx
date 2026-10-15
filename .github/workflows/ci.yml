@@ -8,7 +8,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, feature/execution-01-super-admin-foundation, feature/execution-02-erp-core, feature/execution-03-hr-crm-automotive]
+    branches: [main, feature/execution-01-super-admin-foundation, feature/execution-02-erp-core, feature/execution-03-hr-crm-automotive, feature/execution-04-customer-marketplace-mobile]
   workflow_dispatch:
 
 # Cancel superseded runs on the same ref to conserve CI minutes.

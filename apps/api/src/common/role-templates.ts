@@ -99,6 +99,61 @@ export const WORKSHOP_TECHNICIAN_PERMISSION_CODES: string[] = [
   'erp.inventory.read',
 ];
 
+/** Booking coordinator: the shared calendar, resources and customer intake. */
+export const BOOKING_COORDINATOR_PERMISSION_CODES: string[] = [
+  'company.read',
+  'company.branch.read',
+  'branch.read',
+  'erp.dashboard.read',
+  'erp.booking.read',
+  'erp.booking.manage',
+  'erp.booking.resource.manage',
+  'erp.customer_portal.read',
+  'erp.vehicle.read',
+  'erp.inspection.read',
+  'erp.maintenance.read',
+  'erp.crm.read',
+];
+
+/**
+ * Provider manager: the marketplace side of the house. Deliberately excludes
+ * `erp.payments.manage`, so a provider-facing operator cannot move money.
+ */
+export const PROVIDER_MANAGER_PERMISSION_CODES: string[] = [
+  'company.read',
+  'company.branch.read',
+  'branch.read',
+  'erp.dashboard.read',
+  'erp.provider_portal.read',
+  'erp.provider_portal.manage',
+  'erp.marketplace.provider.manage',
+  'erp.marketplace.listing.manage',
+  'erp.marketplace.request.manage',
+  'erp.marketplace.commission.manage',
+  'erp.booking.read',
+  'erp.booking.manage',
+  'erp.crm.read',
+  'erp.crm.ticket.manage',
+];
+
+/** Finance officer: payment records, refunds and reconciliation. */
+export const FINANCE_OFFICER_PERMISSION_CODES: string[] = [
+  'company.read',
+  'company.branch.read',
+  'branch.read',
+  'erp.dashboard.read',
+  'erp.accounting.read',
+  'erp.accounting.payment.manage',
+  'erp.accounting.statement.read',
+  'erp.sales.read',
+  'erp.sales.payment.manage',
+  'erp.payments.read',
+  'erp.payments.manage',
+  'erp.payments.reconcile',
+  'erp.reports.read',
+  'erp.reports.accounting.read',
+];
+
 export const DEFAULT_COMPANY_ROLE_TEMPLATES: RoleTemplate[] = [
   {
     code: 'company_admin',
@@ -141,5 +196,26 @@ export const DEFAULT_COMPANY_ROLE_TEMPLATES: RoleTemplate[] = [
     nameAr: 'فني الورشة',
     descriptionEn: 'Job cards, inspections, parts reservation and issue.',
     permissions: WORKSHOP_TECHNICIAN_PERMISSION_CODES,
+  },
+  {
+    code: 'booking_coordinator',
+    nameEn: 'Booking Coordinator',
+    nameAr: 'منسق الحجوزات',
+    descriptionEn: 'Manages the shared booking calendar, resources and customer intake.',
+    permissions: BOOKING_COORDINATOR_PERMISSION_CODES,
+  },
+  {
+    code: 'provider_manager',
+    nameEn: 'Provider Manager',
+    nameAr: 'مسؤول مزودي الخدمة',
+    descriptionEn: 'Provider onboarding, listings, marketplace requests and reviews.',
+    permissions: PROVIDER_MANAGER_PERMISSION_CODES,
+  },
+  {
+    code: 'finance_officer',
+    nameEn: 'Finance Officer',
+    nameAr: 'مسؤول المالية',
+    descriptionEn: 'Payment records, refunds, reconciliation and financial reporting.',
+    permissions: FINANCE_OFFICER_PERMISSION_CODES,
   },
 ];
