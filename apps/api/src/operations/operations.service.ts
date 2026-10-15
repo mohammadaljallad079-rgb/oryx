@@ -226,6 +226,7 @@ export class OperationsService {
           type: dto.type ?? 'GENERAL',
           branchId: dto.branchId ?? null,
           departmentId: dto.departmentId ?? null,
+          projectId: dto.projectId ?? null,
           status: dto.assigneeUserId ? 'ASSIGNED' : 'OPEN',
           priority: (dto.priority as never) ?? 'NORMAL',
           assigneeUserId: dto.assigneeUserId ?? null,

@@ -82,6 +82,7 @@ export class CreateWorkOrderDto {
   @IsOptional() @IsString() @MaxLength(60) type?: string;
   @IsOptional() @IsString() branchId?: string;
   @IsOptional() @IsString() departmentId?: string;
+  @IsOptional() @IsString() projectId?: string;
   @IsOptional() @IsIn(['LOW', 'NORMAL', 'HIGH', 'URGENT']) priority?: string;
   @IsOptional() @IsString() assigneeUserId?: string;
   @IsOptional() @IsISO8601() dueDate?: string;

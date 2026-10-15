@@ -418,9 +418,20 @@ export class HrService {
       });
       if (overlap) throw conflict(ERROR_CODES.LEAVE_OVERLAP, 'An overlapping leave request already exists.');
 
+      const leaveType = await tx.leaveType.findFirst({ where: { id: dto.leaveTypeId, companyId } });
+      if (!leaveType) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Leave type not found.');
+      // A new balance is seeded from the leave type's annual entitlement so a
+      // request does not silently start from zero.
       const balance = await tx.leaveBalance.upsert({
         where: { employeeId_leaveTypeId_year: { employeeId: dto.employeeId, leaveTypeId: dto.leaveTypeId, year } },
-        create: { companyId, employeeId: dto.employeeId, leaveTypeId: dto.leaveTypeId, year },
+        create: {
+          companyId,
+          employeeId: dto.employeeId,
+          leaveTypeId: dto.leaveTypeId,
+          year,
+          entitledDays: leaveType.annualEntitlementDays,
+          accruedDays: leaveType.annualEntitlementDays,
+        },
         update: {},
       });
       const available = balance.entitledDays + balance.accruedDays - balance.usedDays - balance.pendingDays;

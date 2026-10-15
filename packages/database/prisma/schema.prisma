@@ -2938,11 +2938,12 @@ model Project {
   updatedAt   DateTime      @updatedAt
 
   company Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
   tasks   ProjectTask[]
+  workOrders WorkOrder[]
 
   @@unique([companyId, code])
   @@index([companyId, status])
-  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
 }
 
 model ProjectTask {
@@ -2963,13 +2964,13 @@ model ProjectTask {
   updatedAt    DateTime     @updatedAt
 
   company  Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch   Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
   project  Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   parent   ProjectTask?  @relation("TaskTree", fields: [parentTaskId], references: [id], onDelete: Cascade)
   children ProjectTask[] @relation("TaskTree")
 
   @@index([companyId, status])
   @@index([companyId, assigneeUserId])
-  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
 }
 
 model WorkOrder {
@@ -2981,6 +2982,7 @@ model WorkOrder {
   type          String          @default("GENERAL")
   branchId      String?
   departmentId  String?
+  projectId     String?
   status        WorkOrderStatus @default(DRAFT)
   priority      TaskPriority    @default(NORMAL)
   requestedById String?
@@ -2997,6 +2999,7 @@ model WorkOrder {
 
   company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  project    Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
   checklist  WorkOrderChecklistItem[]
 
   @@unique([companyId, orderNumber])
