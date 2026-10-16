@@ -21,8 +21,16 @@ same-origin API and the HttpOnly refresh cookie and CSRF double-submit both work
 
 ## Preview links
 
-Every URL below returned **HTTP 200** when checked from outside the sandbox with
-`curl` on 2026-10-16.
+Verified from outside the sandbox with `curl` on 2026-10-16:
+
+| Sweep | Result |
+|---|---|
+| Admin / ERP routes on host 1 | **33 / 33 returned 200**, 0 failed |
+| Customer and mobile routes on host 2 | **21 / 21 returned 200**, 0 failed |
+| API health through host 1 (`/api/health`) | `{"status":"ok","database":"up"}` |
+| `GET /customer/capabilities` without a token | 401 — correct, it is an authenticated route |
+
+Every URL below returned **HTTP 200**.
 
 ### Host 1 — Super Admin and ERP
 
