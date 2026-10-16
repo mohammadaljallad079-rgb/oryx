@@ -25,7 +25,7 @@ force-pushed.
 | --- | --- |
 | Branch | `feature/execution-05-platform-completion` |
 | Base | `main` @ `33ee5579644d88ae6a1763e7d778ba944831912a` (the Execution 04 merge) |
-| Code head | `5bc4ba8` (this report is committed on top) |
+| Code head | `db35fe2` (the tab-bar fix; this report is committed on top) |
 | Pull request | [#5](https://github.com/mohammadaljallad079-rgb/oryx/pull/5) (draft, open) |
 
 ## 3. Baseline verification (before this session's changes)
@@ -39,6 +39,69 @@ All Execution 01–04 invariants (balanced ledger, atomic and idempotent posting
 row-locked inventory, tenant isolation, payroll snapshot, booking concurrency,
 payment idempotency, refresh-token cookie transport) are preserved and still
 asserted by the existing suites.
+
+### 3.1 Runtime verification and the mobile tab-bar defect
+
+The automated suites do not render the mobile app, so the customer app was run
+against the seeded API in a browser at a 390×844 handset viewport and every tab
+was inspected. That surfaced a defect the unit tests could not see.
+
+**Symptom.** The authenticated tab bar rendered ten entries instead of five. The
+five intended destinations were squeezed into the first 156 px of a 390 px bar,
+and the surplus entries were labelled with raw route names — `bookings/index`,
+`garage/[id]`, `providers/[id]`, `bookings/new`, `invoices`, `notifications`.
+
+**Cause.** Expo Router registers *every* file under `apps/mobile/src/app/(app)`
+as a tab. The layout declared only the five primary screens explicitly and left
+the pushed routes (the booking wizard, the garage and provider detail screens,
+invoices and notifications) to be registered by default. A nested `index.tsx`
+is also flattened to `bookings/index`, not `bookings`, so the bookings screen was
+never matched by the tab that was supposed to render it.
+
+**Fix.** `apps/mobile/src/app/(app)/_layout.tsx` now declares the bookings tab as
+`bookings/index` and declares each pushed route with `options={{ href: null }}`,
+which registers it without showing it in the bar.
+
+**Regression guard.** `apps/mobile/test/tabs.test.ts` reads the route files and
+the layout, and fails if a route is added under `(app)` without a matching
+`<Tabs.Screen>`, if the visible set drifts from the five primary destinations, or
+if a pushed route stops being hidden. Three assertions; the file list is derived,
+so a new screen cannot silently become a tab.
+
+**Verified at runtime after the fix.** The tab bar renders exactly five
+correctly-labelled, evenly-sized tabs at 78 px each:
+
+| Tab | Label | x | width |
+| --- | --- | --- | --- |
+| Home | الرئيسية | 0 | 78 |
+| Garage | مرآب سياراتي | 78 | 78 |
+| Bookings | حجوزاتي | 156 | 78 |
+| Services | الخدمات | 234 | 78 |
+| Account | حسابي | 312 | 78 |
+
+The authenticated screens (dashboard, garage, bookings, services, account)
+render live data from the API: the dashboard reports **2 registered vehicles**
+for the demo account, which matches the seeded garage.
+
+The booking engine was also exercised end to end against the running API. The
+seed creates no working hours, so a freshly seeded tenant offers an empty
+calendar; seven company-wide opening hours (Sunday–Saturday, 08:00–18:00, Friday
+closed) and one inspection bay were added for the demo tenant purely to drive the
+check. The engine then returned real slots and four bookings were created through
+`POST /customer/bookings`, all accepted with HTTP 201 and status `HELD`:
+
+| Booking | Type | Start (UTC) | Status |
+| --- | --- | --- | --- |
+| Inspection | INSPECTION | 2026-10-19T08:00:00Z | HELD |
+| Maintenance | MAINTENANCE | 2026-10-20T09:00:00Z | HELD |
+| Inspection | INSPECTION | 2026-10-19T10:00:00Z | HELD |
+| Maintenance | MAINTENANCE | 2026-10-21T11:00:00Z | HELD |
+
+Two notes recorded rather than fixed, because they are pre-existing seed
+behaviour outside this execution's scope: the seed does not create working hours
+or booking resources, and a self-registered customer account has a null
+`defaultCompanyId` until it is linked, so the consumer surface resolves a tenant
+through `TenantCompanyService` rather than from the account.
 
 ## 4. What Execution 05 adds
 
@@ -183,7 +246,7 @@ Captured from the running application into
 | --- | --- |
 | `@oryx/shared` (unit) | **93 passed** (85 baseline + 8 new catalogue-invariant tests) |
 | `@oryx/api` (integration) | **218 passed**, 8 suites (196 baseline + 22 new Execution 05 tests) |
-| `@oryx/mobile` (unit) | **14 passed** |
+| `@oryx/mobile` (unit) | **17 passed** (14 baseline + 3 new tab-bar regression tests) |
 | `@oryx/admin` (browser) | **119 passed**, 1 flaky (see below) |
 
 New suites:
@@ -200,9 +263,13 @@ New suites:
   matter most: an unconfigured gateway is never shown as operational, and a
   connection test on an unimplemented adapter reports "not implemented" rather
   than success.
+- `apps/mobile/test/tabs.test.ts` — 3 tests pinning the authenticated tab bar to
+  the five primary destinations and asserting that every pushed route stays
+  hidden (see section 3.1).
 
-The mobile suite was unaffected: the mobile app consumes the same backend and
-needed no change for this execution.
+The mobile app consumes the same backend APIs as the customer website and needed
+no API change for this execution; the only mobile change is the tab-bar fix in
+section 3.1.
 
 ### Flaky test (pre-existing, not a regression)
 
