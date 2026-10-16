@@ -67,7 +67,7 @@ Security baseline (do not regress):
   adapters that report themselves unconfigured without credentials) and the
   ORYX customer mobile application (`apps/mobile`, Expo/React Native).
 - **Execution 05 (implemented and tested):** the External Integrations Center
-  (a 20-provider catalogue declared once in `packages/shared/src/integrations.ts`,
+  (an 8-provider catalogue declared once in `packages/shared/src/integrations.ts`,
   AES-256-GCM sealed credentials, a company-scope override, an enablement guard
   that refuses to enable a provider with a missing required credential, a real
   connection-test path with append-only check history, audit logging by key and

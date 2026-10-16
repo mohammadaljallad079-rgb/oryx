@@ -19,10 +19,9 @@ customer capabilities endpoint. The catalogue contains **8 providers**, not 20:
 | `PUSH` | MESSAGING | ADAPTER_ONLY | yes | yes | 2 |
 | `IN_APP` | MESSAGING | IMPLEMENTED | no | no | 0 |
 
-> **Documentation discrepancy.** `AGENTS.md` describes "a 20-provider catalogue".
-> The code declares 8. This audit reports the code as authoritative. The
-> discrepancy is recorded here rather than silently corrected in the guide, and
-> the guide should be updated to say 8 by whoever owns it.
+> **Documentation discrepancy (corrected 2026-10-16).** `AGENTS.md` described
+> "a 20-provider catalogue". The code declares 8, and the guide now says 8 to
+> match `packages/shared/src/integrations.ts`.
 
 ## State model
 
@@ -108,4 +107,5 @@ enforces one platform row per provider.
 2. **No production credentials are present**, and none may be committed. A live
    gateway needs credentials supplied through the environment or the
    Integrations Center at deploy time.
-3. **`AGENTS.md` overstates the catalogue size** (20 vs 8). Documentation only.
+3. **`AGENTS.md` overstated the catalogue size** (20 vs 8). Corrected in the
+   guide as part of this audit.

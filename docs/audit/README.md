@@ -1,9 +1,24 @@
 # ORYX — Audit Reports
 
 Audit date: 2026-10-16
-Audited revision: `fc2ab20` (merge of PR #5) plus the working-tree fixes recorded
-in `04_FIXED_DEFECTS.md`.
+Audited revision: `fc2ab20` (merge of PR #5) plus the fixes in `04_FIXED_DEFECTS.md`.
+Delivered on branch `audit/execution-05-verification`, commit `f991e79`.
 Environment: isolated staging (`oryx_staging`), not production.
+
+## Repository state
+
+| Item | Value |
+|---|---|
+| PR #5 (`feature/execution-05-platform-completion`) | **MERGED** 2026-10-16T18:10:37Z, merge commit `fc2ab20` |
+| `origin/main` tree | `c789eec` — identical to the Execution 05 head `7db9689` |
+| This audit | branch `audit/execution-05-verification`, commit `f991e79`, PR #6 |
+| Latest GitHub commit on `main` | `fc2ab20` |
+
+PR #5 is merged, so it cannot be updated; a merged pull request takes no new
+commits. The audit work therefore lands on a fresh branch and PR #6, based on the
+same tree.
+
+## Reports
 
 | Report | Contents |
 |---|---|
