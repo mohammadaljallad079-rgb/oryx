@@ -301,7 +301,12 @@ configs. `eslint` and `@eslint/eslintrc` were already in the lockfile, so
 `pnpm install --frozen-lockfile` still succeeds.
 
 All three CI jobs — typecheck and build, unit and API integration, browser
-acceptance — pass on the final commit `5bc4ba8`.
+acceptance — pass on the final commit `d4a9673` (the mobile fix plus the report
+updates above it).
+
+The `Typecheck and build` job already covered the mobile app: it typechecks,
+lints, unit-tests and bundles it for Android and iOS. The tab-bar fix and its
+regression test therefore run in CI on every push.
 
 ### A CI failure that was worth having
 
