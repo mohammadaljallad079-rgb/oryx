@@ -51,9 +51,9 @@ reports the status and response size.
 
 | Sweep | Result |
 |---|---|
-| Admin / ERP routes on host 1 | **32 / 32 returned 200** |
+| Admin / ERP / control-plane routes on host 1 | **31 / 31 returned 200** |
 | Customer and mobile routes on host 2 | **15 / 15 returned 200** |
-| API health on host 1 (`/api/health`) | `200` |
+| API health on host 1 (`/api/health`) | **1 / 1 returned 200** |
 | **Total** | **47 / 47 returned a success status** |
 
 ### Demo credentials
@@ -220,6 +220,11 @@ pnpm dev:admin    # :3000
 pnpm dev:customer # :3002
 
 node .run/verify-preview.mjs   # external route sweep
-node .run/capture-public.mjs   # public-ingress screenshots
+node .run/capture-public.mjs   # public-ingress screenshots (admin + customer)
+node .run/capture-mobile.mjs   # mobile screenshots, via the app's own tab bar
 node .run/probe-brand.mjs      # rendered brand lockup
+node .run/gen-brand.cjs        # regenerate both apps' logo assets from the source
 ```
+
+`pnpm -r lint` runs `eslint . --max-warnings=0`; `pnpm --filter @oryx/admin lint`,
+`--filter @oryx/customer lint` and `--filter @oryx/mobile lint` all pass.
