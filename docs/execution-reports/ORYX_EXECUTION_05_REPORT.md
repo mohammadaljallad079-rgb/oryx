@@ -79,6 +79,10 @@ correctly-labelled, evenly-sized tabs at 78 px each:
 | Services | الخدمات | 234 | 78 |
 | Account | حسابي | 312 | 78 |
 
+The captured evidence is
+`docs/execution-reports/screenshots/e05-mobile-tabbar-fixed-dashboard-en-dark.png`
+and `…-garage-en-dark.png`.
+
 The authenticated screens (dashboard, garage, bookings, services, account)
 render live data from the API: the dashboard reports **2 registered vehicles**
 for the demo account, which matches the seeded garage.
@@ -239,6 +243,8 @@ Captured from the running application into
 | `e05-integrations-en-light.png` | Integrations Center, English, light |
 | `e05-integration-dialog-en-light.png` | Provider dialog with credential form and check history |
 | `e05-integrations-mobile-en-light.png` | Mobile width (420px) |
+| `e05-mobile-tabbar-fixed-dashboard-en-dark.png` | Customer app, dashboard, tab bar after the fix (section 3.1) |
+| `e05-mobile-tabbar-fixed-garage-en-dark.png` | Customer app, vehicle garage, tab bar after the fix (section 3.1) |
 
 ## 9. Test results
 
