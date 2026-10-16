@@ -57,8 +57,16 @@ export default function AppLayout() {
           tabBarIcon: ({ color }) => <TabIcon glyph="▤" color={color} />,
         }}
       />
+      {/*
+        Expo Router registers every file under this directory as a tab, so each
+        route that is only pushed onto the stack (the booking wizard, the garage
+        and provider detail screens, invoices, notifications) has to be declared
+        with `href: null`. Without it the tab bar renders ten entries and the
+        labels show raw route names. The name is the flattened file path, which
+        is why the bookings index is `bookings/index`, not `bookings`.
+      */}
       <Tabs.Screen
-        name="bookings"
+        name="bookings/index"
         options={{
           title: t('bookings'),
           tabBarIcon: ({ color }) => <TabIcon glyph="▦" color={color} />,
@@ -78,6 +86,12 @@ export default function AppLayout() {
           tabBarIcon: ({ color }) => <TabIcon glyph="◉" color={color} />,
         }}
       />
+
+      <Tabs.Screen name="bookings/new" options={{ href: null }} />
+      <Tabs.Screen name="garage/[id]" options={{ href: null }} />
+      <Tabs.Screen name="providers/[id]" options={{ href: null }} />
+      <Tabs.Screen name="invoices" options={{ href: null }} />
+      <Tabs.Screen name="notifications" options={{ href: null }} />
     </Tabs>
   );
 }
