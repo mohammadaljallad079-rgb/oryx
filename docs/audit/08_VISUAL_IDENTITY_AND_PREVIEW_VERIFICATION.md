@@ -204,7 +204,7 @@ silently override `.env.local` and ship a preview that cannot authenticate.
 | Blocker | Status |
 |---|---|
 | Official **light-theme** design reference | **Missing.** Only the dark-theme dashboard reference exists. The light theme is implemented to mirror the dark layout, but it is not verified against an approved light reference. |
-| Full visual parity | **Not claimed.** The reference contains photographic tiles; the repository ships generated vector tile art because the approved photography is not in the repository. Palette and structure agree; pixel parity is not asserted. |
+| Full visual parity | **Not claimed.** The approved dashboard photography was never supplied, so the photographic tiles are crops of the owner's own approved reference (`scripts/extract-approved-assets.py`), upscaled rather than re-shot. Palette and structure agree; pixel parity is not asserted. |
 | Preview hosting | The preview runs on the sandbox ingress. There is no owner-controlled staging host or CI deployment target; the links live only as long as this sandbox does. |
 | Production secrets | None are present, by design. Every external gateway is `ADAPTER_ONLY` and reports itself unconfigured. |
 
