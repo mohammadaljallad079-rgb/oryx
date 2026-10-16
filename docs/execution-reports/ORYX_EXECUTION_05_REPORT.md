@@ -25,7 +25,7 @@ force-pushed.
 | --- | --- |
 | Branch | `feature/execution-05-platform-completion` |
 | Base | `main` @ `33ee5579644d88ae6a1763e7d778ba944831912a` (the Execution 04 merge) |
-| Code head | `db35fe2` (the tab-bar fix; this report is committed on top) |
+| Code head | `db35fe2` is the code change; later commits on the branch are report-only |
 | Pull request | [#5](https://github.com/mohammadaljallad079-rgb/oryx/pull/5) (draft, open) |
 
 ## 3. Baseline verification (before this session's changes)
@@ -301,8 +301,8 @@ configs. `eslint` and `@eslint/eslintrc` were already in the lockfile, so
 `pnpm install --frozen-lockfile` still succeeds.
 
 All three CI jobs — typecheck and build, unit and API integration, browser
-acceptance — pass on the final commit `d4a9673` (the mobile fix plus the report
-updates above it).
+acceptance — pass on the branch. The mobile fix itself is commit `db35fe2`;
+later commits on the branch are report-only and change no code.
 
 The `Typecheck and build` job already covered the mobile app: it typechecks,
 lints, unit-tests and bundles it for Android and iOS. The tab-bar fix and its
