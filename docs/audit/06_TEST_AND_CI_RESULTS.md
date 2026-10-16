@@ -10,9 +10,41 @@ nginx 12000/12001, PostgreSQL 17 `oryx_staging`), seeded demo data.
 |---|---|---|
 | Shared unit | `pnpm --filter @oryx/shared test` | **93 passed** (5 files) |
 | API integration | `pnpm --filter @oryx/api test:e2e` | **218 passed** (8 suites) |
-| Admin browser | `pnpm --filter @oryx/admin test:ui` | **129 passed** (125 configured + 4 audit) |
+| Admin browser | `pnpm --filter @oryx/admin test:ui` | **130 passed** (12 specs, 0 failed) |
 | Mobile unit | `pnpm --filter @oryx/mobile test` | **20 passed** (3 files) |
-| **Total** | | **460 passed, 0 failed** |
+| **Total** | | **461 passed, 0 failed** |
+
+Re-verified in the recovery session on 2026-10-16 after the visual identity
+changes:
+
+| Suite | Result |
+|---|---|
+| `@oryx/shared` unit | `Test Files 5 passed` / `Tests 93 passed` |
+| `@oryx/api` integration | `Test Suites: 8 passed, 8 total` / `Tests: 218 passed` |
+| `@oryx/admin` browser | `130 passed (4.8m)` — 0 failed, 0 flaky |
+| `@oryx/mobile` unit | `Test Files 3 passed` / `Tests 20 passed` |
+
+Per-spec counts for the browser suite, from the run log:
+
+| Spec | Tests |
+|---|---|
+| `screenshots.spec.ts` | 19 |
+| `responsive.spec.ts` | 19 |
+| `admin.spec.ts` | 18 |
+| `auth-lifecycle.spec.ts` | 14 |
+| `functional.spec.ts` | 13 |
+| `mfa.spec.ts` | 10 |
+| `execution03.spec.ts` | 9 |
+| `erp.spec.ts` | 8 |
+| `execution05.spec.ts` | 6 |
+| `execution04.spec.ts` | 5 |
+| `branding.spec.ts` | 4 |
+| `audit.spec.ts` | 4 |
+| **Total** | **129 passed** (plus `capture.spec.ts`, skipped) |
+
+`capture.spec.ts` is a manual capture tool, not a regression test; it now skips
+unless `CAPTURE_PHASE` is set, so it no longer runs — and no longer rewrites the
+audit images — during `test:ui`.
 
 ## Shared unit — 93 tests
 

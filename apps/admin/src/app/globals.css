@@ -471,10 +471,9 @@ body::before {
   grid-template-areas: 'sidebar header' 'sidebar main';
 }
 
-:root[data-dir='rtl'] .oryx-shell {
-  grid-template-columns: 1fr var(--sidebar-w);
-  grid-template-areas: 'header sidebar' 'main sidebar';
-}
+/* Grid columns follow the inline axis, so an RTL document already renders
+ * column 1 — the sidebar — on the right. No direction override is needed here;
+ * adding one would swap the columns back and push the sidebar to the left. */
 
 .oryx-header {
   grid-area: header;
@@ -578,6 +577,44 @@ body::before {
   border: 1px solid var(--border);
   border-radius: 18px;
   box-shadow: 0 40px 80px -40px rgba(0, 0, 0, 0.9);
+}
+
+/* ----------------------------------------------------------- brand lockup */
+
+/*
+ * The official lockup ships as one raster image, so the two colourways are
+ * stacked and swapped by theme. Both images occupy the same box; the inactive
+ * one is hidden rather than removed so it is already decoded on switch.
+ */
+.oryx-brand-logo {
+  position: relative;
+  display: inline-block;
+  flex: none;
+}
+
+.oryx-brand-logo img {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  object-fit: contain;
+  object-position: left center;
+}
+
+:root[data-dir='rtl'] .oryx-brand-logo img {
+  object-position: right center;
+}
+
+.oryx-brand-logo__on-light {
+  display: none;
+}
+
+:root[data-theme='light'] .oryx-brand-logo__on-dark {
+  display: none;
+}
+
+:root[data-theme='light'] .oryx-brand-logo__on-light {
+  display: block;
 }
 
 /* -------------------------------------------------------------------- misc */

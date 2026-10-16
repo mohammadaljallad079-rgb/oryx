@@ -156,6 +156,40 @@ a {
   box-shadow: var(--shadow-card);
 }
 
+/* Official brand lockup. The artwork is one raster image, so the two
+ * colourways are stacked and swapped by theme; the inactive one is hidden
+ * rather than unmounted so it is already decoded on switch. */
+.oryx-brand-logo {
+  position: relative;
+  display: inline-block;
+  flex: none;
+}
+
+.oryx-brand-logo img {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  object-fit: contain;
+  object-position: left center;
+}
+
+:root[data-dir='rtl'] .oryx-brand-logo img {
+  object-position: right center;
+}
+
+.oryx-brand-logo__on-light {
+  display: none;
+}
+
+:root[data-theme='light'] .oryx-brand-logo__on-dark {
+  display: none;
+}
+
+:root[data-theme='light'] .oryx-brand-logo__on-light {
+  display: block;
+}
+
 .oryx-nav {
   display: flex;
   align-items: center;

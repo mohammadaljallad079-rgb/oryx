@@ -25,10 +25,14 @@ Verified from outside the sandbox with `curl` on 2026-10-16:
 
 | Sweep | Result |
 |---|---|
-| Admin / ERP routes on host 1 | **33 / 33 returned 200**, 0 failed |
-| Customer and mobile routes on host 2 | **21 / 21 returned 200**, 0 failed |
-| API health through host 1 (`/api/health`) | `{"status":"ok","database":"up"}` |
-| `GET /customer/capabilities` without a token | 401 — correct, it is an authenticated route |
+| Admin / ERP / control-plane routes on host 1 | **31 / 31 returned 200**, 0 failed |
+| Customer and mobile routes on host 2 | **15 / 15 returned 200**, 0 failed |
+| API health on host 1 (`/api/health`) | **1 / 1 returned 200** |
+| **Total** | **47 / 47 returned a success status** |
+
+The API health check returns `{"status":"ok","database":"up"}`, and
+`GET /customer/capabilities` without a token returns 401 — correct, it is an
+authenticated route.
 
 Every URL below returned **HTTP 200**.
 
@@ -100,6 +104,13 @@ Sign in as the enterprise admin, then open:
 > without a device or an emulator. Native builds are unchanged; the web export
 > adds a `localStorage` session fallback and echoes the CSRF cookie so the preview
 > is usable in a browser.
+>
+> **Capture note.** The customer session in the web export lives in memory, so a
+> per-screen URL reload drops the access token and renders the login screen. The
+> mobile screenshots in `docs/audit/branding/public/14*.png` are therefore taken
+> by signing in once and then navigating with the app's own tab bar
+> (`.run/capture-mobile.mjs`), which is the only way to see an authenticated
+> screen. The five captures cover home, services, garage, bookings and account.
 
 ## Demo credentials
 
@@ -140,8 +151,10 @@ This is a staging preview, not a production deployment. A production deployment
 would additionally need:
 
 1. A managed PostgreSQL instance and a real domain with TLS.
-2. The official ORYX logo and the original approved photography (see
-   `03_VISUAL_COMPARISON.md`).
+2. The original approved dashboard photography. The official logo is now present
+   (`docs/assets/logo.png.jpeg`, uploaded in `699560c`) and is used by both front
+   ends, but the photographic tiles remain generated vector art (see
+   `03_VISUAL_COMPARISON.md` and `08_VISUAL_IDENTITY_AND_PREVIEW_VERIFICATION.md`).
 3. Production secrets supplied through the environment: `JWT_*` keys,
    `MFA_ENCRYPTION_KEY`, `INTEGRATION_ENCRYPTION_KEY`, and `MFA_REQUIRE_SUPER_ADMIN=true`.
 4. Real gateway credentials if any external integration is to be enabled.

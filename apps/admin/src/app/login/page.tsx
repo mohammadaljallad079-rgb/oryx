@@ -7,6 +7,7 @@ import { useUi } from '@/lib/ui-context';
 import { Icon } from '@/components/icons';
 import { Button, Card, Field } from '@/components/ui';
 import { LocaleToggle, ThemeToggle } from '@/components/topbar-controls';
+import { BrandLogo } from '@/components/brand-logo';
 
 export default function LoginPage() {
   const { t } = useUi();
@@ -84,23 +85,9 @@ export default function LoginPage() {
               }}
             />
             <div className="relative">
-              <div className="flex items-center gap-3">
-                <span
-                  className="grid h-11 w-11 place-items-center rounded-xl"
-                  style={{
-                    background: 'linear-gradient(145deg, var(--gold-soft), var(--gold-deep))',
-                    color: 'var(--text-inverse)',
-                  }}
-                >
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M12 3 21 12 12 21 3 12Z" stroke="currentColor" strokeWidth="1.7" />
-                    <circle cx="12" cy="12" r="3.1" stroke="currentColor" strokeWidth="1.7" />
-                  </svg>
-                </span>
-                <div>
-                  <p className="m-0 text-[20px] font-extrabold tracking-[0.24em]">ORYX</p>
-                  <p className="oryx-muted m-0 text-[12px]">{t('brand.tagline')}</p>
-                </div>
+              <div className="flex flex-col items-start gap-3">
+                <BrandLogo height={38} />
+                <p className="oryx-muted m-0 text-[12px]">{t('brand.tagline')}</p>
               </div>
 
               <h2 className="mt-12 text-[30px] font-extrabold leading-tight">{t('dash.heroTitle')}</h2>

@@ -8,6 +8,7 @@ import { useUi } from '@/lib/ui-context';
 import { ALL_NAV_GROUPS, type NavItem } from '@/lib/navigation';
 import { Icon } from './icons';
 import { Badge } from './ui';
+import { BrandLogo } from './brand-logo';
 
 function visible(item: NavItem, ctx: {
   isPlatform: boolean;
@@ -39,14 +40,11 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
       <Link
         href="/dashboard"
         onClick={onNavigate}
-        className="mb-2 flex items-center gap-3 rounded-xl px-3 py-3"
+        className="mb-2 flex flex-col items-start gap-2 rounded-xl px-3 py-3"
         style={{ border: '1px solid var(--border)' }}
       >
-        <BrandMark />
-        <span className="min-w-0">
-          <span className="block text-[15px] font-extrabold leading-tight tracking-[0.18em]">ORYX</span>
-          <span className="oryx-faint block truncate text-[10.5px]">{t('brand.tagline')}</span>
-        </span>
+        <BrandLogo height={26} />
+        <span className="oryx-faint block truncate text-[10.5px]">{t('brand.tagline')}</span>
       </Link>
 
       {ALL_NAV_GROUPS.map((group) => {
@@ -99,25 +97,5 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
         );
       })}
     </aside>
-  );
-}
-
-function BrandMark() {
-  return (
-    <span
-      aria-hidden="true"
-      className="grid h-9 w-9 flex-none place-items-center rounded-[10px]"
-      style={{
-        background: 'linear-gradient(145deg, var(--gold-soft), var(--gold-deep))',
-        color: 'var(--text-inverse)',
-      }}
-    >
-      {/* Geometric monogram placeholder: the official logo asset is not in the
-          repository yet, so no third-party mark is reproduced here. */}
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M12 3 21 12 12 21 3 12Z" stroke="currentColor" strokeWidth="1.7" />
-        <circle cx="12" cy="12" r="3.1" stroke="currentColor" strokeWidth="1.7" />
-      </svg>
-    </span>
   );
 }
