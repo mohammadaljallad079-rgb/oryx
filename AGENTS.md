@@ -301,6 +301,23 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   cookie without a matching `x-oryx-csrf` header. The refresh branch above it
   echoes the cookie; the login branch must too.
 
+### Mobile gotchas
+
+- **Every file under `(app)` becomes a tab.** Expo Router registers the whole
+  directory, so a screen that is only pushed onto the stack (a detail screen, the
+  booking wizard, invoices, notifications) renders as an extra tab whose label is
+  the raw route name. Declare it with `options={{ href: null }}`. The route name
+  is the flattened file path: a nested index is `bookings/index`, not
+  `bookings`, and the wrong name silently renders a stray tab instead of the
+  screen you meant. `apps/mobile/test/tabs.test.ts` derives the route list from
+  the filesystem and fails when a new screen is added without a declaration.
+- **The customer session is in memory.** A full page reload of the Expo web
+  export drops the access token, so an automated check must log in once and then
+  navigate *inside* the app rather than reloading a URL per screen. A reload also
+  makes the browser present the refresh cookie, which the API rejects for a
+  body-carried token — an artefact of running a native client in a browser, not a
+  product path.
+
 ### Adding a new ERP module
 
 1. Add a `ModuleDefinition` to `packages/shared/src/modules.ts`.
