@@ -197,7 +197,23 @@ silently override `.env.local` and ship a preview that cannot authenticate.
 | `@oryx/shared` unit | **93 passed** (5 files) |
 | `@oryx/mobile` unit | **20 passed** (3 files) |
 | `@oryx/admin` browser, `branding.spec.ts` | **4 passed** |
-| `@oryx/admin` browser, full suite | see `06_TEST_AND_CI_RESULTS.md` |
+| `@oryx/admin` browser, full suite | **130 passed, 0 failed** |
+| `@oryx/api` integration | **218 passed** (8 suites) |
+
+### CI
+
+GitHub Actions run `38983157027` on head `dea5750`, workflow "Audit — Execution
+05 live preview, specification parity and functional audit":
+
+| Job | Result |
+|---|---|
+| Typecheck and build | **pass** (2m33s) |
+| Unit and API integration tests | **pass** (1m43s) |
+| Browser acceptance tests | **pass** (6m58s) |
+
+All three jobs pass on the pushed head. The run before it, on `4c833bc`, failed
+only at `pnpm --filter @oryx/admin lint` — the `<img>` warnings and the `module`
+binding from this session's own new files — and that is fixed in `95d8130`.
 
 ## Remaining blockers
 
