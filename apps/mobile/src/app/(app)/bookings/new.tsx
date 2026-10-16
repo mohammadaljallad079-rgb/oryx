@@ -11,6 +11,7 @@ import {
   Button,
   Card,
   DetailRow,
+  Field,
   Heading,
   Screen,
   StateView,
@@ -131,6 +132,18 @@ export default function NewBookingScreen() {
             ))}
           </View>
         )}
+      </Card>
+
+      <Card>
+        <Field
+          label={t('notes')}
+          value={notes}
+          onChangeText={setNotes}
+          placeholder={t('notesHint')}
+          multiline
+          maxLength={500}
+          editable={!busy}
+        />
       </Card>
 
       <Heading>{t('availableSlots')}</Heading>

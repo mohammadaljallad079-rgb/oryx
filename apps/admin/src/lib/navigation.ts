@@ -117,6 +117,7 @@ export const WEBSITE_APP_NAV: NavGroup = {
     { key: 'featureFlags', labelKey: 'nav.featureFlags', href: '/application/flags', icon: 'flag', permission: 'platform.api.manage', platformOnly: true },
     { key: 'appVersions', labelKey: 'nav.appVersions', href: '/application/versions', icon: 'package', permission: 'platform.api.manage', platformOnly: true },
     { key: 'apiClients', labelKey: 'nav.apiClients', href: '/api-management', icon: 'plug', permission: 'platform.api.manage', platformOnly: true },
+    { key: 'integrations', labelKey: 'nav.integrations', href: '/integrations', icon: 'plug', permission: 'platform.integration.read', platformOnly: true },
   ],
 };
 

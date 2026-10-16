@@ -89,6 +89,8 @@ const strings: Record<string, Entry> = {
   bookingCreated: { ar: 'تم إنشاء الحجز', en: 'Booking created' },
   cancelBooking: { ar: 'إلغاء الحجز', en: 'Cancel booking' },
   cancelReason: { ar: 'سبب الإلغاء', en: 'Reason for cancellation' },
+  notes: { ar: 'ملاحظات (اختياري)', en: 'Notes (optional)' },
+  notesHint: { ar: 'أخبرنا عن العطل أو الخدمة المطلوبة.', en: 'Tell us about the fault or the service you need.' },
   noBookings: { ar: 'لا توجد حجوزات.', en: 'No bookings yet.' },
   reference: { ar: 'المرجع', en: 'Reference' },
   status: { ar: 'الحالة', en: 'Status' },

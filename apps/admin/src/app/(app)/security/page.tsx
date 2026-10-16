@@ -18,7 +18,7 @@ type Status = { enabled: boolean; enrolledAt: string | null; recoveryCodesRemain
  */
 export default function SecurityPage() {
   const { t, locale } = useUi();
-  const { user, isPlatform, refreshSession } = useAuth();
+  const { isPlatform, refreshSession } = useAuth();
   const [status, setStatus] = useState<Status | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

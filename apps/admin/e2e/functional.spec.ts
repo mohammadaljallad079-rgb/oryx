@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { COMPANY_ADMIN, apiToken, setLocale, signIn } from './helpers';
+import { apiToken, setLocale, signIn } from './helpers';
 
 /**
  * Functional acceptance audit.

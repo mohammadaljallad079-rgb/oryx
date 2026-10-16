@@ -308,6 +308,9 @@ model Company {
   paymentReconciliations    PaymentReconciliation[]
   notificationDeliveries    NotificationDelivery[]
 
+  // Execution 05 — per-tenant integration configuration.
+  integrationProviders      IntegrationProvider[]
+
   @@index([type])
   @@index([status])
   @@index([parentCompanyId])
@@ -4487,4 +4490,97 @@ model NotificationDelivery {
   @@index([status, nextAttemptAt])
   @@index([customerAccountId, createdAt])
   @@index([companyId, category])
+}
+
+// ============================================================================
+// EXECUTION 05 — EXTERNAL INTEGRATIONS CENTER & PLATFORM COMPLETION
+//
+// Provider definitions live in @oryx/shared (INTEGRATION_PROVIDERS) so the
+// admin UI, the API and the tests cannot drift. The tables here hold only the
+// per-deployment and per-tenant *state*: which credentials are stored, whether
+// the provider is enabled, and the outcome of the last verification attempt.
+//
+// Secrets are never stored in plaintext: `IntegrationCredential.value` holds the
+// AES-256-GCM sealed value produced by SecretCipher, and every read path masks
+// it. The audit trail records that a credential changed, never its contents.
+// ============================================================================
+
+/** Whether a provider is switched on for the deployment or for one tenant. */
+enum IntegrationScope {
+  PLATFORM
+  COMPANY
+}
+
+/** The last known verification outcome. Only VERIFIED means "working". */
+enum IntegrationVerificationStatus {
+  /** Never tested since the credentials were last changed. */
+  UNVERIFIED
+  /** A real call reached the provider and it answered successfully. */
+  VERIFIED
+  /** A real call was attempted and the provider rejected or failed it. */
+  FAILED
+  /** Credentials are incomplete; no call could be made. */
+  INCOMPLETE
+}
+
+model IntegrationProvider {
+  id               String           @id @default(cuid())
+  /** Provider key from @oryx/shared, e.g. BENEFITPAY. */
+  providerKey      String
+  scope            IntegrationScope @default(PLATFORM)
+  /** Set only when scope is COMPANY. */
+  companyId        String?
+  enabled          Boolean          @default(false)
+  /** Operator note explaining why it is disabled, if it is. */
+  disabledReason   String?
+  verificationStatus IntegrationVerificationStatus @default(UNVERIFIED)
+  lastCheckedAt    DateTime?
+  lastCheckMessage String?
+  /** Who last changed the configuration, for accountability. */
+  updatedById      String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  company     Company?                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  credentials IntegrationCredential[]
+  checks      IntegrationCheck[]
+
+  @@unique([providerKey, scope, companyId])
+  @@index([scope, companyId])
+}
+
+model IntegrationCredential {
+  id            String   @id @default(cuid())
+  providerId    String
+  /** Credential key from the provider definition, e.g. BENEFITPAY_API_KEY. */
+  credentialKey String
+  /** AES-256-GCM sealed value. Never returned to a client unmasked. */
+  value         String
+  /** Last four characters, kept so an operator can tell two keys apart. */
+  hint          String?
+  updatedById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  provider IntegrationProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, credentialKey])
+  @@index([providerId])
+}
+
+/** Append-only record of every connection test, successful or not. */
+model IntegrationCheck {
+  id          String                        @id @default(cuid())
+  providerId  String
+  status      IntegrationVerificationStatus
+  /** Human-readable outcome, safe to display. Never contains a secret. */
+  message     String
+  /** How long the probe took, so a hanging provider is visible. */
+  durationMs  Int?
+  actorUserId String?
+  createdAt   DateTime                      @default(now())
+
+  provider IntegrationProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId, createdAt])
 }
