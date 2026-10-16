@@ -301,6 +301,35 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   cookie without a matching `x-oryx-csrf` header. The refresh branch above it
   echoes the cookie; the login branch must too.
 
+### Branding and preview gotchas
+
+- **An exported `NEXT_PUBLIC_API_BASE_URL` silently overrides `.env.local`.** A
+  shell that has the variable exported — a test harness, for instance — bakes its
+  value into the client bundle, so a preview built that way calls
+  `http://localhost:3001` from the browser and every login fails CORS. `.env.local`
+  is correct with `NEXT_PUBLIC_API_BASE_URL=/api`; build from a clean environment
+  and confirm with `grep -r 'http://localhost:3001' apps/*/.next/static/`.
+- **The customer app's preference keys are namespaced.** It reads
+  `oryx.customer.locale` and `oryx.customer.theme`, while the admin app reads
+  `oryx.locale` and `oryx.theme`. Seeding the wrong pair leaves the app on its
+  default and the capture looks correct-but-unintended.
+- **The official logo has no alpha channel.** `docs/assets/logo.png.jpeg` is a
+  JPEG on a flat grey field, so `.run/gen-brand.cjs` crops to the ink bounding box
+  and rebuilds alpha from the distance to that field, emitting an on-dark and an
+  on-light colourway into **both** apps' `public/brand/`. The two are stacked and
+  swapped by `data-theme` in CSS so the right one paints before hydration.
+- **Grid columns already follow the inline axis.** `dir="rtl"` on `<html>` puts
+  the sidebar column on the right by itself. A `[data-dir='rtl'] .oryx-shell`
+  rule that also swaps `grid-template-columns` cancels that out and lands the
+  sidebar back on the left — the opposite of the requirement.
+- **`next lint` is not the lint gate.** Each app runs `eslint . --max-warnings=0`
+  through a flat config, so a single warning fails the build. Suppress
+  `@next/next/no-img-element` inline where the asset is a static raster, as the
+  MFA QR code already does.
+- **`module` is a reserved lint identifier.** `@next/next/no-assign-module-variable`
+  rejects a `for (const module of …)` loop in an app that shares the admin ESLint
+  config. Name the binding something else.
+
 ### Mobile gotchas
 
 - **Every file under `(app)` becomes a tab.** Expo Router registers the whole
