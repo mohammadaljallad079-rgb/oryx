@@ -28,6 +28,9 @@ export function BrandLogo({
       className={`oryx-brand-logo${className ? ` ${className}` : ''}`}
       style={{ height, width }}
     >
+      {/* The artwork is a single raster lockup, so `next/image`'s loader buys
+          nothing here; both colourways are pre-sized and served as static PNGs. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/brand/oryx-logo-on-dark.png"
         alt="ORYX"
@@ -36,6 +39,7 @@ export function BrandLogo({
         width={width}
         decoding="async"
       />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/brand/oryx-logo-on-light.png"
         alt=""

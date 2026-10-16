@@ -16,7 +16,8 @@ const fs = require('fs');
 const path = require('path');
 
 const SRC = 'docs/assets/logo.png.jpeg';
-const OUT = 'apps/admin/public/brand';
+// Both front ends ship the same two colourways.
+const OUT_DIRS = ['apps/admin/public/brand', 'apps/customer/public/brand'];
 
 // Ink bounding box of the artwork within the 2000x2000 source canvas.
 const X0 = 277;
@@ -30,8 +31,6 @@ const BG = [226, 227, 231];
 const RAMP = 60;
 
 (async () => {
-  fs.mkdirSync(OUT, { recursive: true });
-
   const { data, info } = await sharp(SRC).raw().toBuffer({ resolveWithObject: true });
   const { width: w, channels: c } = info;
 
@@ -74,8 +73,11 @@ const RAMP = 60;
   }
 
   const raw = { width: W, height: H, channels: 4 };
-  await sharp(rgba, { raw }).png().toFile(path.join(OUT, 'oryx-logo-on-light.png'));
-  await sharp(knockout, { raw }).png().toFile(path.join(OUT, 'oryx-logo-on-dark.png'));
+  for (const dir of OUT_DIRS) {
+    fs.mkdirSync(dir, { recursive: true });
+    await sharp(rgba, { raw }).png().toFile(path.join(dir, 'oryx-logo-on-light.png'));
+    await sharp(knockout, { raw }).png().toFile(path.join(dir, 'oryx-logo-on-dark.png'));
+  }
 
-  console.log(`wrote oryx-logo-on-{light,dark}.png (${W}x${H}) to ${OUT}`);
+  console.log(`wrote oryx-logo-on-{light,dark}.png (${W}x${H}) to ${OUT_DIRS.join(', ')}`);
 })();

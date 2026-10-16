@@ -14,6 +14,9 @@ export function BrandLogo({ height = 30 }: { height?: number }) {
   const width = Math.round(height * RATIO);
   return (
     <span className="oryx-brand-logo" style={{ height, width }}>
+      {/* The artwork is a single raster lockup, so `next/image`'s loader buys
+          nothing here; both colourways are pre-sized and served as static PNGs. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/brand/oryx-logo-on-dark.png"
         alt="ORYX"
@@ -22,6 +25,7 @@ export function BrandLogo({ height = 30 }: { height?: number }) {
         width={width}
         decoding="async"
       />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/brand/oryx-logo-on-light.png"
         alt=""

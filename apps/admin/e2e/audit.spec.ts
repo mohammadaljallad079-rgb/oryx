@@ -29,8 +29,8 @@ test.describe('live module audit', () => {
 
     const broken: Array<{ key: string; route: string; status: number }> = [];
 
-    for (const module of ROUTED_MODULES) {
-      const response = await page.goto(module.route, { waitUntil: 'domcontentloaded' });
+    for (const entry of ROUTED_MODULES) {
+      const response = await page.goto(entry.route, { waitUntil: 'domcontentloaded' });
       await page.waitForTimeout(700);
 
       const status = response?.status() ?? 0;
@@ -39,10 +39,10 @@ test.describe('live module audit', () => {
       const isNotFound = /This page could not be found/i.test(body) || status === 404;
 
       if (status !== 200 || isErrorBoundary || isNotFound) {
-        broken.push({ key: module.key, route: module.route, status });
+        broken.push({ key: entry.key, route: entry.route, status });
       }
 
-      await page.screenshot({ path: `${OUT}/module-${slugify(module.key)}-en-dark.png` });
+      await page.screenshot({ path: `${OUT}/module-${slugify(entry.key)}-en-dark.png` });
     }
 
     expect(broken, 'module catalog routes must resolve to a page').toEqual([]);
