@@ -258,6 +258,14 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 - **`next start` snapshots `public/` at boot.** A newly added asset under
   `apps/admin/public/` 404s until the admin server is restarted; a rebuild alone
   is not enough.
+- **Do not point the browser suite at the public HTTPS host.** The admin bundle
+  is built with a relative API base (`NEXT_PUBLIC_API_BASE_URL=/api`) and several
+  specs call `page.evaluate(() => fetch('http://localhost:3001/…'))` directly. On
+  an HTTPS page the browser blocks that plain-HTTP fetch as mixed content, and
+  Playwright reports `TypeError: Failed to fetch` — 12 specs fail while the rest
+  pass, which reads like a product bug and is not. Use
+  `ORYX_ADMIN_URL=http://localhost:12000`; the public host is for the owner's
+  browser.
 - **A sandbox restart drops system packages but keeps the workspace.**
   PostgreSQL, nginx and the Playwright browser download live outside
   `/workspace`, so they vanish while `.run/pgdata`, the built `dist/` and

@@ -57,6 +57,28 @@ Per-spec counts for the browser suite, from the run log:
 unless `CAPTURE_PHASE` is set, so it no longer runs — and no longer rewrites the
 audit images — during `test:ui`.
 
+### The mixed-content trap when pointing the suite at the public host
+
+Running the suite with `ORYX_ADMIN_URL=https://work-1-…all-hands.dev` passes most
+specs but fails exactly the 12 that call `page.evaluate(() => fetch('http://localhost:3001/…'))`
+directly — a plain-HTTP fetch from an HTTPS page, which the browser blocks as
+mixed content and Playwright reports as `TypeError: Failed to fetch`. The 12 are
+`admin.spec.ts` (2), `auth-lifecycle.spec.ts` (2), `erp.spec.ts` (5),
+`functional.spec.ts` (1), `mfa.spec.ts` (2). Use the local proxy URL
+(`http://localhost:12000`) as the report above does; the public HTTPS host is for
+the owner's browser, not for the Node-driven harness.
+
+### Tile-art regression sweep
+
+`branding.spec.ts` sweeps the live dashboard grid. On head `a1ca8aa`:
+
+| Probe | Result |
+|---|---|
+| Module tiles found | 21 |
+| Tiles served as raster crops | **none** |
+| Tiles that failed to decode | **none** |
+| Elements referencing `hero-automotive` | **none** |
+
 ## Shared unit — 93 tests
 
 Covers the authorization invariants, money arithmetic, currency handling,
@@ -90,7 +112,7 @@ AUTH_THROTTLE_LIMIT=100000 THROTTLE_LIMIT=1000000 REFRESH_THROTTLE_LIMIT=100000 
   pnpm --filter @oryx/api test:e2e
 ```
 
-## Admin browser — 129 tests
+## Admin browser — 130 tests
 
 The Playwright suite must run through the reverse proxy, because the preview
 builds use a relative API base (`NEXT_PUBLIC_API_BASE_URL=/api`) so that the
