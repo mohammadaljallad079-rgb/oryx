@@ -74,9 +74,15 @@ export class CustomerAuthController {
     res: Response,
     session: T,
     exposeRefreshToken: boolean,
+    existingCsrf?: string,
   ): Omit<T, 'refreshToken'> | T {
     if (session.refreshToken) {
-      session.csrfToken = this.cookies.setCustomerSession(res, session.refreshToken, this.refreshTtlSeconds());
+      session.csrfToken = this.cookies.setCustomerSession(
+        res,
+        session.refreshToken,
+        this.refreshTtlSeconds(),
+        existingCsrf,
+      );
       if (!exposeRefreshToken) delete session.refreshToken;
     }
     return session;
@@ -146,7 +152,7 @@ export class CustomerAuthController {
       throw notFound(ERROR_CODES.AUTH_TOKEN_INVALID, 'No refresh token was presented.');
     }
     const session = await this.auth.refresh(token, meta(req));
-    return this.complete(res, session, this.wantsBodyToken(req));
+    return this.complete(res, session, this.wantsBodyToken(req), this.cookies.readCustomerCsrfToken(req as never));
   }
 
   @CustomerPublic()
