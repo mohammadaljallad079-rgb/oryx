@@ -267,14 +267,24 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `ORYX_ADMIN_URL=http://localhost:12000`; the public host is for the owner's
   browser.
 - **A sandbox restart drops system packages but keeps the workspace.**
-  PostgreSQL, nginx and the Playwright browser download live outside
-  `/workspace`, so they vanish while `.run/pgdata`, the built `dist/` and
-  `.next/` survive. Recover with
-  `sudo apt-get install -y postgresql-17 nginx`, then
-  `chmod 0700 .run/pgdata` (the restart leaves it group-writable and Postgres
-  refuses to start), then `bash .run/start-stack.sh`. `ss` comes back with
-  `iproute2` via the nginx install, so the script's port checks work again.
-  Playwright needs `playwright install chromium` once more.
+  PostgreSQL, pnpm, the preview proxy and the Playwright browser download live
+  outside `/workspace`, so they vanish while `.run/pgdata`, the built `dist/` and
+  `.next/` survive. `bash .run/start-stack.sh` is now self-healing and handles all
+  of it: it reinstalls PostgreSQL, restores `.run/pgdata` to `0700` (the restart
+  leaves it group-writable and Postgres refuses to start), restores a `pnpm` shim
+  through corepack, and starts one `preview-proxy.mjs` per public host (12000 →
+  admin, 12001 → customer, with a `/mobile` route). It needs no nginx and no
+  re-seed — the seeded cluster is preserved. Playwright still needs
+  `playwright install chromium` once more after a recycle.
+- **`ss`, `netstat` and `lsof` are not installed.** Readiness checks must not use
+  them, or a healthy stack reports every port as closed. `start-stack.sh` uses a
+  bash `/dev/tcp` probe (`port_open`) instead, which needs no external binary.
+- **Point the browser suite at the proxy port, not the app port.** The admin
+  bundle calls the API same-origin, so `ORYX_ADMIN_URL=http://127.0.0.1:12000`
+  (with `ORYX_API=http://127.0.0.1:12000/api/v1`) is required; against the bare
+  port 3000 every authenticated test 404s at login and the failure looks like a
+  routing bug. Also export `DATABASE_URL` — `scripts/reset-seed-mfa.mjs` in the
+  Playwright global setup refuses to run without a recognisable dev/test URL.
 - **`pnpm` can hang where `tsc`/`next`/`playwright` run fine.** In this sandbox
   the pnpm shim stalls indefinitely on `--filter … build` and `exec`; invoking
   `node_modules/.bin/<tool>` directly is reliable. Prefer that when a pnpm
