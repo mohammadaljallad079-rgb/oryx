@@ -1,8 +1,10 @@
 # ORYX — Test and CI Results
 
-Audit date: 2026-10-16
+Audit date: 2026-10-16. Re-verified 2026-10-17 after a sandbox recycle.
 Environment: staging stack (API 3001, admin 3000, customer 3002, mobile-web 8081,
-nginx 12000/12001, PostgreSQL 17 `oryx_staging`), seeded demo data.
+preview proxies 12000/12001, PostgreSQL 17 `oryx_staging`), seeded demo data.
+nginx is no longer part of the stack — the two preview proxies serve the ingress
+ports directly.
 
 ## Summary
 
@@ -14,15 +16,40 @@ nginx 12000/12001, PostgreSQL 17 `oryx_staging`), seeded demo data.
 | Mobile unit | `pnpm --filter @oryx/mobile test` | **20 passed** (3 files) |
 | **Total** | | **461 passed, 0 failed** |
 
-Re-verified in the recovery session on 2026-10-17 after the design-correction
-change (defect 5 in report 04):
+### Recovery session, 2026-10-17
+
+The sandbox image was recycled between sessions, which removed PostgreSQL, pnpm,
+the proxy and the Playwright browser cache while leaving the seeded cluster
+intact. After the self-healing recovery (defect 11 in report 04) the suites were
+re-run against the rebuilt stack:
 
 | Suite | Result |
 |---|---|
 | `@oryx/shared` unit | `Test Files 5 passed` / `Tests 93 passed` |
 | `@oryx/api` integration | `Test Suites: 8 passed, 8 total` / `Tests: 218 passed` |
-| `@oryx/admin` browser | `130 passed (4.9m)` — 0 failed, 0 flaky |
-| `@oryx/mobile` unit | `Test Files 3 passed` / `Tests 20 passed` |
+| `@oryx/admin` browser — `branding.spec.ts` | `5 passed` |
+| `@oryx/admin` browser — `auth-lifecycle.spec.ts` | `18 passed` |
+| `@oryx/admin` typecheck | `tsc --noEmit` clean |
+| `@oryx/admin` lint | `eslint . --max-warnings=0` clean |
+| Public preview sweep | `47 / 47` routes returned `200` |
+
+Live sign-out verification over public HTTPS (`.run/verify-logout.mjs`): the
+refresh cookie `oryx_rt` is present before sign-out, the logout call returns
+`200`, all cookies are cleared afterwards, and a protected route then redirects
+to `/login`.
+
+Locale, theme and viewport matrix (`.run/variants.mjs`), 12 combinations:
+
+| Locale | Theme | Desktop | Tablet | Mobile |
+|---|---|---|---|---|
+| Arabic | dark | ok, `dir=rtl` | ok, `dir=rtl` | ok, `dir=rtl` |
+| Arabic | light | ok, `dir=rtl` | ok, `dir=rtl` | ok, `dir=rtl` |
+| English | dark | ok, `dir=ltr` | ok, `dir=ltr` | ok, `dir=ltr` |
+| English | light | ok, `dir=ltr` | ok, `dir=ltr` | ok, `dir=ltr` |
+
+No horizontal overflow was measured in any combination, and the sign-out control
+was present in all 12. Module captures: `21 / 21` authenticated admin modules
+rendered with the sign-out control visible.
 
 The browser suite must run through the reverse proxy, because the admin bundle
 calls the API same-origin (`NEXT_PUBLIC_API_BASE_URL=/api` in
