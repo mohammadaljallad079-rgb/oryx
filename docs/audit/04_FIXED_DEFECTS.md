@@ -257,3 +257,48 @@ database was preserved throughout, so no re-seed was needed.
 
 **Verified:** cold recovery to `47 / 47` public routes returning `200`.
 
+## 12. A concurrent refresh in a second tab silently signed the user out
+
+**Severity:** high — a real session-loss bug in the shipped auth flow.
+
+**Found by:** CI run `39050023690` (head `06ed1c0`), where the browser suite
+failed 1 of 134 with `two tabs refreshing at once both stay usable`. The
+Playwright trace showed the second tab's `POST /api/v1/auth/refresh` returning
+`403` and the page falling back to `/login`.
+
+**Defect:** the server-side rotation was already race-safe — the guarded
+`updateMany` claim, the grace window and `issueSibling` all behaved correctly,
+and a direct 12-iteration concurrent-refresh probe passed 12/12. The fault was
+the CSRF double-submit token. `CookieService.setSession` minted a **new**
+`oryx_csrf` on every response, including refresh. When two tabs refreshed at
+once, both requests carried the same pre-rotation header, but the first response
+rotated the cookie; the second request then presented a header that no longer
+matched the rotated cookie, so `CsrfGuard` rejected it with
+`auth.csrf_token_invalid` and that tab lost its session.
+
+**Reproduced deterministically** with `node` against the public host: login,
+refresh once (cookie rotated, `rotated=true`), then replay the pre-rotation
+header against the new cookie — `403`. A 12-iteration concurrent probe that
+happened to pair identical headers passed, which is why the defect looked
+intermittent.
+
+**Fix:** the CSRF token is not a credential and gains nothing from per-request
+rotation, so it is now preserved for the life of the session and minted fresh
+only at login. `setSession` and `setCustomerSession` accept an `existingCsrf`
+argument, and the refresh handlers pass the caller's current token through. The
+identical defect existed on the customer plane
+(`CustomerAuthController.complete`) and is fixed the same way.
+
+**Verified:** after the fix the repro reports `rotated=false` and the stale
+header returns `200`; the 12-iteration concurrent probe is still 12/12; the
+multi-tab browser test passes 5/5 consecutively (previously the failure was
+reproducible). Two regression tests were added to `session.e2e-spec.ts` — one
+asserting the token survives rotation and a pre-rotation header still verifies,
+one asserting a genuinely wrong token is still rejected with
+`auth.csrf_token_invalid`, so the guard is demonstrably not weakened. The API
+suite grew from 218 to 220 tests, all passing.
+
+**Security note:** no check was relaxed. `CsrfGuard` still requires the header
+to match the cookie on every unsafe method that presents the refresh cookie; only
+the *value's lifetime* changed, from per-response to per-session.
+

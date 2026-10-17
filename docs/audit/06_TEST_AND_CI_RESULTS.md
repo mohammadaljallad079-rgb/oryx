@@ -11,10 +11,10 @@ ports directly.
 | Suite | Command | Result |
 |---|---|---|
 | Shared unit | `pnpm --filter @oryx/shared test` | **93 passed** (5 files) |
-| API integration | `pnpm --filter @oryx/api test:e2e` | **218 passed** (8 suites) |
+| API integration | `pnpm --filter @oryx/api test:e2e` | **220 passed** (8 suites) |
 | Admin browser | `pnpm --filter @oryx/admin test:ui` | **130 passed** (12 specs, 0 failed) |
 | Mobile unit | `pnpm --filter @oryx/mobile test` | **20 passed** (3 files) |
-| **Total** | | **461 passed, 0 failed** |
+| **Total** | | **463 passed, 0 failed** |
 
 ### Recovery session, 2026-10-17
 
@@ -26,7 +26,7 @@ re-run against the rebuilt stack:
 | Suite | Result |
 |---|---|
 | `@oryx/shared` unit | `Test Files 5 passed` / `Tests 93 passed` |
-| `@oryx/api` integration | `Test Suites: 8 passed, 8 total` / `Tests: 218 passed` |
+| `@oryx/api` integration | `Test Suites: 8 passed, 8 total` / `Tests: 220 passed` |
 | `@oryx/admin` browser — `branding.spec.ts` | `5 passed` |
 | `@oryx/admin` browser — `auth-lifecycle.spec.ts` | `18 passed` |
 | `@oryx/admin` typecheck | `tsc --noEmit` clean |
