@@ -1,0 +1,19 @@
+audit: verify Super Admin access, preview links and visual comparison
+
+Recovered the crashed audit session and completed the outstanding work on
+top of a327f9e. No Execution 01-05 behaviour was rebuilt.
+
+Audit reports updated with this session's verified evidence:
+- 485 automated tests green (96 shared, 229 API, 140 browser, 20 mobile).
+- External preview sweep: 39/39 surfaces over public HTTPS, 0 failed
+  requests, recorded in docs/audit/evidence/.
+- Visual comparison re-run against the current build.
+- Defects 13 (email normalisation on login) and 14 (root .env overriding
+  the admin's relative API base) documented with their fixes.
+
+New regression coverage:
+- apps/api/test/super-admin-access.e2e-spec.ts (9 tests)
+- apps/admin/e2e/super-admin-access.spec.ts (6 tests)
+- packages/shared/test/authorization.test.ts (3 platform-context tests)
+
+Co-authored-by: openhands <openhands@all-hands.dev>

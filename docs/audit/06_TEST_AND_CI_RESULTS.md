@@ -114,6 +114,23 @@ Per-spec counts for the browser suite, from the run log:
 unless `CAPTURE_PHASE` is set, so it no longer runs — and no longer rewrites the
 audit images — during `test:ui`.
 
+### CI is green on head `a14d7b2`
+
+Run [`39064154769`](https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39064154769)
+on `audit/execution-05-verification` completed with conclusion **success** — all
+three jobs green, including step 16 (browser acceptance):
+
+| Job | Result |
+|---|---|
+| Typecheck and build | success |
+| Unit and API integration tests | success |
+| Browser acceptance tests | success |
+
+The previous head `a327f9e` was also green
+([`39052159810`](https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39052159810)),
+and `06ed1c0` before it failed on the concurrent-refresh session loss (defect 12
+in report 04), which is fixed.
+
 ### CI is green on head `a327f9e`
 
 Run [`39052159810`](https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39052159810)
