@@ -58,6 +58,21 @@ describe('ORYX Super Admin access and sign-in (e2e)', () => {
     expect(res.body.accessToken).toBeTruthy();
   });
 
+  it('has exactly one platform super admin role carrying the whole catalog', async () => {
+    // The seed resolves this row with findFirst because (companyId, code) cannot
+    // be enforced when companyId is NULL. A sentinel-keyed upsert therefore
+    // inserted a second row on every re-seed, and the platform principal then
+    // resolved the stale row that held only the PLATFORM-scope permissions.
+    const roles = await ctx.prisma.role.findMany({
+      where: { companyId: null, code: 'platform_super_admin' },
+      include: { permissions: true },
+    });
+
+    expect(roles).toHaveLength(1);
+    expect(roles[0].permissions.length).toBeGreaterThan(100);
+    expect(roles[0].permissions.map((p) => p.permissionCode)).toContain('erp.accounting.read');
+  });
+
   it('accepts a mixed-case login email', async () => {
     const res = await call<{ accessToken: string }>(ctx.base, '/auth/login', {
       method: 'POST',

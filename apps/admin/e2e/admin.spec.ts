@@ -56,6 +56,50 @@ test.describe('themes and locales', () => {
     await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
     await expect(page.getByTestId('module-tiles')).toBeVisible();
   });
+
+  test('the stored theme is applied before the first paint and is not reverted', async ({ page }) => {
+    // The layout ships a blocking bootstrap script that reads the stored theme
+    // and sets `data-theme` before paint. This guards the regression where the
+    // hydration pass wrote the server default back over the stored value and a
+    // light-theme user briefly saw dark.
+    await page.addInitScript(() => {
+      (window as unknown as { __firstTheme: string | null }).__firstTheme = null;
+      const record = () => {
+        const el = document.documentElement;
+        const holder = window as unknown as { __firstTheme: string | null };
+        if (holder.__firstTheme === null && el.getAttribute('data-theme')) {
+          holder.__firstTheme = el.getAttribute('data-theme');
+        }
+      };
+      const start = () => {
+        record();
+        new MutationObserver(record).observe(document, {
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['data-theme'],
+        });
+      };
+      if (document.documentElement) start();
+      else document.addEventListener('readystatechange', start, { once: true });
+    });
+
+    await signIn(page);
+    for (const theme of ['light', 'dark'] as const) {
+      await page.evaluate((value) => window.localStorage.setItem('oryx.theme', value), theme);
+      await page.reload();
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      // The stored preference must survive the reload; the mount write used to
+      // clobber it with the server default.
+      expect(await page.evaluate(() => window.localStorage.getItem('oryx.theme'))).toBe(theme);
+      // The attribute must already be correct at the first observation, not
+      // only after hydration.
+      expect(
+        await page.evaluate(
+          () => (window as unknown as { __firstTheme: string | null }).__firstTheme,
+        ),
+      ).toBe(theme);
+    }
+  });
 });
 
 test.describe('company and branch management', () => {

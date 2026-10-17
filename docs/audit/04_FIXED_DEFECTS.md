@@ -358,3 +358,102 @@ block) is empty. The check is in `docs/audit/evidence/preview-sweep-2026-10-17.j
 leave the root `.env`'s absolute `NEXT_PUBLIC_API_BASE_URL` exported, or the
 served preview loses its same-origin API.
 
+## 15. A stored light theme flashed dark and could be silently reverted
+
+**Found by:** CI. The browser-acceptance job failed on
+`execution04.spec.ts:70` ("every Execution 04 screen renders in both languages
+and both themes") with `Expected: "dark"` but `unexpected value "light"`, on a
+commit that changed only audit markdown. The same code had passed on the
+previous head, which is the signature of a race rather than a deterministic
+failure.
+
+**Cause:** two effects in `UiProvider` (`apps/admin/src/lib/ui-context.tsx`,
+and the same shape in `apps/customer`).
+
+1. The root layout hard-codes `data-theme="dark"` server-side, and the stored
+   preference was applied only inside a `useEffect` after hydration. A
+   light-theme user therefore saw a dark first paint on every navigation — a
+   real visual defect, not just a test artefact.
+2. The theme effect ran on mount and wrote `localStorage['oryx.theme'] = theme`
+   unconditionally. On the hydration pass `theme` is still the server default
+   (`dark`), so the mount wrote `dark` back over whatever the user had stored.
+   When a test (or a user) changed the stored value between the mount write and
+   the next read, the two writes raced and the stored preference lost
+   intermittently.
+
+**Fix:** both front ends now
+
+- render a tiny blocking `<script>` at the top of `<body>` that reads the stored
+  theme and locale and sets `data-theme`/`data-dir`/`lang` on `<html>` before
+  the first paint, so there is no flash and the attribute is already correct
+  when React hydrates; and
+- guard the persistence effects with a `mounted` ref declared last, so the
+  hydration pass never writes the server defaults back over the stored values.
+
+**Verified:** `.run/theme-verify.mjs` drives a real browser against the public
+preview and asserts, for both `light` and `dark`, that the attribute at first
+paint, the attribute after hydration and the stored value all agree. Three
+consecutive runs report `light_ok: true, dark_ok: true`. Before the fix the
+first-paint probe reported `null` (the attribute was not set until after
+hydration) and the stored value reverted to `light` when `dark` was requested.
+
+
+## 16. Super Admin lost every tenant permission after a re-seed
+
+**Severity:** critical, user-visible. A platform Super Admin could sign in and
+see the platform screens, but every company-scoped ERP endpoint answered `403`
+once a company was selected. The owner reported exactly this: "Super Admin full
+access" did not work.
+
+**Found by:** the API integration suite. `super-admin-access.e2e-spec.ts`
+("resolves the whole permission catalog once a company is selected") and
+`permissions-verification.e2e-spec.ts` both failed after the sandbox was
+recycled, while the same commit had passed before the crash. That signature —
+same code, different database state — pointed at data drift rather than a code
+change.
+
+**Cause:** two defects stacked on one another.
+
+1. `seedPlatformRoles()` in `packages/database/prisma/seed.ts` resolved the
+   platform role with
+   `upsert({ where: { companyId_code: { companyId: '', code: 'platform_super_admin' } } })`.
+   A platform role has `companyId = NULL`, and Postgres treats `NULL` as
+   distinct in a unique index, so `(NULL, 'platform_super_admin')` never matched
+   the sentinel key `('', 'platform_super_admin')`. The create path therefore
+   ran and inserted a **second** `platform_super_admin` row on every re-seed.
+   This is the same nullable-unique-key trap already documented for
+   `IntegrationProvider`, but `Role` had no partial index to prevent it.
+2. The consumers — `PrincipalGuard.buildPrincipal`,
+   `AuthService.effectivePermissionCodes` and `RbacService` — all resolve the
+   role with `findFirst({ where: { isPlatform: true, code: 'platform_super_admin' } })`,
+   which has no `orderBy`. It returned the first row Postgres offered, which
+   after the drift was the stale row created before commit `a14d7b2` widened
+   `PLATFORM_SUPER_ADMIN_PERMISSIONS` from the 18 PLATFORM-scope codes to the
+   full 153-code catalog. The principal therefore received 18 permissions, and
+   `resolveEffectivePermissions` correctly refused to widen them: only the
+   PLATFORM-scope subset survived, and every `erp.*` permission was absent.
+
+**Fix:** `seedPlatformRoles()` now resolves the row with
+`findFirst({ where: { companyId: null, code: 'platform_super_admin' } })` and
+updates it in place, creating it only when it is genuinely absent. This is the
+only idempotent form for a nullable unique key, and it matches the pattern
+already used for the platform integration provider.
+
+The stale duplicate row was removed from the staging database. The repaired role
+holds all 153 permission codes.
+
+**Verified:** `node .run/live-login-https.mjs` against the public HTTPS preview
+now reports `Super Admin … perms=18 scoped=200 scopedPerms=153`, where the same
+probe previously reported `scopedPerms=18`. `.run/verify-super-admin-erp.mjs`
+then reaches real tenant data over public HTTPS: accounting accounts `200`
+(21 rows), sales customers `200`, inventory products `200`, HR employees `200`,
+CRM leads `200` and the module catalog `200` (21 modules). Re-running
+`pnpm db:seed` a second time leaves exactly one platform role row with 153
+permissions, so the drift cannot recur.
+
+**Regression guard:** `apps/api/test/super-admin-access.e2e-spec.ts`, test "has
+exactly one platform super admin role carrying the whole catalog". It asserts a
+single `(companyId: null, code: 'platform_super_admin')` row holding more than
+100 permissions including `erp.accounting.read`, so a duplicated or truncated
+platform role fails the suite instead of silently degrading the Super Admin.
+

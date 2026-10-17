@@ -14,9 +14,9 @@ ports directly.
 |---|---|---|
 | Shared unit | `pnpm --filter @oryx/shared test` | **96 passed** (5 files) |
 | API integration | `pnpm --filter @oryx/api test:e2e` | **229 passed** (9 suites) |
-| Admin browser | `pnpm --filter @oryx/admin test:ui` | **140 passed, 1 skipped, 0 failed** |
+| Admin browser | `pnpm --filter @oryx/admin test:ui` | **141 passed, 1 skipped, 0 failed** |
 | Mobile unit | `pnpm --filter @oryx/mobile test` | **20 passed** (3 files) |
-| **Total** | | **485 passed, 0 failed** |
+| **Total** | | **486 passed, 0 failed** |
 
 ### Recovery session, 2026-10-17 (evening) — after the crash
 
@@ -27,7 +27,7 @@ staging database were intact; the changes below were re-run to confirm them.
 |---|---|
 | `@oryx/shared` unit | `Test Files 5 passed` / `Tests 96 passed` |
 | `@oryx/api` integration | `Test Suites: 9 passed, 9 total` / `Tests: 229 passed`, `EXIT=0` |
-| `@oryx/admin` browser (full suite) | `140 passed`, `1 skipped`, `0 failed`, `EXIT=0` (4.9m) |
+| `@oryx/admin` browser (full suite) | `141 passed`, `1 skipped`, `0 failed`, `EXIT=0` (4.8m) |
 | `@oryx/mobile` unit | `Test Files 3 passed` / `Tests 20 passed` |
 | `@oryx/admin` typecheck | `tsc --noEmit` clean |
 | `@oryx/admin` lint | `eslint . --max-warnings=0` clean |
@@ -38,6 +38,55 @@ The API count rose from 220 to 229 with the new `super-admin-access.e2e-spec.ts`
 (9 tests); the browser count rose from 130 to 140 with
 `apps/admin/e2e/super-admin-access.spec.ts` (6 tests) plus the tenant-context
 assertions folded into the existing specs.
+
+### Recovery session, 2026-10-17 (second crash) — theme flash fix
+
+A second interrupted session left one uncommitted change: the theme-flash fix in
+`apps/admin` and `apps/customer` (defect 15 in `04_FIXED_DEFECTS.md`). It was
+completed, verified and covered by a new regression test.
+
+| Suite | Result |
+|---|---|
+| `@oryx/admin` browser (full suite) | `141 passed`, `1 skipped`, `0 failed`, `EXIT=0` (4.8m) |
+| `@oryx/admin` typecheck | `tsc --noEmit` clean |
+| `@oryx/customer` typecheck | `tsc --noEmit` clean |
+| Theme first-paint probe (`.run/theme-verify.mjs`) | 3 consecutive runs, `light_ok: true`, `dark_ok: true` |
+
+The browser count rose from 140 to 141 with the new
+`admin.spec.ts` test "the stored theme is applied before the first paint and is
+not reverted", which asserts for both themes that the attribute at first paint,
+the attribute after hydration and the stored value all agree.
+
+
+### Recovery session, 2026-10-17 (third crash) — Super Admin permission drift
+
+A third interrupted session left the API suite failing 4 tests that had passed on
+the same commit before the crash. The cause was a non-idempotent seed, not a code
+change: `seedPlatformRoles()` keyed its upsert on a sentinel `companyId` that can
+never match a `NULL` platform row, so every re-seed inserted a duplicate
+`platform_super_admin` role. `findFirst` then resolved the stale row holding only
+the 18 PLATFORM-scope permissions, and the Super Admin lost all 135 company-scope
+permissions. See defect 16 in `04_FIXED_DEFECTS.md`.
+
+| Suite | Result |
+|---|---|
+| `@oryx/shared` unit | `Test Files 5 passed` / `Tests 96 passed` |
+| `@oryx/api` integration | `Test Suites: 10 passed, 10 total` / `Tests: 246 passed`, `EXIT=0` |
+| `@oryx/api` targeted (`super-admin-access`, `permissions-verification`) | `25 passed`, `EXIT=0` |
+| Seed idempotency | re-run `pnpm db:seed`: exactly 1 platform role, 153 permissions |
+| Live HTTPS login probe | Super Admin `scopedPerms=153` (was 18) |
+| Live HTTPS ERP probe | accounting `200`, sales `200`, inventory `200`, HR `200`, CRM `200`, modules `200` |
+
+The API count rose from 245 to 246 with the new regression test "has exactly one
+platform super admin role carrying the whole catalog".
+
+
+> **Repository state correction.** The recovery brief named PR #5 and branch
+> `feature/execution-05-platform-completion` as the open work. Both are already
+> merged into `main` (`fc2ab20`, with `7db9689` among its commits). The open pull
+> request is **#6** (`audit/execution-05-verification` → `main`), and this work is
+> pushed there. The owner's `699560c` ("Add files via upload", the ORYX logo) is
+> the current `main` head and is included in this branch.
 
 The public preview sweep is `docs/audit/evidence/preview-sweep-2026-10-17.json`
 and its log. It drives a real browser over the public HTTPS ingress, signs in as
@@ -97,7 +146,7 @@ Per-spec counts for the browser suite, from the run log:
 |---|---|
 | `screenshots.spec.ts` | 19 |
 | `responsive.spec.ts` | 19 |
-| `admin.spec.ts` | 18 |
+| `admin.spec.ts` | 19 |
 | `super-admin-access.spec.ts` | 6 |
 | `auth-lifecycle.spec.ts` | 14 |
 | `functional.spec.ts` | 13 |
@@ -108,7 +157,7 @@ Per-spec counts for the browser suite, from the run log:
 | `execution04.spec.ts` | 5 |
 | `branding.spec.ts` | 5 |
 | `audit.spec.ts` | 4 |
-| **Total** | **140 passed** (plus `capture.spec.ts`, skipped) |
+| **Total** | **141 passed** (plus `capture.spec.ts`, skipped) |
 
 `capture.spec.ts` is a manual capture tool, not a regression test; it now skips
 unless `CAPTURE_PHASE` is set, so it no longer runs — and no longer rewrites the
@@ -210,7 +259,7 @@ AUTH_THROTTLE_LIMIT=100000 THROTTLE_LIMIT=1000000 REFRESH_THROTTLE_LIMIT=100000 
   pnpm --filter @oryx/api test:e2e
 ```
 
-## Admin browser — 140 tests
+## Admin browser — 141 tests
 
 The Playwright suite must run through the reverse proxy, because the preview
 builds use a relative API base (`NEXT_PUBLIC_API_BASE_URL=/api`) so that the
@@ -242,7 +291,7 @@ ORYX_ADMIN_URL=http://localhost:12000 ORYX_API=http://localhost:12000/api/v1 \
 | `super-admin-access.spec.ts` | Super Admin login, permission resolution, password change |
 
 ```
-140 passed, 1 skipped (4.9m)
+141 passed, 1 skipped (4.8m)
 ```
 
 Plus the four `audit.spec.ts` tests:
