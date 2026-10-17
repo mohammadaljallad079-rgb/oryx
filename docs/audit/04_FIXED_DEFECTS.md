@@ -171,3 +171,89 @@ What is still open for the owner is **fidelity, not reuse**: the official brand
 mark and the original automotive photography are still required for full visual
 parity. That is disclosed in `03_VISUAL_COMPARISON.md`.
 
+
+---
+
+## Recovery session (2026-10-17) — additional defects
+
+The previous conversation crashed and the sandbox image was recycled. Recovering
+the preview surfaced four more defects, each fixed and verified.
+
+## 8. The sidebar had no sign-out control
+
+**Severity:** high — a signed-in user could not end their session from the UI.
+
+**Found by:** the owner asking where the sign-out button was, then a sweep of the
+rendered shell, which contained no logout element at all.
+
+**Defect:** `apps/admin/src/components/sidebar.tsx` rendered only navigation
+groups. `useAuth()` exposed `logout()` but nothing called it, so the only way out
+was to clear cookies out of band.
+
+**Fix:** a footer button outside the nav groups, pinned to the bottom of the rail
+with `margin-top: auto` and a sticky position so it stays reachable when the nav
+list scrolls. It is present in both the expanded and the collapsed rail, and it
+carries `data-testid="sidebar-logout"`. `onLogout()` awaits the API call that
+revokes the refresh token and clears the HttpOnly cookie **before** navigating to
+`/login`, so the user never lands on a protected page holding a live session.
+
+**Verified live** over public HTTPS by `.run/verify-logout.mjs`: `oryx_rt`
+present before, `logout API status: 200`, cookies empty afterwards, a protected
+route then refused, and the control visible in **21 / 21** module captures.
+
+**Regression guard:** `auth-lifecycle.spec.ts` › *the sidebar sign-out revokes
+the session and blocks protected pages*.
+
+## 9. Every sign-in failure was reported as bad credentials
+
+**Severity:** medium — it actively misled a throttled or locked user.
+
+**Found by:** reading the login handler while adding the logout test.
+
+**Defect:** `apps/admin/src/app/login/page.tsx` caught every error and set
+`auth.invalid`, so a `429` from the auth throttle and a `403` from an account
+lock both read as "Invalid email or password." A user with a correct password
+would keep retrying and stay locked out.
+
+**Fix:** `signInErrorMessage()` maps the failure to an actionable message —
+`429` to throttling, `auth.account_locked` / `auth.account_inactive` by code,
+`5xx` to unavailable, and only `401` to invalid credentials. Four new dictionary
+keys were added in **both** Arabic and English.
+
+**Regression guard:** three tests in `auth-lifecycle.spec.ts` — a mocked 429, a
+mocked 403 lock, and a genuine 401 — assert the message text differs per cause.
+
+## 10. A configured `/v1` suffix produced a 404 that looked like a routing bug
+
+**Severity:** low — a configuration foot-gun, not a product fault.
+
+**Defect:** `API_BASE` in `apps/admin/src/lib/api.ts` was used verbatim while
+callers append `/v1/...`. A `NEXT_PUBLIC_API_BASE_URL` that already ended in
+`/v1` produced `/api/v1/v1/auth/login`.
+
+**Fix:** trailing slashes and a terminal `/v1` are trimmed from the base, so the
+documented origin-plus-`/api` form and the mistaken form both work.
+
+## 11. The preview stack did not survive a sandbox recycle
+
+**Severity:** high for the deliverable — the owner's preview links went dark.
+
+**Found by:** every port returning `000` after the crash, with
+`PrismaClientInitializationError: Can't reach database server at 127.0.0.1:5432`.
+
+**Defect:** three separate failures. The `postgresql-17` package was removed from
+the image while the seeded cluster under `.run/pgdata` survived; the reinstall
+widened that directory to `2770`, which PostgreSQL refuses to start from; and the
+nginx reverse proxy plus `pnpm` were both gone. `start-stack.sh` also probed
+readiness with `ss`, which is absent from the image, so it reported every healthy
+service as `FAILED`.
+
+**Fix:** `start-stack.sh` is now self-healing — it reinstalls PostgreSQL, restores
+`pgdata` to `0700`, restores a `pnpm` shim through corepack, and starts one
+`preview-proxy.mjs` per public host (12000 → admin, 12001 → customer) with a
+`/mobile` route. Readiness uses a bash `/dev/tcp` probe instead of `ss`. nginx is
+no longer required: the proxies serve the two ingress ports directly. The seeded
+database was preserved throughout, so no re-seed was needed.
+
+**Verified:** cold recovery to `47 / 47` public routes returning `200`.
+

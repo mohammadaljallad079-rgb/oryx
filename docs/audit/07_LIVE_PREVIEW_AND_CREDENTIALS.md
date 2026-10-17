@@ -1,7 +1,11 @@
 # ORYX — Live Preview Links and Demo Credentials
 
-Audit date: 2026-10-16
-Status: **LIVE and externally verified** from outside the sandbox.
+Audit date: 2026-10-16. Re-verified 2026-10-17 after a sandbox recycle.
+
+Status: **LIVE and externally verified** from outside the sandbox. All 47 routes
+were re-checked over public HTTPS on 2026-10-17 after the crashed session was
+recovered and the preview stack was rebuilt (see defect 11 in
+`04_FIXED_DEFECTS.md`).
 
 This is an **isolated staging environment**: a separate PostgreSQL database
 (`oryx_staging`) with seeded synthetic demo records. No production data and no
