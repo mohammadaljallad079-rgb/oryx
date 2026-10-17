@@ -73,9 +73,20 @@ permissions. See defect 16 in `04_FIXED_DEFECTS.md`.
 | `@oryx/shared` unit | `Test Files 5 passed` / `Tests 96 passed` |
 | `@oryx/api` integration | `Test Suites: 10 passed, 10 total` / `Tests: 246 passed`, `EXIT=0` |
 | `@oryx/api` targeted (`super-admin-access`, `permissions-verification`) | `25 passed`, `EXIT=0` |
+| `@oryx/admin` browser (full suite, via the local proxy origin) | `141 passed`, `1 skipped`, `0 failed`, `EXIT=0` (4.9m) |
 | Seed idempotency | re-run `pnpm db:seed`: exactly 1 platform role, 153 permissions |
 | Live HTTPS login probe | Super Admin `scopedPerms=153` (was 18) |
 | Live HTTPS ERP probe | accounting `200`, sales `200`, inventory `200`, HR `200`, CRM `200`, modules `200` |
+| Public preview sweep | `39 / 39` routes `200`, `0` failed requests |
+| Responsive / locale / theme matrix | `12 / 12` combinations, `0` horizontal overflow |
+
+Run the browser suite through the proxy origin (`ORYX_ADMIN_URL=http://localhost:12000`),
+not the bare Next server on `:3000`. The admin bundle now calls a same-origin
+`/api`, which only the proxy forwards, and a few specs `fetch` the absolute
+`http://localhost:3001/api/v1` from inside `page.evaluate`. Against the public
+**HTTPS** origin that absolute `http` fetch is blocked as mixed content, so those
+specs fail with `TypeError: Failed to fetch` even though the product works. The
+HTTP proxy origin satisfies both forms.
 
 The API count rose from 245 to 246 with the new regression test "has exactly one
 platform super admin role carrying the whole catalog".

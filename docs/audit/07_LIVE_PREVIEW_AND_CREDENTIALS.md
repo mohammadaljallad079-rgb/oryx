@@ -47,6 +47,28 @@ reported as failing.
 The API health check returns
 `{"status":"ok","service":"oryx-api","version":"0.1.0","database":"up"}`.
 
+### Super Admin full access — re-verified after the seed fix
+
+The 2026-10-17 (third) recovery session found the Super Admin resolving only the
+18 PLATFORM-scope permissions because a non-idempotent seed had duplicated the
+platform role (defect 16 in `04_FIXED_DEFECTS.md`). After the fix the same
+browser-independent probes over public HTTPS report:
+
+| Probe | Before | After |
+|---|---|---|
+| `superadmin@oryx.local` `/auth/context` with a company selected | `18` | **153** |
+| `GET /api/v1/accounting/accounts` (Enterprise tenant) | `403` | **200**, 21 rows |
+| `GET /api/v1/sales/customers` | `403` | **200** |
+| `GET /api/v1/inventory/products` | `403` | **200** |
+| `GET /api/v1/hr/employees` | `403` | **200** |
+| `GET /api/v1/crm/leads` | `403` | **200** |
+| `GET /api/v1/modules` | `403` | **200**, 21 modules |
+
+Scripts: `.run/live-login-https.mjs` and `.run/verify-super-admin-erp.mjs`. The
+fresh sweep after the fix is
+`docs/audit/evidence/preview-sweep-2026-10-17-super-admin-fix.json` (39/39, 0
+failed requests).
+
 **A platform administrator must select a company before the ERP modules serve
 data.** With no tenant selected, `GET /api/v1/accounting/accounts` and its peers
 correctly return `403`; the modules render their empty state. This is the
