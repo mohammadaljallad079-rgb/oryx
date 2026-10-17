@@ -46,6 +46,11 @@ changes to be pushed to the Execution 05 branch.
 - **One functional defect was found and fixed** (a module catalog route drift),
   plus an RTL sidebar direction defect and a preview-build CORS hazard, each with
   a regression guard.
+- **The approved design reference is no longer used as dashboard artwork.** The
+  dashboard module tile pointed at a crop of
+  `docs/assets/ORYX Auto Services Dashboard.png`; it now uses purpose-drawn art.
+  Verified live: no element on the dashboard references the crop. See defect 5 in
+  report 04.
 - **Full visual parity is not claimed**: the official logo is present, but the
   approved dashboard photography is still missing and there is no approved
   light-theme reference. See report 03.

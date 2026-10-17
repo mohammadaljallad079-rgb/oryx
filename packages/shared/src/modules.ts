@@ -79,7 +79,7 @@ const M = (
 });
 
 export const MODULES: ModuleDefinition[] = [
-  M('dashboard', 'Dashboard', 'لوحة المعلومات', 'Operational overview for the selected company and branch.', 'نظرة تشغيلية للشركة والفرع المحدد.', 'core', 'gauge', 'hero-automotive', '/dashboard', 'AVAILABLE', 'erp.dashboard.read', 'execution-01'),
+  M('dashboard', 'Dashboard', 'لوحة المعلومات', 'Operational overview for the selected company and branch.', 'نظرة تشغيلية للشركة والفرع المحدد.', 'core', 'gauge', 'tile-dashboard', '/dashboard/overview', 'AVAILABLE', 'erp.dashboard.read', 'execution-01'),
   M('company_management', 'Company Management', 'إدارة الشركات', 'Companies, subsidiaries, hierarchy and lifecycle.', 'الشركات والشركات التابعة والهيكل ودورة الحياة.', 'core', 'building', 'tile-company', '/companies', 'AVAILABLE', 'erp.company.manage', 'execution-01'),
   M('branch_management', 'Branch Management', 'إدارة الفروع', 'Branches, locations and branch-level scoping.', 'الفروع والمواقع ونطاق الفرع.', 'core', 'map-pin', 'tile-branch', '/branches', 'AVAILABLE', 'erp.branch.manage', 'execution-01'),
   M('financial_accounting', 'Financial Accounting', 'المحاسبة المالية', 'Chart of accounts, journals, AR/AP and VAT.', 'دليل الحسابات والقيود والمدينون والدائنون والضريبة.', 'finance', 'calculator', 'tile-accounting', '/accounting', 'AVAILABLE', 'erp.accounting.read', 'execution-02', 'erp.accounting.write'),

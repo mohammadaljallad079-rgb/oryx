@@ -245,6 +245,31 @@ export const Icons = {
       <circle cx="16.5" cy="14.5" r="1.2" />
     </Base>
   ),
+  chevronsLeft: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M11 17l-5-5 5-5" />
+      <path d="M18 17l-5-5 5-5" />
+    </Base>
+  ),
+  chevronsRight: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M13 7l5 5-5 5" />
+      <path d="M6 7l5 5-5 5" />
+    </Base>
+  ),
+  calendar: (p: IconProps) => (
+    <Base {...p}>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </Base>
+  ),
+  store: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M4 10v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9" />
+      <path d="M3 6.5 4.6 3h14.8L21 6.5a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0Z" />
+      <path d="M9 20v-5h6v5" />
+    </Base>
+  ),
 } as const;
 
 export type IconName = keyof typeof Icons;

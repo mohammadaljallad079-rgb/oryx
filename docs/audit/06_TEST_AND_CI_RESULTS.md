@@ -14,15 +14,26 @@ nginx 12000/12001, PostgreSQL 17 `oryx_staging`), seeded demo data.
 | Mobile unit | `pnpm --filter @oryx/mobile test` | **20 passed** (3 files) |
 | **Total** | | **461 passed, 0 failed** |
 
-Re-verified in the recovery session on 2026-10-16 after the visual identity
-changes:
+Re-verified in the recovery session on 2026-10-17 after the design-correction
+change (defect 5 in report 04):
 
 | Suite | Result |
 |---|---|
 | `@oryx/shared` unit | `Test Files 5 passed` / `Tests 93 passed` |
 | `@oryx/api` integration | `Test Suites: 8 passed, 8 total` / `Tests: 218 passed` |
-| `@oryx/admin` browser | `130 passed (4.8m)` — 0 failed, 0 flaky |
+| `@oryx/admin` browser | `130 passed (4.9m)` — 0 failed, 0 flaky |
 | `@oryx/mobile` unit | `Test Files 3 passed` / `Tests 20 passed` |
+
+The browser suite must run through the reverse proxy, because the admin bundle
+calls the API same-origin (`NEXT_PUBLIC_API_BASE_URL=/api` in
+`apps/admin/.env.local`). Against the bare app port every authenticated test
+fails identically at login with a `404`:
+
+```bash
+ORYX_ADMIN_URL=http://localhost:12000 \
+AUTH_THROTTLE_LIMIT=100000 THROTTLE_LIMIT=1000000 REFRESH_THROTTLE_LIMIT=100000 \
+pnpm --filter @oryx/admin test:ui
+```
 
 Per-spec counts for the browser suite, from the run log:
 
@@ -38,9 +49,9 @@ Per-spec counts for the browser suite, from the run log:
 | `erp.spec.ts` | 8 |
 | `execution05.spec.ts` | 6 |
 | `execution04.spec.ts` | 5 |
-| `branding.spec.ts` | 4 |
+| `branding.spec.ts` | 5 |
 | `audit.spec.ts` | 4 |
-| **Total** | **129 passed** (plus `capture.spec.ts`, skipped) |
+| **Total** | **130 passed** (plus `capture.spec.ts`, skipped) |
 
 `capture.spec.ts` is a manual capture tool, not a regression test; it now skips
 unless `CAPTURE_PHASE` is set, so it no longer runs — and no longer rewrites the

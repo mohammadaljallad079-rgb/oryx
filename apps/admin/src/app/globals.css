@@ -469,6 +469,7 @@ body::before {
   grid-template-columns: var(--sidebar-w) 1fr;
   grid-template-rows: var(--header-h) 1fr;
   grid-template-areas: 'sidebar header' 'sidebar main';
+  transition: grid-template-columns 0.2s ease;
 }
 
 /* Grid columns follow the inline axis, so an RTL document already renders
@@ -498,9 +499,67 @@ body::before {
   border-inline-end: 1px solid var(--border);
   padding: 16px 12px 28px;
   overflow-y: auto;
+  overflow-x: hidden;
   position: sticky;
   top: 0;
   height: 100vh;
+  transition: width 0.2s ease, padding 0.2s ease;
+}
+
+/* Collapsed (icon-only) rail. The width lives on the shell so the grid column
+ * and the rail stay in step; only one property needs to change. */
+.oryx-shell[data-nav='collapsed'] {
+  --sidebar-w: 78px;
+}
+
+.oryx-shell[data-nav='collapsed'] .oryx-sidebar {
+  padding: 16px 8px 28px;
+}
+
+.oryx-sidebar__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.oryx-shell[data-nav='collapsed'] .oryx-sidebar__brand {
+  align-items: center;
+  padding: 12px 6px;
+}
+
+.oryx-nav-group-label__text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.oryx-shell[data-nav='collapsed'] .oryx-nav-group-label__text,
+.oryx-shell[data-nav='collapsed'] .oryx-sidebar__brand-text,
+.oryx-shell[data-nav='collapsed'] .oryx-nav-item__label,
+.oryx-shell[data-nav='collapsed'] .oryx-nav-item .oryx-badge {
+  display: none;
+}
+
+.oryx-shell[data-nav='collapsed'] .oryx-nav-item {
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.oryx-shell[data-nav='collapsed'] .oryx-nav-group-label {
+  justify-content: center;
+  padding: 14px 0 6px;
+}
+
+/* The active marker stays visible in the collapsed rail via the icon colour. */
+.oryx-shell[data-nav='collapsed'] .oryx-nav-item[aria-current='page'] {
+  background: color-mix(in srgb, var(--gold) 18%, transparent);
 }
 
 .oryx-main {
@@ -631,11 +690,38 @@ body::before {
   overflow: hidden;
   border-radius: 18px;
   border: 1px solid var(--border);
-  min-height: 232px;
+  min-height: 268px;
   display: flex;
   align-items: flex-end;
   color: #fff;
   isolation: isolate;
+}
+
+/* Banner copy sits over the darker left half of the artwork in LTR, and over
+ * the mirrored right half in RTL, so the car is never hidden by text. */
+.oryx-hero__content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  padding: 26px;
+}
+
+.oryx-hero__logo {
+  align-self: flex-start;
+}
+
+:root[data-dir='rtl'] .oryx-hero__logo {
+  align-self: flex-start;
+}
+
+.oryx-hero__eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold-soft);
 }
 
 .oryx-hero__media {
@@ -646,24 +732,37 @@ body::before {
   background-position: center;
 }
 
+/* The artwork carries its own light falloff on the copy side (left). In RTL the
+ * copy moves to the right, so the whole image is mirrored rather than shifted:
+ * shifting would crop the car away at handset widths, mirroring keeps the
+ * composition intact and puts the darker half behind the text. */
+:root[data-dir='rtl'] .oryx-hero__media {
+  transform: scaleX(-1);
+}
+
+/* The artwork carries its own light falloff on the copy side, so this scrim is
+ * deliberately light: it only needs to guarantee contrast for the headline and
+ * must not bury the vehicle. Keep the car side almost clear. */
 .oryx-hero__scrim {
   position: absolute;
   inset: 0;
   z-index: -1;
   background: linear-gradient(
     100deg,
-    rgba(0, 15, 30, 0.95) 6%,
-    rgba(0, 18, 34, 0.78) 46%,
-    rgba(0, 22, 43, 0.42) 100%
+    rgba(0, 15, 30, 0.62) 0%,
+    rgba(0, 18, 34, 0.34) 34%,
+    rgba(0, 22, 43, 0.08) 62%,
+    rgba(0, 22, 43, 0) 100%
   );
 }
 
 :root[data-dir='rtl'] .oryx-hero__scrim {
   background: linear-gradient(
     260deg,
-    rgba(0, 15, 30, 0.95) 6%,
-    rgba(0, 18, 34, 0.78) 46%,
-    rgba(0, 22, 43, 0.42) 100%
+    rgba(0, 15, 30, 0.62) 0%,
+    rgba(0, 18, 34, 0.34) 34%,
+    rgba(0, 22, 43, 0.08) 62%,
+    rgba(0, 22, 43, 0) 100%
   );
 }
 
@@ -686,6 +785,30 @@ body::before {
     grid-template-columns: 1fr;
     grid-template-rows: var(--header-h) 1fr;
     grid-template-areas: 'header' 'main';
+  }
+
+  /* The collapse toggle only applies to the docked desktop rail. The mobile
+   * drawer is always full width with labels, whatever the stored preference
+   * says, or a persisted collapse would render an unlabelled drawer. */
+  .oryx-nav-collapse-toggle {
+    display: none;
+  }
+
+  .oryx-shell[data-nav='collapsed'] .oryx-sidebar__brand,
+  .oryx-shell[data-nav='collapsed'] .oryx-nav-item {
+    justify-content: flex-start;
+    padding-inline: 12px;
+  }
+
+  .oryx-shell[data-nav='collapsed'] .oryx-nav-group-label {
+    justify-content: space-between;
+    padding: 16px 12px 6px;
+  }
+
+  .oryx-shell[data-nav='collapsed'] .oryx-nav-group-label__text,
+  .oryx-shell[data-nav='collapsed'] .oryx-sidebar__brand-text,
+  .oryx-shell[data-nav='collapsed'] .oryx-nav-item__label {
+    display: block;
   }
 
   .oryx-sidebar {

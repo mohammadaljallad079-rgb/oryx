@@ -70,6 +70,92 @@ prefix, matching the export. `.run/serve-mobile-web.mjs` serves the export.
 **Regression guard:** `apps/mobile/test/tabs.test.ts` derives the route list from
 the filesystem, and the browser check logs in and navigates to `/mobile/garage`.
 
+## 5. The approved design reference was used as dashboard artwork
+
+**Severity:** high — it violates the owner's explicit design rule that the
+approved reference image must never be used as dashboard artwork.
+
+**Found by:** auditing every module tile reference against the tile files on
+disk, then driving the live dashboard in a real browser
+(`.run/verify-tile.mjs`) and reading the computed background of each surface.
+
+**Defect:** `scripts/extract-approved-assets.py` treats
+`docs/assets/ORYX Auto Services Dashboard.png` — the owner's approved *design
+reference screenshot* — as an image source and crops photographic regions out of
+it into `apps/admin/public/tiles/*.jpg`. The dashboard hero had already been
+moved to a purpose-drawn vector banner, but the **module catalog** still pointed
+the dashboard tile at the crop:
+
+```diff
+-  M('dashboard', …, 'hero-automotive', '/dashboard/overview', …),
++  M('dashboard', …, 'tile-dashboard', '/dashboard/overview', …),
+```
+
+`tileImageUrl()` resolves a tile name to `/tiles/<name>.jpg`, so the dashboard
+tile rendered `hero-automotive.jpg`, a crop of the reference.
+
+**Fix:**
+
+| Change | File |
+|---|---|
+| Original vector motif for the dashboard tile (gold telemetry gauge over a KPI strip) | `scripts/generate-tile-art.py` → `dashboard()` |
+| Generated artwork | `apps/admin/public/tiles/tile-dashboard.svg`, `tile-dashboard.jpg` (900 × 560) |
+| Dashboard module points at the generated art | `packages/shared/src/modules.ts` |
+
+**Verified live**, through the public HTTPS ingress:
+
+| Probe | Result |
+|---|---|
+| `.oryx-hero__media` background | `…/tiles/banner-automotive.svg` |
+| `tile-dashboard` background | `…/tiles/tile-dashboard.jpg` |
+| Elements referencing `hero-automotive` | **none** |
+| `tile-dashboard.jpg` decoded size | **900 × 560** |
+
+**Regression guard:** `apps/admin/e2e/branding.spec.ts`, test "the approved
+design reference is never used as dashboard artwork".
+
+**Still open, disclosed:** the other `tile-*.jpg` crops remain derived from the
+approved reference, because the original photography was never supplied and
+those modules need image-led tiles. Report 03 and the README continue to state
+that full visual parity is **not** claimed.
+
+## 6. Branding regression test matched two lockups
+
+**Severity:** low — a test defect, not a product defect.
+
+**Found by:** the full browser suite, after the hero gained its own `BrandLogo`.
+
+**Defect:** `locator('.oryx-brand-logo')` resolved to two elements — the sidebar
+lockup and the hero lockup — so Playwright failed with a strict-mode violation.
+
+**Fix:** scope the locators to `.oryx-sidebar` in
+`apps/admin/e2e/branding.spec.ts`, which is what the test always meant to assert.
+
+## 7. The browser suite could not authenticate against the direct app port
+
+**Severity:** medium — it made every authenticated test fail identically and
+masked real defects.
+
+**Found by:** the suite reporting 117 failures, all
+`TimeoutError: page.waitForURL: … waiting for navigation to "**/dashboard"`, with
+`404 POST /api/v1/auth/login` in the browser console.
+
+**Defect:** `apps/admin/.env.local` sets `NEXT_PUBLIC_API_BASE_URL=/api`, so the
+client bundle calls the API same-origin. That resolves only when the app is
+served through the reverse proxy, which routes `/api/` to the API. The Playwright
+default `baseURL` is the bare app port `http://localhost:3000`, where `/api/*` is
+unrouted, so login 404'd.
+
+**Fix:** run the suite through the proxy —
+`ORYX_ADMIN_URL=http://localhost:12000 pnpm --filter @oryx/admin test:ui`.
+No source change was needed; the committed configuration was already correct.
+
+**Regression guard:** documented as a gotcha in `AGENTS.md`, because one repeated
+timeout hid every real failure behind it.
+
 ## Recovered, not yet fixed — needs an owner decision
 
-None. Every defect found in this audit is fixed and guarded.
+The remaining `tile-*.jpg` photographic crops derived from the approved design
+reference (see defect 5). Replacing them needs either the original photography
+files or a decision to commission new artwork; it is not something to invent.
+

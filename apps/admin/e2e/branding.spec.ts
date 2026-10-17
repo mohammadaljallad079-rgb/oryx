@@ -76,11 +76,14 @@ test.describe('branding and direction', () => {
     await setTheme(page, 'dark');
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
 
-    const logo = page.locator('.oryx-brand-logo');
+    // Scope to the sidebar lockup: the dashboard hero carries a second
+    // BrandLogo, so an unscoped `.oryx-brand-logo` matches two elements.
+    const shell = page.locator('.oryx-sidebar');
+    const logo = shell.locator('.oryx-brand-logo');
     await expect(logo).toBeVisible();
 
-    const onDark = page.locator('.oryx-brand-logo__on-dark');
-    const onLight = page.locator('.oryx-brand-logo__on-light');
+    const onDark = shell.locator('.oryx-brand-logo__on-dark');
+    const onLight = shell.locator('.oryx-brand-logo__on-light');
 
     await expect(onDark).toBeVisible();
     await expect(onLight).toBeHidden();
@@ -98,5 +101,53 @@ test.describe('branding and direction', () => {
 
     await expect(onLight).toBeVisible();
     await expect(onDark).toBeHidden();
+  });
+
+  test('the approved design reference is never used as dashboard artwork', async ({ page }) => {
+    await setLocale(page, 'en');
+    await setTheme(page, 'dark');
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle');
+
+    // The banner must be the purpose-drawn vector, not a crop of the approved
+    // design reference. `hero-automotive.jpg` is a crop of
+    // docs/assets/ORYX Auto Services Dashboard.png and must not appear here.
+    const heroMedia = await page
+      .locator('.oryx-hero__media')
+      .evaluate((el) => getComputedStyle(el).backgroundImage);
+    expect(heroMedia).toContain('banner-automotive.svg');
+    expect(heroMedia).not.toContain('hero-automotive');
+
+    // No element on the dashboard may reference the reference crop.
+    const offenders = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('*')).flatMap((el) => {
+        const bg = getComputedStyle(el).backgroundImage;
+        const src = el instanceof HTMLImageElement ? el.getAttribute('src') ?? '' : '';
+        return bg.includes('hero-automotive') || src.includes('hero-automotive')
+          ? [el.className || el.tagName]
+          : [];
+      }),
+    );
+    expect(offenders).toEqual([]);
+
+    // The dashboard module tile must resolve to real, non-empty artwork.
+    const tileUrl = await page
+      .getByTestId('tile-dashboard')
+      .locator('.oryx-tile__media')
+      .evaluate((el) => getComputedStyle(el).backgroundImage);
+    expect(tileUrl).toContain('tile-dashboard');
+
+    const decoded = await page.evaluate(
+      (url) =>
+        new Promise<{ w: number; h: number }>((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+          img.onerror = () => reject(new Error(`failed to load ${url}`));
+          img.src = url;
+        }),
+      tileUrl.match(/url\("?(.*?)"?\)/)?.[1] ?? '',
+    );
+    expect(decoded.w).toBeGreaterThan(100);
+    expect(decoded.h).toBeGreaterThan(0);
   });
 });

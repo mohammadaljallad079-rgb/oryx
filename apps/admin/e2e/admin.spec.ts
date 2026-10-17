@@ -42,7 +42,7 @@ test.describe('themes and locales', () => {
     await signIn(page);
     await setTheme(page, 'light');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-    await expect(page.getByTestId('kpi-row')).toBeVisible();
+    await expect(page.getByTestId('dashboard-hero')).toBeVisible();
     await setTheme(page, 'dark');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await expect(page.getByTestId('module-tiles')).toBeVisible();
@@ -295,6 +295,8 @@ test.describe('dashboard integrity', () => {
   test('dashboard metrics come from the API and support company scoping', async ({ page }) => {
     await signIn(page);
     await setLocale(page, 'en');
+    // Statistics live on لوحة المعلومات, not on the homepage.
+    await page.goto('/dashboard/overview');
     await expect(page.getByTestId('kpi-row')).toBeVisible();
     await expect(page.getByTestId('chart-branches')).toBeVisible();
 

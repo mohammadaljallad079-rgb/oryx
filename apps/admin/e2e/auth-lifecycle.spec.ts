@@ -106,7 +106,7 @@ test.describe('session restoration', () => {
 
     await page.reload();
     await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 25_000 });
-    await expect(page.getByTestId('kpi-row')).toBeVisible();
+    await expect(page.getByTestId('module-tiles')).toBeVisible();
 
     expect(rotations).toBeLessThanOrEqual(1);
 

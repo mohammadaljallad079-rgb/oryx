@@ -248,6 +248,22 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `pnpm install` can update the Playwright build, and the suites then fail with
   `Executable doesn't exist ... headless_shell` until
   `pnpm --filter @oryx/admin exec playwright install chromium` runs again.
+- **Run the browser suite through the reverse proxy, not the bare app port.**
+  `apps/admin/.env.local` sets `NEXT_PUBLIC_API_BASE_URL=/api`, so the client
+  calls the API same-origin. Only the proxy routes `/api/` to the API; against
+  `http://localhost:3000` every authenticated test fails identically with
+  `TimeoutError: page.waitForURL … **/dashboard` and a `404 POST
+  /api/v1/auth/login`, which hides every real failure behind one timeout. Use
+  `ORYX_ADMIN_URL=http://localhost:12000 pnpm --filter @oryx/admin test:ui`.
+- **`next start` snapshots `public/` at boot.** A newly added asset under
+  `apps/admin/public/` 404s until the admin server is restarted; a rebuild alone
+  is not enough.
+- **The dashboard tile must not use the approved design reference.** The owner's
+  rule is that `docs/assets/ORYX Auto Services Dashboard.png` is a design
+  reference, never artwork. `scripts/extract-approved-assets.py` crops it into
+  `tiles/*.jpg`, so a module pointing at one of those names renders a crop of the
+  reference. Dashboard surfaces use purpose-drawn art from
+  `scripts/generate-tile-art.py`; `branding.spec.ts` guards it.
 - **ESLint runs through flat configs, not `next lint`.** `apps/admin`,
   `apps/customer` and `apps/mobile` each have an `eslint.config.mjs` and their
   `lint` script is `eslint . --max-warnings=0`. `next lint` is deprecated in
