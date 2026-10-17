@@ -3,6 +3,10 @@
 The artwork is original generated geometry — no stock photography and no
 third-party brand marks — so the dashboard stays image-led without inventing
 the owner's logo asset (which is not present in the repository).
+
+This is the single source of truth for tile art. The tiles are served as SVG
+(see `tileImageUrl` in packages/shared/src/modules.ts), so there is no raster
+step and no dependency on the owner's design reference.
 """
 
 import math
@@ -15,7 +19,7 @@ W, H = 640, 420
 
 
 def wrap(name, inner):
-    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img">
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" preserveAspectRatio="xMidYMid slice" role="img">
 <defs>
   <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
     <stop offset="0%" stop-color="#04213d"/>
@@ -56,6 +60,32 @@ def hero():
 <path d="M300 330 q40 -66 130 -66 h150 q60 0 84 40 l26 26" fill="none" stroke="#ffffff" stroke-opacity="0.16" stroke-width="2"/>
 <path d="M120 356 h420" stroke="url(#gold)" stroke-opacity="0.35" stroke-width="1.5"/>
 <path d="M60 96 h96 M60 96 v40 M156 96 v40" fill="none" stroke="#d4af37" stroke-opacity="0.5" stroke-width="1.2"/>'''
+
+
+def dashboard():
+    """Operational-overview motif: a gold telemetry gauge over a KPI strip.
+
+    Original geometry, generated here — the dashboard tile must not reuse the
+    approved design reference as artwork.
+    """
+    bars = []
+    heights = [58, 96, 74, 128, 88, 150, 112]
+    for i, h in enumerate(heights):
+        x = 120 + i * 58
+        bars.append(
+            f'<rect x="{x}" y="{300 - h}" width="26" height="{h}" rx="4" '
+            f'fill="url(#gold)" fill-opacity="{0.28 + i * 0.07:.2f}"/>'
+        )
+    return grid() + '''
+<circle cx="500" cy="150" r="118" fill="none" stroke="#ffffff" stroke-opacity="0.10" stroke-width="1.2"/>
+<path d="M500 32 a118 118 0 0 1 102 59" fill="none" stroke="url(#gold)" stroke-opacity="0.85" stroke-width="4" stroke-linecap="round"/>
+<path d="M500 32 a118 118 0 0 0 -102 59" fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="4" stroke-linecap="round"/>
+<circle cx="500" cy="150" r="78" fill="none" stroke="url(#gold)" stroke-opacity="0.45" stroke-width="1.4"/>
+<circle cx="500" cy="150" r="10" fill="url(#gold)"/>
+<path d="M500 150 L560 96" stroke="#ffffff" stroke-opacity="0.55" stroke-width="3" stroke-linecap="round"/>
+''' + ''.join(bars) + '''
+<path d="M96 300 h470" stroke="url(#gold)" stroke-opacity="0.35" stroke-width="1.5"/>
+<path d="M120 340 h96 M120 340 v-22 M216 340 v-22" fill="none" stroke="#d4af37" stroke-opacity="0.5" stroke-width="1.2"/>'''
 
 
 def car():
@@ -274,6 +304,7 @@ ASSETS = {
     'tile-support': shield(),
     'tile-modules': gear(),
     'tile-plans': card(),
+    'tile-dashboard': dashboard(),
 }
 
 

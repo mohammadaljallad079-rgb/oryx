@@ -22,3 +22,12 @@ tsconfig.build.tsbuildinfo
 apps/admin/test-results/
 apps/admin/playwright-report/
 .env.local
+
+# Local staging stack runtime data (.run/start-stack.sh and .run/nginx.conf are tracked)
+.run/pgdata/
+.run/nginx-tmp/
+.run/*.log
+.run/*.pid
+.run/*.pid.lock
+# Scratch renders served locally for inspection; committed evidence lives in docs/audit/
+.run/evidence/

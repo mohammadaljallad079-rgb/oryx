@@ -67,7 +67,7 @@ Security baseline (do not regress):
   adapters that report themselves unconfigured without credentials) and the
   ORYX customer mobile application (`apps/mobile`, Expo/React Native).
 - **Execution 05 (implemented and tested):** the External Integrations Center
-  (a 20-provider catalogue declared once in `packages/shared/src/integrations.ts`,
+  (an 8-provider catalogue declared once in `packages/shared/src/integrations.ts`,
   AES-256-GCM sealed credentials, a company-scope override, an enablement guard
   that refuses to enable a provider with a missing required credential, a real
   connection-test path with append-only check history, audit logging by key and
@@ -248,6 +248,45 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `pnpm install` can update the Playwright build, and the suites then fail with
   `Executable doesn't exist ... headless_shell` until
   `pnpm --filter @oryx/admin exec playwright install chromium` runs again.
+- **Run the browser suite through the reverse proxy, not the bare app port.**
+  `apps/admin/.env.local` sets `NEXT_PUBLIC_API_BASE_URL=/api`, so the client
+  calls the API same-origin. Only the proxy routes `/api/` to the API; against
+  `http://localhost:3000` every authenticated test fails identically with
+  `TimeoutError: page.waitForURL … **/dashboard` and a `404 POST
+  /api/v1/auth/login`, which hides every real failure behind one timeout. Use
+  `ORYX_ADMIN_URL=http://localhost:12000 pnpm --filter @oryx/admin test:ui`.
+- **`next start` snapshots `public/` at boot.** A newly added asset under
+  `apps/admin/public/` 404s until the admin server is restarted; a rebuild alone
+  is not enough.
+- **Do not point the browser suite at the public HTTPS host.** The admin bundle
+  is built with a relative API base (`NEXT_PUBLIC_API_BASE_URL=/api`) and several
+  specs call `page.evaluate(() => fetch('http://localhost:3001/…'))` directly. On
+  an HTTPS page the browser blocks that plain-HTTP fetch as mixed content, and
+  Playwright reports `TypeError: Failed to fetch` — 12 specs fail while the rest
+  pass, which reads like a product bug and is not. Use
+  `ORYX_ADMIN_URL=http://localhost:12000`; the public host is for the owner's
+  browser.
+- **A sandbox restart drops system packages but keeps the workspace.**
+  PostgreSQL, nginx and the Playwright browser download live outside
+  `/workspace`, so they vanish while `.run/pgdata`, the built `dist/` and
+  `.next/` survive. Recover with
+  `sudo apt-get install -y postgresql-17 nginx`, then
+  `chmod 0700 .run/pgdata` (the restart leaves it group-writable and Postgres
+  refuses to start), then `bash .run/start-stack.sh`. `ss` comes back with
+  `iproute2` via the nginx install, so the script's port checks work again.
+  Playwright needs `playwright install chromium` once more.
+- **`pnpm` can hang where `tsc`/`next`/`playwright` run fine.** In this sandbox
+  the pnpm shim stalls indefinitely on `--filter … build` and `exec`; invoking
+  `node_modules/.bin/<tool>` directly is reliable. Prefer that when a pnpm
+  command times out with no output.
+- **The approved design reference is never artwork.** The owner's rule is that
+  `docs/assets/ORYX Auto Services Dashboard.png` is a design *reference*, not a
+  source of imagery. It used to be cropped into `tiles/*.jpg` by
+  `scripts/extract-approved-assets.py`; that script is now a no-op tombstone and
+  every tile is original vector art from `scripts/generate-tile-art.py`, served
+  as SVG (`tileImageUrl()` resolves `.svg`). If you add a tile, add its motif to
+  the generator — do not crop the reference. `branding.spec.ts` sweeps every
+  tile, asserts each URL ends in `.svg` and asserts each one decodes.
 - **ESLint runs through flat configs, not `next lint`.** `apps/admin`,
   `apps/customer` and `apps/mobile` each have an `eslint.config.mjs` and their
   `lint` script is `eslint . --max-warnings=0`. `next lint` is deprecated in
@@ -300,6 +339,35 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   set the refresh cookie, and `CsrfGuard` rejects any unsafe method carrying that
   cookie without a matching `x-oryx-csrf` header. The refresh branch above it
   echoes the cookie; the login branch must too.
+
+### Branding and preview gotchas
+
+- **An exported `NEXT_PUBLIC_API_BASE_URL` silently overrides `.env.local`.** A
+  shell that has the variable exported — a test harness, for instance — bakes its
+  value into the client bundle, so a preview built that way calls
+  `http://localhost:3001` from the browser and every login fails CORS. `.env.local`
+  is correct with `NEXT_PUBLIC_API_BASE_URL=/api`; build from a clean environment
+  and confirm with `grep -r 'http://localhost:3001' apps/*/.next/static/`.
+- **The customer app's preference keys are namespaced.** It reads
+  `oryx.customer.locale` and `oryx.customer.theme`, while the admin app reads
+  `oryx.locale` and `oryx.theme`. Seeding the wrong pair leaves the app on its
+  default and the capture looks correct-but-unintended.
+- **The official logo has no alpha channel.** `docs/assets/logo.png.jpeg` is a
+  JPEG on a flat grey field, so `.run/gen-brand.cjs` crops to the ink bounding box
+  and rebuilds alpha from the distance to that field, emitting an on-dark and an
+  on-light colourway into **both** apps' `public/brand/`. The two are stacked and
+  swapped by `data-theme` in CSS so the right one paints before hydration.
+- **Grid columns already follow the inline axis.** `dir="rtl"` on `<html>` puts
+  the sidebar column on the right by itself. A `[data-dir='rtl'] .oryx-shell`
+  rule that also swaps `grid-template-columns` cancels that out and lands the
+  sidebar back on the left — the opposite of the requirement.
+- **`next lint` is not the lint gate.** Each app runs `eslint . --max-warnings=0`
+  through a flat config, so a single warning fails the build. Suppress
+  `@next/next/no-img-element` inline where the asset is a static raster, as the
+  MFA QR code already does.
+- **`module` is a reserved lint identifier.** `@next/next/no-assign-module-variable`
+  rejects a `for (const module of …)` loop in an app that shares the admin ESLint
+  config. Name the binding something else.
 
 ### Mobile gotchas
 

@@ -4,9 +4,9 @@
  * The website can rely on an HttpOnly refresh cookie; a native client cannot.
  * The API therefore exposes the refresh token in the response body **only** when
  * the request carries `x-oryx-client: mobile` (see `CustomerAuthController`), and
- * this client is the only place that asks for it. The token is written straight
- * to the platform keychain through `expo-secure-store` — never to
- * `AsyncStorage`, never to a plain file, and never logged.
+ * this client is the only place that asks for it. The token is written through
+ * `session-storage.ts` — the platform keychain on a device, `localStorage` in a
+ * browser — never to `AsyncStorage`, never to a plain file, and never logged.
  *
  * The short-lived access token is kept in memory only, so a process restart
  * re-acquires it by rotating the stored refresh token.
@@ -16,7 +16,8 @@
  */
 
 import Constants from 'expo-constants';
-import * as SecureStore from 'expo-secure-store';
+
+import { deleteSecret, getSecret, readCsrfToken, setSecret } from './session-storage';
 
 const API_BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
@@ -171,25 +172,23 @@ export const session = {
  *
  * `WHEN_UNLOCKED_THIS_DEVICE_ONLY` keeps the token out of iCloud Keychain backups
  * and Android auto-backup, so a restored device does not silently inherit a
- * session.
+ * session. The browser fallback lives in `session-storage.ts`.
  */
 async function storeRefreshToken(token: string): Promise<void> {
   cachedRefreshToken = token;
-  await SecureStore.setItemAsync(REFRESH_KEY, token, {
-    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-  });
+  await setSecret(REFRESH_KEY, token);
 }
 
 async function readRefreshToken(): Promise<string | null> {
   if (cachedRefreshToken) return cachedRefreshToken;
-  cachedRefreshToken = await SecureStore.getItemAsync(REFRESH_KEY);
+  cachedRefreshToken = await getSecret(REFRESH_KEY);
   return cachedRefreshToken;
 }
 
 async function clearSession(): Promise<void> {
   accessToken = null;
   cachedRefreshToken = null;
-  await SecureStore.deleteItemAsync(REFRESH_KEY);
+  await deleteSecret(REFRESH_KEY);
   notify();
 }
 
@@ -223,9 +222,14 @@ async function refreshSession(): Promise<boolean> {
       try {
         const refreshToken = await readRefreshToken();
         if (!refreshToken) return false;
+        const csrf = readCsrfToken();
         const res = await fetch(`${API_BASE}/v1/customer/auth/refresh`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', [CLIENT_HEADER]: CLIENT_KIND },
+          headers: {
+            'Content-Type': 'application/json',
+            [CLIENT_HEADER]: CLIENT_KIND,
+            ...(csrf ? { 'x-oryx-csrf': csrf } : {}),
+          },
           body: JSON.stringify({ refreshToken }),
         });
         if (!res.ok) {
@@ -251,6 +255,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const headers: Record<string, string> = { [CLIENT_HEADER]: CLIENT_KIND };
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (!options.anonymous && accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  // No-op on a device; in a browser this mirrors the customer website's
+  // double-submit so a shared origin cannot break an unsafe request.
+  const csrf = readCsrfToken();
+  if (csrf) headers['x-oryx-csrf'] = csrf;
 
   const res = await fetch(`${API_BASE}/v1${path}`, {
     method,

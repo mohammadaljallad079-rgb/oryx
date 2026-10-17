@@ -7,6 +7,8 @@ export interface NavItem {
   icon: string;
   /** Permission that must be held to see this entry. */
   permission?: string;
+  /** Any one of these permissions grants visibility (used when a platform and a tenant code are both acceptable). */
+  anyPermission?: string[];
   /** Module that must be licensed to see this entry. */
   moduleKey?: string;
   /** Platform-only entries are hidden from company principals. */
@@ -24,11 +26,18 @@ export interface NavGroup {
 
 /** ERP navigation mirrors the module catalog so the two cannot diverge. */
 function erpItem(m: ModuleDefinition): NavItem {
+  // The catalog uses kebab-case icon names; the inline icon set is camelCase.
+  // Every catalog icon must be mapped here or it silently falls back to the
+  // gauge glyph.
   const iconMap: Record<string, string> = {
     'shopping-cart': 'cart',
     'bar-chart': 'barChart',
     'heart-handshake': 'heart',
     'clipboard-check': 'clipboardCheck',
+    'map-pin': 'mapPin',
+    'credit-card': 'creditCard',
+    calendar: 'calendar',
+    store: 'store',
   };
   return {
     key: m.key,
@@ -122,7 +131,30 @@ export const WEBSITE_APP_NAV: NavGroup = {
 };
 
 export const ERP_NAV: NavGroup[] = [
-  { key: 'core', labelKey: 'nav.group.core', items: CORE.map(erpItem) },
+  {
+    key: 'core',
+    labelKey: 'nav.group.core',
+    // The home entry is explicit so the statistics overview can live at
+    // /dashboard/overview without the two diverging. The remaining core entries
+    // still derive from the module catalog.
+    items: [
+      {
+        key: 'home',
+        labelKey: 'nav.home',
+        href: '/dashboard',
+        icon: 'gauge',
+        anyPermission: ['erp.dashboard.read', 'platform.company.read'],
+      },
+      {
+        key: 'overview',
+        labelKey: 'nav.dashboard',
+        href: '/dashboard/overview',
+        icon: 'barChart',
+        anyPermission: ['erp.dashboard.read', 'platform.company.read'],
+      },
+      ...CORE.filter((m) => m.key !== 'dashboard').map(erpItem),
+    ],
+  },
   { key: 'finance', labelKey: 'nav.group.finance', items: FINANCE.map(erpItem) },
   { key: 'commerce', labelKey: 'nav.group.commerce', items: COMMERCE.map(erpItem) },
   { key: 'operations', labelKey: 'nav.group.operations', items: OPERATIONS.map(erpItem) },
