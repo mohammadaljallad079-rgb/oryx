@@ -332,13 +332,16 @@ browser suite with `ORYX_ADMIN_URL=http://localhost:3000` and
 `ORYX_API=http://localhost:3001/api/v1`.
 
 CI status for the audited commit is visible on the pull request that carries
-these changes. On head `c460358` all three jobs are green:
+these changes. On the current head `c466d8b` all three jobs are green:
 
 | Job | Result |
 |---|---|
 | `Typecheck and build` | **success** |
 | `Unit and API integration tests` | **success** |
 | `Browser acceptance tests` | **success** |
+
+The seed-fix commit `0904262` also passed all three jobs. On the earlier head
+`c460358` all three jobs were green as well.
 
 The local results above were produced on the staging stack after the fixes in
 `04_FIXED_DEFECTS.md`.
