@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -42,11 +42,32 @@ export function Sidebar({
   collapsed?: boolean;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { t } = useUi();
-  const { isPlatform, can, canAny, hasModule, companyId } = useAuth();
+  const { isPlatform, can, canAny, hasModule, companyId, logout } = useAuth();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [signingOut, setSigningOut] = useState(false);
 
   const ctx = { isPlatform, can, canAny, hasModule, companySelected: Boolean(companyId) };
+
+  /**
+   * Sign out from the sidebar.
+   *
+   * `logout()` calls the API (revoking the refresh token and clearing the
+   * HttpOnly cookie server-side) and drops the in-memory access token. Only then
+   * does this navigate to /login, so the user never lands on a protected page
+   * holding a live session.
+   */
+  async function onLogout() {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await logout();
+    } finally {
+      onNavigate();
+      router.replace('/login');
+    }
+  }
 
   return (
     <aside
@@ -122,6 +143,23 @@ export function Sidebar({
           </div>
         );
       })}
+
+      {/* Always-visible sign-out, pinned to the bottom of the rail. It sits
+          outside the nav groups so a collapsed group cannot hide it. */}
+      <div className="oryx-sidebar__footer">
+        <button
+          type="button"
+          className="oryx-nav-item oryx-nav-item--logout"
+          onClick={() => void onLogout()}
+          disabled={signingOut}
+          data-testid="sidebar-logout"
+          title={collapsed ? t('auth.logout') : undefined}
+          aria-label={collapsed ? t('auth.logout') : undefined}
+        >
+          <Icon name="logout" size={16} />
+          <span className="oryx-nav-item__label min-w-0 flex-1 truncate">{t('auth.logout')}</span>
+        </button>
+      </div>
     </aside>
   );
 }

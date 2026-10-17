@@ -23,6 +23,14 @@ async function storageSnapshot(page: Page): Promise<string> {
   );
 }
 
+/**
+ * API base for the raw `fetch` assertions below. It follows ORYX_API so the
+ * suite works both against the split dev servers (API on :3001) and against a
+ * single-origin staging proxy, where a hardcoded cross-origin call would be
+ * refused by CORS instead of exercising the route.
+ */
+const API_BASE = process.env.ORYX_API ?? 'http://localhost:3001/api/v1';
+
 test.describe('no persisted authentication tokens', () => {
   test('login writes no token to local or session storage', async ({ page }) => {
     await signIn(page);
@@ -120,10 +128,10 @@ test.describe('session restoration', () => {
 
     // A raw fetch from page context carries no bearer token, which is the whole
     // point: an injected script cannot read one from storage and replay it.
-    const status = await page.evaluate(async () => {
-      const res = await fetch('http://localhost:3001/api/v1/auth/me', { credentials: 'include' });
+    const status = await page.evaluate(async (api) => {
+      const res = await fetch(`${api}/auth/me`, { credentials: 'include' });
       return res.status;
-    });
+    }, API_BASE);
     expect(status).toBe(401);
   });
 });
@@ -211,6 +219,33 @@ test.describe('expiry and revocation', () => {
     await page.waitForURL('**/dashboard', { timeout: 25_000 });
     await expect(page.getByTestId('dashboard')).toBeVisible();
   });
+
+  test('the sidebar sign-out revokes the session and blocks protected pages', async ({ page }) => {
+    await signIn(page);
+    await expect(page.getByTestId('sidebar-logout')).toBeVisible();
+
+    // Capture the refresh cookie before signing out, then prove it is dead.
+    const before = (await page.context().cookies()).find((c) => c.name === 'oryx_rt');
+    expect(before).toBeTruthy();
+
+    let logoutStatus = 0;
+    page.on('response', (r) => {
+      if (r.url().includes('/auth/logout')) logoutStatus = r.status();
+    });
+
+    await page.getByTestId('sidebar-logout').click();
+    await page.waitForURL('**/login', { timeout: 25_000 });
+    expect(logoutStatus).toBe(200);
+
+    // The refresh cookie must be gone from the browser.
+    const after = (await page.context().cookies()).find((c) => c.name === 'oryx_rt');
+    expect(after).toBeFalsy();
+
+    // A protected route must bounce straight back to sign-in.
+    await page.goto('/dashboard');
+    await page.waitForURL('**/login', { timeout: 25_000 });
+    await expect(page.getByTestId('login-form')).toBeVisible();
+  });
 });
 
 test.describe('no refresh loop', () => {
@@ -250,5 +285,84 @@ test.describe('no refresh loop', () => {
     // Bounded restore attempts only; no runaway loop.
     expect(refreshCalls).toBe(afterRedirect);
     expect(refreshCalls).toBeLessThanOrEqual(2);
+  });
+});
+
+test.describe('sign-in failure is reported accurately', () => {
+  /**
+   * A throttled login must not be reported as bad credentials.
+   *
+   * The API rate-limits `/auth/login` (AUTH_THROTTLE_LIMIT, default 10/min) and
+   * answers 429. Reporting that as "invalid email or password" sends a user with
+   * a correct password hunting for a typo while the real cause is the limiter.
+   */
+  test('a 429 is reported as throttling, not as bad credentials', async ({ page }) => {
+    await page.route('**/api/v1/auth/login', (route) =>
+      route.fulfill({
+        status: 429,
+        contentType: 'application/json',
+        body: JSON.stringify({ statusCode: 429, message: 'ThrottlerException: Too Many Requests' }),
+      }),
+    );
+
+    await page.goto('/login');
+    // The admin default locale is Arabic; these assertions are English text.
+    await setLocale(page, 'en');
+    await page.getByTestId('login-email').fill(SUPER_ADMIN.email);
+    await page.getByTestId('login-password').fill(SUPER_ADMIN.password);
+    await page.getByTestId('login-submit').click();
+
+    const error = page.getByTestId('login-error');
+    await expect(error).toBeVisible({ timeout: 20_000 });
+    await expect(error).not.toContainText(/invalid email or password/i);
+    await expect(error).toContainText(/too many/i);
+  });
+
+  test('a 403 locked account is reported as a lock, not as bad credentials', async ({ page }) => {
+    await page.route('**/api/v1/auth/login', (route) =>
+      route.fulfill({
+        status: 403,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          statusCode: 403,
+          code: 'auth.account_locked',
+          message: 'Account temporarily locked due to failed sign-in attempts.',
+        }),
+      }),
+    );
+
+    await page.goto('/login');
+    await setLocale(page, 'en');
+    await page.getByTestId('login-email').fill(SUPER_ADMIN.email);
+    await page.getByTestId('login-password').fill(SUPER_ADMIN.password);
+    await page.getByTestId('login-submit').click();
+
+    const error = page.getByTestId('login-error');
+    await expect(error).toBeVisible({ timeout: 20_000 });
+    await expect(error).toContainText(/locked/i);
+  });
+
+  test('a genuine 401 still reports invalid credentials', async ({ page }) => {
+    await page.route('**/api/v1/auth/login', (route) =>
+      route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          statusCode: 401,
+          code: 'auth.invalid_credentials',
+          message: 'Invalid email or password.',
+        }),
+      }),
+    );
+
+    await page.goto('/login');
+    await setLocale(page, 'en');
+    await page.getByTestId('login-email').fill(SUPER_ADMIN.email);
+    await page.getByTestId('login-password').fill(SUPER_ADMIN.password);
+    await page.getByTestId('login-submit').click();
+
+    const error = page.getByTestId('login-error');
+    await expect(error).toBeVisible({ timeout: 20_000 });
+    await expect(error).toContainText(/invalid email or password/i);
   });
 });

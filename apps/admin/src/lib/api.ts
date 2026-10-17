@@ -78,7 +78,18 @@ import type {
   WarehouseDto,
 } from '@oryx/shared';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api';
+/**
+ * Base URL every admin request is built from. Callers append `/v1/<path>`.
+ *
+ * A value that already ends in `/v1` would produce `/api/v1/v1/auth/login` — a
+ * 404 that reads like a routing bug. That is a pure configuration mistake (the
+ * documented value is the origin plus `/api`), so it is normalised here rather
+ * than left to fail at runtime. Trailing slashes are trimmed for the same
+ * reason.
+ */
+const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api')
+  .replace(/\/+$/, '')
+  .replace(/\/v1$/, '');
 
 /**
  * Only non-secret UI preferences are persisted.

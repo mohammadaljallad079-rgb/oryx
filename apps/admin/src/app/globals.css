@@ -504,6 +504,10 @@ body::before {
   top: 0;
   height: 100vh;
   transition: width 0.2s ease, padding 0.2s ease;
+  /* A column so the sign-out footer can be pushed to the bottom with
+   * `margin-top: auto` while the nav list keeps its natural order. */
+  display: flex;
+  flex-direction: column;
 }
 
 /* Collapsed (icon-only) rail. The width lives on the shell so the grid column
@@ -560,6 +564,45 @@ body::before {
 /* The active marker stays visible in the collapsed rail via the icon colour. */
 .oryx-shell[data-nav='collapsed'] .oryx-nav-item[aria-current='page'] {
   background: color-mix(in srgb, var(--gold) 18%, transparent);
+}
+
+/* Sign-out sits at the bottom of the rail. `margin-top: auto` pushes it down
+ * when the nav list is short; when the list is long the rail scrolls and the
+ * sticky footer keeps the control reachable. */
+.oryx-sidebar > * {
+  flex-shrink: 0;
+}
+
+.oryx-sidebar__footer {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  position: sticky;
+  bottom: 0;
+  /* Opaque, so nav items scrolling underneath cannot bleed through. */
+  background: color-mix(in srgb, var(--bg-deep) 96%, transparent);
+}
+
+.oryx-nav-item--logout {
+  width: 100%;
+  cursor: pointer;
+  background: none;
+  color: var(--danger, #e5484d);
+}
+
+.oryx-nav-item--logout:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger, #e5484d) 14%, transparent);
+  color: var(--danger, #e5484d);
+}
+
+.oryx-nav-item--logout:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.oryx-shell[data-nav='collapsed'] .oryx-nav-item--logout {
+  justify-content: center;
+  padding: 10px 0;
 }
 
 .oryx-main {

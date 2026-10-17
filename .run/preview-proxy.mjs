@@ -1,0 +1,76 @@
+/**
+ * Minimal same-origin reverse proxy for the ORYX staging preview.
+ *
+ * The admin bundle is built with NEXT_PUBLIC_API_BASE_URL=/api, so it expects
+ * the API to live under the same origin. This proxy presents one HTTPS origin
+ * (via the runtime ingress on port 12000):
+ *
+ *   /api/*  ->  the NestJS API on 127.0.0.1:3001   (path preserved)
+ *   /*      ->  the Next.js admin app on 127.0.0.1:3000
+ *
+ * Keeping the API on the same origin as the app is what makes the HttpOnly
+ * refresh cookie and the CSRF double-submit work without a cross-site policy.
+ */
+import http from 'node:http';
+
+const LISTEN_PORT = Number(process.env.PROXY_PORT ?? 12000);
+const API_TARGET = { host: '127.0.0.1', port: Number(process.env.API_PORT ?? 3001) };
+// The web app this proxy fronts. The admin control plane runs on the first
+// host and the customer site on the second; both are served same-origin with
+// the API so their HttpOnly refresh cookies and CSRF double-submit work.
+const APP_TARGET = { host: '127.0.0.1', port: Number(process.env.APP_PORT ?? 3000) };
+// Expo web export of the customer mobile app. It is built with
+// `experiments.baseUrl = '/mobile'`, so its asset URLs already carry the
+// prefix and the static server expects `/mobile/...` unchanged.
+const MOBILE_TARGET = { host: '127.0.0.1', port: Number(process.env.MOBILE_PORT ?? 8081) };
+
+const HOP_BY_HOP = new Set([
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+]);
+
+function forward(req, res, target) {
+  const headers = { ...req.headers };
+  for (const name of HOP_BY_HOP) delete headers[name];
+  // The upstreams serve plain HTTP on loopback; tell them the client used HTTPS
+  // so any absolute-URL or secure-cookie logic sees the real scheme.
+  headers['x-forwarded-proto'] = 'https';
+  headers['x-forwarded-host'] = req.headers.host ?? '';
+
+  const upstream = http.request(
+    { host: target.host, port: target.port, method: req.method, path: req.url, headers },
+    (upstreamRes) => {
+      const outHeaders = { ...upstreamRes.headers };
+      for (const name of HOP_BY_HOP) delete outHeaders[name];
+      res.writeHead(upstreamRes.statusCode ?? 502, outHeaders);
+      upstreamRes.pipe(res);
+    },
+  );
+
+  upstream.on('error', (err) => {
+    res.writeHead(502, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end(`ORYX preview proxy: upstream ${target.port} unavailable (${err.code ?? err.message}).\n`);
+  });
+
+  req.pipe(upstream);
+}
+
+const server = http.createServer((req, res) => {
+  const url = req.url ?? '/';
+  let target = APP_TARGET;
+  if (url === '/api' || url.startsWith('/api/')) target = API_TARGET;
+  else if (url === '/mobile' || url.startsWith('/mobile/')) target = MOBILE_TARGET;
+  forward(req, res, target);
+});
+
+server.listen(LISTEN_PORT, '0.0.0.0', () => {
+  console.log(
+    `ORYX preview proxy listening on :${LISTEN_PORT} (/api -> ${API_TARGET.port}, / -> ${APP_TARGET.port}, /mobile -> ${MOBILE_TARGET.port})`,
+  );
+});

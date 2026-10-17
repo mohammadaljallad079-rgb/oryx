@@ -17,6 +17,35 @@ PGDATA="$RUN/pgdata"
 
 log() { printf '%s\n' "$*"; }
 
+# `ss`, `netstat` and `lsof` are absent from the sandbox image, so probe the
+# listening port directly. Bash's /dev/tcp needs no external binary.
+port_open() {
+  (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null && exec 3>&- && return 0
+  return 1
+}
+
+# ------------------------------------------------------------ prerequisites
+# The sandbox image can be recycled between sessions, which removes the
+# PostgreSQL server package while leaving the seeded cluster under .run/pgdata.
+# Reinstall it rather than re-seeding, so the demo records survive.
+if [ ! -x "$PG_BIN/pg_ctl" ]; then
+  log "postgres: server package missing, installing"
+  sudo -n apt-get update -qq >/dev/null 2>&1
+  sudo -n apt-get install -y --no-install-recommends postgresql-17 postgresql-client-17 >/dev/null 2>&1
+  if [ -x "$PG_BIN/pg_ctl" ]; then
+    log "postgres: installed"
+  else
+    log "postgres: INSTALL FAILED — no package source available"
+  fi
+fi
+
+# The packaged cluster is owned by the unprivileged user, so `initdb`-style
+# permissions (0700) are required. A reinstall can widen the directory to 2770
+# and PostgreSQL then refuses to start.
+if [ -d "$PGDATA" ]; then
+  chmod 700 "$PGDATA" 2>/dev/null || true
+fi
+
 # ---------------------------------------------------------------- postgres
 if "$PG_BIN/pg_isready" -h 127.0.0.1 -p 5432 >/dev/null 2>&1; then
   log "postgres: already accepting connections"
@@ -33,16 +62,16 @@ fi
 # --------------------------------------------------------------- services
 start_service() {
   local name="$1" dir="$2" cmd="$3" port="$4"
-  if ss -ltn 2>/dev/null | grep -q ":$port "; then
+  if port_open "$port"; then
     log "$name: already listening on $port"
     return
   fi
   ( cd "$dir" && setsid nohup bash -lc "$cmd" > "$RUN/$name.log" 2>&1 < /dev/null & echo $! > "$RUN/$name.pid" )
   for _ in $(seq 1 60); do
-    ss -ltn 2>/dev/null | grep -q ":$port " && break
+    port_open "$port" && break
     sleep 1
   done
-  ss -ltn 2>/dev/null | grep -q ":$port " \
+  port_open "$port" \
     && log "$name: listening on $port" || log "$name: FAILED (see .run/$name.log)"
 }
 
@@ -52,20 +81,43 @@ set -a
 set +a
 export AUTH_THROTTLE_LIMIT=100000 THROTTLE_LIMIT=1000000 REFRESH_THROTTLE_LIMIT=100000
 
+# `pnpm` is installed through corepack and can disappear with the sandbox image.
+if ! command -v pnpm >/dev/null 2>&1; then
+  mkdir -p "$HOME/.local/bin"
+  printf '#!/bin/sh\nexec corepack pnpm "$@"\n' > "$HOME/.local/bin/pnpm"
+  chmod +x "$HOME/.local/bin/pnpm"
+  export PATH="$HOME/.local/bin:$PATH"
+  log "pnpm: shim restored at $HOME/.local/bin/pnpm"
+fi
+
 start_service api "$ROOT/apps/api" "node dist/main.js" 3001
 start_service admin "$ROOT/apps/admin" "node ../../node_modules/next/dist/bin/next start -p 3000" 3000
 start_service customer "$ROOT/apps/customer" "node ../../node_modules/next/dist/bin/next start -p 3002" 3002
 start_service mobile-web "$ROOT" "node .run/serve-mobile-web.mjs" 8081
 
-# ------------------------------------------------------------------ nginx
-if [ -f "$RUN/nginx.pid" ] && kill -0 "$(cat "$RUN/nginx.pid")" 2>/dev/null; then
-  log "nginx: already running (pid $(cat "$RUN/nginx.pid"))"
-else
-  /usr/sbin/nginx -c "$RUN/nginx.conf" >/dev/null 2>&1
-  sleep 2
-  [ -f "$RUN/nginx.pid" ] && log "nginx: started (pid $(cat "$RUN/nginx.pid"))" \
-    || log "nginx: FAILED (see .run/nginx-error.log)"
-fi
+# ---------------------------------------------------------- preview proxies
+# The platform ingress terminates TLS for work-1/work-2 and forwards plain HTTP
+# to 12000/12001. One proxy per host serves the app at the origin root and
+# routes /api to the API, so the browser sees a single same-origin API and the
+# HttpOnly refresh cookie and CSRF double-submit both work without CORS.
+start_proxy() {
+  local name="$1" port="$2" app="$3"
+  if port_open "$port"; then
+    log "$name: already listening on $port"
+    return
+  fi
+  ( cd "$ROOT" && PROXY_PORT="$port" APP_PORT="$app" setsid nohup node .run/preview-proxy.mjs \
+      > "$RUN/$name.log" 2>&1 < /dev/null & echo $! > "$RUN/$name.pid" )
+  for _ in $(seq 1 30); do
+    port_open "$port" && break
+    sleep 1
+  done
+  port_open "$port" \
+    && log "$name: listening on $port" || log "$name: FAILED (see .run/$name.log)"
+}
+
+start_proxy proxy-admin 12000 3000
+start_proxy proxy-customer 12001 3002
 
 log "--- public checks ---"
 for url in \
