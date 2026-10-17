@@ -379,6 +379,35 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   rejects a `for (const module of …)` loop in an app that shares the admin ESLint
   config. Name the binding something else.
 
+
+### Platform seed gotchas
+
+- **A nullable unique key cannot be upserted on a sentinel.** `Role` has
+  `@@unique([companyId, code])` and a platform role has `companyId = NULL`.
+  Postgres treats `NULL` as distinct in a unique index, so
+  `upsert({ where: { companyId_code: { companyId: '', … } } })` never matches the
+  `NULL` row and inserts a duplicate on every seed. `seedPlatformRoles()` uses
+  `findFirst({ where: { companyId: null, code } })` + update instead. The same
+  trap already applied to `IntegrationProvider`, which needed a hand-written
+  partial index — do not reintroduce the sentinel form.
+- **The platform role is resolved with `findFirst` and no `orderBy`.** After a
+  duplicate existed, `PrincipalGuard`, `AuthService` and `RbacService` picked up
+  the stale row and the Super Admin silently lost every company-scope permission
+  (18 instead of 153), so all `erp.*` endpoints answered `403`. Keep the platform
+  role unique.
+- **Run the browser suite through the proxy origin, not `:3000`.** The admin
+  bundle calls a same-origin `/api`, which only `preview-proxy.mjs` (port 12000)
+  forwards; several specs also `fetch` the absolute `http://localhost:3001/api/v1`
+  from inside `page.evaluate`. Use
+  `ORYX_ADMIN_URL=http://localhost:12000 ORYX_API=http://localhost:3001/api/v1`.
+  Against the public **HTTPS** origin that absolute `http` fetch is blocked as
+  mixed content and those specs fail with `TypeError: Failed to fetch` even
+  though the product works.
+- **The seed needs `DATABASE_URL`; Playwright's global setup does too.** The
+  MFA-reset global setup shells out to `scripts/reset-seed-mfa.mjs`, which exits
+  non-zero without it. Source the root `.env` before `pnpm db:seed` or `test:ui`:
+  `set -a; . ./.env; set +a`.
+
 ### Mobile gotchas
 
 - **Every file under `(app)` becomes a tab.** Expo Router registers the whole
