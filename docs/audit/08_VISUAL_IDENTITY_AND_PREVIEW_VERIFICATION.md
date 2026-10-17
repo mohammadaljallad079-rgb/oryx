@@ -23,6 +23,8 @@ requirements that were still open were finished:
 | Execution 05 head | `7db9689` |
 | Recovery branch | `audit/execution-05-verification` |
 | Open PR | **#6** |
+| Audited head | `18e47f0` |
+| CI on audited head | typecheck + unit/API + browser — **all green** |
 
 The task brief described PR #5 as open and unmerged. That is **not** the case:
 PR #5 is merged, so it takes no further commits. The audit work therefore lands
