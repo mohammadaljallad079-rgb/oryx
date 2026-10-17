@@ -70,7 +70,33 @@ export function resolveEffectivePermissions(principal: Principal): EffectivePerm
       if (def.scope !== 'PLATFORM') continue;
       out.push(code);
     }
-    return { permissions: out.sort(), suppressedByEntitlement: [], branchIds: [] };
+
+    // A platform principal that has selected a tenant context also holds the
+    // company-scope permissions of the platform role, gated by that tenant's
+    // entitlements. Tenant isolation is still enforced independently: every ERP
+    // query resolves its company from the request context, never from the
+    // permission set, so this widens *which operations* the super admin may
+    // perform inside the selected company, never *which companies* it reaches.
+    const platformCompany = principal.company;
+    if (platformCompany && platformCompany.membershipActive) {
+      const licensed = new Set(platformCompany.licensedModuleKeys);
+      for (const code of granted) {
+        const def = PERMISSION_BY_CODE.get(code);
+        if (!def) continue;
+        if (def.scope === 'PLATFORM') continue;
+        if (!moduleLicensed(code, licensed)) {
+          suppressed.push(code);
+          continue;
+        }
+        out.push(code);
+      }
+    }
+
+    return {
+      permissions: [...new Set(out)].sort(),
+      suppressedByEntitlement: [...new Set(suppressed)].sort(),
+      branchIds: [],
+    };
   }
 
   const company = principal.company;

@@ -237,9 +237,16 @@ async function seedPlans() {
   console.log(`  plans: ${PLANS.length} upserted`);
 }
 
-const PLATFORM_SUPER_ADMIN_PERMISSIONS = PERMISSIONS.filter((p) => p.scope === 'PLATFORM').map(
-  (p) => p.code,
-);
+/**
+ * The platform super admin role carries the whole catalog.
+ *
+ * `resolveEffectivePermissions` returns only the PLATFORM-scope codes while the
+ * principal has no tenant context, and adds the company-scope codes (gated by
+ * the selected company's entitlements) once a company is selected. Granting the
+ * full catalog here is what lets one role serve both modes without a second
+ * role, and without granting anything the selected tenant is not licensed for.
+ */
+const PLATFORM_SUPER_ADMIN_PERMISSIONS = PERMISSIONS.map((p) => p.code);
 
 const COMPANY_ADMIN_PERMISSIONS = PERMISSIONS.filter(
   (p) => p.scope !== 'PLATFORM' && p.delegable,

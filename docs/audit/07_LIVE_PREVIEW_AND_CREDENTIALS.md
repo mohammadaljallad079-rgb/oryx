@@ -1,11 +1,10 @@
 # ORYX — Live Preview Links and Demo Credentials
 
-Audit date: 2026-10-16. Re-verified 2026-10-17 after a sandbox recycle.
+Audit date: 2026-10-16. Re-verified 2026-10-17 after a sandbox recycle, and again
+2026-10-17 (evening) after the crash-recovery session, with a browser-driven
+sweep over the public HTTPS ingress.
 
-Status: **LIVE and externally verified** from outside the sandbox. All 47 routes
-were re-checked over public HTTPS on 2026-10-17 after the crashed session was
-recovered and the preview stack was rebuilt (see defect 11 in
-`04_FIXED_DEFECTS.md`).
+Status: **LIVE and externally verified** from outside the sandbox.
 
 This is an **isolated staging environment**: a separate PostgreSQL database
 (`oryx_staging`) with seeded synthetic demo records. No production data and no
@@ -27,21 +26,33 @@ part of the stack — the proxies serve the ingress ports directly.)
 
 ## Preview links
 
-Verified from outside the sandbox with `curl`, most recently on 2026-10-17 after
-the sandbox recycle and stack rebuild:
+Verified from outside the sandbox with a real browser over public HTTPS, most
+recently on 2026-10-17 after the crash-recovery session. The sweep script is
+`.run/sweep-preview.mjs`; its machine-readable output is
+`docs/audit/evidence/preview-sweep-2026-10-17.json`.
+
+The sweep does more than check a status code. It signs in, then visits each
+surface and records every response `>= 400`, any Next.js error boundary and the
+console errors, so a page that returns `200` while its data calls fail is
+reported as failing.
 
 | Sweep | Result |
 |---|---|
-| Admin / ERP / control-plane routes on host 1 | **31 / 31 returned 200**, 0 failed |
-| Customer and mobile routes on host 2 | **15 / 15 returned 200**, 0 failed |
-| API health on host 1 (`/api/health`) | **1 / 1 returned 200** |
-| **Total** | **47 / 47 returned a success status** |
+| Anonymous surfaces (login, health, website, mobile) | **9 / 9 returned 200** |
+| Super Admin sign-in and Enterprise tenant selection | **2 / 2 succeeded** |
+| Admin / ERP / control-plane routes on host 1 | **18 / 18 returned 200, 0 failed requests** |
+| Customer and mobile authenticated routes on host 2 | **10 / 10 returned 200, 0 failed requests** |
+| **Total** | **39 / 39 succeeded, 0 failed, 0 failed requests** |
 
-The API health check returns `{"status":"ok","database":"up"}`, and
-`GET /customer/capabilities` without a token returns 401 — correct, it is an
-authenticated route.
+The API health check returns
+`{"status":"ok","service":"oryx-api","version":"0.1.0","database":"up"}`.
 
-Every URL below returned **HTTP 200**.
+**A platform administrator must select a company before the ERP modules serve
+data.** With no tenant selected, `GET /api/v1/accounting/accounts` and its peers
+correctly return `403`; the modules render their empty state. This is the
+enforced tenant boundary, not a defect — the header company selector (or an
+explicit support session) is what supplies the context, and the sweep selects the
+Enterprise tenant before it visits the ERP surfaces.
 
 ### Host 1 — Super Admin and ERP
 

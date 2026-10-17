@@ -14,10 +14,13 @@ import {
   ValidateNested,
 } from 'class-validator';
 
+import { TrimString } from '../common/transformers';
+
 const LOCALES = ['ar', 'en'] as const;
 const THEMES = ['dark', 'light'] as const;
 
 export class CustomerRegisterDto {
+  @TrimString()
   @IsEmail()
   @MaxLength(200)
   email!: string;
@@ -52,6 +55,7 @@ export class CustomerRegisterDto {
 }
 
 export class CustomerLoginDto {
+  @TrimString()
   @IsEmail()
   @MaxLength(200)
   email!: string;
@@ -71,6 +75,7 @@ export class CustomerRefreshDto {
 }
 
 export class CustomerForgotPasswordDto {
+  @TrimString()
   @IsEmail()
   @MaxLength(200)
   email!: string;

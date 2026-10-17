@@ -1,6 +1,6 @@
 # ORYX — Audit Reports
 
-Audit date: 2026-10-16
+Audit date: 2026-10-16, updated 2026-10-17 after the crash-recovery session
 Audited revision: `fc2ab20` (merge of PR #5), plus `699560c` (the owner's logo
 upload), plus the visual identity and preview fixes in
 `08_VISUAL_IDENTITY_AND_PREVIEW_VERIFICATION.md`.
@@ -14,7 +14,7 @@ Environment: isolated staging (`oryx_staging`), not production.
 | PR #5 (`feature/execution-05-platform-completion`) | **MERGED** 2026-10-16T18:10:37Z, merge commit `fc2ab20` |
 | `origin/main` tree | `c789eec` — identical to the Execution 05 head `7db9689` |
 | Latest `main` commit | `699560c` — the owner's official logo upload |
-| This audit | branch `audit/execution-05-verification`, PR #6 |
+| This audit | branch `audit/execution-05-verification` = `fix/super-admin-access-and-login` at `a327f9e`, PR #6 (draft) |
 
 PR #5 is merged, so it cannot be updated; a merged pull request takes no new
 commits. The audit work therefore lands on a fresh branch and PR #6, based on the
@@ -30,13 +30,13 @@ changes to be pushed to the Execution 05 branch.
 | `03_VISUAL_COMPARISON.md` | Measured comparison against `docs/assets/ORYX Auto Services Dashboard.png` |
 | `04_FIXED_DEFECTS.md` | Defects found, their fixes and their regression guards |
 | `05_INTEGRATION_READINESS.md` | The integration catalogue, state model, credential handling and blockers |
-| `06_TEST_AND_CI_RESULTS.md` | 461 passing tests and how to reproduce them |
+| `06_TEST_AND_CI_RESULTS.md` | 485 passing tests and how to reproduce them |
 | `07_LIVE_PREVIEW_AND_CREDENTIALS.md` | Working HTTPS preview links and demo credentials |
 | `08_VISUAL_IDENTITY_AND_PREVIEW_VERIFICATION.md` | Recovery state, visual identity alignment, externally re-verified preview and the CORS build hazard |
 
 ## Headline result
 
-- **461 automated tests pass**: 93 shared, 218 API integration, 130 browser, 20 mobile.
+- **485 automated tests pass**: 96 shared, 229 API integration, 140 browser, 20 mobile.
 - **Every declared Phase-1 surface is connected end to end** and DB-backed.
 - **Preview links are live and externally verified** — 47 / 47 routes returned a
   success status over public HTTPS — see reports 07 and 08.

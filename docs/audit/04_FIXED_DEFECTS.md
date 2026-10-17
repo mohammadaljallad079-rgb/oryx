@@ -302,3 +302,59 @@ suite grew from 218 to 220 tests, all passing.
 to match the cookie on every unsafe method that presents the refresh cookie; only
 the *value's lifetime* changed, from per-response to per-session.
 
+## 13. Super Admin sign-in rejected a padded or mixed-case email
+
+**Found:** 2026-10-17, during the crash-recovery session, from the owner's report
+that `info@oryxbhr.com` could not sign in permanently.
+
+**Defect:** `LoginDto.email` carried `@IsEmail()` with no normalisation, so a
+value pasted from a mobile keyboard or an email client with a trailing space
+failed validation with a `400 "email must be an email"` before the service ever
+lowered the case or trimmed it. To the user that reads as a broken account rather
+than a stray character.
+
+**Fix:** a `TrimString()` transform decorator was added to
+`apps/api/src/common/transformers.ts` and applied to `LoginDto.email` (and the
+customer, marketplace and RBAC DTOs that take an email). The email is trimmed
+before validation, and the service already lower-cases before lookup.
+
+**Verified:** `apps/api/test/super-admin-access.e2e-spec.ts` signs in with a
+leading and trailing space and with mixed case, both against the seeded Super
+Admin. Regression test in the API suite (9 tests in that spec).
+
+**Note on the owner's account:** `info@oryxbhr.com` is not a seeded account in
+this repository — the seeded platform principal is `superadmin@oryx.local`
+(`SEED_SUPER_ADMIN_EMAIL`). The owner's address can be seeded by setting
+`SEED_SUPER_ADMIN_EMAIL=info@oryxbhr.com` before `pnpm db:seed`, which is how the
+production principal should be provisioned. No production credential is stored in
+the repository.
+
+## 14. Sourcing the root `.env` overrode the admin's relative API base
+
+**Found:** 2026-10-17, during the crash-recovery session, when the external
+preview sweep reported CORS blocks on
+`http://localhost:3001/api/v1/auth/login` from the public HTTPS origin.
+
+**Defect:** `apps/admin/.env.local` correctly sets
+`NEXT_PUBLIC_API_BASE_URL=/api` so the preview bundle calls the API same-origin.
+But the root `.env` sets the same variable to an absolute
+`http://localhost:3001/api`, and Next gives an exported shell variable precedence
+over `.env.local`. A build that sources the root `.env` first — which the other
+workspace builds need for `DATABASE_URL` — therefore baked the absolute localhost
+URL into the served bundle. The reviewer's browser then called its own
+`localhost:3001`, so every authenticated page rendered its shell with no data and
+the console filled with CORS errors. A status-code-only check would have missed
+this, because the pages still returned `200`.
+
+**Fix:** the preview build exports `NEXT_PUBLIC_API_BASE_URL=/api` explicitly for
+the admin build, so the relative value wins regardless of the ambient shell
+environment.
+
+**Verified:** the external sweep now records **0 failed requests** across all 39
+routes, and the failing-request list (which previously named the localhost CORS
+block) is empty. The check is in `docs/audit/evidence/preview-sweep-2026-10-17.json`.
+
+**Note for the next operator:** any command that builds the admin app must not
+leave the root `.env`'s absolute `NEXT_PUBLIC_API_BASE_URL` exported, or the
+served preview loses its same-origin API.
+

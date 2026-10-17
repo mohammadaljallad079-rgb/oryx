@@ -18,23 +18,24 @@ identical viewport.
 
 ## Measured difference
 
-Produced by `scripts/audit-compare.py`.
+Produced by `scripts/audit-compare.py`, re-run 2026-10-17 against the current
+preview build.
 
 | Metric | Value |
 |---|---|
-| Mean absolute difference per channel (R, G, B) | 34.74, 32.54, 32.90 (of 255) |
-| RMS difference per channel | 70.58, 58.95, 54.45 |
+| Mean absolute difference per channel (R, G, B) | 35.95, 32.73, 33.20 (of 255) |
+| RMS difference per channel | 68.28, 58.58, 56.15 |
 | Reference dominant colours | `#00182f` 32%, `#172a40` 21%, `#3f4855` 15%, `#001124` 12%, `#818281` 10% |
-| Live dominant colours | `#021f3a` 39%, `#000f1f` 27%, `#03162a` 15%, `#031e38` 8%, `#203648` 7% |
+| Live dominant colours | `#010f1e` 20%, `#091c2c` 20%, `#152731` 19%, `#041525` 19%, `#00152a` 12% |
 
 ### Region divergence (4×4 grid, mean absolute difference 0–255)
 
 | | col 1 | col 2 | col 3 | col 4 |
 |---|---|---|---|---|
-| **row 1** | 58.3 | 59.8 | 23.4 | 41.6 |
-| **row 2** | 49.6 | 37.7 | 36.7 | 29.6 |
-| **row 3** | 44.2 | 47.5 | 47.4 | 29.1 |
-| **row 4** | 11.7 | 13.6 | 12.3 | 13.2 |
+| **row 1** | 50.8 | 49.0 | 25.8 | 40.3 |
+| **row 2** | 46.1 | 36.1 | 44.0 | 32.2 |
+| **row 3** | 46.7 | 50.7 | 51.8 | 29.9 |
+| **row 4** | 19.1 | 19.0 | 18.4 | 15.4 |
 
 ## Interpretation
 
@@ -42,18 +43,18 @@ The two images are **palette-compatible but not pixel-identical**. Read together
 with the region grid:
 
 1. **Palette agreement.** Both images are dominated by deep navy. The reference
-   clusters on `#00182f` / `#001124`; the implementation clusters on `#021f3a` /
-   `#000f1f`. These are the same navy family a few steps apart. The difference is
+   clusters on `#00182f` / `#001124`; the implementation clusters on `#010f1e` /
+   `#091c2c`. These are the same navy family a few steps apart. The difference is
    a tonal choice, not a different brand colour.
 2. **Structural divergence is concentrated at the top-left and middle rows.** The
-   highest divergence (rows 1–3, columns 1–2: 37–60) is where the reference
+   highest divergence (rows 1–3, columns 1–3: 26–52) is where the reference
    carries the hero headline, statistics and its photographic tiles. The
    implementation reproduces the layout and the tiles, but its tiles are
    **original vector artwork** (`scripts/generate-tile-art.py`) rather than the
    reference's photography — so those regions differ in content even where they
    agree in placement. The reference is never used as artwork (defect 5 in
    `04_FIXED_DEFECTS.md`).
-3. **The bottom band agrees closely** (row 4: 11.7–13.6). This is the dense
+3. **The bottom band agrees closely** (row 4: 15.4–19.1). This is the dense
    tabular area, where both use the same navy panels and light text.
 4. **The lightest region of the reference (`#818281`, 10%) has no counterpart in
    the live capture.** That grey is photographic and neutral-toned content. The

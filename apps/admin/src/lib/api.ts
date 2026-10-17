@@ -364,6 +364,8 @@ export const api = {
     fullNameAr: string;
     password: string;
   }) => request<LoginResult>('/auth/accept-invitation', { method: 'POST', body, anonymous: true }),
+  changePassword: (body: { currentPassword: string; newPassword: string }) =>
+    request<{ ok: boolean }>('/auth/change-password', { method: 'POST', body }),
 
   // -------------------------------------------------------------------- MFA
   mfaStatus: () =>

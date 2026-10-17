@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { Icon } from '@/components/icons';
+import { PasswordField } from '@/components/password-field';
 import { Badge, Button, Card, ErrorBanner, Field, Modal, SectionHeader, Skeleton } from '@/components/ui';
 
 type Status = { enabled: boolean; enrolledAt: string | null; recoveryCodesRemaining: number };
@@ -126,6 +128,8 @@ export default function SecurityPage() {
         )}
       </Card>
 
+      <PasswordCard />
+
       {isPlatform ? (
         <Card className="p-5" data-testid="mfa-admin-reset">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -228,6 +232,88 @@ export default function SecurityPage() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+function PasswordCard() {
+  const { t } = useUi();
+  const router = useRouter();
+  const { logout } = useAuth();
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    // Validate locally first so an obvious mismatch never costs a round trip.
+    if (next.length < 10) return setError(t('password.tooShort'));
+    if (next !== confirm) return setError(t('password.mismatch'));
+    if (next === current) return setError(t('password.sameAsCurrent'));
+
+    setBusy(true);
+    try {
+      await api.changePassword({ currentPassword: current, newPassword: next });
+      // The API revokes every refresh token, including this session's, so the
+      // only honest next step is to clear local state and sign in again.
+      await logout();
+      router.replace('/login');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('common.error'));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="p-5" data-testid="password-card">
+      <form onSubmit={submit} className="flex flex-col gap-4">
+        <div>
+          <p className="oryx-panel-title m-0">{t('password.title')}</p>
+          <p className="oryx-muted m-0 max-w-[70ch] text-[12.5px]">{t('password.subtitle')}</p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <PasswordField
+            label={t('password.current')}
+            value={current}
+            onChange={setCurrent}
+            autoComplete="current-password"
+            required
+            testId="password-current"
+          />
+          <PasswordField
+            label={t('password.new')}
+            value={next}
+            onChange={setNext}
+            autoComplete="new-password"
+            required
+            hint={t('password.tooShort')}
+            testId="password-new"
+          />
+          <PasswordField
+            label={t('password.confirm')}
+            value={confirm}
+            onChange={setConfirm}
+            autoComplete="new-password"
+            required
+            testId="password-confirm"
+          />
+        </div>
+
+        <p className="oryx-faint m-0 text-[11.5px]">{t('password.changeHint')}</p>
+
+        {error ? <ErrorBanner message={error} /> : null}
+
+        <div>
+          <Button type="submit" variant="primary" disabled={busy} data-testid="password-submit">
+            {busy ? t('common.saving') : t('password.changeCta')}
+          </Button>
+        </div>
+      </form>
+    </Card>
   );
 }
 

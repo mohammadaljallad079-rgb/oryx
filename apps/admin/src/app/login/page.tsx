@@ -6,6 +6,7 @@ import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi, type Translator } from '@/lib/ui-context';
 import { Icon } from '@/components/icons';
+import { PasswordField } from '@/components/password-field';
 import { Button, Card, Field } from '@/components/ui';
 import { LocaleToggle, ThemeToggle } from '@/components/topbar-controls';
 import { BrandLogo } from '@/components/brand-logo';
@@ -23,6 +24,10 @@ function signInErrorMessage(error: unknown, t: Translator): string {
     if (error.status === 429) return t('auth.throttled');
     if (error.code === 'auth.account_locked') return t('auth.locked');
     if (error.code === 'auth.account_inactive') return t('auth.inactive');
+    // 400 is a request-shape problem (a stray space in the email, a password
+    // below the minimum length), never a credential rejection. Reporting it as
+    // "invalid email or password" sends the user hunting for a typo.
+    if (error.status === 400) return t('auth.badRequest');
     if (error.status >= 500) return t('auth.unavailable');
     return t('auth.invalid');
   }
@@ -50,7 +55,7 @@ export default function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      const result = await login(email, password);
+      const result = await login(email.trim(), password);
       if (result && result.mfaRequired) {
         // Password accepted; a second factor is required before a session exists.
         setChallengeToken(result.challengeToken);
@@ -179,18 +184,14 @@ export default function LoginPage() {
                       data-testid="login-email"
                     />
                   </Field>
-                  <Field label={t('auth.password')} required>
-                    <input
-                      className="oryx-input"
-                      type="password"
-                      name="password"
-                      autoComplete="current-password"
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      data-testid="login-password"
-                    />
-                  </Field>
+                  <PasswordField
+                    label={t('auth.password')}
+                    value={password}
+                    onChange={setPassword}
+                    autoComplete="current-password"
+                    required
+                    testId="login-password"
+                  />
                 </>
               )}
 
