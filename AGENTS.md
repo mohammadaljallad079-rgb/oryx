@@ -258,12 +258,27 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 - **`next start` snapshots `public/` at boot.** A newly added asset under
   `apps/admin/public/` 404s until the admin server is restarted; a rebuild alone
   is not enough.
-- **The dashboard tile must not use the approved design reference.** The owner's
-  rule is that `docs/assets/ORYX Auto Services Dashboard.png` is a design
-  reference, never artwork. `scripts/extract-approved-assets.py` crops it into
-  `tiles/*.jpg`, so a module pointing at one of those names renders a crop of the
-  reference. Dashboard surfaces use purpose-drawn art from
-  `scripts/generate-tile-art.py`; `branding.spec.ts` guards it.
+- **A sandbox restart drops system packages but keeps the workspace.**
+  PostgreSQL, nginx and the Playwright browser download live outside
+  `/workspace`, so they vanish while `.run/pgdata`, the built `dist/` and
+  `.next/` survive. Recover with
+  `sudo apt-get install -y postgresql-17 nginx`, then
+  `chmod 0700 .run/pgdata` (the restart leaves it group-writable and Postgres
+  refuses to start), then `bash .run/start-stack.sh`. `ss` comes back with
+  `iproute2` via the nginx install, so the script's port checks work again.
+  Playwright needs `playwright install chromium` once more.
+- **`pnpm` can hang where `tsc`/`next`/`playwright` run fine.** In this sandbox
+  the pnpm shim stalls indefinitely on `--filter … build` and `exec`; invoking
+  `node_modules/.bin/<tool>` directly is reliable. Prefer that when a pnpm
+  command times out with no output.
+- **The approved design reference is never artwork.** The owner's rule is that
+  `docs/assets/ORYX Auto Services Dashboard.png` is a design *reference*, not a
+  source of imagery. It used to be cropped into `tiles/*.jpg` by
+  `scripts/extract-approved-assets.py`; that script is now a no-op tombstone and
+  every tile is original vector art from `scripts/generate-tile-art.py`, served
+  as SVG (`tileImageUrl()` resolves `.svg`). If you add a tile, add its motif to
+  the generator — do not crop the reference. `branding.spec.ts` sweeps every
+  tile, asserts each URL ends in `.svg` and asserts each one decodes.
 - **ESLint runs through flat configs, not `next lint`.** `apps/admin`,
   `apps/customer` and `apps/mobile` each have an `eslint.config.mjs` and their
   `lint` script is `eslint . --max-warnings=0`. `next lint` is deprecated in

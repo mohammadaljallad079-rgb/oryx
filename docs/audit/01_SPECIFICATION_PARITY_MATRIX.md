@@ -94,7 +94,7 @@ completed with the assets or infrastructure available.
 | # | Requirement | Status | Verified by |
 |---|---|---|---|
 | E1 | Navy/gold approved reference | PARTIAL | see `03_VISUAL_COMPARISON.md` — palette matches; official logo and photography are absent |
-| E2 | Image-led section tiles | MET | tiles cropped from the approved reference by `extract-approved-assets.py` |
+| E2 | Image-led section tiles | MET | original vector artwork per module (`scripts/generate-tile-art.py`), served as SVG; the approved reference is never used as artwork |
 | E3 | Elegant charts / KPIs | MET | dashboard hero and tiles |
 | E4 | Arabic RTL | MET | `data-dir=rtl` assertions; `dashboard-ar-*.png` |
 | E5 | English LTR | MET | `data-dir=ltr` assertions; `dashboard-en-*.png` |

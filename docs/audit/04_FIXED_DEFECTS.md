@@ -79,45 +79,51 @@ approved reference image must never be used as dashboard artwork.
 disk, then driving the live dashboard in a real browser
 (`.run/verify-tile.mjs`) and reading the computed background of each surface.
 
-**Defect:** `scripts/extract-approved-assets.py` treats
+**Defect:** `scripts/extract-approved-assets.py` treated
 `docs/assets/ORYX Auto Services Dashboard.png` — the owner's approved *design
-reference screenshot* — as an image source and crops photographic regions out of
-it into `apps/admin/public/tiles/*.jpg`. The dashboard hero had already been
-moved to a purpose-drawn vector banner, but the **module catalog** still pointed
-the dashboard tile at the crop:
+reference screenshot* — as an image source and cropped photographic regions out
+of it into `apps/admin/public/tiles/*.jpg`. The dashboard hero had already been
+moved to a purpose-drawn vector banner, but **every module tile** still rendered
+a crop of the reference. The dashboard tile pointed at the crop directly:
 
 ```diff
 -  M('dashboard', …, 'hero-automotive', '/dashboard/overview', …),
 +  M('dashboard', …, 'tile-dashboard', '/dashboard/overview', …),
 ```
 
-`tileImageUrl()` resolves a tile name to `/tiles/<name>.jpg`, so the dashboard
-tile rendered `hero-automotive.jpg`, a crop of the reference.
+`tileImageUrl()` resolved a tile name to `/tiles/<name>.jpg`, so the grid served
+22 upscaled crops of the reference as product artwork.
 
-**Fix:**
+**Fix — the reference is no longer artwork at all:**
 
 | Change | File |
 |---|---|
-| Original vector motif for the dashboard tile (gold telemetry gauge over a KPI strip) | `scripts/generate-tile-art.py` → `dashboard()` |
-| Generated artwork | `apps/admin/public/tiles/tile-dashboard.svg`, `tile-dashboard.jpg` (900 × 560) |
-| Dashboard module points at the generated art | `packages/shared/src/modules.ts` |
+| `tileImageUrl()` resolves `.svg`, not `.jpg` | `packages/shared/src/modules.ts` |
+| Original vector motifs for all 23 tiles (was already the source of truth, but its raster output was being overwritten) | `scripts/generate-tile-art.py` |
+| `preserveAspectRatio="xMidYMid slice"` so vector tiles fill the media box like the raster crops did | `scripts/generate-tile-art.py` |
+| Reference-crop pipeline retired to a no-op tombstone that writes nothing and exits non-zero | `scripts/extract-approved-assets.py` |
+| All 24 crop JPEGs (`tile-*.jpg`, `hero-automotive.jpg`, `automotive-hero.jpg`) deleted | `apps/admin/public/tiles/` |
 
 **Verified live**, through the public HTTPS ingress:
 
 | Probe | Result |
 |---|---|
 | `.oryx-hero__media` background | `…/tiles/banner-automotive.svg` |
-| `tile-dashboard` background | `…/tiles/tile-dashboard.jpg` |
+| `tile-dashboard` background | `…/tiles/tile-dashboard.svg` (640 × 420) |
+| Module tiles swept on the dashboard | **21** |
+| Tiles still served as raster crops | **none** |
+| Tiles that failed to decode | **none** |
 | Elements referencing `hero-automotive` | **none** |
-| `tile-dashboard.jpg` decoded size | **900 × 560** |
 
 **Regression guard:** `apps/admin/e2e/branding.spec.ts`, test "the approved
-design reference is never used as dashboard artwork".
+design reference is never used as dashboard artwork" — it now sweeps **every**
+module tile, asserts each URL ends in `.svg`, and asserts each one decodes. The
+guard fails if a raster crop is reintroduced, which is what a future run of the
+old crop script would have done.
 
-**Still open, disclosed:** the other `tile-*.jpg` crops remain derived from the
-approved reference, because the original photography was never supplied and
-those modules need image-led tiles. Report 03 and the README continue to state
-that full visual parity is **not** claimed.
+**Closed:** the previous revision of this report disclosed that the other
+`tile-*.jpg` crops remained. They no longer exist. No file under
+`apps/admin/public/tiles/` is derived from the owner's reference.
 
 ## 6. Branding regression test matched two lockups
 
@@ -153,9 +159,15 @@ No source change was needed; the committed configuration was already correct.
 **Regression guard:** documented as a gotcha in `AGENTS.md`, because one repeated
 timeout hid every real failure behind it.
 
-## Recovered, not yet fixed — needs an owner decision
+## Closed — the reference is no longer artwork
 
-The remaining `tile-*.jpg` photographic crops derived from the approved design
-reference (see defect 5). Replacing them needs either the original photography
-files or a decision to commission new artwork; it is not something to invent.
+Defect 5's follow-up is complete. The remaining `tile-*.jpg` photographic crops
+derived from the approved design reference have been deleted, and every tile is
+now original vector art generated in-repo and served as SVG. The owner no longer
+needs to supply the original photography for the reference to stop being reused;
+supplying it would only raise fidelity, not correctness.
+
+What is still open for the owner is **fidelity, not reuse**: the official brand
+mark and the original automotive photography are still required for full visual
+parity. That is disclosed in `03_VISUAL_COMPARISON.md`.
 

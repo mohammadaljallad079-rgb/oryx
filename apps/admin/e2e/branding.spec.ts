@@ -148,6 +148,34 @@ test.describe('branding and direction', () => {
       tileUrl.match(/url\("?(.*?)"?\)/)?.[1] ?? '',
     );
     expect(decoded.w).toBeGreaterThan(100);
+
+    // Every module tile must be original vector art. A `.jpg` here would mean
+    // the reference-crop pipeline has been reintroduced.
+    const tileUrls = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('[data-testid^="tile-"] .oryx-tile__media')).map(
+        (el) => getComputedStyle(el).backgroundImage.match(/url\("?(.*?)"?\)/)?.[1] ?? '',
+      ),
+    );
+    expect(tileUrls.length).toBeGreaterThan(10);
+    expect(tileUrls.filter((url) => !url.endsWith('.svg'))).toEqual([]);
+
+    // And every one of them must decode, not just resolve.
+    const broken = await page.evaluate(
+      (urls) =>
+        Promise.all(
+          urls.map(
+            (url) =>
+              new Promise<string | null>((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve(null);
+                img.onerror = () => resolve(url);
+                img.src = url;
+              }),
+          ),
+        ),
+      tileUrls,
+    );
+    expect(broken.filter(Boolean)).toEqual([]);
     expect(decoded.h).toBeGreaterThan(0);
   });
 });

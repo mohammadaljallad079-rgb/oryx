@@ -45,6 +45,37 @@ const refs = await page.evaluate(() => {
 });
 console.log('forbidden hero-automotive refs:', JSON.stringify(refs));
 
+// Every module tile must be original vector art (`.svg`), never a reference
+// crop (`.jpg`). Sweep the whole grid, not just the dashboard tile.
+const tileUrls = await page.evaluate(() =>
+  [...document.querySelectorAll('[data-testid^="tile-"] .oryx-tile__media')].map((el) => {
+    const bg = getComputedStyle(el).backgroundImage;
+    return {
+      tile: el.closest('[data-testid^="tile-"]').dataset.testid,
+      url: bg.match(/url\("?(.*?)"?\)/)?.[1] ?? null,
+    };
+  }),
+);
+const rasterTiles = tileUrls.filter((t) => t.url && !t.url.endsWith('.svg'));
+console.log('module tiles found:', tileUrls.length);
+console.log('tiles still served as raster crops:', JSON.stringify(rasterTiles));
+
+// Confirm every swept tile actually decodes.
+const decoded = await page.evaluate(async (urls) => {
+  const out = [];
+  for (const url of urls) {
+    const ok = await new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+      img.src = url;
+    });
+    if (!ok) out.push(url);
+  }
+  return out;
+}, tileUrls.map((t) => t.url).filter(Boolean));
+console.log('tiles that failed to decode:', JSON.stringify(decoded));
+
 // Confirm the new tile actually decoded as a real image.
 const loaded = await page.evaluate(async () => {
   const url = getComputedStyle(

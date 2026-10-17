@@ -3,6 +3,10 @@
 The artwork is original generated geometry — no stock photography and no
 third-party brand marks — so the dashboard stays image-led without inventing
 the owner's logo asset (which is not present in the repository).
+
+This is the single source of truth for tile art. The tiles are served as SVG
+(see `tileImageUrl` in packages/shared/src/modules.ts), so there is no raster
+step and no dependency on the owner's design reference.
 """
 
 import math
@@ -15,7 +19,7 @@ W, H = 640, 420
 
 
 def wrap(name, inner):
-    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img">
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" preserveAspectRatio="xMidYMid slice" role="img">
 <defs>
   <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
     <stop offset="0%" stop-color="#04213d"/>

@@ -49,9 +49,10 @@ with the region grid:
    highest divergence (rows 1–3, columns 1–2: 37–60) is where the reference
    carries the hero headline, statistics and its photographic tiles. The
    implementation reproduces the layout and the tiles, but its tiles are
-   **crops upscaled from the reference itself** (`extract-approved-assets.py`),
-   not the original photography — so those regions differ in content even where
-   they agree in placement.
+   **original vector artwork** (`scripts/generate-tile-art.py`) rather than the
+   reference's photography — so those regions differ in content even where they
+   agree in placement. The reference is never used as artwork (defect 5 in
+   `04_FIXED_DEFECTS.md`).
 3. **The bottom band agrees closely** (row 4: 11.7–13.6). This is the dense
    tabular area, where both use the same navy panels and light text.
 4. **The lightest region of the reference (`#818281`, 10%) has no counterpart in
@@ -61,18 +62,21 @@ with the region grid:
 
 ## What cannot be claimed
 
-The official ORYX logo and the original approved photography were never supplied
-to the repository. The reference screenshot itself is the only approved asset
-present. Consequently:
+The official ORYX logo is present (`docs/assets/logo.png.jpeg`, owner upload
+`699560c`) and drives the admin sidebar, the admin login page and the customer
+header through `.run/gen-brand.cjs`. The original approved photography was never
+supplied, however, and the reference screenshot itself is the only approved
+design asset present. Consequently:
 
-- The UI uses a neutral monogram placeholder, not the official logo.
-- Module tiles use crops of the approved reference, upscaled with Lanczos. They
-  are real automotive imagery derived from the owner's own file, but they are not
-  the original photography at native resolution.
+- The logo is the owner's real mark, colourway-swapped per theme. It is not a
+  placeholder.
+- Module tiles use original vector artwork generated in-repo
+  (`scripts/generate-tile-art.py`), served as SVG. They are real, purpose-drawn
+  automotive motifs, but they are not the owner's original photography at native
+  resolution. The approved reference is never used as artwork.
 - **Full visual parity is therefore not claimed.** The navy/gold identity,
   layout, tile-led structure, RTL support and theming follow the approved
-  reference; the brand mark and source photography are still required from the
-  owner.
+  reference; the source photography is still required from the owner.
 
 ## Artifacts
 
