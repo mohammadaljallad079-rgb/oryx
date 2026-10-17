@@ -19,13 +19,16 @@ production secret is present.
 | `https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev` | Customer website, customer dashboard and the mobile web preview |
 
 Both hosts terminate TLS at the platform ingress and forward to the staging stack
-(admin 3000, customer 3002, mobile-web 8081, API 3001) through nginx on ports
-12000/12001. Each host proxies `/api` to the API, so the browser sees a single
-same-origin API and the HttpOnly refresh cookie and CSRF double-submit both work.
+(admin 3000, customer 3002, mobile-web 8081, API 3001) through the two preview
+proxies on ports 12000/12001. Each host proxies `/api` to the API, so the browser
+sees a single same-origin API and the HttpOnly refresh cookie and CSRF
+double-submit both work. (nginx was used for this originally; it is no longer
+part of the stack — the proxies serve the ingress ports directly.)
 
 ## Preview links
 
-Verified from outside the sandbox with `curl` on 2026-10-16:
+Verified from outside the sandbox with `curl`, most recently on 2026-10-17 after
+the sandbox recycle and stack rebuild:
 
 | Sweep | Result |
 |---|---|
@@ -143,11 +146,16 @@ Notes:
 | Item | Value |
 |---|---|
 | Database | `oryx_staging` (PostgreSQL 17, local) |
-| Seeded companies | 6 (2 marked `SEED_DEMO_DATA`, 4 internal) |
-| Seeded branches | 10 |
-| Seeded accounts | 126 |
+| Companies | 42 at the last check — the seed creates 6; the rest are E2E fixtures that the browser suite provisions |
+| Branches | 25 |
+| Users | 14 |
 | Payment credentials | **None.** All external gateways are `ADAPTER_ONLY` |
 | Secrets in the preview | **None.** No production credential is present or committed |
+
+The company count is deliberately not pinned to the seeded value: the browser
+suite provisions tenants and does not roll them all back, so the staging database
+carries test fixtures alongside the demo records. That is expected for a staging
+preview and is why `04_FIXED_DEFECTS.md` lists the company list as paginated.
 
 ## What is required for a production deployment
 
