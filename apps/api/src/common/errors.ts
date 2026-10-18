@@ -138,4 +138,6 @@ export const ERROR_CODES = {
   MEDIA_STORAGE_UNAVAILABLE: 'media.storage_unavailable',
   CONTENT_BLOCK_NOT_FOUND: 'cms.content_block_not_found',
   CONTENT_REVISION_NOT_FOUND: 'cms.content_revision_not_found',
+  MEDIA_ASSET_NOT_FOUND: 'cms.media_asset_not_found',
+  SERVICE_CATEGORY_NOT_FOUND: 'cms.service_category_not_found',
 } as const;

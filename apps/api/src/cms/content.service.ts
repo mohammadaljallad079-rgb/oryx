@@ -3,7 +3,11 @@ import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { ERROR_CODES, notFound } from '../common/errors';
 import type { ActorContext } from '../organizations/organizations.service';
-import type { UpsertContentBlockDto } from './cms.dto';
+import type {
+  UpdateServiceCategoryDto,
+  UpsertBannerFullDto,
+  UpsertContentBlockDto,
+} from './cms.dto';
 
 /**
  * Dynamic website content.
@@ -372,5 +376,143 @@ export class ContentService {
         actorUserId: actor.userId ?? null,
       },
     });
+  }
+
+  // ------------------------------------------------- service categories
+
+  /** Every service category, active or not, for the admin CMS. */
+  async listCategories() {
+    return this.prisma.serviceCategory.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { key: 'asc' }],
+      include: { imageAsset: { select: { id: true, altEn: true, altAr: true, width: true, height: true } } },
+    });
+  }
+
+  /**
+   * Updates a category's marketing presentation. The category itself is seeded
+   * (its key is referenced by provider services), so this edits presentation
+   * only — never the identity a booking depends on.
+   */
+  async updateCategory(id: string, dto: UpdateServiceCategoryDto, actor: ActorContext) {
+    const existing = await this.prisma.serviceCategory.findUnique({ where: { id } });
+    if (!existing) throw notFound(ERROR_CODES.SERVICE_CATEGORY_NOT_FOUND, 'Service category not found.');
+
+    if (dto.imageAssetId) {
+      const asset = await this.prisma.cmsMediaAsset.findUnique({ where: { id: dto.imageAssetId } });
+      if (!asset) throw notFound(ERROR_CODES.MEDIA_ASSET_NOT_FOUND, 'Media asset not found.');
+    }
+
+    const category = await this.prisma.serviceCategory.update({
+      where: { id },
+      data: {
+        ...(dto.descriptionEn !== undefined ? { descriptionEn: dto.descriptionEn } : {}),
+        ...(dto.descriptionAr !== undefined ? { descriptionAr: dto.descriptionAr } : {}),
+        ...(dto.imageAssetId !== undefined ? { imageAssetId: dto.imageAssetId } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
+      },
+      include: { imageAsset: { select: { id: true, altEn: true, altAr: true, width: true, height: true } } },
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      action: 'cms.category_updated',
+      targetType: 'SERVICE_CATEGORY',
+      targetId: category.id,
+      summary: `Updated service category ${category.key}`,
+      metadata: { imageAssetId: category.imageAssetId, isActive: category.isActive },
+    });
+
+    return category;
+  }
+
+  // ------------------------------------------------------------- banners
+
+  async listBanners(placement?: string) {
+    return this.prisma.cmsBanner.findMany({
+      where: placement ? { placement } : {},
+      orderBy: [{ placement: 'asc' }, { sortOrder: 'asc' }],
+      include: { mediaAsset: { select: { id: true, altEn: true, altAr: true, width: true, height: true } } },
+    });
+  }
+
+  async createBanner(dto: UpsertBannerFullDto, actor: ActorContext) {
+    await this.assertBannerAsset(dto.mediaAssetId);
+    const banner = await this.prisma.cmsBanner.create({
+      data: {
+        placement: dto.placement,
+        locale: dto.locale,
+        title: dto.title,
+        subtitle: dto.subtitle ?? null,
+        imageUrl: dto.imageUrl ?? null,
+        mediaAssetId: dto.mediaAssetId ?? null,
+        actionUrl: dto.actionUrl ?? null,
+        sortOrder: dto.sortOrder ?? 0,
+        isActive: dto.isActive ?? true,
+      },
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      action: 'cms.banner_created',
+      targetType: 'CMS_BANNER',
+      targetId: banner.id,
+      summary: `Created banner ${banner.placement} (${banner.locale})`,
+      metadata: { mediaAssetId: banner.mediaAssetId },
+    });
+
+    return banner;
+  }
+
+  async updateBanner(id: string, dto: UpsertBannerFullDto, actor: ActorContext) {
+    const existing = await this.prisma.cmsBanner.findUnique({ where: { id } });
+    if (!existing) throw notFound(ERROR_CODES.CONTENT_BLOCK_NOT_FOUND, 'Banner not found.');
+    await this.assertBannerAsset(dto.mediaAssetId);
+
+    const banner = await this.prisma.cmsBanner.update({
+      where: { id },
+      data: {
+        placement: dto.placement,
+        locale: dto.locale,
+        title: dto.title,
+        subtitle: dto.subtitle ?? null,
+        imageUrl: dto.imageUrl ?? null,
+        mediaAssetId: dto.mediaAssetId ?? null,
+        actionUrl: dto.actionUrl ?? null,
+        sortOrder: dto.sortOrder ?? 0,
+        isActive: dto.isActive ?? true,
+      },
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      action: 'cms.banner_updated',
+      targetType: 'CMS_BANNER',
+      targetId: banner.id,
+      summary: `Updated banner ${banner.placement} (${banner.locale})`,
+      metadata: { mediaAssetId: banner.mediaAssetId },
+    });
+
+    return banner;
+  }
+
+  async deleteBanner(id: string, actor: ActorContext) {
+    const existing = await this.prisma.cmsBanner.findUnique({ where: { id } });
+    if (!existing) throw notFound(ERROR_CODES.CONTENT_BLOCK_NOT_FOUND, 'Banner not found.');
+    await this.prisma.cmsBanner.delete({ where: { id } });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      action: 'cms.banner_deleted',
+      targetType: 'CMS_BANNER',
+      targetId: id,
+      summary: `Deleted banner ${existing.placement} (${existing.locale})`,
+    });
+    return { ok: true };
+  }
+
+  private async assertBannerAsset(mediaAssetId?: string | null) {
+    if (!mediaAssetId) return;
+    const asset = await this.prisma.cmsMediaAsset.findUnique({ where: { id: mediaAssetId } });
+    if (!asset) throw notFound(ERROR_CODES.MEDIA_ASSET_NOT_FOUND, 'Media asset not found.');
   }
 }

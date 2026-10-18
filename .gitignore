@@ -31,3 +31,9 @@ apps/admin/playwright-report/
 .run/*.pid.lock
 # Scratch renders served locally for inspection; committed evidence lives in docs/audit/
 .run/evidence/
+
+# Uploaded CMS media. The bytes are runtime state produced by the media
+# library, not source; the curated source photography that seeds it lives in
+# apps/customer/public/media/ and is tracked.
+.media/
+apps/api/.media/

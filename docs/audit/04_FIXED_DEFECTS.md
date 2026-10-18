@@ -562,3 +562,46 @@ fell from 2 to 1, the remaining one being the expected bootstrap `401`.
 **Regression guard:** `apps/api/test/execution04.e2e-spec.ts`, section *A.
 customer identity* — `answers a cookieless refresh with 401, never 404`.
 
+## Defect 19 — three category vocabularies made every category filter return nothing
+
+**Found:** 2026-10-18, during the Execution 07 Phase D verification. The
+homepage category cards rendered the bundled vector fallback instead of the CMS
+photograph (`categoryCardsFromCms: 0`), and a direct probe showed
+`GET /marketplace/providers?categoryKey=automotive_maintenance` returning `0`.
+
+**Defect:** three layers each used a different key for the same concept.
+
+| Layer | Keys it used |
+|---|---|
+| Customer website and mobile `SERVICE_CATEGORIES` | `automotive_maintenance`, `automotive_inspection`, `automotive_tyres`, `automotive_bodywork`, `automotive_recovery` |
+| Seeded `ServiceCategory` rows (the CMS imagery target) | `vehicle_inspection`, `maintenance`, `spare_parts`, `recovery`, `car_wash` |
+| Seeded `MarketplaceProvider.categoryKey` | `WORKSHOP` |
+
+The provider directory filters on `categoryKey`, so each category chip sent a key
+no provider carried and the directory returned an empty list. The homepage looked
+up `content.categories` by the website key, found no row, and fell back to vector
+art. Neither failure raised an error; both rendered a plausible but empty result,
+which is why the earlier status-code-only sweeps missed it.
+
+**Fix:** the catalogue now lives once, in
+`packages/shared/src/service-categories.ts`. The seed writes the `ServiceCategory`
+rows and the provider `categoryKey` values from it and creates one approved
+provider per category; the customer website and the mobile app re-export it. The
+keys are the persisted `ServiceCategory.key` values, so the CMS rows, the
+photography and the provider directory agree by construction.
+
+**Verified:** every canonical key now returns providers
+(`vehicle_inspection` / `maintenance` / `spare_parts` / `recovery` / `car_wash`
+→ `27` each; the retired `automotive_maintenance` and `WORKSHOP` → `0`).
+`.run/verify-category-filter.mjs` drives the live UI and records 27 rendered
+provider cards for each of the five categories in
+`docs/audit/exec07/phase-d/category-filter-verification.json`.
+`.run/capture-exec07-phase-d.mjs` now reports `categoryCardsFromCms: 5` in all
+four locale/theme captures (was `0`).
+
+**Regression guard:** `packages/shared/test/service-categories.test.ts` (7 tests,
+including explicit rejection of the retired keys) and three tests in
+`apps/api/test/execution07.e2e-spec.ts`: the CMS category keys and the provider
+directory agree, a retired key matches nothing, and every catalogue category is a
+seeded `ServiceCategory` row.
+

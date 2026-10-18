@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -13,7 +14,13 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentPrincipal, Public, RequirePermissions, type RequestPrincipal } from '../auth/auth.decorators';
 import { ContentService } from './content.service';
 import type { ActorContext } from '../organizations/organizations.service';
-import { PublishContentDto, RestoreRevisionDto, UpsertContentBlockDto } from './cms.dto';
+import {
+  PublishContentDto,
+  RestoreRevisionDto,
+  UpdateServiceCategoryDto,
+  UpsertBannerFullDto,
+  UpsertContentBlockDto,
+} from './cms.dto';
 
 interface RequestLike {
   ip?: string;
@@ -125,5 +132,75 @@ export class ContentController {
     @Req() req: RequestLike,
   ) {
     return this.content.deleteBlock(key, locale, actorFrom(p, req));
+  }
+
+  // ------------------------------------------------- service categories
+
+  @ApiBearerAuth()
+  @Get('categories')
+  @RequirePermissions('platform.cms.manage')
+  @ApiOperation({ summary: 'List service categories with their imagery and copy' })
+  categories() {
+    return this.content.listCategories();
+  }
+
+  @ApiBearerAuth()
+  @Patch('categories/:id')
+  @RequirePermissions('platform.cms.manage')
+  @ApiOperation({ summary: 'Set a service category image and marketing copy' })
+  updateCategory(
+    @Param('id') id: string,
+    @Body() dto: UpdateServiceCategoryDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.content.updateCategory(id, dto, actorFrom(p, req));
+  }
+
+  // ------------------------------------------------------------- banners
+
+  @ApiBearerAuth()
+  @Get('banners')
+  @RequirePermissions('platform.cms.manage')
+  @ApiOperation({ summary: 'List banners' })
+  banners(@Query('placement') placement?: string) {
+    return this.content.listBanners(placement);
+  }
+
+  @ApiBearerAuth()
+  @Post('banners')
+  @RequirePermissions('platform.cms.manage')
+  @ApiOperation({ summary: 'Create a banner' })
+  createBanner(
+    @Body() dto: UpsertBannerFullDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.content.createBanner(dto, actorFrom(p, req));
+  }
+
+  @ApiBearerAuth()
+  @Put('banners/:id')
+  @RequirePermissions('platform.cms.manage')
+  @ApiOperation({ summary: 'Update a banner' })
+  updateBanner(
+    @Param('id') id: string,
+    @Body() dto: UpsertBannerFullDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.content.updateBanner(id, dto, actorFrom(p, req));
+  }
+
+  @ApiBearerAuth()
+  @Delete('banners/:id')
+  @RequirePermissions('platform.cms.manage')
+  @ApiOperation({ summary: 'Delete a banner' })
+  deleteBanner(
+    @Param('id') id: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.content.deleteBanner(id, actorFrom(p, req));
   }
 }

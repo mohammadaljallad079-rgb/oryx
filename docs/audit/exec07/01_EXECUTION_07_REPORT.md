@@ -160,7 +160,17 @@ added.
    customer page now shares the `premium.tsx` primitives. Verified by 78
    screenshot captures with zero overflow and a 13-route live render check.
 
-## 6. Reproduction
+## 7. Phase D — real photography, dynamic CMS and defect 19
+
+Phase D wired real licensed photography through the dynamic CMS into the customer
+homepage, and in doing so found **defect 19**: three layers used three different
+category vocabularies, so every category filter returned an empty directory and
+the CMS photography never reached a category card. The catalogue now lives once
+in `packages/shared/src/service-categories.ts`. Full detail, evidence and the
+regression tests are in
+[`03_PHASE_D_PHOTOGRAPHY_AND_CATEGORY_FIX.md`](./03_PHASE_D_PHOTOGRAPHY_AND_CATEGORY_FIX.md).
+
+## 8. Reproduction
 
 ```bash
 # Assertions (no auth needed)

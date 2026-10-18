@@ -15,6 +15,8 @@
  * no staff route is reachable with a consumer token.
  */
 
+import { SERVICE_CATEGORIES as SHARED_SERVICE_CATEGORIES } from '@oryx/shared';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api';
 
 /**
@@ -487,6 +489,8 @@ export const publicApi = {
       `/marketplace/providers?pageSize=50${categoryKey ? `&categoryKey=${encodeURIComponent(categoryKey)}` : ''}`,
     ),
   provider: (id: string) => publicGet<ProviderDetail>(`/marketplace/providers/${id}`),
+  /** Published website content managed in the admin CMS. */
+  website: (locale: string) => publicGet<WebsiteContent>(`/cms/public/website?locale=${locale}`),
   applyAsProvider: (body: {
     legalNameEn: string;
     legalNameAr: string;
@@ -511,51 +515,96 @@ export const publicApi = {
 };
 
 /** Service categories offered by the platform. */
-export const SERVICE_CATEGORIES = [
-  {
-    key: 'automotive_maintenance',
-    nameEn: 'Maintenance and repair',
-    nameAr: 'الصيانة والإصلاح',
-    art: '/art/service-maintenance.svg',
-    descEn: 'Scheduled servicing, diagnostics and mechanical repair.',
-    descAr: 'صيانة دورية وتشخيص وإصلاح ميكانيكي.',
-  },
-  {
-    key: 'automotive_inspection',
-    nameEn: 'Vehicle inspection',
-    nameAr: 'فحص المركبات',
-    art: '/art/service-inspection.svg',
-    descEn: 'Periodic and pre-purchase inspection with a written report.',
-    descAr: 'فحص دوري وفحص ما قبل الشراء مع تقرير مكتوب.',
-  },
-  {
-    key: 'automotive_tyres',
-    nameEn: 'Tyres and batteries',
-    nameAr: 'الإطارات والبطاريات',
-    art: '/art/service-tyres.svg',
-    descEn: 'Tyre fitting, balancing and battery replacement.',
-    descAr: 'تركيب وموازنة الإطارات وتبديل البطاريات.',
-  },
-  {
-    key: 'automotive_bodywork',
-    nameEn: 'Bodywork and paint',
-    nameAr: 'الهيكل والدهان',
-    art: '/art/service-bodywork.svg',
-    descEn: 'Dent repair, panel work and professional painting.',
-    descAr: 'إصلاح الصدمات وأعمال الهيكل والدهان الاحترافي.',
-  },
-  {
-    key: 'automotive_recovery',
-    nameEn: 'Roadside recovery',
-    nameAr: 'خدمات الطريق',
-    art: '/art/service-recovery.svg',
-    descEn: 'Towing and roadside assistance when the car will not move.',
-    descAr: 'سحب السيارة وخدمات المساعدة على الطريق.',
-  },
-] as const;
+export const SERVICE_CATEGORIES = SHARED_SERVICE_CATEGORIES;
 
-/** Artwork for a service category, falling back to the generic hero motif. */
-export function categoryArt(key: string): string {
-  const match = SERVICE_CATEGORIES.find((c) => c.key === key);
-  return match ? match.art : '/art/hero-automotive.svg';
+// ------------------------------------------------- dynamic website content
+
+export interface MediaVariant {
+  key: string;
+  width: number;
+  height: number;
+  byteSize: number;
+}
+
+export interface CmsMedia {
+  id: string;
+  width: number;
+  height: number;
+  altAr: string | null;
+  altEn: string | null;
+  dominantColor: string | null;
+  blurDataUrl: string | null;
+  variants: Record<string, MediaVariant>;
+  url: string;
+}
+
+export interface WebsiteBlock {
+  key: string;
+  value: string;
+  body: string | null;
+  linkUrl: string | null;
+  linkLabel: string | null;
+  sortOrder: number;
+  media: CmsMedia | null;
+}
+
+export interface WebsiteBanner {
+  placement: string;
+  title: string;
+  subtitle: string | null;
+  actionUrl: string | null;
+  sortOrder: number;
+  imageUrl: string | null;
+  media: CmsMedia | null;
+}
+
+export interface WebsiteCategory {
+  key: string;
+  nameEn: string;
+  nameAr: string;
+  domain: string;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
+  media: CmsMedia | null;
+}
+
+export interface WebsiteContent {
+  locale: string;
+  blocks: WebsiteBlock[];
+  banners: WebsiteBanner[];
+  categories: WebsiteCategory[];
+}
+
+/** Empty payload used when the CMS is unreachable, so a page still renders. */
+export const EMPTY_WEBSITE: WebsiteContent = { locale: 'ar', blocks: [], banners: [], categories: [] };
+
+/**
+ * Resolves a CMS image to a servable URL at the requested size.
+ *
+ * The API serves bytes by asset id rather than exposing storage paths, so the
+ * URL is always `/cms/media/<id>/file`. `variant` picks a pre-generated size,
+ * which keeps a phone from downloading the 2400px hero.
+ */
+export function mediaUrl(media: CmsMedia | null, variant = 'card'): string | null {
+  if (!media) return null;
+  const chosen = media.variants[variant] ? variant : Object.keys(media.variants)[0];
+  return `${API_BASE}/v1/cms/media/${media.id}/file?variant=${chosen}`;
+}
+
+/** Looks up a published content block by key, returning null when absent. */
+export function block(content: WebsiteContent, key: string): WebsiteBlock | null {
+  return content.blocks.find((b) => b.key === key) ?? null;
+}
+
+/** The value of a content block, or a fallback when it has not been authored. */
+export function blockValue(content: WebsiteContent, key: string, fallback: string): string {
+  const found = block(content, key);
+  return found && found.value ? found.value : fallback;
+}
+
+/** Localised alt text for a CMS image. */
+export function mediaAlt(media: CmsMedia | null, locale: string, fallback: string): string {
+  if (!media) return fallback;
+  const alt = locale === 'ar' ? media.altAr : media.altEn;
+  return alt && alt.trim() ? alt : fallback;
 }

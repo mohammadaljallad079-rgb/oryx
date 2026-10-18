@@ -3,6 +3,7 @@ export * from './modules';
 export * from './money';
 export * from './currency';
 export * from './scheduling';
+export * from './service-categories';
 export * from './tokens';
 export * from './authorization';
 export * from './integrations';

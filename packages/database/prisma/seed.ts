@@ -17,7 +17,7 @@
 
 import { PrismaClient, type Prisma } from '@prisma/client';
 import * as argon2 from 'argon2';
-import { MODULES, PERMISSIONS, lineAmountMinor } from '@oryx/shared';
+import { MODULES, PERMISSIONS, SERVICE_CATEGORIES, lineAmountMinor } from '@oryx/shared';
 
 const prisma = new PrismaClient();
 
@@ -694,13 +694,18 @@ async function seedCms() {
     });
   }
 
-  const categories = [
-    { key: 'vehicle_inspection', nameEn: 'Vehicle Inspection', nameAr: 'فحص المركبات', domain: 'automotive', sortOrder: 1 },
-    { key: 'maintenance', nameEn: 'Maintenance', nameAr: 'الصيانة', domain: 'automotive', sortOrder: 2 },
-    { key: 'spare_parts', nameEn: 'Spare Parts', nameAr: 'قطع الغيار', domain: 'marketplace', sortOrder: 3 },
-    { key: 'recovery', nameEn: 'Recovery', nameAr: 'الإنقاذ', domain: 'automotive', sortOrder: 4 },
-    { key: 'car_wash', nameEn: 'Car Wash', nameAr: 'غسيل السيارات', domain: 'marketplace', sortOrder: 5 },
-  ];
+  // The catalogue comes from @oryx/shared so the seed, the CMS, the provider
+  // directory and both clients agree on one key space. Descriptions and sort
+  // order are kept in step with the code definition.
+  const categories = SERVICE_CATEGORIES.map((c) => ({
+    key: c.key,
+    nameEn: c.nameEn,
+    nameAr: c.nameAr,
+    domain: c.domain,
+    sortOrder: c.sortOrder,
+    descriptionEn: c.descEn,
+    descriptionAr: c.descAr,
+  }));
   for (const c of categories) {
     await prisma.serviceCategory.upsert({ where: { key: c.key }, update: c, create: c });
   }
@@ -1139,27 +1144,46 @@ async function seedExecution03Baseline(idByCode: Map<string, string>, superAdmin
       bays += 1;
     }
 
-    // Marketplace provider (approved) with a listing.
-    const provider = await prisma.marketplaceProvider.upsert({
-      where: { code: `${company.code}-P1` },
-      update: {},
-      create: {
-        code: `${company.code}-P1`,
-        nameEn: 'City Auto Care',
-        nameAr: 'رعاية السيارات المدينة',
-        categoryKey: 'WORKSHOP',
-        providerCompanyId: company.id,
-        commissionPercentBp: 1000,
-        status: 'APPROVED',
-        approvedAt: new Date(),
-      },
-    });
-    if ((await prisma.providerServiceListing.count({ where: { providerId: provider.id } })) === 0) {
-      await prisma.providerServiceListing.create({
-        data: { providerId: provider.id, categoryKey: 'WORKSHOP', nameEn: 'General repair', nameAr: 'إصلاح عام', priceMinor: 30000 },
+    // Marketplace providers (approved), one per service category, so the
+    // customer directory can answer every category filter with real rows. The
+    // category keys come from @oryx/shared — the same keys the website chips and
+    // the CMS category photography use.
+    const providerNames = [
+      { key: 'maintenance', nameEn: 'City Auto Care', nameAr: 'رعاية السيارات المدينة' },
+      { key: 'vehicle_inspection', nameEn: 'Gulf Inspection Centre', nameAr: 'مركز الخليج للفحص' },
+      { key: 'spare_parts', nameEn: 'Al Noor Parts', nameAr: 'النور لقطع الغيار' },
+      { key: 'recovery', nameEn: 'Rapid Recovery 24', nameAr: 'الإنقاذ السريع ٢٤' },
+      { key: 'car_wash', nameEn: 'Premium Car Wash', nameAr: 'غسيل السيارات المميز' },
+    ];
+    for (const [index, p] of providerNames.entries()) {
+      const provider = await prisma.marketplaceProvider.upsert({
+        where: { code: `${company.code}-P${index + 1}` },
+        update: { categoryKey: p.key },
+        create: {
+          code: `${company.code}-P${index + 1}`,
+          nameEn: p.nameEn,
+          nameAr: p.nameAr,
+          categoryKey: p.key,
+          providerCompanyId: company.id,
+          commissionPercentBp: 1000,
+          status: 'APPROVED',
+          approvedAt: new Date(),
+        },
       });
+      if ((await prisma.providerServiceListing.count({ where: { providerId: provider.id } })) === 0) {
+        const category = SERVICE_CATEGORIES.find((c) => c.key === p.key)!;
+        await prisma.providerServiceListing.create({
+          data: {
+            providerId: provider.id,
+            categoryKey: p.key,
+            nameEn: category.nameEn,
+            nameAr: category.nameAr,
+            priceMinor: 30000,
+          },
+        });
+      }
+      providers += 1;
     }
-    providers += 1;
   }
 
   console.log(

@@ -320,3 +320,72 @@ export class RestoreRevisionDto {
   @Min(1)
   revision!: number;
 }
+
+/** Editing a service category's marketing presentation. */
+export class UpdateServiceCategoryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  descriptionEn?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  descriptionAr?: string | null;
+
+  @IsOptional()
+  @IsString()
+  imageAssetId?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+}
+
+/** Creating or editing a banner, including its photography. */
+export class UpsertBannerFullDto {
+  @IsString()
+  @MaxLength(60)
+  placement!: string;
+
+  @IsIn(['ar', 'en'])
+  locale!: 'ar' | 'en';
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  title!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  subtitle?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  imageUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  mediaAssetId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  actionUrl?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}

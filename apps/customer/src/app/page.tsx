@@ -4,7 +4,16 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
-import { publicApi, SERVICE_CATEGORIES, type ProviderSummary } from '@/lib/api';
+import {
+  blockValue,
+  mediaAlt,
+  mediaUrl,
+  publicApi,
+  SERVICE_CATEGORIES,
+  type ProviderSummary,
+  type WebsiteCategory,
+} from '@/lib/api';
+import { useWebsiteContent } from '@/lib/use-website-content';
 import { Card, EmptyState, Stars } from '@/components/ui';
 import { Icon } from '@/components/icons';
 
@@ -12,14 +21,15 @@ import { Icon } from '@/components/icons';
  * Customer homepage.
  *
  * The provider strip is real data from the public marketplace endpoint, so the
- * page cannot advertise a provider that has not been approved. Every claim in
- * the copy maps to something the API actually does (approval before
- * publication, slot-based booking, a stored service record, a payment that is
- * only complete after a verified confirmation).
+ * page cannot advertise a provider that has not been approved. Photography and
+ * headline copy come from the admin CMS when an administrator has authored
+ * them, and fall back to the bundled design otherwise — a page never renders
+ * empty because the CMS is unreachable.
  */
 export default function HomePage() {
   const { t, locale } = useUi();
   const { isAuthenticated } = useCustomerAuth();
+  const { content } = useWebsiteContent(locale);
   const [providers, setProviders] = useState<ProviderSummary[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -40,6 +50,42 @@ export default function HomePage() {
       active = false;
     };
   }, []);
+
+  // Hero photography: the first active banner, else the first CMS category
+  // image, else the bundled vector art.
+  const heroBanner = content.banners.find((b) => b.media || b.imageUrl) ?? null;
+  const heroImage =
+    mediaUrl(heroBanner?.media ?? null, 'hero') ??
+    heroBanner?.imageUrl ??
+    mediaUrl(content.categories[0]?.media ?? null, 'hero') ??
+    '/art/hero-automotive.svg';
+  const heroAlt = heroBanner
+    ? heroBanner.subtitle || heroBanner.title
+    : mediaAlt(content.categories[0]?.media ?? null, locale, t('home.heroAlt'));
+
+  // Category cards prefer the administrator's photograph, then their copy,
+  // then the bundled catalogue entry.
+  const categories: Array<{
+    key: string;
+    name: string;
+    desc: string;
+    art: string | null;
+    alt: string;
+  }> = SERVICE_CATEGORIES.map((fallback) => {
+    const managed: WebsiteCategory | undefined = content.categories.find((c) => c.key === fallback.key);
+    const desc = locale === 'ar' ? managed?.descriptionAr : managed?.descriptionEn;
+    return {
+      key: fallback.key,
+      name: locale === 'ar' ? fallback.nameAr : fallback.nameEn,
+      desc: desc || (locale === 'ar' ? fallback.descAr : fallback.descEn),
+      art: mediaUrl(managed?.media ?? null, 'card'),
+      alt: mediaAlt(managed?.media ?? null, locale, fallback.nameEn),
+    };
+  });
+
+  const partnerImage =
+    mediaUrl(content.categories.find((c) => c.key === 'maintenance')?.media ?? null, 'wide') ??
+    '/art/service-maintenance.svg';
 
   const stats = [
     { value: `${providers.length || '—'}`, label: t('home.statProviders') },
@@ -75,22 +121,22 @@ export default function HomePage() {
       <section className="oryx-hero oryx-hero--home">
         <div
           className="oryx-hero__media"
-          style={{ backgroundImage: 'url(/art/hero-automotive.svg)' }}
+          style={{ backgroundImage: `url(${heroImage})` }}
           role="img"
-          aria-label={t('home.heroAlt')}
+          aria-label={heroAlt}
         />
         <div className="oryx-hero__scrim" />
         <div className="oryx-hero__content">
-          <p className="oryx-eyebrow">{t('home.eyebrow')}</p>
-          <h1 className="oryx-hero__title">{t('home.title')}</h1>
-          <p className="oryx-hero__lede">{t('home.subtitle')}</p>
+          <p className="oryx-eyebrow">{blockValue(content, 'home.hero.eyebrow', t('home.eyebrow'))}</p>
+          <h1 className="oryx-hero__title">{blockValue(content, 'home.hero.title', t('home.title'))}</h1>
+          <p className="oryx-hero__lede">{blockValue(content, 'home.hero.subtitle', t('home.subtitle'))}</p>
           <div className="oryx-hero__actions">
             <Link href="/bookings" className="oryx-btn oryx-btn-primary oryx-btn-lg">
               <Icon name="calendar" size={17} />
-              {t('home.ctaBook')}
+              {blockValue(content, 'home.cta.book', t('home.ctaBook'))}
             </Link>
             <Link href="/providers" className="oryx-btn oryx-btn-lg">
-              {t('home.ctaBrowse')}
+              {blockValue(content, 'home.cta.browse', t('home.ctaBrowse'))}
             </Link>
           </div>
           <dl className="oryx-stat-row">
@@ -107,11 +153,15 @@ export default function HomePage() {
       {/* -------------------------------------------------- categories */}
       <section className="oryx-section" id="services">
         <header className="oryx-section-head">
-          <h2 className="oryx-section-title">{t('home.categories')}</h2>
-          <p className="oryx-muted">{t('home.categoriesSubtitle')}</p>
+          <h2 className="oryx-section-title">
+            {blockValue(content, 'home.categories.title', t('home.categories'))}
+          </h2>
+          <p className="oryx-muted">
+            {blockValue(content, 'home.categories.subtitle', t('home.categoriesSubtitle'))}
+          </p>
         </header>
         <div className="oryx-grid oryx-grid--cards">
-          {SERVICE_CATEGORIES.map((category) => (
+          {categories.map((category) => (
             <Link
               key={category.key}
               href={`/providers?category=${category.key}`}
@@ -120,13 +170,12 @@ export default function HomePage() {
               <span
                 className="oryx-cat-card__art"
                 style={{ backgroundImage: `url(${category.art})` }}
-                aria-hidden
+                role="img"
+                aria-label={category.alt}
               />
               <span className="oryx-cat-card__body">
-                <strong>{locale === 'ar' ? category.nameAr : category.nameEn}</strong>
-                <span className="oryx-muted oryx-cat-card__desc">
-                  {locale === 'ar' ? category.descAr : category.descEn}
-                </span>
+                <strong>{category.name}</strong>
+                <span className="oryx-muted oryx-cat-card__desc">{category.desc}</span>
                 <span className="oryx-cat-card__link">
                   {t('providers.title')}
                   <Icon name="arrow" size={14} />
@@ -140,8 +189,8 @@ export default function HomePage() {
       {/* ----------------------------------------------------- value */}
       <section className="oryx-section">
         <header className="oryx-section-head">
-          <h2 className="oryx-section-title">{t('home.valueTitle')}</h2>
-          <p className="oryx-muted">{t('home.valueSubtitle')}</p>
+          <h2 className="oryx-section-title">{blockValue(content, 'home.value.title', t('home.valueTitle'))}</h2>
+          <p className="oryx-muted">{blockValue(content, 'home.value.subtitle', t('home.valueSubtitle'))}</p>
         </header>
         <div className="oryx-grid oryx-grid--cards">
           {values.map((v) => (
@@ -219,8 +268,10 @@ export default function HomePage() {
       <section className="oryx-section">
         <div className="oryx-partner">
           <div className="oryx-partner__copy">
-            <h2 className="oryx-section-title">{t('home.partnerTitle')}</h2>
-            <p className="oryx-muted">{t('home.partnerBody')}</p>
+            <h2 className="oryx-section-title">
+              {blockValue(content, 'home.partner.title', t('home.partnerTitle'))}
+            </h2>
+            <p className="oryx-muted">{blockValue(content, 'home.partner.body', t('home.partnerBody'))}</p>
             <ul className="oryx-checklist">
               {[t('home.partnerPoint1'), t('home.partnerPoint2'), t('home.partnerPoint3')].map(
                 (point) => (
@@ -236,7 +287,7 @@ export default function HomePage() {
             </Link>
           </div>
           <div className="oryx-partner__art" aria-hidden>
-            <span className="oryx-partner__art-img" style={{ backgroundImage: 'url(/art/service-maintenance.svg)' }} />
+            <span className="oryx-partner__art-img" style={{ backgroundImage: `url(${partnerImage})` }} />
           </div>
         </div>
       </section>
@@ -244,7 +295,7 @@ export default function HomePage() {
       {/* ------------------------------------------------------ trust */}
       <section className="oryx-section">
         <header className="oryx-section-head">
-          <h2 className="oryx-section-title">{t('home.trustTitle')}</h2>
+          <h2 className="oryx-section-title">{blockValue(content, 'home.trust.title', t('home.trustTitle'))}</h2>
           <p className="oryx-muted">{t('home.trustSubtitle')}</p>
         </header>
         <div className="oryx-grid oryx-grid--cards">
@@ -282,8 +333,10 @@ export default function HomePage() {
       <section className="oryx-section">
         <div className="oryx-contact">
           <div>
-            <h2 className="oryx-section-title">{t('home.contactTitle')}</h2>
-            <p className="oryx-muted">{t('home.contactBody')}</p>
+            <h2 className="oryx-section-title">
+              {blockValue(content, 'home.contact.title', t('home.contactTitle'))}
+            </h2>
+            <p className="oryx-muted">{blockValue(content, 'home.contact.body', t('home.contactBody'))}</p>
           </div>
           <Link href="/support" className="oryx-btn oryx-btn-primary">
             <Icon name="headset" size={16} />

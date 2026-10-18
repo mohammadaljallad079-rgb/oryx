@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import sharp from 'sharp';
+import { SERVICE_CATEGORIES } from '@oryx/shared';
 import { createTestApp, login, SEED_COMPANY_ADMIN, SEED_SUPER_ADMIN, type TestContext } from './test-app';
 import { PrismaService } from '../src/common/prisma.service';
 
@@ -411,5 +412,51 @@ describe('Execution 07 — media library & dynamic website content', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { categories: Array<{ key: string; media: unknown }> };
     expect(body.categories.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * The website chips, the CMS category rows and the provider `categoryKey` must
+   * share one key space. When they drifted, every category chip on the customer
+   * site filtered the provider directory by a key no provider carried and
+   * returned nothing — a silent, user-visible failure. These assertions fail if
+   * a future edit reintroduces a second vocabulary.
+   */
+  it('serves the provider directory under the same category keys the CMS publishes', async () => {
+    const site = (await (
+      await fetch(`${ctx.base}/api/v1/cms/public/website?locale=en`)
+    ).json()) as { categories: Array<{ key: string }> };
+    const siteKeys = site.categories.map((c) => c.key);
+    expect(siteKeys.length).toBeGreaterThan(0);
+
+    for (const key of siteKeys) {
+      const res = await fetch(
+        `${ctx.base}/api/v1/marketplace/providers?categoryKey=${encodeURIComponent(key)}`,
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { total: number };
+      expect(body.total).toBeGreaterThan(0);
+    }
+  });
+
+  it('returns no provider for a retired category key', async () => {
+    // `automotive_maintenance` was the pre-Execution-07 website key and
+    // `WORKSHOP` the pre-Execution-07 provider key. Neither is part of the
+    // canonical catalogue, so neither may match a provider.
+    for (const retired of ['automotive_maintenance', 'WORKSHOP']) {
+      const res = await fetch(
+        `${ctx.base}/api/v1/marketplace/providers?categoryKey=${encodeURIComponent(retired)}`,
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { total: number };
+      expect(body.total).toBe(0);
+    }
+  });
+
+  it('persists every catalogue category as a seeded ServiceCategory row', async () => {
+    const rows = await prisma.serviceCategory.findMany({ select: { key: true } });
+    const persisted = new Set(rows.map((r) => r.key));
+    for (const category of SERVICE_CATEGORIES) {
+      expect(persisted.has(category.key)).toBe(true);
+    }
   });
 });
