@@ -22,7 +22,7 @@ import { CookieService } from './cookie.service';
 import { AuditService } from '../common/audit.service';
 import { PrismaService } from '../common/prisma.service';
 import { EntitlementService } from '../common/entitlement.service';
-import { CurrentPrincipal, Public, type RequestPrincipal } from './auth.decorators';
+import { CsrfExempt, CurrentPrincipal, Public, type RequestPrincipal } from './auth.decorators';
 import {
   AcceptInvitationDto,
   ChangePasswordDto,
@@ -83,6 +83,7 @@ export class AuthController {
   }
 
   @Public()
+  @CsrfExempt()
   @Throttle({ default: { limit: Number(process.env.AUTH_THROTTLE_LIMIT ?? 10), ttl: 60_000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -99,6 +100,7 @@ export class AuthController {
   }
 
   @Public()
+  @CsrfExempt()
   @Throttle({ default: { limit: Number(process.env.AUTH_THROTTLE_LIMIT ?? 10), ttl: 60_000 } })
   @Post('mfa/verify-login')
   @HttpCode(HttpStatus.OK)
@@ -128,6 +130,7 @@ export class AuthController {
   }
 
   @Public()
+  @CsrfExempt()
   @Throttle({ default: { limit: Number(process.env.INVITATION_THROTTLE_LIMIT ?? 20), ttl: 60_000 } })
   @Post('accept-invitation')
   @HttpCode(HttpStatus.OK)

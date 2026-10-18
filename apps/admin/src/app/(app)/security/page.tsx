@@ -69,8 +69,8 @@ export default function SecurityPage() {
           <Skeleton height={120} />
         ) : (
           <>
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="flex items-start gap-3">
+            <div className="oryx-card-header flex flex-wrap items-start justify-between gap-4">
+              <div className="flex min-w-0 items-start gap-3">
                 <span
                   className="grid h-11 w-11 flex-none place-items-center rounded-xl"
                   style={{
@@ -132,8 +132,8 @@ export default function SecurityPage() {
 
       {isPlatform ? (
         <Card className="p-5" data-testid="mfa-admin-reset">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
+          <div className="oryx-card-header flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
               <p className="oryx-panel-title m-0">{t('mfa.adminReset')}</p>
               <p className="oryx-muted m-0 max-w-[70ch] text-[12.5px]">{t('mfa.adminResetHint')}</p>
             </div>

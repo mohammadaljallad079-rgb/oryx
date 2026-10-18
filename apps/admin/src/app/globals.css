@@ -728,6 +728,14 @@ body::before {
   font-variant-numeric: tabular-nums;
 }
 
+/* The label sits above the value; it truncates at wide sizes where the card is
+ * wide, and is allowed to wrap at narrow widths (see the 480px query). */
+.oryx-kpi-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .oryx-hero {
   position: relative;
   overflow: hidden;
@@ -876,5 +884,48 @@ body::before {
 
   .oryx-main {
     padding: 16px;
+  }
+}
+
+/* --------------------------------------------------------- narrow viewports */
+/* Below 480px the 2-up KPI grid leaves each card roughly 130px wide, and a
+ * long uppercase label plus its value overflow the card. Let both wrap and
+ * break rather than push the page wide. */
+@media (max-width: 480px) {
+  .oryx-kpi-label,
+  .oryx-kpi-value {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .oryx-kpi-label {
+    display: block;
+  }
+
+  /* A long action label ("Enable two-factor authentication") cannot fit a
+   * 320px viewport on one line. Let buttons wrap their text and grow. */
+  .oryx-btn {
+    height: auto;
+    min-height: 38px;
+    white-space: normal;
+    text-align: center;
+    padding: 8px 14px;
+  }
+
+  .oryx-btn--sm {
+    min-height: 32px;
+  }
+
+  /* Badges carry long platform copy ("Required for Super Admin accounts"). */
+  .oryx-badge {
+    white-space: normal;
+    text-align: start;
+  }
+
+  /* Flex rows that pair a text block with an action button must stack, or the
+   * button's intrinsic width keeps the row wider than the viewport. */
+  .oryx-card-header {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

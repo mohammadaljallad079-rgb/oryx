@@ -32,7 +32,7 @@ import {
   UpdateCustomerProfileDto,
 } from './customer.dto';
 import { ERROR_CODES, notFound } from '../common/errors';
-import { CustomerPlane } from '../auth/auth.decorators';
+import { CsrfExempt, CustomerPlane } from '../auth/auth.decorators';
 
 interface RequestLike {
   headers: Record<string, string | string[] | undefined>;
@@ -96,6 +96,7 @@ export class CustomerAuthController {
 
   @CustomerPublic()
   @Throttle({ default: { limit: Number(process.env.AUTH_THROTTLE_LIMIT ?? 10), ttl: 60_000 } })
+  @CsrfExempt()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a customer account' })
@@ -110,6 +111,7 @@ export class CustomerAuthController {
 
   @CustomerPublic()
   @Throttle({ default: { limit: Number(process.env.AUTH_THROTTLE_LIMIT ?? 10), ttl: 60_000 } })
+  @CsrfExempt()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Sign in; returns an MFA challenge when TOTP is enabled' })
@@ -125,6 +127,7 @@ export class CustomerAuthController {
 
   @CustomerPublic()
   @Throttle({ default: { limit: Number(process.env.AUTH_THROTTLE_LIMIT ?? 10), ttl: 60_000 } })
+  @CsrfExempt()
   @Post('mfa/verify-login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Complete sign-in by verifying a TOTP code' })
@@ -171,6 +174,7 @@ export class CustomerAuthController {
 
   @CustomerPublic()
   @Throttle({ default: { limit: Number(process.env.AUTH_THROTTLE_LIMIT ?? 10), ttl: 60_000 } })
+  @CsrfExempt()
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request a password reset link' })
@@ -189,6 +193,7 @@ export class CustomerAuthController {
 
   @CustomerPublic()
   @Throttle({ default: { limit: Number(process.env.AUTH_THROTTLE_LIMIT ?? 10), ttl: 60_000 } })
+  @CsrfExempt()
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Complete a password reset' })

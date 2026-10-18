@@ -83,12 +83,23 @@ interface RequestOptions {
   noRetry?: boolean;
 }
 
-let refreshInFlight: Promise<boolean> | null = null;
+/**
+ * Single-flight refresh with a three-state outcome.
+ *
+ * `unavailable` (offline, timeout, 5xx, 429) is deliberately distinct from
+ * `expired` (the API rejected the token). Collapsing the two logged a user out
+ * on a transient failure — the defect behind the iPad incident.
+ */
+type RefreshOutcome = 'ok' | 'expired' | 'unavailable';
+
+let refreshInFlight: Promise<RefreshOutcome> | null = null;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Rotate the consumer session; concurrent 401s share one rotation. */
-async function refreshSession(): Promise<boolean> {
+async function refreshSession(): Promise<RefreshOutcome> {
   if (!refreshInFlight) {
-    refreshInFlight = (async () => {
+    refreshInFlight = (async (): Promise<RefreshOutcome> => {
       try {
         const csrf = readCookie(CSRF_COOKIE);
         const res = await fetch(`${API_BASE}/v1/customer/auth/refresh`, {
@@ -100,15 +111,18 @@ async function refreshSession(): Promise<boolean> {
           },
           body: JSON.stringify({}),
         });
-        if (!res.ok) {
-          customerSession.clear();
-          return false;
+        if (res.ok) {
+          const data = (await res.json()) as { accessToken: string };
+          customerSession.setAccessToken(data.accessToken);
+          return 'ok';
         }
-        const data = (await res.json()) as { accessToken: string };
-        customerSession.setAccessToken(data.accessToken);
-        return true;
+        if (res.status === 401 || res.status === 403) {
+          customerSession.clear();
+          return 'expired';
+        }
+        return 'unavailable';
       } catch {
-        return false;
+        return 'unavailable';
       } finally {
         refreshInFlight = null;
       }
@@ -117,10 +131,24 @@ async function refreshSession(): Promise<boolean> {
   return refreshInFlight;
 }
 
-/** Restore a session after a reload, using the HttpOnly refresh cookie. */
-export async function restoreCustomerSession(): Promise<boolean> {
-  if (accessToken) return true;
-  return refreshSession();
+const RESTORE_ATTEMPTS = 3;
+const RESTORE_BACKOFF_MS = 600;
+
+/**
+ * Restore a session after a reload, using the HttpOnly refresh cookie.
+ *
+ * A transient failure is retried a bounded number of times before being
+ * reported, so a flaky network at boot does not bounce the user to sign-in.
+ */
+export async function restoreCustomerSession(): Promise<RefreshOutcome> {
+  if (accessToken) return 'ok';
+  let outcome: RefreshOutcome = 'unavailable';
+  for (let attempt = 0; attempt < RESTORE_ATTEMPTS; attempt += 1) {
+    outcome = await refreshSession();
+    if (outcome !== 'unavailable') return outcome;
+    if (attempt < RESTORE_ATTEMPTS - 1) await sleep(RESTORE_BACKOFF_MS * (attempt + 1));
+  }
+  return outcome;
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -142,9 +170,14 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   });
 
   if (res.status === 401 && !options.anonymous && !options.noRetry) {
-    const refreshed = await refreshSession();
-    if (refreshed) return request<T>(path, { ...options, noRetry: true });
-    customerSession.notifySessionLost();
+    const outcome = await refreshSession();
+    if (outcome === 'ok') return request<T>(path, { ...options, noRetry: true });
+    if (outcome === 'expired') {
+      customerSession.notifySessionLost();
+    } else {
+      // Transient failure: keep the session and report an outage instead.
+      throw new ApiError(503, 'network.unavailable', 'The service is temporarily unavailable.');
+    }
   }
 
   if (!res.ok) {

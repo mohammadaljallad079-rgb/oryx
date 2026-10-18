@@ -177,5 +177,10 @@ test.describe('branding and direction', () => {
     );
     expect(broken.filter(Boolean)).toEqual([]);
     expect(decoded.h).toBeGreaterThan(0);
+
+    // Every card must own a dedicated visual. Two cards sharing one asset means
+    // a module is presenting another module's imagery, which is what the
+    // original screenshot-crop pipeline produced.
+    expect(new Set(tileUrls).size).toBe(tileUrls.length);
   });
 });

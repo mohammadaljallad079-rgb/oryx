@@ -257,7 +257,7 @@ function Kpi({ icon, label, value, sub }: { icon: string; label: string; value: 
         <Icon name={icon} size={18} />
       </span>
       <span className="min-w-0">
-        <span className="oryx-muted block text-[11.5px] font-semibold uppercase tracking-wide">{label}</span>
+        <span className="oryx-muted oryx-kpi-label block text-[11.5px] font-semibold uppercase tracking-wide">{label}</span>
         <span className="oryx-kpi-value block truncate">{value}</span>
         {sub ? <span className="oryx-faint block text-[11.5px]">{sub}</span> : null}
       </span>
