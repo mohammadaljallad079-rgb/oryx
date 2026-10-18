@@ -1,10 +1,13 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { useUi } from '@/lib/ui-context';
 import { publicApi, SERVICE_CATEGORIES } from '@/lib/api';
 import { messageOf } from '@/lib/hooks';
 import { Alert, Button, Card, Field } from '@/components/ui';
+import { PageHeader, StatePanel } from '@/components/premium';
+import { Icon } from '@/components/icons';
 
 /**
  * Public provider application.
@@ -57,15 +60,29 @@ export default function ProviderApplyPage() {
   }
 
   return (
-    <div className="oryx-container" style={{ maxWidth: 620 }}>
-      <h1 className="oryx-section-title">{t('apply.title')}</h1>
-      <p className="oryx-muted" style={{ marginTop: 0, marginBottom: 20 }}>
-        {t('apply.subtitle')}
-      </p>
+    <div className="oryx-container oryx-container--narrow">
+      <PageHeader
+        backHref="/providers"
+        backLabel={t('nav.providers')}
+        eyebrow={t('brand.tagline')}
+        title={t('apply.title')}
+        subtitle={t('apply.subtitle')}
+        art="/art/service-bodywork.svg"
+      />
 
       <Card>
         {done ? (
-          <Alert tone="success">{t('apply.received')}</Alert>
+          <StatePanel
+            tone="success"
+            icon="check"
+            title={t('apply.receivedTitle')}
+            message={t('apply.received')}
+            action={
+              <Link href="/providers" className="oryx-btn">
+                {t('nav.providers')}
+              </Link>
+            }
+          />
         ) : (
           <form onSubmit={onSubmit}>
             {error && (
@@ -124,22 +141,30 @@ export default function ProviderApplyPage() {
 
             <fieldset style={{ border: 'none', padding: 0, margin: '0 0 16px' }}>
               <legend className="oryx-label">{t('apply.category')}</legend>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {SERVICE_CATEGORIES.map((category) => (
-                  <label key={category.key} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={categoryKeys.includes(category.key)}
-                      onChange={() => toggleCategory(category.key)}
-                    />
-                    <span>{locale === 'ar' ? category.nameAr : category.nameEn}</span>
-                  </label>
-                ))}
+              <div className="oryx-choice-grid">
+                {SERVICE_CATEGORIES.map((category) => {
+                  const selected = categoryKeys.includes(category.key);
+                  return (
+                    <label
+                      key={category.key}
+                      className={selected ? 'oryx-choice oryx-choice--on' : 'oryx-choice'}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleCategory(category.key)}
+                      />
+                      <span>{locale === 'ar' ? category.nameAr : category.nameEn}</span>
+                      {selected && <Icon name="check" size={15} />}
+                    </label>
+                  );
+                })}
               </div>
             </fieldset>
 
-            <Button type="submit" variant="primary" disabled={busy} className="oryx-btn-primary">
-              {t('apply.submit')}
+            <Button type="submit" variant="primary" disabled={busy}>
+              <Icon name="plus" size={16} />
+              {busy ? t('common.saving') : t('apply.submit')}
             </Button>
           </form>
         )}

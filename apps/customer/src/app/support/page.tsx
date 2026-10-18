@@ -5,7 +5,9 @@ import { useUi } from '@/lib/ui-context';
 import { customerApi, SERVICE_CATEGORIES } from '@/lib/api';
 import { messageOf, useAsync } from '@/lib/hooks';
 import { RequireCustomer } from '@/components/require-customer';
-import { Alert, Button, Card, EmptyState, Field, Loading, StatusBadge, Stars } from '@/components/ui';
+import { Alert, Button, Card, Field, StatusBadge, Stars } from '@/components/ui';
+import { LoadingPanel, PageHeader, StatePanel, TableWrap } from '@/components/premium';
+import { Icon } from '@/components/icons';
 
 /**
  * Customer support: service requests, reviews and complaints.
@@ -113,7 +115,12 @@ function SupportContent() {
 
   return (
     <div className="oryx-container">
-      <h1 className="oryx-section-title">{t('support.title')}</h1>
+      <PageHeader
+        eyebrow={t('brand.tagline')}
+        title={t('support.title')}
+        subtitle={t('support.subtitle')}
+        art="/art/service-recovery.svg"
+      />
       {error && (
         <div style={{ marginBottom: 16 }}>
           <Alert>{error}</Alert>
@@ -125,8 +132,8 @@ function SupportContent() {
         </div>
       )}
 
-      <div className="oryx-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))' }}>
-        <Card title={t('support.new')}>
+      <div className="oryx-grid oryx-split">
+        <Card title={t('support.new')} subtitle={t('support.newHint')}>
           <form onSubmit={submitRequest}>
             <Field label={t('support.category')}>
               <select
@@ -166,30 +173,33 @@ function SupportContent() {
                 data-testid="request-description"
               />
             </Field>
-            <Button type="submit" variant="primary" disabled={busy} className="oryx-btn-primary">
-              {t('support.submit')}
+            <Button type="submit" variant="primary" disabled={busy}>
+              <Icon name="headset" size={16} />
+              {busy ? t('common.saving') : t('support.submit')}
             </Button>
           </form>
         </Card>
 
-        <Card title={t('support.requests')}>
+        <Card
+          title={t('support.requests')}
+          subtitle={t('support.requestsCount', { count: String(requests.data?.items.length ?? 0) })}
+        >
           {requests.loading ? (
-            <Loading />
+            <LoadingPanel rows={4} />
           ) : (requests.data?.items.length ?? 0) === 0 ? (
-            <EmptyState message={t('support.none')} />
+            <StatePanel icon="headset" title={t('support.none')} message={t('support.noneHint')} />
           ) : (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            <ul className="oryx-list">
               {requests.data?.items.map((request) => (
-                <li
-                  key={request.id}
-                  style={{ padding: '12px 0', borderBottom: '1px solid var(--border-soft)' }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                    <strong dir="ltr">{request.requestNumber}</strong>
+                <li key={request.id} className="oryx-list__item">
+                  <div className="oryx-booking__title">
+                    <span className="oryx-mono" dir="ltr">{request.requestNumber}</span>
                     <StatusBadge status={request.status} />
                   </div>
-                  <div className="oryx-muted">{request.description ?? request.categoryKey}</div>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                  <div className="oryx-muted" style={{ marginTop: 4 }}>
+                    {request.description ?? request.categoryKey}
+                  </div>
+                  <div className="oryx-vehicle__actions">
                     <button
                       type="button"
                       className="oryx-btn oryx-btn-ghost"
@@ -302,10 +312,15 @@ function SupportContent() {
       <div style={{ marginTop: 24 }}>
         <Card title={t('support.disputes')}>
           {disputes.loading ? (
-            <Loading />
+            <LoadingPanel rows={3} />
           ) : (disputes.data?.items.length ?? 0) === 0 ? (
-            <EmptyState message={t('support.none')} />
+            <StatePanel
+              icon="shield"
+              title={t('support.noDisputes')}
+              message={t('support.noDisputesHint')}
+            />
           ) : (
+            <TableWrap>
             <table className="oryx-table">
               <thead>
                 <tr>
@@ -326,6 +341,7 @@ function SupportContent() {
                 ))}
               </tbody>
             </table>
+            </TableWrap>
           )}
         </Card>
       </div>

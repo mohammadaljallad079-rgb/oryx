@@ -4,7 +4,9 @@ import { useUi } from '@/lib/ui-context';
 import { customerApi } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 import { RequireCustomer } from '@/components/require-customer';
-import { Button, Card, EmptyState, Loading, formatDate } from '@/components/ui';
+import { Button, Card, formatDate } from '@/components/ui';
+import { LoadingPanel, PageHeader, StatePanel } from '@/components/premium';
+import { Icon } from '@/components/icons';
 
 /** In-app notifications with read state. */
 export default function NotificationsPage() {
@@ -29,51 +31,67 @@ function NotificationsContent() {
     await notifications.reload();
   }
 
+  const items = notifications.data?.items ?? [];
+  const unread = items.filter((item) => !item.readAt).length;
+
   return (
     <div className="oryx-container">
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          flexWrap: 'wrap',
-        }}
-      >
-        <h1 className="oryx-section-title">{t('notifications.title')}</h1>
-        <Button onClick={() => void markAll()}>{t('notifications.markAll')}</Button>
-      </div>
+      <PageHeader
+        eyebrow={t('brand.tagline')}
+        title={t('notifications.title')}
+        subtitle={t('notifications.subtitle')}
+        art="/art/service-recovery.svg"
+        actions={
+          unread > 0 ? (
+            <Button variant="primary" onClick={() => void markAll()}>
+              <Icon name="check" size={16} />
+              {t('notifications.markAll')}
+            </Button>
+          ) : undefined
+        }
+      />
 
-      <Card>
+      <Card
+        title={t('notifications.title')}
+        subtitle={t('notifications.count', { count: String(items.length), unread: String(unread) })}
+      >
         {notifications.loading ? (
-          <Loading />
-        ) : (notifications.data?.items.length ?? 0) === 0 ? (
-          <EmptyState message={t('notifications.none')} />
+          <LoadingPanel rows={5} />
+        ) : items.length === 0 ? (
+          <StatePanel
+            icon="bell"
+            title={t('notifications.none')}
+            message={t('notifications.noneHint')}
+          />
         ) : (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {notifications.data?.items.map((item) => (
+          <ul className="oryx-list">
+            {items.map((item) => (
               <li
                 key={item.id}
-                style={{
-                  padding: '14px 0',
-                  borderBottom: '1px solid var(--border-soft)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                }}
+                className={item.readAt ? 'oryx-list__item' : 'oryx-list__item oryx-notice--unread'}
               >
-                <div>
-                  <div style={{ fontWeight: item.readAt ? 400 : 650 }}>
-                    {item.title ?? item.category}
+                <div className="oryx-notice">
+                  <span
+                    className={item.readAt ? 'oryx-notice__dot oryx-notice__dot--read' : 'oryx-notice__dot'}
+                    aria-hidden
+                  />
+                  <div className="oryx-notice__body">
+                    <div
+                      className={
+                        item.readAt ? 'oryx-notice__title oryx-notice__title--read' : 'oryx-notice__title'
+                      }
+                    >
+                      {item.title ?? item.category}
+                    </div>
+                    <div className="oryx-muted">{item.body}</div>
+                    <div className="oryx-notice__meta">{formatDate(item.createdAt, locale)}</div>
                   </div>
-                  <div className="oryx-muted">{item.body}</div>
-                  <div className="oryx-muted">{formatDate(item.createdAt, locale)}</div>
+                  {!item.readAt && (
+                    <Button variant="ghost" onClick={() => void markOne(item.id)}>
+                      {t('notifications.markRead')}
+                    </Button>
+                  )}
                 </div>
-                {!item.readAt && (
-                  <Button variant="ghost" onClick={() => void markOne(item.id)}>
-                    {t('notifications.markAll')}
-                  </Button>
-                )}
               </li>
             ))}
           </ul>

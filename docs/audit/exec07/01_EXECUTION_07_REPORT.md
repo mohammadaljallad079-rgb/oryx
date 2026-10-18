@@ -155,6 +155,11 @@ added.
    bookings, invoices, support, providers) still use the pre-Execution-07
    presentation and have not been restyled.
 
+   *Closed by Phase C* — see
+   [`02_PHASE_C_PREMIUM_PAGES.md`](./02_PHASE_C_PREMIUM_PAGES.md). Every
+   customer page now shares the `premium.tsx` primitives. Verified by 78
+   screenshot captures with zero overflow and a 13-route live render check.
+
 ## 6. Reproduction
 
 ```bash

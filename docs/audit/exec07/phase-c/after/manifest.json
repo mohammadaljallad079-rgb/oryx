@@ -1,0 +1,626 @@
+[
+  {
+    "route": "/dashboard",
+    "width": "desktop",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/dashboard",
+    "width": "desktop",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/garage",
+    "width": "desktop",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/garage",
+    "width": "desktop",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/bookings",
+    "width": "desktop",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/bookings",
+    "width": "desktop",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/invoices",
+    "width": "desktop",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/invoices",
+    "width": "desktop",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/support",
+    "width": "desktop",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/support",
+    "width": "desktop",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/notifications",
+    "width": "desktop",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/notifications",
+    "width": "desktop",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/profile",
+    "width": "desktop",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/profile",
+    "width": "desktop",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/",
+    "width": "desktop",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/",
+    "width": "desktop",
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/services",
+    "width": "desktop",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/services",
+    "width": "desktop",
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/providers",
+    "width": "desktop",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/providers",
+    "width": "desktop",
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/providers/apply",
+    "width": "desktop",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/providers/apply",
+    "width": "desktop",
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/login",
+    "width": "desktop",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/login",
+    "width": "desktop",
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/register",
+    "width": "desktop",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/register",
+    "width": "desktop",
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/dashboard",
+    "width": "tablet",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/dashboard",
+    "width": "tablet",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/garage",
+    "width": "tablet",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/garage",
+    "width": "tablet",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/bookings",
+    "width": "tablet",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/bookings",
+    "width": "tablet",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/invoices",
+    "width": "tablet",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/invoices",
+    "width": "tablet",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/support",
+    "width": "tablet",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/support",
+    "width": "tablet",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/notifications",
+    "width": "tablet",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/notifications",
+    "width": "tablet",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/profile",
+    "width": "tablet",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/profile",
+    "width": "tablet",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/",
+    "width": "tablet",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/",
+    "width": "tablet",
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/services",
+    "width": "tablet",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/services",
+    "width": "tablet",
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/providers",
+    "width": "tablet",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/providers",
+    "width": "tablet",
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/providers/apply",
+    "width": "tablet",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/providers/apply",
+    "width": "tablet",
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/login",
+    "width": "tablet",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/login",
+    "width": "tablet",
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/register",
+    "width": "tablet",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/register",
+    "width": "tablet",
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/dashboard",
+    "width": "mobile",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/dashboard",
+    "width": "mobile",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/garage",
+    "width": "mobile",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/garage",
+    "width": "mobile",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/bookings",
+    "width": "mobile",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/bookings",
+    "width": "mobile",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/invoices",
+    "width": "mobile",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/invoices",
+    "width": "mobile",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/support",
+    "width": "mobile",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/support",
+    "width": "mobile",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/notifications",
+    "width": "mobile",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/notifications",
+    "width": "mobile",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/profile",
+    "width": "mobile",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/profile",
+    "width": "mobile",
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/",
+    "width": "mobile",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/",
+    "width": "mobile",
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/services",
+    "width": "mobile",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/services",
+    "width": "mobile",
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/providers",
+    "width": "mobile",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/providers",
+    "width": "mobile",
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/providers/apply",
+    "width": "mobile",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/providers/apply",
+    "width": "mobile",
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/login",
+    "width": "mobile",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/login",
+    "width": "mobile",
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/register",
+    "width": "mobile",
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0
+  },
+  {
+    "route": "/register",
+    "width": "mobile",
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0
+  }
+]

@@ -6,7 +6,9 @@ import { useCustomerAuth } from '@/lib/auth-context';
 import { customerApi, type Address, type NotificationPreference, type PrivacySettings } from '@/lib/api';
 import { messageOf, useAsync } from '@/lib/hooks';
 import { RequireCustomer } from '@/components/require-customer';
-import { Alert, Button, Card, EmptyState, Field, Loading } from '@/components/ui';
+import { Alert, Button, Card, Field } from '@/components/ui';
+import { LoadingPanel, PageHeader, StatePanel } from '@/components/premium';
+import { Icon } from '@/components/icons';
 
 /** Profile, addresses, notification preferences and privacy controls. */
 export default function ProfilePage() {
@@ -150,7 +152,12 @@ function ProfileContent() {
 
   return (
     <div className="oryx-container">
-      <h1 className="oryx-section-title">{t('profile.title')}</h1>
+      <PageHeader
+        eyebrow={t('brand.tagline')}
+        title={t('profile.title')}
+        subtitle={t('profile.subtitle')}
+        art="/art/service-bodywork.svg"
+      />
       {error && (
         <div style={{ marginBottom: 16 }}>
           <Alert>{error}</Alert>
@@ -162,8 +169,8 @@ function ProfileContent() {
         </div>
       )}
 
-      <div className="oryx-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))' }}>
-        <Card title={t('profile.title')}>
+      <div className="oryx-grid oryx-split">
+        <Card title={t('profile.title')} subtitle={t('profile.identityHint')}>
           <form onSubmit={saveProfile}>
             <Field label={t('profile.name')}>
               <input
@@ -184,13 +191,14 @@ function ProfileContent() {
             <Field label={t('auth.email')}>
               <input className="oryx-input" value={profile?.email ?? ''} readOnly dir="ltr" />
             </Field>
-            <Button type="submit" variant="primary" disabled={busy} className="oryx-btn-primary">
-              {t('common.save')}
+            <Button type="submit" variant="primary" disabled={busy}>
+              <Icon name="check" size={16} />
+              {busy ? t('common.saving') : t('common.save')}
             </Button>
           </form>
         </Card>
 
-        <Card title={t('addresses.title')}>
+        <Card title={t('addresses.title')} subtitle={t('addresses.subtitle')}>
           <form onSubmit={addAddress} style={{ marginBottom: 18 }}>
             <Field label={t('addresses.label')} hint={t('common.optional')}>
               <input className="oryx-input" value={label} onChange={(e) => setLabel(e.target.value)} />
@@ -227,23 +235,17 @@ function ProfileContent() {
           </form>
 
           {addresses.loading ? (
-            <Loading />
+            <LoadingPanel rows={3} />
           ) : (addresses.data?.length ?? 0) === 0 ? (
-            <EmptyState message={t('addresses.none')} />
+            <StatePanel icon="user" title={t('addresses.none')} message={t('addresses.noneHint')} />
           ) : (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            <ul className="oryx-list">
               {addresses.data?.map((address: Address) => (
-                <li
-                  key={address.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    gap: 10,
-                    padding: '10px 0',
-                    borderBottom: '1px solid var(--border-soft)',
-                  }}
-                >
-                  <div>
+                <li key={address.id} className="oryx-address">
+                  <span className="oryx-address__icon" aria-hidden>
+                    <Icon name="user" size={16} />
+                  </span>
+                  <div className="oryx-address__body">
                     <div>{address.addressLine1}</div>
                     <div className="oryx-muted">
                       {address.city}, {address.countryCode}
@@ -264,12 +266,12 @@ function ProfileContent() {
         </Card>
       </div>
 
-      <div className="oryx-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', marginTop: 20 }}>
-        <Card title={t('profile.preferences')}>
+      <div className="oryx-grid oryx-split" style={{ marginTop: 20 }}>
+        <Card title={t('profile.preferences')} subtitle={t('profile.preferencesHint')}>
           {preferences.loading || !preferenceState ? (
-            <Loading />
+            <LoadingPanel rows={3} />
           ) : preferenceState.length === 0 ? (
-            <EmptyState message={t('common.empty')} />
+            <StatePanel icon="bell" title={t('profile.noPreferences')} />
           ) : (
             <form onSubmit={savePreferences}>
               <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 14px' }}>
@@ -293,7 +295,7 @@ function ProfileContent() {
                         setPreferenceState(next);
                       }}
                     />
-                    <span dir="ltr">
+                    <span className="oryx-mono" dir="ltr">
                       {preference.channel} · {preference.category}
                     </span>
                   </li>
@@ -306,9 +308,9 @@ function ProfileContent() {
           )}
         </Card>
 
-        <Card title={t('profile.privacy')}>
+        <Card title={t('profile.privacy')} subtitle={t('profile.privacyHint')}>
           {privacy.loading || !privacyState ? (
-            <Loading />
+            <LoadingPanel rows={3} />
           ) : (
             <>
               <form onSubmit={savePrivacy}>
@@ -332,7 +334,7 @@ function ProfileContent() {
                   />
                   <span>{t('profile.shareContact')}</span>
                 </label>
-                <Button type="submit" variant="primary" disabled={busy} className="oryx-btn-primary">
+                <Button type="submit" variant="primary" disabled={busy}>
                   {t('common.save')}
                 </Button>
               </form>
