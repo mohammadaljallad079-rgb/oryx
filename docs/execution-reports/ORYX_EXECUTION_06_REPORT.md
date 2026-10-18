@@ -189,10 +189,11 @@ light-theme reference. See `docs/audit/03_VISUAL_COMPARISON.md` and
 | Item | Value |
 |---|---|
 | Branch | `audit/execution-05-verification` |
-| PR | #6 (draft, open, base `main`) |
-| Local Execution 06 code head | `b1e2f7b` (iPad auth, dual Super Admin, unique art, responsive sweep) |
-| Remote head before this session's push | `5636f4e` |
-| Push state | this session pushes `b1e2f7b` plus the audit/docs and input-validation commits to PR #6 |
+| PR | [#6](https://github.com/mohammadaljallad079-rgb/oryx/pull/6) (draft, open, base `main`) |
+| Pushed head | `a2e4f82` (pushed this session; `5636f4e..a2e4f82`) |
+| `b1e2f7b` | iPad auth, dual Super Admin, unique art, responsive sweep |
+| `a2e4f82` | date-filter validation hardening, audit docs and evidence, Execution 06 report |
 
-The commit SHA of the final pushed head is recorded on PR #6 and in
-`docs/audit/README.md`.
+`a2e4f82` is the head of PR #6. CI (`Typecheck and build`, `Unit and API
+integration tests`, `Browser acceptance tests`) runs on it; status is visible on
+the pull request.
