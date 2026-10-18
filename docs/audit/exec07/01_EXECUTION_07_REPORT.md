@@ -108,7 +108,10 @@ has no corresponding approved reference.
 
 | Suite | Command | Result |
 |---|---|---|
+| Shared unit | `pnpm --filter @oryx/shared test` | 96 / 96 passed |
 | API integration | `pnpm --filter @oryx/api test:e2e` | **278 / 278 passed, 13 suites** |
+| Browser (Playwright) | `pnpm --filter @oryx/admin test:ui` | 184 passed, 1 skipped |
+| Mobile unit | `pnpm --filter @oryx/mobile test` | 20 / 20 passed |
 | Customer lint | `pnpm --filter @oryx/customer lint` | clean (`--max-warnings=0`) |
 | Admin lint | `pnpm --filter @oryx/admin lint` | clean (`--max-warnings=0`) |
 | Homepage + services assertions | `.run/check-exec07-home.mjs` | **ALL PASS** (ar + en) |
@@ -117,8 +120,11 @@ has no corresponding approved reference.
 | External preview sweep | `.run/sweep-preview.mjs` | **39 / 39 surfaces 200** |
 | Documented demo credentials | `.run/check-demo-credentials.mjs` | **4 / 4 sign in** on live HTTPS |
 
-The API total rose from the 218 recorded for Execution 05 because Executions
-06 and 07 added suites; the current figure is measured, not estimated.
+**578 automated tests total** (96 shared, 278 API, 184 browser, 20 mobile). The
+API figure rose from the 277 recorded in the Execution 06 audit to 278 with the
+defect-18 regression test. The browser and mobile figures are carried from that
+audit; this session's live checks are the last five rows, which were all run
+here.
 
 ## 5. Remaining blockers
 
