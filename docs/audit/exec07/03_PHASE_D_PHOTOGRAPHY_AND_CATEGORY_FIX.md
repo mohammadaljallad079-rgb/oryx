@@ -129,11 +129,14 @@ category, distinct sort order, and explicit rejection of the retired
 |---|---|---|
 | Shared unit | `pnpm --filter @oryx/shared test` | **103 passed** (6 files) |
 | API integration | `pnpm --filter @oryx/api test:e2e` | **302 passed** (14 suites) |
+| Mobile unit | `pnpm --filter @oryx/mobile test` | **20 passed** (3 files) |
 | Typecheck | customer, mobile, api, admin | **clean** |
+| Lint | customer, admin | **clean** (`--max-warnings=0`) |
 | External preview sweep | `.run/sweep-preview.mjs` | **39 / 39 surfaces, 0 failed requests** |
+| CI run [`39161406862`](https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39161406862) | head `a9b1db4` | **all 3 jobs success** (typecheck+build, unit+API integration, browser acceptance) |
 
 The full API run log is `.run/api-e2e-full.log`; the sweep log is
-`.run/sweep-phase-d-final.log` and its machine-readable output is
+`.run/sweep-phase-d-final2.log` and its machine-readable output is
 `docs/audit/evidence/exec06-preview-sweep.json`.
 
 ## 5. Live preview
