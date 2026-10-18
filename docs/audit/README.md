@@ -16,7 +16,7 @@ Environment: isolated staging (`oryx_staging`), not production.
 | PR #5 (`feature/execution-05-platform-completion`) | **MERGED** 2026-10-16T18:10:37Z, merge commit `fc2ab20` |
 | `origin/main` tree | `c789eec` — identical to the Execution 05 head `7db9689` |
 | Latest `main` commit | `699560c` — the owner's official logo upload |
-| This audit | branch `audit/execution-05-verification`, PR #6 (draft). Head `715b1d2`; Execution 06 code at `b1e2f7b`, audit/docs and input-validation at `a2e4f82`. |
+| This audit | branch `audit/execution-05-verification`, PR #6 (draft). Head `bc77426`; Execution 06 code at `b1e2f7b`, audit/docs and input-validation at `a2e4f82`. |
 
 PR #5 is merged, so it cannot be updated; a merged pull request takes no new
 commits. The audit work therefore lands on a fresh branch and PR #6, based on the

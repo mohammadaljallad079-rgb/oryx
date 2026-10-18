@@ -190,10 +190,17 @@ light-theme reference. See `docs/audit/03_VISUAL_COMPARISON.md` and
 |---|---|
 | Branch | `audit/execution-05-verification` |
 | PR | [#6](https://github.com/mohammadaljallad079-rgb/oryx/pull/6) (draft, open, base `main`) |
-| Pushed head | `a2e4f82` (pushed this session; `5636f4e..a2e4f82`) |
+| Pushed head | `bc77426` (pushed this session; `5636f4e..bc77426`) |
 | `b1e2f7b` | iPad auth, dual Super Admin, unique art, responsive sweep |
 | `a2e4f82` | date-filter validation hardening, audit docs and evidence, Execution 06 report |
+| `715b1d2`, `1032edf`, `bc77426` | doc pointers and refreshed screenshots |
 
-`a2e4f82` is the head of PR #6. CI (`Typecheck and build`, `Unit and API
-integration tests`, `Browser acceptance tests`) runs on it; status is visible on
-the pull request.
+`bc77426` is the head of PR #6. CI
+([run 39123892149](https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39123892149))
+is green on it — all three jobs:
+
+| Job | Result |
+|---|---|
+| `Typecheck and build` | **success** |
+| `Unit and API integration tests` | **success** |
+| `Browser acceptance tests` | **success** |

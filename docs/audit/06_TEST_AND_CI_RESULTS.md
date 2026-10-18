@@ -334,7 +334,8 @@ browser suite with `ORYX_ADMIN_URL=http://localhost:3000` and
 `ORYX_API=http://localhost:3001/api/v1`.
 
 CI status for the audited commit is visible on the pull request that carries
-these changes. On the current head `c466d8b` all three jobs are green:
+these changes. On the Execution 06 head `bc77426` all three jobs are green
+([run 39123892149](https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39123892149)):
 
 | Job | Result |
 |---|---|
@@ -342,8 +343,9 @@ these changes. On the current head `c466d8b` all three jobs are green:
 | `Unit and API integration tests` | **success** |
 | `Browser acceptance tests` | **success** |
 
-The seed-fix commit `0904262` also passed all three jobs. On the earlier head
-`c460358` all three jobs were green as well.
+On the earlier head `a2e4f82` `Typecheck and build` passed; the other two jobs
+were superseded by the `bc77426` run. The seed-fix commit `0904262` also passed
+all three jobs, and on `c460358` and `c466d8b` all three were green as well.
 
 The local results above were produced on the staging stack after the fixes in
 `04_FIXED_DEFECTS.md`.
