@@ -120,6 +120,8 @@ model User {
   auditLogs         AuditLog[]
   supportSessions   SupportSession[] @relation("SupportSessionActor")
   mfaRecoveryCodes  MfaRecoveryCode[]
+  mediaAssetsCreated CmsMediaAsset[]
+  contentUpdated    CmsContentBlock[]
 
   @@index([status])
 }
@@ -642,8 +644,13 @@ model CmsBanner {
   isActive  Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  /** Preferred reference; `imageUrl` is kept for external absolute URLs. */
+  mediaAssetId String?
+
+  mediaAsset CmsMediaAsset? @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
 
   @@index([placement, locale])
+  @@index([mediaAssetId])
 }
 
 model FeatureFlag {
@@ -698,6 +705,15 @@ model ServiceCategory {
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  /** Photography for the category card; replaces the generated vector art. */
+  imageAssetId String?
+  /** Short marketing copy per locale, editable from the admin CMS. */
+  descriptionEn String?
+  descriptionAr String?
+
+  imageAsset CmsMediaAsset? @relation(fields: [imageAssetId], references: [id], onDelete: SetNull)
+
+  @@index([imageAssetId])
 }
 
 model NotificationTemplate {
@@ -4583,4 +4599,131 @@ model IntegrationCheck {
   provider IntegrationProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
   @@index([providerId, createdAt])
+}
+
+// ============================================================ Execution 07
+// Website media library and dynamic content.
+//
+// The public website reads its imagery and copy from these tables rather than
+// from hardcoded asset paths, so an administrator can change the homepage
+// without a redeploy. A `CmsMediaAsset` row is the single source of truth for
+// an uploaded file: the bytes live on disk under MEDIA_ROOT, the row holds the
+// metadata, the optimisation variants and the focal point.
+
+model CmsMediaFolder {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assets CmsMediaAsset[]
+}
+
+model CmsMediaAsset {
+  id           String   @id @default(cuid())
+  folderId     String?
+  /** Original filename as uploaded, kept for display. Never used as a path. */
+  originalName String
+  /** Content-addressed storage key, e.g. `2026/02/ab12….webp`. */
+  storageKey   String   @unique
+  mimeType     String
+  byteSize     Int
+  width        Int
+  height       Int
+  /** Dominant colour, used as a placeholder background while loading. */
+  dominantColor String?
+  /** Blurred inline placeholder (tiny base64 webp) for progressive loading. */
+  blurDataUrl  String?
+  /** Cropped variants keyed by name (`thumb`, `card`, `hero`). */
+  variants     Json     @default("{}")
+  /** Focal point as a percentage of the source, so cropping stays intentional. */
+  focalX       Float    @default(50)
+  focalY       Float    @default(50)
+  altAr        String?
+  altEn        String?
+  caption      String?
+  credit       String?
+  /** Source/licence note for third-party photography. */
+  licenseNote  String?
+  tags         String[] @default([])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdByUserId String?
+
+  folder       CmsMediaFolder?       @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  createdBy    User?                 @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  versions     CmsMediaAssetVersion[]
+  blocks       CmsContentBlock[]
+  banners      CmsBanner[]
+  categories   ServiceCategory[]
+
+  @@index([folderId])
+  @@index([createdAt])
+}
+
+/**
+ * Immutable snapshot of a media asset's editable metadata. Every metadata edit
+ * appends a version, so an administrator can restore a previous caption, alt
+ * text or focal point. The binary is immutable per storage key, so a version
+ * does not duplicate bytes.
+ */
+model CmsMediaAssetVersion {
+  id        String   @id @default(cuid())
+  assetId   String
+  /** Monotonic per asset; 1 is the upload. */
+  revision  Int
+  snapshot  Json
+  actorUserId String?
+  createdAt DateTime @default(now())
+
+  asset CmsMediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, revision])
+  @@index([assetId, createdAt])
+}
+
+/**
+ * A single editable slot on the public website. `key` is stable and referenced
+ * by the frontend; `value` holds locale-specific content. Publishing toggles
+ * `isPublished`, so a draft never reaches the public endpoint.
+ */
+model CmsContentBlock {
+  id          String   @id @default(cuid())
+  /** Stable key the frontend reads, e.g. `home.hero.title`. */
+  key         String
+  locale      Locale
+  /** Plain text for titles and labels. */
+  value       String
+  /** Optional longer rich copy; rendered as text, never as raw HTML. */
+  body        String?
+  mediaAssetId String?
+  linkUrl     String?
+  linkLabel   String?
+  sortOrder   Int      @default(0)
+  isPublished Boolean  @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  updatedByUserId String?
+
+  mediaAsset CmsMediaAsset? @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
+  updatedBy  User?          @relation(fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([key, locale])
+  @@index([isPublished])
+}
+
+/** Ordered, publishable record of every content change for revert. */
+model CmsContentRevision {
+  id        String   @id @default(cuid())
+  blockId   String
+  revision  Int
+  snapshot  Json
+  actorUserId String?
+  createdAt DateTime @default(now())
+
+  @@unique([blockId, revision])
+  @@index([blockId, createdAt])
 }

@@ -2,8 +2,11 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
+  Matches,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -146,4 +149,174 @@ export class CreateApiClientDto {
   @IsOptional()
   @IsString({ each: true })
   scopes?: string[];
+}
+
+// ------------------------------------------------------- Execution 07: media
+
+export class UpsertMediaFolderDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  name!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  @Matches(/^[a-z0-9-]+$/, { message: 'Slug may contain lowercase letters, digits and dashes only.' })
+  slug!: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+}
+
+export class UpdateMediaAssetDto {
+  @IsOptional()
+  @IsString()
+  folderId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  altAr?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  altEn?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  caption?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  credit?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  licenseNote?: string | null;
+
+  @IsOptional()
+  @IsString({ each: true })
+  tags?: string[];
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  focalX?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  focalY?: number;
+}
+
+export class UploadMediaDto {
+  @IsOptional()
+  @IsString()
+  folderId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  altAr?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  altEn?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  caption?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  credit?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  licenseNote?: string;
+
+  /** Comma-separated, because multipart form fields are strings. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  tags?: string;
+
+  @IsOptional()
+  @IsString()
+  focalX?: string;
+
+  @IsOptional()
+  @IsString()
+  focalY?: string;
+}
+
+// ----------------------------------------------------- Execution 07: content
+
+export class UpsertContentBlockDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(160)
+  @Matches(/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/, {
+    message: 'Key must be a dot-separated lowercase identifier, e.g. home.hero.title.',
+  })
+  key!: string;
+
+  @IsIn(['ar', 'en'])
+  locale!: 'ar' | 'en';
+
+  @IsString()
+  @MaxLength(4000)
+  value!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20000)
+  body?: string | null;
+
+  @IsOptional()
+  @IsString()
+  mediaAssetId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  linkUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  linkLabel?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isPublished?: boolean;
+}
+
+export class PublishContentDto {
+  @IsBoolean()
+  isPublished!: boolean;
+}
+
+export class RestoreRevisionDto {
+  @IsInt()
+  @Min(1)
+  revision!: number;
 }
