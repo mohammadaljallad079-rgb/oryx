@@ -139,6 +139,17 @@ failed:  0
 The single console error is the expected anonymous bootstrap `401` on
 `/api/v1/auth/refresh`, which the client treats as "no session".
 
+### 2.6 CI
+
+Run [`39153101776`](https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39153101776)
+on head `1b9343f` — **success**, all three jobs green:
+
+| Job | Result |
+|---|---|
+| Typecheck and build | success |
+| Unit and API integration tests | success |
+| Browser acceptance tests | success |
+
 ## 3. Environment findings (not product defects)
 
 Two failures in this session came from how the suite was invoked, not from the
