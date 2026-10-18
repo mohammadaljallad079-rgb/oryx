@@ -126,6 +126,22 @@ defect-18 regression test. The browser and mobile figures are carried from that
 audit; this session's live checks are the last five rows, which were all run
 here.
 
+### CI
+
+Run [`39145489000`](https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39145489000)
+on head `bbb9f68` — **success**, all three jobs green:
+
+| Job | Result |
+|---|---|
+| Typecheck and build | success |
+| Unit and API integration tests | success |
+| Browser acceptance tests | success |
+
+The workflow previously listed only the Execution 01–05 branches, so the
+Execution 07 branch reported no checks at all. `ci.yml` now includes
+`feature/execution-07-premium-web`, mirroring how the earlier executions were
+added.
+
 ## 5. Remaining blockers
 
 1. **No approved customer-site design reference.** The only approved reference
