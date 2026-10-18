@@ -197,10 +197,12 @@ console.log(`console errors observed: ${[...new Set(consoleErrors)].length}`);
 for (const e of [...new Set(consoleErrors)].slice(0, 8)) console.log('  ' + e);
 
 const fs = await import('node:fs');
+const out = process.env.SWEEP_OUT ?? 'docs/audit/evidence/exec06-preview-sweep.json';
+fs.mkdirSync(out.slice(0, out.lastIndexOf('/')), { recursive: true });
 fs.writeFileSync(
-  '/tmp/oryxprobe/preview-sweep.json',
+  out,
   JSON.stringify({ checkedAt: new Date().toISOString(), results, consoleErrors: [...new Set(consoleErrors)] }, null, 2),
 );
-console.log('json: /tmp/oryxprobe/preview-sweep.json');
+console.log(`json: ${out}`);
 
 process.exit(results.length - ok === 0 ? 0 : 1);

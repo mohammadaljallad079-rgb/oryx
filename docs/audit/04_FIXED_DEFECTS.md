@@ -457,3 +457,77 @@ single `(companyId: null, code: 'platform_super_admin')` row holding more than
 100 permissions including `erp.accounting.read`, so a duplicated or truncated
 platform role fails the suite instead of silently degrading the Super Admin.
 
+
+## Execution 06 follow-up (2026-10-18) — two defensive-input defects
+
+Both were found by the module-by-module live probe (`.run/probe-bad-dates.mjs`,
+`.run/probe-booking-cal.mjs`), which sends deliberately malformed query strings
+to every date-filtered endpoint. Neither is a data-integrity bug; both turned a
+client mistake into an unhandled 500 and a stack trace in the API log.
+
+## 17. A malformed report date returned 500 instead of 400
+
+**Found:** 2026-10-18, live probe against the staging API.
+
+**Defect:** the four report endpoints — `GET /reports/accounting`,
+`/reports/sales`, `/reports/purchasing` and `/reports/inventory` — declared their
+`from` and `to` filters with `@IsString()`. Any string passed validation, so
+`?from=not-a-date` reached the service, which handed it to `new Date(...)` and
+then to Prisma; the resulting `Invalid Date` threw inside the query and the
+global filter returned a 500. The accounting statement endpoints
+(`general-ledger`, `trial-balance`, `income-statement`, `balance-sheet`) already
+used `@IsISO8601()` and correctly returned 400, so the two families disagreed
+about the same input.
+
+**Fix:** `apps/api/src/reports/reports.dto.ts` now declares `from` and `to` with
+`@IsISO8601()`, matching the accounting DTOs. The class-validator message names
+the field, so the client gets `from must be a valid ISO 8601 date string`.
+
+**Verified:** `.run/probe-bad-dates.mjs` now reports `400` for all six families
+with the field-level message; a valid ISO range still returns `200`.
+
+**Regression guard:** `apps/api/test/input-validation.e2e-spec.ts`, the
+"a malformed date filter is a 400, not a 500" group — eight tests covering all
+four reports plus the four accounting statements.
+
+## 18. The bookings calendar required a range but did not say so
+
+**Found:** 2026-10-18, same probe run.
+
+**Defect:** `GET /bookings/calendar` read `from`, `to` and `resourceId` straight
+from `@Query()` with no DTO. With no range, or with a malformed one, the
+controller passed `undefined`/`Invalid Date` into the availability query, which
+threw and returned a 500. A caller had no way to know the range was mandatory,
+and the failure mode was a server error rather than a validation message.
+
+**Fix:** `apps/api/src/customer/booking.dto.ts` gains `CalendarQueryDto`
+(`@IsDateString()` on `from` and `to`, `@IsOptional() @IsString()` on
+`resourceId`), and `booking.controller.ts` takes `@Query() query:
+CalendarQueryDto`. A missing or malformed range is now a 400 naming the field.
+
+**Verified:** `.run/probe-booking-cal.mjs` reports `400` with no params,
+`400` for `from=bad`, and `200 []` for a valid October range.
+
+**Regression guard:** `apps/api/test/input-validation.e2e-spec.ts`, the
+"bookings calendar requires a real date range" group — three tests.
+
+## Note — the preview bundle must be built with a relative API base
+
+This is not a new defect; it is the recurring operational trap documented as
+defect 14, and the crash-recovery session hit it again. `start-stack.sh` sources
+the root `.env`, which sets `NEXT_PUBLIC_API_BASE_URL=http://localhost:3001/api`.
+Next gives an exported shell variable precedence over `apps/admin/.env.local`, so
+a rebuild after sourcing the root `.env` bakes the absolute localhost URL into
+the served bundle. The public HTTPS pages then return `200` while every
+authenticated fetch is CORS-blocked — a status-code-only check passes while the
+product is broken.
+
+Any rebuild of `apps/admin` or `apps/customer` for the preview must export
+`NEXT_PUBLIC_API_BASE_URL=/api` for the build, and the running `next start`
+processes must be restarted afterwards (`pgrep -f "next start"` does not match
+them; they appear as `next-server`, so kill by port or by PID).
+
+**Verified:** after the rebuild the external sweep records **39/39 routes, 0
+failed requests**, and `grep -rho "localhost:3001" apps/admin/.next/static/chunks`
+returns nothing.
+

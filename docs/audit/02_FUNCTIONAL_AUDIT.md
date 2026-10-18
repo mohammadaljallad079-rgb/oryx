@@ -1,6 +1,7 @@
 # ORYX — Frontend / Backend Functional Audit
 
-Audit date: 2026-10-16
+Audit date: 2026-10-16. Re-verified 2026-10-17 (crash recovery) and
+2026-10-18 (Execution 06 follow-up, module-by-module live probe).
 Audited revision: `fc2ab20` plus the working-tree fixes in `04_FIXED_DEFECTS.md`.
 
 Every surface below was exercised against the running staging stack: a real
@@ -28,10 +29,10 @@ export of the mobile app and a real PostgreSQL database. Nothing was mocked.
 | Mobile screens | 17 | Expo Router; each declared with `href: null` unless a tab |
 | Module catalog entries | 21 | all `AVAILABLE` |
 | Permission catalog entries | 153 | |
-| API e2e specs | 8 | 218 tests |
-| Browser specs | 13 | 129 tests |
+| API e2e specs | 13 | 277 tests |
+| Browser specs | 16 | 189 tests |
 | Mobile unit specs | 3 | 20 tests |
-| Shared unit specs | 5 | 93 tests |
+| Shared unit specs | 5 | 96 tests |
 
 ## Per-module verification
 
@@ -109,6 +110,25 @@ export of the mobile app and a real PostgreSQL database. Nothing was mocked.
 | Login through the public host | browser | reaches `/dashboard` with live data |
 | Customer login through the public host | browser | reaches `/dashboard` with live data |
 | Mobile login | browser | reaches `/mobile/` then `/mobile/garage` |
+| Module surfaces, live API probe | `.run/probe-modules.mjs` | **96/96 return 200** with real rows |
+| Public preview routes, external | `.run/sweep-preview.mjs` | **39/39 success, 0 failed requests** |
+
+### Module-by-module live probe (2026-10-18)
+
+`.run/probe-modules.mjs` signs in as the platform principal and as the Enterprise
+tenant admin, then issues a real authenticated `GET` against every module's list
+endpoint and records the status plus a summary of the returned shape. It is the
+only check that proves each controller reads the database rather than merely
+routing. Result: **96 of 96 surfaces returned 200**, each with a non-empty row
+set, e.g. `Super Admin — companies items(5) total=60`, `audit trail
+items(5) total=3717`, `modules items(21)`, `plans array(20)`, `subscriptions
+array(51)`. Evidence: `docs/audit/evidence/exec06-module-probe.json`.
+
+Two false positives were removed from the probe during this pass: it had guessed
+`GET /hr/salary-structures` (salary structures are created with `POST`, so a
+`GET` correctly 404s) and `GET /crm/customers` (customers live under
+`/sales/customers`; CRM exposes `customers/:id/contacts`). The probe now calls
+the real routes.
 
 ## Database operation audit
 

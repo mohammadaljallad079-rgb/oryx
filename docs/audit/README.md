@@ -1,6 +1,8 @@
 # ORYX — Audit Reports
 
-Audit date: 2026-10-16, updated 2026-10-17 after the crash-recovery session
+Audit date: 2026-10-16, updated 2026-10-17 after the crash-recovery session and
+2026-10-18 after the Execution 06 follow-up (iPad auth, dual Super Admin, unique
+dashboard art, responsive sweep, defensive input validation).
 Audited revision: `fc2ab20` (merge of PR #5), plus `699560c` (the owner's logo
 upload), plus the visual identity and preview fixes in
 `08_VISUAL_IDENTITY_AND_PREVIEW_VERIFICATION.md`.
@@ -14,7 +16,7 @@ Environment: isolated staging (`oryx_staging`), not production.
 | PR #5 (`feature/execution-05-platform-completion`) | **MERGED** 2026-10-16T18:10:37Z, merge commit `fc2ab20` |
 | `origin/main` tree | `c789eec` — identical to the Execution 05 head `7db9689` |
 | Latest `main` commit | `699560c` — the owner's official logo upload |
-| This audit | branch `audit/execution-05-verification` = `fix/super-admin-access-and-login` at `a327f9e`, PR #6 (draft) |
+| This audit | branch `audit/execution-05-verification`, PR #6 (draft). Remote head `5636f4e`; local Execution 06 fixes at `b1e2f7b`. |
 
 PR #5 is merged, so it cannot be updated; a merged pull request takes no new
 commits. The audit work therefore lands on a fresh branch and PR #6, based on the
@@ -30,22 +32,27 @@ changes to be pushed to the Execution 05 branch.
 | `03_VISUAL_COMPARISON.md` | Measured comparison against `docs/assets/ORYX Auto Services Dashboard.png` |
 | `04_FIXED_DEFECTS.md` | Defects found, their fixes and their regression guards |
 | `05_INTEGRATION_READINESS.md` | The integration catalogue, state model, credential handling and blockers |
-| `06_TEST_AND_CI_RESULTS.md` | 485 passing tests and how to reproduce them |
+| `06_TEST_AND_CI_RESULTS.md` | 577 passing tests and how to reproduce them |
 | `07_LIVE_PREVIEW_AND_CREDENTIALS.md` | Working HTTPS preview links and demo credentials |
 | `08_VISUAL_IDENTITY_AND_PREVIEW_VERIFICATION.md` | Recovery state, visual identity alignment, externally re-verified preview and the CORS build hazard |
 
 ## Headline result
 
-- **485 automated tests pass**: 96 shared, 229 API integration, 140 browser, 20 mobile.
+- **577 automated tests pass**: 96 shared, 277 API integration, 184 browser
+  (1 skipped), 20 mobile. Plus a live API probe (96/96 module surfaces 200) and
+  an external preview sweep (39/39 routes, 0 failed requests).
 - **Every declared Phase-1 surface is connected end to end** and DB-backed.
-- **Preview links are live and externally verified** — 47 / 47 routes returned a
+- **Preview links are live and externally verified** — 39 / 39 routes returned a
   success status over public HTTPS — see reports 07 and 08.
 - **The official logo is now in the repository** (owner upload `699560c`) and the
   monogram placeholder has been replaced in the admin sidebar, the admin login
   page and the customer header. The colourway follows the theme.
-- **One functional defect was found and fixed** (a module catalog route drift),
-  plus an RTL sidebar direction defect and a preview-build CORS hazard, each with
-  a regression guard.
+- **Defects found and fixed** (all with regression guards): a module catalog
+  route drift, an RTL sidebar direction defect, a preview-build CORS hazard, the
+  Super Admin permission drift after a re-seed, the iPad sign-in lockout (CSRF
+  guard rejecting a re-login that carried a stale refresh cookie) and two
+  defensive-input defects (a malformed report date and a bookings-calendar range
+  that returned 500 instead of 400). See report 04.
 - **The approved design reference is no longer used as dashboard artwork at
   all.** Every module tile previously rendered a crop of
   `docs/assets/ORYX Auto Services Dashboard.png`. All 24 crop JPEGs are deleted,

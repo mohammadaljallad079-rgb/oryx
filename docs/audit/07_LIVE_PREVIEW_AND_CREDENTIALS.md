@@ -1,8 +1,9 @@
 # ORYX — Live Preview Links and Demo Credentials
 
-Audit date: 2026-10-16. Re-verified 2026-10-17 after a sandbox recycle, and again
-2026-10-17 (evening) after the crash-recovery session, with a browser-driven
-sweep over the public HTTPS ingress.
+Audit date: 2026-10-16. Re-verified 2026-10-17 after a sandbox recycle, again
+2026-10-17 (evening) after the crash-recovery session, again 2026-10-18 for the
+Execution 06 follow-up, with a browser-driven sweep over the public HTTPS
+ingress.
 
 Status: **LIVE and externally verified** from outside the sandbox.
 
@@ -27,9 +28,10 @@ part of the stack — the proxies serve the ingress ports directly.)
 ## Preview links
 
 Verified from outside the sandbox with a real browser over public HTTPS, most
-recently on 2026-10-17 after the crash-recovery session. The sweep script is
+recently on 2026-10-18 after the Execution 06 follow-up. The sweep script is
 `.run/sweep-preview.mjs`; its machine-readable output is
-`docs/audit/evidence/preview-sweep-2026-10-17.json`.
+`docs/audit/evidence/exec06-preview-sweep.json` (the 2026-10-17 runs are kept
+alongside it as `preview-sweep-2026-10-17*.json`).
 
 The sweep does more than check a status code. It signs in, then visits each
 surface and records every response `>= 400`, any Next.js error boundary and the

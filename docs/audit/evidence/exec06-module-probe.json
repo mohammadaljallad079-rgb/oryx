@@ -1,0 +1,679 @@
+{
+  "generatedAt": "2026-10-18T11:11:14.440Z",
+  "ok": 96,
+  "total": 96,
+  "rows": [
+    {
+      "module": "Super Admin — companies",
+      "path": "/companies?pageSize=5",
+      "principal": "platform",
+      "status": 200,
+      "summary": "items(5) total=63"
+    },
+    {
+      "module": "Super Admin — permission catalog",
+      "path": "/permissions/catalog",
+      "principal": "platform",
+      "status": 200,
+      "summary": "object(2 keys)"
+    },
+    {
+      "module": "Super Admin — modules",
+      "path": "/modules",
+      "principal": "platform",
+      "status": 200,
+      "summary": "items(21) total=?"
+    },
+    {
+      "module": "Super Admin — plans",
+      "path": "/plans",
+      "principal": "platform",
+      "status": 200,
+      "summary": "array(21)"
+    },
+    {
+      "module": "Super Admin — subscriptions",
+      "path": "/subscriptions",
+      "principal": "platform",
+      "status": 200,
+      "summary": "array(53)"
+    },
+    {
+      "module": "Super Admin — dashboard",
+      "path": "/dashboard",
+      "principal": "platform",
+      "status": 200,
+      "summary": "object(7 keys)"
+    },
+    {
+      "module": "Super Admin — audit trail",
+      "path": "/audit-logs?pageSize=5",
+      "principal": "platform",
+      "status": 200,
+      "summary": "items(5) total=4037"
+    },
+    {
+      "module": "Super Admin — support sessions",
+      "path": "/support-sessions",
+      "principal": "platform",
+      "status": 200,
+      "summary": "array(16)"
+    },
+    {
+      "module": "Website / CMS — pages",
+      "path": "/cms/pages",
+      "principal": "platform",
+      "status": 200,
+      "summary": "array(20)"
+    },
+    {
+      "module": "Website / CMS — banners",
+      "path": "/cms/banners",
+      "principal": "platform",
+      "status": 200,
+      "summary": "array(4)"
+    },
+    {
+      "module": "Website / CMS — service categories",
+      "path": "/cms/service-categories",
+      "principal": "platform",
+      "status": 200,
+      "summary": "array(5)"
+    },
+    {
+      "module": "Website / CMS — notification templates",
+      "path": "/cms/notification-templates",
+      "principal": "platform",
+      "status": 200,
+      "summary": "array(4)"
+    },
+    {
+      "module": "Application — feature flags",
+      "path": "/cms/feature-flags",
+      "principal": "platform",
+      "status": 200,
+      "summary": "array(11)"
+    },
+    {
+      "module": "Application — app versions",
+      "path": "/cms/app-versions",
+      "principal": "platform",
+      "status": 200,
+      "summary": "array(9)"
+    },
+    {
+      "module": "Application — API clients",
+      "path": "/cms/api-clients",
+      "principal": "platform",
+      "status": 200,
+      "summary": "array(0)"
+    },
+    {
+      "module": "Integrations — provider catalogue",
+      "path": "/integrations",
+      "principal": "platform",
+      "status": 200,
+      "summary": "object(4 keys)"
+    },
+    {
+      "module": "Accounting — chart of accounts",
+      "path": "/accounting/accounts?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(5) total=21"
+    },
+    {
+      "module": "Accounting — fiscal years",
+      "path": "/accounting/fiscal-years",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "array(1)"
+    },
+    {
+      "module": "Accounting — journals",
+      "path": "/accounting/journals?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Accounting — trial balance",
+      "path": "/accounting/trial-balance",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "object(6 keys)"
+    },
+    {
+      "module": "Accounting — income statement",
+      "path": "/accounting/income-statement",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "object(7 keys)"
+    },
+    {
+      "module": "Accounting — balance sheet",
+      "path": "/accounting/balance-sheet",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "object(10 keys)"
+    },
+    {
+      "module": "Accounting — receivables aging",
+      "path": "/accounting/receivables-aging",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "array(0)"
+    },
+    {
+      "module": "Accounting — payables aging",
+      "path": "/accounting/payables-aging",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "array(0)"
+    },
+    {
+      "module": "Sales — customers",
+      "path": "/sales/customers?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(2) total=2"
+    },
+    {
+      "module": "Sales — quotations",
+      "path": "/sales/quotations?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Sales — orders",
+      "path": "/sales/orders?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Sales — invoices",
+      "path": "/sales/invoices?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Sales — credit notes",
+      "path": "/sales/credit-notes?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Sales — cashier sessions",
+      "path": "/sales/cashier-sessions?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Sales — POS sales",
+      "path": "/sales/pos-sales?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Purchasing — suppliers",
+      "path": "/purchasing/suppliers?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(2) total=2"
+    },
+    {
+      "module": "Purchasing — requisitions",
+      "path": "/purchasing/requisitions?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Purchasing — purchase orders",
+      "path": "/purchasing/orders?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Purchasing — goods receipts",
+      "path": "/purchasing/receipts?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Purchasing — supplier invoices",
+      "path": "/purchasing/supplier-invoices?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Purchasing — returns",
+      "path": "/purchasing/returns?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Inventory — warehouses",
+      "path": "/inventory/warehouses?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(1) total=1"
+    },
+    {
+      "module": "Inventory — products",
+      "path": "/inventory/products?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(4) total=4"
+    },
+    {
+      "module": "Inventory — movements",
+      "path": "/inventory/movements?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(4) total=4"
+    },
+    {
+      "module": "Inventory — transfers",
+      "path": "/inventory/transfers?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Inventory — adjustments",
+      "path": "/inventory/adjustments?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Inventory — valuation",
+      "path": "/inventory/valuation",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "object(3 keys)"
+    },
+    {
+      "module": "Inventory — reorder alerts",
+      "path": "/inventory/reorder-alerts",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "HR — departments",
+      "path": "/hr/departments?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(3) total=3"
+    },
+    {
+      "module": "HR — job titles",
+      "path": "/hr/job-titles?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(3) total=3"
+    },
+    {
+      "module": "HR — employees",
+      "path": "/hr/employees?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(3) total=3"
+    },
+    {
+      "module": "HR — shifts",
+      "path": "/hr/shifts?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(1) total=1"
+    },
+    {
+      "module": "HR — leave requests",
+      "path": "/hr/leave-requests?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "HR — attendance",
+      "path": "/hr/attendance?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "HR — leave types",
+      "path": "/hr/leave-types",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(2) total=2"
+    },
+    {
+      "module": "HR — payroll runs",
+      "path": "/hr/payroll-runs?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "HR — advances",
+      "path": "/hr/advances?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "HR — dashboard",
+      "path": "/hr/dashboard",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "object(7 keys)"
+    },
+    {
+      "module": "CRM — lead sources",
+      "path": "/crm/lead-sources?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(3) total=3"
+    },
+    {
+      "module": "CRM — leads",
+      "path": "/crm/leads?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "CRM — pipelines",
+      "path": "/crm/pipelines",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(1) total=1"
+    },
+    {
+      "module": "CRM — opportunities",
+      "path": "/crm/opportunities?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "CRM — activities",
+      "path": "/crm/activities?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "CRM — SLA policies",
+      "path": "/crm/sla-policies?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "CRM — tickets",
+      "path": "/crm/tickets?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "CRM — segments",
+      "path": "/crm/segments?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "CRM — dashboard",
+      "path": "/crm/dashboard",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "object(9 keys)"
+    },
+    {
+      "module": "Operations — projects",
+      "path": "/operations/projects?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Operations — tasks",
+      "path": "/operations/tasks?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Operations — work orders",
+      "path": "/operations/work-orders?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Operations — approvals",
+      "path": "/operations/approvals?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Operations — calendar",
+      "path": "/operations/calendar",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Operations — notifications",
+      "path": "/operations/notifications?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Operations — dashboard",
+      "path": "/operations/dashboard",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "object(9 keys)"
+    },
+    {
+      "module": "Automotive — vehicles",
+      "path": "/automotive/vehicles?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Automotive — inspection services",
+      "path": "/automotive/inspection-services?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(2) total=2"
+    },
+    {
+      "module": "Automotive — inspection bookings",
+      "path": "/automotive/inspection-bookings?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Automotive — bays",
+      "path": "/automotive/bays?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(2) total=2"
+    },
+    {
+      "module": "Automotive — maintenance bookings",
+      "path": "/automotive/maintenance-bookings?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Automotive — job cards",
+      "path": "/automotive/job-cards?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Automotive — reservations",
+      "path": "/automotive/reservations?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Automotive — warranties",
+      "path": "/automotive/warranties?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Automotive — providers",
+      "path": "/automotive/providers?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(20) total=20"
+    },
+    {
+      "module": "Automotive — service requests",
+      "path": "/automotive/service-requests?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Automotive — settlements",
+      "path": "/automotive/settlements?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Automotive — dashboard",
+      "path": "/automotive/dashboard",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "object(5 keys)"
+    },
+    {
+      "module": "Marketplace — provider applications",
+      "path": "/marketplace/admin/applications?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "array(0)"
+    },
+    {
+      "module": "Marketplace — provider directory",
+      "path": "/marketplace/providers?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(5) total=20"
+    },
+    {
+      "module": "Bookings — bookings",
+      "path": "/bookings?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Bookings — calendar",
+      "path": "/bookings/calendar?from=2026-10-01&to=2026-10-31",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "array(0)"
+    },
+    {
+      "module": "Bookings — resources",
+      "path": "/bookings/resources/list",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "array(0)"
+    },
+    {
+      "module": "Payments — providers",
+      "path": "/payments/providers",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "array(5)"
+    },
+    {
+      "module": "Payments — intents",
+      "path": "/payments/intents?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Payments — reconciliations",
+      "path": "/payments/reconciliations",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "array(0)"
+    },
+    {
+      "module": "Customer platform — summary",
+      "path": "/customer-platform/summary",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "object(5 keys)"
+    },
+    {
+      "module": "Customer platform — accounts",
+      "path": "/customer-platform/accounts?pageSize=5",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "items(0) total=0"
+    },
+    {
+      "module": "Reports — accounting",
+      "path": "/reports/accounting",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "object(7 keys)"
+    },
+    {
+      "module": "Reports — sales",
+      "path": "/reports/sales",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "object(11 keys)"
+    },
+    {
+      "module": "Reports — purchasing",
+      "path": "/reports/purchasing",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "object(9 keys)"
+    },
+    {
+      "module": "Reports — inventory",
+      "path": "/reports/inventory",
+      "principal": "tenant",
+      "status": 200,
+      "summary": "object(7 keys)"
+    }
+  ]
+}

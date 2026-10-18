@@ -1,8 +1,10 @@
 # ORYX — Test and CI Results
 
-Audit date: 2026-10-16. Re-verified 2026-10-17 after a sandbox recycle, and again
+Audit date: 2026-10-16. Re-verified 2026-10-17 after a sandbox recycle, again
 2026-10-17 (evening) after the crash-recovery session that fixed the Super Admin
-login and completed the external preview sweep.
+login and completed the external preview sweep, and again 2026-10-18 for the
+Execution 06 follow-up (iPad auth, dual Super Admin, unique dashboard art,
+responsive sweep, defensive input validation).
 Environment: staging stack (API 3001, admin 3000, customer 3002, mobile-web 8081,
 preview proxies 12000/12001, PostgreSQL 17 `oryx_staging`), seeded demo data.
 nginx is no longer part of the stack — the two preview proxies serve the ingress
@@ -13,31 +15,31 @@ ports directly.
 | Suite | Command | Result |
 |---|---|---|
 | Shared unit | `pnpm --filter @oryx/shared test` | **96 passed** (5 files) |
-| API integration | `pnpm --filter @oryx/api test:e2e` | **229 passed** (9 suites) |
-| Admin browser | `pnpm --filter @oryx/admin test:ui` | **141 passed, 1 skipped, 0 failed** |
+| API integration | `pnpm --filter @oryx/api test:e2e` | **277 passed** (13 suites) |
+| Admin browser | `ORYX_ADMIN_URL=http://localhost:12000 pnpm --filter @oryx/admin exec playwright test` | **184 passed, 1 skipped, 0 failed** |
 | Mobile unit | `pnpm --filter @oryx/mobile test` | **20 passed** (3 files) |
-| **Total** | | **486 passed, 0 failed** |
+| Public preview sweep | `.run/sweep-preview.mjs` | **39/39 routes, 0 failed requests** |
+| Module API probe | `.run/probe-modules.mjs` | **96/96 surfaces 200** |
+| **Total (test runners)** | | **577 passed, 0 failed** |
 
-### Recovery session, 2026-10-17 (evening) — after the crash
-
-The previous conversation crashed mid-audit. On recovery the workspace and the
-staging database were intact; the changes below were re-run to confirm them.
+### Execution 06 follow-up, 2026-10-18
 
 | Suite | Result |
 |---|---|
 | `@oryx/shared` unit | `Test Files 5 passed` / `Tests 96 passed` |
-| `@oryx/api` integration | `Test Suites: 9 passed, 9 total` / `Tests: 229 passed`, `EXIT=0` |
-| `@oryx/admin` browser (full suite) | `141 passed`, `1 skipped`, `0 failed`, `EXIT=0` (4.8m) |
+| `@oryx/api` integration | `Test Suites: 13 passed, 13 total` / `Tests: 277 passed`, `EXIT=0` |
+| `@oryx/admin` browser (full suite) | `184 passed`, `1 skipped`, `0 failed`, `EXIT=0` (7.2m) |
 | `@oryx/mobile` unit | `Test Files 3 passed` / `Tests 20 passed` |
-| `@oryx/admin` typecheck | `tsc --noEmit` clean |
-| `@oryx/admin` lint | `eslint . --max-warnings=0` clean |
-| `@oryx/api` build | clean |
-| Public preview sweep | **39 / 39** routes returned a success status, **0** failed requests |
+| Public preview sweep | **39 / 39** routes success, **0** failed requests |
+| Module API probe | **96 / 96** module surfaces returned 200 with real rows |
 
-The API count rose from 220 to 229 with the new `super-admin-access.e2e-spec.ts`
-(9 tests); the browser count rose from 130 to 140 with
-`apps/admin/e2e/super-admin-access.spec.ts` (6 tests) plus the tenant-context
-assertions folded into the existing specs.
+The API count rose from 229 to 277 with four new suites:
+`input-validation.e2e-spec.ts` (the 500→400 hardening, 11 tests),
+`dual-super-admin.e2e-spec.ts` (two platform principals), `reauth-stale-cookie.e2e-spec.ts`
+(re-login with a stale refresh cookie — the iPad lockout) and
+`permissions-verification.e2e-spec.ts`. The browser count rose from 141 to 184
+with `responsive-matrix.spec.ts`, `functional-audit-exec06.spec.ts` and
+`branding.spec.ts` plus new assertions in `super-admin-access.spec.ts`.
 
 ### Recovery session, 2026-10-17 (second crash) — theme flash fix
 
