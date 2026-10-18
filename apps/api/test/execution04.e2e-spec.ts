@@ -297,6 +297,23 @@ describe('Execution 04 — customer platform, marketplace and payments', () => {
       const res = await fetch(`${base}/api/v1/customer/vehicles`);
       expect(res.status).toBe(401);
     });
+
+    /**
+     * A browser that has never signed in bootstraps by POSTing refresh with no
+     * cookie. That is "no session", not "no such endpoint": answering 404 made
+     * the client classify the response as a transient outage and retry three
+     * times, so every anonymous page load produced a burst of failed requests.
+     */
+    it('answers a cookieless refresh with 401, never 404', async () => {
+      const res = await fetch(`${base}/api/v1/customer/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(401);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe('auth.token_invalid');
+    });
   });
 
   // ------------------------------------------------------------- B. garage

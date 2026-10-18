@@ -512,9 +512,50 @@ export const publicApi = {
 
 /** Service categories offered by the platform. */
 export const SERVICE_CATEGORIES = [
-  { key: 'automotive_maintenance', nameEn: 'Maintenance and repair', nameAr: 'الصيانة والإصلاح' },
-  { key: 'automotive_inspection', nameEn: 'Vehicle inspection', nameAr: 'فحص المركبات' },
-  { key: 'automotive_tyres', nameEn: 'Tyres and batteries', nameAr: 'الإطارات والبطاريات' },
-  { key: 'automotive_bodywork', nameEn: 'Bodywork and paint', nameAr: 'الهيكل والدهان' },
-  { key: 'automotive_recovery', nameEn: 'Roadside recovery', nameAr: 'خدمات الطريق' },
+  {
+    key: 'automotive_maintenance',
+    nameEn: 'Maintenance and repair',
+    nameAr: 'الصيانة والإصلاح',
+    art: '/art/service-maintenance.svg',
+    descEn: 'Scheduled servicing, diagnostics and mechanical repair.',
+    descAr: 'صيانة دورية وتشخيص وإصلاح ميكانيكي.',
+  },
+  {
+    key: 'automotive_inspection',
+    nameEn: 'Vehicle inspection',
+    nameAr: 'فحص المركبات',
+    art: '/art/service-inspection.svg',
+    descEn: 'Periodic and pre-purchase inspection with a written report.',
+    descAr: 'فحص دوري وفحص ما قبل الشراء مع تقرير مكتوب.',
+  },
+  {
+    key: 'automotive_tyres',
+    nameEn: 'Tyres and batteries',
+    nameAr: 'الإطارات والبطاريات',
+    art: '/art/service-tyres.svg',
+    descEn: 'Tyre fitting, balancing and battery replacement.',
+    descAr: 'تركيب وموازنة الإطارات وتبديل البطاريات.',
+  },
+  {
+    key: 'automotive_bodywork',
+    nameEn: 'Bodywork and paint',
+    nameAr: 'الهيكل والدهان',
+    art: '/art/service-bodywork.svg',
+    descEn: 'Dent repair, panel work and professional painting.',
+    descAr: 'إصلاح الصدمات وأعمال الهيكل والدهان الاحترافي.',
+  },
+  {
+    key: 'automotive_recovery',
+    nameEn: 'Roadside recovery',
+    nameAr: 'خدمات الطريق',
+    art: '/art/service-recovery.svg',
+    descEn: 'Towing and roadside assistance when the car will not move.',
+    descAr: 'سحب السيارة وخدمات المساعدة على الطريق.',
+  },
 ] as const;
+
+/** Artwork for a service category, falling back to the generic hero motif. */
+export function categoryArt(key: string): string {
+  const match = SERVICE_CATEGORIES.find((c) => c.key === key);
+  return match ? match.art : '/art/hero-automotive.svg';
+}

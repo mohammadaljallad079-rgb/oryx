@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-10-18T11:20:13.647Z",
+  "checkedAt": "2026-10-18T16:22:02.259Z",
   "results": [
     {
       "surface": "Super Admin login",
@@ -125,55 +125,55 @@
       "surface": "Inspections",
       "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/automotive/inspections",
       "status": 200,
-      "note": "1 request(s) >=400: 401 POST https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/api/v1/auth/refresh"
+      "note": ""
     },
     {
       "surface": "Workshop",
       "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/automotive/maintenance",
       "status": 200,
-      "note": "1 request(s) >=400: 401 POST https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/api/v1/auth/refresh"
+      "note": ""
     },
     {
       "surface": "Spare parts",
       "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/automotive/spare-parts",
       "status": 200,
-      "note": "1 request(s) >=400: 401 POST https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/api/v1/auth/refresh"
+      "note": ""
     },
     {
       "surface": "Provider portal",
       "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/providers",
       "status": 200,
-      "note": "1 request(s) >=400: 401 POST https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/api/v1/auth/refresh"
+      "note": ""
     },
     {
       "surface": "Bookings",
       "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/bookings",
       "status": 200,
-      "note": "1 request(s) >=400: 401 POST https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/api/v1/auth/refresh"
+      "note": ""
     },
     {
       "surface": "Payments",
       "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/payments",
       "status": 200,
-      "note": "1 request(s) >=400: 401 POST https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/api/v1/auth/refresh"
+      "note": ""
     },
     {
       "surface": "External Integrations Center",
       "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/integrations",
       "status": 200,
-      "note": "1 request(s) >=400: 401 POST https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/api/v1/auth/refresh"
+      "note": ""
     },
     {
       "surface": "Reports",
       "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/reports",
       "status": 200,
-      "note": "1 request(s) >=400: 401 POST https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/api/v1/auth/refresh"
+      "note": ""
     },
     {
       "surface": "Customer platform admin",
       "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/customer",
       "status": 200,
-      "note": "1 request(s) >=400: 401 POST https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/api/v1/auth/refresh"
+      "note": ""
     },
     {
       "surface": "Customer sign-in",
@@ -237,7 +237,6 @@
     }
   ],
   "consoleErrors": [
-    "Failed to load resource: the server responded with a status of 401 ()",
-    "Failed to load resource: the server responded with a status of 404 ()"
+    "Failed to load resource: the server responded with a status of 401 ()"
   ]
 }

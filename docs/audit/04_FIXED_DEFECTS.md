@@ -531,3 +531,34 @@ them; they appear as `next-server`, so kill by port or by PID).
 failed requests**, and `grep -rho "localhost:3001" apps/admin/.next/static/chunks`
 returns nothing.
 
+## Defect 18 — customer refresh answered `404` where the staff plane answers `401`
+
+**Found:** 2026-10-18, by attributing every `>= 400` response to the page that
+produced it (`.run/diag-http-errors.mjs`) during the Execution 07 re-verification.
+The 39-surface sweep reported `2` console errors; a status-code-only check had
+hidden both.
+
+**Defect:** `CustomerAuthController.refresh` threw
+`notFound(ERROR_CODES.AUTH_TOKEN_INVALID, 'No refresh token was presented.')`
+when the request carried no refresh cookie. The equivalent staff handler,
+`AuthController.refresh`, throws `unauthorized(...)` for the same condition.
+Two problems followed:
+
+1. `404` is semantically wrong — the route exists; the caller has no session.
+2. The customer client treats `401`/`403` as *expired* and anything else as a
+   *transient outage*, so `restoreCustomerSession()` retried the call three
+   times with backoff. A first-time visitor's page load produced three failed
+   requests before rendering.
+
+**Fix:** `apps/api/src/customer/customer-auth.controller.ts` throws
+`unauthorized(...)` instead, matching the staff plane. The import changed from
+`notFound` to `unauthorized`.
+
+**Verified:** `.run/diag-http-errors.mjs` now reports `401` on every anonymous
+customer surface; `.run/check-refresh-count.mjs` reports **1** refresh request
+per anonymous homepage load (was 3); the external sweep's console-error count
+fell from 2 to 1, the remaining one being the expected bootstrap `401`.
+
+**Regression guard:** `apps/api/test/execution04.e2e-spec.ts`, section *A.
+customer identity* — `answers a cookieless refresh with 401, never 404`.
+
