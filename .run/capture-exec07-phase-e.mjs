@@ -101,7 +101,7 @@ async function signIn(page) {
   await page.waitForTimeout(2000);
 }
 
-async function shoot(page, name, path, width, locale, theme, viewport) {
+async function shoot(page, name, path, width, locale, theme, viewport, requiresAuth = false) {
   if (new URL(page.url()).origin === 'null') {
     await page.goto(`${CUSTOMER}/`, { waitUntil: 'domcontentloaded' });
   }
@@ -115,6 +115,17 @@ async function shoot(page, name, path, width, locale, theme, viewport) {
   const res = await page.goto(`${CUSTOMER}${path}`, { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle').catch(() => {});
   await page.waitForTimeout(2200);
+
+  // A guarded surface that redirected to /login means the session was lost, so
+  // the capture would show the login page under an authenticated surface's
+  // name. Fail loudly instead of committing misleading evidence.
+  const landed = new URL(page.url()).pathname.replace(/\/$/, '') || '/';
+  if (requiresAuth && landed !== path.replace(/\/$/, '')) {
+    throw new Error(
+      `${name}: expected authenticated ${path} but landed on ${landed} — the session did not restore (check the bundle's API base is same-origin)`,
+    );
+  }
+
   await page.screenshot({ path: `${OUT}/${name}-${width}-${locale}-${theme}.png` });
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -128,6 +139,8 @@ async function shoot(page, name, path, width, locale, theme, viewport) {
     theme,
     status: res ? res.status() : 0,
     overflow,
+    requiresAuth,
+    landedPath: landed,
     ...style,
     contrast: contrast(style.bodyColor, style.bodyBackground),
   });
@@ -145,7 +158,7 @@ for (const [width, viewport] of WIDTHS) {
     for (const [name, path, requiresAuth] of SURFACES) {
       if (!requiresAuth) continue;
       for (const locale of ['en', 'ar']) {
-        await shoot(authPage, name, path, width, locale, theme, viewport);
+        await shoot(authPage, name, path, width, locale, theme, viewport, true);
       }
     }
     await authCtx.close();

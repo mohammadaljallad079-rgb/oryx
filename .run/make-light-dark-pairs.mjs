@@ -66,9 +66,9 @@ for (const [name, route] of SURFACES) {
           { input: await light.png().toBuffer(), top: 34, left: 0 },
           { input: await dark.png().toBuffer(), top: 34, left: lw + gap },
         ])
-        .png()
-        .toFile(resolve(OUT, `${name}-${viewport}-${locale}-light-vs-dark.png`));
-      console.log(`  ${name}-${viewport}-${locale}-light-vs-dark.png`);
+        .jpeg({ quality: 88 })
+        .toFile(resolve(OUT, `${name}-${viewport}-${locale}-light-vs-dark.jpg`));
+      console.log(`  ${name}-${viewport}-${locale}-light-vs-dark.jpg`);
     }
   }
 }

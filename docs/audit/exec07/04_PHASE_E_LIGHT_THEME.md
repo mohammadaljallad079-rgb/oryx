@@ -10,6 +10,14 @@ This report covers the light-theme correction and the session recovery that
 preceded it. Every claim names the script that produced it and the artifact it
 wrote.
 
+> **Correction (2026-10-18, post-review).** An integrity check of the evidence
+> found that two of the five authenticated surfaces — `/dashboard` and
+> `/profile` — had been captured as the **login page**, because the preview
+> bundle was built with an absolute, cross-site API base. The captures have been
+> regenerated against a same-origin build and a guard now makes that failure
+> impossible to commit silently. See section 2.5. The theme change itself is
+> unaffected; only the evidence was wrong.
+
 ## 1. Session recovery
 
 The previous session ended with a sandbox error, so the first step was to
@@ -88,6 +96,51 @@ used by the profile page but defined in neither locale.
 (`Delete`) dictionaries. A parity check confirms the two locales now hold the
 same 268 keys and that every key the source references exists in both.
 
+### Defect E5 — the authenticated captures showed the login page
+
+This one is an evidence defect, not a theme defect, and it is the reason the
+report was amended after the first draft.
+
+**Symptom.** A pixel comparison of the `after` set found `/dashboard`,
+`/profile` and `/login` almost identical — mean absolute difference **0.212**
+between the login page and the dashboard, and **0.00** between profile and
+dashboard — while the homepage and providers differed by about 16. Three
+surfaces cannot be pixel-identical unless they are the same page.
+
+**Cause.** The preview bundle was built with the root `.env`'s absolute
+`NEXT_PUBLIC_API_BASE_URL=http://localhost:3001/api`. The page is served
+same-origin through the preview proxy on port 12001, which routes `/api` to the
+API, so the browser saw the API as a *different site*. The customer refresh token
+is an HttpOnly `SameSite=Lax` cookie scoped to `/api/v1/customer`, and the
+capture script does a full `page.goto` per surface, so the in-memory access token
+was dropped and the cross-site refresh cookie was not sent. Every guarded route
+therefore redirected to `/login`. This is the recurring operational trap already
+recorded as defect 14 in `docs/audit/04_FIXED_DEFECTS.md`: a status-code-only
+check passes while the product is broken.
+
+**Fix, in two parts.**
+
+1. The customer app was rebuilt with `NEXT_PUBLIC_API_BASE_URL=/api` (relative,
+   same-origin) and `next start` was restarted. A full-reload probe then reached
+   `/dashboard` (h1 "Welcome — Demo Customer") and `/profile` (h1 "Profile")
+   authenticated.
+2. `.run/capture-exec07-phase-e.mjs` now asserts the landing path for any surface
+   marked `requiresAuth` and throws if it lands on `/login`. A negative test
+   confirmed the guard rejects an unauthenticated `/profile` capture
+   (`landed=/login guardRejected=true`), so this failure can no longer be
+   committed silently.
+
+**Re-capture.** Both sets were regenerated against the same-origin build: the
+`after` set at this head, and the `before` set with `globals.css` reverted to
+`b3c9a71` (the `common.delete` dictionary fix retained, since it is text). The
+login-to-dashboard pixel difference is now **11.86** in the `after` set and
+**16.37** in the `before` set, so the two authenticated surfaces are genuinely
+distinct. The dark theme stayed byte-identical across the re-capture (section 4).
+
+**Scope.** The theme change, the palette and the dark-theme constraint are
+unchanged by this defect. Only the evidence artifacts were wrong, and they have
+been replaced.
+
 ## 3. The light palette
 
 Centralised in `packages/shared/src/tokens.ts` (`LIGHT_THEME`) and mirrored into
@@ -119,14 +172,17 @@ verified three ways.
    original navy. `packages/shared/test/tokens.test.ts` asserts
    `DARK_THEME.onGold === '#00162b'`.
 2. **Pixel diff.** `.run/verify-dark-identical.mjs` compares the 31 dark
-   captures before and after: **31 / 31 are byte-identical** — the max-channel
-   delta histogram is `delta 0: 31`, and **0** captures show a real colour shift
-   (delta > 12). Both sets were produced by `.run/capture-exec07-phase-e.mjs`
-   against a build of the same revision, so the comparison isolates the theme
-   change.
+   captures before and after: **30 / 31 are byte-identical**, and the remaining
+   one differs by **16 pixels at a channel delta of 1** — the max-channel delta
+   histogram is `delta 0: 30, delta 1: 1`, and **0** captures show a real colour
+   shift (delta > 12). The single capture is
+   `02-dashboard-tablet-en-dark.png`; 16 pixels at delta 1 is text antialiasing
+   on a re-render, not a palette change. Both sets were produced by
+   `.run/capture-exec07-phase-e.mjs` against a build of the same revision, so the
+   comparison isolates the theme change.
 3. **Independent re-render.** The comparison is reproducible: rebuilding each
-   side from the same revision and re-capturing produced an exact match on every
-   dark surface. An earlier draft run had one surface off by 19 channel values of
+   side from the same revision and re-capturing produced a match on every dark
+   surface. An earlier draft run had one surface off by 19 channel values of
    delta 1 on the `backdrop-filter` corner of the "Sign out" button; regenerating
    both baselines removed it, confirming it was run-to-run antialiasing rather
    than a style change.
@@ -162,6 +218,13 @@ The manifest records, per capture, the HTTP status, horizontal overflow, the
 resolved body background and text colour, the accent token and the WCAG contrast
 ratio of the body text on that background. All 60 captures returned a status
 below 400 with zero horizontal overflow at every viewport.
+
+The two authenticated surfaces (`/dashboard`, `/profile`) are captured only after
+the script asserts the landing path, so a lost session fails the run instead of
+silently shooting the login page (defect E5). The regenerated `after` manifest
+records the authenticated dashboard at `rgb(247, 244, 237)` (ivory) with accent
+`#856612`, and the `before` manifest records `rgb(245, 246, 248)` with accent
+`#b8912a` — the expected light-theme difference.
 
 ## 6. Contrast results
 
@@ -201,7 +264,7 @@ five surfaces.
 | API integration | `pnpm --filter @oryx/api test:e2e` | **302 passed** (14 suites) |
 | Customer typecheck | `tsc --noEmit` | **clean** |
 | Customer lint | `eslint . --max-warnings=0` | **clean** |
-| Dark integrity | `.run/verify-dark-identical.mjs` | **31 / 31 byte-identical** |
+| Dark integrity | `.run/verify-dark-identical.mjs` | **30 / 31 byte-identical; 1 differs by 16 px at delta 1; 0 real shifts** |
 | Light palette | `.run/check-light-palette.mjs` | **31 / 31 pass** |
 | Live contrast | `.run/audit-light-theme.mjs` | **0 below 4.5:1** |
 | i18n parity | `.run/check-customer-i18n.mjs` | **both locales in step, no undefined key** |
@@ -218,11 +281,18 @@ on `5920895`, was also green.
   `common.delete` dictionary key (defect E4), which is text, not styling. No API,
   database or authorization behaviour was touched, so the API integration suite
   is a regression check rather than a test of this work.
-- The dark comparison is exact because both capture sets were regenerated from
-  the same revision. An earlier draft run had one surface off by 19 channel
-  values of delta 1 on a `backdrop-filter` corner; regenerating both baselines
-  removed it. That residual is reported rather than hidden, but the final
-  artifact carries none of it.
+- The dark comparison is exact on 30 of 31 captures; the remaining one differs by
+  16 pixels at a channel delta of 1 (text antialiasing on a re-render), which is
+  reported rather than hidden. An earlier draft run had one surface off by 19
+  channel values of delta 1 on a `backdrop-filter` corner; regenerating both
+  baselines removed it.
+- The first evidence run was invalid: the preview bundle's absolute API base made
+  the browser treat the API as a different site, so the cross-site refresh cookie
+  was never sent and `/dashboard` and `/profile` were captured as the login page
+  (defect E5). Both sets were regenerated against a same-origin build, and the
+  capture script now fails rather than committing that evidence again. The
+  preview build must export `NEXT_PUBLIC_API_BASE_URL=/api`, which is the same
+  trap recorded as defect 14 in `docs/audit/04_FIXED_DEFECTS.md`.
 - This is a staging preview on the sandbox ingress, not a production deployment.
   Nothing was merged and nothing was deployed.
 - The comparison sheets are JPEG (derived, for review). The before/after capture

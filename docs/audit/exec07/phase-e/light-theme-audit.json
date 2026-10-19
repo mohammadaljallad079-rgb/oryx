@@ -90,24 +90,26 @@
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
-        "color(srgb 1 1 1 / 0.94)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
         "rgb(247, 244, 237)"
       ],
       "backgroundImage": "linear-gradient(145deg, rgb(224, 193, 104), rgb(201, 162, 39))",
       "color": "rgb(36, 31, 20)",
       "borderColor": "rgba(0, 0, 0, 0)",
       "borderWidth": "1px",
-      "fontSize": "14px",
+      "fontSize": "15px",
       "fontWeight": "600",
-      "text": "حساب جديد",
+      "text": "احجز موعدًا",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
         "gold": "#856612",
         "textFaint": "#6b6459"
       },
-      "background": "rgb(255, 254, 254)",
-      "contrast": 16.3
+      "background": "rgb(247, 244, 237)",
+      "contrast": 14.92
     },
     "nav-link": {
       "layers": [
@@ -307,17 +309,17 @@
       "background": "rgb(255, 254, 254)",
       "contrast": 16.16
     },
-    "input": {
+    "card": {
       "layers": [
         "rgb(255, 255, 255)"
       ],
       "backgroundImage": null,
       "color": "rgb(34, 32, 29)",
-      "borderColor": "rgba(36, 31, 20, 0.18)",
+      "borderColor": "rgba(36, 31, 20, 0.09)",
       "borderWidth": "1px",
-      "fontSize": "14px",
+      "fontSize": "16px",
       "fontWeight": "400",
-      "text": "",
+      "text": "السيارات2مرآب سياراتي",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
@@ -356,7 +358,9 @@
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
-        "color(srgb 1 1 1 / 0.94)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
         "rgb(247, 244, 237)"
       ],
       "backgroundImage": "linear-gradient(145deg, rgb(224, 193, 104), rgb(201, 162, 39))",
@@ -365,15 +369,15 @@
       "borderWidth": "1px",
       "fontSize": "14px",
       "fontWeight": "600",
-      "text": "حساب جديد",
+      "text": "حجز جديد",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
         "gold": "#856612",
         "textFaint": "#6b6459"
       },
-      "background": "rgb(255, 254, 254)",
-      "contrast": 16.3
+      "background": "rgb(247, 244, 237)",
+      "contrast": 14.92
     },
     "nav-link": {
       "layers": [
@@ -443,28 +447,26 @@
       "background": "rgb(255, 254, 254)",
       "contrast": 7.45
     },
-    "auth-card": {
+    "kpi-icon": {
       "layers": [
-        "rgba(0, 0, 0, 0)",
-        "rgba(0, 0, 0, 0)",
-        "rgba(0, 0, 0, 0)",
-        "rgb(247, 244, 237)"
+        "color(srgb 0.521569 0.4 0.0705882 / 0.12)",
+        "rgb(255, 255, 255)"
       ],
-      "backgroundImage": "linear-gradient(color(srgb 0.947294 0.930353 0.885961), rgb(251, 249, 244))",
-      "color": "rgb(34, 32, 29)",
-      "borderColor": "rgba(36, 31, 20, 0.09)",
+      "backgroundImage": null,
+      "color": "rgb(133, 102, 18)",
+      "borderColor": "color(srgb 0.521569 0.4 0.0705882 / 0.28)",
       "borderWidth": "1px",
       "fontSize": "16px",
       "fontWeight": "400",
-      "text": "ORYXتسجيل الدخولادخل إلى مرآبك وحجوزاتك ",
+      "text": "",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
         "gold": "#856612",
         "textFaint": "#6b6459"
       },
-      "background": "rgb(247, 244, 237)",
-      "contrast": 14.79
+      "background": "rgb(240, 237, 227)",
+      "contrast": 4.58
     }
   },
   "/providers": {
@@ -558,7 +560,7 @@
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
-        "color(srgb 1 1 1 / 0.94)",
+        "rgba(0, 0, 0, 0)",
         "rgb(247, 244, 237)"
       ],
       "backgroundImage": "linear-gradient(145deg, rgb(224, 193, 104), rgb(201, 162, 39))",
@@ -567,15 +569,15 @@
       "borderWidth": "1px",
       "fontSize": "14px",
       "fontWeight": "600",
-      "text": "حساب جديد",
+      "text": "الكل",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
         "gold": "#856612",
         "textFaint": "#6b6459"
       },
-      "background": "rgb(255, 254, 254)",
-      "contrast": 16.3
+      "background": "rgb(247, 244, 237)",
+      "contrast": 14.92
     },
     "nav-link": {
       "layers": [
@@ -760,24 +762,25 @@
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
-        "color(srgb 1 1 1 / 0.94)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
         "rgb(247, 244, 237)"
       ],
-      "backgroundImage": "linear-gradient(145deg, rgb(224, 193, 104), rgb(201, 162, 39))",
+      "backgroundImage": "linear-gradient(145deg, rgb(212, 175, 55), rgb(184, 145, 42))",
       "color": "rgb(36, 31, 20)",
-      "borderColor": "rgba(0, 0, 0, 0)",
+      "borderColor": "rgba(133, 102, 18, 0.5)",
       "borderWidth": "1px",
       "fontSize": "14px",
       "fontWeight": "600",
-      "text": "حساب جديد",
+      "text": "دخول",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
         "gold": "#856612",
         "textFaint": "#6b6459"
       },
-      "background": "rgb(255, 254, 254)",
-      "contrast": 16.3
+      "background": "rgb(247, 244, 237)",
+      "contrast": 14.92
     },
     "nav-link": {
       "layers": [
@@ -913,6 +916,26 @@
       "background": "rgb(255, 254, 254)",
       "contrast": 16.16
     },
+    "card": {
+      "layers": [
+        "rgb(255, 255, 255)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgba(36, 31, 20, 0.09)",
+      "borderWidth": "1px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "text": "الملف الشخصيحدّث بياناتك الأساسية المستخ",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#856612",
+        "textFaint": "#6b6459"
+      },
+      "background": "rgb(255, 255, 255)",
+      "contrast": 16.25
+    },
     "input": {
       "layers": [
         "rgb(255, 255, 255)"
@@ -961,9 +984,7 @@
       "layers": [
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
-        "rgba(0, 0, 0, 0)",
-        "color(srgb 1 1 1 / 0.94)",
-        "rgb(247, 244, 237)"
+        "rgb(255, 255, 255)"
       ],
       "backgroundImage": "linear-gradient(145deg, rgb(224, 193, 104), rgb(201, 162, 39))",
       "color": "rgb(36, 31, 20)",
@@ -971,15 +992,15 @@
       "borderWidth": "1px",
       "fontSize": "14px",
       "fontWeight": "600",
-      "text": "حساب جديد",
+      "text": "حفظ",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
         "gold": "#856612",
         "textFaint": "#6b6459"
       },
-      "background": "rgb(255, 254, 254)",
-      "contrast": 16.3
+      "background": "rgb(255, 255, 255)",
+      "contrast": 16.39
     },
     "nav-link": {
       "layers": [
@@ -1049,20 +1070,20 @@
       "background": "rgb(255, 254, 254)",
       "contrast": 7.45
     },
-    "auth-card": {
+    "page-head": {
       "layers": [
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
         "rgb(247, 244, 237)"
       ],
-      "backgroundImage": "linear-gradient(color(srgb 0.947294 0.930353 0.885961), rgb(251, 249, 244))",
+      "backgroundImage": "radial-gradient(120% 140% at 88% 6%, color(srgb 0.521569 0.4 0.0705882 / 0.16), rgba(0, 0, 0, 0) 58%), linear-gradient(1",
       "color": "rgb(34, 32, 29)",
-      "borderColor": "rgba(36, 31, 20, 0.09)",
+      "borderColor": "rgba(36, 31, 20, 0.14)",
       "borderWidth": "1px",
       "fontSize": "16px",
       "fontWeight": "400",
-      "text": "ORYXتسجيل الدخولادخل إلى مرآبك وحجوزاتك ",
+      "text": "منصة السياراتالملف الشخصيبياناتك الشخصية",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
