@@ -206,6 +206,12 @@ five surfaces.
 | Live contrast | `.run/audit-light-theme.mjs` | **0 below 4.5:1** |
 | i18n parity | `.run/check-customer-i18n.mjs` | **both locales in step, no undefined key** |
 
+CI run [`39185941517`](https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39185941517)
+on head `04f722e`: all three jobs (`Typecheck and build`, `Unit and API
+integration tests`, `Browser acceptance tests`) **success**. An earlier run,
+[`39184822627`](https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39184822627)
+on `5920895`, was also green.
+
 ## 8. Honest limitations
 
 - The theme change is CSS and design-token only. The one exception is the
