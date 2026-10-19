@@ -55,6 +55,31 @@ export interface ThemeTokens {
   tileOverlay: string;
   /** Overlay applied to a category card that sits over artwork. */
   cardScrim: string;
+  /**
+   * Navy band colour for the full-bleed hero. The approved homepage reference
+   * keeps the hero navy in both themes; in the dark theme this equals the page
+   * field, so the approved dark render is unchanged.
+   */
+  band: string;
+  /** Navy band colour for the footer (dark uses the deeper page well). */
+  bandFooter: string;
+  /** Primary ink on a navy band (hero title). */
+  bandText: string;
+  /** Muted ink on a navy band (hero lede, footer headings). */
+  bandTextMuted: string;
+  /** Faint ink on a navy band (hero stat labels, footer links). */
+  bandTextFaint: string;
+  /** Accent gold that reads on a navy band. */
+  bandAccent: string;
+  /** Hairline on a navy band (hero stat rule, footer rules). */
+  bandBorder: string;
+  /**
+   * Accent gold for text that sits on a warm gold-tinted surface (the 10–12%
+   * gold chip fills, the card caption scrim). A tint raises the surface
+   * luminance, so the plain `gold` accent dips below 4.5:1 there; this is the
+   * one value every such chip uses instead of a per-component override.
+   */
+  goldOnTint: string;
   /** Shadow used by cards. */
   shadow: string;
   /** Shadow used by the auth panel. */
@@ -89,6 +114,19 @@ export const DARK_THEME: ThemeTokens = {
     'linear-gradient(180deg, rgba(0,12,24,0.15) 0%, rgba(0,15,30,0.72) 55%, rgba(0,18,34,0.94) 100%)',
   cardScrim:
     'linear-gradient(180deg, rgba(0,12,24,0.15) 0%, rgba(0,15,30,0.72) 55%, rgba(0,18,34,0.94) 100%)',
+  // In the dark theme the page field is already navy and the footer uses the
+  // deeper well, so every band token reproduces the existing dark value
+  // exactly; the band rules are therefore pixel-identical in dark.
+  band: '#00162b',
+  bandFooter: '#000f1e',
+  bandText: '#eef3f9',
+  bandTextMuted: '#9fb3c8',
+  bandTextFaint: '#6f8598',
+  bandAccent: '#d4af37',
+  bandBorder: 'rgba(255, 255, 255, 0.08)',
+  // In dark the plain gold already clears 4.5:1 on every gold-tinted chip, so
+  // this token reproduces it and the approved dark render is unchanged.
+  goldOnTint: '#d4af37',
   shadow: '0 18px 40px -24px rgba(0, 0, 0, 0.85)',
   shadowPanel: '0 24px 60px rgba(0, 0, 0, 0.32)',
 };
@@ -129,6 +167,19 @@ export const LIGHT_THEME: ThemeTokens = {
     'linear-gradient(180deg, rgba(0,12,24,0.10) 0%, rgba(0,22,43,0.62) 55%, rgba(0,22,43,0.90) 100%)',
   cardScrim:
     'linear-gradient(180deg, rgba(247,244,237,0.55) 0%, rgba(247,244,237,0.82) 55%, rgba(247,244,237,0.94) 100%)',
+  // The approved light homepage keeps a navy hero band and a navy footer on an
+  // ivory page, so the band is the deep navy from the reference, not the page
+  // background. White ink and the light metallic gold read on it.
+  band: '#0a1b2f',
+  bandFooter: '#0a1b2f',
+  bandText: '#ffffff',
+  bandTextMuted: '#cdd8e6',
+  bandTextFaint: '#9fb3c8',
+  bandAccent: '#e8c766',
+  bandBorder: 'rgba(232, 199, 102, 0.24)',
+  // A 10–12% gold chip fill lifts the surface enough that the `gold` accent
+  // falls to ~3.9:1; this darker gold clears 4.5:1 on every tinted chip.
+  goldOnTint: '#7a5c10',
   shadow: '0 16px 36px -26px rgba(58, 48, 30, 0.28)',
   shadowPanel: '0 24px 60px -28px rgba(58, 48, 30, 0.35)',
 };

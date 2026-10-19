@@ -1,0 +1,207 @@
+{
+  "captures": 31,
+  "byteIdentical": 23,
+  "realColourShift": 0,
+  "isolatedPixelDeviation": 2,
+  "thresholdStrictPercent": 0.05,
+  "histogram": {
+    "0": 23,
+    "1": 5,
+    "2": 1,
+    "13": 1,
+    "24": 1
+  },
+  "worst": {
+    "file": "04-login-mobile-ar-dark.png",
+    "moved": 0.011240733989549155,
+    "maxDelta": 2
+  },
+  "rows": [
+    {
+      "file": "01-homepage-desktop-ar-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "01-homepage-desktop-en-dark.png",
+      "moved": 0.001,
+      "strictPixels": 5,
+      "maxDelta": 24
+    },
+    {
+      "file": "01-homepage-mobile-ar-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "01-homepage-mobile-en-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "01-homepage-tablet-ar-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "01-homepage-tablet-en-dark.png",
+      "moved": 0.0006,
+      "strictPixels": 1,
+      "maxDelta": 13
+    },
+    {
+      "file": "02-dashboard-desktop-ar-dark.png",
+      "moved": 0.0008,
+      "strictPixels": 0,
+      "maxDelta": 1
+    },
+    {
+      "file": "02-dashboard-desktop-en-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "02-dashboard-mobile-ar-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "02-dashboard-mobile-en-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "02-dashboard-tablet-ar-dark.png",
+      "moved": 0.0013,
+      "strictPixels": 0,
+      "maxDelta": 1
+    },
+    {
+      "file": "02-dashboard-tablet-en-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "03-providers-desktop-ar-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "03-providers-desktop-en-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "03-providers-mobile-ar-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "03-providers-mobile-en-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "03-providers-tablet-ar-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "03-providers-tablet-en-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "04-login-desktop-ar-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "04-login-desktop-en-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "04-login-mobile-ar-dark.png",
+      "moved": 0.0112,
+      "strictPixels": 0,
+      "maxDelta": 2
+    },
+    {
+      "file": "04-login-mobile-en-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "04-login-tablet-ar-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "04-login-tablet-en-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "05-comparison-homepage-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "06-profile-desktop-ar-dark.png",
+      "moved": 0.0008,
+      "strictPixels": 0,
+      "maxDelta": 1
+    },
+    {
+      "file": "06-profile-desktop-en-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "06-profile-mobile-ar-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "06-profile-mobile-en-dark.png",
+      "moved": 0,
+      "strictPixels": 0,
+      "maxDelta": 0
+    },
+    {
+      "file": "06-profile-tablet-ar-dark.png",
+      "moved": 0.0013,
+      "strictPixels": 0,
+      "maxDelta": 1
+    },
+    {
+      "file": "06-profile-tablet-en-dark.png",
+      "moved": 0.0017,
+      "strictPixels": 0,
+      "maxDelta": 1
+    }
+  ]
+}

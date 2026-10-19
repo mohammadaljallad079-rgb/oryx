@@ -7,7 +7,7 @@
  */
 import { chromium } from 'playwright';
 
-const CUSTOMER = 'https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev';
+const CUSTOMER = process.env.ORYX_CUSTOMER_BASE ?? 'https://work-2-wqqgzexpmdagonjk.prod-runtime.all-hands.dev';
 const failures = [];
 function check(name, cond, detail = '') {
   if (cond) console.log(`  PASS  ${name}`);

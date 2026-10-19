@@ -14,6 +14,7 @@
  * Run with: node .run/audit-light-theme.mjs
  */
 import { chromium } from 'playwright';
+import { PNG } from 'pngjs';
 import { writeFileSync, mkdirSync } from 'fs';
 
 const CUSTOMER = process.env.ORYX_CUSTOMER_BASE ?? 'http://127.0.0.1:12001';
@@ -106,6 +107,14 @@ const SAMPLE = (selector) => {
     node = node.parentElement;
   }
   const tokens = getComputedStyle(document.documentElement);
+  // A container like `.oryx-hero` owns no text of its own, and an icon glyph
+  // is a graphic, not body copy. Both would otherwise be reported as text
+  // failures against the wrong threshold.
+  const ownText = [...el.childNodes]
+    .filter((n) => n.nodeType === 3)
+    .map((n) => n.textContent.trim())
+    .join('');
+  const isIcon = el.querySelector('svg') !== null && ownText.length === 0 && (el.textContent ?? '').trim().length === 0;
   return {
     layers,
     backgroundImage: cs.backgroundImage === 'none' ? null : cs.backgroundImage.slice(0, 120),
@@ -114,6 +123,9 @@ const SAMPLE = (selector) => {
     borderWidth: cs.borderTopWidth,
     fontSize: cs.fontSize,
     fontWeight: cs.fontWeight,
+    ownText,
+    isIcon,
+    threshold: isIcon ? 3 : 4.5,
     text: (el.textContent ?? '').trim().slice(0, 40),
     tokens: {
       bg: tokens.getPropertyValue('--bg').trim(),
@@ -132,6 +144,51 @@ function effectiveBackground(layers, field = 'rgb(247, 244, 237)') {
     if (layer) out = over(layer, out);
   }
   return out;
+}
+
+/**
+ * Mean colour of an element's real pixels with its glyphs hidden.
+ *
+ * `effectiveBackground` can only composite `background-color` layers, so a
+ * surface painted with a `background-image` gradient (the navy hero band, the
+ * page header, the dashboard banner) would be measured against the page field
+ * and report a false low ratio. For those, read the rendered pixels instead.
+ */
+async function renderedBackground(page, selector, box) {
+  const viewport = page.viewportSize() ?? { width: 1440, height: 1024 };
+  const x = Math.max(0, Math.round(box.x));
+  const y = Math.max(0, Math.round(box.y));
+  const width = Math.min(Math.round(box.width), viewport.width - x);
+  const height = Math.min(Math.round(box.height), viewport.height - y);
+  // An element scrolled out of view has no pixels to read; the caller falls
+  // back to layer compositing in that case.
+  if (width < 2 || height < 2) return null;
+  const prev = await page.evaluate(([sel]) => {
+    const el = document.querySelector(sel);
+    const p = el.style.color;
+    el.style.color = 'transparent';
+    return p;
+  }, [selector]);
+  await page.waitForTimeout(80);
+  let shot;
+  try {
+    shot = await page.screenshot({ clip: { x, y, width, height } });
+  } finally {
+    await page.evaluate(([sel, p]) => {
+      document.querySelector(sel).style.color = p;
+    }, [selector, prev]);
+  }
+  const png = PNG.sync.read(shot);
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  const n = png.width * png.height;
+  for (let i = 0; i < png.data.length; i += 4) {
+    r += png.data[i];
+    g += png.data[i + 1];
+    b += png.data[i + 2];
+  }
+  return [r / n, g / n, b / n];
 }
 
 const browser = await chromium.launch();
@@ -162,14 +219,20 @@ for (const [name, path] of [
   const rows = {};
   for (const [key, selector] of TARGETS) {
     const s = await page.evaluate(SAMPLE, selector);
-    if (s) {
-      const bg = effectiveBackground(s.layers);
-      rows[key] = {
-        ...s,
-        background: `rgb(${bg.slice(0, 3).map((v) => Math.round(v)).join(', ')})`,
-        contrast: contrast(`rgb(${parseRgb(s.color).slice(0, 3).join(', ')})`, `rgb(${bg.slice(0, 3).join(', ')})`),
-      };
-    }
+    if (!s) continue;
+    const box = await page.locator(selector).first().boundingBox().catch(() => null);
+    // A gradient can sit on the element *or* an ancestor (the navy hero band
+    // wraps the stat labels), and `background-color` compositing cannot see it.
+    // Whenever the element is on screen, measure the pixels actually behind it.
+    const measured = box && box.width >= 2 && box.height >= 2;
+    const rendered = measured ? await renderedBackground(page, selector, box) : null;
+    const bg = rendered ?? effectiveBackground(s.layers);
+    rows[key] = {
+      ...s,
+      measuredFrom: rendered ? 'rendered-pixels' : 'composited-layers',
+      background: `rgb(${bg.slice(0, 3).map((v) => Math.round(v)).join(', ')})`,
+      contrast: contrast(`rgb(${parseRgb(s.color).slice(0, 3).join(', ')})`, `rgb(${bg.slice(0, 3).join(', ')})`),
+    };
   }
   report[path] = rows;
   console.log(`\n=== ${name} (${path}) ===`);
@@ -183,14 +246,16 @@ for (const [name, path] of [
 await browser.close();
 writeFileSync(`${OUT}/light-theme-audit.json`, JSON.stringify(report, null, 2));
 
-// Flag low-contrast text (below the 4.5:1 body threshold).
+// Flag low-contrast text (below the 4.5:1 body threshold; icons take 3:1) and
+// skip containers that own no text of their own.
 const failures = [];
 for (const [route, rows] of Object.entries(report)) {
   for (const [key, v] of Object.entries(rows)) {
-    if (v.contrast !== null && v.contrast < 4.5) {
-      failures.push(`${route} ${key} ${v.contrast}:1 (fg ${v.color} on ${v.background})`);
+    if (v.ownText === '' && !v.isIcon) continue;
+    if (v.contrast !== null && v.contrast < v.threshold) {
+      failures.push(`${route} ${key} ${v.contrast}:1 < ${v.threshold}:1 (fg ${v.color} on ${v.background})`);
     }
   }
 }
-console.log(`\n${failures.length} text/surface pairs below 4.5:1`);
+console.log(`\n${failures.length} text/surface pairs below their WCAG threshold`);
 for (const f of failures) console.log('  ' + f);

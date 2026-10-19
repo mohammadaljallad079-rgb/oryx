@@ -6,7 +6,7 @@
  */
 import { chromium } from 'playwright';
 
-const ORIGIN = 'https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev';
+const ORIGIN = process.env.ORYX_CUSTOMER_BASE ?? 'https://work-2-wqqgzexpmdagonjk.prod-runtime.all-hands.dev';
 const USER = { email: 'customer@oryx-demo.local', password: 'OryxDemo!2026' };
 
 const AUTH_ROUTES = ['/dashboard', '/garage', '/bookings', '/invoices', '/support', '/notifications', '/profile'];

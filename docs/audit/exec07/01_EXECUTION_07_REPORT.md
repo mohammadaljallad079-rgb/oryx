@@ -173,14 +173,27 @@ regression tests are in
 ## 8. Phase E — light-theme correction
 
 Phase E corrected the light theme the owner reported as inconsistent, and in
-doing so found three theme defects and one i18n defect: gold was one token doing
-two incompatible jobs (**E1**), the ink on a gold fill was not the approved dark
-ink (**E2**), the card caption scrim was dark in both themes (**E3**), and the
-profile "Delete" control rendered the raw key `common.delete` (**E4**). The light
-theme now uses an ivory/white/charcoal/metallic-gold palette driven by central
-tokens, and the dark theme is **31 / 31 byte-identical** in the before/after
-captures. Full detail, evidence and the test results are in
-[`04_PHASE_E_LIGHT_THEME.md`](./04_PHASE_E_LIGHT_THEME.md).
+doing so found eight defects. The customer site had defaulted to the **dark**
+theme rather than the approved light reference (**E0**); gold was one token doing
+two incompatible jobs (**E1**); the ink on a gold fill was not the approved dark
+ink (**E2**); the hero, header and panel scrims were built from the page field
+rather than the navy band the approved reference uses (**E3**); the profile
+"Delete" control rendered the raw key `common.delete` (**E4**); the authenticated
+captures had silently shot the login page (**E5**, an evidence defect); a
+category-card link failed WCAG contrast at 4.28:1 on its tinted scrim (**E7**,
+found by an exhaustive rendered-contrast sweep rather than a fixed list, and the
+defect the owner's complaint was actually pointing at); and two pre-existing dark
+pairs sit below 4.5:1 (**E8**, reported and deliberately left alone so the
+approved dark theme stays intact).
+
+The light theme is now an ivory page with white and warm-neutral surfaces, deep
+charcoal type, a metallic gold accent and a navy hero/footer band — all driven by
+central tokens in `packages/shared/src/tokens.ts` and mirrored into
+`:root[data-theme='light']`, with the dark block defining the same token names so
+no rule needs a theme branch. The dark theme is **0 real colour shifts** in the
+before/after captures (23/31 byte-identical; the rest are isolated antialiasing
+pixels on the blurred header and gold edges). Full detail, evidence and the test
+results are in [`04_PHASE_E_LIGHT_THEME.md`](./04_PHASE_E_LIGHT_THEME.md).
 
 ## 9. Reproduction
 

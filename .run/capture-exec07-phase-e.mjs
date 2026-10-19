@@ -114,7 +114,47 @@ async function shoot(page, name, path, width, locale, theme, viewport, requiresA
   );
   const res = await page.goto(`${CUSTOMER}${path}`, { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle').catch(() => {});
-  await page.waitForTimeout(2200);
+  // The hero and category photography come from the CMS as background images,
+  // which `networkidle` does not cover. Decode every background image before
+  // the shot, otherwise the same surface renders with and without the photo and
+  // the dark regression comparison reports a false colour shift.
+  await page
+    .evaluate(async () => {
+      const urls = new Set();
+      for (const el of document.querySelectorAll('*')) {
+        const bg = getComputedStyle(el).backgroundImage;
+        for (const m of bg.matchAll(/url\(["']?([^"')]+)["']?\)/g)) urls.add(m[1]);
+      }
+      await Promise.all(
+        [...urls].map(
+          (u) =>
+            new Promise((resolve) => {
+              const img = new Image();
+              img.onload = img.onerror = () => resolve();
+              img.src = u;
+            }),
+        ),
+      );
+    })
+    .catch(() => {});
+  // The hero background starts as the bundled vector art and is replaced once
+  // the CMS content resolves. Wait until it stops changing so the same surface
+  // is captured with the same photograph on every run.
+  await page
+    .evaluate(async () => {
+      const el = document.querySelector('.oryx-hero__media, .oryx-dash-hero__art');
+      if (!el) return;
+      let last = getComputedStyle(el).backgroundImage;
+      let stable = 0;
+      for (let i = 0; i < 40 && stable < 5; i += 1) {
+        await new Promise((r) => setTimeout(r, 200));
+        const now = getComputedStyle(el).backgroundImage;
+        stable = now === last ? stable + 1 : 0;
+        last = now;
+      }
+    })
+    .catch(() => {});
+  await page.waitForTimeout(1200);
 
   // A guarded surface that redirected to /login means the session was lost, so
   // the capture would show the login page under an authenticated surface's

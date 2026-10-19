@@ -9,7 +9,7 @@
 import { chromium } from 'playwright';
 import { mkdirSync } from 'fs';
 
-const CUSTOMER = 'https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev';
+const CUSTOMER = process.env.ORYX_CUSTOMER_BASE ?? 'https://work-2-wqqgzexpmdagonjk.prod-runtime.all-hands.dev';
 const OUT = 'docs/audit/exec07/responsive';
 const USER = { email: 'customer@oryx-demo.local', password: 'OryxDemo!2026' };
 

@@ -43,7 +43,7 @@ export function UiProvider({
   children,
   dictionaries,
   initialLocale = DEFAULT_LOCALE,
-  initialTheme = 'dark',
+  initialTheme = 'light',
 }: {
   children: ReactNode;
   dictionaries: Record<Locale, Record<string, string>>;

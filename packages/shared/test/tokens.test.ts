@@ -101,6 +101,34 @@ describe('theme token contract', () => {
     expect(contrast(LIGHT_THEME.goldHover, LIGHT_THEME.background)!).toBeGreaterThanOrEqual(4.5);
   });
 
+  it('keeps the accent gold readable on a warm gold-tinted chip', () => {
+    // A 10–12% gold chip fill lifts the surface enough that the plain accent
+    // gold falls below 4.5:1, so those chips use `goldOnTint`. The tint is the
+    // gold mixed over the surface at the highest alpha the chips use.
+    const chip = (surface: string, alpha: number) => {
+      const g = hexToRgb(LIGHT_THEME.gold)!;
+      const s = hexToRgb(surface)!;
+      const mix = g.map((c, i) => Math.round(c * alpha + s[i] * (1 - alpha)));
+      return `rgb(${mix.join(',')})`;
+    };
+    const lightChips = [
+      ['white surface', LIGHT_THEME.surface, 0.12],
+      ['warm neutral', LIGHT_THEME.surfaceRaised, 0.12],
+    ] as const;
+    for (const [label, surface, alpha] of lightChips) {
+      expect(
+        contrast(LIGHT_THEME.goldOnTint, chip(surface, alpha)),
+        `goldOnTint on a 12% gold chip over ${label}`,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+    // The darker gold must actually be darker than the plain accent, and the
+    // dark theme must keep its existing gold so its approved render is intact.
+    expect(luminance(hexToRgb(LIGHT_THEME.goldOnTint)!)).toBeLessThan(
+      luminance(hexToRgb(LIGHT_THEME.gold)!),
+    );
+    expect(DARK_THEME.goldOnTint).toBe(DARK_THEME.gold);
+  });
+
   const lightPairs: Array<[string, string, string, number]> = [
     ['body text on ivory page', LIGHT_THEME.text, LIGHT_THEME.background, 4.5],
     ['body text on white card', LIGHT_THEME.text, LIGHT_THEME.surface, 4.5],
@@ -150,6 +178,25 @@ describe('theme token contract', () => {
     expect(LIGHT_THEME.cardScrim).toContain('247,244,237');
     expect(DARK_THEME.cardScrim).not.toContain('247,244,237');
   });
+
+  it('keeps the navy band ink readable in both themes', () => {
+    // The hero and footer are navy bands in both themes, so their ink is
+    // measured against the band colour rather than the page field.
+    for (const theme of [LIGHT_THEME, DARK_THEME]) {
+      expect(contrast(theme.bandText, theme.band)!).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(theme.bandTextMuted, theme.band)!).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(theme.bandAccent, theme.band)!).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('keeps the light theme the approved ivory-and-navy identity', () => {
+    // The reference is an ivory page with a navy hero band and a navy footer.
+    // The band must not drift back to the page field in the light theme.
+    expect(LIGHT_THEME.band).toBe('#0a1b2f');
+    expect(LIGHT_THEME.band).not.toBe(LIGHT_THEME.background);
+    expect(LIGHT_THEME.bandFooter).toBe('#0a1b2f');
+    expect(LIGHT_THEME.bandText).toBe('#ffffff');
+  });
 });
 
 describe('CSS custom properties match the shared tokens', () => {
@@ -173,6 +220,14 @@ describe('CSS custom properties match the shared tokens', () => {
     ['warning', '--warning'],
     ['danger', '--danger'],
     ['info', '--info'],
+    ['band', '--band'],
+    ['bandFooter', '--band-footer'],
+    ['bandText', '--band-text'],
+    ['bandTextMuted', '--band-text-muted'],
+    ['bandTextFaint', '--band-text-faint'],
+    ['bandAccent', '--band-accent'],
+    ['bandBorder', '--band-border'],
+    ['goldOnTint', '--gold-on-tint'],
   ];
 
   it('keeps the customer stylesheet in step with LIGHT_THEME', () => {

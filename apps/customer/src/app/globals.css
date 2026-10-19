@@ -70,21 +70,54 @@
    * is the warm charcoal that reads on the lighter light-theme gold ramp.
    */
   --on-gold: #00162b;
+  /*
+   * The full-bleed hero and the footer are navy bands in both themes. In the
+   * dark theme the page field is already navy, so the band equals `--bg` and
+   * the approved dark render is unchanged; the light theme keeps the approved
+   * navy band on an ivory page.
+   */
+  --band: #00162b;
+  --band-footer: #000f1e;
+  --band-text: #eef3f9;
+  --band-text-muted: #9fb3c8;
+  --band-text-faint: #6f8598;
+  --band-accent: #d4af37;
+  --band-border: rgba(255, 255, 255, 0.08);
+  /*
+   * Accent gold for text on a warm gold-tinted chip. In the dark theme the
+   * plain gold already clears 4.5:1 on every chip, so this reproduces it and
+   * the approved dark render is unchanged.
+   */
+  --gold-on-tint: #d4af37;
+  /*
+   * Photo panels (the homepage hero, page headers and the dashboard banner).
+   * In the dark theme the panel field is the existing navy gradient, so the
+   * approved render is unchanged; the light theme uses a navy band so the white
+   * panel ink reads, exactly as the approved reference does.
+   */
+  --panel-bg: radial-gradient(
+      120% 140% at 88% 6%,
+      color-mix(in srgb, var(--gold) 16%, transparent),
+      transparent 58%
+    ),
+    linear-gradient(150deg, var(--surface-raised), var(--bg-deep));
+  --panel-ink: var(--text);
+  --panel-ink-muted: var(--text-muted);
   --hero-scrim: linear-gradient(
     100deg,
-    color-mix(in srgb, var(--bg) 94%, transparent) 8%,
-    color-mix(in srgb, var(--bg) 74%, transparent) 48%,
-    color-mix(in srgb, var(--bg) 34%, transparent) 100%
+    color-mix(in srgb, var(--band) 94%, transparent) 8%,
+    color-mix(in srgb, var(--band) 74%, transparent) 48%,
+    color-mix(in srgb, var(--band) 34%, transparent) 100%
   );
   --panel-scrim: linear-gradient(
     100deg,
-    color-mix(in srgb, var(--bg) 92%, transparent) 10%,
-    color-mix(in srgb, var(--bg) 62%, transparent) 70%
+    color-mix(in srgb, var(--band) 92%, transparent) 10%,
+    color-mix(in srgb, var(--band) 62%, transparent) 70%
   );
   --head-scrim: linear-gradient(
     100deg,
-    color-mix(in srgb, var(--bg) 94%, transparent) 8%,
-    color-mix(in srgb, var(--bg) 66%, transparent) 72%
+    color-mix(in srgb, var(--band) 94%, transparent) 8%,
+    color-mix(in srgb, var(--band) 66%, transparent) 72%
   );
   --shadow-card: 0 18px 40px -24px rgba(0, 0, 0, 0.85);
   --shadow-panel: 0 24px 60px rgba(0, 0, 0, 0.32);
@@ -146,23 +179,25 @@
   /*
    * The hero caption spans the left ~60% of the panel, so the scrim stays
    * near-opaque across that band and only thins out on the right, where the
-   * photograph is meant to show. Measured with `.run/probe-overlay-contrast.mjs`.
+   * photograph is meant to show. It is built from the navy band token so the
+   * caption keeps white-ink contrast in both themes; in the dark theme the band
+   * equals the page field, so the approved render is unchanged.
    */
   --hero-scrim: linear-gradient(
     100deg,
-    color-mix(in srgb, var(--bg) 96%, transparent) 4%,
-    color-mix(in srgb, var(--bg) 92%, transparent) 55%,
-    color-mix(in srgb, var(--bg) 70%, transparent) 100%
+    color-mix(in srgb, var(--band) 96%, transparent) 4%,
+    color-mix(in srgb, var(--band) 92%, transparent) 55%,
+    color-mix(in srgb, var(--band) 70%, transparent) 100%
   );
   --panel-scrim: linear-gradient(
     100deg,
-    color-mix(in srgb, var(--bg) 96%, transparent) 8%,
-    color-mix(in srgb, var(--bg) 86%, transparent) 70%
+    color-mix(in srgb, var(--band) 96%, transparent) 8%,
+    color-mix(in srgb, var(--band) 88%, transparent) 70%
   );
   --head-scrim: linear-gradient(
     100deg,
-    color-mix(in srgb, var(--bg) 97%, transparent) 8%,
-    color-mix(in srgb, var(--bg) 88%, transparent) 72%
+    color-mix(in srgb, var(--band) 97%, transparent) 8%,
+    color-mix(in srgb, var(--band) 90%, transparent) 72%
   );
   --shadow-card: 0 16px 36px -26px rgba(58, 48, 30, 0.28);
   --shadow-panel: 0 24px 60px -28px rgba(58, 48, 30, 0.35);
@@ -173,6 +208,38 @@
   --field-border: rgba(36, 31, 20, 0.18);
   /* Warm charcoal on the lighter light-theme gold ramp (9.4:1 on the light end). */
   --on-gold: #241f14;
+  /*
+   * The approved light homepage keeps a navy hero band and a navy footer on an
+   * ivory page. The band tokens carry white ink and the light metallic gold, so
+   * the hero, the page headers and the footer read as one navy family without
+   * scattering colour values through the rules.
+   */
+  --band: #0a1b2f;
+  --band-footer: #0a1b2f;
+  --band-text: #ffffff;
+  --band-text-muted: #cdd8e6;
+  --band-text-faint: #9fb3c8;
+  --band-accent: #e8c766;
+  --band-border: rgba(232, 199, 102, 0.24);
+  /*
+   * A 10–12% gold chip fill lifts the surface enough that the plain accent gold
+   * falls to ~3.9:1; this darker gold clears 4.5:1 on every tinted chip, so the
+   * chips share one value rather than each carrying its own override.
+   */
+  --gold-on-tint: #7a5c10;
+  /*
+   * Photo panels are navy bands in the approved light homepage, so the panel
+   * field is the navy band with a faint gold bloom. The panel ink is white for
+   * the same reason the hero's is.
+   */
+  --panel-bg: radial-gradient(
+      120% 140% at 88% 6%,
+      color-mix(in srgb, var(--band-accent) 20%, transparent),
+      transparent 58%
+    ),
+    linear-gradient(150deg, var(--band), color-mix(in srgb, var(--band) 82%, #000000));
+  --panel-ink: var(--band-text);
+  --panel-ink-muted: var(--band-text-muted);
 }
 
 * {
@@ -636,7 +703,7 @@ a {
 
 .oryx-eyebrow {
   margin: 0 0 10px;
-  color: var(--gold);
+  color: var(--band-accent);
   font-size: 12.5px;
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -649,11 +716,12 @@ a {
   line-height: 1.14;
   font-weight: 800;
   letter-spacing: -0.01em;
+  color: var(--band-text);
 }
 
 .oryx-hero__lede {
   margin: 0 0 26px;
-  color: var(--text-muted);
+  color: var(--band-text-muted);
   font-size: clamp(14px, 1.5vw, 17px);
   max-width: 60ch;
 }
@@ -677,7 +745,7 @@ a {
   gap: 10px;
   margin: 34px 0 0;
   padding: 18px 0 0;
-  border-top: 1px solid var(--border-soft);
+  border-top: 1px solid var(--band-border);
 }
 
 .oryx-stat {
@@ -687,7 +755,7 @@ a {
 }
 
 .oryx-stat__label {
-  color: var(--text-faint);
+  color: var(--band-text-faint);
   font-size: 12px;
   letter-spacing: 0.04em;
 }
@@ -696,7 +764,7 @@ a {
   margin: 0;
   font-size: 22px;
   font-weight: 750;
-  color: var(--text);
+  color: var(--band-text);
 }
 
 /* ------------------------------------------------------------- sections */
@@ -814,7 +882,7 @@ a {
   align-items: center;
   gap: 6px;
   margin-top: 6px;
-  color: var(--gold);
+  color: var(--gold-on-tint);
   font-size: 12.5px;
   font-weight: 700;
 }
@@ -830,6 +898,14 @@ a {
   display: flex;
   align-items: center;
   margin-bottom: 20px;
+}
+
+/* In the light theme the banner is a navy band under the artwork, so its white
+   ink reads. The dark theme composites the artwork directly over the page field
+   and is left exactly as the approved dashboard renders it. */
+:root[data-theme='light'] .oryx-dash-hero {
+  background: var(--panel-bg);
+  color: var(--panel-ink);
 }
 
 .oryx-dash-hero__art {
@@ -882,7 +958,7 @@ a {
   display: grid;
   place-items: center;
   border-radius: 10px;
-  color: var(--gold);
+  color: var(--gold-on-tint);
   background: color-mix(in srgb, var(--gold) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--gold) 28%, transparent);
   margin-bottom: 2px;
@@ -950,7 +1026,7 @@ a {
   display: grid;
   place-items: center;
   border-radius: 12px;
-  color: var(--gold);
+  color: var(--gold-on-tint);
   background: color-mix(in srgb, var(--gold) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
 }
@@ -1144,10 +1220,22 @@ a {
 .oryx-footer {
   margin-top: 72px;
   border-top: 1px solid var(--border-soft);
-  background: var(--bg-deep);
-  padding: 44px 0 28px;
-  color: var(--text-faint);
+  background: var(--band-footer);
+  padding: 28px 0;
+  color: var(--band-text-faint);
   font-size: 13px;
+}
+
+/* The footer is a navy band in both themes, so the lockup always uses the
+   light-on-navy colourway rather than following the page theme. */
+.oryx-footer .oryx-brand-logo__on-dark,
+:root[data-theme='light'] .oryx-footer .oryx-brand-logo__on-dark {
+  display: block;
+}
+
+.oryx-footer .oryx-brand-logo__on-light,
+:root[data-theme='light'] .oryx-footer .oryx-brand-logo__on-light {
+  display: none;
 }
 
 .oryx-footer__grid {
@@ -1173,7 +1261,7 @@ a {
   font-size: 12.5px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--band-text-muted);
   font-weight: 700;
 }
 
@@ -1186,23 +1274,36 @@ a {
 }
 
 .oryx-footer__col a {
-  color: var(--text-faint);
+  color: var(--band-text-faint);
   text-decoration: none;
 }
 
 .oryx-footer__col a:hover {
-  color: var(--gold);
+  color: var(--band-accent);
 }
 
 .oryx-footer__bar {
   margin-top: 32px;
   padding-top: 20px;
-  border-top: 1px solid var(--border-soft);
+  border-top: 1px solid var(--band-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
   flex-wrap: wrap;
+}
+
+/* The light theme's footer bar sits on a navy band while the page ink is
+   charcoal, so its controls take the band ink. The dark theme already renders
+   the footer on the page field, so its existing button styling is unchanged. */
+:root[data-theme='light'] .oryx-footer .oryx-btn {
+  color: var(--band-text);
+  border-color: var(--band-border);
+}
+
+:root[data-theme='light'] .oryx-footer .oryx-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--band-text) 12%, transparent);
+  border-color: var(--band-accent);
 }
 
 .oryx-hero h1 {
@@ -1213,7 +1314,7 @@ a {
 }
 
 .oryx-hero p {
-  color: var(--text-muted);
+  color: var(--band-text-muted);
   max-width: 560px;
   margin: 0 0 24px;
   font-size: 16px;
@@ -1236,13 +1337,6 @@ a {
 .oryx-stars {
   color: var(--gold);
   letter-spacing: 2px;
-}
-
-.oryx-footer {
-  border-top: 1px solid var(--border-soft);
-  padding: 28px 0;
-  color: var(--text-faint);
-  font-size: 13px;
 }
 
 .oryx-skip {
@@ -1367,9 +1461,8 @@ a {
   overflow: hidden;
   border-radius: 20px;
   border: 1px solid var(--border);
-  background:
-    radial-gradient(120% 140% at 88% 6%, color-mix(in srgb, var(--gold) 16%, transparent), transparent 58%),
-    linear-gradient(150deg, var(--surface-raised), var(--bg-deep));
+  background: var(--panel-bg);
+  color: var(--panel-ink);
   margin-bottom: 22px;
 }
 
@@ -1399,12 +1492,12 @@ a {
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--panel-ink-muted);
   margin-bottom: 10px;
 }
 
 .oryx-page-head__back:hover {
-  color: var(--gold);
+  color: var(--band-accent);
 }
 
 /* The shared arrow glyph points along the reading direction, so the "back"
@@ -1422,7 +1515,7 @@ a {
 
 .oryx-page-head__subtitle {
   margin: 8px 0 0;
-  color: var(--text-muted);
+  color: var(--panel-ink-muted);
   max-width: 70ch;
 }
 
@@ -1457,7 +1550,7 @@ a {
   display: grid;
   place-items: center;
   border-radius: 14px;
-  color: var(--gold);
+  color: var(--gold-on-tint);
   background: color-mix(in srgb, var(--gold) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--gold) 26%, transparent);
 }
@@ -1599,7 +1692,7 @@ a {
   display: grid;
   place-items: center;
   border-radius: 12px;
-  color: var(--gold);
+  color: var(--gold-on-tint);
   background: color-mix(in srgb, var(--gold) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--gold) 24%, transparent);
 }
@@ -1784,7 +1877,7 @@ a {
 }
 
 .oryx-slot--active {
-  border-color: var(--gold);
+  border-color: var(--gold-on-tint);
   background: color-mix(in srgb, var(--gold) 18%, var(--surface-raised));
   color: var(--text);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold) 40%, transparent);
@@ -1810,7 +1903,7 @@ a {
   display: grid;
   place-items: center;
   border-radius: 10px;
-  color: var(--gold);
+  color: var(--gold-on-tint);
   background: color-mix(in srgb, var(--gold) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--gold) 22%, transparent);
 }
@@ -1884,7 +1977,7 @@ a {
   display: grid;
   place-items: center;
   border-radius: 12px;
-  color: var(--gold);
+  color: var(--gold-on-tint);
   background: color-mix(in srgb, var(--gold) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--gold) 24%, transparent);
   font-weight: 800;
@@ -1927,7 +2020,7 @@ a {
 }
 
 .oryx-choice--on {
-  border-color: var(--gold);
+  border-color: var(--gold-on-tint);
   background: color-mix(in srgb, var(--gold) 14%, var(--surface-raised));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold) 36%, transparent);
 }
@@ -1981,7 +2074,7 @@ a {
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--gold) 34%, transparent);
   background: color-mix(in srgb, var(--gold) 12%, transparent);
-  color: var(--gold);
+  color: var(--gold-on-tint);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.22em;
