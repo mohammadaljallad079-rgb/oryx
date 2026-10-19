@@ -296,6 +296,17 @@ async function buildEvidencePages() {
         .join('')
     : '';
 
+  // Captures of the published site itself, taken from the live URL. They live
+  // in the repository like every other piece of evidence.
+  const liveDir = 'docs/audit/exec07/preview';
+  const liveCaptures = [];
+  if (exists(liveDir)) {
+    for (const f of listFiles(liveDir, ['.webp', '.png', '.jpg']).sort()) {
+      const out = await makeThumb(`${liveDir}/${f}`, `assets/evidence/live-${f.replace(/\.[^.]+$/, '')}`, 1400);
+      liveCaptures.push(figure(out, escapeHtml(f.replace(/\.(webp|png|jpg)$/i, '')), 'the published preview', '../'));
+    }
+  }
+
   const body = `
     <p class="eyebrow">Design evidence</p>
     <h1>Light-theme evidence, permanently hosted</h1>
@@ -304,6 +315,7 @@ async function buildEvidencePages() {
       <strong>Dark theme is the control.</strong> The middle capture of each pair is the dark render. It is the approved theme and must not change; the before/after comparison is what proves it did not.
     </div>
     ${darkStats ? `<h2>Dark-invariance verdict</h2><div class="kpis">${darkStats}</div>` : ''}
+    ${liveCaptures.length ? `<section><div class="section-head"><h2>The published preview</h2><p>captured from the live GitHub Pages URL</p></div><div class="gallery">${liveCaptures.join('')}</div></section>` : ''}
     ${sections.join('')}
     ${sheets.length ? `<section><div class="section-head"><h2>Light vs dark sheets</h2><p>side-by-side composites</p></div><div class="gallery">${sheets.join('')}</div></section>` : ''}
     <p class="card__meta">${copied} capture pairs · before set from <code>docs/audit/exec07/phase-e/before/</code> · after set from <code>docs/audit/exec07/phase-e/after/</code></p>
@@ -333,6 +345,7 @@ const REPORT_GROUPS = [
       '02_PHASE_C_PREMIUM_PAGES.md',
       '03_PHASE_D_PHOTOGRAPHY_AND_CATEGORY_FIX.md',
       '04_PHASE_E_LIGHT_THEME.md',
+      '05_PERMANENT_PREVIEW.md',
     ],
   },
   {
