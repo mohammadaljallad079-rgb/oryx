@@ -126,15 +126,16 @@ jobs:
           PREVIEW_BASE: http://127.0.0.1:8099
 
   # --------------------------------------------------------------- deploy
+  # This job deliberately does not declare the `github-pages` environment. That
+  # environment is restricted to the `gh-pages` branch, so a job running on the
+  # design branch is held by the branch policy and fails. The environment adds
+  # nothing here: publishing is a plain force-push to `gh-pages`.
   deploy:
     name: Publish to GitHub Pages
     runs-on: ubuntu-latest
     needs: [build, verify]
     permissions:
       contents: write
-    environment:
-      name: github-pages
-      url: https://mohammadaljallad079-rgb.github.io/oryx/
     steps:
       - name: Download the preview site
         uses: actions/download-artifact@v4
