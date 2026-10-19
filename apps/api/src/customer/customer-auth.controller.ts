@@ -32,7 +32,7 @@ import {
   UpdateCustomerProfileDto,
 } from './customer.dto';
 import { ERROR_CODES, notFound } from '../common/errors';
-import { CustomerPlane } from '../auth/auth.decorators';
+import { CsrfExempt, CustomerPlane } from '../auth/auth.decorators';
 
 interface RequestLike {
   headers: Record<string, string | string[] | undefined>;
@@ -74,9 +74,15 @@ export class CustomerAuthController {
     res: Response,
     session: T,
     exposeRefreshToken: boolean,
+    existingCsrf?: string,
   ): Omit<T, 'refreshToken'> | T {
     if (session.refreshToken) {
-      session.csrfToken = this.cookies.setCustomerSession(res, session.refreshToken, this.refreshTtlSeconds());
+      session.csrfToken = this.cookies.setCustomerSession(
+        res,
+        session.refreshToken,
+        this.refreshTtlSeconds(),
+        existingCsrf,
+      );
       if (!exposeRefreshToken) delete session.refreshToken;
     }
     return session;
@@ -90,6 +96,7 @@ export class CustomerAuthController {
 
   @CustomerPublic()
   @Throttle({ default: { limit: Number(process.env.AUTH_THROTTLE_LIMIT ?? 10), ttl: 60_000 } })
+  @CsrfExempt()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a customer account' })
@@ -104,6 +111,7 @@ export class CustomerAuthController {
 
   @CustomerPublic()
   @Throttle({ default: { limit: Number(process.env.AUTH_THROTTLE_LIMIT ?? 10), ttl: 60_000 } })
+  @CsrfExempt()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Sign in; returns an MFA challenge when TOTP is enabled' })
@@ -119,6 +127,7 @@ export class CustomerAuthController {
 
   @CustomerPublic()
   @Throttle({ default: { limit: Number(process.env.AUTH_THROTTLE_LIMIT ?? 10), ttl: 60_000 } })
+  @CsrfExempt()
   @Post('mfa/verify-login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Complete sign-in by verifying a TOTP code' })
@@ -146,7 +155,7 @@ export class CustomerAuthController {
       throw notFound(ERROR_CODES.AUTH_TOKEN_INVALID, 'No refresh token was presented.');
     }
     const session = await this.auth.refresh(token, meta(req));
-    return this.complete(res, session, this.wantsBodyToken(req));
+    return this.complete(res, session, this.wantsBodyToken(req), this.cookies.readCustomerCsrfToken(req as never));
   }
 
   @CustomerPublic()
@@ -165,6 +174,7 @@ export class CustomerAuthController {
 
   @CustomerPublic()
   @Throttle({ default: { limit: Number(process.env.AUTH_THROTTLE_LIMIT ?? 10), ttl: 60_000 } })
+  @CsrfExempt()
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request a password reset link' })
@@ -183,6 +193,7 @@ export class CustomerAuthController {
 
   @CustomerPublic()
   @Throttle({ default: { limit: Number(process.env.AUTH_THROTTLE_LIMIT ?? 10), ttl: 60_000 } })
+  @CsrfExempt()
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Complete a password reset' })

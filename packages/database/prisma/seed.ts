@@ -237,9 +237,16 @@ async function seedPlans() {
   console.log(`  plans: ${PLANS.length} upserted`);
 }
 
-const PLATFORM_SUPER_ADMIN_PERMISSIONS = PERMISSIONS.filter((p) => p.scope === 'PLATFORM').map(
-  (p) => p.code,
-);
+/**
+ * The platform super admin role carries the whole catalog.
+ *
+ * `resolveEffectivePermissions` returns only the PLATFORM-scope codes while the
+ * principal has no tenant context, and adds the company-scope codes (gated by
+ * the selected company's entitlements) once a company is selected. Granting the
+ * full catalog here is what lets one role serve both modes without a second
+ * role, and without granting anything the selected tenant is not licensed for.
+ */
+const PLATFORM_SUPER_ADMIN_PERMISSIONS = PERMISSIONS.map((p) => p.code);
 
 const COMPANY_ADMIN_PERMISSIONS = PERMISSIONS.filter(
   (p) => p.scope !== 'PLATFORM' && p.delegable,
@@ -267,34 +274,29 @@ const STAFF_VIEWER_PERMISSIONS = [
 ];
 
 async function seedPlatformRoles() {
-  const role = await prisma.role.upsert({
-    where: { companyId_code: { companyId: '', code: 'platform_super_admin' } },
-    update: { isPlatform: true, isSystem: true },
-    create: {
-      code: 'platform_super_admin',
-      nameEn: 'Platform Super Admin',
-      nameAr: 'مدير المنصة',
-      descriptionEn: 'Full platform governance across every company and tenant.',
-      isSystem: true,
-      isPlatform: true,
-    },
-  }).catch(async () => {
-    // companyId is nullable; Prisma requires a find-first for the null case.
-    const existing = await prisma.role.findFirst({
-      where: { companyId: null, code: 'platform_super_admin' },
-    });
-    if (existing) return existing;
-    return prisma.role.create({
-      data: {
-        code: 'platform_super_admin',
-        nameEn: 'Platform Super Admin',
-        nameAr: 'مدير المنصة',
-        descriptionEn: 'Full platform governance across every company and tenant.',
-        isSystem: true,
-        isPlatform: true,
-      },
-    });
+  // A platform role has `companyId = NULL`. The compound unique on
+  // (companyId, code) cannot express that: Postgres treats NULL as distinct, so
+  // an upsert keyed on a sentinel value matches nothing and inserts a duplicate
+  // row on every run. Resolve the row with findFirst and update it, which is the
+  // only idempotent form for a nullable key.
+  const existing = await prisma.role.findFirst({
+    where: { companyId: null, code: 'platform_super_admin' },
   });
+  const role = existing
+    ? await prisma.role.update({
+        where: { id: existing.id },
+        data: { isPlatform: true, isSystem: true },
+      })
+    : await prisma.role.create({
+        data: {
+          code: 'platform_super_admin',
+          nameEn: 'Platform Super Admin',
+          nameAr: 'مدير المنصة',
+          descriptionEn: 'Full platform governance across every company and tenant.',
+          isSystem: true,
+          isPlatform: true,
+        },
+      });
 
   for (const code of PLATFORM_SUPER_ADMIN_PERMISSIONS) {
     await prisma.rolePermission.upsert({

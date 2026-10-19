@@ -245,6 +245,45 @@ export const Icons = {
       <circle cx="16.5" cy="14.5" r="1.2" />
     </Base>
   ),
+  chevronsLeft: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M11 17l-5-5 5-5" />
+      <path d="M18 17l-5-5 5-5" />
+    </Base>
+  ),
+  chevronsRight: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M13 7l5 5-5 5" />
+      <path d="M6 7l5 5-5 5" />
+    </Base>
+  ),
+  calendar: (p: IconProps) => (
+    <Base {...p}>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </Base>
+  ),
+  store: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M4 10v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9" />
+      <path d="M3 6.5 4.6 3h14.8L21 6.5a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0Z" />
+      <path d="M9 20v-5h6v5" />
+    </Base>
+  ),
+  eye: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </Base>
+  ),
+  eyeOff: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M10.6 6.1A9.7 9.7 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-3 3.7" />
+      <path d="M6.3 7.6A17 17 0 0 0 2.5 12S6 18 12 18a9.6 9.6 0 0 0 4-.9" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+      <path d="m3 3 18 18" />
+    </Base>
+  ),
 } as const;
 
 export type IconName = keyof typeof Icons;

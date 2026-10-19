@@ -57,6 +57,9 @@ const config: ExpoConfig = {
   ],
   experiments: {
     typedRoutes: true,
+    // Web exports are hosted under a sub-path on the customer origin. Native
+    // builds ignore this; leaving it empty keeps the default root hosting.
+    baseUrl: process.env.EXPO_BASE_PATH || undefined,
   },
   extra: {
     // Overridable at build time with EXPO_PUBLIC_API_BASE_URL.

@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { ALL_NAV_GROUPS, type NavItem } from '@/lib/navigation';
 import { Icon } from './icons';
 import { Badge } from './ui';
+import { BrandLogo } from './brand-logo';
 
 function visible(item: NavItem, ctx: {
   isPlatform: boolean;
@@ -18,7 +19,10 @@ function visible(item: NavItem, ctx: {
 }): boolean {
   if (item.platformOnly && !ctx.isPlatform) return false;
   if (item.moduleKey && ctx.companySelected && !ctx.hasModule(item.moduleKey)) return false;
-  if (item.permission) {
+  if (item.anyPermission) {
+    // Accepts either code, so one entry can serve platform and tenant principals.
+    if (!ctx.canAny(...item.anyPermission)) return false;
+  } else if (item.permission) {
     // Platform principals hold platform.* codes; company principals hold company.*.
     const platformVariant = item.permission.replace(/^company\./, 'platform.company.');
     if (!ctx.can(item.permission) && !ctx.can(platformVariant) && !ctx.canAny(item.permission)) return false;
@@ -26,26 +30,61 @@ function visible(item: NavItem, ctx: {
   return true;
 }
 
-export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }) {
+const COLLAPSE_KEY = 'oryx.navCollapsed';
+
+export function Sidebar({
+  open,
+  onNavigate,
+  collapsed = false,
+}: {
+  open: boolean;
+  onNavigate: () => void;
+  collapsed?: boolean;
+}) {
   const pathname = usePathname();
+  const router = useRouter();
   const { t } = useUi();
-  const { isPlatform, can, canAny, hasModule, companyId } = useAuth();
+  const { isPlatform, can, canAny, hasModule, companyId, logout } = useAuth();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [signingOut, setSigningOut] = useState(false);
 
   const ctx = { isPlatform, can, canAny, hasModule, companySelected: Boolean(companyId) };
 
+  /**
+   * Sign out from the sidebar.
+   *
+   * `logout()` calls the API (revoking the refresh token and clearing the
+   * HttpOnly cookie server-side) and drops the in-memory access token. Only then
+   * does this navigate to /login, so the user never lands on a protected page
+   * holding a live session.
+   */
+  async function onLogout() {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await logout();
+    } finally {
+      onNavigate();
+      router.replace('/login');
+    }
+  }
+
   return (
-    <aside className="oryx-sidebar" data-open={open} aria-label={t('context.scope')}>
+    <aside
+      className="oryx-sidebar"
+      data-open={open}
+      data-collapsed={collapsed}
+      aria-label={t('nav.label')}
+    >
       <Link
         href="/dashboard"
         onClick={onNavigate}
-        className="mb-2 flex items-center gap-3 rounded-xl px-3 py-3"
-        style={{ border: '1px solid var(--border)' }}
+        className="oryx-sidebar__brand"
+        title={t('brand.tagline')}
       >
-        <BrandMark />
-        <span className="min-w-0">
-          <span className="block text-[15px] font-extrabold leading-tight tracking-[0.18em]">ORYX</span>
-          <span className="oryx-faint block truncate text-[10.5px]">{t('brand.tagline')}</span>
+        <BrandLogo height={26} />
+        <span className="oryx-sidebar__brand-text oryx-faint block truncate text-[10.5px]">
+          {t('brand.tagline')}
         </span>
       </Link>
 
@@ -63,8 +102,9 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
               className="oryx-nav-group-label flex w-full items-center justify-between text-start"
               onClick={() => isCollapsible && setExpanded((p) => ({ ...p, [group.key]: !isOpen }))}
               style={{ background: 'none', border: 0, cursor: isCollapsible ? 'pointer' : 'default' }}
+              title={collapsed ? t(group.labelKey) : undefined}
             >
-              <span>{t(group.labelKey)}</span>
+              <span className="oryx-nav-group-label__text">{t(group.labelKey)}</span>
               {isCollapsible ? (
                 <Icon
                   name="chevronDown"
@@ -73,9 +113,10 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
                 />
               ) : null}
             </button>
-            {isOpen
+            {isOpen || collapsed
               ? items.map((item) => {
                   const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                  const label = t(item.labelKey);
                   return (
                     <Link
                       key={item.key}
@@ -83,9 +124,13 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
                       onClick={onNavigate}
                       className="oryx-nav-item"
                       aria-current={active ? 'page' : undefined}
+                      // In icon-only mode the label is hidden, so it is exposed
+                      // as a tooltip and as the accessible name.
+                      title={collapsed ? label : undefined}
+                      aria-label={collapsed ? label : undefined}
                     >
                       <Icon name={item.icon} size={16} />
-                      <span className="min-w-0 flex-1 truncate">{t(item.labelKey)}</span>
+                      <span className="oryx-nav-item__label min-w-0 flex-1 truncate">{label}</span>
                       {item.planned ? (
                         <Badge tone="neutral">
                           <span className="text-[10px]">{t('nav.planned')}</span>
@@ -98,26 +143,25 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
           </div>
         );
       })}
+
+      {/* Always-visible sign-out, pinned to the bottom of the rail. It sits
+          outside the nav groups so a collapsed group cannot hide it. */}
+      <div className="oryx-sidebar__footer">
+        <button
+          type="button"
+          className="oryx-nav-item oryx-nav-item--logout"
+          onClick={() => void onLogout()}
+          disabled={signingOut}
+          data-testid="sidebar-logout"
+          title={collapsed ? t('auth.logout') : undefined}
+          aria-label={collapsed ? t('auth.logout') : undefined}
+        >
+          <Icon name="logout" size={16} />
+          <span className="oryx-nav-item__label min-w-0 flex-1 truncate">{t('auth.logout')}</span>
+        </button>
+      </div>
     </aside>
   );
 }
 
-function BrandMark() {
-  return (
-    <span
-      aria-hidden="true"
-      className="grid h-9 w-9 flex-none place-items-center rounded-[10px]"
-      style={{
-        background: 'linear-gradient(145deg, var(--gold-soft), var(--gold-deep))',
-        color: 'var(--text-inverse)',
-      }}
-    >
-      {/* Geometric monogram placeholder: the official logo asset is not in the
-          repository yet, so no third-party mark is reproduced here. */}
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M12 3 21 12 12 21 3 12Z" stroke="currentColor" strokeWidth="1.7" />
-        <circle cx="12" cy="12" r="3.1" stroke="currentColor" strokeWidth="1.7" />
-      </svg>
-    </span>
-  );
-}
+export { COLLAPSE_KEY };

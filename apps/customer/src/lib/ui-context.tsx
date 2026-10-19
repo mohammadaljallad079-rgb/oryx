@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -51,6 +52,12 @@ export function UiProvider({
 }) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale);
   const [theme, setThemeState] = useState<Theme>(initialTheme);
+  // The layout's bootstrap script already put the stored preference on <html>
+  // before the first paint, and the server rendered the defaults. The effects
+  // below therefore skip their first (hydration) pass entirely, so they cannot
+  // overwrite the already-correct attributes or persist the server defaults
+  // over the stored values. From the second pass on they reflect real changes.
+  const mounted = useRef(false);
 
   useEffect(() => {
     const storedLocale = window.localStorage.getItem(LOCALE_KEY);
@@ -60,6 +67,7 @@ export function UiProvider({
   }, []);
 
   useEffect(() => {
+    if (!mounted.current) return;
     const dir = locale === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.setAttribute('data-dir', dir);
     document.documentElement.setAttribute('lang', locale);
@@ -68,10 +76,17 @@ export function UiProvider({
   }, [locale]);
 
   useEffect(() => {
+    if (!mounted.current) return;
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.style.colorScheme = theme;
     window.localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
+
+  // Declared last so every effect above sees `mounted.current === false` on the
+  // hydration pass.
+  useEffect(() => {
+    mounted.current = true;
+  }, []);
 
   const setLocale = useCallback((next: Locale) => setLocaleState(next), []);
   const setTheme = useCallback((next: Theme) => setThemeState(next), []);

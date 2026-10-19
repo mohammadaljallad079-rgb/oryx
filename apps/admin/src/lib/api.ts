@@ -78,7 +78,18 @@ import type {
   WarehouseDto,
 } from '@oryx/shared';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api';
+/**
+ * Base URL every admin request is built from. Callers append `/v1/<path>`.
+ *
+ * A value that already ends in `/v1` would produce `/api/v1/v1/auth/login` — a
+ * 404 that reads like a routing bug. That is a pure configuration mistake (the
+ * documented value is the origin plus `/api`), so it is normalised here rather
+ * than left to fail at runtime. Trailing slashes are trimmed for the same
+ * reason.
+ */
+const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api')
+  .replace(/\/+$/, '')
+  .replace(/\/v1$/, '');
 
 /**
  * Only non-secret UI preferences are persisted.
@@ -136,6 +147,13 @@ let sessionHinted = false;
 /** Subscribers notified when the session is lost, so the UI can redirect. */
 const sessionLossListeners = new Set<() => void>();
 
+/**
+ * Subscribers notified when the API is unreachable but the session may still be
+ * valid. Distinct from session loss on purpose: a transient outage must not
+ * redirect the user to sign-in.
+ */
+const offlineListeners = new Set<() => void>();
+
 export const tokenStore = {
   get access(): string | null {
     return accessToken;
@@ -187,6 +205,18 @@ export const tokenStore = {
     accessToken = null;
     for (const listener of sessionLossListeners) listener();
   },
+  /**
+   * Report a transient outage. Unlike `notifySessionLost` this deliberately
+   * keeps the in-memory token and the session hint: the session is probably
+   * still valid and the next successful request should continue seamlessly.
+   */
+  onOffline(listener: () => void): () => void {
+    offlineListeners.add(listener);
+    return () => offlineListeners.delete(listener);
+  },
+  notifyOffline() {
+    for (const listener of offlineListeners) listener();
+  },
 };
 
 interface RequestOptions {
@@ -204,16 +234,34 @@ interface RequestOptions {
  * Every caller that needs a new access token awaits the same promise, so
  * concurrent 401s across widgets produce exactly one rotation request. This is
  * what prevents a refresh storm and the token-family revocation it would cause.
+ *
+ * The result distinguishes three outcomes:
+ *   - `ok`          a new access token was obtained;
+ *   - `expired`     the API rejected the refresh token (401/403), so the
+ *                   session really is over and the shell should sign out;
+ *   - `unavailable` the refresh could not be attempted or answered — an offline
+ *                   network, a timeout, a 5xx or a 429. The session may still be
+ *                   perfectly valid, so it must NOT be torn down.
+ *
+ * Collapsing `unavailable` into `expired` was the defect behind the iPad
+ * incident: one transient failure signed the user out and, because the stale
+ * HttpOnly cookie could not be cleared from script, the guard then blocked
+ * every subsequent sign-in.
  */
-let refreshInFlight: Promise<boolean> | null = null;
+export type RefreshOutcome = 'ok' | 'expired' | 'unavailable';
 
-/**
- * Rotate the session using the HttpOnly refresh cookie. The CSRF header must
- * accompany the request, which is why it is read from the readable cookie.
- */
-async function refreshSession(): Promise<boolean> {
+let refreshInFlight: Promise<RefreshOutcome> | null = null;
+
+/** Only an explicit rejection by the API means the session is over. */
+function isTerminalRefreshStatus(status: number): boolean {
+  return status === 401 || status === 403;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function refreshSession(): Promise<RefreshOutcome> {
   if (!refreshInFlight) {
-    refreshInFlight = (async () => {
+    refreshInFlight = (async (): Promise<RefreshOutcome> => {
       try {
         const csrf = readCookie(CSRF_COOKIE);
         const res = await fetch(`${API_BASE}/v1/auth/refresh`, {
@@ -226,15 +274,20 @@ async function refreshSession(): Promise<boolean> {
           },
           body: JSON.stringify({}),
         });
-        if (!res.ok) {
-          tokenStore.clear();
-          return false;
+        if (res.ok) {
+          const data = (await res.json()) as LoginResponse;
+          tokenStore.setAccessToken(data.accessToken);
+          return 'ok';
         }
-        const data = (await res.json()) as LoginResponse;
-        tokenStore.setAccessToken(data.accessToken);
-        return true;
+        if (isTerminalRefreshStatus(res.status)) {
+          tokenStore.clear();
+          return 'expired';
+        }
+        // 5xx, 429 or any other unexpected status: retryable, not terminal.
+        return 'unavailable';
       } catch {
-        return false;
+        // A thrown fetch is a network/DNS/offline failure, never a rejection.
+        return 'unavailable';
       } finally {
         refreshInFlight = null;
       }
@@ -243,15 +296,26 @@ async function refreshSession(): Promise<boolean> {
   return refreshInFlight;
 }
 
+/** Bounded retries so a brief outage does not look like a lost session. */
+const RESTORE_ATTEMPTS = 3;
+const RESTORE_BACKOFF_MS = 600;
+
 /**
  * Restore a session after a reload.
  *
- * Called once when the app mounts. It performs a single refresh so the tab has
- * an access token again; a failure simply means there is no session.
+ * Called once when the app mounts. A `401`/`403` means there is genuinely no
+ * session; a transient failure is retried a bounded number of times before it
+ * is reported, so a flaky network at boot does not bounce the user to sign-in.
  */
-export async function restoreSession(): Promise<boolean> {
-  if (accessToken) return true;
-  return refreshSession();
+export async function restoreSession(): Promise<RefreshOutcome> {
+  if (accessToken) return 'ok';
+  let outcome: RefreshOutcome = 'unavailable';
+  for (let attempt = 0; attempt < RESTORE_ATTEMPTS; attempt += 1) {
+    outcome = await refreshSession();
+    if (outcome !== 'unavailable') return outcome;
+    if (attempt < RESTORE_ATTEMPTS - 1) await sleep(RESTORE_BACKOFF_MS * (attempt + 1));
+  }
+  return outcome;
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -281,10 +345,17 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   });
 
   if (res.status === 401 && !options.anonymous && !options.noRetry) {
-    const refreshed = await refreshSession();
-    if (refreshed) return request<T>(path, { ...options, noRetry: true });
-    // The session is genuinely gone: tell the shell so it can redirect.
-    tokenStore.notifySessionLost();
+    const outcome = await refreshSession();
+    if (outcome === 'ok') return request<T>(path, { ...options, noRetry: true });
+    if (outcome === 'expired') {
+      // The API explicitly rejected the refresh token: the session is gone.
+      tokenStore.notifySessionLost();
+    } else {
+      // Transient failure. The session may still be valid, so surface the
+      // problem instead of signing the user out. `noRetry` prevents a loop.
+      tokenStore.notifyOffline();
+      throw new ApiError(503, 'network.unavailable', 'The service is temporarily unavailable.');
+    }
   }
 
   if (!res.ok) {
@@ -353,6 +424,8 @@ export const api = {
     fullNameAr: string;
     password: string;
   }) => request<LoginResult>('/auth/accept-invitation', { method: 'POST', body, anonymous: true }),
+  changePassword: (body: { currentPassword: string; newPassword: string }) =>
+    request<{ ok: boolean }>('/auth/change-password', { method: 'POST', body }),
 
   // -------------------------------------------------------------------- MFA
   mfaStatus: () =>

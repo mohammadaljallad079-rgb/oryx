@@ -31,6 +31,24 @@ export const RequireModule = (moduleKey: string) => SetMetadata(MODULE_KEY, modu
 export const CUSTOMER_PLANE_KEY = 'oryx:customerPlane';
 
 /**
+ * Marks a route as exempt from the CSRF double-submit check.
+ *
+ * Reserved for session-*establishing* endpoints (credential login, MFA
+ * completion, invitation acceptance, credential recovery). Those requests carry
+ * no ambient authority to abuse: the body holds the credential and the refresh
+ * cookie grants nothing on its own. The check must not gate them, because a
+ * stale `oryx_rt` cookie left over from a previous session is HttpOnly — page
+ * script cannot delete it — and `CsrfGuard` would then reject every subsequent
+ * sign-in with a 403, locking the user out of the device permanently.
+ *
+ * Never apply this to a route that authenticates *by* cookie (refresh, logout,
+ * logout-all, change-password), where the double-submit check is the only thing
+ * preventing a cross-site forced action.
+ */
+export const CSRF_EXEMPT_KEY = 'oryx:csrfExempt';
+export const CsrfExempt = () => SetMetadata(CSRF_EXEMPT_KEY, true);
+
+/**
  * Marks a route as belonging to the customer identity plane.
  *
  * The global staff guards (`CsrfGuard`, `PrincipalGuard`, `PermissionsGuard`,

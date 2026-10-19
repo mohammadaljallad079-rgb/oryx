@@ -81,7 +81,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     bootstrapped.current = true;
     (async () => {
       try {
-        if (await api.restore()) await refreshProfile();
+        // Only a confirmed session loads the profile. `unavailable` means the
+        // network was down, not that the session ended, so the user is left
+        // signed in for the next successful request.
+        if ((await api.restore()) === 'ok') await refreshProfile();
       } catch {
         // A stale profile is not a reason to block the app; stay signed out.
       } finally {

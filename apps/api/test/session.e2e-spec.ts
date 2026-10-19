@@ -181,6 +181,46 @@ describe('ORYX API session lifecycle (e2e)', () => {
       });
       expect(logged).not.toBeNull();
     });
+
+    it('keeps the CSRF token stable across a refresh so a concurrent tab is not rejected', async () => {
+      // Regression: rotating the CSRF cookie on every refresh made the loser of
+      // a two-tab race present a header that no longer matched the rotated
+      // cookie. CsrfGuard then answered 403 and the tab silently lost its
+      // session. The double-submit token must survive rotation.
+      const jar = await login();
+      const before = jar.get('oryx_csrf')!;
+
+      const rotated = await refresh(jar);
+      expect(rotated.status).toBe(200);
+      const after = jar.get('oryx_csrf');
+
+      // Same token value, so a request built before the rotation still matches.
+      expect(after).toBe(before);
+
+      // The header that the racing tab had already captured must still verify.
+      const replay = await jarCall<{ accessToken?: string }>(ctx.base, '/auth/refresh', {
+        method: 'POST',
+        body: {},
+        jar,
+        csrf: before,
+      });
+      expect(replay.status).toBe(200);
+      expect(replay.body.accessToken).toBeTruthy();
+    });
+
+    it('still rejects a genuinely wrong CSRF token after a refresh', async () => {
+      // The guard must not be weakened by the stability fix.
+      const jar = await login();
+      await refresh(jar);
+      const bad = await jarCall<{ code?: string }>(ctx.base, '/auth/refresh', {
+        method: 'POST',
+        body: {},
+        jar,
+        csrf: 'definitely-not-the-real-token',
+      });
+      expect(bad.status).toBe(403);
+      expect(bad.body.code).toBe('auth.csrf_token_invalid');
+    });
   });
 
   describe('reuse detection', () => {

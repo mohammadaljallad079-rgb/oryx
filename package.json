@@ -13,6 +13,7 @@
     "db:migrate:dev": "pnpm --filter @oryx/database migrate:dev",
     "db:seed": "pnpm --filter @oryx/database seed",
     "db:reset": "pnpm --filter @oryx/database reset",
+    "provision:super-admin": "node scripts/provision-super-admin.mjs",
     "build": "pnpm -r --filter @oryx/shared build && pnpm --filter @oryx/database build && pnpm --filter @oryx/api build && pnpm --filter @oryx/admin build && pnpm --filter @oryx/customer build",
     "dev:api": "pnpm --filter @oryx/api dev",
     "dev:admin": "pnpm --filter @oryx/admin dev",

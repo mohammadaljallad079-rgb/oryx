@@ -64,6 +64,18 @@ export class AvailabilityQueryDto {
   bufferMinutes?: number;
 }
 
+export class CalendarQueryDto {
+  @IsDateString()
+  from!: string;
+
+  @IsDateString()
+  to!: string;
+
+  @IsOptional()
+  @IsString()
+  resourceId?: string;
+}
+
 export class CreateBookingDto {
   @IsString()
   @IsIn(BOOKING_TYPES)

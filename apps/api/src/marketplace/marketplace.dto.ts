@@ -15,6 +15,8 @@ import {
   ValidateNested,
 } from 'class-validator';
 
+import { TrimString } from '../common/transformers';
+
 // ------------------------------------------------------------- applications
 
 export class ProviderApplicationDto {
@@ -28,6 +30,7 @@ export class ProviderApplicationDto {
   @MaxLength(160)
   legalNameAr!: string;
 
+  @TrimString()
   @IsEmail()
   @MaxLength(200)
   contactEmail!: string;
@@ -204,6 +207,7 @@ export class UpdateProviderProfileDto {
   phone?: string;
 
   @IsOptional()
+  @TrimString()
   @IsEmail()
   @MaxLength(200)
   email?: string;

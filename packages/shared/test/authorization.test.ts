@@ -59,6 +59,58 @@ describe('effective permission resolution', () => {
     expect(result.permissions).toEqual(['platform.company.create']);
   });
 
+  it('grants a platform principal the company-scope permissions of its tenant context', () => {
+    const principal: Principal = {
+      kind: 'PLATFORM',
+      userId: 'u1',
+      grantedPermissions: ['platform.company.create', 'company.read', 'erp.dashboard.read'],
+      company: {
+        companyId: 'c1',
+        licensedModuleKeys: ['dashboard'],
+        branchIds: [],
+        membershipActive: true,
+      },
+    };
+    const result = resolveEffectivePermissions(principal);
+    expect(result.permissions).toContain('platform.company.create');
+    expect(result.permissions).toContain('company.read');
+    expect(result.permissions).toContain('erp.dashboard.read');
+  });
+
+  it('still suppresses unlicensed modules for a platform principal in tenant context', () => {
+    const principal: Principal = {
+      kind: 'PLATFORM',
+      userId: 'u1',
+      grantedPermissions: ['erp.accounting.read', 'erp.hr.read', 'erp.dashboard.read'],
+      company: {
+        companyId: 'c1',
+        licensedModuleKeys: ['dashboard'],
+        branchIds: [],
+        membershipActive: true,
+      },
+    };
+    const result = resolveEffectivePermissions(principal);
+    expect(result.permissions).toContain('erp.dashboard.read');
+    expect(result.permissions).not.toContain('erp.accounting.read');
+    expect(result.suppressedByEntitlement).toContain('erp.accounting.read');
+  });
+
+  it('does not widen a platform principal to company permissions without an active membership', () => {
+    const principal: Principal = {
+      kind: 'PLATFORM',
+      userId: 'u1',
+      grantedPermissions: ['platform.company.create', 'company.read'],
+      company: {
+        companyId: 'c1',
+        licensedModuleKeys: ['dashboard'],
+        branchIds: [],
+        membershipActive: false,
+      },
+    };
+    const result = resolveEffectivePermissions(principal);
+    expect(result.permissions).toEqual(['platform.company.create']);
+  });
+
   it('suppresses permissions for modules the plan does not license', () => {
     const principal: Principal = {
       kind: 'COMPANY',

@@ -10,6 +10,8 @@ import {
   MinLength,
 } from 'class-validator';
 
+import { TrimString } from '../common/transformers';
+
 export class CreateRoleDto {
   @IsString()
   @MinLength(2)
@@ -62,6 +64,7 @@ export class UpdateRoleDto {
 }
 
 export class InviteUserDto {
+  @TrimString()
   @IsEmail()
   email!: string;
 

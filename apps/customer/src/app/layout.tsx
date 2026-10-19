@@ -19,14 +19,24 @@ export const viewport: Viewport = {
 };
 
 /**
+ * Applies the stored theme/locale to <html> before the first paint.
+ *
+ * Without this the server's dark default is painted first and the stored
+ * preference is applied only after hydration, so a light-theme visitor sees a
+ * dark flash on every navigation. Running it as a blocking inline script also
+ * means `data-theme` is already correct when React hydrates.
+ */
+const PREFERENCE_BOOTSTRAP = `(function(){try{var d=document.documentElement;var t=localStorage.getItem('oryx.customer.theme');if(t==='light'||t==='dark'){d.setAttribute('data-theme',t);d.style.colorScheme=t;}var l=localStorage.getItem('oryx.customer.locale');if(l==='ar'||l==='en'){d.setAttribute('lang',l);d.setAttribute('data-dir',l==='ar'?'rtl':'ltr');d.dir=l==='ar'?'rtl':'ltr';}}catch(e){}})();`;
+
+/**
  * The site is rendered Arabic RTL dark by default — the approved identity — and
- * the client providers apply the visitor's stored preference immediately after
- * hydration.
+ * the bootstrap script then applies the visitor's stored preference.
  */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ar" dir="rtl" data-theme="dark" data-dir="rtl" suppressHydrationWarning>
       <body>
+        <script dangerouslySetInnerHTML={{ __html: PREFERENCE_BOOTSTRAP }} />
         <UiProvider dictionaries={dictionaries} initialLocale="ar" initialTheme="dark">
           <CustomerAuthProvider>
             <div className="oryx-page">

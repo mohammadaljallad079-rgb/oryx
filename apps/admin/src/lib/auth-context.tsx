@@ -68,13 +68,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * case we attempt one cookie-based restore before concluding there is no
    * session. `api.me()` itself also retries through the refresh cookie on a 401,
    * so a stale in-memory token is recovered transparently.
+   *
+   * A transient failure (`unavailable`) is NOT a lost session. Only an explicit
+   * `expired` outcome, or a 401/403 from `me`, ends the session; anything else
+   * leaves the user signed in and retries on the next request. Treating an
+   * outage as a sign-out is what logged the iPad out.
    */
   const loadSession = useCallback(async () => {
     try {
       if (!tokenStore.access) {
-        const restored = await restoreSession();
-        if (!restored) {
+        const outcome = await restoreSession();
+        if (outcome === 'expired') {
           setState((p) => ({ ...p, ready: true, user: null, permissions: [], memberships: [] }));
+          return;
+        }
+        if (outcome === 'unavailable') {
+          // Keep whatever session state we already had; do not sign out.
+          setState((p) => ({ ...p, ready: true }));
           return;
         }
       }
@@ -100,7 +110,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         branchId: me.context.branchId ?? p.branchId,
         supportSessionCompanyId: me.context.supportSessionCompanyId,
       }));
-    } catch {
+    } catch (error) {
+      // A transient API failure must not end the session. Only an explicit
+      // authentication rejection does.
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        tokenStore.clear();
+        setState((p) => ({ ...p, ready: true, user: null, permissions: [], memberships: [] }));
+        return;
+      }
+      if (error instanceof ApiError && error.code === 'network.unavailable') {
+        setState((p) => ({ ...p, ready: true }));
+        return;
+      }
       tokenStore.clear();
       setState((p) => ({ ...p, ready: true, user: null, permissions: [], memberships: [] }));
     }
@@ -163,6 +184,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
+      // Drop any leftover session first. A stale in-memory token or a stale
+      // `oryx_csrf` cookie from a previous session must not be presented to the
+      // login endpoint; the API clears its own cookies on a successful login.
+      tokenStore.clear();
       const res = await api.login(email, password);
       if ('mfaRequired' in res && res.mfaRequired) {
         // Password accepted but a second factor is required: no session yet.

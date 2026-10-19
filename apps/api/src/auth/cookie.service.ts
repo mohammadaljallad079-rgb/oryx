@@ -108,8 +108,20 @@ export class CookieService {
     };
   }
 
-  setSession(res: Response, refreshToken: string, ttlSeconds: number): string {
-    const csrfToken = randomBytes(32).toString('base64url');
+  /**
+   * Attach the session cookies.
+   *
+   * `existingCsrf` keeps the double-submit token stable across a refresh. A
+   * rotated token would break any request that was built before the rotation
+   * landed — two tabs refreshing at once is the everyday case: the loser's
+   * request still carries the pre-rotation header while the cookie jar has
+   * already absorbed the new cookie, so `CsrfGuard` rejects it with a 403 and
+   * the tab silently loses its session. The CSRF token is not a credential and
+   * gains nothing from per-request rotation, so it is preserved for the life of
+   * the session and only minted fresh at login.
+   */
+  setSession(res: Response, refreshToken: string, ttlSeconds: number, existingCsrf?: string): string {
+    const csrfToken = existingCsrf && existingCsrf.length > 0 ? existingCsrf : randomBytes(32).toString('base64url');
     res.cookie(REFRESH_COOKIE, refreshToken, this.refreshCookieOptions(ttlSeconds));
     res.cookie(CSRF_COOKIE, csrfToken, this.csrfCookieOptions(ttlSeconds));
     return csrfToken;
@@ -126,11 +138,17 @@ export class CookieService {
     return cookies?.[REFRESH_COOKIE];
   }
 
+  /** The readable CSRF cookie, used to keep the double-submit token stable. */
+  readCsrfToken(req: Request): string | undefined {
+    const cookies = (req as Request & { cookies?: Record<string, string> }).cookies;
+    return cookies?.[CSRF_COOKIE];
+  }
+
   // -------------------------------------------------------------- customer plane
 
   /** HttpOnly refresh cookie for the customer website and mobile web. */
-  setCustomerSession(res: Response, refreshToken: string, ttlSeconds: number): string {
-    const csrfToken = randomBytes(32).toString('base64url');
+  setCustomerSession(res: Response, refreshToken: string, ttlSeconds: number, existingCsrf?: string): string {
+    const csrfToken = existingCsrf && existingCsrf.length > 0 ? existingCsrf : randomBytes(32).toString('base64url');
     res.cookie(CUSTOMER_REFRESH_COOKIE, refreshToken, {
       ...this.refreshCookieOptions(ttlSeconds),
       path: CUSTOMER_REFRESH_COOKIE_PATH,
@@ -150,6 +168,12 @@ export class CookieService {
   readCustomerRefreshToken(req: Request): string | undefined {
     const cookies = (req as Request & { cookies?: Record<string, string> }).cookies;
     return cookies?.[CUSTOMER_REFRESH_COOKIE];
+  }
+
+  /** The readable customer CSRF cookie, kept stable across a refresh. */
+  readCustomerCsrfToken(req: Request): string | undefined {
+    const cookies = (req as Request & { cookies?: Record<string, string> }).cookies;
+    return cookies?.[CUSTOMER_CSRF_COOKIE];
   }
 
   verifyCustomerCsrf(req: Request): boolean {

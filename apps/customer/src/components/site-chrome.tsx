@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
+import { BrandLogo } from '@/components/brand-logo';
 
 /**
  * Public site header.
@@ -29,14 +30,9 @@ export function SiteHeader() {
     <header className="oryx-header">
       <div className="oryx-container oryx-header-inner">
         <Link href="/" className="oryx-brand" aria-label="ORYX">
-          <span className="oryx-brand-mark" aria-hidden>
-            O
-          </span>
-          <span>
-            ORYX
-            <span className="oryx-muted" style={{ display: 'block', fontSize: 10, letterSpacing: '0.12em' }}>
-              {t('brand.tagline')}
-            </span>
+          <BrandLogo height={30} />
+          <span className="oryx-muted" style={{ display: 'block', fontSize: 10, letterSpacing: '0.12em' }}>
+            {t('brand.tagline')}
           </span>
         </Link>
 

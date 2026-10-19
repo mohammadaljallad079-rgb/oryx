@@ -4,9 +4,9 @@
  * The website can rely on an HttpOnly refresh cookie; a native client cannot.
  * The API therefore exposes the refresh token in the response body **only** when
  * the request carries `x-oryx-client: mobile` (see `CustomerAuthController`), and
- * this client is the only place that asks for it. The token is written straight
- * to the platform keychain through `expo-secure-store` — never to
- * `AsyncStorage`, never to a plain file, and never logged.
+ * this client is the only place that asks for it. The token is written through
+ * `session-storage.ts` — the platform keychain on a device, `localStorage` in a
+ * browser — never to `AsyncStorage`, never to a plain file, and never logged.
  *
  * The short-lived access token is kept in memory only, so a process restart
  * re-acquires it by rotating the stored refresh token.
@@ -16,7 +16,8 @@
  */
 
 import Constants from 'expo-constants';
-import * as SecureStore from 'expo-secure-store';
+
+import { deleteSecret, getSecret, readCsrfToken, setSecret } from './session-storage';
 
 const API_BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
@@ -171,25 +172,23 @@ export const session = {
  *
  * `WHEN_UNLOCKED_THIS_DEVICE_ONLY` keeps the token out of iCloud Keychain backups
  * and Android auto-backup, so a restored device does not silently inherit a
- * session.
+ * session. The browser fallback lives in `session-storage.ts`.
  */
 async function storeRefreshToken(token: string): Promise<void> {
   cachedRefreshToken = token;
-  await SecureStore.setItemAsync(REFRESH_KEY, token, {
-    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-  });
+  await setSecret(REFRESH_KEY, token);
 }
 
 async function readRefreshToken(): Promise<string | null> {
   if (cachedRefreshToken) return cachedRefreshToken;
-  cachedRefreshToken = await SecureStore.getItemAsync(REFRESH_KEY);
+  cachedRefreshToken = await getSecret(REFRESH_KEY);
   return cachedRefreshToken;
 }
 
 async function clearSession(): Promise<void> {
   accessToken = null;
   cachedRefreshToken = null;
-  await SecureStore.deleteItemAsync(REFRESH_KEY);
+  await deleteSecret(REFRESH_KEY);
   notify();
 }
 
@@ -214,30 +213,49 @@ interface RequestOptions {
   noRetry?: boolean;
 }
 
-let refreshInFlight: Promise<boolean> | null = null;
+/**
+ * Single-flight refresh with a three-state outcome.
+ *
+ * `unavailable` (offline, timeout, 5xx) is deliberately distinct from `expired`
+ * (the API rejected the token). Collapsing the two signed a user out on a
+ * transient failure — the defect behind the iPad incident.
+ */
+type RefreshOutcome = 'ok' | 'expired' | 'unavailable';
+
+let refreshInFlight: Promise<RefreshOutcome> | null = null;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Rotate the session; concurrent 401s share one rotation. */
-async function refreshSession(): Promise<boolean> {
+async function refreshSession(): Promise<RefreshOutcome> {
   if (!refreshInFlight) {
-    refreshInFlight = (async () => {
+    refreshInFlight = (async (): Promise<RefreshOutcome> => {
       try {
         const refreshToken = await readRefreshToken();
-        if (!refreshToken) return false;
+        if (!refreshToken) return 'expired';
+        const csrf = readCsrfToken();
         const res = await fetch(`${API_BASE}/v1/customer/auth/refresh`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', [CLIENT_HEADER]: CLIENT_KIND },
+          headers: {
+            'Content-Type': 'application/json',
+            [CLIENT_HEADER]: CLIENT_KIND,
+            ...(csrf ? { 'x-oryx-csrf': csrf } : {}),
+          },
           body: JSON.stringify({ refreshToken }),
         });
-        if (!res.ok) {
-          await clearSession();
-          return false;
+        if (res.ok) {
+          const data = (await res.json()) as SessionResponse;
+          if (data.refreshToken) await storeRefreshToken(data.refreshToken);
+          adoptSession(data);
+          return 'ok';
         }
-        const data = (await res.json()) as SessionResponse;
-        if (data.refreshToken) await storeRefreshToken(data.refreshToken);
-        adoptSession(data);
-        return true;
+        if (res.status === 401 || res.status === 403) {
+          await clearSession();
+          return 'expired';
+        }
+        return 'unavailable';
       } catch {
-        return false;
+        return 'unavailable';
       } finally {
         refreshInFlight = null;
       }
@@ -246,11 +264,18 @@ async function refreshSession(): Promise<boolean> {
   return refreshInFlight;
 }
 
+const RESTORE_ATTEMPTS = 3;
+const RESTORE_BACKOFF_MS = 600;
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? 'GET';
   const headers: Record<string, string> = { [CLIENT_HEADER]: CLIENT_KIND };
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (!options.anonymous && accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  // No-op on a device; in a browser this mirrors the customer website's
+  // double-submit so a shared origin cannot break an unsafe request.
+  const csrf = readCsrfToken();
+  if (csrf) headers['x-oryx-csrf'] = csrf;
 
   const res = await fetch(`${API_BASE}/v1${path}`, {
     method,
@@ -259,8 +284,14 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   });
 
   if (res.status === 401 && !options.anonymous && !options.noRetry) {
-    if (await refreshSession()) return request<T>(path, { ...options, noRetry: true });
-    await clearSession();
+    const outcome = await refreshSession();
+    if (outcome === 'ok') return request<T>(path, { ...options, noRetry: true });
+    if (outcome === 'expired') {
+      await clearSession();
+    } else {
+      // Transient failure: keep the stored session and report an outage.
+      throw new ApiError(503, 'network.unavailable', 'The service is temporarily unavailable.');
+    }
   }
 
   if (!res.ok) {
@@ -322,10 +353,18 @@ export const api = {
    *
    * A stored refresh token is exchanged for a new access token; nothing else is
    * trusted, so an expired or revoked token simply leaves the app signed out.
+   * A transient failure is retried a bounded number of times first, so a flaky
+   * network at launch does not sign the user out.
    */
-  async restore(): Promise<boolean> {
-    if (accessToken) return true;
-    return refreshSession();
+  async restore(): Promise<RefreshOutcome> {
+    if (accessToken) return 'ok';
+    let outcome: RefreshOutcome = 'unavailable';
+    for (let attempt = 0; attempt < RESTORE_ATTEMPTS; attempt += 1) {
+      outcome = await refreshSession();
+      if (outcome !== 'unavailable') return outcome;
+      if (attempt < RESTORE_ATTEMPTS - 1) await sleep(RESTORE_BACKOFF_MS * (attempt + 1));
+    }
+    return outcome;
   },
 
   async logout() {

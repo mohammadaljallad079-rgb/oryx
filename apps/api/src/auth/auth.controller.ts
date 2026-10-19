@@ -22,7 +22,7 @@ import { CookieService } from './cookie.service';
 import { AuditService } from '../common/audit.service';
 import { PrismaService } from '../common/prisma.service';
 import { EntitlementService } from '../common/entitlement.service';
-import { CurrentPrincipal, Public, type RequestPrincipal } from './auth.decorators';
+import { CsrfExempt, CurrentPrincipal, Public, type RequestPrincipal } from './auth.decorators';
 import {
   AcceptInvitationDto,
   ChangePasswordDto,
@@ -69,9 +69,10 @@ export class AuthController {
     res: Response,
     session: T,
     refreshTtl: number,
+    existingCsrf?: string,
   ): Omit<T, 'refreshToken'> {
     if (session.refreshToken) {
-      session.csrfToken = this.cookies.setSession(res, session.refreshToken, refreshTtl);
+      session.csrfToken = this.cookies.setSession(res, session.refreshToken, refreshTtl, existingCsrf);
       delete session.refreshToken;
     }
     return session as Omit<T, 'refreshToken'>;
@@ -82,6 +83,7 @@ export class AuthController {
   }
 
   @Public()
+  @CsrfExempt()
   @Throttle({ default: { limit: Number(process.env.AUTH_THROTTLE_LIMIT ?? 10), ttl: 60_000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -98,6 +100,7 @@ export class AuthController {
   }
 
   @Public()
+  @CsrfExempt()
   @Throttle({ default: { limit: Number(process.env.AUTH_THROTTLE_LIMIT ?? 10), ttl: 60_000 } })
   @Post('mfa/verify-login')
   @HttpCode(HttpStatus.OK)
@@ -121,10 +124,13 @@ export class AuthController {
     const token = this.cookies.readRefreshToken(req as never) ?? dto.refreshToken;
     if (!token) throw unauthorized(ERROR_CODES.AUTH_TOKEN_INVALID, 'No refresh token was presented.');
     const session = await this.auth.refresh(token, meta(req));
-    return this.completeLogin(res, session, this.refreshTtlSeconds());
+    // Carry the caller's CSRF token forward so a concurrent refresh in another
+    // tab is not rejected by the double-submit check.
+    return this.completeLogin(res, session, this.refreshTtlSeconds(), this.cookies.readCsrfToken(req as never));
   }
 
   @Public()
+  @CsrfExempt()
   @Throttle({ default: { limit: Number(process.env.INVITATION_THROTTLE_LIMIT ?? 20), ttl: 60_000 } })
   @Post('accept-invitation')
   @HttpCode(HttpStatus.OK)
