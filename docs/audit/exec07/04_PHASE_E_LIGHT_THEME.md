@@ -23,13 +23,16 @@ establish what actually existed on the remote before touching anything.
 | PR #7 | open, draft, head `b3c9a71`, base `audit/execution-05-verification` | GitHub REST `pulls/7` |
 | PR #6 | open, head `604e36a`, base `main` | GitHub REST `pulls/6` |
 | Unpushed work recoverable from the sandbox | **none** | see below |
+| Dangling stash from the crashed session | `aa67f19` ("exec07-phase-e-light-fix"), parented on `b3c9a71` | `git fsck --lost-found` |
+| Content unique to that stash | **none** — its `globals.css` and `tokens.ts` blobs are byte-identical to the commit below, and it holds no file the commit lacks | `git rev-parse aa67f19:<path>` vs `HEAD:<path>`, `git diff --name-status aa67f19 HEAD` |
 
 **No lost unpushed commit was recovered, and none is claimed.** The crashed
-sandbox left no reachable commit that is absent from `origin`. The Phase E
-working-tree edits that did survive are the light-theme changes in
-`apps/customer/src/app/globals.css` and `packages/shared/src/tokens.ts`; the
-`after` captures from the crashed session were rebuilt here rather than trusted,
-because a rebuild was needed to make them reproducible (section 4).
+sandbox left no reachable commit that is absent from `origin`. Its uncommitted
+theme edits survived in the working tree and are committed here as `5920895`
+(the tree of dangling stash `aa67f19` is a strict subset of that commit, so
+nothing it held was dropped). The `after` captures from the crashed session were
+rebuilt rather than trusted, because a rebuild was needed to make them
+reproducible (section 4).
 
 The Execution 07 work that was already pushed — the premium design (Phase C),
 the photography and category fix (Phase D) — is present and untouched on the
