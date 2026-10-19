@@ -36,6 +36,7 @@ changes to be pushed to the Execution 05 branch.
 | `07_LIVE_PREVIEW_AND_CREDENTIALS.md` | Working HTTPS preview links and demo credentials |
 | `08_VISUAL_IDENTITY_AND_PREVIEW_VERIFICATION.md` | Recovery state, visual identity alignment, externally re-verified preview and the CORS build hazard |
 | `exec07/01_EXECUTION_07_REPORT.md` | Execution 07 premium web experience, responsive hardening, defect 18 and the corrected screenshot comparison |
+| `exec07/04_PHASE_E_LIGHT_THEME.md` | Phase E light-theme correction, the four defects fixed, the dark-integrity proof and the five-surface before/after evidence |
 
 ## Headline result
 

@@ -32,8 +32,20 @@
   --text-inverse: #00121f;
   --navy: #00162b;
   --gold: #d4af37;
+  --gold-hover: #e8c766;
   --gold-soft: #e8c766;
   --gold-deep: #a9861f;
+  /*
+   * Gold is overloaded in a design system: it is both an accent *text* colour
+   * (which must be dark on a light surface) and a metallic *fill* (which must
+   * be light enough for dark ink). One token cannot satisfy both, so the fill
+   * ramp is separate. The dark values reproduce the previous
+   * `gold-soft → gold` and `gold → gold-deep` gradients exactly.
+   */
+  --gold-fill-from: #e8c766;
+  --gold-fill-to: #d4af37;
+  --gold-fill-hover-from: #d4af37;
+  --gold-fill-hover-to: #a9861f;
   --success: #3ecf8e;
   --warning: #f0b429;
   --danger: #f2555a;
@@ -44,38 +56,123 @@
     rgba(0, 15, 30, 0.72) 55%,
     rgba(0, 18, 34, 0.94) 100%
   );
+  /* Category cards sit on the page surface rather than a photograph, so they
+   * get their own scrim that follows the theme. */
+  --card-scrim: linear-gradient(
+    180deg,
+    rgba(0, 12, 24, 0.15) 0%,
+    rgba(0, 15, 30, 0.72) 55%,
+    rgba(0, 18, 34, 0.94) 100%
+  );
+  /*
+   * Ink on a metallic gold fill. The dark value is the original `--navy`, so
+   * this split leaves the approved dark theme pixel-identical; the light value
+   * is the warm charcoal that reads on the lighter light-theme gold ramp.
+   */
+  --on-gold: #00162b;
+  --hero-scrim: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--bg) 94%, transparent) 8%,
+    color-mix(in srgb, var(--bg) 74%, transparent) 48%,
+    color-mix(in srgb, var(--bg) 34%, transparent) 100%
+  );
+  --panel-scrim: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--bg) 92%, transparent) 10%,
+    color-mix(in srgb, var(--bg) 62%, transparent) 70%
+  );
+  --head-scrim: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--bg) 94%, transparent) 8%,
+    color-mix(in srgb, var(--bg) 66%, transparent) 72%
+  );
   --shadow-card: 0 18px 40px -24px rgba(0, 0, 0, 0.85);
+  --shadow-panel: 0 24px 60px rgba(0, 0, 0, 0.32);
+  --header-bg: color-mix(in srgb, var(--bg-deep) 92%, transparent);
+  /* Field well: darker than the card so the input reads as inset. */
+  --field-bg: var(--bg-deep);
+  --field-border: var(--border-soft);
   --header-h: 68px;
 }
 
+/*
+ * Light theme — elegant ivory field, white and warm-neutral surfaces, deep
+ * charcoal type and a restrained metallic gold.
+ *
+ * Every value here is measured: `.run/check-light-palette.mjs` asserts the
+ * WCAG 2.1 ratio of each foreground/background pair this theme renders, so a
+ * future edit that breaks contrast fails a test instead of shipping.
+ */
 :root[data-theme='light'] {
-  --bg: #f5f6f8;
-  --bg-deep: #eceef2;
+  --bg: #f7f4ed;
+  --bg-deep: #efeae0;
   --surface: #ffffff;
-  --surface-raised: #f0f2f6;
-  --surface-hover: #e8ecf2;
-  --border: rgba(0, 22, 43, 0.12);
-  --border-soft: rgba(0, 22, 43, 0.08);
-  --border-strong: rgba(169, 134, 31, 0.55);
-  --text: #0d2338;
-  --text-muted: #5b6b7d;
-  --text-faint: #8794a3;
-  --text-inverse: #ffffff;
+  --surface-raised: #fbf9f4;
+  --surface-hover: #f4f0e8;
+  --border: rgba(36, 31, 20, 0.14);
+  --border-soft: rgba(36, 31, 20, 0.09);
+  --border-strong: rgba(133, 102, 18, 0.5);
+  --text: #22201d;
+  --text-muted: #5a544b;
+  --text-faint: #6b6459;
+  --text-inverse: #241f14;
   --navy: #00162b;
-  --gold: #b8912a;
-  --gold-soft: #d4af37;
-  --gold-deep: #8f6f18;
-  --success: #1f9d63;
-  --warning: #b7791f;
-  --danger: #c53030;
-  --info: #2b6cb0;
+  /* Accent text and hairlines: dark enough to read on ivory (4.9:1). */
+  --gold: #856612;
+  --gold-hover: #6f5510;
+  --gold-soft: #d9b447;
+  --gold-deep: #a9821c;
+  --gold-fill-from: #e0c168;
+  --gold-fill-to: #c9a227;
+  --gold-fill-hover-from: #d4af37;
+  --gold-fill-hover-to: #b8912a;
+  --success: #1a7f4f;
+  --warning: #8a5a06;
+  --danger: #b3261e;
+  --info: #1d5fa8;
   --tile-overlay: linear-gradient(
     180deg,
     rgba(0, 12, 24, 0.1) 0%,
     rgba(0, 22, 43, 0.62) 55%,
     rgba(0, 22, 43, 0.9) 100%
   );
-  --shadow-card: 0 16px 36px -26px rgba(0, 22, 43, 0.45);
+  /* Ivory scrim so the charcoal caption keeps its contrast over artwork. */
+  --card-scrim: linear-gradient(
+    180deg,
+    rgba(247, 244, 237, 0.55) 0%,
+    rgba(247, 244, 237, 0.82) 55%,
+    rgba(247, 244, 237, 0.94) 100%
+  );
+  /*
+   * The hero caption spans the left ~60% of the panel, so the scrim stays
+   * near-opaque across that band and only thins out on the right, where the
+   * photograph is meant to show. Measured with `.run/probe-overlay-contrast.mjs`.
+   */
+  --hero-scrim: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--bg) 96%, transparent) 4%,
+    color-mix(in srgb, var(--bg) 92%, transparent) 55%,
+    color-mix(in srgb, var(--bg) 70%, transparent) 100%
+  );
+  --panel-scrim: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--bg) 96%, transparent) 8%,
+    color-mix(in srgb, var(--bg) 86%, transparent) 70%
+  );
+  --head-scrim: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--bg) 97%, transparent) 8%,
+    color-mix(in srgb, var(--bg) 88%, transparent) 72%
+  );
+  --shadow-card: 0 16px 36px -26px rgba(58, 48, 30, 0.28);
+  --shadow-panel: 0 24px 60px -28px rgba(58, 48, 30, 0.35);
+  /* Opaque white so the sticky band never shows a seam over page content. */
+  --header-bg: color-mix(in srgb, var(--surface) 94%, transparent);
+  /* White field on a warm well so inputs read as inset on white cards. */
+  --field-bg: #ffffff;
+  --field-border: rgba(36, 31, 20, 0.18);
+  /* Warm charcoal on the lighter light-theme gold ramp (9.4:1 on the light end). */
+  --on-gold: #241f14;
 }
 
 * {
@@ -122,7 +219,7 @@ a {
   top: 0;
   z-index: 40;
   height: var(--header-h);
-  background: color-mix(in srgb, var(--bg-deep) 92%, transparent);
+  background: var(--header-bg);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-soft);
 }
@@ -218,8 +315,8 @@ a {
   border-radius: 10px;
   display: grid;
   place-items: center;
-  background: linear-gradient(145deg, var(--gold-soft), var(--gold-deep));
-  color: var(--navy);
+  background: linear-gradient(145deg, var(--gold-fill-from), var(--gold-fill-to));
+  color: var(--on-gold);
   font-weight: 800;
   letter-spacing: 0;
   box-shadow: var(--shadow-card);
@@ -338,13 +435,13 @@ a {
 }
 
 .oryx-btn-primary {
-  background: linear-gradient(145deg, var(--gold-soft), var(--gold));
+  background: linear-gradient(145deg, var(--gold-fill-from), var(--gold-fill-to));
   border-color: transparent;
-  color: var(--navy);
+  color: var(--on-gold);
 }
 
 .oryx-btn-primary:hover:not(:disabled) {
-  background: linear-gradient(145deg, var(--gold), var(--gold-deep));
+  background: linear-gradient(145deg, var(--gold-fill-hover-from), var(--gold-fill-hover-to));
 }
 
 .oryx-btn-ghost {
@@ -360,8 +457,8 @@ a {
 .oryx-select,
 .oryx-textarea {
   width: 100%;
-  background: var(--bg-deep);
-  border: 1px solid var(--border-soft);
+  background: var(--field-bg);
+  border: 1px solid var(--field-border);
   border-radius: 10px;
   color: var(--text);
   padding: 10px 12px;
@@ -374,6 +471,12 @@ a {
 .oryx-textarea:focus {
   outline: none;
   border-color: var(--border-strong);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 16%, transparent);
+}
+
+.oryx-input::placeholder,
+.oryx-textarea::placeholder {
+  color: var(--text-faint);
 }
 
 .oryx-label {
@@ -520,12 +623,7 @@ a {
 .oryx-hero__scrim {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    100deg,
-    color-mix(in srgb, var(--bg) 94%, transparent) 8%,
-    color-mix(in srgb, var(--bg) 74%, transparent) 48%,
-    color-mix(in srgb, var(--bg) 34%, transparent) 100%
-  );
+  background: var(--hero-scrim);
 }
 
 .oryx-hero__content {
@@ -643,7 +741,7 @@ a {
   text-decoration: none;
 }
 .oryx-link:hover {
-  color: var(--gold-soft);
+  color: var(--gold-hover);
 }
 
 /* ------------------------------------------------- category cards (art) */
@@ -681,9 +779,14 @@ a {
   content: '';
   position: absolute;
   inset: 0;
-  background: var(--tile-overlay);
+  background: var(--card-scrim);
 }
 
+/*
+ * The caption sits on the scrim, not on the page surface. In light theme the
+ * scrim is ivory, so the type has to be the ink colour rather than the muted
+ * one, and the accent link needs the dark gold to stay legible.
+ */
 .oryx-cat-card__body {
   position: relative;
   z-index: 1;
@@ -691,16 +794,19 @@ a {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  color: var(--text);
 }
 
 .oryx-cat-card__body strong {
   font-size: 17px;
   font-weight: 700;
+  color: var(--text);
 }
 
 .oryx-cat-card__desc {
   font-size: 12.5px;
   line-height: 1.5;
+  color: var(--text-muted);
 }
 
 .oryx-cat-card__link {
@@ -738,11 +844,7 @@ a {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    100deg,
-    color-mix(in srgb, var(--bg) 92%, transparent) 10%,
-    color-mix(in srgb, var(--bg) 62%, transparent) 70%
-  );
+  background: var(--panel-scrim);
 }
 
 .oryx-dash-hero__body {
@@ -893,7 +995,7 @@ a {
   border-radius: 10px;
   font-weight: 800;
   color: var(--text-inverse);
-  background: linear-gradient(180deg, var(--gold-soft), var(--gold));
+  background: linear-gradient(180deg, var(--gold-fill-from), var(--gold-fill-to));
 }
 
 .oryx-step__text {
@@ -1283,11 +1385,7 @@ a {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    100deg,
-    color-mix(in srgb, var(--bg) 94%, transparent) 8%,
-    color-mix(in srgb, var(--bg) 66%, transparent) 72%
-  );
+  background: var(--head-scrim);
 }
 
 .oryx-page-head__body {
@@ -1874,7 +1972,7 @@ a {
     color-mix(in srgb, var(--surface-raised) 92%, var(--gold) 8%),
     var(--surface-raised)
   );
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
+  box-shadow: var(--shadow-panel);
 }
 
 .oryx-auth__mark {

@@ -1,0 +1,1142 @@
+[
+  {
+    "route": "/dashboard",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "en",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/dashboard",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/profile",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "en",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/profile",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "en",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/providers",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "en",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/providers",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/login",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "en",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/login",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/dashboard",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/dashboard",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/profile",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/profile",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/providers",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/providers",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/login",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/login",
+    "width": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 1024
+    },
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/dashboard",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "en",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/dashboard",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/profile",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "en",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/profile",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "en",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/providers",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "en",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/providers",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/login",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "en",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/login",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/dashboard",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/dashboard",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/profile",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/profile",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/providers",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/providers",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/login",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/login",
+    "width": "tablet",
+    "viewport": {
+      "width": 834,
+      "height": 1112
+    },
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/dashboard",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "en",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/dashboard",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/profile",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "en",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/profile",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "en",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/providers",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "en",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/providers",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/login",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "en",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/login",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "ar",
+    "theme": "light",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(245, 246, 248)",
+    "bodyColor": "rgb(13, 35, 56)",
+    "accent": "#b8912a",
+    "surface": "#fff",
+    "bgToken": "#f5f6f8",
+    "contrast": 14.77
+  },
+  {
+    "route": "/dashboard",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/dashboard",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/profile",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/profile",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/providers",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/providers",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/login",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "en",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "ltr",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  },
+  {
+    "route": "/login",
+    "width": "mobile",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "locale": "ar",
+    "theme": "dark",
+    "status": 200,
+    "overflow": 0,
+    "dir": "rtl",
+    "bodyBackground": "rgb(0, 22, 43)",
+    "bodyColor": "rgb(238, 243, 249)",
+    "accent": "#d4af37",
+    "surface": "#021f3a",
+    "bgToken": "#00162b",
+    "contrast": 16.37
+  }
+]

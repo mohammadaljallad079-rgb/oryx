@@ -170,7 +170,19 @@ in `packages/shared/src/service-categories.ts`. Full detail, evidence and the
 regression tests are in
 [`03_PHASE_D_PHOTOGRAPHY_AND_CATEGORY_FIX.md`](./03_PHASE_D_PHOTOGRAPHY_AND_CATEGORY_FIX.md).
 
-## 8. Reproduction
+## 8. Phase E — light-theme correction
+
+Phase E corrected the light theme the owner reported as inconsistent, and in
+doing so found three theme defects and one i18n defect: gold was one token doing
+two incompatible jobs (**E1**), the ink on a gold fill was not the approved dark
+ink (**E2**), the card caption scrim was dark in both themes (**E3**), and the
+profile "Delete" control rendered the raw key `common.delete` (**E4**). The light
+theme now uses an ivory/white/charcoal/metallic-gold palette driven by central
+tokens, and the dark theme is **31 / 31 byte-identical** in the before/after
+captures. Full detail, evidence and the test results are in
+[`04_PHASE_E_LIGHT_THEME.md`](./04_PHASE_E_LIGHT_THEME.md).
+
+## 9. Reproduction
 
 ```bash
 # Assertions (no auth needed)
@@ -185,4 +197,14 @@ node .run/check-refresh-count.mjs
 
 # Screenshots
 node .run/capture-exec07-after.mjs
+
+# Phase E light-theme evidence (needs the seeded DB and the customer app up)
+node .run/seed-customer-demo.mjs              # idempotent; populates the account the auth captures use
+node .run/capture-exec07-phase-e.mjs before   # HEAD theme + i18n fix
+node .run/capture-exec07-phase-e.mjs after    # Phase E applied
+node .run/verify-dark-identical.mjs           # dark must be byte-identical
+node .run/check-light-palette.mjs             # static contrast pairs
+node .run/audit-light-theme.mjs               # live computed-style contrast
+node .run/check-customer-i18n.mjs             # dictionary parity
+node .run/make-light-dark-pairs.mjs after     # light-vs-dark sheets
 ```
