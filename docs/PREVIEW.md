@@ -6,6 +6,7 @@ link to it does not expire when an editor session ends.
 - **Site:** `https://mohammadaljallad079-rgb.github.io/oryx/`
 - **Workflow:** `.github/workflows/preview.yml`
 - **Built from:** `feature/execution-07-premium-web`
+- **Served from:** the `gh-pages` branch (generated output; do not edit by hand)
 
 The URL is stable. It changes only if the repository is renamed or the Pages
 site is reconfigured.
@@ -38,11 +39,13 @@ The job has three stages:
    renders, every image resolves, no console error, no horizontal overflow at
    desktop and mobile. A separate crawl follows every internal link and renders
    each page in dark mode. A failure here blocks publication.
-3. **deploy** — uploads the artifact and publishes it with GitHub Pages.
+3. **deploy** — force-updates the `gh-pages` branch with the built site, which
+   GitHub Pages serves. That branch holds generated output only and is never
+   edited by hand.
 
-No repository secret is required. The deploy job requests a short-lived OIDC
-token for itself, and the build reads only committed assets, so the workflow is
-safe to run on any branch.
+No repository secret is required: the workflow uses the token GitHub issues to
+the run itself, and the build reads only committed assets, so it is safe to run
+on any branch.
 
 ## Running it locally
 
