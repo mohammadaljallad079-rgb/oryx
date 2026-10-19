@@ -23,6 +23,10 @@
     "test:shared": "pnpm --filter @oryx/shared test",
     "test:e2e": "pnpm --filter @oryx/api test:e2e",
     "test:ui": "pnpm --filter @oryx/admin test:ui",
+    "preview:build": "node scripts/preview/build-preview.mjs",
+    "preview:serve": "node scripts/preview/serve-preview.mjs",
+    "preview:verify": "node scripts/preview/verify-preview.mjs",
+    "preview:check": "node scripts/preview/check-links.mjs",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck"
   },

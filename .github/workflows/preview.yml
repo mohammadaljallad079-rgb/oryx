@@ -1,0 +1,166 @@
+name: Design preview
+
+# Publishes the Execution 07 design preview to GitHub Pages on every push to the
+# web design branch, so the owner gets a stable HTTPS link instead of a
+# temporary sandbox URL. The site is generated from files already committed to
+# the branch, so the preview can never show something the repository does not
+# contain.
+#
+# No repository secret is required: GitHub Pages deployment authenticates with
+# an OIDC token that the job requests for itself, and the build reads only
+# committed assets.
+on:
+  push:
+    branches: [feature/execution-07-premium-web]
+  # Allow a manual republish, for example after enabling Pages or a transient
+  # deployment failure.
+  workflow_dispatch:
+
+# One deployment at a time. A newer push supersedes an in-flight build, but an
+# in-flight deployment is never cancelled, so the published site is never left
+# half-written.
+concurrency:
+  group: design-preview
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '9.15.9'
+
+jobs:
+  # ---------------------------------------------------------------- build
+  build:
+    name: Build the static preview
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the preview site
+        run: pnpm preview:build
+        env:
+          PREVIEW_BRANCH: ${{ github.ref_name }}
+          PREVIEW_SHA: ${{ github.sha }}
+
+      - name: Report what was built
+        run: |
+          echo "Pages: $(find build/preview -name '*.html' | wc -l)"
+          echo "Images: $(find build/preview/assets -type f | wc -l)"
+          echo "Size: $(du -sh build/preview | cut -f1)"
+
+      - name: Upload the preview site
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-site
+          path: build/preview/
+          retention-days: 14
+
+  # --------------------------------------------------------------- verify
+  # Proves the built site actually renders before it is published: every page
+  # loads, every image resolves, no console error, and no horizontal overflow at
+  # a desktop and a mobile viewport.
+  verify:
+    name: Verify the built site
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download the preview site
+        uses: actions/download-artifact@v4
+        with:
+          name: preview-site
+          path: build/preview
+
+      - name: Install the Playwright browser
+        run: pnpm --filter @oryx/admin exec playwright install --with-deps chromium
+
+      - name: Serve the site
+        run: |
+          node scripts/preview/serve-preview.mjs 8099 > /tmp/preview-server.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:8099/; then echo "ready after ${i}s"; exit 0; fi
+            sleep 1
+          done
+          echo "preview server failed to start"; cat /tmp/preview-server.log; exit 1
+
+      - name: Render check
+        run: pnpm preview:verify
+        env:
+          PREVIEW_BASE: http://127.0.0.1:8099
+
+      - name: Link and dark-theme crawl
+        run: pnpm preview:check
+        env:
+          PREVIEW_BASE: http://127.0.0.1:8099
+
+  # --------------------------------------------------------------- deploy
+  deploy:
+    name: Publish to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: [build, verify]
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the preview site
+        uses: actions/download-artifact@v4
+        with:
+          name: preview-site
+          path: build/preview
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          # Enable the Pages site on the first run so the preview is fully
+          # GitHub-managed and needs no manual repository setting. This is
+          # allowed for a public repository with the pages:write token.
+          enablement: true
+
+      - name: Upload the Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/preview
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Report the published URL
+        run: |
+          echo "### Design preview published" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ steps.deployment.outputs.page_url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Built from \`${{ github.sha }}\` on \`${{ github.ref_name }}\`." >> "$GITHUB_STEP_SUMMARY"
