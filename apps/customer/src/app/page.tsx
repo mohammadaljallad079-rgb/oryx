@@ -5,7 +5,9 @@ import { useEffect, useState } from 'react';
 import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
 import {
+  assetUrl,
   blockValue,
+  categoryImage,
   mediaAlt,
   mediaUrl,
   publicApi,
@@ -52,13 +54,19 @@ export default function HomePage() {
   }, []);
 
   // Hero photography: the first active banner, else the first CMS category
-  // image, else the bundled vector art.
+  // image, else the bundled photograph, else the vector art. Every branch
+  // yields a servable URL so the hero can never render as an empty panel.
   const heroBanner = content.banners.find((b) => b.media || b.imageUrl) ?? null;
+  // A banner image can be a CMS media id or a plain path; both are normalised
+  // to a servable URL, and the bundled asset prefix is applied to the latter.
+  const bannerImage = heroBanner?.imageUrl ? assetUrl(heroBanner.imageUrl) : null;
   const heroImage =
     mediaUrl(heroBanner?.media ?? null, 'hero') ??
-    heroBanner?.imageUrl ??
+    bannerImage ??
     mediaUrl(content.categories[0]?.media ?? null, 'hero') ??
-    '/art/hero-automotive.svg';
+    (content.categories[0]
+      ? categoryImage(null, content.categories[0].key, 'hero')
+      : assetUrl('/art/hero-automotive.svg'));
   const heroAlt = heroBanner
     ? heroBanner.subtitle || heroBanner.title
     : mediaAlt(content.categories[0]?.media ?? null, locale, t('home.heroAlt'));
@@ -69,7 +77,7 @@ export default function HomePage() {
     key: string;
     name: string;
     desc: string;
-    art: string | null;
+    art: string;
     alt: string;
   }> = SERVICE_CATEGORIES.map((fallback) => {
     const managed: WebsiteCategory | undefined = content.categories.find((c) => c.key === fallback.key);
@@ -78,14 +86,18 @@ export default function HomePage() {
       key: fallback.key,
       name: locale === 'ar' ? fallback.nameAr : fallback.nameEn,
       desc: desc || (locale === 'ar' ? fallback.descAr : fallback.descEn),
-      art: mediaUrl(managed?.media ?? null, 'card'),
+      // A photograph rather than the old shared gradient, so the five
+      // categories are visually distinct.
+      art: categoryImage(managed?.media ?? null, fallback.key, 'card'),
       alt: mediaAlt(managed?.media ?? null, locale, fallback.nameEn),
     };
   });
 
-  const partnerImage =
-    mediaUrl(content.categories.find((c) => c.key === 'maintenance')?.media ?? null, 'wide') ??
-    '/art/service-maintenance.svg';
+  const partnerImage = categoryImage(
+    content.categories.find((c) => c.key === 'maintenance')?.media ?? null,
+    'maintenance',
+    'wide',
+  );
 
   const stats = [
     { value: `${providers.length || '—'}`, label: t('home.statProviders') },

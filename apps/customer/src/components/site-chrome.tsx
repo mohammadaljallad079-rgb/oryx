@@ -5,8 +5,29 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
+import { IS_STATIC_PREVIEW, previewNotice } from '@/lib/preview-data';
 import { BrandLogo } from '@/components/brand-logo';
 import { Icon } from '@/components/icons';
+
+/**
+ * The notice that marks the static GitHub Pages build.
+ *
+ * It is rendered once, at the top of every page, rather than per screen, so a
+ * visitor cannot mistake the exported preview for the live platform. It renders
+ * nothing in a normal build.
+ */
+function PreviewStrip() {
+  const { t, locale } = useUi();
+  if (!IS_STATIC_PREVIEW) return null;
+  return (
+    <div className="oryx-preview-strip" role="note" data-testid="preview-strip">
+      <div className="oryx-container oryx-preview-strip__inner">
+        <span className="oryx-preview-strip__badge">{t('preview.badge')}</span>
+        <span className="oryx-preview-strip__text">{previewNotice(locale)}</span>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Public site header.
@@ -39,6 +60,7 @@ export function SiteHeader() {
 
   return (
     <header className="oryx-header">
+      <PreviewStrip />
       <div className="oryx-container oryx-header-inner">
         <Link href="/" className="oryx-brand" aria-label="ORYX">
           <BrandLogo height={30} />

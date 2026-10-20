@@ -55,6 +55,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The published root is the real customer website, so it is built first.
+      # `ORYX_STATIC_EXPORT=1` turns the Next.js app into a static export; the
+      # shared and database packages are built because the app resolves them
+      # from their compiled `dist/`.
+      - name: Build the customer website
+        run: pnpm build:site
+        env:
+          ORYX_BASE_PATH: /oryx
+
+      # `preview:build` copies `apps/customer/out` to the site root and adds the
+      # evidence, report and brand sections below it.
       - name: Build the preview site
         run: pnpm preview:build
         env:

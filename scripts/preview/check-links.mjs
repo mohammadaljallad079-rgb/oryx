@@ -28,9 +28,16 @@ while (queue.length) {
   }
 }
 
-// Dark-mode render of every page reached above.
-await page.emulateMedia({ colorScheme: 'dark' });
+// Dark render of every page reached above.
+//
+// The site resolves its theme from `localStorage` (the header toggle), not from
+// `prefers-color-scheme`, so `emulateMedia` alone leaves it on the default
+// light theme and the "dark" pass would measure the light palette. The stored
+// preference is set instead, which is what the toggle itself writes.
 let darkIssues = 0;
+await ctx.addInitScript(() => {
+  window.localStorage.setItem('oryx.customer.theme', 'dark');
+});
 for (const url of seen) {
   await page.goto(BASE + url, { waitUntil: 'networkidle' });
   const overflow = await page.evaluate(

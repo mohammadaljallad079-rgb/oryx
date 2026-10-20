@@ -1306,6 +1306,12 @@ a {
   border-color: var(--band-accent);
 }
 
+/*
+ * These two rules are the legacy hero typography. They are intentionally more
+ * specific than `.oryx-hero__title` / `.oryx-hero__lede`, so they set the
+ * rendered size of the homepage hero. They must stay: removing them changes the
+ * approved dark render.
+ */
 .oryx-hero h1 {
   font-size: 38px;
   line-height: 1.2;
@@ -1318,6 +1324,24 @@ a {
   max-width: 560px;
   margin: 0 0 24px;
   font-size: 16px;
+}
+
+/*
+ * `.oryx-hero p` above is more specific than `.oryx-eyebrow`, so the homepage
+ * hero eyebrow inherited the lede's muted colour and 16px size instead of the
+ * gold accent every other eyebrow uses — the light-theme inconsistency the owner
+ * reported. Restated here at a matching specificity so the accent wins again.
+ *
+ * Scoped to the light theme on purpose: the dark render is approved and stays
+ * byte-identical (see docs/audit/exec07/phase-e/after/dark-invariance.json).
+ */
+:root[data-theme='light'] .oryx-hero .oryx-eyebrow {
+  color: var(--band-accent);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin: 0 0 10px;
 }
 
 .oryx-section-title {
@@ -2118,3 +2142,57 @@ a {
     font-size: 21px;
   }
 }
+
+/* ---------------------------------------------------------- preview strip
+ *
+ * Marks the static GitHub Pages export. It sits at the top of the header so the
+ * preview can never be mistaken for the live platform, and it renders only when
+ * ORYX_STATIC_EXPORT is set.
+ *
+ * It is a navy band in both themes, so its ink and its gold come from the band
+ * tokens rather than the page tokens. Using the page gold here was a real
+ * defect: `--gold` is tuned to read on ivory (4.9:1), and on the navy band it
+ * falls to 3.2:1.
+ */
+.oryx-preview-strip {
+  background: var(--band, #0a1f38);
+  border-bottom: 1px solid var(--band-accent, #d4af37);
+  color: var(--band-text, #ffffff);
+}
+
+.oryx-preview-strip__inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.oryx-preview-strip__badge {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--band-accent, #d4af37);
+  color: var(--band-accent, #d4af37);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.oryx-preview-strip__text {
+  color: var(--band-text, #ffffff);
+  opacity: 0.88;
+}
+
+@media (max-width: 640px) {
+  .oryx-preview-strip__inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 9px 0;
+  }
+}
+

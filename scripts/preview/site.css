@@ -555,3 +555,40 @@ figcaption strong {
   color: var(--text-muted);
   margin-top: 3px;
 }
+
+/* ------------------------------------------------------------------- cta
+ *
+ * The single call to action that opens the exported website. It is the first
+ * thing on the overview page, because the website — not the document index —
+ * is what the published URL is for.
+ */
+.cta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 26px 0 8px;
+}
+
+.cta__button {
+  display: inline-block;
+  padding: 13px 26px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--gold-fill-from), var(--gold-fill-to));
+  color: var(--on-gold);
+  font-weight: 700;
+  font-size: 15px;
+  text-decoration: none;
+  border: 1px solid var(--gold);
+}
+
+.cta__button:hover {
+  filter: brightness(1.06);
+}
+
+.cta__hint {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  max-width: 46ch;
+}
+

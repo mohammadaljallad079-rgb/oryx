@@ -31,6 +31,27 @@ const ROOT = path.resolve(HERE, '..', '..');
 const OUT = path.join(ROOT, 'build', 'preview');
 const ASSETS = path.join(OUT, 'assets');
 
+/**
+ * The generated site is a superset of the exported ORYX website.
+ *
+ *   /                     the real customer website (Next.js static export)
+ *   /evidence/            Phase E before/after captures and comparison sheets
+ *   /reports/             every committed audit report, rendered to HTML
+ *   /brand/               the approved logo and design references
+ *
+ * The website is the root document, so the published URL opens the actual
+ * product rather than an index of documents. The evidence and reports keep
+ * their own prefixes and never shadow a site route: the build asserts that
+ * before it writes anything.
+ */
+const EVIDENCE = path.join(OUT, 'evidence');
+const REPORTS = path.join(OUT, 'reports');
+const BRAND = path.join(OUT, 'brand');
+/** The exported Next.js site, produced into `apps/customer/out`. */
+const SITE_SRC = path.join(ROOT, 'apps', 'customer', 'out');
+/** Prefix the evidence/report pages use to reach the site's own assets. */
+const ASSET_PREFIX = '../assets/';
+
 const REPO = 'https://github.com/mohammadaljallad079-rgb/oryx';
 const BRANCH = process.env.PREVIEW_BRANCH || 'feature/execution-07-premium-web';
 const SHA = process.env.PREVIEW_SHA || '';
@@ -66,11 +87,30 @@ function listFiles(dir, exts) {
     .sort();
 }
 
-/** Deterministic page shell shared by every page. */
-function page({ title, description, body, depth = 0, current = '' }) {
-  const up = depth === 0 ? './' : '../'.repeat(depth);
+/** Count the HTML documents under a directory, recursively. */
+function countHtml(dir) {
+  if (!existsSync(dir)) return 0;
+  let n = 0;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) n += countHtml(path.join(dir, entry.name));
+    else if (entry.name.endsWith('.html')) n += 1;
+  }
+  return n;
+}
+
+/**
+ * Page shell shared by every generated page.
+ *
+ * Every page this script writes lives exactly one directory below the site
+ * root (`/evidence/`, `/reports/`, `/brand/`, `/overview/`), so a single `../`
+ * reaches both the site's assets and the website itself. Keeping that uniform
+ * removes a class of broken-link bugs: there is no depth to get wrong.
+ */
+function page({ title, description, body, current = '' }) {
+  const up = '../';
   const nav = [
-    ['', 'Overview'],
+    ['', 'The website'],
+    ['overview/', 'Overview'],
     ['evidence/', 'Design evidence'],
     ['reports/', 'Reports'],
     ['brand/', 'Brand'],
@@ -122,6 +162,42 @@ function figure(src, caption, alt, prefix = '') {
 
 // ------------------------------------------------------------------ reset
 rmSync(OUT, { recursive: true, force: true });
+mkdirSync(ASSETS, { recursive: true });
+
+// ------------------------------------------------------- the ORYX website
+// The exported customer site is the root of the published URL. It is built by
+// `next build` in `apps/customer` with `ORYX_STATIC_EXPORT=1`, which writes
+// `apps/customer/out`. A missing export is a hard failure: publishing a
+// documentation index in its place is exactly the outcome the owner rejected.
+if (!existsSync(SITE_SRC)) {
+  console.error(
+    'preview: apps/customer/out is missing.\n' +
+      'preview: build the website first:\n' +
+      'preview:   ORYX_STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/oryx pnpm --filter @oryx/customer build',
+  );
+  process.exit(1);
+}
+if (!existsSync(path.join(SITE_SRC, 'index.html'))) {
+  console.error('preview: apps/customer/out/index.html is missing; the export is incomplete.');
+  process.exit(1);
+}
+
+cpSync(SITE_SRC, OUT, { recursive: true });
+
+// The evidence, report and brand directories must never shadow a real site
+// route, or a page of the website would be replaced by a document.
+for (const reserved of ['evidence', 'reports', 'brand', 'overview']) {
+  if (existsSync(path.join(OUT, reserved, 'index.html')) && reserved !== 'overview') {
+    // `evidence` and `brand` do not exist in the app; a collision means the
+    // site grew a route with the same name and the two would fight.
+    console.error(
+      `preview: the website already serves /${reserved}/ — rename the document section before publishing.`,
+    );
+    process.exit(1);
+  }
+}
+
+// The site's own bundled assets are what the evidence pages link to.
 mkdirSync(ASSETS, { recursive: true });
 
 // ----------------------------------------------------------- brand assets
@@ -321,7 +397,7 @@ async function buildEvidencePages() {
     <p class="card__meta">${copied} capture pairs · before set from <code>docs/audit/exec07/phase-e/before/</code> · after set from <code>docs/audit/exec07/phase-e/after/</code></p>
   `;
 
-  write('evidence/index.html', page({ title: 'Design evidence', description: 'Phase E light-theme captures: before, after, light vs dark.', body, depth: 1, current: 'evidence' }));
+  write('evidence/index.html', page({ title: 'Design evidence', description: 'Phase E light-theme captures: before, after, light vs dark.', body, current: 'evidence' }));
 
   if (missing.length) {
     throw new Error(
@@ -424,7 +500,7 @@ function buildReports() {
         ${toc ? `<nav class="card"><strong>Contents</strong><ul class="toc">${toc}</ul></nav>` : ''}
         <article>${html}</article>
       `;
-      write(`reports/${slug}.html`, page({ title, description: title, body, depth: 1, current: 'reports' }));
+      write(`reports/${slug}.html`, page({ title, description: title, body, current: 'reports' }));
       rendered += 1;
       items.push({ file: src, slug, title, size: markdown.length });
     }
@@ -451,7 +527,7 @@ function buildReports() {
     <p class="lede">The Markdown in the repository is the source of truth. These pages are rendered from it at build time so a reader can read the evidence without cloning the branch.</p>
     ${sections}
   `;
-  write('reports/index.html', page({ title: 'Reports', description: 'All ORYX audit and execution reports.', body, depth: 1, current: 'reports' }));
+  write('reports/index.html', page({ title: 'Reports', description: 'All ORYX audit and execution reports.', body, current: 'reports' }));
   return rendered;
 }
 
@@ -479,7 +555,7 @@ async function buildBrand() {
     <div class="section-head"><h2>References and brand captures</h2><p>${files.length} assets</p></div>
     <div class="gallery">${files.map((f) => figure(f.out, escapeHtml(f.label), f.label, '../')).join('')}</div>
   `;
-  write('brand/index.html', page({ title: 'Brand', description: 'The approved ORYX logo and design references.', body, depth: 1, current: 'brand' }));
+  write('brand/index.html', page({ title: 'Brand', description: 'The approved ORYX logo and design references.', body, current: 'brand' }));
   return files.length;
 }
 
@@ -490,15 +566,21 @@ async function buildOverview(stats) {
   const prUrl = `${REPO}/pull/7`;
   const body = `
     <p class="eyebrow">Permanent preview</p>
-    <h1>ORYX design preview</h1>
-    <p class="lede">A permanent, GitHub-hosted view of the Execution 07 web design work: the light and dark themes, the photography and category fixes, and the full evidence trail. It is generated from the repository and updated on every push to the design branch.</p>
+    <h1>ORYX website and design preview</h1>
+    <p class="lede">The published ORYX customer website, built from this branch and served at the root of this URL, with the Execution 07 design evidence, audit reports and approved brand assets alongside it.</p>
+
+    <div class="cta">
+      <a class="cta__button" href="../">Open the website &rarr;</a>
+      <span class="cta__hint">The real Next.js site, statically exported. Every page below the root is that site.</span>
+    </div>
 
     <div class="notice">
-      <strong>This is a static design preview, not a deployed application.</strong>
-      It hosts the committed screenshots, reports and brand assets. The interactive customer site and the API are full-stack services and are <em>not</em> hosted here — see the hosting requirements below. This site is marked <code>noindex</code>.
+      <strong>The website is a static export, so it is read-only.</strong>
+      It renders the real pages, themes, photography and layout, but GitHub Pages serves files only: it cannot run the NestJS API or PostgreSQL, so signing in and booking cannot succeed here. The export says so on every page and never reports a write as successful. The interactive application runs from the branch on a host that meets the requirements below.
     </div>
 
     <div class="kpis">
+      <div class="kpi"><div class="kpi__value">${stats.sitePages}</div><div class="kpi__label">website pages</div></div>
       <div class="kpi"><div class="kpi__value">${stats.reports}</div><div class="kpi__label">reports rendered</div></div>
       <div class="kpi"><div class="kpi__value">${stats.captures}</div><div class="kpi__label">capture pairs</div></div>
       <div class="kpi"><div class="kpi__value">${stats.sheets}</div><div class="kpi__label">light-vs-dark sheets</div></div>
@@ -506,9 +588,9 @@ async function buildOverview(stats) {
     </div>
 
     <div class="grid">
-      <a class="card card--link" href="evidence/"><h3>Design evidence</h3><p class="card__meta">Homepage, dashboard, provider directory, sign-in and profile — before/after with the dark render beside each, in Arabic RTL and English LTR at three viewports.</p></a>
-      <a class="card card--link" href="reports/"><h3>Reports</h3><p class="card__meta">Every audit and execution report, rendered from the committed Markdown.</p></a>
-      <a class="card card--link" href="brand/"><h3>Brand</h3><p class="card__meta">The official logo and the approved design references.</p></a>
+      <a class="card card--link" href="../evidence/"><h3>Design evidence</h3><p class="card__meta">Homepage, dashboard, provider directory, sign-in and profile — before/after with the dark render beside each, in Arabic RTL and English LTR at three viewports.</p></a>
+      <a class="card card--link" href="../reports/"><h3>Reports</h3><p class="card__meta">Every audit and execution report, rendered from the committed Markdown.</p></a>
+      <a class="card card--link" href="../brand/"><h3>Brand</h3><p class="card__meta">The official logo and the approved design references.</p></a>
     </div>
 
     <h2>What this preview covers</h2>
@@ -543,7 +625,7 @@ async function buildOverview(stats) {
     <h2>Source of truth</h2>
     <p>The pull request is <a href="${prUrl}">#7</a>, still open and unmerged. The branch is <a href="${REPO}/tree/${encodeURIComponent(BRANCH)}"><code>${escapeHtml(BRANCH)}</code></a>. Nothing here is deployed to production.</p>
   `;
-  write('index.html', page({ title: 'Overview', description: 'Permanent GitHub-hosted ORYX design preview.', body }));
+  write('overview/index.html', page({ title: 'Overview', description: 'Permanent GitHub-hosted ORYX design preview.', body, current: 'overview' }));
 }
 
 // ======================================================================
@@ -552,7 +634,9 @@ async function buildOverview(stats) {
 const reports = buildReports();
 const evidence = await buildEvidencePages();
 const brandCount = await buildBrand();
+const sitePages = countHtml(SITE_SRC);
 await buildOverview({
+  sitePages,
   reports,
   captures: evidence.captures,
   sheets: evidence.sheets,
@@ -565,4 +649,7 @@ writeFileSync(path.join(OUT, '.nojekyll'), '');
 
 const total = thumbsMade.length;
 console.log(`preview: built ${OUT}`);
-console.log(`preview: ${reports} reports, ${evidence.captures} capture pairs, ${evidence.sheets} sheets, ${brandCount} brand assets, ${total} images`);
+console.log(
+  `preview: website at / (${sitePages} pages), ${reports} reports, ` +
+    `${evidence.captures} capture pairs, ${evidence.sheets} sheets, ${brandCount} brand assets, ${total} images`,
+);

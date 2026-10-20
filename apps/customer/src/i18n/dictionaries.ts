@@ -10,6 +10,7 @@ import type { Locale } from '@oryx/shared';
 export const dictionaries: Record<Locale, Record<string, string>> = {
   ar: {
     'brand.tagline': 'منصة السيارات',
+    'preview.badge': 'معاينة تصميم',
     'nav.home': 'الرئيسية',
     'nav.services': 'الخدمات',
     'nav.providers': 'مزودو الخدمة',
@@ -284,6 +285,7 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
   },
   en: {
     'brand.tagline': 'Automotive Platform',
+    'preview.badge': 'Design preview',
     'nav.home': 'Home',
     'nav.services': 'Services',
     'nav.providers': 'Providers',

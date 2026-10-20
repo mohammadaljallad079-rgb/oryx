@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import clsx from 'clsx';
 import { useUi } from '@/lib/ui-context';
+import { assetUrl } from '@/lib/api';
 import { Icon, type IconName } from '@/components/icons';
 
 /**
@@ -36,7 +37,7 @@ export function PageHeader({
       {art && (
         <span
           className="oryx-page-head__art"
-          style={{ backgroundImage: `url(${art})` }}
+          style={{ backgroundImage: `url(${assetUrl(art)})` }}
           aria-hidden
         />
       )}

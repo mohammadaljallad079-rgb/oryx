@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
-import { customerApi } from '@/lib/api';
+import { customerApi, assetUrl } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 import { RequireCustomer } from '@/components/require-customer';
 import { Card, EmptyState, Loading, StatusBadge, formatDate } from '@/components/ui';
@@ -34,7 +34,7 @@ function DashboardContent() {
       <section className="oryx-dash-hero">
         <span
           className="oryx-dash-hero__art"
-          style={{ backgroundImage: 'url(/art/hero-automotive.svg)' }}
+          style={{ backgroundImage: `url(${assetUrl('/art/hero-automotive.svg')})` }}
           aria-hidden
         />
         <div className="oryx-dash-hero__body">

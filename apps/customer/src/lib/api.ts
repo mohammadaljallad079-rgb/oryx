@@ -15,7 +15,31 @@
  * no staff route is reachable with a consumer token.
  */
 
-import { SERVICE_CATEGORIES as SHARED_SERVICE_CATEGORIES } from '@oryx/shared';
+import { SERVICE_CATEGORIES as SHARED_SERVICE_CATEGORIES, categoryArt } from '@oryx/shared';
+import { assetUrl } from './asset-url';
+import {
+  IS_STATIC_PREVIEW,
+  PREVIEW_ADDRESSES,
+  PREVIEW_BOOKINGS,
+  PREVIEW_NOTIFICATION_PREFERENCES,
+  PREVIEW_NOTIFICATIONS,
+  PREVIEW_PAYMENTS,
+  PREVIEW_PRIVACY,
+  PREVIEW_PROFILE,
+  PREVIEW_READ_ONLY_MESSAGE,
+  PREVIEW_SERVICE_REQUESTS,
+  PREVIEW_VEHICLES,
+  previewCategoryPhoto,
+  previewProvider,
+  previewProviders,
+  previewWebsiteContent,
+} from './preview-data';
+
+/** Re-exported so callers have one import for API access and asset paths. */
+export { assetUrl, ASSET_PREFIX } from './asset-url';
+
+/** Re-exported so a page can branch on the preview without a second import. */
+export { IS_STATIC_PREVIEW } from './preview-data';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api';
 
@@ -341,44 +365,69 @@ export interface PrivacySettings {
 
 // ------------------------------------------------------------------- client
 
+/**
+ * Raised by any mutating call in the static preview.
+ *
+ * The preview must never imply that a booking was placed, a payment moved or a
+ * session was created, so every write fails loudly instead of being faked.
+ */
+function previewReadOnly(): never {
+  throw new ApiError(501, 'preview_read_only', PREVIEW_READ_ONLY_MESSAGE);
+}
+
 export const customerApi = {
   // ---------------------------------------------------------------- auth
   register: (body: { email: string; password: string; fullName: string; phone?: string }) =>
-    request<{ accessToken: string }>('/customer/auth/register', {
-      method: 'POST',
-      body,
-      anonymous: true,
-    }),
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<{ accessToken: string }>('/customer/auth/register', {
+          method: 'POST',
+          body,
+          anonymous: true,
+        }),
   login: (email: string, password: string) =>
-    request<
-      | { accessToken: string }
-      | { mfaRequired: true; challengeToken: string }
-    >('/customer/auth/login', { method: 'POST', body: { email, password }, anonymous: true }),
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<
+          | { accessToken: string }
+          | { mfaRequired: true; challengeToken: string }
+        >('/customer/auth/login', { method: 'POST', body: { email, password }, anonymous: true }),
   verifyMfaLogin: (challengeToken: string, code: string) =>
-    request<{ accessToken: string }>('/customer/auth/mfa/verify-login', {
-      method: 'POST',
-      body: { challengeToken, code },
-      anonymous: true,
-    }),
-  logout: () => request<{ loggedOut: boolean }>('/customer/auth/logout', { method: 'POST', body: {} }),
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<{ accessToken: string }>('/customer/auth/mfa/verify-login', {
+          method: 'POST',
+          body: { challengeToken, code },
+          anonymous: true,
+        }),
+  logout: () =>
+    IS_STATIC_PREVIEW
+      ? Promise.resolve({ loggedOut: true })
+      : request<{ loggedOut: boolean }>('/customer/auth/logout', { method: 'POST', body: {} }),
   forgotPassword: (email: string) =>
-    request<{ accepted: boolean }>('/customer/auth/forgot-password', {
-      method: 'POST',
-      body: { email },
-      anonymous: true,
-    }),
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<{ accepted: boolean }>('/customer/auth/forgot-password', {
+          method: 'POST',
+          body: { email },
+          anonymous: true,
+        }),
   resetPassword: (token: string, password: string) =>
-    request<{ reset: boolean }>('/customer/auth/reset-password', {
-      method: 'POST',
-      body: { token, password },
-      anonymous: true,
-    }),
-  me: () => request<CustomerProfile>('/customer/auth/me'),
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<{ reset: boolean }>('/customer/auth/reset-password', {
+          method: 'POST',
+          body: { token, password },
+          anonymous: true,
+        }),
+  me: () => (IS_STATIC_PREVIEW ? Promise.resolve(PREVIEW_PROFILE) : request<CustomerProfile>('/customer/auth/me')),
   updateProfile: (body: { fullName?: string; phone?: string; preferredLocale?: 'ar' | 'en'; preferredTheme?: 'dark' | 'light' }) =>
-    request<CustomerProfile>('/customer/auth/profile', { method: 'POST', body }),
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<CustomerProfile>('/customer/auth/profile', { method: 'POST', body }),
 
   // -------------------------------------------------------------- garage
-  vehicles: () => request<Vehicle[]>('/customer/vehicles'),
+  vehicles: () => (IS_STATIC_PREVIEW ? Promise.resolve(PREVIEW_VEHICLES) : request<Vehicle[]>('/customer/vehicles')),
   addVehicle: (body: {
     vin: string;
     make: string;
@@ -387,41 +436,71 @@ export const customerApi = {
     plateNumber?: string;
     color?: string;
     mileage?: number;
-  }) => request<Vehicle>('/customer/vehicles', { method: 'POST', body }),
-  vehicle: (id: string) => request<Vehicle>(`/customer/vehicles/${id}`),
+  }) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<Vehicle>('/customer/vehicles', { method: 'POST', body }),
+  vehicle: (id: string) =>
+    IS_STATIC_PREVIEW
+      ? (() => {
+          const found = PREVIEW_VEHICLES.find((v) => v.id === id);
+          if (!found) throw new ApiError(404, 'not_found', 'Vehicle not found.');
+          return Promise.resolve(found);
+        })()
+      : request<Vehicle>(`/customer/vehicles/${id}`),
   vehicleHistory: (id: string) =>
-    request<{ items: Array<Record<string, unknown>> }>(`/customer/vehicles/${id}/history`),
-  removeVehicle: (id: string) => request<void>(`/customer/vehicles/${id}`, { method: 'DELETE' }),
+    IS_STATIC_PREVIEW
+      ? Promise.resolve({ items: [] as Array<Record<string, unknown>> })
+      : request<{ items: Array<Record<string, unknown>> }>(`/customer/vehicles/${id}/history`),
+  removeVehicle: (id: string) =>
+    IS_STATIC_PREVIEW ? previewReadOnly() : request<void>(`/customer/vehicles/${id}`, { method: 'DELETE' }),
 
   // ----------------------------------------------------------- addresses
-  addresses: () => request<Address[]>('/customer/addresses'),
+  addresses: () =>
+    IS_STATIC_PREVIEW ? Promise.resolve(PREVIEW_ADDRESSES) : request<Address[]>('/customer/addresses'),
   addAddress: (body: {
     label?: string;
     addressLine1: string;
     city: string;
     countryCode?: string;
     isDefault?: boolean;
-  }) => request<Address>('/customer/addresses', { method: 'POST', body }),
-  removeAddress: (id: string) => request<void>(`/customer/addresses/${id}`, { method: 'DELETE' }),
+  }) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<Address>('/customer/addresses', { method: 'POST', body }),
+  removeAddress: (id: string) =>
+    IS_STATIC_PREVIEW ? previewReadOnly() : request<void>(`/customer/addresses/${id}`, { method: 'DELETE' }),
 
   // ------------------------------------------------------------- privacy
-  privacy: () => request<PrivacySettings>('/customer/privacy'),
+  privacy: () =>
+    IS_STATIC_PREVIEW ? Promise.resolve(PREVIEW_PRIVACY) : request<PrivacySettings>('/customer/privacy'),
   updatePrivacy: (body: Partial<PrivacySettings>) =>
-    request<PrivacySettings>('/customer/privacy', { method: 'PATCH', body }),
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<PrivacySettings>('/customer/privacy', { method: 'PATCH', body }),
   requestDataExport: (reason?: string) =>
-    request<{ recorded: boolean }>('/customer/privacy/data-export', { method: 'POST', body: { reason } }),
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<{ recorded: boolean }>('/customer/privacy/data-export', { method: 'POST', body: { reason } }),
   requestDeletion: (reason?: string) =>
-    request<{ recorded: boolean }>('/customer/privacy/deletion', { method: 'POST', body: { reason } }),
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<{ recorded: boolean }>('/customer/privacy/deletion', { method: 'POST', body: { reason } }),
   notificationPreferences: () =>
-    request<NotificationPreference[]>('/customer/notification-preferences'),
+    IS_STATIC_PREVIEW
+      ? Promise.resolve(PREVIEW_NOTIFICATION_PREFERENCES)
+      : request<NotificationPreference[]>('/customer/notification-preferences'),
   updateNotificationPreferences: (items: NotificationPreference[]) =>
-    request<NotificationPreference[]>('/customer/notification-preferences', {
-      method: 'PATCH',
-      body: { preferences: items },
-    }),
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<NotificationPreference[]>('/customer/notification-preferences', {
+          method: 'PATCH',
+          body: { preferences: items },
+        }),
 
   // ------------------------------------------------------------ bookings
   availability: (params: { date: string; durationMinutes: number; serviceRef?: string }) => {
+    if (IS_STATIC_PREVIEW) return Promise.resolve([] as AvailableSlot[]);
     const qs = new URLSearchParams({
       date: params.date,
       durationMinutes: String(params.durationMinutes),
@@ -436,61 +515,115 @@ export const customerApi = {
     vehicleId?: string;
     serviceRef?: string;
     notes?: string;
-  }) => request<BookingSlot>('/customer/bookings', { method: 'POST', body }),
+  }) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<BookingSlot>('/customer/bookings', { method: 'POST', body }),
   bookings: () =>
-    request<{ items: BookingSlot[]; total: number }>('/customer/bookings?pageSize=50'),
+    IS_STATIC_PREVIEW
+      ? Promise.resolve({ items: PREVIEW_BOOKINGS, total: PREVIEW_BOOKINGS.length })
+      : request<{ items: BookingSlot[]; total: number }>('/customer/bookings?pageSize=50'),
   cancelBooking: (id: string, reason: string) =>
-    request<BookingSlot>(`/customer/bookings/${id}/cancel`, { method: 'POST', body: { reason } }),
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<BookingSlot>(`/customer/bookings/${id}/cancel`, { method: 'POST', body: { reason } }),
 
   // ------------------------------------------------------------ payments
   payments: () =>
-    request<{ items: PaymentRecord[]; total: number }>('/customer/payments?pageSize=50'),
+    IS_STATIC_PREVIEW
+      ? Promise.resolve({ items: PREVIEW_PAYMENTS, total: PREVIEW_PAYMENTS.length })
+      : request<{ items: PaymentRecord[]; total: number }>('/customer/payments?pageSize=50'),
 
   // ------------------------------------------------------- notifications
   notifications: (unreadOnly = false) =>
-    request<{ items: NotificationItem[]; total: number }>(
-      `/customer/notifications?pageSize=50${unreadOnly ? '&unreadOnly=true' : ''}`,
-    ),
+    IS_STATIC_PREVIEW
+      ? Promise.resolve({
+          items: unreadOnly ? PREVIEW_NOTIFICATIONS.filter((n) => !n.readAt) : PREVIEW_NOTIFICATIONS,
+          total: PREVIEW_NOTIFICATIONS.length,
+        })
+      : request<{ items: NotificationItem[]; total: number }>(
+          `/customer/notifications?pageSize=50${unreadOnly ? '&unreadOnly=true' : ''}`,
+        ),
   markNotificationsRead: (ids: string[]) =>
-    request<{ updated: number }>('/customer/notifications/read', { method: 'POST', body: { ids } }),
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<{ updated: number }>('/customer/notifications/read', { method: 'POST', body: { ids } }),
   markAllNotificationsRead: () =>
-    request<{ updated: number }>('/customer/notifications/read-all', { method: 'POST', body: {} }),
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<{ updated: number }>('/customer/notifications/read-all', { method: 'POST', body: {} }),
 
   // ---------------------------------------------------------- marketplace
   serviceRequests: () =>
-    request<{ items: ServiceRequestRecord[]; total: number }>('/customer/marketplace/requests?pageSize=50'),
+    IS_STATIC_PREVIEW
+      ? Promise.resolve({ items: PREVIEW_SERVICE_REQUESTS, total: PREVIEW_SERVICE_REQUESTS.length })
+      : request<{ items: ServiceRequestRecord[]; total: number }>('/customer/marketplace/requests?pageSize=50'),
   createServiceRequest: (body: {
     categoryKey: string;
     description?: string;
     vehicleId?: string;
-  }) => request<ServiceRequestRecord>('/customer/marketplace/requests', { method: 'POST', body }),
+  }) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<ServiceRequestRecord>('/customer/marketplace/requests', { method: 'POST', body }),
   cancelServiceRequest: (id: string) =>
-    request<ServiceRequestRecord>(`/customer/marketplace/requests/${id}/cancel`, {
-      method: 'POST',
-      body: {},
-    }),
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<ServiceRequestRecord>(`/customer/marketplace/requests/${id}/cancel`, {
+          method: 'POST',
+          body: {},
+        }),
   submitReview: (body: { serviceRequestId: string; rating: number; comment?: string }) =>
-    request<{ id: string; rating: number }>('/customer/marketplace/reviews', { method: 'POST', body }),
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<{ id: string; rating: number }>('/customer/marketplace/reviews', { method: 'POST', body }),
   disputes: () =>
-    request<{ items: DisputeRecord[]; total: number }>('/customer/marketplace/disputes?pageSize=50'),
+    IS_STATIC_PREVIEW
+      ? Promise.resolve({ items: [] as DisputeRecord[], total: 0 })
+      : request<{ items: DisputeRecord[]; total: number }>('/customer/marketplace/disputes?pageSize=50'),
   openDispute: (body: { serviceRequestId: string; subject?: string; description: string }) =>
-    request<DisputeRecord>('/customer/marketplace/disputes', { method: 'POST', body }),
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<DisputeRecord>('/customer/marketplace/disputes', { method: 'POST', body }),
   disputeMessage: (id: string, body: string) =>
-    request<{ id: string }>(`/customer/marketplace/disputes/${id}/messages`, {
-      method: 'POST',
-      body: { body },
-    }),
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<{ id: string }>(`/customer/marketplace/disputes/${id}/messages`, {
+          method: 'POST',
+          body: { body },
+        }),
 };
 
-/** Public content, safe to fetch from a server component. */
+/**
+ * Public content, safe to fetch from a server component.
+ *
+ * In the static export these resolve from the bundled preview data instead of
+ * the API, because there is no API to reach. `preview-data.ts` documents the
+ * limits of that data; every page that shows it also shows a preview notice.
+ */
 export const publicApi = {
-  providers: (categoryKey?: string) =>
-    publicGet<{ items: ProviderSummary[]; total: number }>(
+  providers: async (categoryKey?: string) => {
+    if (IS_STATIC_PREVIEW) {
+      const items = previewProviders(categoryKey);
+      return { items, total: items.length };
+    }
+    return publicGet<{ items: ProviderSummary[]; total: number }>(
       `/marketplace/providers?pageSize=50${categoryKey ? `&categoryKey=${encodeURIComponent(categoryKey)}` : ''}`,
-    ),
-  provider: (id: string) => publicGet<ProviderDetail>(`/marketplace/providers/${id}`),
+    );
+  },
+  provider: async (id: string) => {
+    if (IS_STATIC_PREVIEW) {
+      const found = previewProvider(id);
+      if (!found) throw new ApiError(404, 'not_found', 'Provider not found.');
+      return found;
+    }
+    return publicGet<ProviderDetail>(`/marketplace/providers/${id}`);
+  },
   /** Published website content managed in the admin CMS. */
-  website: (locale: string) => publicGet<WebsiteContent>(`/cms/public/website?locale=${locale}`),
+  website: async (locale: string) => {
+    if (IS_STATIC_PREVIEW) return previewWebsiteContent(locale);
+    return publicGet<WebsiteContent>(`/cms/public/website?locale=${locale}`);
+  },
   applyAsProvider: (body: {
     legalNameEn: string;
     legalNameAr: string;
@@ -607,4 +740,26 @@ export function mediaAlt(media: CmsMedia | null, locale: string, fallback: strin
   if (!media) return fallback;
   const alt = locale === 'ar' ? media.altAr : media.altEn;
   return alt && alt.trim() ? alt : fallback;
+}
+
+/**
+ * The image for a service category.
+ *
+ * Three sources in priority order: the photograph an administrator attached in
+ * the CMS, the bundled photograph the static preview ships, then the vector
+ * motif. The result is always a servable URL, so a category tile can never
+ * render an empty or broken image.
+ */
+export function categoryImage(
+  media: CmsMedia | null,
+  categoryKey: string,
+  variant = 'card',
+): string {
+  const fromCms = mediaUrl(media, variant);
+  if (fromCms) return fromCms;
+  if (IS_STATIC_PREVIEW) {
+    const photo = previewCategoryPhoto(categoryKey);
+    if (photo) return assetUrl(photo);
+  }
+  return assetUrl(categoryArt(categoryKey));
 }

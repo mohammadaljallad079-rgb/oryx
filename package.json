@@ -23,6 +23,7 @@
     "test:shared": "pnpm --filter @oryx/shared test",
     "test:e2e": "pnpm --filter @oryx/api test:e2e",
     "test:ui": "pnpm --filter @oryx/admin test:ui",
+    "build:site": "ORYX_STATIC_EXPORT=1 pnpm --filter @oryx/shared build && ORYX_STATIC_EXPORT=1 pnpm --filter @oryx/database build && ORYX_STATIC_EXPORT=1 pnpm --filter @oryx/customer build",
     "preview:build": "node scripts/preview/build-preview.mjs",
     "preview:serve": "node scripts/preview/serve-preview.mjs",
     "preview:verify": "node scripts/preview/verify-preview.mjs",
