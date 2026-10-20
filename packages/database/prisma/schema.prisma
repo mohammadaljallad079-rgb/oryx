@@ -183,8 +183,8 @@ model Company {
   status          CompanyStatus @default(PROVISIONING)
   industry        String?
   countryCode     String?
-  currency        String        @default("SAR")
-  timezone        String        @default("Asia/Riyadh")
+  currency        String        @default("BHD")
+  timezone        String        @default("Asia/Bahrain")
   taxNumber       String?
   parentCompanyId String?
   notes           String?
@@ -328,7 +328,7 @@ model Branch {
   countryCode String?
   addressLine String?
   phone       String?
-  timezone    String   @default("Asia/Riyadh")
+  timezone    String   @default("Asia/Bahrain")
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -501,7 +501,7 @@ model Plan {
   descriptionAr      String
   monthlyPrice       Decimal  @db.Decimal(12, 2)
   annualPrice        Decimal  @db.Decimal(12, 2)
-  currency           String   @default("SAR")
+  currency           String   @default("BHD")
   isPublic           Boolean  @default(true)
   isActive           Boolean  @default(true)
   trialDays          Int      @default(14)
@@ -538,7 +538,7 @@ model Subscription {
   status           SubscriptionStatus @default(TRIAL)
   billingPeriod    BillingPeriod      @default(MONTHLY)
   price            Decimal            @db.Decimal(12, 2)
-  currency         String             @default("SAR")
+  currency         String             @default("BHD")
   startedAt        DateTime           @default(now())
   currentPeriodEnd DateTime?
   cancelledAt      DateTime?
@@ -736,6 +736,32 @@ model PlatformSetting {
   value     Json
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
+}
+
+/**
+ * Platform-level service-area catalogue.
+ *
+ * Seeded from `BAHRAIN_SERVICE_AREAS` in `@oryx/shared` so a fresh deployment
+ * is usable, but stored in the database so an administrator can rename,
+ * deactivate or add an area without a code change. The `code` is the stable
+ * identifier; the names are display values.
+ *
+ * This is a platform catalogue, not a tenant table: it carries no `companyId`,
+ * because every tenant in the launch market shares the same administrative
+ * areas. A tenant narrows coverage through its own branches.
+ */
+model ServiceArea {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  nameEn      String
+  nameAr      String
+  countryCode String   @default("BH")
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([countryCode, isActive])
 }
 
 // ============================================================================
@@ -957,7 +983,7 @@ model Account {
   isSystem      Boolean              @default(false)
   /** System role tag (e.g. AR_CONTROL, AP_CONTROL, CASH, SALES_REVENUE, VAT_OUTPUT). */
   systemRole    String?
-  currency      String               @default("SAR")
+  currency      String               @default("BHD")
   isActive      Boolean              @default(true)
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
@@ -1039,7 +1065,7 @@ model JournalEntry {
   /** Source document id, used to make posting idempotent. */
   sourceId         String?
   memo             String?
-  currency         String            @default("SAR")
+  currency         String            @default("BHD")
   totalDebitMinor  Int               @default(0)
   totalCreditMinor Int               @default(0)
   reversalOfId     String?
@@ -1115,7 +1141,7 @@ model Payment {
   paymentNumber  String
   method         PaymentMethod    @default(CASH)
   amountMinor    Int
-  currency       String           @default("SAR")
+  currency       String           @default("BHD")
   reference      String?
   notes          String?
   paidAt         DateTime
@@ -1360,7 +1386,7 @@ model Customer {
   paymentTermsDays    Int      @default(0)
   /** Control account for this customer's receivable. */
   receivableAccountId String?
-  currency            String   @default("SAR")
+  currency            String   @default("BHD")
   isActive            Boolean  @default(true)
   notes               String?
   createdAt           DateTime @default(now())
@@ -1403,7 +1429,7 @@ model Quotation {
   discountMinor    Int             @default(0)
   taxMinor         Int             @default(0)
   totalMinor       Int             @default(0)
-  currency         String          @default("SAR")
+  currency         String          @default("BHD")
   notes            String?
   convertedOrderId String?
   createdById      String
@@ -1449,7 +1475,7 @@ model SalesOrder {
   discountMinor Int              @default(0)
   taxMinor      Int              @default(0)
   totalMinor    Int              @default(0)
-  currency      String           @default("SAR")
+  currency      String           @default("BHD")
   notes         String?
   createdById   String
   createdAt     DateTime         @default(now())
@@ -1498,7 +1524,7 @@ model SalesInvoice {
   taxMinor        Int                @default(0)
   totalMinor      Int                @default(0)
   amountPaidMinor Int                @default(0)
-  currency        String             @default("SAR")
+  currency        String             @default("BHD")
   notes           String?
   journalEntryId  String?
   createdById     String
@@ -1555,7 +1581,7 @@ model CreditNote {
   taxMinor         Int            @default(0)
   totalMinor       Int            @default(0)
   reason           String?
-  currency         String         @default("SAR")
+  currency         String         @default("BHD")
   restockInventory Boolean        @default(false)
   journalEntryId   String?
   createdById      String
@@ -1634,7 +1660,7 @@ model PosSale {
   paidMinor        Int           @default(0)
   changeMinor      Int           @default(0)
   paymentMethod    PaymentMethod @default(CASH)
-  currency         String        @default("SAR")
+  currency         String        @default("BHD")
   salesInvoiceId   String?
   journalEntryId   String?
   createdById      String
@@ -1685,7 +1711,7 @@ model Supplier {
   paymentTermsDays Int      @default(0)
   /** Control account for this supplier's payable. */
   payableAccountId String?
-  currency         String   @default("SAR")
+  currency         String   @default("BHD")
   isActive         Boolean  @default(true)
   notes            String?
   createdAt        DateTime @default(now())
@@ -1757,7 +1783,7 @@ model PurchaseOrder {
   subtotalMinor Int                 @default(0)
   taxMinor      Int                 @default(0)
   totalMinor    Int                 @default(0)
-  currency      String              @default("SAR")
+  currency      String              @default("BHD")
   notes         String?
   approvedById  String?
   approvedAt    DateTime?
@@ -1849,7 +1875,7 @@ model SupplierInvoice {
   taxMinor              Int                   @default(0)
   totalMinor            Int                   @default(0)
   amountPaidMinor       Int                   @default(0)
-  currency              String                @default("SAR")
+  currency              String                @default("BHD")
   notes                 String?
   journalEntryId        String?
   createdById           String
@@ -1901,7 +1927,7 @@ model PurchaseReturn {
   taxMinor        Int            @default(0)
   totalMinor      Int            @default(0)
   reason          String?
-  currency        String         @default("SAR")
+  currency        String         @default("BHD")
   journalEntryId  String?
   createdById     String
   postedAt        DateTime?
@@ -2336,7 +2362,7 @@ model EmploymentContract {
   endDate       DateTime?
   /** Contracted base salary at signing, in minor units. */
   baseSalaryMinor Int
-  currency      String         @default("SAR")
+  currency      String         @default("BHD")
   probationDays Int            @default(0)
   notes         String?
   createdAt     DateTime       @default(now())
@@ -2537,7 +2563,7 @@ model SalaryStructure {
   effectiveFrom DateTime
   /** Base monthly salary in minor units. */
   basicMinor    Int
-  currency      String   @default("SAR")
+  currency      String   @default("BHD")
   isActive      Boolean  @default(true)
   notes         String?
   createdAt     DateTime @default(now())
@@ -2604,7 +2630,7 @@ model PayrollRun {
   allowancesMinor Int             @default(0)
   deductionsMinor Int             @default(0)
   netMinor       Int              @default(0)
-  currency       String           @default("SAR")
+  currency       String           @default("BHD")
   journalEntryId String?
   approvedById   String?
   approvedAt     DateTime?
@@ -2637,7 +2663,7 @@ model Payslip {
   deductionsMinor Int    @default(0)
   grossMinor    Int      @default(0)
   netMinor      Int      @default(0)
-  currency      String   @default("SAR")
+  currency      String   @default("BHD")
   advanceDeductionMinor Int @default(0)
   /** Full snapshot of the salary structure and computed components at run time. */
   snapshot      Json?
@@ -2675,7 +2701,7 @@ model EmployeeAdvance {
   amountMinor   Int
   installments  Int           @default(1)
   settledMinor  Int           @default(0)
-  currency      String        @default("SAR")
+  currency      String        @default("BHD")
   status        AdvanceStatus @default(OPEN)
   issuedAt      DateTime
   reason        String?
@@ -2739,7 +2765,7 @@ model Lead {
   status        LeadStatus @default(NEW)
   ownerUserId   String?
   estimatedValueMinor Int  @default(0)
-  currency      String     @default("SAR")
+  currency      String     @default("BHD")
   notes         String?
   /** Set when the lead is converted to a customer. */
   customerId    String?
@@ -2806,7 +2832,7 @@ model Opportunity {
   leadId        String?
   ownerUserId   String?
   amountMinor   Int               @default(0)
-  currency      String            @default("SAR")
+  currency      String            @default("BHD")
   expectedCloseDate DateTime?
   status        OpportunityStatus @default(OPEN)
   /** Set when converted into a quotation. */
@@ -3453,7 +3479,7 @@ model RepairEstimate {
   subtotalMinor Int           @default(0)
   taxMinor      Int           @default(0)
   totalMinor    Int           @default(0)
-  currency      String        @default("SAR")
+  currency      String        @default("BHD")
   customerApprovedById String?
   approvedAt    DateTime?
   expiresAt     DateTime?
@@ -3625,7 +3651,7 @@ model ProviderServiceListing {
   nameAr      String
   description String?
   priceMinor  Int      @default(0)
-  currency    String   @default("SAR")
+  currency    String   @default("BHD")
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -3675,7 +3701,7 @@ model MarketplaceCommission {
   baseMinor        Int
   rateBp           Int
   commissionMinor  Int
-  currency         String           @default("SAR")
+  currency         String           @default("BHD")
   status           CommissionStatus @default(PENDING)
   createdAt        DateTime         @default(now())
 
@@ -3694,7 +3720,7 @@ model ProviderSettlement {
   grossMinor      Int              @default(0)
   commissionMinor Int              @default(0)
   netMinor        Int              @default(0)
-  currency        String           @default("SAR")
+  currency        String           @default("BHD")
   status          SettlementStatus @default(DRAFT)
   approvedById    String?
   paidAt          DateTime?

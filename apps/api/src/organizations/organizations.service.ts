@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { checkLimit, type PlanLimits } from '@oryx/shared';
+import { checkLimit, DEFAULT_COUNTRY_CODE, DEFAULT_CURRENCY, DEFAULT_TIMEZONE, type PlanLimits } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { EntitlementService } from '../common/entitlement.service';
 import { AuditService } from '../common/audit.service';
@@ -131,8 +131,8 @@ export class OrganizationsService {
           type: dto.type,
           status: 'ACTIVE',
           industry: dto.industry ?? null,
-          countryCode: dto.countryCode ?? 'SA',
-          currency: dto.currency ?? 'SAR',
+          countryCode: dto.countryCode ?? DEFAULT_COUNTRY_CODE,
+          currency: dto.currency ?? DEFAULT_CURRENCY,
           parentCompanyId: dto.parentCompanyId ?? null,
           notes: dto.notes ?? null,
         },
@@ -328,10 +328,10 @@ export class OrganizationsService {
         nameEn: dto.nameEn,
         nameAr: dto.nameAr,
         city: dto.city ?? null,
-        countryCode: dto.countryCode ?? 'SA',
+        countryCode: dto.countryCode ?? DEFAULT_COUNTRY_CODE,
         addressLine: dto.addressLine ?? null,
         phone: dto.phone ?? null,
-        timezone: dto.timezone ?? 'Asia/Riyadh',
+        timezone: dto.timezone ?? DEFAULT_TIMEZONE,
       },
       include: { company: { select: { nameEn: true } }, _count: { select: { memberships: true } } },
     });

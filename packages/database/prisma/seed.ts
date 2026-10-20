@@ -17,11 +17,57 @@
 
 import { PrismaClient, type Prisma } from '@prisma/client';
 import * as argon2 from 'argon2';
-import { MODULES, PERMISSIONS, SERVICE_CATEGORIES, lineAmountMinor } from '@oryx/shared';
+import {
+  BAHRAIN_SERVICE_AREAS,
+  DEFAULT_COUNTRY_CODE,
+  DEFAULT_CURRENCY,
+  DEFAULT_TIMEZONE,
+  MODULES,
+  PERMISSIONS,
+  PLANS,
+  SERVICE_CATEGORIES,
+  lineAmountMinor,
+} from '@oryx/shared';
 
 const prisma = new PrismaClient();
 
 const DEMO_MARKER = 'SEED_DEMO_DATA';
+
+/**
+ * The seed is a **development and demonstration** tool. It creates a known
+ * Super Admin password, two synthetic demo tenants and baseline rows that are
+ * appropriate for a sandbox and dangerous in production.
+ *
+ * It therefore refuses to run when it believes it is pointed at production,
+ * unless the operator has explicitly accepted the risk with
+ * `ALLOW_SEED_IN_PRODUCTION=true`. The refusal is the default: an operator who
+ * has not thought about it should not get demo tenants and a published default
+ * password in their live database.
+ *
+ * The check is deliberately conservative about what counts as production. An
+ * unrecognised environment is treated as production, because the cost of a
+ * false refusal is one environment variable and the cost of a false permit is a
+ * compromised deployment.
+ */
+function assertSeedIsAllowed(): void {
+  const env = (process.env.NODE_ENV ?? '').toLowerCase();
+  const explicitlyAllowed = process.env.ALLOW_SEED_IN_PRODUCTION === 'true';
+  const isProductionLike = env === 'production' || env === 'staging';
+
+  if (isProductionLike && !explicitlyAllowed) {
+    console.error(
+      `\nORYX seed refused: NODE_ENV is "${env}".\n\n` +
+        'This script creates demo tenants and a default Super Admin password and\n' +
+        'must not run against a production database.\n\n' +
+        'For a production deployment, initialise the platform with:\n' +
+        '  pnpm db:migrate\n' +
+        '  node scripts/provision-super-admin.mjs\n\n' +
+        'If this really is a disposable environment, re-run with:\n' +
+        '  ALLOW_SEED_IN_PRODUCTION=true pnpm db:seed\n',
+    );
+    process.exit(1);
+  }
+}
 
 /** Standard chart of accounts mirrored from the accounting service. */
 const STANDARD_CHART: Array<{
@@ -113,80 +159,6 @@ async function seedModules() {
   console.log(`  modules: ${MODULES.length} upserted`);
 }
 
-const CORE_MODULES = [
-  'dashboard',
-  'company_management',
-  'branch_management',
-  'users_permissions',
-  'subscription_management',
-  'settings',
-];
-
-const PLANS = [
-  {
-    code: 'starter',
-    nameEn: 'Starter',
-    nameAr: 'المبتدئ',
-    descriptionEn: 'Core company, branch and user management for small teams.',
-    descriptionAr: 'إدارة الشركات والفروع والمستخدمين للفرق الصغيرة.',
-    monthlyPrice: '499.00',
-    annualPrice: '4990.00',
-    trialDays: 14,
-    maxCompanies: 1,
-    maxBranches: 2,
-    maxUsers: 10,
-    storageMb: 2048,
-    apiRequestsPerMonth: 10000,
-    modules: [...CORE_MODULES, 'crm', 'reports_analytics'],
-  },
-  {
-    code: 'professional',
-    nameEn: 'Professional',
-    nameAr: 'الاحترافي',
-    descriptionEn: 'Adds finance, sales, purchasing, inventory and HR.',
-    descriptionAr: 'يشمل المالية والمبيعات والمشتريات والمخزون والموارد البشرية.',
-    monthlyPrice: '1499.00',
-    annualPrice: '14990.00',
-    trialDays: 14,
-    maxCompanies: 3,
-    maxBranches: 10,
-    maxUsers: 75,
-    storageMb: 20480,
-    apiRequestsPerMonth: 100000,
-    modules: [
-      ...CORE_MODULES,
-      'crm',
-      'reports_analytics',
-      'financial_accounting',
-      'sales_pos',
-      'purchasing_procurement',
-      'warehouses_inventory',
-      'human_resources',
-      'operations',
-      // Execution 04 — the scheduling engine and payment records are useful to
-      // any tenant that runs operations, so they are licensed from Professional.
-      'booking_engine',
-      'payments',
-    ],
-  },
-  {
-    code: 'enterprise',
-    nameEn: 'Enterprise',
-    nameAr: 'المؤسسي',
-    descriptionEn: 'Full ERP including the automotive ecosystem modules.',
-    descriptionAr: 'النظام الكامل بما يشمل وحدات المنظومة اللوجستية للسيارات.',
-    monthlyPrice: '3499.00',
-    annualPrice: '34990.00',
-    trialDays: 30,
-    maxCompanies: 25,
-    maxBranches: -1,
-    maxUsers: -1,
-    storageMb: 204800,
-    apiRequestsPerMonth: -1,
-    modules: MODULES.map((m) => m.key),
-  },
-];
-
 async function seedPlans() {
   for (const plan of PLANS) {
     const record = await prisma.plan.upsert({
@@ -222,7 +194,7 @@ async function seedPlans() {
       },
     });
 
-    for (const moduleKey of plan.modules) {
+    for (const moduleKey of plan.licensedModules) {
       await prisma.planModule.upsert({
         where: { planId_moduleKey: { planId: record.id, moduleKey } },
         update: {},
@@ -231,7 +203,7 @@ async function seedPlans() {
     }
     // Remove modules that are no longer part of the plan definition.
     await prisma.planModule.deleteMany({
-      where: { planId: record.id, moduleKey: { notIn: plan.modules } },
+      where: { planId: record.id, moduleKey: { notIn: plan.licensedModules } },
     });
   }
   console.log(`  plans: ${PLANS.length} upserted`);
@@ -486,8 +458,8 @@ async function seedCompanies(superAdminId: string) {
         type: spec.type,
         industry: spec.industry,
         status: 'ACTIVE',
-        countryCode: 'SA',
-        currency: 'SAR',
+        countryCode: DEFAULT_COUNTRY_CODE,
+        currency: DEFAULT_CURRENCY,
         notes,
       },
     });
@@ -1193,7 +1165,57 @@ async function seedExecution03Baseline(idByCode: Map<string, string>, superAdmin
   );
 }
 
+/**
+ * Seed the platform-level Bahrain service-area catalogue.
+ *
+ * Idempotent by `code` and never overwrites an existing row, so re-running the
+ * seed after an administrator has renamed or deactivated an area preserves
+ * their change.
+ */
+async function seedServiceAreas(): Promise<number> {
+  let created = 0;
+  for (const [index, area] of BAHRAIN_SERVICE_AREAS.entries()) {
+    const existing = await prisma.serviceArea.findUnique({ where: { code: area.code } });
+    if (existing) continue;
+    await prisma.serviceArea.create({
+      data: {
+        code: area.code,
+        nameEn: area.nameEn,
+        nameAr: area.nameAr,
+        countryCode: DEFAULT_COUNTRY_CODE,
+        sortOrder: index,
+      },
+    });
+    created += 1;
+  }
+  return created;
+}
+
+/**
+ * Record the launch-market defaults as platform settings.
+ *
+ * Written explicitly rather than left to the service's fallback so an operator
+ * can see and edit them, and so the VAT rate is visibly zero rather than
+ * implicitly absent.
+ */
+async function seedPlatformSettings(): Promise<void> {
+  const settings: Array<[string, unknown]> = [
+    ['market.country_code', DEFAULT_COUNTRY_CODE],
+    ['market.currency', DEFAULT_CURRENCY],
+    ['market.timezone', DEFAULT_TIMEZONE],
+    ['finance.default_vat_rate_bp', 0],
+  ];
+  for (const [key, value] of settings) {
+    await prisma.platformSetting.upsert({
+      where: { key },
+      update: { value: value as never },
+      create: { key, value: value as never },
+    });
+  }
+}
+
 async function main() {
+  assertSeedIsAllowed();
   console.log('ORYX seed — start');
   await seedModules();
   await seedPlans();
@@ -1206,6 +1228,9 @@ async function main() {
   await seedErpBaseline(idByCode, superAdmin.id);
   await seedExecution03Baseline(idByCode, superAdmin.id);
   await seedAuditBaseline(superAdmin.id, idByCode);
+  const areas = await seedServiceAreas();
+  await seedPlatformSettings();
+  console.log(`  e08 baseline: ${areas} new service area(s), platform settings written`);
   console.log('ORYX seed — done');
 }
 

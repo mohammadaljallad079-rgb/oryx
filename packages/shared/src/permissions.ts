@@ -68,6 +68,8 @@ export const PERMISSIONS: PermissionDefinition[] = [
   P('platform.integration.manage', 'Platform', 'Manage integrations', 'إدارة التكاملات', 'PLATFORM', false, 'Configure, enable and disable external provider credentials.'),
   P('platform.integration.verify', 'Platform', 'Verify integrations', 'التحقق من التكاملات', 'PLATFORM', false, 'Run a live connection test against an external provider.'),
   P('platform.support.access', 'Platform', 'Support access to a tenant', 'الدخول الدعم لشركة', 'PLATFORM', false, 'Open an explicit, audited, time-bounded support session into a tenant.'),
+  P('platform.settings.read', 'Platform', 'View platform settings', 'عرض إعدادات المنصة', 'PLATFORM', false, 'Read market configuration and the service-area catalogue.'),
+  P('platform.settings.manage', 'Platform', 'Manage platform settings', 'إدارة إعدادات المنصة', 'PLATFORM', false, 'Change market configuration and manage service areas.'),
 
   // ----------------------------------------------------------------- company
   P('company.read', 'Company', 'View company', 'عرض الشركة', 'COMPANY', true, 'Read own company profile.'),
