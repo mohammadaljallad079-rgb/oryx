@@ -32,6 +32,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # GitHub rejects an invalid workflow file at the *workflow* level: the run
+      # appears with zero jobs and a failure, which is easy to misread as a code
+      # failure. Lint every workflow before anything else so that cannot happen.
+      # Pinned by image digest; actionlint is a single static binary with no
+      # post-install script.
+      - name: Validate workflow files
+        uses: docker://rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: -color
+
       - uses: pnpm/action-setup@v4
         with:
           version: ${{ env.PNPM_VERSION }}

@@ -53,9 +53,13 @@ jobs:
     runs-on: ubuntu-latest
     # The `production` environment lets the repository require a reviewer
     # approval before the job runs. Configure it under Settings → Environments.
+    #
+    # `environment.url` may not read `secrets`, so the link is built from an
+    # optional repository *variable* (`Settings → Variables → Actions`). When it
+    # is unset the deployment still runs and simply shows no environment link.
     environment:
       name: production
-      url: https://${{ secrets.DEPLOY_HOST }}
+      url: ${{ vars.ORYX_DEPLOY_URL }}
 
     steps:
       - name: Validate inputs
