@@ -1,0 +1,157 @@
+name: Deploy
+
+# Deploys a released tag to the production server over SSH.
+#
+# This workflow is **manual only** (`workflow_dispatch`). It is not triggered by
+# a push or a merge, because a merge is a code decision and a deploy is an
+# operational decision with a different owner, a different risk and a different
+# moment. The operator picks the tag, the workflow runs the same
+# `deploy/scripts/deploy.sh` that is used by hand, so the automated path and the
+# documented path cannot drift apart.
+#
+# Required repository secrets:
+#   DEPLOY_HOST      the server hostname or IP
+#   DEPLOY_USER      an unprivileged user that can run docker
+#   DEPLOY_SSH_KEY   the private key for that user
+#   DEPLOY_PATH      the absolute path of the checked-out repository on the server
+#
+# Optional:
+#   DEPLOY_PORT      SSH port, defaults to 22
+#
+# See docs/DEPLOYMENT.md §10.
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Release tag to deploy (e.g. 2026.10.19)'
+        required: true
+        type: string
+      skip_backup:
+        description: 'Skip the pre-deploy database backup (not recommended)'
+        required: false
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Validate the workflow and secrets without deploying'
+        required: false
+        type: boolean
+        default: false
+
+# One deploy at a time. Two concurrent deploys on one server would race on the
+# image tag and on the database.
+concurrency:
+  group: oryx-deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    # The `production` environment lets the repository require a reviewer
+    # approval before the job runs. Configure it under Settings → Environments.
+    environment:
+      name: production
+      url: https://${{ secrets.DEPLOY_HOST }}
+
+    steps:
+      - name: Validate inputs
+        run: |
+          tag='${{ inputs.image_tag }}'
+          if [[ ! "$tag" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::image_tag may only contain letters, digits, dot, underscore and dash"
+            exit 1
+          fi
+          echo "Release tag: $tag"
+
+      - name: Check required secrets are present
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          missing=0
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_PATH; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::secret $name is not set"
+              missing=1
+            fi
+          done
+          exit $missing
+
+      - name: Report the plan (dry run)
+        if: ${{ inputs.dry_run }}
+        run: |
+          cat <<'EOF'
+          Dry run — nothing was deployed.
+
+          The following would have run on the server:
+            git fetch --tags && git checkout <tag>
+            deploy/scripts/deploy.sh <tag>
+
+          deploy.sh takes a verified backup, rebuilds the images, waits for the
+          health probe, and rolls back to the previous tag if the probe fails.
+          EOF
+
+      - name: Configure SSH
+        if: ${{ !inputs.dry_run }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' '${{ secrets.DEPLOY_SSH_KEY }}' > ~/.ssh/oryx_deploy
+          chmod 600 ~/.ssh/oryx_deploy
+          # Pin the host key on first use so a later MITM cannot silently take
+          # over the connection. The key is recorded in the log for the operator
+          # to compare against the server's fingerprint.
+          ssh-keyscan -p '${{ secrets.DEPLOY_PORT || 22 }}' -H '${{ secrets.DEPLOY_HOST }}' >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy over SSH
+        if: ${{ !inputs.dry_run }}
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || 22 }}
+          TAG: ${{ inputs.image_tag }}
+          SKIP_BACKUP: ${{ inputs.skip_backup }}
+        run: |
+          # `-n` so the remote command cannot consume the local stdin, and
+          # `-o BatchMode=yes` so a key problem fails fast instead of hanging on
+          # a password prompt in CI.
+          ssh -n \
+            -i ~/.ssh/oryx_deploy \
+            -p "$DEPLOY_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "set -euo pipefail
+             cd '$DEPLOY_PATH'
+             git fetch --tags --prune
+             git checkout '$TAG'
+             if [[ '$SKIP_BACKUP' == 'true' ]]; then
+               deploy/scripts/deploy.sh '$TAG' --skip-backup
+             else
+               deploy/scripts/deploy.sh '$TAG'
+             fi"
+
+      - name: Summary
+        if: ${{ !inputs.dry_run }}
+        run: |
+          {
+            echo "### ORYX deployment"
+            echo
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Release | \`${{ inputs.image_tag }}\` |"
+            echo "| Host | \`${{ secrets.DEPLOY_HOST }}\` |"
+            echo "| Backup taken | ${{ inputs.skip_backup && '**no**' || 'yes' }} |"
+            echo "| Triggered by | @${{ github.actor }} |"
+            echo
+            echo "The workflow succeeded, which means the health probe reported \`ok\`."
+            echo "Run \`deploy/scripts/health-check.sh\` on the server for the full check."
+          } >> "$GITHUB_STEP_SUMMARY"

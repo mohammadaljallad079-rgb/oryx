@@ -18,6 +18,12 @@ import type { NextConfig } from 'next';
  */
 
 const isStaticExport = process.env.ORYX_STATIC_EXPORT === '1';
+/**
+ * `ORYX_DOCKER_BUILD=1` switches on `output: 'standalone'` for the
+ * server-rendered container image. It is ignored during a static export, which
+ * writes plain files rather than a server.
+ */
+const isDockerBuild = process.env.ORYX_DOCKER_BUILD === '1' && !isStaticExport;
 const basePath = isStaticExport ? (process.env.ORYX_BASE_PATH ?? '/oryx') : '';
 
 const nextConfig: NextConfig = {
@@ -41,6 +47,7 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_BASE_PATH: basePath,
     NEXT_PUBLIC_ORYX_STATIC_EXPORT: isStaticExport ? '1' : '',
   },
+  ...(isDockerBuild ? { output: 'standalone' as const } : {}),
   ...(isStaticExport
     ? {
         output: 'export' as const,

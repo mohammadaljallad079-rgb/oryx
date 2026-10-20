@@ -1,0 +1,104 @@
+# ORYX — production reverse proxy.
+#
+# This file is processed by the nginx image's entrypoint: every
+# `/etc/nginx/templates/*.template` is rendered with `envsubst` into
+# `/etc/nginx/conf.d/`. Only the variables named in NGINX_ENVSUBST_* are
+# substituted, so nginx's own `$host`, `$request_uri` and friends survive.
+#
+# One hostname per surface, each terminating TLS and proxying to a service that
+# is not otherwise published. The API is exposed under `/api/` on every host so
+# the browser sees a same-origin API; that keeps the HttpOnly refresh cookie
+# first-party and the CSRF double-submit check meaningful without CORS.
+#
+# TLS material is expected at /etc/nginx/certs/<host>.crt and <host>.key, with
+# the chain at <host>.chain.crt. Issue it with certbot and copy it in — see
+# docs/DEPLOYMENT.md §5.
+
+# ---------------------------------------------------------------- upstreams
+upstream oryx_api      { server api:3001      keepalive 32; }
+upstream oryx_admin    { server admin:3000    keepalive 32; }
+upstream oryx_customer { server customer:3002 keepalive 32; }
+
+# ------------------------------------------------------------- rate limiting
+# A coarse edge limit. The API applies its own per-route throttles; this stops a
+# flood before it reaches Node at all.
+limit_req_zone $binary_remote_addr zone=oryx_edge:10m rate=30r/s;
+limit_req_status 429;
+
+map $http_upgrade $oryx_connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+# ------------------------------------------------------------------- HTTP
+server {
+    listen 80 default_server;
+    server_name _;
+
+    # ACME challenges must stay on plain HTTP. Everything else is redirected.
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ------------------------------------------------------------------- admin
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${ORYX_ADMIN_HOST};
+
+    ssl_certificate         /etc/nginx/certs/${ORYX_ADMIN_HOST}.crt;
+    ssl_certificate_key     /etc/nginx/certs/${ORYX_ADMIN_HOST}.key;
+    ssl_trusted_certificate /etc/nginx/certs/${ORYX_ADMIN_HOST}.chain.crt;
+    include /etc/nginx/snippets/oryx-tls.conf;
+    include /etc/nginx/snippets/oryx-security-headers.conf;
+
+    client_max_body_size 25m;
+
+    location /api/ {
+        limit_req zone=oryx_edge burst=60 nodelay;
+        include /etc/nginx/snippets/oryx-proxy.conf;
+        proxy_pass http://oryx_api;
+    }
+
+    location / {
+        include /etc/nginx/snippets/oryx-proxy.conf;
+        proxy_pass http://oryx_admin;
+    }
+}
+
+# ---------------------------------------------------------------- customer
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${ORYX_CUSTOMER_HOST};
+
+    ssl_certificate         /etc/nginx/certs/${ORYX_CUSTOMER_HOST}.crt;
+    ssl_certificate_key     /etc/nginx/certs/${ORYX_CUSTOMER_HOST}.key;
+    ssl_trusted_certificate /etc/nginx/certs/${ORYX_CUSTOMER_HOST}.chain.crt;
+    include /etc/nginx/snippets/oryx-tls.conf;
+    include /etc/nginx/snippets/oryx-security-headers.conf;
+
+    client_max_body_size 25m;
+
+    location /api/ {
+        limit_req zone=oryx_edge burst=60 nodelay;
+        include /etc/nginx/snippets/oryx-proxy.conf;
+        proxy_pass http://oryx_api;
+    }
+
+    # Uploaded media is served by the API, which owns the path-traversal guard.
+    location /media/ {
+        include /etc/nginx/snippets/oryx-proxy.conf;
+        proxy_pass http://oryx_api;
+    }
+
+    location / {
+        include /etc/nginx/snippets/oryx-proxy.conf;
+        proxy_pass http://oryx_customer;
+    }
+}
