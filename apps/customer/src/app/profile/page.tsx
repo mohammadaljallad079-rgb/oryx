@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { DEFAULT_COUNTRY_CODE } from '@oryx/shared';
 import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
 import { customerApi, type Address, type NotificationPreference, type PrivacySettings } from '@/lib/api';
@@ -35,7 +36,7 @@ function ProfileContent() {
   const [label, setLabel] = useState('');
   const [addressLine1, setAddressLine1] = useState('');
   const [city, setCity] = useState('');
-  const [countryCode, setCountryCode] = useState('BH');
+  const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY_CODE);
 
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);

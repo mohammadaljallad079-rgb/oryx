@@ -3,7 +3,7 @@
 import { PermissionGate } from '@/components/permission-gate';
 import { useEffect, useState } from 'react';
 import type { PlanDto } from '@oryx/shared';
-import { MODULES } from '@oryx/shared';
+import { CURRENCIES, DEFAULT_CURRENCY, MODULES } from '@oryx/shared';
 import { api } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
@@ -195,7 +195,7 @@ function PlanEditor({
     descriptionAr: '',
     monthlyPrice: 0,
     annualPrice: 0,
-    currency: 'SAR',
+    currency: DEFAULT_CURRENCY,
     trialDays: 14,
     maxCompanies: 1,
     maxBranches: 1,
@@ -240,7 +240,7 @@ function PlanEditor({
         descriptionAr: '',
         monthlyPrice: 0,
         annualPrice: 0,
-        currency: 'SAR',
+        currency: DEFAULT_CURRENCY,
         trialDays: 14,
         maxCompanies: 1,
         maxBranches: 1,
@@ -382,11 +382,17 @@ function PlanEditor({
           />
         </Field>
         <Field label={t('plans.currency')}>
-          <input
+          <select
             className="oryx-input"
             value={form.currency}
-            onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
-          />
+            onChange={(e) => setForm({ ...form, currency: e.target.value })}
+          >
+            {CURRENCIES.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.code}
+              </option>
+            ))}
+          </select>
         </Field>
         <Field label={t('plans.trial')}>
           <input

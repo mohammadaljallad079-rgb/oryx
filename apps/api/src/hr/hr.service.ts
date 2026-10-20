@@ -237,6 +237,7 @@ export class HrService {
   async createContract(employeeId: string, dto: CreateContractDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     await this.assertEmployee(companyId, employeeId);
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const dup = await this.prisma.employmentContract.findUnique({ where: { companyId_contractNumber: { companyId, contractNumber: dto.contractNumber } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Contract number ${dto.contractNumber} already exists.`);
     const contract = await this.prisma.employmentContract.create({
@@ -249,7 +250,7 @@ export class HrService {
         startDate: new Date(dto.startDate),
         endDate: dto.endDate ? new Date(dto.endDate) : null,
         baseSalaryMinor: dto.baseSalaryMinor,
-        currency: dto.currency ?? 'SAR',
+        currency: dto.currency ?? companyCurrency,
         probationDays: dto.probationDays ?? 0,
         notes: dto.notes ?? null,
       },
@@ -562,6 +563,7 @@ export class HrService {
   async createSalaryStructure(dto: CreateSalaryStructureDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     await this.assertEmployee(companyId, dto.employeeId);
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const structure = await this.posting.withTransaction(async (tx) => {
       // Supersede the previous active structure rather than editing it, so
       // historical payroll results stay intact.
@@ -575,7 +577,7 @@ export class HrService {
           employeeId: dto.employeeId,
           effectiveFrom: new Date(dto.effectiveFrom),
           basicMinor: dto.basicMinor,
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? companyCurrency,
           notes: dto.notes ?? null,
           components: {
             create: dto.components.map((c, i) => ({
@@ -652,6 +654,7 @@ export class HrService {
     if (!period) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Payroll period not found.');
     if (period.status !== 'OPEN') throw forbidden(ERROR_CODES.PAYROLL_PERIOD_LOCKED, 'The payroll period is not open.');
 
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const employees = await this.prisma.employee.findMany({
       where: { companyId, status: { in: ['ACTIVE', 'ON_LEAVE'] } },
       include: {
@@ -665,7 +668,7 @@ export class HrService {
     const result = await this.posting.withTransaction(async (tx) => {
       const runNumber = await this.sequences.next(tx, companyId, 'payrollRun');
       const run = await tx.payrollRun.create({
-        data: { companyId, periodId: period.id, runNumber, status: 'DRAFT', currency: 'SAR', createdById: actor.userId, notes: dto.notes ?? null },
+        data: { companyId, periodId: period.id, runNumber, status: 'DRAFT', currency: companyCurrency, createdById: actor.userId, notes: dto.notes ?? null },
       });
 
       let gross = 0;

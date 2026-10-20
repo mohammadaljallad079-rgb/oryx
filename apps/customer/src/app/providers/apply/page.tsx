@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { DEFAULT_COUNTRY_CODE } from '@oryx/shared';
 import { useUi } from '@/lib/ui-context';
 import { publicApi, SERVICE_CATEGORIES } from '@/lib/api';
 import { messageOf } from '@/lib/hooks';
@@ -46,7 +47,7 @@ export default function ProviderApplyPage() {
         legalNameAr: legalNameAr || legalNameEn,
         contactEmail,
         contactPhone,
-        countryCode: 'BH',
+        countryCode: DEFAULT_COUNTRY_CODE,
         ...(registrationNumber ? { registrationNumber } : {}),
         ...(city ? { city } : {}),
         ...(categoryKeys.length > 0 ? { categoryKeys } : {}),

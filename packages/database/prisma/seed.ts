@@ -475,7 +475,7 @@ async function seedCompanies(superAdminId: string) {
           nameEn: b.nameEn,
           nameAr: b.nameAr,
           city: b.city,
-          countryCode: 'SA',
+          countryCode: DEFAULT_COUNTRY_CODE,
           isActive: true,
         },
       });

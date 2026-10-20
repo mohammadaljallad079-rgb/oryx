@@ -104,6 +104,11 @@ export class SalesService {
 
   async createCustomer(dto: CreateCustomerDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    // A new customer inherits the tenant's own market, not a hard-coded one.
+    const [defaultCurrency, defaultCountry] = await Promise.all([
+      this.context.companyCurrency(companyId),
+      this.context.companyCountryCode(companyId),
+    ]);
     const dup = await this.prisma.customer.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Customer code ${dto.code} already exists.`);
     const customer = await this.prisma.customer.create({
@@ -117,10 +122,10 @@ export class SalesService {
         taxNumber: dto.taxNumber ?? null,
         addressLine: dto.addressLine ?? null,
         city: dto.city ?? null,
-        countryCode: dto.countryCode ?? 'SA',
+        countryCode: dto.countryCode ?? defaultCountry,
         creditLimitMinor: dto.creditLimitMinor ?? 0,
         paymentTermsDays: dto.paymentTermsDays ?? 0,
-        currency: dto.currency ?? 'SAR',
+        currency: dto.currency ?? defaultCurrency,
         notes: dto.notes ?? null,
       },
     });
@@ -191,6 +196,7 @@ export class SalesService {
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     await this.assertCustomer(companyId, dto.customerId);
 
+    const currency = dto.currency ?? (await this.context.companyCurrency(companyId));
     const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })));
     const quotation = await this.posting.withTransaction(async (tx) => {
       const quoteNumber = await this.sequences.next(tx, companyId, 'quotation');
@@ -207,7 +213,7 @@ export class SalesService {
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
-          currency: dto.currency ?? 'SAR',
+          currency,
           notes: dto.notes ?? null,
           createdById: actor.userId,
           lines: { create: buildSimpleLineRows(totals, dto.lines) },
@@ -307,6 +313,7 @@ export class SalesService {
     await this.assertCustomer(companyId, dto.customerId);
     if (dto.warehouseId) await this.assertWarehouse(companyId, dto.warehouseId);
 
+    const currency = dto.currency ?? (await this.context.companyCurrency(companyId));
     const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })));
     const order = await this.posting.withTransaction(async (tx) => {
       const orderNumber = await this.sequences.next(tx, companyId, 'salesOrder');
@@ -323,7 +330,7 @@ export class SalesService {
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
-          currency: dto.currency ?? 'SAR',
+          currency,
           notes: dto.notes ?? null,
           createdById: actor.userId,
           lines: { create: buildSimpleLineRows(totals, dto.lines) },
@@ -391,11 +398,12 @@ export class SalesService {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
 
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
       let customerId = dto.customerId ?? null;
       let orderId: string | null = null;
       let warehouseId = dto.warehouseId ?? null;
-      let currency = dto.currency ?? 'SAR';
+      let currency = dto.currency ?? companyCurrency;
       let lineInputs: Array<PricedLineInput & { productId: string | null; description: string }>;
 
       if (dto.orderId) {
@@ -617,6 +625,8 @@ export class SalesService {
   async issueInvoice(tx: Tx, input: IssueInvoiceInput) {
     const totals = computeDocumentTotals(input.lines);
     const invoiceNumber = await this.sequences.next(tx, input.companyId, 'salesInvoice');
+    // A module-issued invoice follows the tenant's currency unless told otherwise.
+    const currency = input.currency ?? (await this.context.companyCurrency(input.companyId, tx));
     const invoice = await tx.salesInvoice.create({
       data: {
         companyId: input.companyId,
@@ -630,7 +640,7 @@ export class SalesService {
         discountMinor: totals.discountMinor,
         taxMinor: totals.taxMinor,
         totalMinor: totals.totalMinor,
-        currency: input.currency ?? 'SAR',
+        currency,
         notes: input.notes ?? null,
         createdById: input.actorUserId,
         lines: { create: buildLineRows(totals, input.lines) },
@@ -642,7 +652,7 @@ export class SalesService {
       branchId: input.branchId ?? null,
       customerId: input.customerId,
       warehouseId: input.warehouseId ?? null,
-      currency: input.currency ?? 'SAR',
+      currency,
       lines: input.lines,
       entryDate: input.entryDate,
       sourceType: input.sourceType,
@@ -677,6 +687,7 @@ export class SalesService {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
 
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
       await this.assertCustomerTx(tx, companyId, dto.customerId);
       let invoiceId: string | null = dto.invoiceId ?? null;
@@ -705,7 +716,7 @@ export class SalesService {
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
           reason: dto.reason ?? null,
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? companyCurrency,
           restockInventory: dto.restockInventory ?? false,
           createdById: actor.userId,
           postedAt: new Date(),
@@ -953,6 +964,7 @@ export class SalesService {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
 
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
       const session = await tx.cashierSession.findFirst({
         where: { id: dto.cashierSessionId, companyId },
@@ -995,7 +1007,7 @@ export class SalesService {
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
-          currency: 'SAR',
+          currency: companyCurrency,
           notes: `POS sale in session ${session.sessionNumber}`,
           createdById: actor.userId,
           lines: { create: buildLineRows(totals, lineInputs) },
@@ -1008,7 +1020,7 @@ export class SalesService {
         branchId: dto.branchId,
         customerId,
         warehouseId,
-        currency: 'SAR',
+        currency: companyCurrency,
         lines: lineInputs,
         entryDate: invoiceDate,
         sourceType: 'POS_SALE',
@@ -1040,7 +1052,7 @@ export class SalesService {
           paidMinor,
           changeMinor,
           paymentMethod: dto.paymentMethod,
-          currency: 'SAR',
+          currency: companyCurrency,
           salesInvoiceId: invoice.id,
           journalEntryId: posted.journalEntryId ?? null,
           createdById: actor.userId,

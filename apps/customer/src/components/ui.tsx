@@ -2,6 +2,7 @@
 
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
+import { DEFAULT_CURRENCY } from '@oryx/shared';
 import { useUi } from '@/lib/ui-context';
 
 export function Card({
@@ -137,7 +138,7 @@ export function Loading({ label }: { label?: string }) {
 }
 
 /** Render a monetary minor-unit amount in the currency's own scale. */
-export function Money({ minor, currency = 'BHD', scale = 3 }: { minor: number; currency?: string; scale?: number }) {
+export function Money({ minor, currency = DEFAULT_CURRENCY, scale = 3 }: { minor: number; currency?: string; scale?: number }) {
   const value = minor / 10 ** scale;
   const formatted = value.toLocaleString('en-BH', {
     minimumFractionDigits: scale,
