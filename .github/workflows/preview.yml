@@ -78,12 +78,33 @@ jobs:
           echo "Images: $(find build/preview/assets -type f | wc -l)"
           echo "Size: $(du -sh build/preview | cut -f1)"
 
+      # Pages runs Jekyll unless `.nojekyll` is present, and Jekyll drops every
+      # path beginning with an underscore — which is the whole `_next` directory,
+      # so the site would publish with no CSS and no JavaScript. `upload-artifact`
+      # skips dotfiles by default, so the marker is asserted here and the upload
+      # below is told to include it.
+      - name: Assert the Pages marker and the exported assets are present
+        run: |
+          set -euo pipefail
+          test -f build/preview/.nojekyll || {
+            echo "::error::build/preview/.nojekyll is missing; Pages would strip _next/"
+            exit 1
+          }
+          test -d build/preview/_next/static || {
+            echo "::error::build/preview/_next/static is missing; the export did not run"
+            exit 1
+          }
+          echo "marker ok; $(find build/preview/_next -type f | wc -l) _next files"
+
       - name: Upload the preview site
         uses: actions/upload-artifact@v4
         with:
           name: preview-site
           path: build/preview/
           retention-days: 14
+          # Without this the dotfiles are silently dropped, and `.nojekyll` is a
+          # dotfile. That single omission is what broke the published site.
+          include-hidden-files: true
 
   # --------------------------------------------------------------- verify
   # Proves the built site actually renders before it is published: every page
@@ -180,6 +201,31 @@ jobs:
             sleep 15
           done
           echo "the published site did not become reachable"; exit 1
+
+      # The local verify job serves the build from disk, so it cannot see what
+      # Pages does to it. This is the check that would have caught Jekyll
+      # stripping `_next/`: it fetches the *published* HTML, takes the stylesheet
+      # it asks for, and requires that asset to come back.
+      - name: Assert the published site actually loads its assets
+        run: |
+          set -euo pipefail
+          html=$(curl -fsS "${PREVIEW_URL}")
+          css=$(printf '%s' "$html" | grep -o '/oryx/_next/static/css/[^"]*\.css' | head -1)
+          test -n "$css" || { echo "::error::the published page references no stylesheet"; exit 1; }
+          code=$(curl -s -o /dev/null -w '%{http_code}' "https://mohammadaljallad079-rgb.github.io${css}")
+          echo "stylesheet ${css} -> ${code}"
+          test "$code" = "200" || {
+            echo "::error::the published stylesheet 404s; Pages is stripping _next/ (is .nojekyll published?)"
+            exit 1
+          }
+          js=$(printf '%s' "$html" | grep -o '/oryx/_next/static/chunks/[^"]*\.js' | head -1)
+          test -n "$js" || { echo "::error::the published page references no script"; exit 1; }
+          jscode=$(curl -s -o /dev/null -w '%{http_code}' "https://mohammadaljallad079-rgb.github.io${js}")
+          echo "script ${js} -> ${jscode}"
+          test "$jscode" = "200" || {
+            echo "::error::the published script 404s; Pages is stripping _next/"
+            exit 1
+          }
 
       - name: Report the published URL
         run: |
