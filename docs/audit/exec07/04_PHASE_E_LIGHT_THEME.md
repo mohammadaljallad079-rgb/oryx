@@ -499,3 +499,75 @@ on `5920895` were also green.
 - The capture harnesses default to the sandbox preview host, which changes when a
   sandbox is recreated. Each reads `ORYX_CUSTOMER_BASE` so a re-run can be
   pointed at the current origin without editing the script.
+
+## 9. Continuation session (2026-10-18) — light-theme sign-off
+
+The sandbox for the session that wrote sections 1–8 failed again. This section
+records what was recovered and what was corrected in the continuation.
+
+### 9.1 Recovery
+
+| Question | Finding | How it was checked |
+|---|---|---|
+| Remote branch tip | `32c1d166583169a9ebca3e08fb68483e70b562ea` | `git ls-remote origin feature/execution-07-premium-web` |
+| Local HEAD | `32c1d16` — in step with the remote | `git rev-parse HEAD` |
+| Commits beyond `b3c9a71` | **ten**, ending at `32c1d16` | `git log --oneline b3c9a71..HEAD` |
+| Uncommitted work in the workspace | **present** — the hero-eyebrow fix in `globals.css`, the static-export preview wiring (`preview-data.ts`, `asset-url.ts`, `api.ts`, `auth-context.tsx`, `use-website-content.ts`, the `PreviewStrip`) and the preview tooling | `git status --porcelain` |
+| Stashes | **none** | `git stash list` |
+
+**The crash did not lose any pushed commit.** Every commit the previous session
+pushed is on `origin`; the remote tip is `32c1d16`, which is the workspace HEAD.
+The work that was still uncommitted when the sandbox failed survived in the
+workspace filesystem and is committed here — it was never lost, and nothing had
+to be reconstructed from a stash.
+
+### 9.2 The light-theme correction that was still outstanding
+
+The owner's report — "the Light Theme colors still look inconsistent" — pointed
+at the homepage hero eyebrow. `.oryx-hero p` is more specific than
+`.oryx-eyebrow`, so the eyebrow inherited the lede's muted colour and 16px size
+instead of the gold accent every other eyebrow uses. Measured on the live render:
+`rgb(159,179,200)` at 16px, where the approved design shows a small gold
+uppercase label. The fix is one light-scoped rule that restates the eyebrow at a
+matching specificity (`:root[data-theme='light'] .oryx-hero .oryx-eyebrow`), so
+it reads `--band-accent` again. It is scoped to the light theme precisely because
+the dark render is approved: dark still resolves the eyebrow at 16px, and the
+dark-invariance check confirms it did not move.
+
+### 9.3 Defects found and fixed in this session
+
+| # | Defect | Fix |
+|---|---|---|
+| E9 | The preview overview page's three card links (`evidence/`, `reports/`, `brand/`) were written without the `../` prefix, so each resolved one directory too deep and returned **404** — three broken links on the page a reviewer lands on first. Found by the link crawl, not by eye. | Prefix the three `href`s with `../` in `scripts/preview/build-preview.mjs` |
+| E10 | The link crawl's "dark" pass used `page.emulateMedia({ colorScheme: 'dark' })`, but the site resolves its theme from `localStorage`, not `prefers-color-scheme`, so the pass measured the **light** palette and reported it as dark. | Set the stored preference with `ctx.addInitScript`, which is what the header toggle writes; the pass now reports the navy `rgb(0,22,43)` field |
+| E11 | `eslint .` in the customer app linted the static-export `out/` directory (generated, minified, git-ignored), producing 165 spurious errors and hiding the real lint result. | Add `out/**` to the flat-config `ignores` |
+| E12 | A `globals.css` comment cited `docs/audit/exec07/phase-e/dark-identical.txt`, which does not exist; the verdict lives in `after/dark-invariance.json`. | Point the comment at the real file |
+
+### 9.4 Verification after the fixes
+
+| Check | Command | Result |
+|---|---|---|
+| Link and dark crawl | `pnpm preview:check` | **203 pages crawled; 0 bad responses; 0 dark-mode issues** (was 3 × 404) |
+| Preview render | `pnpm preview:verify` | **61 page/theme combinations; issues: none** |
+| Static export build | `pnpm build:site` | **22 website pages exported** |
+| Preview build | `pnpm preview:build` | 22 website pages, 23 reports, 30 capture pairs, 32 sheets, 22 brand assets, 148 images |
+| Light sweep | `.run/sweep-light-contrast.mjs light` | **0 text pairs below their WCAG threshold** |
+| Dark integrity | `.run/verify-dark-identical.mjs` | **22/31 byte-identical; 0 real colour shifts**; worst 0.0112% at delta 2 |
+| Shared unit | `pnpm --filter @oryx/shared test` | **132 passed** |
+| API integration | `pnpm --filter @oryx/api test:e2e` | **302 passed** |
+| Mobile unit | `pnpm --filter @oryx/mobile test` | **20 passed** |
+| Customer typecheck | `tsc --noEmit` | **clean** |
+| Customer lint | `eslint . --max-warnings=0` | **clean** |
+
+The dark-invariance figure is unchanged from section 4 — same 22 byte-identical
+captures, same zero real shifts — which is the evidence that the light-theme
+work and the preview fixes left the approved dark theme alone.
+
+### 9.5 Captures re-verified
+
+The five requested surfaces plus the light-vs-dark comparison were re-captured
+from the restored same-origin live preview at desktop (1440), tablet (834) and
+mobile (390), in Arabic RTL and English LTR, for both themes — 60 captures
+recorded in `after/manifest.json`, plus two derived comparison sheets (62 PNGs
+in total). Every capture is `status=200` with `overflow=0`, and body contrast is
+14.79:1 in light and 16.37:1 in dark.

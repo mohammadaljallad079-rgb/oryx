@@ -1,18 +1,17 @@
 {
   "captures": 31,
-  "byteIdentical": 23,
+  "byteIdentical": 22,
   "realColourShift": 0,
-  "isolatedPixelDeviation": 2,
+  "isolatedPixelDeviation": 1,
   "thresholdStrictPercent": 0.05,
   "histogram": {
-    "0": 23,
-    "1": 5,
-    "2": 1,
-    "13": 1,
-    "24": 1
+    "0": 22,
+    "1": 6,
+    "2": 2,
+    "13": 1
   },
   "worst": {
-    "file": "04-login-mobile-ar-dark.png",
+    "file": "01-homepage-mobile-ar-dark.png",
     "moved": 0.011240733989549155,
     "maxDelta": 2
   },
@@ -25,15 +24,15 @@
     },
     {
       "file": "01-homepage-desktop-en-dark.png",
-      "moved": 0.001,
-      "strictPixels": 5,
-      "maxDelta": 24
-    },
-    {
-      "file": "01-homepage-mobile-ar-dark.png",
       "moved": 0,
       "strictPixels": 0,
       "maxDelta": 0
+    },
+    {
+      "file": "01-homepage-mobile-ar-dark.png",
+      "moved": 0.0112,
+      "strictPixels": 0,
+      "maxDelta": 2
     },
     {
       "file": "01-homepage-mobile-en-dark.png",
@@ -85,9 +84,9 @@
     },
     {
       "file": "02-dashboard-tablet-en-dark.png",
-      "moved": 0,
+      "moved": 0.0017,
       "strictPixels": 0,
-      "maxDelta": 0
+      "maxDelta": 1
     },
     {
       "file": "03-providers-desktop-ar-dark.png",
