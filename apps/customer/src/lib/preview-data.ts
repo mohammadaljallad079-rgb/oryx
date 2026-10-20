@@ -20,6 +20,7 @@
  */
 
 import { SERVICE_CATEGORIES } from '@oryx/shared';
+import { SITE_PHOTOS, sitePhotoForCategory } from './site-media';
 import type {
   Address,
   BookingSlot,
@@ -69,32 +70,10 @@ export function previewLabel(locale: string): string {
 // ------------------------------------------------------------ photography
 
 /**
- * The approved photographs, copied into the export at build time.
- *
- * These are the owner-supplied files in `apps/customer/public/media`, the same
- * images the CMS attaches to each category in a seeded deployment.
+ * The approved photographs live in `site-media.ts`, so the bundled export and a
+ * live deployment share one mapping. This module only exposes the pieces the
+ * preview needs.
  */
-const PHOTO = {
-  heroShowroom: '/media/hero-showroom.jpg',
-  showroomJaguar: '/media/showroom-jaguar.jpg',
-  workshopArtDeco: '/media/workshop-artdeco.jpg',
-  mechanicEngine: '/media/mechanic-engine.jpg',
-  inspectionBay: '/media/inspection-bay.jpg',
-  garageBrastad: '/media/garage-brastad.jpg',
-  partsStore: '/media/parts-store.jpg',
-  carwashPremium: '/media/carwash-premium.jpg',
-  recoveryTow: '/media/recovery-tow.jpg',
-  evCharging: '/media/ev-charging.jpg',
-} as const;
-
-/** Which photograph illustrates which catalogue category. */
-const CATEGORY_PHOTO: Record<string, string> = {
-  vehicle_inspection: PHOTO.inspectionBay,
-  maintenance: PHOTO.mechanicEngine,
-  spare_parts: PHOTO.partsStore,
-  recovery: PHOTO.recoveryTow,
-  car_wash: PHOTO.carwashPremium,
-};
 
 /** The administrator-authored category copy, mirroring the content seed. */
 const CATEGORY_COPY: Record<string, { descriptionEn: string; descriptionAr: string }> = {
@@ -307,7 +286,7 @@ export function previewWebsiteContent(locale: string): WebsiteContent {
         sortOrder: 0,
         // A bundled photograph rather than a CMS media id, because the export
         // has no API to serve asset bytes from.
-        imageUrl: PHOTO.heroShowroom,
+        imageUrl: SITE_PHOTOS.autoService.src,
         media: null,
       },
     ],
@@ -333,26 +312,30 @@ export function previewWebsiteContent(locale: string): WebsiteContent {
  * such endpoint, so the bundled file is returned directly.
  */
 export function previewCategoryPhoto(categoryKey: string): string | null {
-  return CATEGORY_PHOTO[categoryKey] ?? null;
+  return sitePhotoForCategory(categoryKey)?.src ?? null;
 }
 
 /** The hero photograph, used when the CMS banner carries no image. */
-export const PREVIEW_HERO_PHOTO = PHOTO.heroShowroom;
+export const PREVIEW_HERO_PHOTO = SITE_PHOTOS.autoService.src;
 
 /** A secondary photograph for the partner panel. */
-export const PREVIEW_PARTNER_PHOTO = PHOTO.mechanicEngine;
+export const PREVIEW_PARTNER_PHOTO = SITE_PHOTOS.mechanicEngine.src;
 
 /** The gallery strip on the services page. */
 export const PREVIEW_GALLERY = [
-  { src: PHOTO.heroShowroom, altEn: 'A luxury car showroom with polished vehicles', altAr: 'صالة عرض فاخرة للسيارات' },
-  { src: PHOTO.inspectionBay, altEn: 'A vehicle inspection bay with a car on a ramp', altAr: 'قسم فحص المركبات مع رفع السيارة' },
-  { src: PHOTO.mechanicEngine, altEn: 'Two mechanics repairing an engine', altAr: 'ميكانيكيان يصلحان محركاً' },
-  { src: PHOTO.partsStore, altEn: 'Shelves of organised car spare parts', altAr: 'رفوف قطع غيار منظمة' },
-  { src: PHOTO.recoveryTow, altEn: 'A recovery truck loading a car', altAr: 'شاحنة إنقاذ تحمل سيارة' },
-  { src: PHOTO.carwashPremium, altEn: 'A premium car wash station', altAr: 'محطة غسيل سيارات مميزة' },
-  { src: PHOTO.workshopArtDeco, altEn: 'A classic automotive workshop building', altAr: 'ورشة سيارات كلاسيكية' },
-  { src: PHOTO.evCharging, altEn: 'An electric vehicle charging at a station', altAr: 'سيارة كهربائية تشحن في محطة' },
-] as const;
+  SITE_PHOTOS.autoService,
+  SITE_PHOTOS.inspectionBay,
+  SITE_PHOTOS.mechanicEngine,
+  SITE_PHOTOS.partsStore,
+  SITE_PHOTOS.recoveryTow,
+  SITE_PHOTOS.carwashPremium,
+  SITE_PHOTOS.workshopArtDeco,
+  SITE_PHOTOS.evCharging,
+].map((photo) => ({ src: photo.src, altEn: photo.altEn, altAr: photo.altAr })) as ReadonlyArray<{
+  src: string;
+  altEn: string;
+  altAr: string;
+}>;
 
 // ------------------------------------------------------- customer records
 

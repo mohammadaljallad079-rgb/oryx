@@ -90,6 +90,22 @@
    */
   --gold-on-tint: #d4af37;
   /*
+   * The gold-tint ramp. Every chip, wash, hairline and inset panel takes one of
+   * these seven steps instead of its own `color-mix(... var(--gold) N% ...)`,
+   * which is what made the light theme read as assembled rather than designed.
+   * The dark values are the percentages the rules already used most often, so
+   * the approved dark render moves by at most one step.
+   */
+  --tint-wash: color-mix(in srgb, var(--gold) 6%, transparent);
+  --tint-fill: color-mix(in srgb, var(--gold) 12%, transparent);
+  --tint-focus: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tint-glow: color-mix(in srgb, var(--gold) 22%, transparent);
+  --tint-active: color-mix(in srgb, var(--gold) 18%, var(--surface-raised));
+  --tint-line: color-mix(in srgb, var(--gold) 26%, transparent);
+  --tint-badge-line: color-mix(in srgb, var(--gold) 34%, transparent);
+  --tint-ring: color-mix(in srgb, var(--gold) 40%, transparent);
+  --tint-panel: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+  /*
    * Photo panels (the homepage hero, page headers and the dashboard banner).
    * In the dark theme the panel field is the existing navy gradient, so the
    * approved render is unchanged; the light theme uses a navy band so the white
@@ -97,7 +113,7 @@
    */
   --panel-bg: radial-gradient(
       120% 140% at 88% 6%,
-      color-mix(in srgb, var(--gold) 16%, transparent),
+      var(--tint-fill),
       transparent 58%
     ),
     linear-gradient(150deg, var(--surface-raised), var(--bg-deep));
@@ -227,6 +243,22 @@
    * chips share one value rather than each carrying its own override.
    */
   --gold-on-tint: #7a5c10;
+  /*
+   * The gold-tint ramp. A chip takes one named step instead of carrying its own
+   * percentage, so every chip, wash and hairline in the light theme shares one
+   * warm gold rather than the sixteen ad-hoc values the rules used to mix.
+   * `--tint-fill` is the 12% chip the `goldOnTint` value above is measured
+   * against, so its contrast is unchanged.
+   */
+  --tint-wash: color-mix(in srgb, var(--gold) 6%, transparent);
+  --tint-fill: color-mix(in srgb, var(--gold) 12%, transparent);
+  --tint-focus: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tint-glow: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tint-active: color-mix(in srgb, var(--gold) 14%, var(--surface-raised));
+  --tint-line: color-mix(in srgb, var(--gold) 26%, transparent);
+  --tint-badge-line: color-mix(in srgb, var(--gold) 34%, transparent);
+  --tint-ring: color-mix(in srgb, var(--gold) 40%, transparent);
+  --tint-panel: color-mix(in srgb, var(--surface-raised) 55%, transparent);
   /*
    * Photo panels are navy bands in the approved light homepage, so the panel
    * field is the navy band with a faint gold bloom. The panel ink is white for
@@ -538,7 +570,7 @@ a {
 .oryx-textarea:focus {
   outline: none;
   border-color: var(--border-strong);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 16%, transparent);
+  box-shadow: 0 0 0 3px var(--tint-focus);
 }
 
 .oryx-input::placeholder,
@@ -645,7 +677,7 @@ a {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--gold) 22%, transparent), transparent 60%),
+    radial-gradient(120% 90% at 85% 0%, var(--tint-glow), transparent 60%),
     linear-gradient(160deg, var(--surface-raised), var(--bg-deep));
 }
 
@@ -661,7 +693,7 @@ a {
   padding: 56px 40px;
   border: 1px solid var(--border);
   background:
-    radial-gradient(90% 120% at 90% 10%, color-mix(in srgb, var(--gold) 20%, transparent), transparent 55%),
+    radial-gradient(90% 120% at 90% 10%, var(--tint-glow), transparent 55%),
     linear-gradient(150deg, var(--surface-raised), var(--bg-deep));
 }
 
@@ -877,6 +909,16 @@ a {
   color: var(--text-muted);
 }
 
+/*
+ * The card description was the last ad-hoc size in the light theme: it read at
+ * 12.5px while the muted text it sits beside reads at 13px, so the two lines of
+ * one card disagreed. Corrected for the light theme only, because the dark
+ * render is the approved baseline and a 0.5px change re-lays-out every card.
+ */
+:root[data-theme='light'] .oryx-cat-card__desc {
+  font-size: 13px;
+}
+
 .oryx-cat-card__link {
   display: inline-flex;
   align-items: center;
@@ -959,8 +1001,8 @@ a {
   place-items: center;
   border-radius: 10px;
   color: var(--gold-on-tint);
-  background: color-mix(in srgb, var(--gold) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--gold) 28%, transparent);
+  background: var(--tint-fill);
+  border: 1px solid var(--tint-line);
   margin-bottom: 2px;
 }
 
@@ -1027,8 +1069,8 @@ a {
   place-items: center;
   border-radius: 12px;
   color: var(--gold-on-tint);
-  background: color-mix(in srgb, var(--gold) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
+  background: var(--tint-fill);
+  border: 1px solid var(--tint-line);
 }
 
 .oryx-feature__body {
@@ -1207,7 +1249,7 @@ a {
   border-radius: 20px;
   border: 1px solid var(--border);
   background:
-    radial-gradient(80% 140% at 100% 0%, color-mix(in srgb, var(--gold) 16%, transparent), transparent 60%),
+    radial-gradient(80% 140% at 100% 0%, var(--tint-glow), transparent 60%),
     var(--surface);
 }
 
@@ -1575,8 +1617,8 @@ a {
   place-items: center;
   border-radius: 14px;
   color: var(--gold-on-tint);
-  background: color-mix(in srgb, var(--gold) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--gold) 26%, transparent);
+  background: var(--tint-fill);
+  border: 1px solid var(--tint-line);
 }
 
 .oryx-state--error .oryx-state__icon {
@@ -1717,8 +1759,8 @@ a {
   place-items: center;
   border-radius: 12px;
   color: var(--gold-on-tint);
-  background: color-mix(in srgb, var(--gold) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--gold) 24%, transparent);
+  background: var(--tint-fill);
+  border: 1px solid var(--tint-line);
 }
 
 .oryx-vehicle__body {
@@ -1759,8 +1801,8 @@ a {
   text-align: center;
   border-radius: 12px;
   padding: 10px 6px;
-  background: color-mix(in srgb, var(--gold) 9%, transparent);
-  border: 1px solid color-mix(in srgb, var(--gold) 22%, transparent);
+  background: var(--tint-wash);
+  border: 1px solid var(--tint-line);
 }
 
 .oryx-booking__day {
@@ -1803,7 +1845,7 @@ a {
 }
 
 .oryx-notice--unread {
-  background: color-mix(in srgb, var(--gold) 6%, transparent);
+  background: var(--tint-wash);
 }
 
 .oryx-notice__dot {
@@ -1853,7 +1895,7 @@ a {
   border-radius: 14px;
   padding: 14px 16px;
   border: 1px solid var(--border-soft);
-  background: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+  background: var(--tint-panel);
 }
 
 .oryx-invoice-summary__label {
@@ -1902,9 +1944,9 @@ a {
 
 .oryx-slot--active {
   border-color: var(--gold-on-tint);
-  background: color-mix(in srgb, var(--gold) 18%, var(--surface-raised));
+  background: var(--tint-active);
   color: var(--text);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold) 40%, transparent);
+  box-shadow: 0 0 0 1px var(--tint-ring);
 }
 
 .oryx-address {
@@ -1928,8 +1970,8 @@ a {
   place-items: center;
   border-radius: 10px;
   color: var(--gold-on-tint);
-  background: color-mix(in srgb, var(--gold) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--gold) 22%, transparent);
+  background: var(--tint-fill);
+  border: 1px solid var(--tint-line);
 }
 
 .oryx-address__body {
@@ -1970,7 +2012,7 @@ a {
   padding: 14px 18px;
   border-radius: 14px;
   border: 1px solid var(--border-soft);
-  background: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+  background: var(--tint-panel);
   margin-bottom: 20px;
 }
 
@@ -2002,8 +2044,8 @@ a {
   place-items: center;
   border-radius: 12px;
   color: var(--gold-on-tint);
-  background: color-mix(in srgb, var(--gold) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--gold) 24%, transparent);
+  background: var(--tint-fill);
+  border: 1px solid var(--tint-line);
   font-weight: 800;
 }
 
@@ -2045,8 +2087,8 @@ a {
 
 .oryx-choice--on {
   border-color: var(--gold-on-tint);
-  background: color-mix(in srgb, var(--gold) 14%, var(--surface-raised));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold) 36%, transparent);
+  background: var(--tint-active);
+  box-shadow: 0 0 0 1px var(--tint-ring);
 }
 
 .oryx-choice input[type='checkbox'] {
@@ -2071,7 +2113,7 @@ a {
   inset: -20% 30% 40%;
   background: radial-gradient(
     ellipse at 50% 0%,
-    color-mix(in srgb, var(--gold) 12%, transparent),
+    var(--tint-fill),
     transparent 70%
   );
   pointer-events: none;
@@ -2096,8 +2138,8 @@ a {
   display: inline-block;
   padding: 4px 12px;
   border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--gold) 34%, transparent);
-  background: color-mix(in srgb, var(--gold) 12%, transparent);
+  border: 1px solid var(--tint-badge-line);
+  background: var(--tint-fill);
   color: var(--gold-on-tint);
   font-size: 12px;
   font-weight: 800;
@@ -2155,9 +2197,9 @@ a {
  * falls to 3.2:1.
  */
 .oryx-preview-strip {
-  background: var(--band, #0a1f38);
-  border-bottom: 1px solid var(--band-accent, #d4af37);
-  color: var(--band-text, #ffffff);
+  background: var(--band);
+  border-bottom: 1px solid var(--band-accent);
+  color: var(--band-text);
 }
 
 .oryx-preview-strip__inner {
@@ -2173,8 +2215,8 @@ a {
   flex: none;
   padding: 3px 10px;
   border-radius: 999px;
-  border: 1px solid var(--band-accent, #d4af37);
-  color: var(--band-accent, #d4af37);
+  border: 1px solid var(--band-accent);
+  color: var(--band-accent);
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -2183,7 +2225,7 @@ a {
 }
 
 .oryx-preview-strip__text {
-  color: var(--band-text, #ffffff);
+  color: var(--band-text);
   opacity: 0.88;
 }
 
@@ -2194,5 +2236,71 @@ a {
     gap: 6px;
     padding: 9px 0;
   }
+}
+
+/* ------------------------------------------------------------- credits */
+
+.oryx-credits__intro {
+  margin-bottom: 22px;
+}
+
+.oryx-credits__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.oryx-credit {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.oryx-credit img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--surface-hover);
+}
+
+.oryx-credit figcaption {
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.oryx-credit__caption {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.oryx-credit__byline {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.oryx-credit__licence {
+  margin: 0;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+}
+
+.oryx-credit__licence a {
+  color: var(--gold);
+  text-decoration: none;
+}
+
+.oryx-credit__licence a:hover {
+  text-decoration: underline;
 }
 

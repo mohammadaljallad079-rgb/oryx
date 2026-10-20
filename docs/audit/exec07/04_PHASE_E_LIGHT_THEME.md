@@ -655,3 +655,112 @@ represented by the bundled preview session, not by a real sign-in. The
 functional surfaces (accounting, inventory, CRM, payroll, the marketplace
 backend) are covered by the API integration suite against a real database, not
 by this site.
+
+## 11. Third continuation session — recovery and the light-theme correction
+
+A third sandbox failure interrupted the session that was consolidating the
+scattered gold tints into a tokenised ramp. This section records the recovery
+and the light-theme work that the owner's report — "the Light Theme colors
+still look inconsistent" — still required.
+
+### 11.1 Recovery
+
+| Question | Finding | How it was checked |
+|---|---|---|
+| Remote branch tip on entry | `327f954f554ba55c5e9c0aaf94e11a7ad2c5bb15` | `git rev-parse origin/feature/execution-07-premium-web` |
+| Local HEAD on entry | `327f954` — in step with the remote | `git rev-list --left-right --count origin/...HEAD` → `0 0` |
+| The hand-off's last known SHA | `b3c9a71` — an **ancestor** of the tip, fifteen commits back | `git merge-base --is-ancestor b3c9a71 HEAD` |
+| Commits pushed by the crashed session | **fifteen**, `5920895` … `327f954` | `git log --oneline b3c9a71..HEAD` |
+| Uncommitted work in the workspace | **present** — 226 paths, +5056/−244 lines: the gold-tint ramp in `tokens.ts` and `globals.css`, the media scripts, the CMS media wiring, the refreshed photography, the admin website/CMS page | `git status --porcelain`, `git diff --stat` |
+| Stashes | **none** | `git stash list` |
+
+**No pushed commit was lost.** The hand-off named `b3c9a71` as the last known
+SHA, but the branch had already advanced fifteen commits past it, every one of
+them on `origin`. The work that was still uncommitted when the sandbox failed —
+the whole gold-tint consolidation — survived intact in the workspace filesystem.
+Nothing was reset, force-pushed or reconstructed from a stash; the uncommitted
+tree was snapshotted with `git stash create` before any edit so it could not be
+lost by this session either.
+
+### 11.2 The gold-tint ramp (T1)
+
+The light theme's gold appeared at a dozen different strengths written inline as
+`color-mix(in srgb, var(--gold) N%, transparent)`. Ten named steps now live in
+one place — `GOLD_TINT` in `packages/shared/src/tokens.ts`, mirrored as CSS
+custom properties in the customer stylesheet's two theme blocks:
+
+| Token | Dark | Light | Used for |
+|---|---|---|---|
+| `goldOnTint` | `#d4af37` | `#7a5c10` | ink on a gold-tinted fill |
+| `tintWash` | 6% | 6% | faintest section wash |
+| `tintFill` | 12% | 12% | icon-chip and badge fill |
+| `tintFocus` | 16% | 16% | focus ring fill |
+| `tintGlow` | 22% | 16% | decorative radial glow |
+| `tintActive` | 18% + surface-raised | 18% + surface-raised | active nav pill |
+| `tintLine` | 26% | 26% | hairline border |
+| `tintBadgeLine` | 34% | 34% | badge border |
+| `tintRing` | 40% | 40% | strong ring |
+| `tintPanel` | surface-raised 55% | surface-raised 55% | translucent panel |
+
+`packages/shared/test/tokens.test.ts` gained a mapping assertion for each step
+and a stylesheet guard that fails if an ad-hoc `color-mix(... var(--gold) N% ...)`
+reappears in the customer stylesheet, so the scatter cannot come back.
+
+### 11.3 The remaining light-theme inconsistency
+
+The consistency audit (`.run/consistency-audit.mjs`) still reported two
+light-theme defects after the ramp landed, both in the card description:
+
+| Defect | Before | After | Why it read as inconsistent |
+|---|---|---|---|
+| `.oryx-cat-card__desc` font size | `12.5px` | `13px` (light only) | the muted text beside it reads at `13px`, so one card carried two sizes |
+| `.oryx-btn-lg` radius | `12px` | `12px` (reverted) | see below |
+
+The button-radius change was **reverted**: removing the `12px` override made the
+homepage hero buttons differ from every other primary button. The audit's
+"button" group had reported a radius split only because it pooled the large
+variant with the standard one; separating the variants shows the base
+`.oryx-btn` radius is a single value everywhere and the hero keeps its
+deliberate larger radius.
+
+The card-description fix is scoped to the light theme on purpose. Measured
+against the approved dark baseline, a global `13px` moved **29,460 pixels**
+(2.0% of the frame, max channel delta 238) because a 0.5px change re-lays-out
+every card on the homepage. Scoped to `:root[data-theme='light']` it leaves the
+dark render **byte-identical**.
+
+The audit was also made honest about three measurement artefacts that had been
+producing phantom defects:
+
+| Artefact | Effect | Fix |
+|---|---|---|
+| The pointer stays where the last click landed | `:hover` changed the button gradient, reported as two designs | park the pointer at `(0,0)` before each surface |
+| `display:none` controls were measured | they report the initial value for every property (`height:auto`, `padding:0`) | skip elements with a zero-area box |
+| `.oryx-btn-lg` pooled with `.oryx-btn` | the deliberate larger hero size read as a defect | measure the large variant as its own group |
+
+### 11.4 Verification
+
+| Check | Result |
+|---|---|
+| Light-theme consistency sweep (11 surfaces, 19 component groups) | **no inconsistent component properties found** |
+| Light-theme consistency sweep, Arabic RTL | **no inconsistent component properties found** |
+| Dark-theme consistency sweep | only the approved homepage eyebrow quirk (see §9.2) |
+| Phase E captures | **60** + 2 comparison sheets, every one `status=200 overflow=0` |
+| Dark-theme invariance vs the approved baseline | **0 captures with a real colour shift** (was 5 before the scoping fix); 5 byte-identical, worst non-zero delta 13 on a single pixel |
+| Light body background | `#f7f4ed` — ivory |
+| Light surfaces | `--surface #fff`, `--surface-raised #fbf9f4` — white and warm neutral |
+| Light ink | `--text #22201d` — deep charcoal |
+| Light gold | `--gold #856612`, `--gold-on-tint #7a5c10` |
+| Dark body background | `#00162b` — navy (unchanged) |
+| Light capture composition | ivory+white dominant on every surface; dashboard 76% ivory, providers 74%, login 97% |
+| Gold present in the light captures | 0.4–5.9% of pixels, strongest on the provider directory |
+| Media audit (`scripts/exec07-verify-media.mjs`) | **OK** — every service has a correct photograph, all files present, licences attributed |
+| `@oryx/shared` tests | **134 passed** (7 files) |
+| `@oryx/api` integration tests | **302 passed** (14 suites) |
+| `@oryx/customer` typecheck / lint / build | pass / pass / pass |
+| `@oryx/admin` typecheck / lint | pass / pass |
+
+The evidence images are in `docs/audit/exec07/phase-e/after/`, with
+`manifest.json` recording each capture's status, overflow, body background and
+contrast, and `dark-invariance.json` recording the dark comparison.
+

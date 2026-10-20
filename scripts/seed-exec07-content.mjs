@@ -32,16 +32,16 @@ const MEDIA_DIR = resolve('apps/customer/public/media');
 /** Each curated photograph, its licence and where it is used. */
 const PHOTOS = [
   {
-    key: 'hero-showroom',
-    file: 'hero-showroom.jpg',
-    altEn: 'A luxury car showroom with polished vehicles under warm lighting',
-    altAr: 'صالة عرض فاخرة للسيارات بإضاءة دافئة',
+    key: 'auto-service',
+    file: 'auto-service.jpg',
+    altEn: 'A car raised on a lift inside a modern service workshop',
+    altAr: 'سيارة مرفوعة على رافعة داخل ورشة صيانة حديثة',
   },
   {
-    key: 'showroom-jaguar',
-    file: 'showroom-jaguar.jpg',
-    altEn: 'A bright modern showroom displaying a white saloon car',
-    altAr: 'صالة عرض حديثة تعرض سيارة سيدان بيضاء',
+    key: 'garage-interior',
+    file: 'garage-interior.jpg',
+    altEn: 'The interior of a professional automotive repair garage',
+    altAr: 'المظهر الداخلي لورشة إصلاح سيارات احترافية',
   },
   {
     key: 'workshop-artdeco',
@@ -328,7 +328,7 @@ async function main() {
       locale: 'en',
       title: 'Every service your car needs',
       subtitle: 'Approved providers, real slots, a documented record.',
-      mediaAssetId: assets['hero-showroom'].id,
+      mediaAssetId: assets['auto-service'].id,
       sortOrder: 1,
       isActive: true,
     }),

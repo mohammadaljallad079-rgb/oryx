@@ -17,6 +17,7 @@
 
 import { SERVICE_CATEGORIES as SHARED_SERVICE_CATEGORIES, categoryArt } from '@oryx/shared';
 import { assetUrl } from './asset-url';
+import { sitePhotoForCategory } from './site-media';
 import {
   IS_STATIC_PREVIEW,
   PREVIEW_ADDRESSES,
@@ -29,7 +30,6 @@ import {
   PREVIEW_READ_ONLY_MESSAGE,
   PREVIEW_SERVICE_REQUESTS,
   PREVIEW_VEHICLES,
-  previewCategoryPhoto,
   previewProvider,
   previewProviders,
   previewWebsiteContent,
@@ -746,9 +746,11 @@ export function mediaAlt(media: CmsMedia | null, locale: string, fallback: strin
  * The image for a service category.
  *
  * Three sources in priority order: the photograph an administrator attached in
- * the CMS, the bundled photograph the static preview ships, then the vector
- * motif. The result is always a servable URL, so a category tile can never
- * render an empty or broken image.
+ * the CMS, the bundled photograph for that service, then the vector motif. The
+ * bundled photograph is the fallback in every deployment, not only the static
+ * preview, so an unreachable CMS degrades to a correct picture of the service
+ * rather than to abstract art. The result is always a servable URL, so a
+ * category tile can never render an empty or broken image.
  */
 export function categoryImage(
   media: CmsMedia | null,
@@ -757,9 +759,7 @@ export function categoryImage(
 ): string {
   const fromCms = mediaUrl(media, variant);
   if (fromCms) return fromCms;
-  if (IS_STATIC_PREVIEW) {
-    const photo = previewCategoryPhoto(categoryKey);
-    if (photo) return assetUrl(photo);
-  }
+  const bundled = sitePhotoForCategory(categoryKey);
+  if (bundled) return assetUrl(bundled.src);
   return assetUrl(categoryArt(categoryKey));
 }

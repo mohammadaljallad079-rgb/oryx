@@ -356,6 +356,40 @@ export interface FeatureFlagDto {
   rolloutPercentage: number;
 }
 
+/** One image in the media library. */
+export interface CmsMediaFolderDto {
+  id: string;
+  name: string;
+  slug: string;
+  sortOrder: number;
+}
+
+export interface CmsMediaAssetDto {
+  id: string;
+  folderId: string | null;
+  folder?: { id: string; name: string; slug: string } | null;
+  originalName: string;
+  mimeType: string;
+  byteSize: number;
+  width: number;
+  height: number;
+  dominantColor: string | null;
+  blurDataUrl: string | null;
+  variants: Record<string, unknown>;
+  focalX: number;
+  focalY: number;
+  altAr: string | null;
+  altEn: string | null;
+  caption: string | null;
+  credit: string | null;
+  licenseNote: string | null;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+  /** Where the image is used. Present on the single-asset read. */
+  usage?: Array<{ id: string; title: string; placement: string; locale: string; kind: string }>;
+}
+
 export interface AppVersionDto {
   id: string;
   platform: 'IOS' | 'ANDROID';

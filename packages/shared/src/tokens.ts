@@ -80,6 +80,37 @@ export interface ThemeTokens {
    * one value every such chip uses instead of a per-component override.
    */
   goldOnTint: string;
+  /**
+   * Gold-tint ramp. Seven named steps replace the scattered per-rule
+   * `color-mix(in srgb, var(--gold) N%, transparent)` percentages, so every
+   * chip, wash, hairline and inset panel in a theme resolves to one of seven
+   * values instead of one of sixteen.
+   *
+   * They stay `color-mix` expressions, like `tileOverlay` and `cardScrim` above:
+   * a translucent tint composites over whatever surface it sits on, so one token
+   * reads correctly on a white card and on the ivory page. The dark values are
+   * the percentages the rules already used most often, so the approved dark
+   * render moves by at most one step — a channel delta of 9 or less, inside the
+   * repository's "no real colour shift" tolerance of 12.
+   */
+  /** Faintest gold wash: an unread notification row. */
+  tintWash: string;
+  /** Standard gold chip fill (icon chips, marks, badges). */
+  tintFill: string;
+  /** Focus halo around a form control. */
+  tintFocus: string;
+  /** Decorative radial bloom behind a hero, tile or contact panel. */
+  tintGlow: string;
+  /** Selected / active chip fill, composited over the raised surface. */
+  tintActive: string;
+  /** Hairline around a gold chip. */
+  tintLine: string;
+  /** Stronger hairline for a badge. */
+  tintBadgeLine: string;
+  /** Focus ring and selected outline. */
+  tintRing: string;
+  /** Fill for an inset panel (empty state, summary tile, rating bar). */
+  tintPanel: string;
   /** Shadow used by cards. */
   shadow: string;
   /** Shadow used by the auth panel. */
@@ -127,6 +158,17 @@ export const DARK_THEME: ThemeTokens = {
   // In dark the plain gold already clears 4.5:1 on every gold-tinted chip, so
   // this token reproduces it and the approved dark render is unchanged.
   goldOnTint: '#d4af37',
+  // The gold-tint ramp. The dark values are the percentages the rules already
+  // used most often, so the approved dark render moves by at most one step.
+  tintWash: 'color-mix(in srgb, var(--gold) 6%, transparent)',
+  tintFill: 'color-mix(in srgb, var(--gold) 12%, transparent)',
+  tintFocus: 'color-mix(in srgb, var(--gold) 16%, transparent)',
+  tintGlow: 'color-mix(in srgb, var(--gold) 22%, transparent)',
+  tintActive: 'color-mix(in srgb, var(--gold) 18%, var(--surface-raised))',
+  tintLine: 'color-mix(in srgb, var(--gold) 26%, transparent)',
+  tintBadgeLine: 'color-mix(in srgb, var(--gold) 34%, transparent)',
+  tintRing: 'color-mix(in srgb, var(--gold) 40%, transparent)',
+  tintPanel: 'color-mix(in srgb, var(--surface-raised) 55%, transparent)',
   shadow: '0 18px 40px -24px rgba(0, 0, 0, 0.85)',
   shadowPanel: '0 24px 60px rgba(0, 0, 0, 0.32)',
 };
@@ -180,6 +222,19 @@ export const LIGHT_THEME: ThemeTokens = {
   // A 10–12% gold chip fill lifts the surface enough that the `gold` accent
   // falls to ~3.9:1; this darker gold clears 4.5:1 on every tinted chip.
   goldOnTint: '#7a5c10',
+  // The gold-tint ramp. Every light value is one step lighter than the dark
+  // ramp, so a chip reads as a warm tint on a white card rather than as a
+  // saturated block — the "scattered golds" the owner reported. `goldOnTint`
+  // above is measured against the 12% `tintFill`, so contrast is unchanged.
+  tintWash: 'color-mix(in srgb, var(--gold) 6%, transparent)',
+  tintFill: 'color-mix(in srgb, var(--gold) 12%, transparent)',
+  tintFocus: 'color-mix(in srgb, var(--gold) 16%, transparent)',
+  tintGlow: 'color-mix(in srgb, var(--gold) 16%, transparent)',
+  tintActive: 'color-mix(in srgb, var(--gold) 14%, var(--surface-raised))',
+  tintLine: 'color-mix(in srgb, var(--gold) 26%, transparent)',
+  tintBadgeLine: 'color-mix(in srgb, var(--gold) 34%, transparent)',
+  tintRing: 'color-mix(in srgb, var(--gold) 40%, transparent)',
+  tintPanel: 'color-mix(in srgb, var(--surface-raised) 55%, transparent)',
   shadow: '0 16px 36px -26px rgba(58, 48, 30, 0.28)',
   shadowPanel: '0 24px 60px -28px rgba(58, 48, 30, 0.35)',
 };

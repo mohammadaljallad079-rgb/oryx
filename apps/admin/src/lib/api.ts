@@ -7,6 +7,8 @@ import type {
   BranchDto,
   CashierSessionDto,
   CmsBannerDto,
+  CmsMediaAssetDto,
+  CmsMediaFolderDto,
   CmsPageDto,
   CompanyDto,
   ContextResponse,
@@ -226,6 +228,11 @@ interface RequestOptions {
   anonymous?: boolean;
   /** Do not attempt a refresh-and-retry on 401. */
   noRetry?: boolean;
+  /**
+   * Send the body as-is (a `FormData` upload) instead of JSON-encoding it. The
+   * browser must set the multipart boundary itself, so no Content-Type is set.
+   */
+  raw?: boolean;
 }
 
 /**
@@ -321,7 +328,9 @@ export async function restoreSession(): Promise<RefreshOutcome> {
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? 'GET';
   const headers: Record<string, string> = {};
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  // A raw body is a multipart upload: the browser sets the boundary, so no
+  // Content-Type may be written here or the request is rejected as malformed.
+  if (options.body !== undefined && !options.raw) headers['Content-Type'] = 'application/json';
   if (!options.anonymous) {
     const token = tokenStore.access;
     if (token) headers.Authorization = `Bearer ${token}`;
@@ -340,7 +349,12 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     method,
     headers,
     credentials: 'include',
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body:
+      options.body === undefined
+        ? undefined
+        : options.raw
+          ? (options.body as BodyInit)
+          : JSON.stringify(options.body),
     cache: 'no-store',
   });
 
@@ -573,6 +587,28 @@ export const api = {
   upsertAppVersion: (body: Record<string, unknown>) =>
     request<Record<string, unknown>>('/cms/app-versions', { method: 'PUT', body }),
   serviceCategories: () => request<Array<Record<string, unknown>>>('/cms/service-categories'),
+
+  // ------------------------------------------------------------ media library
+  mediaFolders: () => request<CmsMediaFolderDto[]>('/cms/media/folders'),
+  upsertMediaFolder: (body: Record<string, unknown>) =>
+    request<CmsMediaFolderDto>('/cms/media/folders', { method: 'PUT', body }),
+  deleteMediaFolder: (id: string) =>
+    request<{ ok: boolean }>(`/cms/media/folders/${id}`, { method: 'DELETE' }),
+  mediaAssets: (params: { folderId?: string; search?: string; page?: number; pageSize?: number } = {}) =>
+    request<Paginated<CmsMediaAssetDto>>(`/cms/media?${toQuery(params)}`),
+  mediaAsset: (id: string) => request<CmsMediaAssetDto>(`/cms/media/${id}`),
+  /**
+   * Upload an image. Sent as multipart/form-data so the browser streams the
+   * file; `request` must not set a JSON content type here.
+   */
+  uploadMedia: (form: FormData) =>
+    request<CmsMediaAssetDto>('/cms/media', { method: 'POST', body: form, raw: true }),
+  updateMedia: (id: string, body: Record<string, unknown>) =>
+    request<CmsMediaAssetDto>(`/cms/media/${id}`, { method: 'PATCH', body }),
+  deleteMedia: (id: string) => request<{ ok: boolean }>(`/cms/media/${id}`, { method: 'DELETE' }),
+  /** The servable URL of an image variant (`card` by default). */
+  mediaFileUrl: (id: string, variant = 'card') => `${API_BASE}/v1/cms/media/${id}/file?variant=${variant}`,
+
   notificationTemplates: () => request<Array<Record<string, unknown>>>('/cms/notification-templates'),
   apiClients: () => request<Array<Record<string, unknown>>>('/cms/api-clients'),
   createApiClient: (body: Record<string, unknown>) =>

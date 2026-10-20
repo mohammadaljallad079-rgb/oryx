@@ -197,6 +197,30 @@ describe('theme token contract', () => {
     expect(LIGHT_THEME.bandFooter).toBe('#0a1b2f');
     expect(LIGHT_THEME.bandText).toBe('#ffffff');
   });
+
+  it('resolves every gold tint to the named ramp', () => {
+    // The owner's complaint was that the light theme "still looked
+    // inconsistent": each chip carried its own `color-mix(... var(--gold) N%
+    // ...)`, so five icon chips rendered five different golds. Every tint token
+    // must now be a step on one ramp, in a fixed light-to-dark order.
+    const order: Array<[string, number]> = [
+      ['tintWash', 6],
+      ['tintFill', 12],
+      ['tintFocus', 16],
+      ['tintLine', 26],
+      ['tintBadgeLine', 34],
+      ['tintRing', 40],
+    ];
+    for (const [token, pct] of order) {
+      expect(LIGHT_THEME[token as keyof typeof LIGHT_THEME], token).toContain(
+        `var(--gold) ${pct}%`,
+      );
+    }
+    // The selected chip and the inset panel composite over a surface rather
+    // than a transparent layer, so they carry their own form.
+    expect(LIGHT_THEME.tintActive).toContain('var(--surface-raised)');
+    expect(LIGHT_THEME.tintPanel).toContain('var(--surface-raised)');
+  });
 });
 
 describe('CSS custom properties match the shared tokens', () => {
@@ -228,6 +252,15 @@ describe('CSS custom properties match the shared tokens', () => {
     ['bandAccent', '--band-accent'],
     ['bandBorder', '--band-border'],
     ['goldOnTint', '--gold-on-tint'],
+    ['tintWash', '--tint-wash'],
+    ['tintFill', '--tint-fill'],
+    ['tintFocus', '--tint-focus'],
+    ['tintGlow', '--tint-glow'],
+    ['tintActive', '--tint-active'],
+    ['tintLine', '--tint-line'],
+    ['tintBadgeLine', '--tint-badge-line'],
+    ['tintRing', '--tint-ring'],
+    ['tintPanel', '--tint-panel'],
   ];
 
   it('keeps the customer stylesheet in step with LIGHT_THEME', () => {
@@ -246,5 +279,19 @@ describe('CSS custom properties match the shared tokens', () => {
         DARK_THEME[token],
       );
     }
+  });
+
+  it('keeps every gold tint in a rule on the named ramp', () => {
+    // The regression this guards: a new chip rule writing its own
+    // `color-mix(in srgb, var(--gold) 15%, transparent)` reintroduces exactly
+    // the inconsistency the ramp removed. Tints are only allowed where the ramp
+    // defines them.
+    const css = readFileSync(CUSTOMER_CSS, 'utf8');
+    const themeBlocksEnd = css.indexOf(":root[data-theme='light']");
+    const body = css.slice(css.indexOf('}', themeBlocksEnd));
+    const offenders = [...body.matchAll(/color-mix\(in srgb, var\(--gold\) [0-9]+%/g)].map(
+      (m) => body.slice(0, m.index).split('\n').length,
+    );
+    expect(offenders, `ad-hoc gold tints at lines ${offenders.join(', ')}`).toEqual([]);
   });
 });

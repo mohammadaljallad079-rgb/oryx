@@ -21,8 +21,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(135, 140, 144)",
-      "contrast": 4.79
+      "background": "rgb(139, 144, 148)",
+      "contrast": 5.04
     },
     "header": {
       "layers": [
@@ -204,7 +204,7 @@
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(29, 43, 58)",
-      "contrast": 1.12
+      "contrast": 1.13
     },
     "cat-card": {
       "layers": [
@@ -228,7 +228,7 @@
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(211, 208, 202)",
-      "contrast": 10.6
+      "contrast": 10.59
     },
     "stat-label": {
       "layers": [
@@ -258,8 +258,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(30, 41, 55)",
-      "contrast": 6.8
+      "background": "rgb(25, 36, 50)",
+      "contrast": 7.26
     },
     "muted": {
       "layers": [

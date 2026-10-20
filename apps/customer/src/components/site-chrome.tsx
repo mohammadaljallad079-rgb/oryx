@@ -193,6 +193,7 @@ export function SiteFooter() {
         { href: '/', label: t('footer.about') },
         { href: '/#how', label: t('footer.howItWorks') },
         { href: '/providers/apply', label: t('footer.becomeProvider') },
+        { href: '/credits', label: t('footer.credits') },
       ],
     },
     {

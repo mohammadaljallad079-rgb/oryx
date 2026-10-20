@@ -282,6 +282,12 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     'footer.becomeProvider': 'كن مزود خدمة',
     'footer.contact': 'تواصل معنا',
     'footer.legal': '© {year} أوريكس. جميع الحقوق محفوظة.',
+    'footer.credits': 'حقوق الصور',
+    'credits.eyebrow': 'الشفافية',
+    'credits.title': 'حقوق الصور والمصادر',
+    'credits.subtitle': 'كل صورة على الموقع مع مصدرها ورخصتها.',
+    'credits.intro':
+      'تُنشر صور هذا الموقع بموجب رخص المشاع الإبداعي. الصور المرخّصة بـ CC BY و CC BY-SA تتطلب ذكر المصدر، وهو ما يوفّره هذا الجدول. الصور المرخّصة بـ CC0 لا تتطلب ذلك لكننا نذكرها للشفافية.',
   },
   en: {
     'brand.tagline': 'Automotive Platform',
@@ -557,5 +563,11 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     'footer.becomeProvider': 'Become a provider',
     'footer.contact': 'Contact us',
     'footer.legal': '© {year} ORYX. All rights reserved.',
+    'footer.credits': 'Photo credits',
+    'credits.eyebrow': 'Transparency',
+    'credits.title': 'Photography credits and sources',
+    'credits.subtitle': 'Every photograph on the site, with its source and licence.',
+    'credits.intro':
+      'The photographs on this site are published under Creative Commons licences. The CC BY and CC BY-SA images require attribution, which this page provides. The CC0 images do not require it, but they are listed here for transparency.',
   },
 };
