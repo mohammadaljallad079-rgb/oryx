@@ -356,6 +356,54 @@ async function buildEvidencePages() {
     sheets.push(figure(out, escapeHtml(base), `light vs dark comparison ${base}`, '../'));
   }
 
+  // Execution 08 — the same four owner-facing surfaces, swept from the live
+  // published preview across three viewports, both locales and both themes.
+  const EXEC08_SURFACES = [
+    ['homepage', 'Homepage', '/'],
+    ['dashboard', 'Customer dashboard', '/dashboard'],
+    ['providers', 'Provider directory', '/providers'],
+    ['login', 'Sign in', '/login'],
+  ];
+  const exec08Dir = 'docs/execution-reports/exec08-preview';
+  const exec08 = [];
+  if (exists(exec08Dir)) {
+    for (const [slug, label, route] of EXEC08_SURFACES) {
+      const pairs = [];
+      for (const width of WIDTHS) {
+        for (const locale of LOCALES) {
+          const lightSrc = `${exec08Dir}/${slug}-${width}-${locale}-light.png`;
+          if (!exists(lightSrc)) continue;
+          const light = await makeThumb(lightSrc, `assets/evidence/exec08-${slug}-${width}-${locale}-light`);
+          const sheetSrc = `${exec08Dir}/comparisons/${slug}-${width}-${locale}.png`;
+          const sheet = exists(sheetSrc)
+            ? await makeThumb(sheetSrc, `assets/evidence/exec08-${slug}-${width}-${locale}-sheet`, 1400)
+            : null;
+          pairs.push(`
+        <div class="pair">
+          <div class="pair__head">
+            <span class="badge badge--info">${width} · ${locale.toUpperCase()}</span>
+            <span>live GitHub Pages</span>
+          </div>
+          <div class="pair__grid">
+            ${figure(light, '<strong>Light</strong> — Execution 08', `${label} ${width} ${locale} light`, '../')}
+            ${sheet ? figure(sheet, 'Light <strong>vs</strong> dark', `${label} ${width} ${locale} comparison`, '../') : ''}
+          </div>
+        </div>`);
+        }
+      }
+      if (pairs.length) {
+        exec08.push(`
+      <section>
+        <div class="section-head">
+          <h2>${escapeHtml(label)}</h2>
+          <p><code>${escapeHtml(route)}</code> · captured from the live preview</p>
+        </div>
+        ${pairs.join('')}
+      </section>`);
+      }
+    }
+  }
+
   const DARK_LABELS = {
     captures: 'dark captures compared',
     byteIdentical: 'byte-identical',
@@ -394,6 +442,7 @@ async function buildEvidencePages() {
     ${liveCaptures.length ? `<section><div class="section-head"><h2>The published preview</h2><p>captured from the live GitHub Pages URL</p></div><div class="gallery">${liveCaptures.join('')}</div></section>` : ''}
     ${sections.join('')}
     ${sheets.length ? `<section><div class="section-head"><h2>Light vs dark sheets</h2><p>side-by-side composites</p></div><div class="gallery">${sheets.join('')}</div></section>` : ''}
+    ${exec08.length ? `<section><div class="section-head"><h2>Execution 08 — swept from the live preview</h2><p>light render and light-vs-dark sheet for every viewport and locale</p></div></section>${exec08.join('')}` : ''}
     <p class="card__meta">${copied} capture pairs · before set from <code>docs/audit/exec07/phase-e/before/</code> · after set from <code>docs/audit/exec07/phase-e/after/</code></p>
   `;
 
