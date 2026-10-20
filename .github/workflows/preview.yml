@@ -206,26 +206,34 @@ jobs:
       # Pages does to it. This is the check that would have caught Jekyll
       # stripping `_next/`: it fetches the *published* HTML, takes the stylesheet
       # it asks for, and requires that asset to come back.
+      #
+      # Pages serves the previous deployment until the new one finishes building,
+      # so the root URL can answer 200 with stale HTML while the new assets are
+      # not yet live. The check therefore retries, and only fails if the asset is
+      # still missing after the CDN has had time to catch up.
       - name: Assert the published site actually loads its assets
         run: |
           set -euo pipefail
-          html=$(curl -fsS "${PREVIEW_URL}")
-          css=$(printf '%s' "$html" | grep -o '/oryx/_next/static/css/[^"]*\.css' | head -1)
-          test -n "$css" || { echo "::error::the published page references no stylesheet"; exit 1; }
-          code=$(curl -s -o /dev/null -w '%{http_code}' "https://mohammadaljallad079-rgb.github.io${css}")
-          echo "stylesheet ${css} -> ${code}"
-          test "$code" = "200" || {
-            echo "::error::the published stylesheet 404s; Pages is stripping _next/ (is .nojekyll published?)"
-            exit 1
-          }
-          js=$(printf '%s' "$html" | grep -o '/oryx/_next/static/chunks/[^"]*\.js' | head -1)
-          test -n "$js" || { echo "::error::the published page references no script"; exit 1; }
-          jscode=$(curl -s -o /dev/null -w '%{http_code}' "https://mohammadaljallad079-rgb.github.io${js}")
-          echo "script ${js} -> ${jscode}"
-          test "$jscode" = "200" || {
-            echo "::error::the published script 404s; Pages is stripping _next/"
-            exit 1
-          }
+          ORIGIN=https://mohammadaljallad079-rgb.github.io
+          for attempt in $(seq 1 20); do
+            html=$(curl -fsS "${PREVIEW_URL}" || true)
+            css=$(printf '%s' "$html" | grep -o '/oryx/_next/static/css/[^"]*\.css' | head -1)
+            js=$(printf '%s' "$html" | grep -o '/oryx/_next/static/chunks/[^"]*\.js' | head -1)
+            if [ -n "$css" ] && [ -n "$js" ]; then
+              code=$(curl -s -o /dev/null -w '%{http_code}' "${ORIGIN}${css}")
+              jscode=$(curl -s -o /dev/null -w '%{http_code}' "${ORIGIN}${js}")
+              echo "attempt ${attempt}: css ${code}, js ${jscode}"
+              if [ "$code" = "200" ] && [ "$jscode" = "200" ]; then
+                echo "the published site serves its stylesheet and script"
+                exit 0
+              fi
+            else
+              echo "attempt ${attempt}: the published HTML references no asset yet"
+            fi
+            sleep 15
+          done
+          echo "::error::the published site still 404s its own assets; Pages is stripping _next/ (is .nojekyll published?)"
+          exit 1
 
       - name: Report the published URL
         run: |
