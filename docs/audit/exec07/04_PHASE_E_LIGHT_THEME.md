@@ -571,3 +571,87 @@ mobile (390), in Arabic RTL and English LTR, for both themes — 60 captures
 recorded in `after/manifest.json`, plus two derived comparison sheets (62 PNGs
 in total). Every capture is `status=200` with `overflow=0`, and body contrast is
 14.79:1 in light and 16.37:1 in dark.
+
+## 10. Second continuation session — the published preview
+
+A second sandbox failure interrupted the session that was publishing the site.
+This section records the recovery and the defect that the published site
+exposed.
+
+### 10.1 Recovery
+
+| Question | Finding | How it was checked |
+|---|---|---|
+| Remote branch tip on entry | `32c1d16` | `git ls-remote origin feature/execution-07-premium-web` |
+| Local HEAD on entry | `32c1d16` — in step with the remote | `git rev-parse HEAD` |
+| Commits beyond the last SHA in the hand-off | **ten**, ending at `32c1d16` | `git log --oneline b3c9a71..HEAD` |
+| Uncommitted work | **present** — the light-theme `globals.css` rule, the static-export wiring and the preview tooling | `git status --porcelain` |
+| Stashes | **none** | `git stash list` |
+
+**No pushed commit was lost.** The hand-off named `b3c9a71` as the last known
+SHA, but the branch had already advanced ten commits past it, all on `origin`.
+The uncommitted work was still in the workspace filesystem, so nothing had to be
+reconstructed from a stash and nothing was reset or force-pushed.
+
+### 10.2 Defect E13 — Pages published the site without its CSS or JavaScript
+
+The published preview loaded its HTML and nothing else. Every
+`/oryx/_next/...` request returned **404**, so the homepage rendered as unstyled
+text on a white field. The build itself was correct: the same artifact served
+from disk passed the render check and the 203-page crawl.
+
+Cause: GitHub Pages runs Jekyll unless a `.nojekyll` marker is present, and
+Jekyll discards every path beginning with an underscore — which is the whole
+`_next` directory. `preview:build` was already writing the marker, but
+`actions/upload-artifact` skips dotfiles by default, so `.nojekyll` never left
+the build job and never reached the `gh-pages` branch.
+
+| Fix | Where |
+|---|---|
+| `include-hidden-files: true` so the marker survives the artifact upload | `.github/workflows/preview.yml` |
+| A build-time assertion that `.nojekyll` and `_next/static` both exist | `.github/workflows/preview.yml` |
+| A post-publish check that fetches the deployed HTML and requires its own stylesheet and script to return 200 | `.github/workflows/preview.yml` |
+
+The post-publish check is the one that matters. The local verify job serves the
+build from disk, where the underscore directory is always present, so it is
+structurally incapable of observing what Pages does to the artifact. The check
+retries for up to five minutes, because Pages keeps serving the previous
+deployment until the new one finishes building — a first, non-retrying version
+of the check failed against a deployment that was merely still in flight, and
+the asset was live seconds later.
+
+### 10.3 Verification of the published site
+
+Captured from `https://mohammadaljallad079-rgb.github.io/oryx/` — the deployed
+site, not a local build — with `.run/capture-live-pages.mjs`.
+
+| Check | Result |
+|---|---|
+| Captures | **48** — 4 surfaces × 3 viewports × 2 locales × 2 themes |
+| HTTP status | **200** on every capture |
+| Horizontal overflow | **0** on every capture |
+| Broken images | **0** on every capture |
+| Document direction | `rtl` for Arabic, `ltr` for English |
+| Light body background | `rgb(247, 244, 237)` — ivory |
+| Dark body background | `rgb(0, 22, 43)` — navy |
+| Gold accent present in the light render | **13,983** warm pixels in the hero band |
+| Light-theme contrast sweep | **0 solid-surface pairs below threshold** across 22 pages |
+| Light-theme consistency sweep | 25 selectors, 5 with more than one treatment — all state variants (badge status, active nav, hero button size), none a palette inconsistency |
+| CI — `Typecheck and build` | **success** |
+| CI — `Unit and API integration tests` | **success** |
+| CI — `Browser acceptance tests` | **success** |
+| Design preview — build / verify / publish | **success**, including the published-asset assertion |
+
+The captures are in `phase-e/live-pages/` with `manifest.json`; the two
+light-vs-dark comparison sheets were built by `.run/make-theme-sheet.mjs`.
+
+### 10.4 Limitation of the published preview
+
+The published site is a **static export**. It has no API behind it, so it reads
+bundled preview data and labels every page accordingly. Every mutating action
+fails with `501` rather than appearing to succeed — the preview must never
+imply that a booking was placed or a payment moved. Authentication is
+represented by the bundled preview session, not by a real sign-in. The
+functional surfaces (accounting, inventory, CRM, payroll, the marketplace
+backend) are covered by the API integration suite against a real database, not
+by this site.
