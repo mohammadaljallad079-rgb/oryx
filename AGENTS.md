@@ -378,6 +378,29 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `.oryx-stat__label` at 4.42–4.49 against a 4.5 floor (documented as defect E8,
   left alone under the "do not alter the approved theme" rule).
 
+### Existing-server pre-deployment gotchas (Execution 10)
+
+- **The deployment host is not reachable from the agent sandbox.** There is no
+  SSH client, no key, no `~/.ssh`, no `DEPLOY_*` variable, and no docker daemon.
+  `deploy.yml` reads its host from repository secrets that an integration token
+  cannot read (`403 Resource not accessible by integration`), and the
+  `production` environment does not exist. A pre-deployment task therefore
+  starts by asking for access, not by assuming a hostname — do not invent one.
+- **`deploy/scripts/inspect-server.sh` is the read-only survey.** It answers the
+  OS, resources, ORYX roots, PM2/Docker, nginx, PostgreSQL, DNS, certificate,
+  version, uploads and env-file questions without writing anything. It prints
+  env-file **paths and modes only, never values**. Run it with `sudo` for the
+  root-only sections; without root it skips them and still produces a partial
+  audit.
+- **Staging isolation is the compose project name, not a second compose file.**
+  `docker compose -p oryx-staging … --env-file .env.staging` gives separate
+  volumes automatically, because compose prefixes volume names with the project.
+  Also change `EDGE_HTTP_PORT`/`EDGE_HTTPS_PORT` and `POSTGRES_DB`; sharing any
+  of them disturbs the live stack.
+- **`deploy.sh` never reverses a migration.** It restores the previous image tag
+  on a failed health probe and stops. A schema rollback is a deliberate restore
+  into a separate database, then a promotion — not an automatic down migration.
+
 
 ### Branding and preview gotchas
 
