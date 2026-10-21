@@ -255,6 +255,51 @@ export const PLATFORM_PERMISSION_CODES: readonly string[] = PERMISSIONS.filter(
   (p) => p.scope === 'PLATFORM',
 ).map((p) => p.code);
 
+/**
+ * The permission set the platform Super Admin role must hold: the whole
+ * catalogue.
+ *
+ * It is defined here, once, so the seed, the production bootstrap and the repair
+ * script cannot drift apart. A Super Admin is not "granted a handful of
+ * permissions" — it holds the catalogue — and `resolveEffectivePermissions` is
+ * what narrows that set to the PLATFORM-scope codes (plus, once a tenant is
+ * selected, the tenant's licensed company-scope codes). Seeding a partial set
+ * is what produced `Missing any of the required permissions` on the dashboard,
+ * because the dashboard is reachable through either `erp.dashboard.read`
+ * (COMPANY) or `platform.company.read` (PLATFORM) and a drifted role held
+ * neither.
+ */
+export const PLATFORM_SUPER_ADMIN_PERMISSION_CODES: readonly string[] = PERMISSION_CODES;
+
+export interface PermissionReconciliation {
+  /** Catalogue codes the role should hold but does not. */
+  grant: string[];
+  /** Stored codes the role should not hold, including codes the catalogue dropped. */
+  revoke: string[];
+  /** True when the stored set already equals the expected set. */
+  inSync: boolean;
+}
+
+/**
+ * Diff a stored role grant against the expected set.
+ *
+ * Reconciliation is deliberately two-directional. An upsert-only loop (add the
+ * missing codes, never remove anything) cannot repair a role that has already
+ * drifted, and it leaves codes from a permission the catalogue has since
+ * removed granting access that no longer has a definition. `revoke` is
+ * therefore as important as `grant`.
+ */
+export function reconcilePermissions(
+  current: readonly string[],
+  expected: readonly string[] = PERMISSION_CODES,
+): PermissionReconciliation {
+  const have = new Set(current);
+  const want = new Set(expected);
+  const grant = expected.filter((code) => !have.has(code));
+  const revoke = current.filter((code) => !want.has(code));
+  return { grant, revoke, inSync: grant.length === 0 && revoke.length === 0 };
+}
+
 export const PERMISSION_GROUPS: readonly string[] = Array.from(new Set(PERMISSIONS.map((p) => p.group)));
 
 export function isKnownPermission(code: string): boolean {

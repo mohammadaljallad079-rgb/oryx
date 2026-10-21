@@ -24,6 +24,7 @@ import {
   DEFAULT_TIMEZONE,
   MODULES,
   PERMISSIONS,
+  PLATFORM_SUPER_ADMIN_PERMISSION_CODES,
   PLANS,
   SERVICE_CATEGORIES,
   lineAmountMinor,
@@ -212,13 +213,16 @@ async function seedPlans() {
 /**
  * The platform super admin role carries the whole catalog.
  *
- * `resolveEffectivePermissions` returns only the PLATFORM-scope codes while the
- * principal has no tenant context, and adds the company-scope codes (gated by
- * the selected company's entitlements) once a company is selected. Granting the
- * full catalog here is what lets one role serve both modes without a second
- * role, and without granting anything the selected tenant is not licensed for.
+ * The list itself lives in `@oryx/shared` (`PLATFORM_SUPER_ADMIN_PERMISSION_CODES`)
+ * so the seed, the production bootstrap and the repair script all read one
+ * definition. `resolveEffectivePermissions` returns only the PLATFORM-scope
+ * codes while the principal has no tenant context, and adds the company-scope
+ * codes (gated by the selected company's entitlements) once a company is
+ * selected. Granting the full catalog here is what lets one role serve both
+ * modes without a second role, and without granting anything the selected
+ * tenant is not licensed for.
  */
-const PLATFORM_SUPER_ADMIN_PERMISSIONS = PERMISSIONS.map((p) => p.code);
+const PLATFORM_SUPER_ADMIN_PERMISSIONS = PLATFORM_SUPER_ADMIN_PERMISSION_CODES;
 
 const COMPANY_ADMIN_PERMISSIONS = PERMISSIONS.filter(
   (p) => p.scope !== 'PLATFORM' && p.delegable,
@@ -270,6 +274,24 @@ async function seedPlatformRoles() {
         },
       });
 
+  // Reconcile rather than only add. An upsert-only loop cannot repair a role
+  // that already drifted, and it keeps codes the catalogue has removed. The
+  // same two-directional sync runs in production via
+  // scripts/lib/platform-role.mjs, from the same catalogue constant.
+  const expected = new Set(PLATFORM_SUPER_ADMIN_PERMISSIONS);
+  const current = (
+    await prisma.rolePermission.findMany({
+      where: { roleId: role.id },
+      select: { permissionCode: true },
+    })
+  ).map((p) => p.permissionCode);
+
+  const revoke = current.filter((code) => !expected.has(code));
+  if (revoke.length > 0) {
+    await prisma.rolePermission.deleteMany({
+      where: { roleId: role.id, permissionCode: { in: revoke } },
+    });
+  }
   for (const code of PLATFORM_SUPER_ADMIN_PERMISSIONS) {
     await prisma.rolePermission.upsert({
       where: { roleId_permissionCode: { roleId: role.id, permissionCode: code } },
