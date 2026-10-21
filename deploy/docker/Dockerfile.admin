@@ -41,7 +41,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY packages ./packages
 COPY apps/admin ./apps/admin
-COPY tsconfig.base.json ./
 RUN pnpm --filter @oryx/shared build \
  && pnpm --filter @oryx/admin build
 
@@ -49,6 +48,11 @@ RUN pnpm --filter @oryx/shared build \
 FROM base AS runtime
 ENV NODE_ENV=production
 ENV PORT=3000
+# Next.js standalone binds to `process.env.HOSTNAME`, which Docker sets to the
+# container id. That id resolves on the compose network but not on loopback, so
+# the healthcheck below would fail while the app served traffic normally. Bind
+# every interface explicitly.
+ENV HOSTNAME=0.0.0.0
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN groupadd --system --gid 1001 oryx \

@@ -1,0 +1,55 @@
+# Keep the Docker build context to source only.
+#
+# Without this file the context is the whole repository, including the sandbox
+# runtime directories (`.run/`, several gigabytes of PostgreSQL data, captured
+# screenshots and Playwright browser binaries) and every built artefact. That
+# makes the context enormous and, worse, lets a stale host `dist/` or `.next/`
+# be copied over a fresh build.
+
+# Runtime and audit state — never part of an image.
+.run/
+backups/
+docs/audit/
+logs/
+
+# Dependencies and build output are produced inside the image.
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.next/
+**/.next/
+out/
+**/out/
+*.tsbuildinfo
+
+# Tests, coverage and tooling caches.
+coverage/
+**/coverage/
+playwright-report/
+**/playwright-report/
+test-results/
+**/test-results/
+.agent_tmp/
+.turbo/
+
+# Local configuration and secrets. `.env.example` is committed; a real `.env`
+# or `.env.production` must never enter an image layer.
+.env
+.env.*
+!.env.example
+deploy/env/*.env
+!deploy/env/*.example
+
+# Version control and editor metadata.
+.git/
+.gitignore
+.github/
+.vscode/
+.idea/
+*.log
+.DS_Store
+
+# Deployment material that is mounted, not baked in.
+deploy/nginx/certs/
+deploy/nginx/logs/

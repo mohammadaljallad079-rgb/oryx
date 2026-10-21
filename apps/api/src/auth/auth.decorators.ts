@@ -31,6 +31,20 @@ export const RequireModule = (moduleKey: string) => SetMetadata(MODULE_KEY, modu
 export const CUSTOMER_PLANE_KEY = 'oryx:customerPlane';
 
 /**
+ * Marks a route as reachable by a privileged account that still owes MFA
+ * enrollment.
+ *
+ * When `MFA_REQUIRE_SUPER_ADMIN=true`, an unenrolled Super Admin is blocked
+ * from every route — including `mfa/enroll`, which would make enrollment
+ * impossible and lock the owner out of a fresh production deploy. These routes
+ * carry no ambient authority beyond the account's own second-factor setup, so
+ * they are exempt from the enrollment gate (and only that gate; the token is
+ * still required).
+ */
+export const MFA_ENROLLMENT_KEY = 'oryx:mfaEnrollmentAllowed';
+export const AllowMfaEnrollment = () => SetMetadata(MFA_ENROLLMENT_KEY, true);
+
+/**
  * Marks a route as exempt from the CSRF double-submit check.
  *
  * Reserved for session-*establishing* endpoints (credential login, MFA

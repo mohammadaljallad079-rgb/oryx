@@ -15,9 +15,22 @@
 # docs/DEPLOYMENT.md §5.
 
 # ---------------------------------------------------------------- upstreams
-upstream oryx_api      { server api:3001      keepalive 32; }
-upstream oryx_admin    { server admin:3000    keepalive 32; }
-upstream oryx_customer { server customer:3002 keepalive 32; }
+# `keepalive` is a directive of its own: it must be terminated by a semicolon
+# before the block closes. Writing it on the `server` line makes nginx parse it
+# as a parameter of `server` and refuse to start ("invalid parameter
+# keepalive"), which is a hard failure, not a warning.
+upstream oryx_api {
+    server api:3001;
+    keepalive 32;
+}
+upstream oryx_admin {
+    server admin:3000;
+    keepalive 32;
+}
+upstream oryx_customer {
+    server customer:3002;
+    keepalive 32;
+}
 
 # ------------------------------------------------------------- rate limiting
 # A coarse edge limit. The API applies its own per-route throttles; this stops a

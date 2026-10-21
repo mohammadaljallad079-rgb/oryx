@@ -22,7 +22,13 @@ import { CookieService } from './cookie.service';
 import { AuditService } from '../common/audit.service';
 import { PrismaService } from '../common/prisma.service';
 import { EntitlementService } from '../common/entitlement.service';
-import { CsrfExempt, CurrentPrincipal, Public, type RequestPrincipal } from './auth.decorators';
+import {
+  AllowMfaEnrollment,
+  CsrfExempt,
+  CurrentPrincipal,
+  Public,
+  type RequestPrincipal,
+} from './auth.decorators';
 import {
   AcceptInvitationDto,
   ChangePasswordDto,
@@ -256,6 +262,7 @@ export class AuthController {
   }
 
   @ApiBearerAuth()
+  @AllowMfaEnrollment()
   @Get('me')
   @ApiOperation({ summary: 'Current user, memberships, effective permissions and MFA status' })
   async me(@CurrentPrincipal() principal: RequestPrincipal) {
@@ -412,6 +419,7 @@ export class AuthController {
   // -------------------------------------------------------------------- MFA
 
   @ApiBearerAuth()
+  @AllowMfaEnrollment()
   @Get('mfa/status')
   @ApiOperation({ summary: 'MFA enrollment status for the current account' })
   mfaStatus(@CurrentPrincipal() principal: RequestPrincipal) {
@@ -419,6 +427,7 @@ export class AuthController {
   }
 
   @ApiBearerAuth()
+  @AllowMfaEnrollment()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('mfa/enroll')
   @HttpCode(HttpStatus.OK)
@@ -428,6 +437,7 @@ export class AuthController {
   }
 
   @ApiBearerAuth()
+  @AllowMfaEnrollment()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('mfa/enroll/confirm')
   @HttpCode(HttpStatus.OK)

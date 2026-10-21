@@ -8,7 +8,16 @@ coverage/
 .env
 .env.local
 .env.*.local
+# Production and staging secrets live in a real env file and must never be
+# committed. The templates in deploy/env/ are the committed examples.
+.env.production
+.env.staging
 !.env.example
+# TLS private keys and certificates are host-specific secrets, never source.
+# `deploy/nginx/certs/` holds them at runtime; only the .gitkeep placeholder is
+# tracked.
+deploy/nginx/certs/*
+!deploy/nginx/certs/.gitkeep
 .DS_Store
 .agent_tmp/
 test-results/

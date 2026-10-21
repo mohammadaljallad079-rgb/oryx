@@ -25,6 +25,15 @@ CUSTOMER_HOST="${ORYX_CUSTOMER_HOST:-}"
 API_PATH="${ORYX_HEALTH_PATH:-/api/health}"
 WARN_DAYS="${ORYX_CERT_WARN_DAYS:-21}"
 
+# A pre-launch rehearsal runs against a self-signed certificate, which curl
+# rejects before it ever sees the response. `ORYX_HEALTH_INSECURE=1` skips only
+# the chain-of-trust check; TLS is still used, and the certificate is still
+# inspected for expiry below. It must never be set for a real launch.
+CURL_TLS=()
+if [[ "${ORYX_HEALTH_INSECURE:-0}" == "1" ]]; then
+  CURL_TLS=(-k)
+fi
+
 failures=0
 warnings=0
 
@@ -41,7 +50,7 @@ command -v curl >/dev/null 2>&1 || { echo "curl is required" >&2; exit 1; }
 # ---------------------------------------------------------------- TLS and host
 section "TLS and reachability"
 for host in "$ADMIN_HOST" "$CUSTOMER_HOST"; do
-  if curl -fsS -o /dev/null --max-time 15 "https://$host/" 2>/dev/null; then
+  if curl ${CURL_TLS[@]+"${CURL_TLS[@]}"} -fsS -o /dev/null --max-time 15 "https://$host/" 2>/dev/null; then
     pass "https://$host/ responds"
   else
     fail "https://$host/ did not respond"
@@ -83,7 +92,7 @@ fi
 
 # ------------------------------------------------------------------- API health
 section "API health"
-health=$(curl -fsS --max-time 15 "https://$CUSTOMER_HOST$API_PATH" 2>/dev/null)
+health=$(curl ${CURL_TLS[@]+"${CURL_TLS[@]}"} -fsS --max-time 15 "https://$CUSTOMER_HOST$API_PATH" 2>/dev/null)
 if [[ -z "$health" ]]; then
   fail "GET https://$CUSTOMER_HOST$API_PATH did not return a body"
 else
@@ -100,7 +109,7 @@ fi
 
 # --------------------------------------------------------- security headers
 section "Security headers"
-headers=$(curl -sI --max-time 15 "https://$CUSTOMER_HOST/" 2>/dev/null)
+headers=$(curl ${CURL_TLS[@]+"${CURL_TLS[@]}"} -sI --max-time 15 "https://$CUSTOMER_HOST/" 2>/dev/null)
 check_header() {
   if printf '%s' "$headers" | grep -qi "^$1:"; then
     pass "$1 present"
@@ -118,7 +127,7 @@ section "Refresh cookie flags"
 # A login attempt with a deliberately wrong password still sets no cookie on
 # failure, so probe the refresh endpoint instead: it always answers with the
 # cookie attributes when it rejects a missing token.
-cookie_headers=$(curl -sI -X POST --max-time 15 \
+cookie_headers=$(curl ${CURL_TLS[@]+"${CURL_TLS[@]}"} -sI -X POST --max-time 15 \
   "https://$CUSTOMER_HOST/api/v1/auth/refresh" 2>/dev/null)
 if printf '%s' "$cookie_headers" | grep -qi 'set-cookie:.*oryx_rt=.*HttpOnly'; then
   if printf '%s' "$cookie_headers" | grep -qi 'set-cookie:.*oryx_rt=.*Secure'; then
@@ -142,7 +151,7 @@ if command -v docker >/dev/null 2>&1; then
   if [[ -f "$compose_file" && -f "$env_file" ]]; then
     db_user=$(grep -E '^POSTGRES_USER=' "$env_file" | tail -1 | cut -d= -f2-)
     db_name=$(grep -E '^POSTGRES_DB=' "$env_file" | tail -1 | cut -d= -f2-)
-    demo=$(docker compose -f "$compose_file" --env-file "$env_file" exec -T postgres \
+    demo=$(docker compose ${ORYX_COMPOSE_PROJECT:+-p "$ORYX_COMPOSE_PROJECT"} -f "$compose_file" --env-file "$env_file" exec -T postgres \
       psql -U "$db_user" -d "$db_name" -tAc \
       "SELECT count(*) FROM \"Company\" WHERE \"notes\" LIKE '%SEED_DEMO_DATA%';" 2>/dev/null | tr -d '[:space:]')
     if [[ "$demo" == "0" ]]; then

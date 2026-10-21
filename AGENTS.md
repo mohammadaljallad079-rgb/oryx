@@ -350,6 +350,35 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   cookie without a matching `x-oryx-csrf` header. The refresh branch above it
   echoes the cookie; the login branch must too.
 
+### Production-readiness gotchas (Execution 09)
+
+- **`MFA_REQUIRE_SUPER_ADMIN=true` must not lock the owner out.** The guard
+  refuses an unenrolled Super Admin on every route, so without an exemption the
+  owner could log in, get a token, and then be 403'd on `auth/me` — the shell
+  drops the session and bounces back to sign-in, forever. `@AllowMfaEnrollment()`
+  on `auth/me`, `auth/mfa/status`, `auth/mfa/enroll` and `auth/mfa/enroll/confirm`
+  is what makes the documented "set the flag, sign in, enrol TOTP" runbook
+  work. Keep the exemption to those routes: every other platform route stays
+  refused until the second factor exists.
+- **The shipped API image must contain `packages/database/scripts/`.** The
+  first-deploy step runs `production-init` inside the API container so it
+  reaches PostgreSQL on the internal network. The runtime stage copies the
+  script and recreates the `packages/database/node_modules/@oryx/shared`
+  symlink the pruned install omits, and `chown`s both to `oryx` — the file is
+  root-owned and mode 660 in the build stage, so without the `chown` the
+  unprivileged runtime user gets `EACCES` reading its own bootstrap script.
+- **Prisma needs `openssl` in the image.** The `node:*-slim` base omits it, so
+  Prisma logs `failed to detect the libssl/openssl version … Defaulting to
+  "openssl-1.1.x"` and loads a 1.1.x engine against Debian 12's OpenSSL 3. It
+  happens to connect, but the warning is a real mismatch — install `openssl` in
+  the base stage.
+- **Contrast must be measured, not eyeballed.** `scripts/verify-theme-matrix.mjs`
+  drives the real pages and computes WCAG contrast per element. The light theme
+  passes; the approved dark theme has one pre-existing miss,
+  `.oryx-stat__label` at 4.42–4.49 against a 4.5 floor (documented as defect E8,
+  left alone under the "do not alter the approved theme" rule).
+
+
 ### Branding and preview gotchas
 
 - **An exported `NEXT_PUBLIC_API_BASE_URL` silently overrides `.env.local`.** A
