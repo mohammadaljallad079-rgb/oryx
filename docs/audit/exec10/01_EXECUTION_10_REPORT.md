@@ -130,11 +130,79 @@ or reset; no destructive migration is proposed.
 
 ---
 
-## 4. STEP 3 — isolated staging (plan, not performed)
+## 4. STEP 3 — isolated staging (plan, not performed; isolation defect found and fixed)
 
-The intent is to run `911f35d` on the existing server **without disturbing the
-running dashboards**. The repository already supports this, because the compose
-file takes its ports, hosts, database name and volumes from the environment.
+The intent is to run the current commit on the existing server **without
+disturbing the running dashboards**. While validating the isolation offline, a
+real defect in the shipped compose file was found and fixed. It is described
+first, because it changes the staging procedure.
+
+### 4.1 The defect — `--env-file` does not isolate the API container
+
+`deploy/docker-compose.production.yml` gave the `api` service a hard-coded
+`env_file: [../.env.production]`. Compose treats `--env-file` and a service's
+`env_file:` as two different mechanisms:
+
+- `--env-file` only interpolates `${...}` references **inside the compose
+  file**.
+- `env_file:` injects the file's keys **directly into the container**, and it is
+  overridden only by an explicit `environment:` entry for the same key.
+
+The `api` service overrides just three keys (`NODE_ENV`, `DATABASE_URL`,
+`MEDIA_ROOT`). Everything else came from `.env.production`. Resolving the stack
+with `--env-file .env.staging` therefore produced an API container holding the
+**production** values — measured, not assumed:
+
+```
+api.JWT_ACCESS_SECRET   = <production value, not staging>
+api.MFA_ENCRYPTION_KEY  = <production value, not staging>
+api.POSTGRES_PASSWORD   = <production value, not staging>
+```
+
+That is 49 keys, four of them secrets, and it means a "staging" stack would
+have signed sessions with the production key and accepted production MFA
+enrolments. It did **not** touch the production database, because
+`DATABASE_URL` is one of the three keys the service overrides — but it is a
+serious isolation failure and it was on the path to STEP 3.
+
+### 4.2 The fix
+
+The env-file path is now configurable, defaulting to production so the
+documented production command is unchanged:
+
+```yaml
+    env_file:
+      - "${ORYX_API_ENV_FILE:-../.env.production}"
+```
+
+Verified with `docker compose config` (which needs no daemon):
+
+| Stack | `JWT_ACCESS_SECRET` resolved to | Result |
+|---|---|---|
+| Production (`--env-file .env.production`, var unset) | the production value | unchanged |
+| Staging (`--env-file .env.staging`, `ORYX_API_ENV_FILE=../.env.staging`) | the staging value | isolated |
+
+`ORYX_API_ENV_FILE` is documented in `deploy/env/production.env.example`.
+
+### 4.3 The regression guard — `deploy/scripts/verify-staging-isolation.sh`
+
+A read-only checker that resolves both stacks and asserts they share no project
+name, no published port, no persistent volume, no sensitive value and no
+database. It prints no secret value. It is proven non-vacuous: it **passes** on
+the fixed compose file and **fails** on the original one, naming exactly the
+leaking keys.
+
+```bash
+deploy/scripts/verify-staging-isolation.sh .env.staging
+```
+
+Run this **before** starting a staging stack. Two early versions of the checker
+were wrong and were corrected — it first compared declared volume keys (which
+are identical by design; compose prefixes the project name at runtime) and
+flagged empty unconfigured adapters as leaks. Both were false positives; the
+final version compares resolved volume names and skips empty values.
+
+### 4.4 Isolation levers
 
 The isolation levers, all of which must differ from the live deployment:
 
@@ -145,6 +213,7 @@ The isolation levers, all of which must differ from the live deployment:
 | Database | `oryx_production` | a separate database, e.g. `oryx_staging` |
 | Postgres data | `oryx_postgres-data` | `oryx-staging_postgres-data` (compose prefixes the project name, so this is automatic) |
 | Media | `oryx_media-data` | `oryx-staging_media-data` (automatic) |
+| API env file | `../.env.production` | `ORYX_API_ENV_FILE=../.env.staging` |
 | Secrets | production values | freshly generated, never shared |
 | Hostnames | `www.*` / `admin.*` | `staging.www.*` / `staging.admin.*` |
 
@@ -153,10 +222,14 @@ The isolation levers, all of which must differ from the live deployment:
 cp deploy/env/production.env.example .env.staging
 # ... set ORYX_ADMIN_HOST/ORYX_CUSTOMER_HOST to staging names,
 #     EDGE_HTTP_PORT=8080 EDGE_HTTPS_PORT=8443,
-#     POSTGRES_DB=oryx_staging, and fresh secrets for JWT_* and MFA_ENCRYPTION_KEY
+#     POSTGRES_DB=oryx_staging, fresh secrets for JWT_* and MFA_ENCRYPTION_KEY,
+#     and ORYX_API_ENV_FILE=../.env.staging
+
+# prove the isolation before starting anything
+deploy/scripts/verify-staging-isolation.sh .env.staging
 
 # build and start under a separate project name — the live stack is untouched
-ORYX_IMAGE_TAG=911f35d \
+ORYX_IMAGE_TAG=<commit> \
   docker compose -p oryx-staging \
     -f deploy/docker-compose.production.yml --env-file .env.staging \
     up -d --build
@@ -287,9 +360,16 @@ Only after staging passes, and only with explicit owner approval:
   changed.** Every one of those is blocked on access.
 - Nothing was switched, replaced, merged or cut over. No PR was merged.
 - The approved website was not redesigned.
-- What this execution actually delivered: the diagnosis of the blocker with
-  evidence, a read-only inspection script that answers all of STEP 1, the
-  verified backup and isolation plans, and the cutover and rollback procedures —
-  so the moment access is provided, STEPS 1–4 can run without further design.
+- **One real defect was found and fixed while validating STEP 3 offline:** the
+  compose file's hard-coded `env_file: [../.env.production]` meant a staging
+  stack would have received the production JWT, refresh, MFA and database
+  secrets. The fix is backward compatible (production is unchanged) and is
+  guarded by a new, non-vacuous checker. This is a genuine improvement to the
+  deployment package, not a staging run — no container was started.
+- What this execution actually delivered: the diagnosis of the access blocker
+  with evidence, a read-only inspection script that answers all of STEP 1, the
+  verified backup and isolation plans, the staging-isolation defect fix and its
+  regression guard, and the cutover and rollback procedures — so the moment
+  access is provided, STEPS 1–4 can run without further design.
 
 _This report was written by an AI agent (OpenHands) on behalf of the repository owner._

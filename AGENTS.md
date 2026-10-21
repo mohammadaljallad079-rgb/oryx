@@ -400,6 +400,26 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 - **`deploy.sh` never reverses a migration.** It restores the previous image tag
   on a failed health probe and stops. A schema rollback is a deliberate restore
   into a separate database, then a promotion — not an automatic down migration.
+- **`--env-file` does not isolate a container; a service's `env_file:` does.**
+  `--env-file` only interpolates `${...}` inside the compose file. The `api`
+  service's `env_file:` injects keys straight into the container and is
+  overridden only by an explicit `environment:` entry. It used to be hard-coded
+  to `../.env.production`, so a staging stack resolved with the **production**
+  JWT, refresh, MFA and database secrets. It is now
+  `${ORYX_API_ENV_FILE:-../.env.production}`, which keeps production unchanged
+  and lets staging point at its own file. Never remove that indirection, and
+  never "simplify" it back to a literal path.
+- **Prove staging isolation with the checker, not by reading the files.**
+  `deploy/scripts/verify-staging-isolation.sh .env.staging` resolves both stacks
+  with `docker compose config` (no daemon needed) and fails on a shared project
+  name, port, resolved volume name, sensitive value or database. It is verified
+  non-vacuous: it fails on the pre-fix compose file. When writing such a check,
+  compare *resolved* volume names (compose prefixes the project) and skip *empty*
+  values (an unconfigured adapter is empty in both files) — both are easy false
+  positives.
+- **`env_file:` in flow-sequence form cannot hold a `:-` default.** `env_file:
+  [${VAR:-x}]` fails to parse (`did not find expected ',' or ']'`); use the block
+  list form.
 
 
 ### Branding and preview gotchas

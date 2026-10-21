@@ -66,7 +66,14 @@ services:
       dockerfile: deploy/docker/Dockerfile.api
     image: oryx-api:${ORYX_IMAGE_TAG:-latest}
     restart: unless-stopped
-    env_file: [../.env.production]
+    # Path is relative to this file's directory. It defaults to the production
+    # env so the documented production command is unchanged, but a staging stack
+    # sets ORYX_API_ENV_FILE in its own --env-file so the API container does not
+    # inherit the production secrets. Without this, `--env-file .env.staging`
+    # only interpolates ${...} in this file; the container would still be handed
+    # every key in .env.production.
+    env_file:
+      - "${ORYX_API_ENV_FILE:-../.env.production}"
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
