@@ -28,7 +28,13 @@
   --border-strong: rgba(212, 175, 55, 0.55);
   --text: #eef3f9;
   --text-muted: #9fb3c8;
-  --text-faint: #6f8598;
+  /*
+   * Raised from #6f8598, which measured 4.43:1 on the gradient stat panel —
+   * just under the 4.5:1 the contrast harness enforces. This is the smallest
+   * lightening that clears AA on every surface the token lands on (4.93:1 on
+   * the lightest), so the approved dark render shifts imperceptibly.
+   */
+  --text-faint: #778da1;
   --text-inverse: #00121f;
   --navy: #00162b;
   --gold: #d4af37;
@@ -80,7 +86,12 @@
   --band-footer: #000f1e;
   --band-text: #eef3f9;
   --band-text-muted: #9fb3c8;
-  --band-text-faint: #6f8598;
+  /*
+   * Raised from #6f8598 alongside `--text-faint`: the stat label sits on the
+   * gradient stat panel, where the old value measured 4.43:1 — just under the
+   * 4.5:1 the contrast harness enforces.
+   */
+  --band-text-faint: #778da1;
   --band-accent: #d4af37;
   --band-border: rgba(255, 255, 255, 0.08);
   /*
@@ -119,19 +130,28 @@
     linear-gradient(150deg, var(--surface-raised), var(--bg-deep));
   --panel-ink: var(--text);
   --panel-ink-muted: var(--text-muted);
+  /*
+   * The photo scrims run across the caption, so their angle is a token rather
+   * than a literal: the caption starts at the inline-start edge, which is the
+   * left in LTR and the right in RTL, and the opaque end must follow it. The
+   * light theme flips the angle under `[data-dir='rtl']`; the dark theme leaves
+   * it at 100deg, where the band equals the page field and the approved render
+   * is already direction-neutral.
+   */
+  --scrim-angle: 100deg;
   --hero-scrim: linear-gradient(
-    100deg,
+    var(--scrim-angle),
     color-mix(in srgb, var(--band) 94%, transparent) 8%,
     color-mix(in srgb, var(--band) 74%, transparent) 48%,
     color-mix(in srgb, var(--band) 34%, transparent) 100%
   );
   --panel-scrim: linear-gradient(
-    100deg,
+    var(--scrim-angle),
     color-mix(in srgb, var(--band) 92%, transparent) 10%,
     color-mix(in srgb, var(--band) 62%, transparent) 70%
   );
   --head-scrim: linear-gradient(
-    100deg,
+    var(--scrim-angle),
     color-mix(in srgb, var(--band) 94%, transparent) 8%,
     color-mix(in srgb, var(--band) 66%, transparent) 72%
   );
@@ -141,6 +161,29 @@
   /* Field well: darker than the card so the input reads as inset. */
   --field-bg: var(--bg-deep);
   --field-border: var(--border-soft);
+  /*
+   * The status ramp. A badge or an alert is a *tinted chip*, so the strength of
+   * its wash belongs to the theme, not to the rule that draws it. A rule names
+   * `var(--status-fill)` and declares only *which* status it is, through
+   * `--status-color` (a badge needs no declaration — its `color` already is the
+   * status colour). This is the only place the strength lives, which is what
+   * lets the light theme tune the chips without a scattered override.
+   */
+  --status-line: color-mix(in srgb, var(--status-color, currentColor) 40%, transparent);
+  --status-fill: color-mix(in srgb, var(--status-color, currentColor) 12%, transparent);
+  /*
+   * The neutral overlay ramp. Hover washes, inset wells, skeletons and the
+   * muted dot were each a different magic percentage in the rules; they are
+   * named here so both themes share one scale and the light theme can deepen it
+   * for contrast on ivory without touching a component.
+   */
+  --overlay-hover: color-mix(in srgb, var(--text) 4%, transparent);
+  --well-bg: color-mix(in srgb, var(--surface-raised) 40%, transparent);
+  --skeleton-from: color-mix(in srgb, var(--text) 6%, transparent);
+  --skeleton-to: color-mix(in srgb, var(--text) 13%, transparent);
+  --dot-muted: color-mix(in srgb, var(--text-faint) 50%, transparent);
+  --auth-sheen: color-mix(in srgb, var(--surface-raised) 92%, var(--gold) 8%);
+  --band-btn-hover: color-mix(in srgb, var(--band-text) 12%, transparent);
   --header-h: 68px;
 }
 
@@ -200,18 +243,18 @@
    * equals the page field, so the approved render is unchanged.
    */
   --hero-scrim: linear-gradient(
-    100deg,
+    var(--scrim-angle),
     color-mix(in srgb, var(--band) 96%, transparent) 4%,
     color-mix(in srgb, var(--band) 92%, transparent) 55%,
     color-mix(in srgb, var(--band) 70%, transparent) 100%
   );
   --panel-scrim: linear-gradient(
-    100deg,
+    var(--scrim-angle),
     color-mix(in srgb, var(--band) 96%, transparent) 8%,
     color-mix(in srgb, var(--band) 88%, transparent) 70%
   );
   --head-scrim: linear-gradient(
-    100deg,
+    var(--scrim-angle),
     color-mix(in srgb, var(--band) 97%, transparent) 8%,
     color-mix(in srgb, var(--band) 90%, transparent) 72%
   );
@@ -272,6 +315,38 @@
     linear-gradient(150deg, var(--band), color-mix(in srgb, var(--band) 82%, #000000));
   --panel-ink: var(--band-text);
   --panel-ink-muted: var(--band-text-muted);
+  /*
+   * Status chips on ivory. The dark theme's 40%/12% were tuned against bright
+   * status colours; the light theme uses *darker* status colours (so the text
+   * clears 4.5:1 on white), and the same percentages then produce a wash too
+   * faint to see and a hairline too strong to sit under it. The strength is
+   * therefore raised here, in the token, so every badge and alert moves together
+   * and no component carries an override.
+   */
+  --status-line: color-mix(in srgb, var(--status-color, currentColor) 38%, transparent);
+  --status-fill: color-mix(in srgb, var(--status-color, currentColor) 10%, transparent);
+  /*
+   * The neutral overlay ramp, deepened for ivory. A 4% charcoal hover that reads
+   * on navy is nearly invisible on white, and a 40% well that reads as an inset
+   * on navy looks like a dirty patch on ivory. One scale, tuned once.
+   */
+  --overlay-hover: color-mix(in srgb, var(--text) 6%, transparent);
+  --well-bg: color-mix(in srgb, var(--surface) 70%, var(--bg-deep));
+  --skeleton-from: color-mix(in srgb, var(--text) 8%, transparent);
+  --skeleton-to: color-mix(in srgb, var(--text) 16%, transparent);
+  --dot-muted: color-mix(in srgb, var(--text-faint) 45%, transparent);
+  --auth-sheen: color-mix(in srgb, var(--surface-raised) 94%, var(--gold) 6%);
+  --band-btn-hover: color-mix(in srgb, var(--band-text) 14%, transparent);
+}
+
+/*
+ * The light theme's photo scrims are anchored to the caption, which sits at the
+ * inline-start edge: the left in LTR and the right in RTL. Mirroring the angle
+ * keeps the near-opaque end over the caption in both directions, so the white
+ * band ink holds its contrast instead of falling onto the 70%-opaque tail.
+ */
+:root[data-theme='light'][data-dir='rtl'] {
+  --scrim-angle: 260deg;
 }
 
 * {
@@ -548,7 +623,7 @@ a {
 }
 
 .oryx-btn-danger {
-  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  border-color: var(--status-line);
   color: var(--danger);
 }
 
@@ -604,33 +679,33 @@ a {
 
 .oryx-badge-success {
   color: var(--success);
-  border-color: color-mix(in srgb, var(--success) 40%, transparent);
+  border-color: var(--status-line);
 }
 .oryx-badge-warning {
   color: var(--warning);
-  border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+  border-color: var(--status-line);
 }
 .oryx-badge-danger {
   color: var(--danger);
-  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  border-color: var(--status-line);
 }
 .oryx-badge-info {
   color: var(--info);
-  border-color: color-mix(in srgb, var(--info) 40%, transparent);
+  border-color: var(--status-line);
 }
 
 .oryx-alert {
+  --status-color: var(--danger);
   border-radius: 12px;
   padding: 12px 14px;
   font-size: 14px;
-  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border: 1px solid var(--status-line);
+  background: var(--status-fill);
   color: var(--text);
 }
 
 .oryx-alert-success {
-  border-color: color-mix(in srgb, var(--success) 40%, transparent);
-  background: color-mix(in srgb, var(--success) 12%, transparent);
+  --status-color: var(--success);
 }
 
 .oryx-table {
@@ -1344,7 +1419,7 @@ a {
 }
 
 :root[data-theme='light'] .oryx-footer .oryx-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--band-text) 12%, transparent);
+  background: var(--band-btn-hover);
   border-color: var(--band-accent);
 }
 
@@ -1603,7 +1678,7 @@ a {
   padding: 42px 24px;
   border: 1px dashed var(--border-soft);
   border-radius: 16px;
-  background: color-mix(in srgb, var(--surface-raised) 40%, transparent);
+  background: var(--well-bg);
 }
 
 .oryx-state--compact {
@@ -1623,14 +1698,14 @@ a {
 
 .oryx-state--error .oryx-state__icon {
   color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+  background: var(--status-fill);
+  border-color: var(--status-line);
 }
 
 .oryx-state--success .oryx-state__icon {
   color: var(--success);
-  background: color-mix(in srgb, var(--success) 12%, transparent);
-  border-color: color-mix(in srgb, var(--success) 30%, transparent);
+  background: var(--status-fill);
+  border-color: var(--status-line);
 }
 
 .oryx-state__title {
@@ -1665,9 +1740,9 @@ a {
   border-radius: 8px;
   background: linear-gradient(
     90deg,
-    color-mix(in srgb, var(--text) 6%, transparent) 0%,
-    color-mix(in srgb, var(--text) 13%, transparent) 50%,
-    color-mix(in srgb, var(--text) 6%, transparent) 100%
+    var(--skeleton-from) 0%,
+    var(--skeleton-to) 50%,
+    var(--skeleton-from) 100%
   );
   background-size: 200% 100%;
   animation: oryx-shimmer 1.4s ease-in-out infinite;
@@ -1705,7 +1780,7 @@ a {
 }
 
 .oryx-table tbody tr:hover {
-  background: color-mix(in srgb, var(--text) 4%, transparent);
+  background: var(--overlay-hover);
 }
 
 /* ------------------------------------------------------- layout + list shell */
@@ -1858,7 +1933,7 @@ a {
 }
 
 .oryx-notice__dot--read {
-  background: color-mix(in srgb, var(--text-faint) 50%, transparent);
+  background: var(--dot-muted);
 }
 
 .oryx-notice__body {
@@ -2128,7 +2203,7 @@ a {
   border: 1px solid var(--border-soft);
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--surface-raised) 92%, var(--gold) 8%),
+    var(--auth-sheen),
     var(--surface-raised)
   );
   box-shadow: var(--shadow-panel);

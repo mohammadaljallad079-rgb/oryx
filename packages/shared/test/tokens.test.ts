@@ -294,4 +294,22 @@ describe('CSS custom properties match the shared tokens', () => {
     );
     expect(offenders, `ad-hoc gold tints at lines ${offenders.join(', ')}`).toEqual([]);
   });
+
+  it('mirrors the light photo scrims under RTL', () => {
+    // The regression this guards: the caption sits at the inline-start edge, so
+    // a scrim hard-coded at 100deg keeps its opaque end on the left while the
+    // caption moves to the right in RTL. The label then lands on the 70%-opaque
+    // tail and the white band ink measures 3.79:1. Every scrim angle must be the
+    // token, and the light theme must flip that token for RTL.
+    const css = readFileSync(CUSTOMER_CSS, 'utf8');
+    const literalAngles = [...css.matchAll(/linear-gradient\(\s*[0-9]+deg,\s*\n\s*color-mix\(in srgb, var\(--band\)/g)];
+    expect(literalAngles, 'scrim with a literal angle').toEqual([]);
+
+    const flip = css.match(/:root\[data-theme='light'\]\[data-dir='rtl'\]\s*\{([^}]*)\}/);
+    expect(flip, 'light RTL scrim override is missing').not.toBeNull();
+    const angle = flip![1].match(/--scrim-angle:\s*([0-9]+)deg/);
+    expect(angle, 'light RTL block does not set --scrim-angle').not.toBeNull();
+    // 260deg is the mirror of 100deg about the vertical axis.
+    expect(Number(angle![1])).toBe(260);
+  });
 });

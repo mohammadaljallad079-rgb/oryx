@@ -152,7 +152,10 @@ export const DARK_THEME: ThemeTokens = {
   bandFooter: '#000f1e',
   bandText: '#eef3f9',
   bandTextMuted: '#9fb3c8',
-  bandTextFaint: '#6f8598',
+  // Raised from #6f8598, which measured 4.43:1 on the gradient stat panel — just
+  // under the 4.5:1 the contrast harness enforces. This is the smallest
+  // lightening that clears AA on every surface the token lands on.
+  bandTextFaint: '#778da1',
   bandAccent: '#d4af37',
   bandBorder: 'rgba(255, 255, 255, 0.08)',
   // In dark the plain gold already clears 4.5:1 on every gold-tinted chip, so
