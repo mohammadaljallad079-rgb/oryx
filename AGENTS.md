@@ -302,6 +302,13 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `lint` script is `eslint . --max-warnings=0`. `next lint` is deprecated in
   Next 15 and prompts interactively when no config exists, which made
   `pnpm -r lint` hang in CI. CI runs admin and customer lint.
+- **Pin the Chromium jobs to `ubuntu-24.04`, not `ubuntu-latest`.** GitHub moved
+  the `ubuntu-latest` label to Ubuntu 26.04, and Playwright 1.56.1 refuses to
+  install Chromium on it (`Playwright does not support chromium on
+  ubuntu26.04-x64`). The failure lands at `playwright install --with-deps
+  chromium`, before any test runs, so it looks like the commit it happened to be
+  attached to rather than image drift. `test-ui` in `ci.yml` and `verify` in
+  `preview.yml` are pinned; lift the pin when Playwright supports 26.04.
 
 ### Execution 05 gotchas
 
