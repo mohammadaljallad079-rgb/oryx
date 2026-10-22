@@ -112,7 +112,9 @@ jobs:
   # a desktop and a mobile viewport.
   verify:
     name: Verify the built site
-    runs-on: ubuntu-latest
+    # Pinned: `ubuntu-latest` now resolves to Ubuntu 26.04, which Playwright
+    # 1.56.1 refuses to install Chromium on. See the same note in `ci.yml`.
+    runs-on: ubuntu-24.04
     needs: build
     steps:
       - uses: actions/checkout@v4
