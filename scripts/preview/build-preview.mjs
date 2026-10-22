@@ -404,6 +404,65 @@ async function buildEvidencePages() {
     }
   }
 
+  // Execution 11 — the live light-theme verification, captured from the running
+  // stack after the ivory correction. The dark render sits beside each surface
+  // as the control: it is the approved theme and must not change.
+  const EXEC11_DIR = 'docs/audit/exec11/light-theme';
+  const EXEC11_SURFACES = [
+    ['01-homepage', 'Homepage', '/'],
+    ['02-dashboard', 'Customer dashboard', '/dashboard'],
+    ['03-providers', 'Provider directory', '/providers'],
+    ['04-login', 'Sign in', '/login'],
+    ['05-admin-dashboard', 'Super Admin dashboard', 'admin /dashboard'],
+  ];
+  const exec11 = [];
+  if (exists(EXEC11_DIR)) {
+    for (const [slug, label, route] of EXEC11_SURFACES) {
+      const pairs = [];
+      for (const width of WIDTHS) {
+        for (const locale of LOCALES) {
+          const lightSrc = `${EXEC11_DIR}/${slug}-${width}-${locale}-light.png`;
+          if (!exists(lightSrc)) continue;
+          const light = await makeThumb(lightSrc, `assets/evidence/exec11-${slug}-${width}-${locale}-light`, 1200);
+          const darkSrc = `${EXEC11_DIR}/${slug}-${width}-${locale}-dark.png`;
+          const dark = exists(darkSrc)
+            ? await makeThumb(darkSrc, `assets/evidence/exec11-${slug}-${width}-${locale}-dark`, 1200)
+            : null;
+          pairs.push(`
+        <div class="pair">
+          <div class="pair__head">
+            <span class="badge badge--info">${width} · ${locale.toUpperCase()}</span>
+            <span>Execution 11 · running stack</span>
+          </div>
+          <div class="pair__grid">
+            ${figure(light, '<strong>Light</strong> — ivory identity', `${label} ${width} ${locale} light`, '../')}
+            ${dark ? figure(dark, '<strong>Dark</strong> — unchanged control', `${label} ${width} ${locale} dark`, '../') : ''}
+          </div>
+        </div>`);
+        }
+      }
+      if (pairs.length) {
+        exec11.push(`
+      <section>
+        <div class="section-head">
+          <h2>${escapeHtml(label)}</h2>
+          <p><code>${escapeHtml(route)}</code> · light and dark, captured from the running stack</p>
+        </div>
+        ${pairs.join('')}
+      </section>`);
+      }
+    }
+  }
+  const exec11Sheets = [];
+  if (exists(EXEC11_DIR)) {
+    for (const f of listFiles(EXEC11_DIR, ['.png']).filter((f) => f.startsWith('cmp-'))) {
+      const out = await makeThumb(`${EXEC11_DIR}/${f}`, `assets/evidence/exec11-${f.replace(/\.png$/, '')}`, 1600);
+      exec11Sheets.push(
+        figure(out, escapeHtml(f.replace(/^cmp-/, '').replace(/\.png$/, '')), 'light vs dark', '../'),
+      );
+    }
+  }
+
   const DARK_LABELS = {
     captures: 'dark captures compared',
     byteIdentical: 'byte-identical',
@@ -443,7 +502,9 @@ async function buildEvidencePages() {
     ${sections.join('')}
     ${sheets.length ? `<section><div class="section-head"><h2>Light vs dark sheets</h2><p>side-by-side composites</p></div><div class="gallery">${sheets.join('')}</div></section>` : ''}
     ${exec08.length ? `<section><div class="section-head"><h2>Execution 08 — swept from the live preview</h2><p>light render and light-vs-dark sheet for every viewport and locale</p></div></section>${exec08.join('')}` : ''}
-    <p class="card__meta">${copied} capture pairs · before set from <code>docs/audit/exec07/phase-e/before/</code> · after set from <code>docs/audit/exec07/phase-e/after/</code></p>
+    ${exec11.length ? `<section><div class="section-head"><h2>Execution 11 — the light-theme correction, verified live</h2><p>captured from the running stack: Arabic RTL and English LTR at desktop, tablet and mobile, with the approved dark render as the control</p></div></section>${exec11.join('')}` : ''}
+    ${exec11Sheets.length ? `<section><div class="section-head"><h2>Execution 11 — light vs dark sheets</h2><p>side-by-side composites, one per surface and locale</p></div><div class="gallery">${exec11Sheets.join('')}</div></section>` : ''}
+    <p class="card__meta">${copied} capture pairs · before set from <code>docs/audit/exec07/phase-e/before/</code> · after set from <code>docs/audit/exec07/phase-e/after/</code> · Execution 11 set from <code>docs/audit/exec11/light-theme/</code></p>
   `;
 
   write('evidence/index.html', page({ title: 'Design evidence', description: 'Phase E light-theme captures: before, after, light vs dark.', body, current: 'evidence' }));

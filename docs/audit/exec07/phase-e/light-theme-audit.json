@@ -22,7 +22,7 @@
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(139, 144, 148)",
-      "contrast": 5.04
+      "contrast": 5.05
     },
     "header": {
       "layers": [
@@ -46,8 +46,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(248, 248, 247)",
-      "contrast": 15.25
+      "background": "rgb(246, 244, 238)",
+      "contrast": 14.78
     },
     "card": {
       "layers": [
@@ -99,28 +99,26 @@
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(253, 253, 252)",
-      "contrast": 15.98
+      "contrast": 15.93
     },
     "btn-primary": {
       "layers": [
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
-        "rgba(0, 0, 0, 0)",
-        "rgba(0, 0, 0, 0)",
-        "rgba(0, 0, 0, 0)",
+        "color(srgb 1 1 1 / 0.94)",
         "rgb(247, 244, 237)"
       ],
       "backgroundImage": "linear-gradient(145deg, rgb(224, 193, 104), rgb(201, 162, 39))",
       "color": "rgb(36, 31, 20)",
       "borderColor": "rgba(0, 0, 0, 0)",
       "borderWidth": "1px",
-      "fontSize": "15px",
+      "fontSize": "14px",
       "fontWeight": "600",
-      "ownText": "احجز موعداً",
+      "ownText": "حساب جديد",
       "isIcon": false,
       "threshold": 4.5,
-      "text": "احجز موعداً",
+      "text": "حساب جديد",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
@@ -128,8 +126,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(210, 175, 71)",
-      "contrast": 7.78
+      "background": "rgb(214, 181, 79)",
+      "contrast": 8.25
     },
     "nav-link": {
       "layers": [
@@ -186,7 +184,7 @@
         "rgba(0, 0, 0, 0)",
         "rgb(247, 244, 237)"
       ],
-      "backgroundImage": "radial-gradient(90% 120% at 90% 10%, color(srgb 0.521569 0.4 0.0705882 / 0.2), rgba(0, 0, 0, 0) 55%), linear-gradient(15",
+      "backgroundImage": "radial-gradient(90% 120% at 90% 10%, color(srgb 0.521569 0.4 0.0705882 / 0.16), rgba(0, 0, 0, 0) 55%), linear-gradient(1",
       "color": "rgb(34, 32, 29)",
       "borderColor": "rgba(133, 102, 18, 0.5)",
       "borderWidth": "1px",
@@ -195,7 +193,7 @@
       "ownText": "",
       "isIcon": false,
       "threshold": 4.5,
-      "text": "منصة خدمات السيارات الموحدةكل خدمات سيار",
+      "text": "منصة خدمات السيارات في البحرينكل ما تحتا",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
@@ -203,8 +201,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(29, 43, 58)",
-      "contrast": 1.13
+      "background": "rgb(30, 44, 59)",
+      "contrast": 1.14
     },
     "cat-card": {
       "layers": [
@@ -227,8 +225,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(211, 208, 202)",
-      "contrast": 10.59
+      "background": "rgb(212, 209, 203)",
+      "contrast": 10.69
     },
     "stat-label": {
       "layers": [
@@ -258,8 +256,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(25, 36, 50)",
-      "contrast": 7.26
+      "background": "rgb(15, 30, 49)",
+      "contrast": 7.79
     },
     "muted": {
       "layers": [
@@ -296,7 +294,7 @@
       ],
       "backgroundImage": null,
       "color": "rgb(122, 92, 16)",
-      "borderColor": "color(srgb 0.521569 0.4 0.0705882 / 0.3)",
+      "borderColor": "color(srgb 0.521569 0.4 0.0705882 / 0.26)",
       "borderWidth": "1px",
       "fontSize": "16px",
       "fontWeight": "400",
@@ -337,8 +335,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(200, 202, 202)",
-      "contrast": 9.85
+      "background": "rgb(246, 242, 234)",
+      "contrast": 14.57
     },
     "header": {
       "layers": [
@@ -362,23 +360,23 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(248, 248, 247)",
-      "contrast": 15.31
+      "background": "rgb(246, 245, 239)",
+      "contrast": 14.84
     },
-    "card": {
+    "input": {
       "layers": [
         "rgb(255, 255, 255)"
       ],
       "backgroundImage": null,
       "color": "rgb(34, 32, 29)",
-      "borderColor": "rgba(36, 31, 20, 0.09)",
+      "borderColor": "rgba(36, 31, 20, 0.18)",
       "borderWidth": "1px",
-      "fontSize": "16px",
+      "fontSize": "14px",
       "fontWeight": "400",
       "ownText": "",
       "isIcon": false,
       "threshold": 4.5,
-      "text": "السيارات2مرآب سياراتي",
+      "text": "",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
@@ -386,8 +384,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(253, 252, 251)",
-      "contrast": 15.89
+      "background": "rgb(253, 253, 253)",
+      "contrast": 15.97
     },
     "btn": {
       "layers": [
@@ -415,16 +413,14 @@
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(253, 253, 252)",
-      "contrast": 15.98
+      "contrast": 15.93
     },
     "btn-primary": {
       "layers": [
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
-        "rgba(0, 0, 0, 0)",
-        "rgba(0, 0, 0, 0)",
-        "rgba(0, 0, 0, 0)",
+        "color(srgb 1 1 1 / 0.94)",
         "rgb(247, 244, 237)"
       ],
       "backgroundImage": "linear-gradient(145deg, rgb(224, 193, 104), rgb(201, 162, 39))",
@@ -433,10 +429,10 @@
       "borderWidth": "1px",
       "fontSize": "14px",
       "fontWeight": "600",
-      "ownText": "حجز جديد",
+      "ownText": "حساب جديد",
       "isIcon": false,
       "threshold": 4.5,
-      "text": "حجز جديد",
+      "text": "حساب جديد",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
@@ -444,8 +440,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(204, 172, 70)",
-      "contrast": 7.44
+      "background": "rgb(214, 181, 79)",
+      "contrast": 8.25
     },
     "nav-link": {
       "layers": [
@@ -495,9 +491,9 @@
         "gold": "#856612",
         "textFaint": "#6b6459"
       },
-      "measuredFrom": "rendered-pixels",
-      "background": "rgb(15, 31, 51)",
-      "contrast": 7.7
+      "measuredFrom": "composited-layers",
+      "background": "rgb(10, 27, 47)",
+      "contrast": 8.06
     },
     "muted": {
       "layers": [
@@ -527,21 +523,23 @@
       "background": "rgb(255, 255, 254)",
       "contrast": 7.48
     },
-    "kpi-icon": {
+    "auth-card": {
       "layers": [
-        "color(srgb 0.521569 0.4 0.0705882 / 0.12)",
-        "rgb(255, 255, 255)"
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgb(247, 244, 237)"
       ],
-      "backgroundImage": null,
-      "color": "rgb(122, 92, 16)",
-      "borderColor": "color(srgb 0.521569 0.4 0.0705882 / 0.28)",
+      "backgroundImage": "linear-gradient(color(srgb 0.956549 0.941882 0.903686), rgb(251, 249, 244))",
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgba(36, 31, 20, 0.09)",
       "borderWidth": "1px",
       "fontSize": "16px",
       "fontWeight": "400",
       "ownText": "",
-      "isIcon": true,
-      "threshold": 3,
-      "text": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "ORYXتسجيل الدخولادخل إلى مرآبك وحجوزاتك ",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
@@ -549,8 +547,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(238, 234, 223)",
-      "contrast": 5.18
+      "background": "rgb(242, 237, 221)",
+      "contrast": 13.84
     }
   },
   "/providers": {
@@ -575,8 +573,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(209, 209, 205)",
-      "contrast": 10.65
+      "background": "rgb(209, 209, 204)",
+      "contrast": 10.62
     },
     "header": {
       "layers": [
@@ -600,8 +598,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(247, 247, 247)",
-      "contrast": 15.22
+      "background": "rgb(246, 244, 238)",
+      "contrast": 14.76
     },
     "card": {
       "layers": [
@@ -625,7 +623,7 @@
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(247, 243, 231)",
-      "contrast": 14.71
+      "contrast": 14.69
     },
     "btn": {
       "layers": [
@@ -653,14 +651,14 @@
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(253, 253, 252)",
-      "contrast": 15.98
+      "contrast": 15.93
     },
     "btn-primary": {
       "layers": [
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
-        "rgba(0, 0, 0, 0)",
+        "color(srgb 1 1 1 / 0.94)",
         "rgb(247, 244, 237)"
       ],
       "backgroundImage": "linear-gradient(145deg, rgb(224, 193, 104), rgb(201, 162, 39))",
@@ -669,10 +667,10 @@
       "borderWidth": "1px",
       "fontSize": "14px",
       "fontWeight": "600",
-      "ownText": "الكل",
+      "ownText": "حساب جديد",
       "isIcon": false,
       "threshold": 4.5,
-      "text": "الكل",
+      "text": "حساب جديد",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
@@ -680,8 +678,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(214, 181, 81)",
-      "contrast": 8.29
+      "background": "rgb(214, 181, 79)",
+      "contrast": 8.25
     },
     "nav-link": {
       "layers": [
@@ -788,7 +786,7 @@
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(20, 36, 54)",
-      "contrast": 15.71
+      "contrast": 15.73
     }
   },
   "/login": {
@@ -814,7 +812,7 @@
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(246, 242, 234)",
-      "contrast": 14.58
+      "contrast": 14.57
     },
     "header": {
       "layers": [
@@ -838,8 +836,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(248, 248, 247)",
-      "contrast": 15.31
+      "background": "rgb(246, 245, 239)",
+      "contrast": 14.84
     },
     "input": {
       "layers": [
@@ -891,27 +889,26 @@
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(253, 253, 252)",
-      "contrast": 15.98
+      "contrast": 15.93
     },
     "btn-primary": {
       "layers": [
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
-        "rgba(0, 0, 0, 0)",
-        "rgba(0, 0, 0, 0)",
+        "color(srgb 1 1 1 / 0.94)",
         "rgb(247, 244, 237)"
       ],
-      "backgroundImage": "linear-gradient(145deg, rgb(212, 175, 55), rgb(184, 145, 42))",
+      "backgroundImage": "linear-gradient(145deg, rgb(224, 193, 104), rgb(201, 162, 39))",
       "color": "rgb(36, 31, 20)",
-      "borderColor": "rgba(133, 102, 18, 0.5)",
+      "borderColor": "rgba(0, 0, 0, 0)",
       "borderWidth": "1px",
       "fontSize": "14px",
       "fontWeight": "600",
-      "ownText": "دخول",
+      "ownText": "حساب جديد",
       "isIcon": false,
       "threshold": 4.5,
-      "text": "دخول",
+      "text": "حساب جديد",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
@@ -919,8 +916,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(198, 161, 53)",
-      "contrast": 6.67
+      "background": "rgb(214, 181, 79)",
+      "contrast": 8.25
     },
     "nav-link": {
       "layers": [
@@ -1009,7 +1006,7 @@
         "rgba(0, 0, 0, 0)",
         "rgb(247, 244, 237)"
       ],
-      "backgroundImage": "linear-gradient(color(srgb 0.947294 0.930353 0.885961), rgb(251, 249, 244))",
+      "backgroundImage": "linear-gradient(color(srgb 0.956549 0.941882 0.903686), rgb(251, 249, 244))",
       "color": "rgb(34, 32, 29)",
       "borderColor": "rgba(36, 31, 20, 0.09)",
       "borderWidth": "1px",
@@ -1026,8 +1023,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(241, 235, 219)",
-      "contrast": 13.7
+      "background": "rgb(242, 237, 221)",
+      "contrast": 13.84
     }
   },
   "/profile": {
@@ -1052,8 +1049,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(222, 223, 223)",
-      "contrast": 12.19
+      "background": "rgb(246, 242, 234)",
+      "contrast": 14.57
     },
     "header": {
       "layers": [
@@ -1077,32 +1074,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(248, 248, 247)",
-      "contrast": 15.31
-    },
-    "card": {
-      "layers": [
-        "rgb(255, 255, 255)"
-      ],
-      "backgroundImage": null,
-      "color": "rgb(34, 32, 29)",
-      "borderColor": "rgba(36, 31, 20, 0.09)",
-      "borderWidth": "1px",
-      "fontSize": "16px",
-      "fontWeight": "400",
-      "ownText": "",
-      "isIcon": false,
-      "threshold": 4.5,
-      "text": "الملف الشخصيحدّث بياناتك الأساسية المستخ",
-      "tokens": {
-        "bg": "#f7f4ed",
-        "surface": "#fff",
-        "gold": "#856612",
-        "textFaint": "#6b6459"
-      },
-      "measuredFrom": "rendered-pixels",
-      "background": "rgb(250, 249, 246)",
-      "contrast": 15.45
+      "background": "rgb(246, 245, 239)",
+      "contrast": 14.84
     },
     "input": {
       "layers": [
@@ -1126,7 +1099,7 @@
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(253, 253, 253)",
-      "contrast": 15.98
+      "contrast": 15.97
     },
     "btn": {
       "layers": [
@@ -1154,13 +1127,15 @@
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(253, 253, 252)",
-      "contrast": 15.98
+      "contrast": 15.93
     },
     "btn-primary": {
       "layers": [
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
-        "rgb(255, 255, 255)"
+        "rgba(0, 0, 0, 0)",
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
       ],
       "backgroundImage": "linear-gradient(145deg, rgb(224, 193, 104), rgb(201, 162, 39))",
       "color": "rgb(36, 31, 20)",
@@ -1168,10 +1143,10 @@
       "borderWidth": "1px",
       "fontSize": "14px",
       "fontWeight": "600",
-      "ownText": "حفظ",
+      "ownText": "حساب جديد",
       "isIcon": false,
       "threshold": 4.5,
-      "text": "حفظ",
+      "text": "حساب جديد",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
@@ -1179,8 +1154,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(214, 181, 80)",
-      "contrast": 8.27
+      "background": "rgb(214, 181, 79)",
+      "contrast": 8.25
     },
     "nav-link": {
       "layers": [
@@ -1262,23 +1237,23 @@
       "background": "rgb(255, 255, 254)",
       "contrast": 7.48
     },
-    "page-head": {
+    "auth-card": {
       "layers": [
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
         "rgb(247, 244, 237)"
       ],
-      "backgroundImage": "radial-gradient(120% 140% at 88% 6%, color(srgb 0.909804 0.780392 0.4 / 0.2), rgba(0, 0, 0, 0) 58%), linear-gradient(150",
-      "color": "rgb(255, 255, 255)",
-      "borderColor": "rgba(36, 31, 20, 0.14)",
+      "backgroundImage": "linear-gradient(color(srgb 0.956549 0.941882 0.903686), rgb(251, 249, 244))",
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgba(36, 31, 20, 0.09)",
       "borderWidth": "1px",
       "fontSize": "16px",
       "fontWeight": "400",
       "ownText": "",
       "isIcon": false,
       "threshold": 4.5,
-      "text": "منصة السياراتالملف الشخصيبياناتك الشخصية",
+      "text": "ORYXتسجيل الدخولادخل إلى مرآبك وحجوزاتك ",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
@@ -1286,8 +1261,8 @@
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(13, 30, 49)",
-      "contrast": 16.85
+      "background": "rgb(242, 237, 221)",
+      "contrast": 13.84
     }
   }
 }
