@@ -764,3 +764,133 @@ The evidence images are in `docs/audit/exec07/phase-e/after/`, with
 `manifest.json` recording each capture's status, overflow, body background and
 contrast, and `dark-invariance.json` recording the dark comparison.
 
+## 12. Fourth continuation session — the RTL scrim regression
+
+A fourth sandbox failure interrupted the session that was verifying the
+corrected light theme. The owner's outstanding note was still "the Light Theme
+colors still look inconsistent", so this session first re-established what
+existed, then fixed the one genuine defect the verification exposed.
+
+### 12.1 Recovery
+
+| Question | Finding | How it was checked |
+|---|---|---|
+| Remote branch tip on entry | `951b78a94cef6ab7d385f41245e00082f4e3b1b3` | `git rev-parse origin/feature/execution-07-premium-web` |
+| Local HEAD on entry | `5563e3c` — **one commit ahead** of the remote | `git log --oneline origin/...HEAD` |
+| The hand-off's last known SHA | `b3c9a71` — an **ancestor** of the tip, **27 commits** back | `git merge-base --is-ancestor b3c9a71 origin/...` |
+| Commits pushed by the crashed session | **27**, `5920895` … `951b78a` | `git log --oneline b3c9a71..origin/...` |
+| Uncommitted work in the workspace | **present** — the light-theme token refactor, the RTL scrim fix, and the whole Execution 10 branding feature | `git status --porcelain`, `git diff` |
+| Stash from the crashed session | `f799f47` ("WIP on … 5563e3c", 2026-10-22 00:23) | `git fsck --lost-found` |
+| Content unique to that stash | **none** — its `globals.css` is a strict subset of the workspace copy (identical apart from this session's scrim fix) | `git show f799f47:…/globals.css` vs the file |
+| Dangling commits predating the hand-off | `aa67f19`, `58f063a`, `50946c9`, `ae003d7`, `7aed52c` — all accounted for in §11 | `git fsck --lost-found` |
+
+**No pushed commit was lost.** The hand-off named `b3c9a71` as the last known
+SHA, but the branch had already advanced **27 commits** past it, every one of
+them on `origin`. The work that was still uncommitted when the sandbox failed
+survived intact in the workspace filesystem and is committed by this session
+(§12.4). Nothing was reset, force-pushed, overwritten or reconstructed from a
+stash.
+
+The one commit the crashed session had left **unpushed** — `5563e3c`,
+`fix(rbac): make the platform Super Admin role repairable` — was already a
+complete commit in the local history, and is pushed unchanged with the rest.
+
+### 12.2 Defect E14 — the photo scrim did not follow the caption under RTL
+
+The theme matrix caught this and the light LTR render did not: the light-theme
+photo scrims (`--hero-scrim`, `--panel-scrim`, `--head-scrim`) were hard-coded
+at `100deg`, so their near-opaque end sat on the **left**. That is correct in
+LTR, where the caption also starts on the left. In RTL the caption moves to the
+**right** and lands on the 70%-opaque tail of the same gradient.
+
+| Surface | Ink | Sampled surface | Contrast | AA target |
+|---|---|---|---|---|
+| `.oryx-stat__label` (RTL, before) | `rgb(159,179,200)` | `rgb(23,38,56)` | **3.79:1** | 4.5:1 |
+| `.oryx-stat__label` (RTL, after) | `rgb(159,179,200)` | `rgb(23,38,56)` | **6.90:1** | 4.5:1 |
+
+The angle is now the `--scrim-angle` token rather than a literal. The light
+theme mirrors it to `260deg` under `[data-dir='rtl']`, which puts the opaque end
+back over the caption; the dark theme leaves the token at `100deg`, where the
+band already equals the page field and the approved render is direction-neutral.
+The dark render is therefore untouched — all 14 dark captures are pixel-identical
+to the approved baseline (`maxDelta = 0`).
+
+`packages/shared/test/tokens.test.ts` gained a case that fails if any scrim
+carries a literal angle or the light RTL override goes missing. It was confirmed
+to fail with the fix reverted and to pass with it in place.
+
+### 12.3 The light-theme surface tokens
+
+The remaining "inconsistent" reading came from strengths that lived inline in
+the rules rather than in the theme. Each is now a named token with one value per
+theme, so a badge, an alert, a hover row, an inset well and a skeleton cannot
+drift apart:
+
+| Token | Dark | Light | Used for |
+|---|---|---|---|
+| `--status-line` | status 40% | status 38% | badge, alert and error-icon border |
+| `--status-fill` | status 12% | status 10% | alert and error-icon fill |
+| `--overlay-hover` | text 4% | text 6% | table row hover |
+| `--well-bg` | surface-raised 40% | surface 70% + bg-deep | empty-state and drop-zone well |
+| `--skeleton-from` / `--skeleton-to` | text 6% / 13% | text 8% / 16% | loading shimmer |
+| `--dot-muted` | text-faint 50% | text-faint 45% | read-notification dot |
+| `--auth-sheen` | surface-raised 92% + gold 8% | surface-raised 94% + gold 6% | sign-in card sheen |
+| `--band-btn-hover` | band-text 12% | band-text 14% | footer button hover |
+
+The dark column reproduces the percentages the rules already carried, so the
+approved dark render moves by at most one step. `--text-faint` and
+`--band-text-faint` were raised from `#6f8598` to `#778da1` in both themes: the
+stat label sits on the gradient stat panel, where the old value measured 4.43:1
+— just under the 4.5:1 the harness enforces. The light theme keeps its own
+`#5a544b`, which measures 7.48:1 on white.
+
+### 12.4 Verification
+
+| Check | Result |
+|---|---|
+| Theme matrix (`scripts/verify-theme-matrix.mjs`) | **12/12 cells pass** — light/dark × RTL/LTR × mobile/tablet/desktop |
+| The cell that previously failed (light RTL desktop) | now passes; worst light label 6.90:1 against a 4.5:1 target |
+| Light surface check (`scripts/verify-light-surface.mjs`) | **96/96 checks pass** — ivory `#f7f4ed` body, warm `#fbf9f4` surfaces, charcoal `#22201d` ink, gold `#856612`, logo present, photography present |
+| Dark invariance | **14/14 dark captures pixel-identical** to the approved baseline (`maxDelta = 0`) |
+| Phase E captures (`scripts/capture-light-theme.mjs`) | **28** captures, every one correct theme/dir/lang with `overflow=false` |
+| Capture reproducibility | 27 of 28 byte-identical across two runs; the one delta is a 0.1% footer region (see §12.5) |
+| Light-vs-dark sheets (`scripts/make-exec07-pairs.mjs`) | **8** comparison sheets |
+| `@oryx/shared` tests | **172 passed** (9 files) |
+| `@oryx/api` integration tests | **311 passed** (16 suites) |
+| `@oryx/admin` browser tests | **184 passed** |
+| `@oryx/mobile` tests | **20 passed** (3 files) |
+| `@oryx/shared` / `@oryx/api` typecheck | pass / pass |
+| `@oryx/admin` build | pass |
+
+### 12.5 An honest limitation
+
+One capture — `homepage-light-rtl-mobile.png` — is not byte-reproducible. Two
+identical runs differ by 245 on a single channel across **0.10%** of the frame,
+in a bounding box at `x=242-373, y=5952-5981` of a 6583px page (the bottom 9.6%,
+the footer). The dimensions match exactly and the region is footer content, so
+this is capture-time rendering nondeterminism, not a theme regression: the
+change in §12.2 only defines a custom property the footer never consumes. The
+committed capture is the one from the verification run.
+
+The earlier-session note that the dark screenshots under `docs/` moved by up to
+`maxDelta = 242` is **not** a theme change either. Those files are regenerated as
+a byproduct of the Playwright suite, which captures the **local** database; they
+are not part of the Phase E evidence set and were reverted rather than committed.
+
+### 12.6 Execution 10 branding, recovered and committed
+
+The crashed session had left a complete, untracked per-company branding feature
+in the workspace. It was verified (schema validates, migration applies cleanly,
+API builds, 12 shared tests pass) and committed rather than discarded:
+
+| Piece | Path |
+|---|---|
+| Identity type, ORYX default, resolver, hex validator | `packages/shared/src/branding.ts` |
+| Tenant-scoped read/write API | `apps/api/src/branding/` |
+| One nullable row per company (additive migration) | `packages/database/prisma/schema.prisma`, `…/20261021120000_execution_10_company_branding/` |
+| Resolver and validator tests | `packages/shared/test/branding.test.ts` |
+
+This is Execution 10 work and is not part of the Phase E light-theme
+deliverable; it is recorded here because it was recovered alongside it.
+
+
