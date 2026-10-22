@@ -9,4 +9,5 @@ export * from './service-categories';
 export * from './tokens';
 export * from './authorization';
 export * from './integrations';
+export * from './branding';
 export * from './contracts';

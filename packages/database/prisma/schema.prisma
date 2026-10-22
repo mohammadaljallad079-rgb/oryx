@@ -200,6 +200,7 @@ model Company {
   invitations  Invitation[]
   auditLogs    AuditLog[]
   supportSessions SupportSession[]
+  branding        CompanyBranding?
 
   // Execution 02 — ERP core (all tenant-owned rows carry companyId).
   documentSequences   DocumentSequence[]
@@ -4636,6 +4637,46 @@ model IntegrationCheck {
 // an uploaded file: the bytes live on disk under MEDIA_ROOT, the row holds the
 // metadata, the optimisation variants and the focal point.
 
+/**
+ * Per-company visual identity.
+ *
+ * One row per company. A company that has never set branding has no row at all,
+ * and the API resolves it to the ORYX default; a partial row inherits the
+ * remaining fields. Every `*AssetId` is a `CmsMediaAsset` id, so a logo is
+ * uploaded, validated and optimised through the existing media pipeline rather
+ * than being pasted in as a base64 blob on the company row.
+ *
+ * A platform-level ORYX logo is not stored here: it is the platform default and
+ * lives in the `branding` platform setting, so a tenant can never overwrite it.
+ */
+model CompanyBranding {
+  companyId String @id
+
+  nameEn String?
+  nameAr String?
+
+  logoAssetId      String?
+  logoDarkAssetId  String?
+  faviconAssetId   String?
+
+  /** 6-digit hex (`#rrggbb`). Validated in the API; never interpolated unvalidated. */
+  primaryColor String?
+  accentColor  String?
+
+  supportEmail String?
+  supportPhone String?
+  websiteUrl   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  logoAsset     CmsMediaAsset? @relation("CompanyLogo", fields: [logoAssetId], references: [id], onDelete: SetNull)
+  logoDarkAsset CmsMediaAsset? @relation("CompanyLogoDark", fields: [logoDarkAssetId], references: [id], onDelete: SetNull)
+  faviconAsset  CmsMediaAsset? @relation("CompanyFavicon", fields: [faviconAssetId], references: [id], onDelete: SetNull)
+}
+
 model CmsMediaFolder {
   id        String   @id @default(cuid())
   name      String
@@ -4684,6 +4725,9 @@ model CmsMediaAsset {
   blocks       CmsContentBlock[]
   banners      CmsBanner[]
   categories   ServiceCategory[]
+  companyLogos     CompanyBranding[] @relation("CompanyLogo")
+  companyLogosDark CompanyBranding[] @relation("CompanyLogoDark")
+  companyFavicons  CompanyBranding[] @relation("CompanyFavicon")
 
   @@index([folderId])
   @@index([createdAt])
