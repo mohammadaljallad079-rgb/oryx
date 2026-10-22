@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ORYX_DEFAULT_BRANDING,
+  brandingCssVariables,
   contrastRatioWithWhite,
   isValidHexColor,
   normalizeHexColor,
@@ -97,5 +98,45 @@ describe('branding fallback resolution', () => {
     const resolved = resolveBranding({ nameEn: 'Changed' });
     resolved.nameEn = 'Mutated';
     expect(ORYX_DEFAULT_BRANDING).toEqual(before);
+  });
+});
+
+/**
+ * The shell applies the resolved identity through CSS custom properties. These
+ * pin the two properties that matter: an invalid or absent colour contributes
+ * nothing (so the approved palette survives), and a supplied colour always
+ * carries a foreground chosen for contrast rather than assuming white.
+ */
+describe('brandingCssVariables', () => {
+  it('emits nothing when no colours are set, leaving the approved palette intact', () => {
+    expect(brandingCssVariables({ primaryColor: null, accentColor: null })).toEqual({});
+  });
+
+  it('emits a validated colour with a readable foreground', () => {
+    const vars = brandingCssVariables({ primaryColor: '#d4af37', accentColor: null });
+    expect(vars['--brand-primary']).toBe('#d4af37');
+    // Gold is light, so white text on it would fail contrast.
+    expect(vars['--brand-primary-foreground']).toBe('#0b0b0c');
+  });
+
+  it('chooses white text on a dark brand colour', () => {
+    const vars = brandingCssVariables({ primaryColor: '#00162b', accentColor: null });
+    expect(vars['--brand-primary-foreground']).toBe('#ffffff');
+  });
+
+  it('drops a colour that is not a 6-digit hex rather than passing it to the DOM', () => {
+    // These reach a `style` attribute, so a value that is not strictly a colour
+    // must never be emitted.
+    const vars = brandingCssVariables({
+      primaryColor: '#d4af37; background:url(x)',
+      accentColor: 'red',
+    });
+    expect(vars).toEqual({});
+  });
+
+  it('handles the two colours independently', () => {
+    const vars = brandingCssVariables({ primaryColor: null, accentColor: '#123456' });
+    expect(vars['--brand-primary']).toBeUndefined();
+    expect(vars['--brand-accent']).toBe('#123456');
   });
 });

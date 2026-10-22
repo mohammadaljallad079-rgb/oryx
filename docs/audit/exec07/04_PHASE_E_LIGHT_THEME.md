@@ -900,3 +900,124 @@ This is Execution 10 work and is not part of the Phase E light-theme
 deliverable; it is recorded here because it was recovered alongside it.
 
 
+
+## 13. Fifth continuation session — the admin control-plane light theme
+
+### 13.1 Recovery
+
+The crashed sandbox was inspected before any change was made. `git ls-remote`
+reported the remote tip of `feature/execution-07-premium-web` at `7f4efe7`,
+which matched local `HEAD`; the branch was 0 ahead and 0 behind. The last known
+SHA from the crash report, `b3c9a71`, is an ancestor of `HEAD`. Nothing was
+reset, force-pushed or discarded.
+
+No unpushed work was recovered, because none was present. The crashed session
+had pushed everything it produced before it died. The one piece of untracked
+work found in the workspace was the per-company branding feature, which is
+Execution 10 material and is recorded in §12.6 rather than claimed here.
+
+### 13.2 What was still inconsistent
+
+Phase E corrected the customer site (`apps/customer`) to a warm ivory light
+theme. The **admin control plane** (`apps/admin`) was never corrected, and it
+still rendered a cold blue-grey ramp:
+
+| Token | Before (admin light) | After (admin light) |
+|---|---|---|
+| page field | `#f5f6f8` cold grey | `#f7f4ed` warm ivory |
+| deep field | `#eceef2` | `#efeae0` |
+| raised surface | `#f0f2f6` | `#fbf9f4` |
+| body type | `#0d2338` navy | `#22201d` deep charcoal |
+| muted type | `#5b6b7d` blue-grey | `#5a544b` warm grey |
+| accent gold | `#b8912a` | `#7d5f10` (text) / `#e0c168→#c9a227` (fill) |
+
+The two applications therefore read as two products. The correction brings the
+admin light theme onto the same approved identity the customer site already
+renders.
+
+### 13.3 The approach: tokens, not overrides
+
+The previous admin stylesheet carried separate `:root[data-theme='light']`
+override blocks that patched individual rules. Those are gone. Every value now
+lives in the two token blocks at the top of `apps/admin/src/app/globals.css`,
+and each rule consumes a variable.
+
+The scattered literals that remained were promoted to semantic tokens so that
+neither theme needs a rule-level override:
+
+| Token | Job |
+|---|---|
+| `--focus-ring` | the input focus ring (softer on ivory than on navy) |
+| `--backdrop` | the modal scrim (lighter over ivory) |
+| `--shadow-tile`, `--shadow-modal` | elevation, warm on ivory instead of black |
+| `--row-hover` | a hovered table row, re-tuned so it separates from ivory |
+| `--gold-fill-*`, `--on-gold` | the metallic gold button ramp and its ink |
+| `--on-media*`, `--media-chip-*` | ink over photography |
+| `--hero-scrim`, `--hero-scrim-rtl` | the hero gradient, direction included |
+| `--ambient-wash` | the page wash, warm on ivory instead of blue |
+
+The media and hero tokens are deliberately identical in both blocks: those
+surfaces sit on a navy scrim in both themes, so white type over artwork stays
+correct on ivory. Keeping them as tokens means the rule no longer hard-codes a
+value that only made sense for one theme.
+
+### 13.4 Why the dark theme did not move
+
+Every literal that defined the approved dark theme was preserved byte for byte.
+The only dark-theme edit was **additive**: new tokens whose values reproduce
+exactly what the rules previously hard-coded (for example `--shadow-tile:
+0 24px 48px -26px rgba(0, 0, 0, 0.9)` replaces the same literal inline, and
+`--hero-scrim` holds the identical gradient). The render is unchanged, which the
+browser check below asserts by reading the computed field and type colours.
+
+### 13.5 Contrast
+
+`.run/check-admin-light-palette.mjs` measures 33 foreground/background pairs
+against WCAG 2.1 and exits non-zero on a failure. All 33 pass. The accent gold
+was darkened from `#856612` to `#7d5f10` during the run because the original
+value measured 4.48:1 on the deepest ivory surface, just under the 4.5:1 body
+threshold.
+
+### 13.6 Verification
+
+`.run/verify-admin-light.mjs` signs in and asserts, per surface, per locale and
+per viewport:
+
+- the field is `rgb(247, 244, 237)` and the type `rgb(34, 32, 29)` in light;
+- body-text contrast is at least 4.5:1;
+- the dark theme still reports `rgb(0, 22, 43)` / `rgb(238, 243, 249)`;
+- Arabic sets `data-dir="rtl"` and English `data-dir="ltr"`;
+- there is no horizontal overflow at 1440, 834 or 390 px.
+
+**222 of 222 assertions pass** across six surfaces. The company-scoped branding
+editor is asserted in a second pass as a company administrator, because a
+platform principal deliberately carries no tenant scope and so does not render
+it.
+
+Existing suites were re-run and none regressed:
+
+| Suite | Result |
+|---|---|
+| `@oryx/shared` unit | 177 passed (9 files) |
+| branding API e2e | 9 passed |
+| admin Playwright (`branding.spec.ts`) | 5 passed |
+| admin Playwright (full suite) | 184 passed, 1 skipped, 0 failed |
+| customer light palette (`.run/check-light-palette.mjs`) | 31/31 pairs |
+
+### 13.7 Evidence
+
+`docs/audit/exec07/admin-light/` holds before/after captures of five surfaces in
+both themes, the comparison sheets, and the verification manifest. The rendered
+page is served by the preview proxy at `/evidence/exec07-light-theme/`.
+
+### 13.8 Honest limitations
+
+- The change is scoped to `apps/admin`. No customer file was touched, so the
+  customer-site evidence from earlier sessions remains valid.
+- The branding editor renders only for a company administrator. A Super Admin
+  sees no tenant branding controls by design; the verification asserts this
+  rather than working around it.
+- No deployment was performed and PR #7 was not merged. This session pushes the
+  correction to the existing Execution 07 branch and updates the pull request
+  with evidence only.
+

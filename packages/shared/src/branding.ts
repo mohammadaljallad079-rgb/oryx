@@ -102,6 +102,33 @@ export function readableForegroundOn(hex: string): '#ffffff' | '#0b0b0c' {
 }
 
 /**
+ * The CSS custom properties a resolved identity contributes to the shell.
+ *
+ * Returned as a plain record rather than a style string so a caller sets them
+ * through React's `style` prop, which escapes them; building a `:root{...}`
+ * string would put a tenant-supplied value back into a CSS parser.
+ *
+ * Only colours are exposed, and only after `isValidHexColor`, so an unset or
+ * malformed value never reaches the DOM. `--brand-accent` is the tenant's
+ * primary colour with a readable foreground, so a button painted with it can
+ * pick its own text colour instead of assuming white.
+ */
+export function brandingCssVariables(
+  branding: Pick<CompanyBranding, 'primaryColor' | 'accentColor'>,
+): Record<string, string> {
+  const vars: Record<string, string> = {};
+  if (branding.primaryColor && isValidHexColor(branding.primaryColor)) {
+    vars['--brand-primary'] = branding.primaryColor;
+    vars['--brand-primary-foreground'] = readableForegroundOn(branding.primaryColor);
+  }
+  if (branding.accentColor && isValidHexColor(branding.accentColor)) {
+    vars['--brand-accent'] = branding.accentColor;
+    vars['--brand-accent-foreground'] = readableForegroundOn(branding.accentColor);
+  }
+  return vars;
+}
+
+/**
  * The stored shape of a branding row: every field nullable, because a company
  * may set any subset and `null` means "inherit".
  */

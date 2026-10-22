@@ -364,6 +364,28 @@ export interface CmsMediaFolderDto {
   sortOrder: number;
 }
 
+/**
+ * A company's resolved visual identity, as returned by the branding API.
+ *
+ * This is `CompanyBranding` (from `./branding`) plus the two fields the API
+ * adds: which company it belongs to, and whether the company has no stored row
+ * and is therefore showing the platform default.
+ */
+export interface CompanyBrandingDto {
+  companyId: string;
+  isDefault: boolean;
+  nameEn: string;
+  nameAr: string;
+  logoAssetId: string | null;
+  logoDarkAssetId: string | null;
+  faviconAssetId: string | null;
+  primaryColor: string | null;
+  accentColor: string | null;
+  supportEmail: string | null;
+  supportPhone: string | null;
+  websiteUrl: string | null;
+}
+
 export interface CmsMediaAssetDto {
   id: string;
   folderId: string | null;

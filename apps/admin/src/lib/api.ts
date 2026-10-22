@@ -11,6 +11,7 @@ import type {
   CmsMediaFolderDto,
   CmsPageDto,
   CompanyDto,
+  CompanyBrandingDto,
   ContextResponse,
   CustomerDto,
   DashboardResponse,
@@ -479,6 +480,28 @@ export const api = {
     request<CompanyDto>(`/companies/${id}`, { method: 'PATCH', body }),
   setCompanyStatus: (id: string, status: string, reason?: string) =>
     request<CompanyDto>(`/companies/${id}/status`, { method: 'PATCH', body: { status, reason } }),
+
+  // ---------------------------------------------------------------- branding
+  /**
+   * The resolved identity for a company.
+   *
+   * The API applies the platform default field by field, so a company that has
+   * set nothing still returns a complete identity rather than nulls.
+   */
+  getBranding: (companyId: string) =>
+    request<CompanyBrandingDto>(`/companies/${companyId}/branding`),
+  /**
+   * Update a company's identity.
+   *
+   * The tri-state is preserved on the wire: an omitted key leaves the stored
+   * value alone, an explicit `null` clears it back to the platform default, and
+   * a value sets it. `JSON.stringify` drops `undefined`, so an omitted key is
+   * genuinely absent from the body.
+   */
+  updateBranding: (companyId: string, body: Record<string, unknown>) =>
+    request<CompanyBrandingDto>(`/companies/${companyId}/branding`, { method: 'PATCH', body }),
+  resetBranding: (companyId: string) =>
+    request<CompanyBrandingDto>(`/companies/${companyId}/branding`, { method: 'DELETE' }),
 
   // ---------------------------------------------------------------- branches
   listBranches: (companyId: string, params: { page?: number; pageSize?: number; search?: string } = {}) =>
