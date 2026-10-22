@@ -96,6 +96,13 @@ Honest accounting — this is **not** recovered, because it is not present:
   work.
 - Any reasoning or plan text that existed only in the crashed conversation's
   context is not recoverable. This record replaces it from the repository state.
+- Three untracked helper scripts from the crashed session were found in the
+  working tree and are preserved in `.run/` rather than discarded:
+  `exec09-make-env.py` (fills `deploy/env/production.env.example` with generated
+  secrets into a temp path — no secret is hardcoded), `probe-effective-perms.mjs`
+  (reads the repaired platform role and runs it through the shipped resolver)
+  and `rewrite-tokens.py` (the one-off token consolidation whose result is
+  already in `apps/customer/src/app/globals.css`). None carries a credential.
 
 ## 4. The light theme today — measured, not eyeballed
 
