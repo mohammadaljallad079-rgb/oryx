@@ -457,6 +457,24 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 - **`module` is a reserved lint identifier.** `@next/next/no-assign-module-variable`
   rejects a `for (const module of …)` loop in an app that shares the admin ESLint
   config. Name the binding something else.
+- **Capture the customer app over `localhost`, not `127.0.0.1`.** The exported
+  bundle's `NEXT_PUBLIC_API_BASE_URL` points at `http://localhost:3001`, and the
+  customer refresh token is an HttpOnly cookie. A browser opened on
+  `http://127.0.0.1:12001` treats `localhost:3001` as a different site, so the
+  refresh cookie is not sent, every authenticated surface redirects to `/login`,
+  and a capture script that asserts an authenticated route fails with "landed on
+  /login". Use `http://localhost:12001` and the session survives a reload.
+- **The admin light theme is a warm ivory system, not the customer's tokens.**
+  The two apps keep separate token blocks, but the approved identity is the same:
+  field `#f7f4ed`, raised `#fbf9f4`, body type `#22201d`, muted `#5a544b`, gold
+  text `#7d5f10`. Do not reintroduce the old cold ramp (`#f5f6f8` / `#0d2338`);
+  the customer site never used it and the mismatch reads as two products.
+- **Admin light-theme checks are scripts, not specs.**
+  `.run/check-admin-light-palette.mjs` (WCAG pairs) and
+  `.run/verify-admin-light.mjs` (browser assertions) fail loudly and must stay
+  green. The branding editor is company-scoped, so the verifier signs in a second
+  time as a company administrator to assert it; a Super Admin carries no tenant
+  scope and legitimately does not render it.
 
 
 ### Platform seed gotchas
