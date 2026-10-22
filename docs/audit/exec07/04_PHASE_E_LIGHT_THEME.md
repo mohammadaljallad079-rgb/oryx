@@ -805,15 +805,19 @@ LTR, where the caption also starts on the left. In RTL the caption moves to the
 
 | Surface | Ink | Sampled surface | Contrast | AA target |
 |---|---|---|---|---|
-| `.oryx-stat__label` (RTL, before) | `rgb(159,179,200)` | `rgb(23,38,56)` | **3.79:1** | 4.5:1 |
-| `.oryx-stat__label` (RTL, after) | `rgb(159,179,200)` | `rgb(23,38,56)` | **6.90:1** | 4.5:1 |
+| `.oryx-stat__label`, scrim at the LTR `100deg` | `rgb(159,179,200)` | `rgb(69,81,93)` | **3.79:1** | 4.5:1 |
+| `.oryx-stat__label`, scrim at the committed `260deg` | `rgb(159,179,200)` | `rgb(21,37,55)` | **7.24:1** | 4.5:1 |
+
+Both rows come from a single controlled run (`.run/probe-scrim-causal.mjs`) that
+measures the label with the committed cascade and then again with
+`--scrim-angle` forced back to `100deg` through an inline style. The 3.79:1 is
+therefore reproduced, not quoted from an earlier session.
 
 The angle is now the `--scrim-angle` token rather than a literal. The light
 theme mirrors it to `260deg` under `[data-dir='rtl']`, which puts the opaque end
-back over the caption; the dark theme leaves the token at `100deg`, where the
-band already equals the page field and the approved render is direction-neutral.
-The dark render is therefore untouched — all 14 dark captures are pixel-identical
-to the approved baseline (`maxDelta = 0`).
+back over the caption. The dark theme never sees the override: it computes
+`--scrim-angle: 100deg` in **both** directions (`.run/probe-scrim-computed.mjs`),
+so this change cannot reach the approved dark render.
 
 `packages/shared/test/tokens.test.ts` gained a case that fails if any scrim
 carries a literal angle or the light RTL override goes missing. It was confirmed
@@ -839,19 +843,21 @@ drift apart:
 
 The dark column reproduces the percentages the rules already carried, so the
 approved dark render moves by at most one step. `--text-faint` and
-`--band-text-faint` were raised from `#6f8598` to `#778da1` in both themes: the
-stat label sits on the gradient stat panel, where the old value measured 4.43:1
-— just under the 4.5:1 the harness enforces. The light theme keeps its own
-`#5a544b`, which measures 7.48:1 on white.
+`--band-text-faint` were raised from `#6f8598` to `#778da1`: the stat label sits
+on the gradient stat panel, where the old value measured 4.42–4.49:1 — just under
+the 4.5:1 the harness enforces, and the miss recorded as defect E8 in §2. It now
+measures **5.41:1**, so E8 is resolved rather than carried. The light theme keeps
+its own `--text-faint: #6b6459`, which measures 5.32:1 on ivory and 5.85:1 on
+white.
 
 ### 12.4 Verification
 
 | Check | Result |
 |---|---|
 | Theme matrix (`scripts/verify-theme-matrix.mjs`) | **12/12 cells pass** — light/dark × RTL/LTR × mobile/tablet/desktop |
-| The cell that previously failed (light RTL desktop) | now passes; worst light label 6.90:1 against a 4.5:1 target |
+| The cell that previously failed (light RTL desktop) | now passes; the stat label measures **7.24:1** against a 4.5:1 target (3.79:1 at the unmirrored angle) |
 | Light surface check (`scripts/verify-light-surface.mjs`) | **96/96 checks pass** — ivory `#f7f4ed` body, warm `#fbf9f4` surfaces, charcoal `#22201d` ink, gold `#856612`, logo present, photography present |
-| Dark invariance | **14/14 dark captures pixel-identical** to the approved baseline (`maxDelta = 0`) |
+| Dark-theme invariance | the scrim override is scoped to `[data-theme='light']`, and the dark theme computes `--scrim-angle: 100deg` in both directions (`.run/probe-scrim-computed.mjs`), so the change cannot reach the approved dark render |
 | Phase E captures (`scripts/capture-light-theme.mjs`) | **28** captures, every one correct theme/dir/lang with `overflow=false` |
 | Capture reproducibility | 27 of 28 byte-identical across two runs; the one delta is a 0.1% footer region (see §12.5) |
 | Light-vs-dark sheets (`scripts/make-exec07-pairs.mjs`) | **8** comparison sheets |
