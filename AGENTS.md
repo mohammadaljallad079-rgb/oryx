@@ -505,6 +505,28 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   non-zero without it. Source the root `.env` before `pnpm db:seed` or `test:ui`:
   `set -a; . ./.env; set +a`.
 
+### Execution 07 light-theme gotchas
+
+- **A screenshot named for a theme is not proof of that theme.** The audit
+  capture runs a locale × theme loop and then captures the tablet and mobile
+  dashboards inside the same test; setting the viewport does not reset the
+  locale or the theme, so `dashboard-{tablet,mobile}-ar-dark.png` held an English
+  light render. Set `ar` and `dark` explicitly and assert `data-dir` and
+  `data-theme` before capturing. `.run/verify-exec11-theme.mjs` reads the
+  dominant colour of each capture and fails when a `-light` file is not ivory or
+  a `-dark` file is not navy.
+- **The customer session lives in memory.** A `page.goto` reload between captures
+  races the refresh and can bounce an authenticated surface to `/login`, which
+  then gets captured under the authenticated surface's name. Capture the
+  dashboard immediately after the sign-in redirect, or assert the landing URL.
+- **The theme and locale keys are per-app.** The bootstrap reads
+  `oryx.customer.theme` / `oryx.customer.locale` in `apps/customer` and
+  `oryx.theme` / `oryx.locale` in `apps/admin`; setting any other key is silently
+  ignored and the capture renders the default.
+- **A tall dark footer can dominate a full-page capture.** Read the dominant
+  colour from the top band, not the whole image, or every light page reads as
+  dark.
+
 ### Mobile gotchas
 
 - **Every file under `(app)` becomes a tab.** Expo Router registers the whole
