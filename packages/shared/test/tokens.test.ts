@@ -313,3 +313,106 @@ describe('CSS custom properties match the shared tokens', () => {
     expect(Number(angle![1])).toBe(260);
   });
 });
+
+const ADMIN_CSS = resolve(repoRoot, 'apps/admin/src/app/globals.css');
+
+describe('the admin control plane shares the one theme contract', () => {
+  /**
+   * The admin shell was the last surface not bound to the shared tokens. Its
+   * light block had drifted: it never declared `--gold-hover`, and five rules
+   * wrote their own `color-mix(in srgb, var(--gold) N%, transparent)` instead of
+   * taking a named step, so a chip, a badge and two nav markers resolved to four
+   * different golds. The owner saw exactly that as "the light theme looks
+   * inconsistent".
+   *
+   * The customer theme already had these two guards. These are the same guards
+   * for the admin app, so the two cannot drift apart again.
+   */
+
+  /** Every token the admin stylesheet actually reads. */
+  function adminUsedTokens(css: string): Set<string> {
+    return new Set([...css.matchAll(/var\(\s*(--[a-z0-9-]+)/g)].map((m) => m[1]));
+  }
+
+  it('declares every shared token the admin shell reads', () => {
+    const css = readFileSync(ADMIN_CSS, 'utf8');
+    const used = adminUsedTokens(css);
+    const dark = readThemeBlock(ADMIN_CSS, 'dark');
+    const light = readThemeBlock(ADMIN_CSS, 'light');
+    // The band tokens describe the customer site's full-bleed hero and footer,
+    // which the admin shell does not render; the tint ramp and the accent tokens
+    // are shared by both.
+    const shared = [
+      '--gold',
+      '--gold-hover',
+      '--gold-soft',
+      '--gold-deep',
+      '--gold-on-tint',
+      '--on-gold',
+      '--tint-wash',
+      '--tint-fill',
+      '--tint-focus',
+      '--tint-glow',
+      '--tint-active',
+      '--tint-line',
+      '--tint-badge-line',
+      '--tint-ring',
+      '--tint-panel',
+    ];
+    for (const variable of shared) {
+      if (!used.has(variable)) continue;
+      expect(dark[variable], `admin dark is missing ${variable}`).toBeDefined();
+      expect(light[variable], `admin light is missing ${variable}`).toBeDefined();
+    }
+  });
+
+  it('keeps the admin gold-tint ramp on the shared steps', () => {
+    // The regression this guards: a rule writing its own percentage instead of
+    // naming a ramp step. The light block must be exactly the shared ramp; the
+    // dark block is the approved render, so it keeps the percentages its rules
+    // already used (badge 15%/40%, collapsed nav 18%, nav gradient 20%).
+    const css = readFileSync(ADMIN_CSS, 'utf8');
+    const rampOf = (block: Record<string, string>) =>
+      Object.entries(block)
+        .filter(([name]) => name.startsWith('--tint-'))
+        .map(([, value]) => {
+          const m = value.match(/var\(--gold\) (\d+)%/);
+          return m ? Number(m[1]) : null;
+        })
+        .filter((n): n is number => n !== null);
+
+    const light = rampOf(readThemeBlock(ADMIN_CSS, 'light'));
+    const dark = rampOf(readThemeBlock(ADMIN_CSS, 'dark'));
+    expect(light.length).toBeGreaterThan(0);
+    expect(dark.length).toBeGreaterThan(0);
+
+    const sharedSteps = new Set([6, 12, 14, 16, 22, 26, 34, 40]);
+    for (const pct of light) {
+      expect(sharedSteps.has(pct), `admin light tint ${pct}% is not a shared ramp step`).toBe(true);
+    }
+    const approvedDarkSteps = new Set([6, 15, 16, 18, 20, 26, 40]);
+    for (const pct of dark) {
+      expect(approvedDarkSteps.has(pct), `admin dark tint ${pct}% left the approved ramp`).toBe(true);
+    }
+
+    // And no rule body may write its own gold tint: every `color-mix` over
+    // `var(--gold)` outside a declaration is a stray.
+    const bodyStart = css.indexOf('.oryx-');
+    const body = css.slice(bodyStart);
+    const offenders = [...body.matchAll(/color-mix\(in srgb, var\(--gold\) [0-9]+%/g)].filter(
+      (m) => !/--tint-[a-z-]+:/.test(body.slice(Math.max(0, m.index - 40), m.index)),
+    );
+    expect(offenders.map((m) => body.slice(0, m.index).split('\n').length)).toEqual([]);
+  });
+
+  it('keeps the admin light theme the approved ivory-and-gold identity', () => {
+    const light = readThemeBlock(ADMIN_CSS, 'light');
+    // Ivory field, white card, warm neutral raised surface, deep charcoal ink.
+    expect(light['--bg']).toBe(LIGHT_THEME.background);
+    expect(light['--surface']).toBe(LIGHT_THEME.surface);
+    expect(light['--surface-raised']).toBe(LIGHT_THEME.surfaceRaised);
+    expect(light['--text']).toBe(LIGHT_THEME.text);
+    // The accent gold darkens on hover rather than lightening.
+    expect(light['--gold-hover']).toBe(LIGHT_THEME.goldHover);
+  });
+});

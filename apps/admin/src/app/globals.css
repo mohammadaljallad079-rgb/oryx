@@ -44,6 +44,28 @@
   --gold-fill-hover-from: #d4af37;
   --gold-fill-hover-to: #a9861f;
   --on-gold: #00121f;
+  /* Gold used as *text* on a gold-tinted chip. In the dark theme the plain
+   * accent already clears 4.5:1 on every chip, so this reproduces it. */
+  --gold-on-tint: #d4af37;
+  /*
+   * The gold-tint ramp. Rules take a step by name instead of writing their own
+   * `color-mix(in srgb, var(--gold) N%, transparent)`, so a chip, a badge and the
+   * nav markers cannot resolve to four different golds.
+   *
+   * The dark percentages are exactly the ones the admin rules already used
+   * (badge 15%/40%, collapsed nav 18%, nav gradient 20%), so the approved dark
+   * render is byte-identical. The light block below tunes the same names, which
+   * is the point of a ramp: the theme changes the steps, not the rules.
+   */
+  --tint-wash: color-mix(in srgb, var(--gold) 6%, transparent);
+  --tint-fill: color-mix(in srgb, var(--gold) 15%, transparent);
+  --tint-focus: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tint-glow: color-mix(in srgb, var(--gold) 20%, transparent);
+  --tint-active: color-mix(in srgb, var(--gold) 18%, transparent);
+  --tint-line: color-mix(in srgb, var(--gold) 26%, transparent);
+  --tint-badge-line: color-mix(in srgb, var(--gold) 40%, transparent);
+  --tint-ring: color-mix(in srgb, var(--gold) 40%, transparent);
+  --tint-panel: color-mix(in srgb, var(--surface-raised) 55%, transparent);
   /* A hovered table row: subtle on navy, and re-tuned on ivory where the same
    * lift would disappear into the page. */
   --row-hover: color-mix(in srgb, var(--surface-raised) 70%, transparent);
@@ -135,8 +157,11 @@
    * white ink would fall to ~2:1 on its top stop. */
   --text-inverse: #241f14;
   --navy: #00162b;
-  /* Accent gold dark enough to read as text on the deepest ivory (5:1). */
+  /* Accent gold dark enough to read as text on the deepest ivory (5:1). The
+   * hover step darkens rather than lightens, because a lighter gold loses
+   * contrast on a light surface. */
   --gold: #7d5f10;
+  --gold-hover: #6f5510;
   --gold-soft: #d9b447;
   --gold-deep: #a9821c;
   /*
@@ -149,6 +174,25 @@
   --gold-fill-hover-from: #d4af37;
   --gold-fill-hover-to: #b8912a;
   --on-gold: #241f14;
+  /* Gold used as *text* on a gold-tinted chip. A 12% chip lifts the surface
+   * enough that the plain accent dips toward the AA floor, so chips use this
+   * slightly deeper gold instead — the same value the customer theme uses. */
+  --gold-on-tint: #7a5c10;
+  /*
+   * The gold-tint ramp, one step lighter than the dark ramp so a chip reads as a
+   * warm tint on a white card rather than a saturated block. The light
+   * percentages match `LIGHT_THEME`, so the control plane and the customer
+   * platform cannot drift apart.
+   */
+  --tint-wash: color-mix(in srgb, var(--gold) 6%, transparent);
+  --tint-fill: color-mix(in srgb, var(--gold) 12%, transparent);
+  --tint-focus: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tint-glow: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tint-active: color-mix(in srgb, var(--gold) 14%, var(--surface-raised));
+  --tint-line: color-mix(in srgb, var(--gold) 26%, transparent);
+  --tint-badge-line: color-mix(in srgb, var(--gold) 34%, transparent);
+  --tint-ring: color-mix(in srgb, var(--gold) 40%, transparent);
+  --tint-panel: color-mix(in srgb, var(--surface-raised) 55%, transparent);
   /* A warm lift, so a hovered row separates from the ivory field. */
   --row-hover: color-mix(in srgb, var(--surface-raised) 85%, transparent);
   --success: #1a7f4f;
@@ -423,9 +467,9 @@ body::before {
 }
 
 .oryx-badge--gold {
-  color: var(--gold);
-  background: color-mix(in srgb, var(--gold) 15%, transparent);
-  border-color: color-mix(in srgb, var(--gold) 40%, transparent);
+  color: var(--gold-on-tint);
+  background: var(--tint-fill);
+  border-color: var(--tint-badge-line);
 }
 
 .oryx-badge--neutral {
@@ -679,7 +723,7 @@ body::before {
 
 /* The active marker stays visible in the collapsed rail via the icon colour. */
 .oryx-shell[data-nav='collapsed'] .oryx-nav-item[aria-current='page'] {
-  background: color-mix(in srgb, var(--gold) 18%, transparent);
+  background: var(--tint-active);
 }
 
 /* Sign-out sits at the bottom of the rail. `margin-top: auto` pushes it down
@@ -756,14 +800,18 @@ body::before {
   color: var(--text);
 }
 
+/* The active item is marked by a gold wash that fades out, so the marker reads
+ * on the rail without painting an opaque block. The wash is the named
+ * decorative step, so the light theme tunes it with every other gold surface
+ * instead of this rule carrying its own percentage. */
 .oryx-nav-item[aria-current='page'] {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 20%, transparent), transparent);
+  background: linear-gradient(90deg, var(--tint-glow), transparent);
   color: var(--text);
   border-color: var(--border-strong);
 }
 
 :root[data-dir='rtl'] .oryx-nav-item[aria-current='page'] {
-  background: linear-gradient(270deg, color-mix(in srgb, var(--gold) 20%, transparent), transparent);
+  background: linear-gradient(270deg, var(--tint-glow), transparent);
 }
 
 .oryx-nav-item__dot {
