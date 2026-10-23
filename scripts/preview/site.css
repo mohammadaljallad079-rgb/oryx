@@ -22,7 +22,7 @@
   --text-muted: #5a544b;
   --text-faint: #6b6459;
 
-  --gold: #856612;
+  --gold: #7d5f10;
   --gold-fill-from: #e0c168;
   --gold-fill-to: #c9a227;
   --on-gold: #241f14;
@@ -307,7 +307,7 @@ li {
 }
 
 .badge--ok {
-  border-color: rgba(133, 102, 18, 0.4);
+  border-color: rgba(125, 95, 16, 0.4);
   background: rgba(224, 193, 104, 0.18);
   color: var(--gold);
 }

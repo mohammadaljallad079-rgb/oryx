@@ -100,7 +100,7 @@ for (const [device, viewport] of Object.entries(viewports)) {
     record(result.textOnRaised >= 12, `ink on raised ${result.textOnRaised.toFixed(2)} < 12`);
     record(result.textOnSurface >= 12, `ink on surface ${result.textOnSurface.toFixed(2)} < 12`);
     // Metallic gold accent present as a real warm gold hue. The accent *text*
-    // token is deliberately deepened for contrast on ivory (#856612), while the
+    // token is deliberately deepened for contrast on ivory (#7d5f10), while the
     // metallic fills are lighter (#d9b447); both are warm gold, i.e. r > g > b
     // with a clear amber gap, so assert the hue rather than one literal.
     const [gr, gg, gb] = result.gold

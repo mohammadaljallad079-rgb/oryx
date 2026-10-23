@@ -64,6 +64,10 @@
    * theme needs a softer ring and a lighter scrim than a navy page does. */
   --focus-ring: rgba(212, 175, 55, 0.18);
   --backdrop: rgba(0, 10, 20, 0.66);
+  /* The shade a company brand colour is mixed toward to derive its pressed and
+   * hover states. It is a token rather than a literal so the branded shell has
+   * no colour value that a theme switch cannot reach. */
+  --brand-shade: #000000;
   /*
    * Ink and chrome for photo-backed surfaces (module tiles, the dashboard hero).
    * These sit on a navy scrim in both themes, so the values are intentionally
@@ -123,7 +127,7 @@
   --surface-hover: #f4f0e8;
   --border: rgba(36, 31, 20, 0.14);
   --border-soft: rgba(36, 31, 20, 0.09);
-  --border-strong: rgba(133, 102, 18, 0.5);
+  --border-strong: rgba(125, 95, 16, 0.5);
   --text: #22201d;
   --text-muted: #5a544b;
   --text-faint: #6b6459;
@@ -160,6 +164,9 @@
     rgba(0, 22, 43, 0.9) 100%
   );
   --shadow-card: 0 16px 36px -26px rgba(58, 48, 30, 0.28);
+  /* See the dark block: a warm charcoal reads as a shade on ivory, whereas
+   * pure black makes a branded button look dirty. */
+  --brand-shade: #241f14;
   --shadow-tile: 0 24px 48px -26px rgba(58, 48, 30, 0.35);
   --shadow-modal: 0 40px 80px -40px rgba(58, 48, 30, 0.4);
   --focus-ring: color-mix(in srgb, var(--gold) 20%, transparent);
@@ -192,7 +199,7 @@
   /* A warm gold bloom rather than the dark theme's blue one, so the ivory field
    * does not pick up a cold cast. */
   --ambient-wash: radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.16), transparent 62%),
-    radial-gradient(900px 460px at 6% 4%, rgba(133, 102, 18, 0.05), transparent 58%);
+    radial-gradient(900px 460px at 6% 4%, rgba(125, 95, 16, 0.05), transparent 58%);
 }
 
 * {
@@ -696,12 +703,12 @@ body::before {
   width: 100%;
   cursor: pointer;
   background: none;
-  color: var(--danger, #e5484d);
+  color: var(--danger);
 }
 
 .oryx-nav-item--logout:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger, #e5484d) 14%, transparent);
-  color: var(--danger, #e5484d);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
 }
 
 .oryx-nav-item--logout:disabled {
@@ -845,12 +852,12 @@ body::before {
  */
 .oryx-shell[data-branded='true'] .oryx-btn--primary {
   background: var(--brand-primary);
-  border-color: color-mix(in srgb, var(--brand-primary) 78%, #000000);
+  border-color: color-mix(in srgb, var(--brand-primary) 78%, var(--brand-shade));
   color: var(--brand-primary-foreground);
 }
 
 .oryx-shell[data-branded='true'] .oryx-btn--primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--brand-primary) 86%, #000000);
+  background: color-mix(in srgb, var(--brand-primary) 86%, var(--brand-shade));
 }
 
 .oryx-shell[data-branded='true'] .oryx-nav-item[aria-current='page'] {

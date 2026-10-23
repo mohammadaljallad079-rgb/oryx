@@ -190,12 +190,20 @@ export const LIGHT_THEME: ThemeTokens = {
   surface: '#ffffff',
   surfaceRaised: '#fbf9f4',
   border: 'rgba(36, 31, 20, 0.14)',
-  borderStrong: 'rgba(133, 102, 18, 0.5)',
+  borderStrong: 'rgba(125, 95, 16, 0.5)',
   text: '#22201d',
   textMuted: '#5a544b',
   textInverse: '#241f14',
   navy: '#00162b',
-  gold: '#856612',
+  /**
+   * The single accent gold for the light theme, used for text, hairlines and
+   * small marks. It is deep enough to clear WCAG AA (4.5:1) on *every* light
+   * surface the theme renders — including the deepest ivory (`bg-deep`,
+   * `#efeae0`), which is the tightest case. A lighter gold such as `#856612`
+   * measures 4.48:1 there and fails, so do not lighten this value; raise the
+   * surfaces instead.
+   */
+  gold: '#7d5f10',
   goldHover: '#6f5510',
   goldSoft: '#d9b447',
   goldDeep: '#a9821c',
