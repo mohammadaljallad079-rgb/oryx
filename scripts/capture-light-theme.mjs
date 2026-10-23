@@ -81,7 +81,17 @@ async function settle(page, { quiet = 5, max = 40 } = {}) {
   return last;
 }
 
-const browser = await chromium.launch();
+// The bundled Playwright build is not always present on this host; the system
+// Chromium is, so fall back to it rather than failing the capture.
+async function launch() {
+  try {
+    return await chromium.launch();
+  } catch {
+    return chromium.launch({ executablePath: '/usr/bin/chromium' });
+  }
+}
+
+const browser = await launch();
 
 // ---------------------------------------------------------------- public pages
 for (const [theme, locale, dir] of [

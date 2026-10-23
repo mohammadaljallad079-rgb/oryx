@@ -15,8 +15,8 @@ import sharp from 'sharp';
 import { mkdirSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const DIR = resolve('docs/audit/exec07/phase-e-after/captures');
-const OUT = resolve('docs/audit/exec07/phase-e-after/comparisons');
+const DIR = resolve(process.env.ORYX_PAIRS_DIR ?? 'docs/audit/exec07/phase-e-after/captures');
+const OUT = resolve(process.env.ORYX_PAIRS_OUT ?? 'docs/audit/exec07/phase-e-after/comparisons');
 mkdirSync(OUT, { recursive: true });
 
 const PAIRS = [

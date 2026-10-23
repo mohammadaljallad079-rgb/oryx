@@ -20,7 +20,7 @@ const hex = (s) => {
   return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
 };
 
-const files = readdirSync(BEFORE).filter((f) => f.includes('-dark-') && f.endsWith('.png')).sort();
+const files = readdirSync(BEFORE).filter((f) => f.includes('-dark') && f.endsWith('.png')).sort();
 console.log(`${'capture'.padEnd(42)}${'changed'.padStart(9)}${'maxD'.padStart(6)}  dominant moved colours`);
 for (const f of files) {
   const b = join(AFTER, f);
