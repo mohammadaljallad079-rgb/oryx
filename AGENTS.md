@@ -526,6 +526,28 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 - **A tall dark footer can dominate a full-page capture.** Read the dominant
   colour from the top band, not the whole image, or every light page reads as
   dark.
+- **Gold is two tokens, not one.** A gold *text* colour on an ivory field must be
+  dark enough for 4.5:1; a gold *tint fill* must be light enough for dark ink to
+  read on it. Painting `--gold` as text on a gold tint puts the label in the same
+  colour family as its own background. The chip foreground is `--gold-on-tint`.
+  This is why the light theme has both and the dark theme can reproduce `--gold`.
+- **The tint percentages differ per theme on purpose.** The admin dark ramp keeps
+  the percentages its rules already used (badge 15%/40%, collapsed nav 18%, nav
+  gradient 20%) so the approved dark render stays byte-identical; the light ramp
+  matches `LIGHT_THEME`. `scripts/check-token-parity.mjs` records the dark values
+  as an explicit exemption. "Fixing" the dark ramp to match the light one changes
+  the approved dark theme — don't.
+- **Measure the computed style, not the screenshot, when judging a theme.** A
+  region-average sampler with a loose selector (`main`, `section`) matches the
+  wrong element and reports nonsense such as a dark "card" in a light theme.
+  `scripts/probe-light-chrome.mjs` reads `getComputedStyle` for the page
+  background and text and asserts they equal `LIGHT_THEME`.
+- **The evidence preview server only maps `/evidence/` onto `.run/evidence/`.**
+  A capture copied to `.run/evidence/exec07-final/x.png` is reachable at
+  `/evidence/exec07-final/x.png` on port 12000. Any other path falls through to
+  the Next app and returns that app's HTML shell with a `404`/`200`, so a link to
+  a file that was never copied looks plausible and serves the wrong thing. Check
+  `content-type` before publishing a link.
 
 ### Mobile gotchas
 
