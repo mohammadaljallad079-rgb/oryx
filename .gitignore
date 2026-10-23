@@ -46,3 +46,4 @@ apps/admin/playwright-report/
 # apps/customer/public/media/ and is tracked.
 .media/
 apps/api/.media/
+.run/pgsock/

@@ -160,6 +160,14 @@ model RefreshToken {
    * compromised family does not disturb the user's other devices.
    */
   familyId   String    @default(cuid())
+  /**
+   * Distinguishes a browser session from a native mobile session. A mobile
+   * session carries its refresh token in the request body, so the row records
+   * which kind of client owns it; the session list shows it and the rotation
+   * path carries it forward.
+   */
+  deviceKind String    @default("WEB")
+  deviceName String?
   userAgent  String?
   ipAddress  String?
   createdAt  DateTime  @default(now())
