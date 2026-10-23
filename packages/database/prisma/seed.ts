@@ -520,11 +520,13 @@ async function seedCompanies(superAdminId: string) {
 }
 
 async function seedSubscriptions(idByCode: Map<string, string>) {
+  // Only SaaS tenants carry a subscription. An ORYX internal company (type
+  // `INTERNAL`) belongs to the group and is governed by the Platform Super
+  // Admin, so it is never plan-gated: `EntitlementService.forCompany` resolves
+  // every catalogued module and no limits for it. Seeding a plan against an
+  // internal company made it behave like a customer, which is the conflation
+  // the two-model rule forbids.
   const assignments: Array<{ companyCode: string; planCode: string; status: 'ACTIVE' | 'TRIAL'; period: 'MONTHLY' | 'ANNUAL' }> = [
-    { companyCode: 'ORYX-HOLDING', planCode: 'enterprise', status: 'ACTIVE', period: 'ANNUAL' },
-    { companyCode: 'ORYX-AUTO', planCode: 'enterprise', status: 'ACTIVE', period: 'ANNUAL' },
-    { companyCode: 'ORYX-REALESTATE', planCode: 'professional', status: 'ACTIVE', period: 'MONTHLY' },
-    { companyCode: 'ORYX-LOGISTICS', planCode: 'starter', status: 'ACTIVE', period: 'MONTHLY' },
     { companyCode: 'DEMO-ALNOOR', planCode: 'professional', status: 'ACTIVE', period: 'MONTHLY' },
     { companyCode: 'DEMO-GULFAUTO', planCode: 'enterprise', status: 'TRIAL', period: 'MONTHLY' },
   ];
@@ -580,7 +582,22 @@ async function seedSubscriptions(idByCode: Map<string, string>) {
       });
     }
   }
-  console.log(`  subscriptions: ${assignments.length} upserted`);
+
+  // Repair any internal company that a previous seed gave a subscription. The
+  // rows are deleted rather than updated: an internal company is not a paying
+  // customer, and leaving a dormant plan row behind would let a later query
+  // mistake it for one.
+  const internal = await prisma.company.findMany({
+    where: { type: 'INTERNAL' },
+    select: { id: true, code: true },
+  });
+  let repaired = 0;
+  for (const company of internal) {
+    const removed = await prisma.subscription.deleteMany({ where: { companyId: company.id } });
+    repaired += removed.count;
+  }
+
+  console.log(`  subscriptions: ${assignments.length} upserted, ${repaired} internal-company rows removed`);
 }
 
 async function seedCompanyAdmin(

@@ -115,6 +115,17 @@ export class OrganizationsService {
       if (!parent) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Parent company not found.');
     }
 
+    // The two company models are distinct and must not be conflated. A SaaS
+    // tenant is provisioned against a plan; an ORYX internal company is owned by
+    // the group, governed by the Platform Super Admin, and is never
+    // subscription-limited, so attaching a plan to it is a modelling error.
+    if (dto.type === 'INTERNAL' && dto.planId) {
+      throw badRequest(
+        ERROR_CODES.VALIDATION_FAILED,
+        'An internal company is not subscription-limited and must not be given a plan.',
+      );
+    }
+
     if (dto.planId) {
       const plan = await this.prisma.plan.findUnique({ where: { id: dto.planId } });
       if (!plan) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Plan not found.');
