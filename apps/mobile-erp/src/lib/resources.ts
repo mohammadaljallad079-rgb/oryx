@@ -47,6 +47,23 @@ export interface ResourceSpec {
   permission: string;
   /** Permission required to create; absent means the resource is read-only here. */
   createPermission?: string;
+  /**
+   * Permission required to update, mirroring the update route's decorator.
+   * Absent means the API exposes no update for this resource.
+   */
+  updatePermission?: string;
+  /**
+   * HTTP method for the update route. The ERP is not uniform: sales customers
+   * and purchasing suppliers take `POST /:id`, everything else takes `PATCH`.
+   * Defaults to PATCH when omitted.
+   */
+  updateMethod?: 'POST' | 'PATCH';
+  /**
+   * Create fields the update route does not accept. The API runs
+   * `forbidNonWhitelisted`, so echoing an immutable key back on edit would be a
+   * 400 rather than a no-op. These keys are omitted from the edit payload.
+   */
+  immutable?: string[];
   columns: ColumnSpec[];
   fields?: FieldSpec[];
   /** Server-side search parameter, when the route supports one. */
@@ -67,6 +84,9 @@ export const RESOURCES: ResourceSpec[] = [
     title: 'resCustomers',
     permission: 'erp.sales.read',
     createPermission: 'erp.sales.customer.manage',
+    updatePermission: 'erp.sales.customer.manage',
+    updateMethod: 'POST',
+    immutable: ['code'],
     searchParam: 'search',
     columns: [
       { key: 'code', label: 'code', kind: 'code' },
@@ -140,6 +160,9 @@ export const RESOURCES: ResourceSpec[] = [
     title: 'resProducts',
     permission: 'erp.inventory.read',
     createPermission: 'erp.inventory.item.manage',
+    updatePermission: 'erp.inventory.item.manage',
+    updateMethod: 'PATCH',
+    immutable: ['sku', 'type'],
     searchParam: 'search',
     columns: [
       { key: 'sku', label: 'sku', kind: 'code' },
@@ -166,6 +189,9 @@ export const RESOURCES: ResourceSpec[] = [
     title: 'resWarehouses',
     permission: 'erp.inventory.read',
     createPermission: 'erp.inventory.warehouse.manage',
+    updatePermission: 'erp.inventory.warehouse.manage',
+    updateMethod: 'PATCH',
+    immutable: ['code'],
     columns: [
       { key: 'code', label: 'code', kind: 'code' },
       { key: 'nameEn', label: 'nameEn', kind: 'text' },
@@ -213,6 +239,9 @@ export const RESOURCES: ResourceSpec[] = [
     title: 'resSuppliers',
     permission: 'erp.purchasing.read',
     createPermission: 'erp.purchasing.supplier.manage',
+    updatePermission: 'erp.purchasing.supplier.manage',
+    updateMethod: 'POST',
+    immutable: ['code'],
     searchParam: 'search',
     columns: [
       { key: 'code', label: 'code', kind: 'code' },
@@ -253,6 +282,9 @@ export const RESOURCES: ResourceSpec[] = [
     title: 'resEmployees',
     permission: 'erp.hr.read',
     createPermission: 'erp.hr.employee.manage',
+    updatePermission: 'erp.hr.employee.manage',
+    updateMethod: 'PATCH',
+    immutable: ['code', 'hireDate'],
     searchParam: 'search',
     statusParam: 'status',
     statuses: ['ACTIVE', 'ON_LEAVE', 'SUSPENDED', 'TERMINATED'],
@@ -281,6 +313,9 @@ export const RESOURCES: ResourceSpec[] = [
     title: 'resLeads',
     permission: 'erp.crm.read',
     createPermission: 'erp.crm.lead.manage',
+    updatePermission: 'erp.crm.lead.manage',
+    updateMethod: 'PATCH',
+    immutable: ['code'],
     searchParam: 'search',
     statusParam: 'status',
     statuses: ['NEW', 'CONTACTED', 'QUALIFIED', 'CONVERTED', 'LOST'],
@@ -323,6 +358,9 @@ export const RESOURCES: ResourceSpec[] = [
     title: 'resTickets',
     permission: 'erp.crm.read',
     createPermission: 'erp.crm.ticket.manage',
+    updatePermission: 'erp.crm.ticket.manage',
+    updateMethod: 'PATCH',
+    immutable: ['subject'],
     statusParam: 'status',
     statuses: ['NEW', 'OPEN', 'PENDING', 'RESOLVED', 'CLOSED'],
     columns: [
@@ -345,6 +383,9 @@ export const RESOURCES: ResourceSpec[] = [
     title: 'resProjects',
     permission: 'erp.operations.read',
     createPermission: 'erp.operations.project.manage',
+    updatePermission: 'erp.operations.project.manage',
+    updateMethod: 'PATCH',
+    immutable: ['code'],
     statusParam: 'status',
     statuses: ['PLANNED', 'ACTIVE', 'ON_HOLD', 'COMPLETED', 'CANCELLED'],
     columns: [
@@ -366,6 +407,8 @@ export const RESOURCES: ResourceSpec[] = [
     title: 'resTasks',
     permission: 'erp.operations.read',
     createPermission: 'erp.operations.task.manage',
+    updatePermission: 'erp.operations.task.manage',
+    updateMethod: 'PATCH',
     statusParam: 'status',
     statuses: ['TODO', 'IN_PROGRESS', 'BLOCKED', 'DONE', 'CANCELLED'],
     columns: [
@@ -401,6 +444,9 @@ export const RESOURCES: ResourceSpec[] = [
     title: 'resVehicles',
     permission: 'erp.vehicle.read',
     createPermission: 'erp.vehicle.manage',
+    updatePermission: 'erp.vehicle.manage',
+    updateMethod: 'PATCH',
+    immutable: ['customerId', 'vin', 'mileage'],
     searchParam: 'search',
     columns: [
       { key: 'vin', label: 'code', kind: 'code' },
@@ -409,6 +455,20 @@ export const RESOURCES: ResourceSpec[] = [
       { key: 'model', label: 'nameAr', kind: 'text' },
       { key: 'customerNameEn', label: 'name', kind: 'text' },
       { key: 'mileage', label: 'quantity', kind: 'text' },
+    ],
+    // `modelYear` and `mileage` are plain integers on the DTO, not 10^4-scaled
+    // quantities, so they use `number` — a `quantity` field would send 25000
+    // for "2.5" and the API would reject it as out of range.
+    fields: [
+      { key: 'customerId', label: 'customer', kind: 'text', required: true },
+      { key: 'vin', label: 'vin', kind: 'text', required: true },
+      { key: 'plateNumber', label: 'plate', kind: 'text' },
+      { key: 'make', label: 'make', kind: 'text', required: true },
+      { key: 'model', label: 'model', kind: 'text', required: true },
+      { key: 'modelYear', label: 'modelYear', kind: 'number', required: true },
+      { key: 'color', label: 'color', kind: 'text' },
+      { key: 'mileage', label: 'quantity', kind: 'number' },
+      { key: 'notes', label: 'notes', kind: 'text' },
     ],
   },
   {

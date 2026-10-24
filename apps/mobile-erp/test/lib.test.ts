@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { directionFor, translate } from '../src/lib/i18n';
-import { formatBasisPoints, formatDate, formatMoney, formatQuantity, toBasisPoints, toMinor, toScaledQuantity } from '../src/lib/format';
+import { formatBasisPoints, formatDate, formatMoney, formatQuantity, fromFieldValue, toBasisPoints, toMinor, toScaledQuantity } from '../src/lib/format';
 import { statusColor, themes } from '../src/lib/theme';
 import { resourceFor, RESOURCES, visibleResources } from '../src/lib/resources';
 
@@ -76,6 +76,32 @@ describe('money and quantity scales', () => {
   it('does not lose a date to timezone drift', () => {
     expect(formatDate('2026-10-17T00:00:00.000Z')).toMatch(/2026/);
   });
+
+  it('round-trips a stored money value back into the edit field', () => {
+    // 33000 minor units is 33.000 BHD; an edit form must show "33", not "33000",
+    // or saving without touching the field would multiply the amount by 1000.
+    expect(fromFieldValue(33_000, 'money', 'BHD')).toBe('33');
+    expect(toMinor(fromFieldValue(33_000, 'money', 'BHD'), 'BHD')).toBe(33_000);
+    // A two-decimal currency must round-trip at its own scale, not BHD's.
+    expect(fromFieldValue(12_500, 'money', 'USD')).toBe('125');
+    expect(toMinor(fromFieldValue(12_500, 'money', 'USD'), 'USD')).toBe(12_500);
+  });
+
+  it('round-trips a stored quantity back into the edit field', () => {
+    expect(fromFieldValue(25_000, 'quantity', 'BHD')).toBe('2.5');
+    expect(toScaledQuantity(fromFieldValue(25_000, 'quantity', 'BHD'))).toBe(25_000);
+  });
+
+  it('renders an empty string for a missing value rather than "undefined"', () => {
+    expect(fromFieldValue(undefined, 'text', 'BHD')).toBe('');
+    expect(fromFieldValue(null, 'money', 'BHD')).toBe('');
+    expect(fromFieldValue(null, 'quantity', 'BHD')).toBe('');
+  });
+
+  it('passes text and trims a date to its calendar day', () => {
+    expect(fromFieldValue('Al Noor', 'text', 'BHD')).toBe('Al Noor');
+    expect(fromFieldValue('2026-10-17T00:00:00.000Z', 'date', 'BHD')).toBe('2026-10-17');
+  });
 });
 
 describe('theme', () => {
@@ -134,6 +160,46 @@ describe('resource registry', () => {
   it('offers a create form only where the API supports a create', () => {
     const withForm = RESOURCES.filter((r) => r.fields);
     for (const resource of withForm) expect(resource.createPermission).toBeTruthy();
+  });
+
+  it('offers an edit only where the API exposes an update', () => {
+    // An updatePermission without a form would render an Edit button that opens
+    // an empty panel; a form without an updatePermission would render no button.
+    for (const resource of RESOURCES) {
+      if (resource.updatePermission) {
+        expect(resource.fields, `${resource.key} needs fields to edit`).toBeTruthy();
+      }
+    }
+    expect(resourceFor('customers')?.updatePermission).toBe('erp.sales.customer.manage');
+    expect(resourceFor('invoices')?.updatePermission).toBeUndefined();
+  });
+
+  it('declares the update verb the API actually accepts', () => {
+    // Sales customers and purchasing suppliers take POST /:id; the rest PATCH.
+    // The wrong verb is a 404, so the registry is the single place it is pinned.
+    expect(resourceFor('customers')?.updateMethod).toBe('POST');
+    expect(resourceFor('suppliers')?.updateMethod).toBe('POST');
+    expect(resourceFor('products')?.updateMethod).toBe('PATCH');
+    expect(resourceFor('employees')?.updateMethod).toBe('PATCH');
+  });
+
+  it('never sends an immutable key on update', () => {
+    // `forbidNonWhitelisted` turns a stray immutable key into a 400, so every
+    // key an edit form could carry must either be mutable or listed as immutable
+    // and therefore excluded from the edit payload.
+    for (const resource of RESOURCES) {
+      if (!resource.updatePermission || !resource.fields) continue;
+      const immutable = resource.immutable ?? [];
+      for (const key of immutable) {
+        expect(
+          resource.fields.some((f) => f.key === key),
+          `${resource.key}: immutable '${key}' is not a field`,
+        ).toBe(true);
+      }
+      // At least one field must remain editable, or the form is pointless.
+      const editable = resource.fields.filter((f) => !immutable.includes(f.key));
+      expect(editable.length, `${resource.key} has nothing editable`).toBeGreaterThan(0);
+    }
   });
 
   it('resolves every column and field label to real copy', () => {

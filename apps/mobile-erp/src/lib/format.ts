@@ -110,6 +110,35 @@ export function toBasisPoints(input: string): number {
   return Math.round(value * 100);
 }
 
+/**
+ * Render a stored value back into the string a form field shows.
+ *
+ * The inverse of the `toMinor` / `toScaledQuantity` / `toBasisPoints` pair, so an
+ * edit form opens on the record's current values rather than on blanks. Money and
+ * quantity are stored as scaled integers and must be divided back down before the
+ * user sees them; a raw `33000` in a price box would be wrong by 1000x.
+ */
+export function fromFieldValue(
+  value: unknown,
+  kind: 'text' | 'number' | 'money' | 'quantity' | 'select' | 'date' | 'boolean',
+  currency: string,
+): string {
+  if (value === null || value === undefined) return '';
+  if (kind === 'money') {
+    const minor = Number(value);
+    if (!Number.isFinite(minor)) return '';
+    return String(minor / 10 ** currencyScale(currency));
+  }
+  if (kind === 'quantity') {
+    const scaled = Number(value);
+    if (!Number.isFinite(scaled)) return '';
+    return String(scaled / 10_000);
+  }
+  if (kind === 'boolean') return value === true ? 'true' : 'false';
+  if (kind === 'date' && typeof value === 'string') return value.slice(0, 10);
+  return String(value);
+}
+
 /** The picker-friendly label for a record: Arabic name first in an Arabic UI. */
 export function displayName(
   record: { nameEn?: string | null; nameAr?: string | null; title?: string | null; fullNameEn?: string | null; fullNameAr?: string | null },

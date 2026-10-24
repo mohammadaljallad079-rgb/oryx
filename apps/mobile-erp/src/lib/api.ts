@@ -429,8 +429,16 @@ export const api = {
   get: <T>(path: string) => request<T>(path),
   create: <T>(path: string, body: Record<string, unknown>) =>
     request<T>(path, { method: 'POST', body }),
-  update: <T>(path: string, body: Record<string, unknown>) =>
-    request<T>(path, { method: 'POST', body }),
+  /**
+   * Update a record by id.
+   *
+   * The ERP is not uniform: sales customers and purchasing suppliers are updated
+   * with `POST /:id`, every other writable resource with `PATCH /:id`. The caller
+   * passes the verb its registry entry declares rather than the client guessing,
+   * because the wrong verb is a 404, not a fallback.
+   */
+  update: <T>(path: string, id: string, body: Record<string, unknown>, method: 'POST' | 'PATCH' = 'PATCH') =>
+    request<T>(`${path}/${encodeURIComponent(id)}`, { method, body }),
 
   // ------------------------------------------------------- sales specifics
   createInvoice: (body: Record<string, unknown>) =>

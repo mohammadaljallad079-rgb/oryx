@@ -12,10 +12,10 @@ import {
   formatDateTime,
   formatMoney,
   formatQuantity,
+  fromFieldValue,
   toMinor,
   toScaledQuantity,
 } from '../../../lib/format';
-import { DEFAULT_CURRENCY } from '@oryx/shared';
 import { resourceFor, type ColumnSpec, type FieldSpec } from '../../../lib/resources';
 import type { TranslateKey } from '../../../lib/i18n';
 import {
@@ -51,13 +51,14 @@ const PAGE_SIZE = 25;
 export default function ResourceScreen() {
   const { resource: key } = useLocalSearchParams<{ resource: string }>();
   const resource = resourceFor(key);
-  const { theme, t, locale, can } = useApp();
+  const { theme, t, locale, can, currency } = useApp();
 
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounced(search);
   const [status, setStatus] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<Record<string, unknown> | null>(null);
 
   const allowed = resource ? can(resource.permission) : false;
 
@@ -101,6 +102,7 @@ export default function ResourceScreen() {
   const items = list.data?.items ?? [];
   const total = list.data?.total ?? 0;
   const canCreate = Boolean(resource.createPermission && resource.fields && can(resource.createPermission!));
+  const canEdit = Boolean(resource.updatePermission && resource.fields && can(resource.updatePermission!));
 
   return (
     <Screen>
@@ -139,9 +141,27 @@ export default function ResourceScreen() {
         <CreateForm
           path={resource.path}
           fields={resource.fields}
+          currency={currency}
           onCancel={() => setCreating(false)}
           onCreated={() => {
             setCreating(false);
+            list.reload();
+          }}
+        />
+      ) : null}
+
+      {editing && resource.fields ? (
+        <EditForm
+          path={resource.path}
+          id={String(editing.id)}
+          fields={resource.fields}
+          record={editing}
+          currency={currency}
+          method={resource.updateMethod ?? 'PATCH'}
+          immutable={resource.immutable ?? []}
+          onCancel={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
             list.reload();
           }}
         />
@@ -157,6 +177,19 @@ export default function ResourceScreen() {
         {items.map((item) => (
           <Card key={String(item.id ?? Math.random())}>
             <RowColumns columns={resource.columns} item={item} locale={locale} t={t} />
+            {canEdit ? (
+              <View style={{ marginTop: space.sm }}>
+                <Button
+                  title={t('edit')}
+                  variant="secondary"
+                  onPress={() => {
+                    setCreating(false);
+                    setEditing(item);
+                  }}
+                  testID="resource-edit"
+                />
+              </View>
+            ) : null}
           </Card>
         ))}
       </View>
@@ -245,11 +278,13 @@ function renderValue(
 function CreateForm({
   path,
   fields,
+  currency,
   onCancel,
   onCreated,
 }: {
   path: string;
   fields: FieldSpec[];
+  currency: string;
   onCancel: () => void;
   onCreated: () => void;
 }) {
@@ -271,17 +306,7 @@ function CreateForm({
     }
     setBusy(true);
     try {
-      const body: Record<string, unknown> = {};
-      for (const field of fields) {
-        const raw = values[field.key]?.trim() ?? '';
-        if (!raw) continue;
-        if (field.kind === 'money') body[field.key] = toMinor(raw, DEFAULT_CURRENCY);
-        else if (field.kind === 'quantity') body[field.key] = toScaledQuantity(raw);
-        else if (field.kind === 'number') body[field.key] = Number(raw);
-        else if (field.kind === 'boolean') body[field.key] = raw === 'true';
-        else body[field.key] = raw;
-      }
-      await api.create(path, body);
+      await api.create(path, buildPayload(fields, values, currency));
       onCreated();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('error'));
@@ -315,6 +340,120 @@ function CreateForm({
       {error ? <Body muted>{error}</Body> : null}
       <View style={{ flexDirection: 'row', gap: space.md }}>
         <Button title={t('save')} onPress={submit} loading={busy} />
+        <Button title={t('cancel')} onPress={onCancel} variant="secondary" />
+      </View>
+    </Card>
+  );
+}
+
+/**
+ * Convert the form's strings into the API's wire format.
+ *
+ * Money becomes integer minor units in the *tenant's* currency, quantity is
+ * scaled by 10^4 and a percentage becomes basis points. The API rejects a float,
+ * so the conversion is not optional.
+ */
+function buildPayload(
+  fields: FieldSpec[],
+  values: Record<string, string>,
+  currency: string,
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  for (const field of fields) {
+    const raw = values[field.key]?.trim() ?? '';
+    if (!raw) continue;
+    if (field.kind === 'money') body[field.key] = toMinor(raw, currency);
+    else if (field.kind === 'quantity') body[field.key] = toScaledQuantity(raw);
+    else if (field.kind === 'number') body[field.key] = Number(raw);
+    else if (field.kind === 'boolean') body[field.key] = raw === 'true';
+    else body[field.key] = raw;
+  }
+  return body;
+}
+
+/**
+ * Edit an existing record.
+ *
+ * Prefilled from the row's current values and posted to `/:id` with the verb the
+ * registry declares. Fields the update DTO does not accept are omitted rather
+ * than echoed back: the API runs `forbidNonWhitelisted`, so an immutable key such
+ * as a customer `code` would turn a legitimate save into a 400.
+ */
+function EditForm({
+  path,
+  id,
+  fields,
+  record,
+  currency,
+  method,
+  immutable,
+  onCancel,
+  onSaved,
+}: {
+  path: string;
+  id: string;
+  fields: FieldSpec[];
+  record: Record<string, unknown>;
+  currency: string;
+  method: 'POST' | 'PATCH';
+  immutable: string[];
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const { t, theme } = useApp();
+  const editable = fields.filter((field) => !immutable.includes(field.key));
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(editable.map((f) => [f.key, fromFieldValue(record[f.key], f.kind, currency)])),
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const set = (key: string, value: string) => setValues((prev) => ({ ...prev, [key]: value }));
+
+  const submit = async () => {
+    setError(null);
+    const missing = editable.filter((f) => f.required && !values[f.key]?.trim());
+    if (missing.length > 0) {
+      setError(t('required'));
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.update(path, id, buildPayload(editable, values, currency), method);
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card style={{ borderColor: theme.gold }}>
+      <SectionTitle>{t('editRecord')}</SectionTitle>
+      {editable.map((field) =>
+        field.kind === 'select' ? (
+          <View key={field.key} style={{ marginBottom: space.md }}>
+            <Chips
+              options={field.options ?? []}
+              value={values[field.key] || null}
+              onChange={(next) => set(field.key, next ?? '')}
+            />
+          </View>
+        ) : (
+          <Field
+            key={field.key}
+            label={t(field.label)}
+            value={values[field.key]}
+            onChangeText={(value) => set(field.key, value)}
+            keyboardType={field.kind === 'money' || field.kind === 'quantity' || field.kind === 'number' ? 'decimal-pad' : 'default'}
+            testID={`edit-${field.key}`}
+          />
+        ),
+      )}
+      {error ? <Body muted>{error}</Body> : null}
+      <View style={{ flexDirection: 'row', gap: space.md }}>
+        <Button title={t('save')} onPress={submit} loading={busy} testID="edit-save" />
         <Button title={t('cancel')} onPress={onCancel} variant="secondary" />
       </View>
     </Card>
