@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>ORYX — Audit Reports · ORYX design preview</title>
+<meta name="description" content="ORYX — Audit Reports" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Audit</p>
+        <h1>ORYX — Audit Reports</h1>
+        <p class="card__meta">Rendered from <code>docs/audit/README.md</code> at <code>aa1569d</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/audit/README.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#repository-state">Repository state</a></li><li><a href="#reports">Reports</a></li><li><a href="#headline-result">Headline result</a></li><li><a href="#reproducing-the-evidence">Reproducing the evidence</a></li></ul></nav>
+        <article><h1 id="oryx-audit-reports">ORYX — Audit Reports</h1>
+<p>Audit date: 2026-10-16, updated 2026-10-17 after the crash-recovery session and<br />
+2026-10-18 after the Execution 06 follow-up (iPad auth, dual Super Admin, unique<br />
+dashboard art, responsive sweep, defensive input validation).<br />
+Audited revision: <code>fc2ab20</code> (merge of PR #5), plus <code>699560c</code> (the owner&#39;s logo<br />
+upload), plus the visual identity and preview fixes in<br />
+<code>08_VISUAL_IDENTITY_AND_PREVIEW_VERIFICATION.md</code>.<br />
+Delivered on branch <code>audit/execution-05-verification</code>.<br />
+Environment: isolated staging (<code>oryx_staging</code>), not production.</p>
+<h2 id="repository-state">Repository state</h2>
+<div class="table-wrap"><table><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody><tr><td>PR #5 (<code>feature/execution-05-platform-completion</code>)</td><td><strong>MERGED</strong> 2026-10-16T18:10:37Z, merge commit <code>fc2ab20</code></td></tr><tr><td><code>origin/main</code> tree</td><td><code>c789eec</code> — identical to the Execution 05 head <code>7db9689</code></td></tr><tr><td>Latest <code>main</code> commit</td><td><code>699560c</code> — the owner&#39;s official logo upload</td></tr><tr><td>This audit</td><td>branch <code>audit/execution-05-verification</code>, PR #6 (draft). Head <code>bc77426</code>; Execution 06 code at <code>b1e2f7b</code>, audit/docs and input-validation at <code>a2e4f82</code>.</td></tr></tbody></table></div>
+<p>PR #5 is merged, so it cannot be updated; a merged pull request takes no new<br />
+commits. The audit work therefore lands on a fresh branch and PR #6, based on the<br />
+same tree. Report 08 records this explicitly, because the task brief asked for<br />
+changes to be pushed to the Execution 05 branch.</p>
+<h2 id="reports">Reports</h2>
+<div class="table-wrap"><table><thead><tr><th>Report</th><th>Contents</th></tr></thead><tbody><tr><td><code>01_SPECIFICATION_PARITY_MATRIX.md</code></td><td>Every master-reference requirement mapped to code and a verifiable check</td></tr><tr><td><code>02_FUNCTIONAL_AUDIT.md</code></td><td>Frontend/backend connections, database operations, permissions, navigation, forms, workflows, RTL/LTR, themes, responsiveness</td></tr><tr><td><code>03_VISUAL_COMPARISON.md</code></td><td>Measured comparison against <code>docs/assets/ORYX Auto Services Dashboard.png</code></td></tr><tr><td><code>04_FIXED_DEFECTS.md</code></td><td>Defects found, their fixes and their regression guards</td></tr><tr><td><code>05_INTEGRATION_READINESS.md</code></td><td>The integration catalogue, state model, credential handling and blockers</td></tr><tr><td><code>06_TEST_AND_CI_RESULTS.md</code></td><td>577 passing tests and how to reproduce them</td></tr><tr><td><code>07_LIVE_PREVIEW_AND_CREDENTIALS.md</code></td><td>Working HTTPS preview links and demo credentials</td></tr><tr><td><code>08_VISUAL_IDENTITY_AND_PREVIEW_VERIFICATION.md</code></td><td>Recovery state, visual identity alignment, externally re-verified preview and the CORS build hazard</td></tr><tr><td><code>exec07/01_EXECUTION_07_REPORT.md</code></td><td>Execution 07 premium web experience, responsive hardening, defect 18 and the corrected screenshot comparison</td></tr><tr><td><code>exec07/04_PHASE_E_LIGHT_THEME.md</code></td><td>Phase E light-theme correction, the four defects fixed, the dark-integrity proof, the five-surface before/after evidence and the RTL scrim regression</td></tr></tbody></table></div>
+<h2 id="headline-result">Headline result</h2>
+<ul><li><strong>578 automated tests pass</strong>: 96 shared, 278 API integration, 184 browser</li></ul>
+<p>(1 skipped), 20 mobile. Plus a live API probe (96/96 module surfaces 200) and<br />
+an external preview sweep (39/39 routes, 0 failed requests). The API figure<br />
+rose from 277 to 278 with the Execution 07 cookieless-refresh regression test<br />
+(defect 18).</p>
+<ul><li><strong>Every declared Phase-1 surface is connected end to end</strong> and DB-backed.</li><li><strong>Preview links are live and externally verified</strong> — 39 / 39 routes returned a</li></ul>
+<p>success status over public HTTPS — see reports 07 and 08.</p>
+<ul><li><strong>The official logo is now in the repository</strong> (owner upload <code>699560c</code>) and the</li></ul>
+<p>monogram placeholder has been replaced in the admin sidebar, the admin login<br />
+page and the customer header. The colourway follows the theme.</p>
+<ul><li><strong>Defects found and fixed</strong> (all with regression guards): a module catalog</li></ul>
+<p>route drift, an RTL sidebar direction defect, a preview-build CORS hazard, the<br />
+Super Admin permission drift after a re-seed, the iPad sign-in lockout (CSRF<br />
+guard rejecting a re-login that carried a stale refresh cookie) and two<br />
+defensive-input defects (a malformed report date and a bookings-calendar range<br />
+that returned 500 instead of 400). See report 04.</p>
+<ul><li>**The approved design reference is no longer used as dashboard artwork at</li></ul>
+<p>all.** Every module tile previously rendered a crop of<br />
+<code>docs/assets/ORYX Auto Services Dashboard.png</code>. All 24 crop JPEGs are deleted,<br />
+the crop script is a retired tombstone, and every tile is original vector art<br />
+served as SVG. Verified live: 21 tiles swept, none raster, none broken. See<br />
+defect 5 in report 04.</p>
+<ul><li><strong>Full visual parity is not claimed</strong>: the official logo is present, but the</li></ul>
+<p>approved dashboard photography is still missing and there is no approved<br />
+light-theme reference. See report 03.</p>
+<h2 id="reproducing-the-evidence">Reproducing the evidence</h2>
+<pre><code class="language-bash">pnpm db:reset                      # clean seeded staging database
+pnpm db:seed                       # if reset did not seed
+AUTH_THROTTLE_LIMIT=100000 THROTTLE_LIMIT=1000000 REFRESH_THROTTLE_LIMIT=100000 \
+  pnpm --filter @oryx/api test:e2e
+ORYX_ADMIN_URL=http://localhost:12000 ORYX_API=http://localhost:12000/api/v1 \
+  pnpm --filter @oryx/admin test:ui
+python3 scripts/audit-compare.py   # regenerate the visual comparison</code></pre></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>aa1569d</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-24T02:32:08.728Z</span>
+  </div>
+</footer>
+</body>
+</html>

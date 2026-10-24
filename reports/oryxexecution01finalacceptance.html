@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>ORYX — Execution 01.1 Final Acceptance Report · ORYX design preview</title>
+<meta name="description" content="ORYX — Execution 01.1 Final Acceptance Report" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Execution reports</p>
+        <h1>ORYX — Execution 01.1 Final Acceptance Report</h1>
+        <p class="card__meta">Rendered from <code>docs/execution-reports/ORYX_EXECUTION_01_FINAL_ACCEPTANCE.md</code> at <code>aa1569d</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/execution-reports/ORYX_EXECUTION_01_FINAL_ACCEPTANCE.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#1-baseline-audit">1. Baseline audit</a></li><li><a href="#2-changed-files-and-their-purpose">2. Changed files and their purpose</a></li><li><a href="#3-security-changes">3. Security changes</a></li><li><a href="#4-mfa-implementation-and-test-evidence">4. MFA implementation and test evidence</a></li><li><a href="#5-refresh-token-transport-and-csrf-implementation">5. Refresh-token transport and CSRF implementation</a></li><li><a href="#6-visual-fidelity-comparison">6. Visual-fidelity comparison</a></li><li><a href="#7-screenshots">7. Screenshots</a></li><li><a href="#8-functional-acceptance-matrix">8. Functional acceptance matrix</a></li><li><a href="#9-test-counts-and-failures">9. Test counts and failures</a></li><li><a href="#10-production-build-results">10. Production build results</a></li><li><a href="#11-known-limitations">11. Known limitations</a></li><li><a href="#12-missing-assets">12. Missing assets</a></li><li><a href="#13-deployment-prerequisites">13. Deployment prerequisites</a></li><li><a href="#14-final-git-commit">14. Final Git commit</a></li><li><a href="#15-pr-url-and-readiness-status">15. PR URL and readiness status</a></li></ul></nav>
+        <article><h1 id="oryx-execution-011-final-acceptance-report">ORYX — Execution 01.1 Final Acceptance Report</h1>
+<p><strong>Execution:</strong> 01.1 — Final Visual Fidelity, Security Hardening &amp; Production Readiness<br />
+<strong>Repository:</strong> <code>mohammadaljallad079-rgb/oryx</code><br />
+<strong>Branch:</strong> <code>feature/execution-01-super-admin-foundation</code><br />
+<strong>Base branch:</strong> <code>main</code><br />
+<strong>Pull request:</strong> <a href="https://github.com/mohammadaljallad079-rgb/oryx/pull/1" target="_blank" rel="noopener noreferrer">#1</a><br />
+<strong>Final commit:</strong> <code>a56042c85e27975a4401cdc79b287901d9969233</code><br />
+<strong>Date:</strong> 2026-10-14<br />
+<strong>Readiness:</strong> <strong>Ready for owner review.</strong> Not merged. Not deployed.</p>
+<hr />
+<h2 id="1-baseline-audit">1. Baseline audit</h2>
+<h3 id="repository-state-before-any-change">Repository state before any change</h3>
+<p>The Execution 01 branch was checked out at <code>69e498f</code>. The pre-existing<br />
+implementation was verified to be real before extending it:</p>
+<div class="table-wrap"><table><thead><tr><th>Check</th><th>Command</th><th>Result at baseline</th></tr></thead><tbody><tr><td>Working tree</td><td><code>git status</code></td><td>clean</td></tr><tr><td>Branch</td><td><code>git branch --show-current</code></td><td><code>feature/execution-01-super-admin-foundation</code></td></tr><tr><td>Authorization invariants</td><td><code>pnpm --filter @oryx/shared test</code></td><td><strong>22 passed</strong></td></tr><tr><td>API integration</td><td><code>pnpm --filter @oryx/api test:e2e</code></td><td><strong>45 passed</strong></td></tr><tr><td>Database</td><td><code>psql ... \dt</code></td><td>18 companies, schema in sync with the two migrations</td></tr><tr><td>Build artefacts</td><td><code>ls apps/api/dist/main.js apps/admin/.next</code></td><td>both present</td></tr></tbody></table></div>
+<h3 id="verified-functionality-versus-documentation-claims">Verified functionality versus documentation claims</h3>
+<p>The Execution 01 report claimed functional authentication, tenancy, RBAC, plans<br />
+and entitlements, a DB-backed dashboard, CMS and support access. Each claim was<br />
+re-tested rather than trusted:</p>
+<ul><li><strong>Verified as real.</strong> Authentication with argon2id and refresh-token rotation;</li></ul>
+<p>company/branch/user/role CRUD persisting to PostgreSQL; entitlement snapshots<br />
+that survive a plan edit; cross-tenant rejection; a dashboard built from real<br />
+aggregates; CMS pages and banners; the audit trail; reasoned, time-bounded<br />
+support sessions.</p>
+<ul><li><strong>Verified as correctly labelled.</strong> Every ERP operational module reports</li></ul>
+<p><code>PLANNED</code> and its screen states that nothing is implemented.</p>
+<ul><li><strong>Corrected.</strong> Five claims were accurate but incomplete, and two behaviours</li></ul>
+<p>did not work at all. All seven are listed in section 3.</p>
+<p>No existing commit was discarded and no completed module was rebuilt. The<br />
+architecture was extended in place.</p>
+<hr />
+<h2 id="2-changed-files-and-their-purpose">2. Changed files and their purpose</h2>
+<p><code>git diff --stat 4e08f8f..a56042c</code> reports **106 files changed, 4350<br />
+insertions, 198 deletions**.</p>
+<h3 id="security-api-new">Security — API (new)</h3>
+<div class="table-wrap"><table><thead><tr><th>File</th><th>Purpose</th></tr></thead><tbody><tr><td><code>apps/api/src/auth/cookie.service.ts</code></td><td>HttpOnly refresh cookie and readable CSRF cookie; <code>Secure</code>/<code>SameSite</code> from environment; constant-time CSRF verification</td></tr><tr><td><code>apps/api/src/auth/csrf.guard.ts</code></td><td>Global guard rejecting state-changing requests that present the refresh cookie without a matching CSRF header</td></tr><tr><td><code>apps/api/src/auth/mfa.service.ts</code></td><td>AES-256-GCM secret cipher and TOTP verification with replay protection; recovery-code generation and hashing</td></tr><tr><td><code>apps/api/src/auth/mfa-enrollment.service.ts</code></td><td>Enrollment, confirmation, challenge verification, recovery-code regeneration, disable and administrative reset</td></tr><tr><td><code>packages/database/prisma/migrations/20261014085627_mfa_and_recovery_codes/</code></td><td>Adds MFA columns to <code>User</code> and the <code>MfaRecoveryCode</code> table</td></tr></tbody></table></div>
+<h3 id="security-api-modified">Security — API (modified)</h3>
+<div class="table-wrap"><table><thead><tr><th>File</th><th>Change</th></tr></thead><tbody><tr><td><code>apps/api/src/auth/auth.controller.ts</code></td><td>Cookie-based session issue, MFA challenge endpoints, cookie clearing on logout and password change</td></tr><tr><td><code>apps/api/src/auth/auth.service.ts</code></td><td>Split login into a password step and an MFA step; <code>issueSession</code> extracted so both paths share it</td></tr><tr><td><code>apps/api/src/auth/auth.dto.ts</code></td><td>Optional refresh token in the body; MFA challenge and code DTOs</td></tr><tr><td><code>apps/api/src/auth/auth.module.ts</code></td><td>Registers the cookie, cipher, MFA and CSRF providers</td></tr><tr><td><code>apps/api/src/auth/principal.guard.ts</code></td><td>Optional defence-in-depth check that a Super Admin has enrolled MFA</td></tr><tr><td><code>apps/api/src/common/security.module.ts</code></td><td>CSRF guard runs first in the global pipeline</td></tr><tr><td><code>apps/api/src/common/errors.ts</code></td><td>CSRF and MFA error codes</td></tr><tr><td><code>apps/api/src/main.ts</code></td><td>CORS credentials plus the <code>x-oryx-csrf</code> allowed header</td></tr><tr><td><code>apps/api/src/organizations/organizations.controller.ts</code></td><td><code>PATCH /companies/:id</code> now accepts <code>platform.company.update</code> as well as <code>company.update</code></td></tr></tbody></table></div>
+<h3 id="frontend">Frontend</h3>
+<div class="table-wrap"><table><thead><tr><th>File</th><th>Purpose</th></tr></thead><tbody><tr><td><code>apps/admin/src/app/(app)/security/page.tsx</code></td><td>New MFA screen: status, enrollment, recovery codes, regeneration, disable, platform-only reset</td></tr><tr><td><code>apps/admin/src/lib/api.ts</code></td><td>Cookie-based session, CSRF header echo, MFA methods, no refresh token in storage</td></tr><tr><td><code>apps/admin/src/lib/auth-context.tsx</code></td><td>Two-step login; only the access token is stored client-side</td></tr><tr><td><code>apps/admin/src/app/login/page.tsx</code></td><td>MFA challenge as a second form step</td></tr><tr><td><code>apps/admin/src/lib/navigation.ts</code></td><td>Adds the security route</td></tr><tr><td><code>apps/admin/src/app/(app)/dashboard/page.tsx</code></td><td>Approved photography for the hero and tiles; <code>min-w-0</code> on grid children</td></tr><tr><td><code>apps/admin/src/components/topbar-controls.tsx</code></td><td>Responsive context selector so the header cannot overflow</td></tr><tr><td><code>apps/admin/src/components/charts.tsx</code></td><td>Chart wrappers can shrink inside narrow grid columns</td></tr><tr><td><code>apps/admin/src/app/globals.css</code></td><td>Header clips instead of widening the page; revised hero and tile geometry</td></tr><tr><td><code>apps/admin/src/i18n/dictionaries.ts</code></td><td>Arabic and English strings for the MFA and security screens</td></tr><tr><td><code>apps/admin/src/app/(app)/roles/page.tsx</code></td><td>Page testid in the no-company state</td></tr></tbody></table></div>
+<h3 id="visual-assets">Visual assets</h3>
+<div class="table-wrap"><table><thead><tr><th>File</th><th>Purpose</th></tr></thead><tbody><tr><td><code>scripts/extract-approved-assets.py</code></td><td>Crops the owner-approved automotive photography out of the approved reference into 24 servable JPEGs</td></tr><tr><td><code>apps/admin/public/tiles/*.jpg</code> (24 files)</td><td>The approved photography used by the hero and module tiles, replacing generated SVG art</td></tr><tr><td><code>packages/shared/src/modules.ts</code></td><td><code>tileImageUrl</code> helper; hero points at the photographic asset</td></tr></tbody></table></div>
+<h3 id="tests">Tests</h3>
+<div class="table-wrap"><table><thead><tr><th>File</th><th>Purpose</th></tr></thead><tbody><tr><td><code>apps/api/test/mfa.e2e-spec.ts</code></td><td>16 MFA integration tests</td></tr><tr><td><code>apps/api/test/rate-limit.e2e-spec.ts</code></td><td>Asserts HTTP 429 beyond the login limit</td></tr><tr><td><code>apps/api/test/setup-env.ts</code></td><td>Relaxed throttle limits and MFA key for the bulk suites</td></tr><tr><td><code>apps/api/test/test-app.ts</code></td><td>Cookie jar, TOTP generator, MFA baseline reset in <code>cleanupFixtures</code></td></tr><tr><td><code>apps/api/test/authorization.e2e-spec.ts</code></td><td>Updated to the cookie contract; adds CSRF assertions</td></tr><tr><td><code>apps/admin/e2e/mfa.spec.ts</code></td><td>10 MFA and session-transport UI tests</td></tr><tr><td><code>apps/admin/e2e/responsive.spec.ts</code></td><td>19 responsive and bilingual tests</td></tr><tr><td><code>apps/admin/e2e/functional.spec.ts</code></td><td>13 end-to-end workflow tests with API-level assertions</td></tr><tr><td><code>apps/admin/e2e/screenshots.spec.ts</code></td><td>The required screenshot captures</td></tr><tr><td><code>apps/admin/e2e/global-setup.ts</code></td><td>Restores the MFA baseline before UI runs</td></tr><tr><td><code>scripts/verify-security-flow.mjs</code></td><td>23 checks against a running API</td></tr><tr><td><code>scripts/reset-seed-mfa.mjs</code></td><td>Resets MFA on seeded development accounts</td></tr></tbody></table></div>
+<h3 id="documentation">Documentation</h3>
+<div class="table-wrap"><table><thead><tr><th>File</th><th>Purpose</th></tr></thead><tbody><tr><td><code>docs/DEPLOYMENT.md</code></td><td>New deployment runbook (Phase F)</td></tr><tr><td><code>docs/api/API_REFERENCE.md</code></td><td>MFA endpoints, session transport, new error codes</td></tr><tr><td><code>.env.example</code></td><td>Cookie, MFA and production-guidance variables</td></tr><tr><td><code>AGENTS.md</code></td><td>Updated state and gotchas</td></tr></tbody></table></div>
+<hr />
+<h2 id="3-security-changes">3. Security changes</h2>
+<h3 id="31-refresh-token-transport">3.1 Refresh-token transport</h3>
+<div class="table-wrap"><table><thead><tr><th>Before</th><th>After</th></tr></thead><tbody><tr><td>Refresh token returned in the JSON body and stored in <code>localStorage</code></td><td>Delivered in an <strong>HttpOnly</strong> cookie named <code>oryx_rt</code>, scoped to <code>/api/v1/auth</code></td></tr><tr><td>Readable by any script on the page</td><td>Not readable by JavaScript; verified in a real browser</td></tr><tr><td>No <code>Secure</code> or <code>SameSite</code> control</td><td><code>Secure</code> defaults to on when <code>NODE_ENV=production</code>; <code>SameSite</code> configurable (<code>lax</code> default, <code>none</code> requires <code>Secure</code>)</td></tr><tr><td>Rotation and reuse detection</td><td><strong>Preserved unchanged</strong>; a replayed token still revokes every session for the user</td></tr></tbody></table></div>
+<p>Only the short-lived access token remains client-side. The UI test<br />
+<code>the refresh token is never exposed to JavaScript</code> asserts that the cookie is<br />
+<code>HttpOnly</code>, that <code>document.cookie</code> does not contain <code>oryx_rt</code>, and that no<br />
+refresh-related value appears in <code>localStorage</code> or <code>sessionStorage</code>.</p>
+<h3 id="32-csrf-protection">3.2 CSRF protection</h3>
+<p>The refresh cookie is sent automatically by the browser, so a cross-site POST<br />
+could otherwise trigger a rotation. The double-submit pattern closes that:</p>
+<ul><li>the API sets a <strong>readable</strong> <code>oryx_csrf</code> cookie;</li><li>the client echoes it in the <code>x-oryx-csrf</code> header on every non-GET request;</li><li><code>CsrfGuard</code> runs before principal resolution and rejects a missing or</li></ul>
+<p>mismatched token with <code>auth.csrf_token_invalid</code>;</p>
+<ul><li>comparison is constant-time over SHA-256 digests, so length differences do not</li></ul>
+<p>leak.</p>
+<p>Requests carrying no refresh cookie have no ambient authority and pass through,<br />
+which keeps the credential login endpoint usable.</p>
+<h3 id="33-multi-factor-authentication">3.3 Multi-factor authentication</h3>
+<div class="table-wrap"><table><thead><tr><th>Requirement</th><th>Implementation</th></tr></thead><tbody><tr><td>Secure enrollment</td><td>Secret generated server-side; enrollment is pending until confirmed</td></tr><tr><td>QR-code provisioning</td><td>Inline PNG data URL plus an <code>otpauth://</code> URI and a manual entry key</td></tr><tr><td>TOTP verification</td><td>otplib, 6 digits, 30-second step, one step of drift tolerance</td></tr><tr><td>MFA challenge during login</td><td>Password success returns a short-lived challenge token; <strong>no access token is issued</strong> until the second factor is verified</td></tr><tr><td>Encrypted secret storage</td><td>AES-256-GCM under <code>MFA_ENCRYPTION_KEY</code>; format <code>v1.&lt;iv&gt;.&lt;tag&gt;.&lt;ciphertext&gt;</code></td></tr><tr><td>Hashed, single-use recovery codes</td><td>Ten codes, SHA-256 hashed, marked used on first redemption</td></tr><tr><td>Secure regeneration</td><td>Requires a valid current code; the previous set is invalidated</td></tr><tr><td>MFA reset requiring authorisation</td><td>Platform-only <code>POST /auth/mfa/reset/:userId</code>; clears all MFA material and revokes the target&#39;s sessions</td></tr><tr><td>Audit events</td><td><code>mfa.enrollment_started</code>, <code>mfa.enrolled</code>, <code>mfa.enrollment_failed</code>, <code>mfa.disabled</code>, <code>mfa.recovery_codes_regenerated</code>, <code>mfa.admin_reset</code>, <code>auth.mfa_challenge_issued</code>, <code>auth.mfa_verified</code>, <code>auth.mfa_failed</code></td></tr><tr><td>Rate limiting</td><td>Dedicated throttles on every MFA endpoint</td></tr><tr><td>Replay protection</td><td>otplib <code>afterTimeStep</code> plus a monotonic <code>mfaLastUsedStep</code>; a code whose step is not strictly greater is rejected</td></tr></tbody></table></div>
+<p>MFA is <strong>required</strong> for Super Admin accounts: <code>MFA_REQUIRE_SUPER_ADMIN=true</code><br />
+makes the principal guard refuse a platform account that has not enrolled.<br />
+Secrets and recovery codes are never logged, and are returned exactly once.</p>
+<h3 id="34-authorization-regression">3.4 Authorization regression</h3>
+<p>All previously verified rules were re-asserted at the API layer (not through<br />
+hidden UI): platform-to-company isolation, cross-tenant denial, branch scope,<br />
+permission delegation limits, module entitlement gating, entitlement snapshots,<br />
+support sessions, the invitation lifecycle, and session revocation.</p>
+<hr />
+<h2 id="4-mfa-implementation-and-test-evidence">4. MFA implementation and test evidence</h2>
+<h3 id="api-integration-appsapitestmfae2e-spects-16-tests-all-passing">API integration — <code>apps/api/test/mfa.e2e-spec.ts</code> (16 tests, all passing)</h3>
+<div class="table-wrap"><table><thead><tr><th>Area</th><th>Assertion</th></tr></thead><tbody><tr><td>Enrollment</td><td>Ten recovery codes issued; none stored in plaintext</td></tr><tr><td>Enrollment</td><td>Secret stored encrypted (<code>v1.</code> prefix) and never equal to the plaintext</td></tr><tr><td>Enrollment</td><td>Confirmation with an invalid code returns <code>auth.mfa_invalid_code</code></td></tr><tr><td>Enrollment</td><td>No session is issued from the password step once MFA is on</td></tr><tr><td>Challenge</td><td>Invalid code returns 401 without setting a session cookie</td></tr><tr><td>Challenge</td><td>A valid code issues a session</td></tr><tr><td>Challenge</td><td><strong>Replaying an accepted code is rejected</strong></td></tr><tr><td>Challenge</td><td>A tampered challenge token is rejected</td></tr><tr><td>Recovery</td><td>A recovery code works exactly once</td></tr><tr><td>Recovery</td><td>Regeneration invalidates the previous set (an old unused code stops working)</td></tr><tr><td>Recovery</td><td>Regeneration requires a valid current code</td></tr><tr><td>Disable</td><td>Requires a valid code; on success all MFA material is cleared and password-only login works again</td></tr><tr><td>Reset</td><td>Unauthenticated callers are rejected</td></tr><tr><td>Reset</td><td>Non-platform callers are rejected</td></tr></tbody></table></div>
+<h3 id="ui-acceptance-appsadmine2emfaspects-10-tests-all-passing">UI acceptance — <code>apps/admin/e2e/mfa.spec.ts</code> (10 tests, all passing)</h3>
+<p>Status and enrollment offer; the enrollment dialog renders a real PNG QR code<br />
+and a manual key; an invalid enrollment code surfaces an error; the screen<br />
+renders in both themes and both directions; the platform-only reset is visible<br />
+to the Super Admin and absent for a company administrator; the login challenge<br />
+appears with no session cookie present; an invalid challenge code keeps the user<br />
+on <code>/login</code>; and the refresh cookie is HttpOnly with nothing refresh-related in<br />
+web storage.</p>
+<h3 id="standalone-verification-scriptsverify-security-flowmjs">Standalone verification — <code>scripts/verify-security-flow.mjs</code></h3>
+<p>Run against a live API: <strong>23 checks, 0 failures</strong>, covering cookie attributes,<br />
+CSRF rejection and acceptance, the full TOTP lifecycle, replay rejection,<br />
+single-use recovery codes and logout clearing.</p>
+<hr />
+<h2 id="5-refresh-token-transport-and-csrf-implementation">5. Refresh-token transport and CSRF implementation</h2>
+<p>Documented in sections 3.1 and 3.2. Implementation files:</p>
+<ul><li><code>apps/api/src/auth/cookie.service.ts</code> — cookie construction, attribute policy,</li></ul>
+<p>constant-time CSRF comparison.</p>
+<ul><li><code>apps/api/src/auth/csrf.guard.ts</code> — the global enforcement point.</li><li><code>apps/admin/src/lib/api.ts</code> — reads the CSRF cookie, echoes the header, sends</li></ul>
+<p><code>credentials: &#39;include&#39;</code>, and refreshes through the cookie only.</p>
+<p>Production guidance is in <code>docs/DEPLOYMENT.md</code> section 5 and 7: terminate TLS,<br />
+set <code>COOKIE_SECURE=true</code> when the proxy terminates TLS, keep <code>SameSite=lax</code><br />
+unless the admin app is on a different site, and never log the tokens.</p>
+<hr />
+<h2 id="6-visual-fidelity-comparison">6. Visual-fidelity comparison</h2>
+<h3 id="reference">Reference</h3>
+<p><code>docs/assets/ORYX Auto Services Dashboard.png</code> — 1536 × 1024, the authoritative<br />
+owner-approved layout. It is an Arabic RTL dashboard with a deep navy field,<br />
+restrained gold accents, a luxury automotive hero photograph, image-led module<br />
+rectangles, KPI figures and analytics charts.</p>
+<h3 id="implementation">Implementation</h3>
+<p><code>docs/execution-reports/screenshots/dashboard-ar-dark.png</code> (1440 × 1000) and<br />
+<code>dashboard-ar-dark-full.png</code> (full page).</p>
+<h3 id="what-now-matches">What now matches</h3>
+<div class="table-wrap"><table><thead><tr><th>Reference element</th><th>Implementation</th><th>Status</th></tr></thead><tbody><tr><td>Deep navy field, layered panels</td><td><code>--bg #00162b</code>, <code>--surface #021f3a</code>, <code>--surface-raised #072a4a</code></td><td>Matches</td></tr><tr><td>Restrained gold accent</td><td><code>--gold #d4af37</code> with soft and deep variants</td><td>Matches</td></tr><tr><td>Automotive hero photograph</td><td><strong>The owner&#39;s own approved hero photograph</strong>, cropped from the reference at native resolution</td><td>Matches</td></tr><tr><td>Image-led module rectangles</td><td><strong>The owner&#39;s approved photography</strong> behind a navy gradient scrim, with icon chip, badge, title and description</td><td>Matches</td></tr><tr><td>Right-side Arabic navigation</td><td>Sidebar moves to the inline-start edge under RTL; grouped, with a gold active state</td><td>Matches</td></tr><tr><td>Premium top bar</td><td>Sticky translucent header, blurred backdrop, scope selector, theme and language toggles, user menu</td><td>Matches</td></tr><tr><td>Card overlays, borders, typography</td><td>Hairline gold-tinted borders, text shadows over imagery, gold-bordered icon chips</td><td>Matches</td></tr><tr><td>KPI placement</td><td>Four-column KPI row with icon chip, label, tabular value and sub-label</td><td>Matches</td></tr><tr><td>Analytics charts</td><td>Theme-aware inline SVG and CSS charts</td><td>Matches</td></tr><tr><td>Proportions and density</td><td>Three-column tile grid, four-column KPI row, three-column analytics row at 1440 px</td><td>Matches</td></tr></tbody></table></div>
+<h3 id="outstanding-deviations">Outstanding deviations</h3>
+<ol><li><strong>No ORYX logo.</strong> The official logo is <strong>not in the repository</strong>. The brand</li></ol>
+<p>slot shows a neutral geometric monogram placeholder, clearly marked in code<br />
+as such. No mark was invented, following the visual reference&#39;s own<br />
+instruction. <strong>This is the single largest remaining visual gap.</strong></p>
+<ol><li><strong>Photography is the reference&#39;s own pixels.</strong> The approved photography</li></ol>
+<p>exists only inside the approved screenshot; the original image files were<br />
+never supplied. <code>scripts/extract-approved-assets.py</code> crops them out at native<br />
+resolution and upscales with Lanczos, so the tiles show genuine approved<br />
+imagery rather than invented art — but they are crops of a screenshot, not<br />
+the original photographs. Supplying the originals and dropping them into<br />
+<code>apps/admin/public/tiles/</code> with the same filenames completes the match with no<br />
+code change.</p>
+<ol><li><strong>Metrics are real, not illustrative.</strong> The reference shows fixed sample</li></ol>
+<p>figures. The implementation queries the database for the authorized scope.<br />
+With only seeded data present it shows a labelled demo notice; with real data<br />
+the notice disappears. This difference is intentional and required by the<br />
+execution rules.</p>
+<ol><li><strong>Tiles carry an availability badge.</strong> Modules not implemented in Execution 01</li></ol>
+<p>are desaturated and labelled &quot;Planned&quot;, and their page states plainly that the<br />
+workflow is absent. The reference shows all tiles as equal.</p>
+<ol><li><strong>Extra operational chrome.</strong> A company/branch scope selector, and analytics</li></ol>
+<p>panels that carry meaning (branch staffing, module entitlement, recent<br />
+activity) rather than decoration.</p>
+<p><strong>No claim of pixel-perfect fidelity is made.</strong> The composition, palette,<br />
+hierarchy and image-led tile treatment now follow the approved reference closely<br />
+in both themes and both directions; the two asset gaps in items 1 and 2 are<br />
+disclosed rather than hidden.</p>
+<h3 id="theme-and-direction-coverage">Theme and direction coverage</h3>
+<div class="table-wrap"><table><thead><tr><th>Variant</th><th>Screenshot</th></tr></thead><tbody><tr><td>Arabic dark</td><td><code>dashboard-ar-dark.png</code>, <code>dashboard-ar-dark-full.png</code></td></tr><tr><td>Arabic light</td><td><code>dashboard-ar-light.png</code></td></tr><tr><td>English dark</td><td><code>dashboard-en-dark.png</code>, <code>dashboard-en-dark-full.png</code></td></tr><tr><td>English light</td><td><code>dashboard-en-light.png</code></td></tr><tr><td>Mobile dark / light</td><td><code>dashboard-mobile-dark.png</code>, <code>dashboard-mobile-light.png</code></td></tr><tr><td>Tablet dark</td><td><code>dashboard-tablet-dark.png</code></td></tr></tbody></table></div>
+<p>An automated test asserts that the persisted theme is applied before paint<br />
+(<code>data-theme</code> is already <code>light</code> immediately after navigation and the body<br />
+background is not navy), so theme switching does not flash.</p>
+<hr />
+<h2 id="7-screenshots">7. Screenshots</h2>
+<p>All in <code>docs/execution-reports/screenshots/</code>, captured from the running<br />
+application.</p>
+<div class="table-wrap"><table><thead><tr><th>Required capture</th><th>File</th></tr></thead><tbody><tr><td>Dashboard — Arabic dark</td><td><code>dashboard-ar-dark.png</code></td></tr><tr><td>Dashboard — Arabic light</td><td><code>dashboard-ar-light.png</code></td></tr><tr><td>Dashboard — English dark</td><td><code>dashboard-en-dark.png</code></td></tr><tr><td>Dashboard — English light</td><td><code>dashboard-en-light.png</code></td></tr><tr><td>Dashboard — mobile dark</td><td><code>dashboard-mobile-dark.png</code></td></tr><tr><td>Dashboard — mobile light</td><td><code>dashboard-mobile-light.png</code></td></tr><tr><td>Company management</td><td><code>companies-dark.png</code>, <code>companies-light.png</code></td></tr><tr><td>Subscription packages</td><td><code>plans-dark.png</code></td></tr><tr><td>Roles and permissions</td><td><code>roles-dark.png</code></td></tr><tr><td>MFA enrollment</td><td><code>mfa-enrollment-dark.png</code> (plus <code>mfa-settings-dark.png</code>)</td></tr><tr><td>MFA login challenge</td><td><code>mfa-login-challenge-dark.png</code></td></tr></tbody></table></div>
+<p>Additional: <code>dashboard-tablet-dark.png</code>, <code>dashboard-ar-dark-full.png</code>,<br />
+<code>dashboard-en-dark-full.png</code>, <code>company-admin-dark.png</code>,<br />
+<code>planned-module-dark.png</code>, <code>login-dark.png</code>, <code>login-light.png</code>.</p>
+<hr />
+<h2 id="8-functional-acceptance-matrix">8. Functional acceptance matrix</h2>
+<p>Verified by <code>apps/admin/e2e/functional.spec.ts</code>, which asserts against API<br />
+responses rather than the screen, so a success message over a failed request<br />
+cannot pass.</p>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Workflow</th><th>Verified behaviour</th><th>Result</th></tr></thead><tbody><tr><td>1</td><td>Login and logout</td><td>Real session transitions; protected routes redirect</td><td>Pass</td></tr><tr><td>2</td><td>Company creation and editing</td><td>Row exists in the database; the edit is stored</td><td>Pass</td></tr><tr><td>3</td><td>Branch creation and editing</td><td>Branch persists; the edit is stored</td><td>Pass</td></tr><tr><td>4</td><td>User invitation and account management</td><td>64-character token issued, displayed once, and redeemable</td><td>Pass</td></tr><tr><td>5</td><td>Role creation and permission assignment</td><td>Role persists with the selected permission</td><td>Pass</td></tr><tr><td>6</td><td>Module catalog administration</td><td>17 modules; <code>AVAILABLE</code> versus <code>PLANNED</code> matches what is shipped</td><td>Pass</td></tr><tr><td>7</td><td>Subscription package creation and editing</td><td>Plan persists at the given price; the edit is stored</td><td>Pass</td></tr><tr><td>8</td><td>Subscription assignment and entitlement enforcement</td><td>Starter excludes accounting; Enterprise includes the automotive modules</td><td>Pass</td></tr><tr><td>9</td><td>Dashboard filters and scoped metrics</td><td>Platform sees all companies; a company scope sees exactly one</td><td>Pass</td></tr><tr><td>10</td><td>CMS content management</td><td>A draft is absent from the public endpoint; publishing makes it appear</td><td>Pass</td></tr><tr><td>11</td><td>Application configuration and feature flags</td><td>Flag and app version persist and appear in the UI</td><td>Pass</td></tr><tr><td>12</td><td>Audit trail</td><td>Records <code>company.created</code>, <code>auth.login</code>, <code>plan.created</code>, <code>subscription.assigned</code></td><td>Pass</td></tr><tr><td>13</td><td>Authorised support sessions</td><td>Short reason rejected; session opened and ended; audited</td><td>Pass</td></tr></tbody></table></div>
+<p>**No dead buttons, fake saves, decorative forms or misleading success messages<br />
+were found.** A scan for empty click handlers, <code>href=&quot;#&quot;</code> and placeholder<br />
+comments returned nothing. Planned modules are labelled honestly.</p>
+<hr />
+<h2 id="9-test-counts-and-failures">9. Test counts and failures</h2>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Command</th><th>Tests</th><th>Result</th></tr></thead><tbody><tr><td>Authorization invariants (unit)</td><td><code>pnpm --filter @oryx/shared test</code></td><td>22</td><td><strong>22 passed</strong></td></tr><tr><td>API integration — authorization</td><td><code>pnpm --filter @oryx/api test:e2e</code></td><td>45</td><td><strong>45 passed</strong></td></tr><tr><td>API integration — MFA</td><td>(same run)</td><td>16</td><td><strong>16 passed</strong></td></tr><tr><td>API integration — rate limiting</td><td>(same run)</td><td>1</td><td><strong>1 passed</strong></td></tr><tr><td>UI — admin acceptance</td><td><code>pnpm --filter @oryx/admin test:ui</code></td><td>18</td><td><strong>18 passed</strong></td></tr><tr><td>UI — MFA and session transport</td><td>(same run)</td><td>10</td><td><strong>10 passed</strong></td></tr><tr><td>UI — responsive and bilingual</td><td>(same run)</td><td>19</td><td><strong>19 passed</strong></td></tr><tr><td>UI — functional audit</td><td>(same run)</td><td>13</td><td><strong>13 passed</strong></td></tr><tr><td>UI — screenshots</td><td>(same run)</td><td>14</td><td><strong>14 passed</strong></td></tr><tr><td>Security flow script</td><td><code>node scripts/verify-security-flow.mjs</code></td><td>23 checks</td><td><strong>23 passed</strong></td></tr><tr><td><strong>Total</strong></td><td></td><td><strong>181</strong></td><td><strong>0 failures</strong></td></tr></tbody></table></div>
+<p>Baseline for comparison: 22 unit and 45 API tests before this execution. The API<br />
+suite grew from 45 to 62; the UI suite from 29 to 74.</p>
+<h3 id="defects-found-and-fixed-during-this-execution">Defects found and fixed during this execution</h3>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Defect</th><th>Severity</th><th>Fix</th></tr></thead><tbody><tr><td>1</td><td>The header could widen the page on phones because the company and branch selectors forced a fixed minimum width</td><td>Layout, user-visible</td><td>Selectors shrink, labels collapse below <code>md</code>, the header clips</td></tr><tr><td>2</td><td>A wide dashboard chart forced horizontal page scroll on mobile because grid children could not shrink</td><td>Layout, user-visible</td><td><code>min-w-0</code> on grid children and chart wrappers</td></tr><tr><td>3</td><td>The Super Admin could not edit a company profile — <code>PATCH /companies/:id</code> accepted only the company-scope permission</td><td>Functional, blocking</td><td>The route also accepts <code>platform.company.update</code></td></tr><tr><td>4</td><td>The roles screen had no page testid in its no-company state</td><td>Testability</td><td>Testid added</td></tr></tbody></table></div>
+<hr />
+<h2 id="10-production-build-results">10. Production build results</h2>
+<div class="table-wrap"><table><thead><tr><th>Build</th><th>Command</th><th>Result</th></tr></thead><tbody><tr><td>Shared package</td><td><code>pnpm --filter @oryx/shared build</code></td><td>Clean</td></tr><tr><td>Database package</td><td><code>pnpm --filter @oryx/database build</code></td><td>Clean, Prisma client generated</td></tr><tr><td>API</td><td><code>pnpm --filter @oryx/api build</code></td><td>Clean; <code>dist/main.js</code> emitted</td></tr><tr><td>Admin app</td><td><code>pnpm --filter @oryx/admin build</code></td><td>Clean; <strong>27 routes</strong> prerendered</td></tr><tr><td>API typecheck</td><td><code>pnpm --filter @oryx/api typecheck</code></td><td>Clean</td></tr><tr><td>Admin typecheck</td><td><code>pnpm --filter @oryx/admin typecheck</code></td><td>Clean</td></tr></tbody></table></div>
+<p>Note: the workspace packages must be built before the apps, because the apps<br />
+resolve them from their compiled <code>dist/</code>. This is documented in <code>AGENTS.md</code> and<br />
+in the runbook.</p>
+<hr />
+<h2 id="11-known-limitations">11. Known limitations</h2>
+<ol><li><strong>MFA is not mandatory by default.</strong> <code>MFA_REQUIRE_SUPER_ADMIN</code> defaults to</li></ol>
+<p><code>false</code> so the seeded development flow keeps working. Set it to <code>true</code> in<br />
+production; the deployment checklist covers it.</p>
+<ol><li><strong>Access tokens still live in <code>localStorage</code>.</strong> Only the refresh token moved</li></ol>
+<p>to a cookie. An XSS payload could read a 15-minute access token. Moving the<br />
+access token to memory only is the next hardening step.</p>
+<ol><li><strong>No MFA key versioning.</strong> Rotating <code>MFA_ENCRYPTION_KEY</code> makes every existing</li></ol>
+<p>enrollment unreadable; affected users must re-enroll.</p>
+<ol><li><strong>No storage or API-request metering.</strong> <code>storageMb</code> and <code>apiRequestsPerMonth</code></li></ol>
+<p>are stored, displayed and returned but not enforced.</p>
+<ol><li><strong><code>maxCompanies</code> is not enforced</strong>; the Super Admin provisions companies.</li><li><strong>No payment gateway.</strong> Subscriptions record price, period and immutable</li></ol>
+<p>history; no charge is attempted and no integration is claimed.</p>
+<ol><li><strong>No email, SMS or push delivery.</strong> Invitation tokens are returned once by the</li></ol>
+<p>API and must be delivered out of band.</p>
+<ol><li><strong>Swagger UI is exposed</strong> at <code>/api/docs</code>. Restrict or disable it in production.</li><li><strong>Migrations are forward-only.</strong> There is no automatic down-migration; rollback</li></ol>
+<p>is a restore from the pre-migration backup.</p>
+<ol><li><strong>Mobile has no interaction test suite.</strong> Mobile is covered by screenshot and</li></ol>
+<p>overflow assertions, not by workflow interaction at phone width.</p>
+<ol><li><strong>The rate limiter is per IP.</strong> Behind a proxy that does not forward the real</li></ol>
+<p>client IP, all users share one bucket.</p>
+<hr />
+<h2 id="12-missing-assets">12. Missing assets</h2>
+<div class="table-wrap"><table><thead><tr><th>Asset</th><th>Expected location</th><th>Status</th><th>Consequence</th></tr></thead><tbody><tr><td>Official ORYX logo (<code>WhatsApp Image 2026-10-06 at 1.25.18 PM(3).jpeg</code>)</td><td><code>docs/assets/oryx-logo-original.jpg</code></td><td><strong>Absent</strong></td><td>The brand slot uses a neutral monogram placeholder. No mark was invented</td></tr><tr><td>Approved dashboard photography (original files)</td><td><code>apps/admin/public/tiles/</code></td><td><strong>Absent</strong>; crops of the approved screenshot are used instead</td><td>Tiles show genuine approved imagery but at screenshot resolution rather than original quality</td></tr></tbody></table></div>
+<p>A repository-wide search for the logo found no file: <code>docs/assets/</code> contains only<br />
+<code>ORYX Auto Services Dashboard.png</code> and <code>README.md</code>.</p>
+<hr />
+<h2 id="13-deployment-prerequisites">13. Deployment prerequisites</h2>
+<p>Full detail is in <code>docs/DEPLOYMENT.md</code>. Summary:</p>
+<div class="table-wrap"><table><thead><tr><th>Prerequisite</th><th>Requirement</th></tr></thead><tbody><tr><td>Database</td><td>PostgreSQL 15+, reachable over TLS</td></tr><tr><td>Runtime</td><td>Node.js 20+</td></tr><tr><td>HTTPS</td><td>Mandatory; session cookies are <code>Secure</code> in production</td></tr><tr><td>Secrets</td><td><code>JWT_ACCESS_SECRET</code>, <code>JWT_REFRESH_SECRET</code> and <code>MFA_ENCRYPTION_KEY</code>, each ≥ 32 random characters, from a secret manager — never from a committed file</td></tr><tr><td>Reverse proxy</td><td>Must forward <code>X-Forwarded-For</code> so rate limiting and audit see the real client IP</td></tr><tr><td>CORS</td><td>The admin origin listed exactly in <code>CORS_ORIGINS</code></td></tr><tr><td>Migrations</td><td><code>pnpm db:migrate</code>; never <code>migrate dev</code> against production</td></tr><tr><td>Backup</td><td>Verified <code>pg_dump</code> before every migration</td></tr><tr><td>Health probe</td><td><code>GET /api/health</code> returns <code>&quot;database&quot;:&quot;up&quot;</code></td></tr><tr><td>Development defaults removed</td><td>Seeded passwords changed, demo tenants archived, Swagger restricted</td></tr></tbody></table></div>
+<p><strong>Prepared but not performed.</strong> No deployment has been carried out and no<br />
+deployment is claimed.</p>
+<hr />
+<h2 id="14-final-git-commit">14. Final Git commit</h2>
+<pre><code>a56042c85e27975a4401cdc79b287901d9969233</code></pre>
+<p>Branch: <code>feature/execution-01-super-admin-foundation</code>, pushed to<br />
+<code>origin</code>. Five commits since the Execution 01 report:</p>
+<pre><code>a56042c test(audit): verify all thirteen Super Admin workflows end to end
+a32a578 test(ui): MFA, responsive and screenshot suites; fix mobile header overflow
+24d5645 feat(security): HttpOnly refresh cookies, CSRF protection and TOTP MFA
+69e498f docs: document the workspace build order requirement
+157f0cd docs(execution-01): link the opened pull request in the execution report</code></pre>
+<hr />
+<h2 id="15-pr-url-and-readiness-status">15. PR URL and readiness status</h2>
+<p><strong>Pull request:</strong> <a href="https://github.com/mohammadaljallad079-rgb/oryx/pull/1" target="_blank" rel="noopener noreferrer">https://github.com/mohammadaljallad079-rgb/oryx/pull/1</a><br />
+<strong>Status:</strong> open, updated with this execution, <strong>ready for owner review</strong>.<br />
+<strong>Not merged. Not deployed.</strong></p>
+<h3 id="strict-completion-criteria">Strict completion criteria</h3>
+<div class="table-wrap"><table><thead><tr><th>Criterion</th><th>Status</th><th>Evidence</th></tr></thead><tbody><tr><td>Existing functionality remains operational</td><td><strong>Met</strong></td><td>Baseline 22 + 45 tests still pass; the API suite grew to 62</td></tr><tr><td>Super Admin MFA works end to end</td><td><strong>Met</strong></td><td>16 API tests, 10 UI tests, 23 script checks</td></tr><tr><td>Refresh-token handling is secure</td><td><strong>Met</strong></td><td>HttpOnly cookie, no JavaScript access, CSRF double-submit, rotation and reuse detection preserved</td></tr><tr><td>Tenant isolation and delegated permissions remain intact</td><td><strong>Met</strong></td><td>Authorization suite re-asserted at the API layer</td></tr><tr><td>Dark and Light themes work across implemented screens</td><td><strong>Met</strong></td><td>Screenshots plus an automated no-flash assertion</td></tr><tr><td>The dashboard closely follows the approved design</td><td><strong>Met with disclosed gaps</strong></td><td>Approved photography now used; logo and original photography still absent</td></tr><tr><td>All critical automated tests pass</td><td><strong>Met</strong></td><td>181 tests, 0 failures</td></tr><tr><td>Production builds succeed</td><td><strong>Met</strong></td><td>Four builds clean; 27 admin routes</td></tr><tr><td>Missing assets and limitations are explicitly disclosed</td><td><strong>Met</strong></td><td>Sections 11 and 12</td></tr><tr><td>PR #1 is updated and ready for owner review</td><td><strong>Met</strong></td><td>This report and the commits above</td></tr></tbody></table></div>
+<h3 id="blocked-criteria">Blocked criteria</h3>
+<p>None. Every acceptance criterion is either met or met with an explicitly<br />
+disclosed asset limitation. The logo is the one item that cannot be resolved<br />
+without the owner supplying the original file; it is reported, not worked<br />
+around.</p>
+<h3 id="recommended-next-steps">Recommended next steps</h3>
+<ol><li>Upload the official ORYX logo and the original dashboard photography.</li><li>Set <code>MFA_REQUIRE_SUPER_ADMIN=true</code> and enroll MFA on the production Super</li></ol>
+<p>Admin before real data is loaded.</p>
+<ol><li>Move the access token out of <code>localStorage</code>.</li><li>Implement Execution 02 (Financial Accounting, Sales &amp; POS, Purchasing,</li></ol>
+<p>Reports) as real DB-backed workflows, promoting each module from <code>PLANNED</code> to<br />
+<code>AVAILABLE</code> in the shared catalog.</p>
+<ol><li>Add storage and API-request metering so those plan limits are enforced.</li></ol></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>aa1569d</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-24T02:32:08.728Z</span>
+  </div>
+</footer>
+</body>
+</html>

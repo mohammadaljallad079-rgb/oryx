@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>05 — Permanent GitHub-hosted design preview · ORYX design preview</title>
+<meta name="description" content="05 — Permanent GitHub-hosted design preview" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Execution 07 — the current execution</p>
+        <h1>05 — Permanent GitHub-hosted design preview</h1>
+        <p class="card__meta">Rendered from <code>docs/audit/exec07/05_PERMANENT_PREVIEW.md</code> at <code>aa1569d</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/audit/exec07/05_PERMANENT_PREVIEW.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#why-github-pages">Why GitHub Pages</a></li><li><a href="#how-it-is-published">How it is published</a></li><li><a href="#verification">Verification</a></li><li><a href="#note-on-the-committed-demo-credentials">Note on the committed demo credentials</a></li></ul></nav>
+        <article><h1 id="05-permanent-github-hosted-design-preview">05 — Permanent GitHub-hosted design preview</h1>
+<p>The owner rejected temporary sandbox preview links. This report records the<br />
+permanent preview and the verification behind it.</p>
+<ul><li><strong>Site:</strong> <code>https://mohammadaljallad079-rgb.github.io/oryx/</code></li><li><strong>Workflow:</strong> <code>.github/workflows/preview.yml</code></li><li><strong>Served from:</strong> the <code>gh-pages</code> branch (generated output, never edited by hand)</li><li><strong>Source:</strong> <code>feature/execution-07-premium-web</code></li></ul>
+<h2 id="why-github-pages">Why GitHub Pages</h2>
+<p>GitHub is already the source of truth for this work, so publishing the preview<br />
+from GitHub keeps one system rather than adding a second one that can drift. The<br />
+preview is generated from files committed to the branch, so it can only show<br />
+what the repository contains.</p>
+<p>The static preview is the part that can live on GitHub. The interactive<br />
+applications cannot: the API is a long-lived Node process with PostgreSQL behind<br />
+it, and GitHub Pages serves static files only. <code>docs/PREVIEW.md</code> records what a<br />
+full-stack preview would require.</p>
+<h2 id="how-it-is-published">How it is published</h2>
+<p><code>preview.yml</code> runs on every push to <code>feature/execution-07-premium-web</code>, and on<br />
+manual dispatch.</p>
+<div class="table-wrap"><table><thead><tr><th>Stage</th><th>What it does</th><th>Gate</th></tr></thead><tbody><tr><td>build</td><td><code>pnpm preview:build</code> writes <code>build/preview/</code></td><td>Fails if a surface&#39;s captures are missing</td></tr><tr><td>verify</td><td>Serves the build, drives it with Playwright, crawls every internal link and renders each page in dark mode</td><td>Fails on a broken image, console error or horizontal overflow</td></tr><tr><td>deploy</td><td>Force-updates <code>gh-pages</code>, then waits for the published URL to answer</td><td>Fails if the site does not become reachable</td></tr></tbody></table></div>
+<p>Verification blocks publication, so a bad build is never published. No<br />
+repository secret is required: the workflow uses the token GitHub issues to the<br />
+run itself.</p>
+<p>Two failures were found and fixed while bringing this up, both in the workflow<br />
+rather than the site:</p>
+<ol><li>The first deploy used <code>actions/configure-pages</code> with <code>enablement: true</code>. The</li></ol>
+<p>run token cannot create a Pages site — `Resource not accessible by<br />
+integration` — so publishing could never succeed that way.</p>
+<ol><li>The deploy job then declared the <code>github-pages</code> environment, which carries a</li></ol>
+<p>branch policy allowing only <code>gh-pages</code>. A job running on the design branch<br />
+was held by that policy and failed after the push had already succeeded.<br />
+Removing the environment reference is the correct fix; the environment does<br />
+not gate a plain branch push.</p>
+<h2 id="verification">Verification</h2>
+<p>Run <a href="https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39332710747" target="_blank" rel="noopener noreferrer"><code>39332710747</code></a><br />
+on head <code>3474568</code>: <strong>build, verify and deploy all success.</strong> CI on the same head<br />
+is also success.</p>
+<div class="table-wrap"><table><thead><tr><th>Check</th><th>Result</th></tr></thead><tbody><tr><td>Pages site reachable</td><td><code>200</code> on <code>/</code>, <code>/evidence/</code>, <code>/reports/</code>, <code>/brand/</code>, a report page and the stylesheet</td></tr><tr><td>Published <code>gh-pages</code> head</td><td><code>9d4f449</code>, committed from <code>3474568</code></td></tr><tr><td>Live render, 4 viewports</td><td><strong>0 broken images</strong></td></tr><tr><td>Internal links</td><td><strong>171 pages crawled, 0 bad responses</strong></td></tr><tr><td>Dark mode</td><td>every page rendered dark, <strong>0 issues</strong></td></tr><tr><td>Brand assets on the live site</td><td>24 images, 0 broken</td></tr></tbody></table></div>
+<p>The captures in this directory were taken from the <strong>published</strong> URL, not from a<br />
+local build, so they show what a visitor sees.</p>
+<div class="table-wrap"><table><thead><tr><th>File</th><th>Surface</th></tr></thead><tbody><tr><td><code>preview-01-home.webp</code></td><td>Homepage, desktop</td></tr><tr><td><code>preview-02-evidence.webp</code></td><td>Evidence index, desktop, top of page</td></tr><tr><td><code>preview-03-brand.webp</code></td><td>Brand assets</td></tr><tr><td><code>preview-04-mobile.webp</code></td><td>Homepage, 390 px</td></tr></tbody></table></div>
+<h2 id="note-on-the-committed-demo-credentials">Note on the committed demo credentials</h2>
+<p>Several reports under <code>docs/audit/</code> and <code>docs/execution-reports/</code> list the<br />
+seeded demo accounts and their development passwords. Those values are already<br />
+public in <code>.env.example</code>, are development defaults, and are not production<br />
+secrets. The preview publishes the reports unchanged, because they are the<br />
+evidence and redacting them would change it. They must still be replaced before<br />
+any real deployment.</p></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>aa1569d</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-24T02:32:08.728Z</span>
+  </div>
+</footer>
+</body>
+</html>

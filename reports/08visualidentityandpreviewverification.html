@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>ORYX — Visual Identity Alignment and Live Preview Verification · ORYX design preview</title>
+<meta name="description" content="ORYX — Visual Identity Alignment and Live Preview Verification" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Audit</p>
+        <h1>ORYX — Visual Identity Alignment and Live Preview Verification</h1>
+        <p class="card__meta">Rendered from <code>docs/audit/08_VISUAL_IDENTITY_AND_PREVIEW_VERIFICATION.md</code> at <code>aa1569d</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/audit/08_VISUAL_IDENTITY_AND_PREVIEW_VERIFICATION.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#why-this-report-exists">Why this report exists</a></li><li><a href="#repository-state-at-recovery">Repository state at recovery</a></li><li><a href="#live-preview-externally-verified">Live preview — externally verified</a></li><li><a href="#screenshots-of-the-live-preview">Screenshots of the live preview</a></li><li><a href="#visual-identity-alignment">Visual identity alignment</a></li><li><a href="#defect-found-and-fixed-during-preview-verification">Defect found and fixed during preview verification</a></li><li><a href="#test-results">Test results</a></li><li><a href="#remaining-blockers">Remaining blockers</a></li><li><a href="#how-to-reproduce">How to reproduce</a></li></ul></nav>
+        <article><h1 id="oryx-visual-identity-alignment-and-live-preview-verification">ORYX — Visual Identity Alignment and Live Preview Verification</h1>
+<p>Audit date: 2026-10-16<br />
+Session: recovery of the interrupted audit conversation, then final visual<br />
+identity alignment and external preview verification.</p>
+<h2 id="why-this-report-exists">Why this report exists</h2>
+<p>The previous conversation crashed mid-task. On recovery the repository state was<br />
+re-checked against GitHub before any work continued, and the two owner<br />
+requirements that were still open were finished:</p>
+<ol><li>the <strong>working HTTPS preview links</strong> the owner needs in order to review the</li></ol>
+<p>real platform, and</p>
+<ol><li>the <strong>visual identity alignment</strong> that was in progress when the session died.</li></ol>
+<h2 id="repository-state-at-recovery">Repository state at recovery</h2>
+<div class="table-wrap"><table><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody><tr><td>PR #5 (<code>feature/execution-05-platform-completion</code>)</td><td><strong>MERGED</strong> 2026-10-16T18:10:37Z — merge commit <code>fc2ab20</code></td></tr><tr><td><code>main</code> head at recovery</td><td><code>699560c</code> (&quot;Add files via upload&quot; — the official logo)</td></tr><tr><td>Execution 05 head</td><td><code>7db9689</code></td></tr><tr><td>Recovery branch</td><td><code>audit/execution-05-verification</code></td></tr><tr><td>Open PR</td><td><strong>#6</strong></td></tr><tr><td>Audited head</td><td><code>18e47f0</code></td></tr><tr><td>CI on audited head</td><td>typecheck + unit/API + browser — <strong>all green</strong></td></tr></tbody></table></div>
+<p>The task brief described PR #5 as open and unmerged. That is <strong>not</strong> the case:<br />
+PR #5 is merged, so it takes no further commits. The audit work therefore lands<br />
+on <code>audit/execution-05-verification</code> and PR #6, which is based on the same tree.<br />
+This is stated rather than silently worked around, because the brief&#39;s<br />
+instruction to &quot;push to the existing Execution 05 branch and update PR #5&quot; cannot<br />
+be executed against a merged pull request.</p>
+<p>No reset, force-push or history rewrite was performed. Every commit from<br />
+Executions 01–05 is intact.</p>
+<h2 id="live-preview-externally-verified">Live preview — externally verified</h2>
+<p>Both hosts terminate TLS at the platform ingress and proxy <code>/api</code> to the API, so<br />
+the browser sees a single same-origin API and the HttpOnly refresh cookie and<br />
+CSRF double-submit both work.</p>
+<div class="table-wrap"><table><thead><tr><th>Host</th><th>Serves</th></tr></thead><tbody><tr><td><code>https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev</code></td><td>Super Admin control plane and every ERP module</td></tr><tr><td><code>https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev</code></td><td>Customer website, customer dashboard, mobile web preview</td></tr></tbody></table></div>
+<p>The route sweep in <code>.run/verify-preview.mjs</code> requests each URL over the public<br />
+HTTPS ingress — the same path a reviewer&#39;s browser takes, not localhost — and<br />
+reports the status and response size.</p>
+<div class="table-wrap"><table><thead><tr><th>Sweep</th><th>Result</th></tr></thead><tbody><tr><td>Admin / ERP / control-plane routes on host 1</td><td><strong>31 / 31 returned 200</strong></td></tr><tr><td>Customer and mobile routes on host 2</td><td><strong>15 / 15 returned 200</strong></td></tr><tr><td>API health on host 1 (<code>/api/health</code>)</td><td><strong>1 / 1 returned 200</strong></td></tr><tr><td><strong>Total</strong></td><td><strong>47 / 47 returned a success status</strong></td></tr></tbody></table></div>
+<h3 id="demo-credentials">Demo credentials</h3>
+<p>All demo data is synthetic, seeded by <code>packages/database/prisma/seed.ts</code>. The<br />
+passwords are development values from <code>.env.example</code>, not production secrets.</p>
+<div class="table-wrap"><table><thead><tr><th>Role</th><th>Email</th><th>Password</th></tr></thead><tbody><tr><td>Super Admin (platform)</td><td><code>superadmin@oryx.local</code></td><td><code>ChangeMe!Oryx2026</code></td></tr><tr><td>Enterprise company admin</td><td><code>admin@oryx-auto.local</code></td><td><code>ChangeMe!Oryx2026</code></td></tr><tr><td>Demo SaaS tenant admin</td><td><code>admin@demo-alnoor.local</code></td><td><code>ChangeMe!Oryx2026</code></td></tr><tr><td>Customer / consumer</td><td><code>customer@oryx-demo.local</code></td><td><code>OryxDemo!2026</code></td></tr></tbody></table></div>
+<p>Both a staff login and a consumer login were executed against the <strong>public</strong><br />
+hosts and returned <code>200</code> with a session, so the credentials above are verified,<br />
+not assumed.</p>
+<h2 id="screenshots-of-the-live-preview">Screenshots of the live preview</h2>
+<p><code>docs/audit/branding/public/</code> holds captures taken through the public HTTPS<br />
+ingress in a real headless Chromium. They are grouped by the fourteen preview<br />
+surfaces the owner asked to inspect.</p>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Preview surface</th><th>Screenshot</th><th>Role</th></tr></thead><tbody><tr><td>1</td><td>Super Admin dashboard</td><td><code>01-super-admin-dashboard.png</code></td><td>Super Admin</td></tr><tr><td>2</td><td>Company ERP dashboard</td><td><code>02-company-erp-dashboard.png</code></td><td>Enterprise admin</td></tr><tr><td>3</td><td>Accounting</td><td><code>03-accounting.png</code></td><td>Enterprise admin</td></tr><tr><td>4</td><td>Sales / POS</td><td><code>04-sales-pos.png</code></td><td>Enterprise admin</td></tr><tr><td>5</td><td>Inventory</td><td><code>05-inventory.png</code></td><td>Enterprise admin</td></tr><tr><td>6</td><td>Procurement</td><td><code>06-procurement.png</code></td><td>Enterprise admin</td></tr><tr><td>7</td><td>HR / payroll</td><td><code>07-hr-payroll.png</code></td><td>Enterprise admin</td></tr><tr><td>8</td><td>CRM</td><td><code>08-crm.png</code></td><td>Enterprise admin</td></tr><tr><td>9</td><td>Automotive operations</td><td><code>09-automotive-operations.png</code></td><td>Enterprise admin</td></tr><tr><td>10</td><td>Workshop / maintenance</td><td><code>10-workshop-maintenance.png</code></td><td>Enterprise admin</td></tr><tr><td>11</td><td>Provider portal</td><td><code>11-provider-portal.png</code></td><td>Enterprise admin</td></tr><tr><td>12</td><td>Customer website + dashboard</td><td><code>12a-…</code>, <code>12b-…</code></td><td>Customer</td></tr><tr><td>13</td><td>External Integrations Center</td><td><code>13-integrations-center.png</code></td><td>Super Admin</td></tr><tr><td>14</td><td>Mobile app (Expo web export)</td><td><code>14a…14e</code></td><td>Customer</td></tr></tbody></table></div>
+<p>The five mobile captures are taken at a 430 × 932 phone viewport, because the<br />
+Expo web export is a phone layout; a desktop viewport wastes most of the frame.<br />
+They are produced by signing in once and then navigating with the app&#39;s own tab<br />
+bar, because the customer session lives in memory and a per-screen URL reload<br />
+drops the token — the behaviour already recorded in the mobile gotchas in<br />
+<code>AGENTS.md</code>.</p>
+<h2 id="visual-identity-alignment">Visual identity alignment</h2>
+<h3 id="official-assets-now-present">Official assets now present</h3>
+<p>The owner uploaded the official artwork, so the &quot;missing asset&quot; blocker recorded<br />
+in earlier reports is resolved for the logo:</p>
+<div class="table-wrap"><table><thead><tr><th>Asset</th><th>Location</th><th>Notes</th></tr></thead><tbody><tr><td>Official logo</td><td><code>docs/assets/logo.png.jpeg</code></td><td>2000 × 2000 source frame, uploaded in <code>699560c</code></td></tr><tr><td>Dashboard reference</td><td><code>docs/assets/ORYX Auto Services Dashboard.png</code></td><td>1536 × 1024 dark-theme design reference</td></tr></tbody></table></div>
+<h3 id="what-was-wrong">What was wrong</h3>
+<p>The admin sidebar, the admin login page and the customer site header each<br />
+rendered a <strong>hand-drawn geometric monogram placeholder</strong> — a diamond and circle<br />
+drawn in SVG — because the official logo was not in the repository. The<br />
+placeholder was honest about its status, but it is not the approved identity.</p>
+<h3 id="what-changed">What changed</h3>
+<div class="table-wrap"><table><thead><tr><th>Change</th><th>File</th></tr></thead><tbody><tr><td>Logo knock-out and colourways derived from the official asset</td><td><code>apps/admin/public/brand/oryx-logo-on-{dark,light}.png</code> (1404 × 320, alpha)</td></tr><tr><td>Same assets for the customer app</td><td><code>apps/customer/public/brand/</code></td></tr><tr><td>Reusable theme-swapped lockup component</td><td><code>apps/admin/src/components/brand-logo.tsx</code>, <code>apps/customer/src/components/brand-logo.tsx</code></td></tr><tr><td>Placeholder replaced in the sidebar</td><td><code>apps/admin/src/components/sidebar.tsx</code></td></tr><tr><td>Placeholder replaced on the login page</td><td><code>apps/admin/src/app/login/page.tsx</code></td></tr><tr><td>Placeholder replaced in the customer header</td><td><code>apps/customer/src/components/site-chrome.tsx</code></td></tr><tr><td>Lockup styles</td><td><code>apps/admin/src/app/globals.css</code>, <code>apps/customer/src/app/globals.css</code></td></tr></tbody></table></div>
+<p>The lockup is one raster image per colourway, stacked and swapped by<br />
+<code>data-theme</code>; the inactive one is hidden rather than unmounted so it is already<br />
+decoded when the theme changes.</p>
+<h3 id="verified-rendering">Verified rendering</h3>
+<p><code>.run/probe-brand.mjs</code> reads the rendered element in a real browser. It reports<br />
+the natural size, the on-screen box, and the dominant ink colours, so an<br />
+inverted or unloaded image is visible in the output.</p>
+<div class="table-wrap"><table><thead><tr><th>App</th><th>Theme</th><th>Visible source</th><th>Natural</th><th>Box</th><th>Dominant ink</th></tr></thead><tbody><tr><td>Admin</td><td>dark</td><td><code>oryx-logo-on-dark.png</code></td><td>1404 × 320</td><td>167 × 38</td><td>near-black background with navy ink</td></tr><tr><td>Admin</td><td>light</td><td><code>oryx-logo-on-light.png</code></td><td>1404 × 320</td><td>167 × 38</td><td>near-white background with navy ink</td></tr><tr><td>Customer</td><td>dark</td><td><code>oryx-logo-on-dark.png</code></td><td>1404 × 320</td><td>132 × 30</td><td>near-black background with navy ink</td></tr><tr><td>Customer</td><td>light</td><td><code>oryx-logo-on-light.png</code></td><td>1404 × 320</td><td>132 × 30</td><td>near-white background with navy ink</td></tr></tbody></table></div>
+<p>Both apps therefore show the official lockup, and the colourway follows the<br />
+theme. The regression guard is <code>apps/admin/e2e/branding.spec.ts</code>.</p>
+<h3 id="defect-fixed-rtl-sidebar-direction">Defect fixed: RTL sidebar direction</h3>
+<p>The sidebar swapped sides <strong>twice</strong> under Arabic RTL, landing back on the left.<br />
+The cause was a redundant direction override in <code>apps/admin/src/app/globals.css</code><br />
+on top of the <code>dir</code> attribute the UI provider already sets on <code>&lt;html&gt;</code>. Removing<br />
+the override restores a single swap. Verified: the sidebar sits at <code>x = 1268</code> in<br />
+Arabic RTL and <code>x = 0</code> in English LTR, and the <code>branding.spec.ts</code> direction test<br />
+guards it.</p>
+<h2 id="defect-found-and-fixed-during-preview-verification">Defect found and fixed during preview verification</h2>
+<h3 id="preview-logins-failed-from-the-public-host-cors">Preview logins failed from the public host (CORS)</h3>
+<p><strong>Symptom.</strong> Signing in through the public HTTPS URL failed with<br />
+`Access to fetch at &#39;http://localhost:3001/api/v1/auth/login&#39; … has been blocked<br />
+by CORS policy<code>. The login form stayed on </code>/login` and reported invalid<br />
+credentials.</p>
+<p><strong>Cause.</strong> The admin client bundle had <code>http://localhost:3001/api</code> baked into it<br />
+as the API base. The build had inherited an exported<br />
+<code>NEXT_PUBLIC_API_BASE_URL</code> from the shell environment used to run the test<br />
+harness. An exported process variable takes precedence over <code>.env.local</code> in<br />
+Next.js, so the value that reached the bundle was the localhost one even though<br />
+<code>.env.local</code> correctly said <code>/api</code>.</p>
+<p><strong>Fix.</strong> Rebuilt both front ends from a clean environment. <code>.env.local</code> already<br />
+contained the correct relative value (<code>NEXT_PUBLIC_API_BASE_URL=/api</code>), which<br />
+resolves same-origin through the reverse proxy, so no source change was needed —<br />
+the committed configuration was always right.</p>
+<p><strong>Verification.</strong> <code>grep -r &#39;http://localhost:3001&#39; apps/*/.next/static/</code> returns<br />
+nothing after the rebuild, and both logins now succeed over the public host.</p>
+<p>This is recorded because it is a <strong>deployment hazard</strong>, not just a local<br />
+accident: any build pipeline that exports <code>NEXT_PUBLIC_API_BASE_URL</code> will<br />
+silently override <code>.env.local</code> and ship a preview that cannot authenticate.</p>
+<h2 id="test-results">Test results</h2>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Result</th></tr></thead><tbody><tr><td><code>@oryx/shared</code> unit</td><td><strong>93 passed</strong> (5 files)</td></tr><tr><td><code>@oryx/mobile</code> unit</td><td><strong>20 passed</strong> (3 files)</td></tr><tr><td><code>@oryx/admin</code> browser, <code>branding.spec.ts</code></td><td><strong>4 passed</strong></td></tr><tr><td><code>@oryx/admin</code> browser, full suite</td><td><strong>130 passed, 0 failed</strong></td></tr><tr><td><code>@oryx/api</code> integration</td><td><strong>218 passed</strong> (8 suites)</td></tr></tbody></table></div>
+<h3 id="ci">CI</h3>
+<p>GitHub Actions run <code>38983157027</code> on head <code>dea5750</code>, workflow &quot;Audit — Execution<br />
+05 live preview, specification parity and functional audit&quot;:</p>
+<div class="table-wrap"><table><thead><tr><th>Job</th><th>Result</th></tr></thead><tbody><tr><td>Typecheck and build</td><td><strong>pass</strong> (2m33s)</td></tr><tr><td>Unit and API integration tests</td><td><strong>pass</strong> (1m43s)</td></tr><tr><td>Browser acceptance tests</td><td><strong>pass</strong> (6m58s)</td></tr></tbody></table></div>
+<p>All three jobs pass on the pushed head. The run before it, on <code>4c833bc</code>, failed<br />
+only at <code>pnpm --filter @oryx/admin lint</code> — the <code>&lt;img&gt;</code> warnings and the <code>module</code><br />
+binding from this session&#39;s own new files — and that is fixed in <code>95d8130</code>.</p>
+<h2 id="remaining-blockers">Remaining blockers</h2>
+<div class="table-wrap"><table><thead><tr><th>Blocker</th><th>Status</th></tr></thead><tbody><tr><td>Official <strong>light-theme</strong> design reference</td><td><strong>Missing.</strong> Only the dark-theme dashboard reference exists. The light theme is implemented to mirror the dark layout, but it is not verified against an approved light reference.</td></tr><tr><td>Full visual parity</td><td><strong>Not claimed.</strong> The approved dashboard photography was never supplied. Every tile is original vector artwork generated in-repo (<code>scripts/generate-tile-art.py</code>) and the approved reference is never used as artwork; palette and structure agree, pixel parity is not asserted.</td></tr><tr><td>Preview hosting</td><td>The preview runs on the sandbox ingress. There is no owner-controlled staging host or CI deployment target; the links live only as long as this sandbox does.</td></tr><tr><td>Production secrets</td><td>None are present, by design. Every external gateway is <code>ADAPTER_ONLY</code> and reports itself unconfigured.</td></tr></tbody></table></div>
+<h2 id="how-to-reproduce">How to reproduce</h2>
+<pre><code class="language-bash">pnpm install
+cp .env.example .env
+pnpm db:generate &amp;&amp; pnpm db:migrate &amp;&amp; pnpm db:seed
+pnpm --filter @oryx/shared build &amp;&amp; pnpm --filter @oryx/database build
+pnpm dev:api      # :3001
+pnpm dev:admin    # :3000
+pnpm dev:customer # :3002
+
+node .run/verify-preview.mjs   # external route sweep
+node .run/capture-public.mjs   # public-ingress screenshots (admin + customer)
+node .run/capture-mobile.mjs   # mobile screenshots, via the app&#39;s own tab bar
+node .run/probe-brand.mjs      # rendered brand lockup
+node .run/gen-brand.cjs        # regenerate both apps&#39; logo assets from the source</code></pre>
+<p><code>pnpm -r lint</code> runs <code>eslint . --max-warnings=0</code>; <code>pnpm --filter @oryx/admin lint</code>,<br />
+<code>--filter @oryx/customer lint</code> and <code>--filter @oryx/mobile lint</code> all pass.</p></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>aa1569d</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-24T02:32:08.728Z</span>
+  </div>
+</footer>
+</body>
+</html>

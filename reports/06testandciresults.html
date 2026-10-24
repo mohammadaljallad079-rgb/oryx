@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>ORYX — Test and CI Results · ORYX design preview</title>
+<meta name="description" content="ORYX — Test and CI Results" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Audit</p>
+        <h1>ORYX — Test and CI Results</h1>
+        <p class="card__meta">Rendered from <code>docs/audit/06_TEST_AND_CI_RESULTS.md</code> at <code>aa1569d</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/audit/06_TEST_AND_CI_RESULTS.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#summary">Summary</a></li><li><a href="#shared-unit-96-tests">Shared unit — 96 tests</a></li><li><a href="#api-integration-229-tests">API integration — 229 tests</a></li><li><a href="#admin-browser-141-tests">Admin browser — 141 tests</a></li><li><a href="#mobile-unit-20-tests">Mobile unit — 20 tests</a></li><li><a href="#ci">CI</a></li><li><a href="#notes">Notes</a></li></ul></nav>
+        <article><h1 id="oryx-test-and-ci-results">ORYX — Test and CI Results</h1>
+<p>Audit date: 2026-10-16. Re-verified 2026-10-17 after a sandbox recycle, again<br />
+2026-10-17 (evening) after the crash-recovery session that fixed the Super Admin<br />
+login and completed the external preview sweep, and again 2026-10-18 for the<br />
+Execution 06 follow-up (iPad auth, dual Super Admin, unique dashboard art,<br />
+responsive sweep, defensive input validation).<br />
+Environment: staging stack (API 3001, admin 3000, customer 3002, mobile-web 8081,<br />
+preview proxies 12000/12001, PostgreSQL 17 <code>oryx_staging</code>), seeded demo data.<br />
+nginx is no longer part of the stack — the two preview proxies serve the ingress<br />
+ports directly.</p>
+<h2 id="summary">Summary</h2>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Command</th><th>Result</th></tr></thead><tbody><tr><td>Shared unit</td><td><code>pnpm --filter @oryx/shared test</code></td><td><strong>96 passed</strong> (5 files)</td></tr><tr><td>API integration</td><td><code>pnpm --filter @oryx/api test:e2e</code></td><td><strong>277 passed</strong> (13 suites)</td></tr><tr><td>Admin browser</td><td><code>ORYX_ADMIN_URL=http://localhost:12000 pnpm --filter @oryx/admin exec playwright test</code></td><td><strong>184 passed, 1 skipped, 0 failed</strong></td></tr><tr><td>Mobile unit</td><td><code>pnpm --filter @oryx/mobile test</code></td><td><strong>20 passed</strong> (3 files)</td></tr><tr><td>Public preview sweep</td><td><code>.run/sweep-preview.mjs</code></td><td><strong>39/39 routes, 0 failed requests</strong></td></tr><tr><td>Module API probe</td><td><code>.run/probe-modules.mjs</code></td><td><strong>96/96 surfaces 200</strong></td></tr><tr><td><strong>Total (test runners)</strong></td><td></td><td><strong>577 passed, 0 failed</strong></td></tr></tbody></table></div>
+<h3 id="execution-06-follow-up-2026-10-18">Execution 06 follow-up, 2026-10-18</h3>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Result</th></tr></thead><tbody><tr><td><code>@oryx/shared</code> unit</td><td><code>Test Files 5 passed</code> / <code>Tests 96 passed</code></td></tr><tr><td><code>@oryx/api</code> integration</td><td><code>Test Suites: 13 passed, 13 total</code> / <code>Tests: 277 passed</code>, <code>EXIT=0</code></td></tr><tr><td><code>@oryx/admin</code> browser (full suite)</td><td><code>184 passed</code>, <code>1 skipped</code>, <code>0 failed</code>, <code>EXIT=0</code> (7.2m)</td></tr><tr><td><code>@oryx/mobile</code> unit</td><td><code>Test Files 3 passed</code> / <code>Tests 20 passed</code></td></tr><tr><td>Public preview sweep</td><td><strong>39 / 39</strong> routes success, <strong>0</strong> failed requests</td></tr><tr><td>Module API probe</td><td><strong>96 / 96</strong> module surfaces returned 200 with real rows</td></tr></tbody></table></div>
+<p>The API count rose from 229 to 277 with four new suites:<br />
+<code>input-validation.e2e-spec.ts</code> (the 500→400 hardening, 11 tests),<br />
+<code>dual-super-admin.e2e-spec.ts</code> (two platform principals), <code>reauth-stale-cookie.e2e-spec.ts</code><br />
+(re-login with a stale refresh cookie — the iPad lockout) and<br />
+<code>permissions-verification.e2e-spec.ts</code>. The browser count rose from 141 to 184<br />
+with <code>responsive-matrix.spec.ts</code>, <code>functional-audit-exec06.spec.ts</code> and<br />
+<code>branding.spec.ts</code> plus new assertions in <code>super-admin-access.spec.ts</code>.</p>
+<h3 id="recovery-session-2026-10-17-second-crash-theme-flash-fix">Recovery session, 2026-10-17 (second crash) — theme flash fix</h3>
+<p>A second interrupted session left one uncommitted change: the theme-flash fix in<br />
+<code>apps/admin</code> and <code>apps/customer</code> (defect 15 in <code>04_FIXED_DEFECTS.md</code>). It was<br />
+completed, verified and covered by a new regression test.</p>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Result</th></tr></thead><tbody><tr><td><code>@oryx/admin</code> browser (full suite)</td><td><code>141 passed</code>, <code>1 skipped</code>, <code>0 failed</code>, <code>EXIT=0</code> (4.8m)</td></tr><tr><td><code>@oryx/admin</code> typecheck</td><td><code>tsc --noEmit</code> clean</td></tr><tr><td><code>@oryx/customer</code> typecheck</td><td><code>tsc --noEmit</code> clean</td></tr><tr><td>Theme first-paint probe (<code>.run/theme-verify.mjs</code>)</td><td>3 consecutive runs, <code>light_ok: true</code>, <code>dark_ok: true</code></td></tr></tbody></table></div>
+<p>The browser count rose from 140 to 141 with the new<br />
+<code>admin.spec.ts</code> test &quot;the stored theme is applied before the first paint and is<br />
+not reverted&quot;, which asserts for both themes that the attribute at first paint,<br />
+the attribute after hydration and the stored value all agree.</p>
+<h3 id="recovery-session-2026-10-17-third-crash-super-admin-permission-drift">Recovery session, 2026-10-17 (third crash) — Super Admin permission drift</h3>
+<p>A third interrupted session left the API suite failing 4 tests that had passed on<br />
+the same commit before the crash. The cause was a non-idempotent seed, not a code<br />
+change: <code>seedPlatformRoles()</code> keyed its upsert on a sentinel <code>companyId</code> that can<br />
+never match a <code>NULL</code> platform row, so every re-seed inserted a duplicate<br />
+<code>platform_super_admin</code> role. <code>findFirst</code> then resolved the stale row holding only<br />
+the 18 PLATFORM-scope permissions, and the Super Admin lost all 135 company-scope<br />
+permissions. See defect 16 in <code>04_FIXED_DEFECTS.md</code>.</p>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Result</th></tr></thead><tbody><tr><td><code>@oryx/shared</code> unit</td><td><code>Test Files 5 passed</code> / <code>Tests 96 passed</code></td></tr><tr><td><code>@oryx/api</code> integration</td><td><code>Test Suites: 10 passed, 10 total</code> / <code>Tests: 246 passed</code>, <code>EXIT=0</code></td></tr><tr><td><code>@oryx/api</code> targeted (<code>super-admin-access</code>, <code>permissions-verification</code>)</td><td><code>25 passed</code>, <code>EXIT=0</code></td></tr><tr><td><code>@oryx/admin</code> browser (full suite, via the local proxy origin)</td><td><code>141 passed</code>, <code>1 skipped</code>, <code>0 failed</code>, <code>EXIT=0</code> (4.9m)</td></tr><tr><td>Seed idempotency</td><td>re-run <code>pnpm db:seed</code>: exactly 1 platform role, 153 permissions</td></tr><tr><td>Live HTTPS login probe</td><td>Super Admin <code>scopedPerms=153</code> (was 18)</td></tr><tr><td>Live HTTPS ERP probe</td><td>accounting <code>200</code>, sales <code>200</code>, inventory <code>200</code>, HR <code>200</code>, CRM <code>200</code>, modules <code>200</code></td></tr><tr><td>Public preview sweep</td><td><code>39 / 39</code> routes <code>200</code>, <code>0</code> failed requests</td></tr><tr><td>Responsive / locale / theme matrix</td><td><code>12 / 12</code> combinations, <code>0</code> horizontal overflow</td></tr></tbody></table></div>
+<p>Run the browser suite through the proxy origin (<code>ORYX_ADMIN_URL=http://localhost:12000</code>),<br />
+not the bare Next server on <code>:3000</code>. The admin bundle now calls a same-origin<br />
+<code>/api</code>, which only the proxy forwards, and a few specs <code>fetch</code> the absolute<br />
+<code>http://localhost:3001/api/v1</code> from inside <code>page.evaluate</code>. Against the public<br />
+<strong>HTTPS</strong> origin that absolute <code>http</code> fetch is blocked as mixed content, so those<br />
+specs fail with <code>TypeError: Failed to fetch</code> even though the product works. The<br />
+HTTP proxy origin satisfies both forms.</p>
+<p>The API count rose from 245 to 246 with the new regression test &quot;has exactly one<br />
+platform super admin role carrying the whole catalog&quot;.</p>
+<blockquote><p><strong>Repository state correction.</strong> The recovery brief named PR #5 and branch<br />
+<code>feature/execution-05-platform-completion</code> as the open work. Both are already<br />
+merged into <code>main</code> (<code>fc2ab20</code>, with <code>7db9689</code> among its commits). The open pull<br />
+request is <strong>#6</strong> (<code>audit/execution-05-verification</code> → <code>main</code>), and this work is<br />
+pushed there. The owner&#39;s <code>699560c</code> (&quot;Add files via upload&quot;, the ORYX logo) is<br />
+the current <code>main</code> head and is included in this branch.</p></blockquote>
+<p>The public preview sweep is <code>docs/audit/evidence/preview-sweep-2026-10-17.json</code><br />
+and its log. It drives a real browser over the public HTTPS ingress, signs in as<br />
+the Super Admin, selects the Enterprise tenant through the header control, then<br />
+visits each ERP surface and records every response <code>&gt;= 400</code>. It then repeats the<br />
+exercise for the customer surfaces in a fresh browser context.</p>
+<h3 id="recovery-session-2026-10-17-morning">Recovery session, 2026-10-17 (morning)</h3>
+<p>The sandbox image was recycled between sessions, which removed PostgreSQL, pnpm,<br />
+the proxy and the Playwright browser cache while leaving the seeded cluster<br />
+intact. After the self-healing recovery (defect 11 in report 04) the suites were<br />
+re-run against the rebuilt stack:</p>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Result</th></tr></thead><tbody><tr><td><code>@oryx/shared</code> unit</td><td><code>Test Files 5 passed</code> / <code>Tests 93 passed</code></td></tr><tr><td><code>@oryx/api</code> integration</td><td><code>Test Suites: 8 passed, 8 total</code> / <code>Tests: 220 passed</code></td></tr><tr><td><code>@oryx/admin</code> browser — <code>branding.spec.ts</code></td><td><code>5 passed</code></td></tr><tr><td><code>@oryx/admin</code> browser — <code>auth-lifecycle.spec.ts</code></td><td><code>18 passed</code></td></tr><tr><td><code>@oryx/admin</code> typecheck</td><td><code>tsc --noEmit</code> clean</td></tr><tr><td><code>@oryx/admin</code> lint</td><td><code>eslint . --max-warnings=0</code> clean</td></tr><tr><td>Public preview sweep</td><td><code>47 / 47</code> routes returned <code>200</code></td></tr></tbody></table></div>
+<p>Live sign-out verification over public HTTPS (<code>.run/verify-logout.mjs</code>): the<br />
+refresh cookie <code>oryx_rt</code> is present before sign-out, the logout call returns<br />
+<code>200</code>, all cookies are cleared afterwards, and a protected route then redirects<br />
+to <code>/login</code>.</p>
+<p>Locale, theme and viewport matrix (<code>.run/variants.mjs</code>), 12 combinations:</p>
+<div class="table-wrap"><table><thead><tr><th>Locale</th><th>Theme</th><th>Desktop</th><th>Tablet</th><th>Mobile</th></tr></thead><tbody><tr><td>Arabic</td><td>dark</td><td>ok, <code>dir=rtl</code></td><td>ok, <code>dir=rtl</code></td><td>ok, <code>dir=rtl</code></td></tr><tr><td>Arabic</td><td>light</td><td>ok, <code>dir=rtl</code></td><td>ok, <code>dir=rtl</code></td><td>ok, <code>dir=rtl</code></td></tr><tr><td>English</td><td>dark</td><td>ok, <code>dir=ltr</code></td><td>ok, <code>dir=ltr</code></td><td>ok, <code>dir=ltr</code></td></tr><tr><td>English</td><td>light</td><td>ok, <code>dir=ltr</code></td><td>ok, <code>dir=ltr</code></td><td>ok, <code>dir=ltr</code></td></tr></tbody></table></div>
+<p>No horizontal overflow was measured in any combination, and the sign-out control<br />
+was present in all 12. Module captures: <code>21 / 21</code> authenticated admin modules<br />
+rendered with the sign-out control visible.</p>
+<p>The browser suite must run through the reverse proxy, because the admin bundle<br />
+calls the API same-origin (<code>NEXT_PUBLIC_API_BASE_URL=/api</code> in<br />
+<code>apps/admin/.env.local</code>). Against the bare app port every authenticated test<br />
+fails identically at login with a <code>404</code>:</p>
+<pre><code class="language-bash">ORYX_ADMIN_URL=http://localhost:12000 \
+AUTH_THROTTLE_LIMIT=100000 THROTTLE_LIMIT=1000000 REFRESH_THROTTLE_LIMIT=100000 \
+pnpm --filter @oryx/admin test:ui</code></pre>
+<p>Per-spec counts for the browser suite, from the run log:</p>
+<div class="table-wrap"><table><thead><tr><th>Spec</th><th>Tests</th></tr></thead><tbody><tr><td><code>screenshots.spec.ts</code></td><td>19</td></tr><tr><td><code>responsive.spec.ts</code></td><td>19</td></tr><tr><td><code>admin.spec.ts</code></td><td>19</td></tr><tr><td><code>super-admin-access.spec.ts</code></td><td>6</td></tr><tr><td><code>auth-lifecycle.spec.ts</code></td><td>14</td></tr><tr><td><code>functional.spec.ts</code></td><td>13</td></tr><tr><td><code>mfa.spec.ts</code></td><td>10</td></tr><tr><td><code>execution03.spec.ts</code></td><td>9</td></tr><tr><td><code>erp.spec.ts</code></td><td>8</td></tr><tr><td><code>execution05.spec.ts</code></td><td>6</td></tr><tr><td><code>execution04.spec.ts</code></td><td>5</td></tr><tr><td><code>branding.spec.ts</code></td><td>5</td></tr><tr><td><code>audit.spec.ts</code></td><td>4</td></tr><tr><td><strong>Total</strong></td><td><strong>141 passed</strong> (plus <code>capture.spec.ts</code>, skipped)</td></tr></tbody></table></div>
+<p><code>capture.spec.ts</code> is a manual capture tool, not a regression test; it now skips<br />
+unless <code>CAPTURE_PHASE</code> is set, so it no longer runs — and no longer rewrites the<br />
+audit images — during <code>test:ui</code>.</p>
+<h3 id="ci-is-green-on-head-a14d7b2">CI is green on head <code>a14d7b2</code></h3>
+<p>Run <a href="https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39064154769" target="_blank" rel="noopener noreferrer"><code>39064154769</code></a><br />
+on <code>audit/execution-05-verification</code> completed with conclusion <strong>success</strong> — all<br />
+three jobs green, including step 16 (browser acceptance):</p>
+<div class="table-wrap"><table><thead><tr><th>Job</th><th>Result</th></tr></thead><tbody><tr><td>Typecheck and build</td><td>success</td></tr><tr><td>Unit and API integration tests</td><td>success</td></tr><tr><td>Browser acceptance tests</td><td>success</td></tr></tbody></table></div>
+<p>The previous head <code>a327f9e</code> was also green<br />
+(<a href="https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39052159810" target="_blank" rel="noopener noreferrer"><code>39052159810</code></a>),<br />
+and <code>06ed1c0</code> before it failed on the concurrent-refresh session loss (defect 12<br />
+in report 04), which is fixed.</p>
+<h3 id="ci-is-green-on-head-a327f9e">CI is green on head <code>a327f9e</code></h3>
+<p>Run <a href="https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39052159810" target="_blank" rel="noopener noreferrer"><code>39052159810</code></a><br />
+on <code>audit/execution-05-verification</code> completed with conclusion <strong>success</strong> — all<br />
+three jobs, including step 16 (browser acceptance), the step that had been<br />
+failing on the previous head <code>06ed1c0</code>:</p>
+<div class="table-wrap"><table><thead><tr><th>Job</th><th>Result</th></tr></thead><tbody><tr><td>Typecheck and build</td><td>success (23/23 steps)</td></tr><tr><td>Unit and API integration tests</td><td>success (19/19 steps)</td></tr><tr><td>Browser acceptance tests</td><td>success (step 16 green)</td></tr></tbody></table></div>
+<p>The failure on <code>06ed1c0</code> was the concurrent-refresh session loss (defect 12 in<br />
+report 04). It is fixed, and the multi-tab test was re-run 5 times consecutively<br />
+locally, passing 5/5, where the failure had previously been reproducible.</p>
+<h3 id="the-mixed-content-trap-when-pointing-the-suite-at-the-public-host">The mixed-content trap when pointing the suite at the public host</h3>
+<p>Running the suite with <code>ORYX_ADMIN_URL=https://work-1-…all-hands.dev</code> passes most<br />
+specs but fails exactly the 12 that call <code>page.evaluate(() =&gt; fetch(&#39;http://localhost:3001/…&#39;))</code><br />
+directly — a plain-HTTP fetch from an HTTPS page, which the browser blocks as<br />
+mixed content and Playwright reports as <code>TypeError: Failed to fetch</code>. The 12 are<br />
+<code>admin.spec.ts</code> (2), <code>auth-lifecycle.spec.ts</code> (2), <code>erp.spec.ts</code> (5),<br />
+<code>functional.spec.ts</code> (1), <code>mfa.spec.ts</code> (2). Use the local proxy URL<br />
+(<code>http://localhost:12000</code>) as the report above does; the public HTTPS host is for<br />
+the owner&#39;s browser, not for the Node-driven harness.</p>
+<p>The same 10–12 specs also fail if the proxy is addressed as<br />
+<code>http://127.0.0.1:12000</code> rather than <code>http://localhost:12000</code>: the API&#39;s<br />
+<code>CORS_ORIGINS</code> defaults to <code>http://localhost:3000</code>, so a page served from the<br />
+<code>127.0.0.1</code> origin is refused with <code>TypeError: Failed to fetch</code>. The host name is<br />
+part of the origin; use <code>localhost</code> consistently.</p>
+<h3 id="tile-art-regression-sweep">Tile-art regression sweep</h3>
+<p><code>branding.spec.ts</code> sweeps the live dashboard grid. On head <code>a1ca8aa</code>:</p>
+<div class="table-wrap"><table><thead><tr><th>Probe</th><th>Result</th></tr></thead><tbody><tr><td>Module tiles found</td><td>21</td></tr><tr><td>Tiles served as raster crops</td><td><strong>none</strong></td></tr><tr><td>Tiles that failed to decode</td><td><strong>none</strong></td></tr><tr><td>Elements referencing <code>hero-automotive</code></td><td><strong>none</strong></td></tr></tbody></table></div>
+<h2 id="shared-unit-96-tests">Shared unit — 96 tests</h2>
+<p>Covers the authorization invariants, money arithmetic, currency handling,<br />
+scheduling and the integration catalogue. These need no database, so they run in<br />
+any environment.</p>
+<h2 id="api-integration-229-tests">API integration — 229 tests</h2>
+<p>Nine suites against the seeded database:</p>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Covers</th></tr></thead><tbody><tr><td><code>session.e2e-spec.ts</code></td><td>refresh-cookie lifecycle, CSRF double-submit (19 tests, incl. the CSRF-stability regression)</td></tr><tr><td><code>mfa.e2e-spec.ts</code></td><td>TOTP enrollment, challenge, replay protection, recovery codes</td></tr><tr><td><code>authorization.e2e-spec.ts</code></td><td>RBAC, tenant isolation, delegation limits</td></tr><tr><td><code>rate-limit.e2e-spec.ts</code></td><td>throttling</td></tr><tr><td><code>erp.e2e-spec.ts</code></td><td>accounting, sales/POS, procurement, inventory</td></tr><tr><td><code>execution03.e2e-spec.ts</code></td><td>HR/payroll, CRM, operations, automotive</td></tr><tr><td><code>execution04.e2e-spec.ts</code></td><td>customer platform, marketplace, booking, payments, notifications</td></tr><tr><td><code>execution05.e2e-spec.ts</code></td><td>integrations centre, credentials, capabilities</td></tr><tr><td><code>super-admin-access.e2e-spec.ts</code></td><td>Super Admin login normalisation, the full permission catalogue, tenant ERP access, password rotation with session revocation (9 tests)</td></tr></tbody></table></div>
+<pre><code>Test Suites: 9 passed, 9 total
+Tests:       229 passed, 229 total</code></pre>
+<p>Run with raised throttles for a full sweep:</p>
+<pre><code class="language-bash">AUTH_THROTTLE_LIMIT=100000 THROTTLE_LIMIT=1000000 REFRESH_THROTTLE_LIMIT=100000 \
+  pnpm --filter @oryx/api test:e2e</code></pre>
+<h2 id="admin-browser-141-tests">Admin browser — 141 tests</h2>
+<p>The Playwright suite must run through the reverse proxy, because the preview<br />
+builds use a relative API base (<code>NEXT_PUBLIC_API_BASE_URL=/api</code>) so that the<br />
+public HTTPS host is same-origin and the HttpOnly refresh cookie and CSRF<br />
+double-submit both work without CORS. The suite supports URL overrides:</p>
+<pre><code class="language-bash">ORYX_ADMIN_URL=http://localhost:12000 ORYX_API=http://localhost:12000/api/v1 \
+  pnpm --filter @oryx/admin test:ui</code></pre>
+<blockquote><p>Running it against <code>http://localhost:3000</code> directly fails, because nothing<br />
+proxies <code>/api</code> on that port. That is an environment fact, not a product defect;<br />
+CI builds with an absolute API base and runs against 3000/3001 directly.</p></blockquote>
+<div class="table-wrap"><table><thead><tr><th>Spec</th><th>Count</th></tr></thead><tbody><tr><td><code>admin.spec.ts</code></td><td>core Super Admin acceptance</td></tr><tr><td><code>auth-lifecycle.spec.ts</code></td><td>session lifecycle</td></tr><tr><td><code>mfa.spec.ts</code></td><td>MFA UI</td></tr><tr><td><code>erp.spec.ts</code></td><td>ERP modules</td></tr><tr><td><code>execution03.spec.ts</code></td><td>HR, CRM, operations, automotive</td></tr><tr><td><code>execution04.spec.ts</code></td><td>customer, providers, payments</td></tr><tr><td><code>execution05.spec.ts</code></td><td>integrations centre</td></tr><tr><td><code>functional.spec.ts</code></td><td>cross-cutting workflows</td></tr><tr><td><code>responsive.spec.ts</code></td><td>breakpoints</td></tr><tr><td><code>screenshots.spec.ts</code></td><td>required screenshots</td></tr><tr><td><code>audit.spec.ts</code></td><td>live module route sweep and visual capture</td></tr><tr><td><code>super-admin-access.spec.ts</code></td><td>Super Admin login, permission resolution, password change</td></tr></tbody></table></div>
+<pre><code>141 passed, 1 skipped (4.8m)</code></pre>
+<p>Plus the four <code>audit.spec.ts</code> tests:</p>
+<pre><code>✓ every AVAILABLE module route resolves to a real page (19.4s)
+✓ the platform governance surfaces render for the Super Admin (12.1s)
+✓ an enterprise company principal reaches the licensed ERP modules (4.2s)
+✓ the dashboard is bilingual, themed and responsive (8.6s)
+4 passed (45.3s)</code></pre>
+<h2 id="mobile-unit-20-tests">Mobile unit — 20 tests</h2>
+<div class="table-wrap"><table><thead><tr><th>File</th><th>Covers</th></tr></thead><tbody><tr><td><code>tabs.test.ts</code></td><td>every routed screen declares <code>href: null</code> unless it is a tab</td></tr><tr><td><code>session-storage.test.ts</code></td><td>keychain on a device, <code>localStorage</code> in a browser</td></tr><tr><td><code>lib.test.ts</code></td><td>client helpers</td></tr></tbody></table></div>
+<h2 id="ci">CI</h2>
+<p><code>.github/workflows/ci.yml</code> builds the workspace packages first, then the apps,<br />
+then runs lint, typecheck, the shared and API tests and the browser suite. It<br />
+builds with <code>NEXT_PUBLIC_API_BASE_URL=http://localhost:3001/api</code> and runs the<br />
+browser suite with <code>ORYX_ADMIN_URL=http://localhost:3000</code> and<br />
+<code>ORYX_API=http://localhost:3001/api/v1</code>.</p>
+<p>CI status for the audited commit is visible on the pull request that carries<br />
+these changes. On the Execution 06 head <code>bc77426</code> all three jobs are green<br />
+(<a href="https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39123892149" target="_blank" rel="noopener noreferrer">run 39123892149</a>):</p>
+<div class="table-wrap"><table><thead><tr><th>Job</th><th>Result</th></tr></thead><tbody><tr><td><code>Typecheck and build</code></td><td><strong>success</strong></td></tr><tr><td><code>Unit and API integration tests</code></td><td><strong>success</strong></td></tr><tr><td><code>Browser acceptance tests</code></td><td><strong>success</strong></td></tr></tbody></table></div>
+<p>On the earlier head <code>a2e4f82</code> <code>Typecheck and build</code> passed; the other two jobs<br />
+were superseded by the <code>bc77426</code> run. The seed-fix commit <code>0904262</code> also passed<br />
+all three jobs, and on <code>c460358</code> and <code>c466d8b</code> all three were green as well.</p>
+<p>The local results above were produced on the staging stack after the fixes in<br />
+<code>04_FIXED_DEFECTS.md</code>.</p>
+<h2 id="notes">Notes</h2>
+<ul><li>A database reset (<code>pnpm db:reset</code>) wipes the demo consumer account, because the</li></ul>
+<p>seed does not create one. Re-register it before a customer-login check:<br />
+<code>POST /api/v1/customer/auth/register</code> with a password of at least 10<br />
+characters.</p>
+<ul><li>The browser suite mutates state (it provisions companies and edits plans).</li></ul>
+<p>Reset the database after a full run before treating the staging data as a clean<br />
+demo.</p>
+<ul><li><code>cleanupFixtures</code> resets MFA for the seeded accounts; the Playwright global</li></ul>
+<p>setup calls <code>scripts/reset-seed-mfa.mjs</code> for the same reason.</p></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>aa1569d</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-24T02:32:08.728Z</span>
+  </div>
+</footer>
+</body>
+</html>

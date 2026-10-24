@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Execution 07 — Phase C: Premium design across every customer page · ORYX design preview</title>
+<meta name="description" content="Execution 07 — Phase C: Premium design across every customer page" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Execution 07 — the current execution</p>
+        <h1>Execution 07 — Phase C: Premium design across every customer page</h1>
+        <p class="card__meta">Rendered from <code>docs/audit/exec07/02_PHASE_C_PREMIUM_PAGES.md</code> at <code>aa1569d</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/audit/exec07/02_PHASE_C_PREMIUM_PAGES.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#1-what-changed">1. What changed</a></li><li><a href="#2-verification">2. Verification</a></li><li><a href="#3-environment-findings-not-product-defects">3. Environment findings (not product defects)</a></li><li><a href="#4-live-preview-links">4. Live preview links</a></li><li><a href="#5-visual-comparison-against-the-approved-reference">5. Visual comparison against the approved reference</a></li><li><a href="#6-remaining-blockers">6. Remaining blockers</a></li><li><a href="#7-reproduction">7. Reproduction</a></li></ul></nav>
+        <article><h1 id="execution-07-phase-c-premium-design-across-every-customer-page">Execution 07 — Phase C: Premium design across every customer page</h1>
+<p>Report date: 2026-10-18<br />
+Branch: <code>feature/execution-07-premium-web</code> (PR #7)<br />
+Base head at the start of this session: <code>eabe345</code><br />
+Status: <strong>Phase C complete; owner review pending</strong></p>
+<p>This phase closes blocker 3 of the Execution 07 report, which recorded that the<br />
+visual system had been applied only to the homepage, services, dashboard,<br />
+navigation and footer, leaving the remaining customer pages on the<br />
+pre-Execution-07 presentation. Every customer page is now built on the same<br />
+premium primitives, with no business logic changed.</p>
+<h2 id="1-what-changed">1. What changed</h2>
+<h3 id="11-new-shared-primitives">1.1 New shared primitives</h3>
+<p><code>apps/customer/src/components/premium.tsx</code> (new file, untracked before this<br />
+session) exports the page furniture the whole customer app now shares:</p>
+<div class="table-wrap"><table><thead><tr><th>Export</th><th>Purpose</th></tr></thead><tbody><tr><td><code>PageHeader</code></td><td>Eyebrow, title, subtitle, optional art, optional back link and actions</td></tr><tr><td><code>StatePanel</code></td><td>The four states — loading, empty, error, success — in one component</td></tr><tr><td><code>LoadingPanel</code></td><td>Skeleton rows for a first load, instead of a bare spinner</td></tr><tr><td><code>TableWrap</code></td><td>Horizontal-scroll wrapper so a wide table never overflows the page</td></tr><tr><td><code>Toolbar</code></td><td>Filter and action row above a list</td></tr><tr><td><code>AuthShell</code></td><td>Centred frame shared by sign-in, registration and password recovery</td></tr><tr><td><code>StatCard</code></td><td>KPI tile</td></tr></tbody></table></div>
+<p><code>AuthShell</code> was added in this session so the four unauthenticated screens read<br />
+as one deliberate entry point rather than four unrelated forms.</p>
+<h3 id="12-pages-recreated-or-upgraded">1.2 Pages recreated or upgraded</h3>
+<div class="table-wrap"><table><thead><tr><th>Page</th><th>Route</th><th>Change</th></tr></thead><tbody><tr><td>Invoices</td><td><code>/invoices</code></td><td>Recreated on <code>PageHeader</code> + summary grid + <code>StatePanel</code></td></tr><tr><td>Bookings</td><td><code>/bookings</code></td><td>Recreated; <code>booking.bookingType</code> column preserved</td></tr><tr><td>Notifications</td><td><code>/notifications</code></td><td>Upgraded; local <code>formatWhen</code> replaced with shared <code>formatDate</code></td></tr><tr><td>Support</td><td><code>/support</code></td><td>Upgraded to <code>PageHeader</code> + <code>StatePanel</code></td></tr><tr><td>Profile</td><td><code>/profile</code></td><td>Upgraded to <code>PageHeader</code> + <code>StatePanel</code></td></tr><tr><td>Provider detail</td><td><code>/providers/[id]</code></td><td>Upgraded; opening hours and rating blocks</td></tr><tr><td>Provider directory</td><td><code>/providers</code></td><td>Upgraded: header, <code>Toolbar</code> filter, provider cards with monogram, <code>StatePanel</code> empty state</td></tr><tr><td>Provider application</td><td><code>/providers/apply</code></td><td>Upgraded: <code>AuthShell</code>-style header, selectable category tiles, success <code>StatePanel</code></td></tr><tr><td>Sign in</td><td><code>/login</code></td><td>Upgraded to <code>AuthShell</code></td></tr><tr><td>Register</td><td><code>/register</code></td><td>Upgraded to <code>AuthShell</code></td></tr><tr><td>Forgot password</td><td><code>/forgot-password</code></td><td>Upgraded to <code>AuthShell</code> + success <code>StatePanel</code></td></tr><tr><td>Reset password</td><td><code>/reset-password</code></td><td>Upgraded to <code>AuthShell</code> + invalid-link and success <code>StatePanel</code></td></tr></tbody></table></div>
+<h3 id="13-internationalisation">1.3 Internationalisation</h3>
+<p>New keys were added to <strong>both</strong> the <code>ar</code> and <code>en</code> dictionaries in<br />
+<code>apps/customer/src/i18n/dictionaries.ts</code>:</p>
+<ul><li><code>providers.noneHint</code>, <code>providers.unavailable</code></li><li><code>apply.receivedTitle</code></li><li><code>auth.loginSubtitle</code>, <code>auth.registerSubtitle</code>, <code>auth.forgotSubtitle</code>,</li></ul>
+<p><code>auth.resetSentTitle</code>, <code>auth.resetTitle</code>, <code>auth.resetSubtitle</code>,<br />
+<code>auth.resetInvalid</code>, <code>auth.resetInvalidHint</code>, <code>auth.resetDoneTitle</code>,<br />
+<code>auth.resetDone</code></p>
+<ul><li>(from the earlier part of this session) <code>garage.*</code>, <code>invoices.*</code>,</li></ul>
+<p><code>bookings.*</code>, <code>support.*</code>, <code>notifications.*</code>, <code>profile.*</code>, <code>addresses.*</code>,<br />
+<code>providers.*</code>, <code>common.saving</code>, <code>common.refresh</code></p>
+<p>No key is present in one dictionary and missing from the other.</p>
+<h3 id="14-styles">1.4 Styles</h3>
+<p><code>apps/customer/src/app/globals.css</code> gained the Phase C blocks: the auth shell<br />
+(<code>.oryx-auth*</code>), the selectable choice tiles (<code>.oryx-choice*</code>) and<br />
+<code>.oryx-container--narrow</code>. Existing classes for the earlier-upgraded pages<br />
+(<code>.oryx-page-head</code>, <code>.oryx-state</code>, <code>.oryx-table-wrap</code>, <code>.oryx-toolbar</code>,<br />
+<code>.oryx-invoice-summary</code>, <code>.oryx-notice</code>, <code>.oryx-provider-*</code>, <code>.oryx-hours</code>)<br />
+were already present and are reused rather than duplicated.</p>
+<h2 id="2-verification">2. Verification</h2>
+<h3 id="21-build-typecheck-and-lint">2.1 Build, typecheck and lint</h3>
+<div class="table-wrap"><table><thead><tr><th>Check</th><th>Command</th><th>Result</th></tr></thead><tbody><tr><td>Build</td><td><code>pnpm --filter @oryx/customer build</code></td><td>clean, 16 routes emitted</td></tr><tr><td>Typecheck</td><td><code>pnpm --filter @oryx/customer typecheck</code></td><td>clean</td></tr><tr><td>Lint</td><td><code>pnpm --filter @oryx/customer lint</code></td><td>clean (<code>--max-warnings=0</code>)</td></tr></tbody></table></div>
+<h3 id="22-live-render-verification">2.2 Live render verification</h3>
+<p><code>.run/verify-phase-c.mjs</code> signs in as the demo customer over the public HTTPS<br />
+preview and asserts that each page renders its premium structure, then checks<br />
+AR/RTL and the light theme on a public route.</p>
+<pre><code>13 routes checked; 0 failed
+
+rtl:   { &quot;dir&quot;: &quot;rtl&quot;, &quot;lang&quot;: &quot;ar&quot;, &quot;title&quot;: &quot;دليل مزودي الخدمة&quot; }
+theme: { &quot;theme&quot;: &quot;light&quot;, &quot;bg&quot;: &quot;rgb(245, 246, 248)&quot; }</code></pre>
+<p>Every route returned HTTP 200 with zero horizontal overflow. Authenticated<br />
+routes rendered real database content or a designed <code>StatePanel</code>, never a blank<br />
+panel.</p>
+<h3 id="23-screenshot-matrix">2.3 Screenshot matrix</h3>
+<p><code>.run/capture-phase-c.mjs after</code> captured every route at three widths and both<br />
+locales:</p>
+<pre><code>78 captures; 0 with a status&gt;=400 or overflow</code></pre>
+<p>Artifacts: <code>docs/audit/exec07/phase-c/after/</code> (39 PNGs) plus <code>manifest.json</code>.<br />
+A browsable index is served at<br />
+<code>https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/evidence/exec07-phase-c/index.html</code>.</p>
+<h3 id="24-full-test-suite">2.4 Full test suite</h3>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Command</th><th>Result</th></tr></thead><tbody><tr><td>Shared unit</td><td><code>pnpm --filter @oryx/shared test</code></td><td>96 / 96 passed</td></tr><tr><td>API integration</td><td><code>pnpm --filter @oryx/api test:e2e</code></td><td>278 / 278 passed, 13 suites</td></tr><tr><td>Browser (Playwright)</td><td><code>pnpm --filter @oryx/admin test:ui</code></td><td>184 passed, 1 skipped</td></tr><tr><td>Mobile unit</td><td><code>pnpm --filter @oryx/mobile test</code></td><td>20 / 20 passed</td></tr></tbody></table></div>
+<p><strong>578 automated tests, all green.</strong></p>
+<h3 id="25-external-preview-sweep">2.5 External preview sweep</h3>
+<p><code>.run/sweep-preview.mjs</code> — every preview URL checked from outside the sandbox<br />
+over public HTTPS:</p>
+<pre><code>checked: 39
+success: 39
+failed:  0</code></pre>
+<p>The single console error is the expected anonymous bootstrap <code>401</code> on<br />
+<code>/api/v1/auth/refresh</code>, which the client treats as &quot;no session&quot;.</p>
+<h3 id="26-ci">2.6 CI</h3>
+<p>Run <a href="https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39153101776" target="_blank" rel="noopener noreferrer"><code>39153101776</code></a><br />
+on head <code>1b9343f</code> — <strong>success</strong>, all three jobs green:</p>
+<div class="table-wrap"><table><thead><tr><th>Job</th><th>Result</th></tr></thead><tbody><tr><td>Typecheck and build</td><td>success</td></tr><tr><td>Unit and API integration tests</td><td>success</td></tr><tr><td>Browser acceptance tests</td><td>success</td></tr></tbody></table></div>
+<h2 id="3-environment-findings-not-product-defects">3. Environment findings (not product defects)</h2>
+<p>Two failures in this session came from how the suite was invoked, not from the<br />
+application. Both are recorded so the next run does not repeat them.</p>
+<ol><li><strong>Playwright&#39;s global setup needs the environment.</strong> `pnpm --filter</li></ol>
+<p>@oryx/admin test:ui<code> run bare exits at </code>global-setup.ts` with *&quot;Refusing to<br />
+reset MFA: DATABASE_URL does not look like a development or test<br />
+database&quot;*, because the MFA guard never sees <code>.env</code>. Source it first:<br />
+<code>set -a &amp;&amp; . ./.env &amp;&amp; set +a</code>.</p>
+<ol><li><strong>The admin suite must run through the proxy, not the app port.</strong> The admin</li></ol>
+<p>bundle is built with <code>NEXT_PUBLIC_API_BASE_URL=/api</code>, a same-origin relative<br />
+path. Playwright&#39;s default <code>baseURL</code> is <code>http://localhost:3000</code>, which is the<br />
+Next.js server alone and has no <code>/api</code> route, so every login 404s and the<br />
+suite times out. Point it at the proxy:<br />
+<code>ORYX_ADMIN_URL=http://localhost:12000</code>. The <code>/api</code> route on 3000 is not a<br />
+product path; the deployed topology is the proxy on 12000.</p>
+<p>Neither is a regression: the same configuration produced the green run recorded<br />
+in the Execution 07 report.</p>
+<h2 id="4-live-preview-links">4. Live preview links</h2>
+<p>Staging only. Separate staging database (<code>oryx_staging</code>) with synthetic demo<br />
+records. No production data and no real credentials are exposed.</p>
+<h3 id="staff-control-plane-httpswork-1-cpaunenxhadbkkefprod-runtimeall-handsdev">Staff control plane — <a href="https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev" target="_blank" rel="noopener noreferrer">https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev</a></h3>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Surface</th><th>Path</th></tr></thead><tbody><tr><td>1</td><td>Super Admin dashboard</td><td><code>/dashboard</code></td></tr><tr><td>2</td><td>Company ERP dashboard</td><td><code>/dashboard</code> (select ORYX Auto Services)</td></tr><tr><td>3</td><td>Accounting</td><td><code>/accounting</code></td></tr><tr><td>4</td><td>Sales / POS</td><td><code>/sales</code></td></tr><tr><td>5</td><td>Inventory</td><td><code>/inventory</code></td></tr><tr><td>6</td><td>Procurement</td><td><code>/purchasing</code></td></tr><tr><td>7</td><td>HR / payroll</td><td><code>/hr</code></td></tr><tr><td>8</td><td>CRM</td><td><code>/crm</code></td></tr><tr><td>9</td><td>Automotive operations</td><td><code>/operations</code></td></tr><tr><td>10</td><td>Inspections</td><td><code>/automotive/inspections</code></td></tr><tr><td>11</td><td>Workshop</td><td><code>/automotive/maintenance</code></td></tr><tr><td>12</td><td>Spare parts</td><td><code>/automotive/spare-parts</code></td></tr><tr><td>13</td><td>Provider portal</td><td><code>/providers</code></td></tr><tr><td>14</td><td>Bookings</td><td><code>/bookings</code></td></tr><tr><td>15</td><td>Payments</td><td><code>/payments</code></td></tr><tr><td>16</td><td>External Integrations Center</td><td><code>/integrations</code></td></tr><tr><td>17</td><td>Reports</td><td><code>/reports</code></td></tr><tr><td>18</td><td>Customer platform admin</td><td><code>/customer</code></td></tr></tbody></table></div>
+<h3 id="customer-website-httpswork-2-cpaunenxhadbkkefprod-runtimeall-handsdev">Customer website — <a href="https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev" target="_blank" rel="noopener noreferrer">https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev</a></h3>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Surface</th><th>Path</th></tr></thead><tbody><tr><td>19</td><td>Customer website (home)</td><td><code>/</code></td></tr><tr><td>20</td><td>Service categories</td><td><code>/services</code></td></tr><tr><td>21</td><td>Provider directory</td><td><code>/providers</code></td></tr><tr><td>22</td><td>Provider application</td><td><code>/providers/apply</code></td></tr><tr><td>23</td><td>Customer dashboard</td><td><code>/dashboard</code></td></tr><tr><td>24</td><td>My garage</td><td><code>/garage</code></td></tr><tr><td>25</td><td>Bookings</td><td><code>/bookings</code></td></tr><tr><td>26</td><td>Invoices &amp; payments</td><td><code>/invoices</code></td></tr><tr><td>27</td><td>Support</td><td><code>/support</code></td></tr><tr><td>28</td><td>Notifications</td><td><code>/notifications</code></td></tr><tr><td>29</td><td>Profile &amp; addresses</td><td><code>/profile</code></td></tr></tbody></table></div>
+<h3 id="mobile-web-export-httpswork-2-cpaunenxhadbkkefprod-runtimeall-handsdev">Mobile web export — <a href="https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev" target="_blank" rel="noopener noreferrer">https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev</a></h3>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Surface</th><th>Path</th></tr></thead><tbody><tr><td>30</td><td>Mobile login</td><td><code>/mobile/login</code></td></tr><tr><td>31</td><td>Mobile home</td><td><code>/mobile/</code></td></tr><tr><td>32</td><td>Mobile garage</td><td><code>/mobile/garage</code></td></tr><tr><td>33</td><td>Mobile bookings</td><td><code>/mobile/bookings</code></td></tr><tr><td>34</td><td>Mobile services</td><td><code>/mobile/services</code></td></tr><tr><td>35</td><td>Mobile account</td><td><code>/mobile/account</code></td></tr></tbody></table></div>
+<h3 id="design-evidence">Design evidence</h3>
+<div class="table-wrap"><table><thead><tr><th>Artifact</th><th>URL</th></tr></thead><tbody><tr><td>Phase C screenshot index</td><td><code>/evidence/exec07-phase-c/index.html</code></td></tr></tbody></table></div>
+<h3 id="demo-credentials">Demo credentials</h3>
+<p>These are the seeded demo accounts, documented in the repository and already<br />
+published in the Execution 06 audit. They are not production credentials.</p>
+<div class="table-wrap"><table><thead><tr><th>Role</th><th>Email</th><th>Password</th></tr></thead><tbody><tr><td>Super Admin</td><td><code>superadmin@oryx.local</code></td><td><code>ChangeMe!Oryx2026</code></td></tr><tr><td>Enterprise tenant admin (licenses automotive)</td><td><code>admin@oryx-auto.local</code></td><td><code>ChangeMe!Oryx2026</code></td></tr><tr><td>Professional tenant admin</td><td><code>admin@demo-alnoor.local</code></td><td><code>ChangeMe!Oryx2026</code></td></tr><tr><td>Customer</td><td><code>customer@oryx-demo.local</code></td><td><code>OryxDemo!2026</code></td></tr></tbody></table></div>
+<p>Automotive surfaces (inspections, workshop, spare parts) are licensed to the<br />
+Enterprise plan, so use <code>admin@oryx-auto.local</code> for those.</p>
+<h2 id="5-visual-comparison-against-the-approved-reference">5. Visual comparison against the approved reference</h2>
+<p>The only approved design reference in the repository is<br />
+<code>docs/assets/ORYX Auto Services Dashboard.png</code>, a dark-theme <strong>admin</strong> dashboard.<br />
+The Phase C work is on the <strong>customer</strong> website, for which no approved mockup<br />
+exists.</p>
+<ul><li>For the admin dashboard, the navy/gold palette, KPI rhythm and card structure</li></ul>
+<p>match the reference&#39;s approach.</p>
+<ul><li>For the customer website, the pages use the same navy/gold tokens and the same</li></ul>
+<p>card/typography system, but there is no approved customer reference to compare<br />
+against.</p>
+<p><strong>Full visual parity is not claimed.</strong> It cannot be assessed for the customer<br />
+site until an approved customer-site reference exists. The official logo is<br />
+present (<code>docs/assets/logo.png.jpeg</code>) and is the source for both colourways.</p>
+<h2 id="6-remaining-blockers">6. Remaining blockers</h2>
+<ol><li><strong>No approved customer-site design reference.</strong> Unchanged from the Execution</li></ol>
+<p>07 report. Parity for the customer website cannot be assessed.</p>
+<ol><li><strong>No native iOS/Android build preview.</strong> The Expo app is verified through its</li></ol>
+<p>web export (<code>/mobile/*</code>). A device or EAS build is unavailable in this<br />
+environment.</p>
+<ol><li><strong>The staging environment is ephemeral.</strong> The sandbox that serves the preview</li></ol>
+<p>links above can be recycled; <code>.run/start-stack.sh</code> brings the stack back from<br />
+a cold sandbox without re-seeding.</p>
+<h2 id="7-reproduction">7. Reproduction</h2>
+<pre><code class="language-bash"># Build, typecheck, lint
+pnpm --filter @oryx/customer build
+pnpm --filter @oryx/customer typecheck
+pnpm --filter @oryx/customer lint
+
+# Live render assertions (needs the staging stack running)
+node .run/verify-phase-c.mjs
+
+# Screenshot matrix + browsable index
+node .run/capture-phase-c.mjs after
+node .run/build-evidence-index.mjs
+
+# Full suites
+pnpm --filter @oryx/shared test
+pnpm --filter @oryx/api test:e2e
+
+# Browser suite — source the env and use the proxy origin
+set -a &amp;&amp; . ./.env &amp;&amp; set +a
+export AUTH_THROTTLE_LIMIT=100000 THROTTLE_LIMIT=1000000 REFRESH_THROTTLE_LIMIT=100000
+export ORYX_ADMIN_URL=http://localhost:12000
+pnpm --filter @oryx/admin test:ui
+
+# External preview sweep
+node .run/sweep-preview.mjs</code></pre></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>aa1569d</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-24T02:32:08.728Z</span>
+  </div>
+</footer>
+</body>
+</html>

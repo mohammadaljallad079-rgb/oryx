@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>ORYX — Visual Comparison Report · ORYX design preview</title>
+<meta name="description" content="ORYX — Visual Comparison Report" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Audit</p>
+        <h1>ORYX — Visual Comparison Report</h1>
+        <p class="card__meta">Rendered from <code>docs/audit/03_VISUAL_COMPARISON.md</code> at <code>aa1569d</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/audit/03_VISUAL_COMPARISON.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#reference">Reference</a></li><li><a href="#live-capture">Live capture</a></li><li><a href="#measured-difference">Measured difference</a></li><li><a href="#interpretation">Interpretation</a></li><li><a href="#what-cannot-be-claimed">What cannot be claimed</a></li><li><a href="#artifacts">Artifacts</a></li><li><a href="#required-to-close-the-gap">Required to close the gap</a></li></ul></nav>
+        <article><h1 id="oryx-visual-comparison-report">ORYX — Visual Comparison Report</h1>
+<p>Audit date: 2026-10-16</p>
+<h2 id="reference">Reference</h2>
+<p><code>docs/assets/ORYX Auto Services Dashboard.png</code> — owner-approved dashboard<br />
+reference, <strong>1536 × 1024</strong>, RGB. This file is tracked in the repository.</p>
+<h2 id="live-capture">Live capture</h2>
+<p><code>docs/audit/screenshots/dashboard-reference-viewport-ar-dark.png</code> — the actual<br />
+implemented dashboard, captured in a real headless Chromium at the **same<br />
+1536 × 1024** viewport, Arabic RTL, dark theme. Captured by <code>audit.spec.ts</code>.</p>
+<p>Like-for-like comparison is therefore valid: identical pixel dimensions and<br />
+identical viewport.</p>
+<h2 id="measured-difference">Measured difference</h2>
+<p>Produced by <code>scripts/audit-compare.py</code>, re-run 2026-10-17 against the current<br />
+preview build.</p>
+<div class="table-wrap"><table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody><tr><td>Mean absolute difference per channel (R, G, B)</td><td>35.95, 32.73, 33.20 (of 255)</td></tr><tr><td>RMS difference per channel</td><td>68.28, 58.58, 56.15</td></tr><tr><td>Reference dominant colours</td><td><code>#00182f</code> 32%, <code>#172a40</code> 21%, <code>#3f4855</code> 15%, <code>#001124</code> 12%, <code>#818281</code> 10%</td></tr><tr><td>Live dominant colours</td><td><code>#010f1e</code> 20%, <code>#091c2c</code> 20%, <code>#152731</code> 19%, <code>#041525</code> 19%, <code>#00152a</code> 12%</td></tr></tbody></table></div>
+<h3 id="region-divergence-44-grid-mean-absolute-difference-0255">Region divergence (4×4 grid, mean absolute difference 0–255)</h3>
+<div class="table-wrap"><table><thead><tr><th></th><th>col 1</th><th>col 2</th><th>col 3</th><th>col 4</th></tr></thead><tbody><tr><td><strong>row 1</strong></td><td>50.8</td><td>49.0</td><td>25.8</td><td>40.3</td></tr><tr><td><strong>row 2</strong></td><td>46.1</td><td>36.1</td><td>44.0</td><td>32.2</td></tr><tr><td><strong>row 3</strong></td><td>46.7</td><td>50.7</td><td>51.8</td><td>29.9</td></tr><tr><td><strong>row 4</strong></td><td>19.1</td><td>19.0</td><td>18.4</td><td>15.4</td></tr></tbody></table></div>
+<h2 id="interpretation">Interpretation</h2>
+<p>The two images are <strong>palette-compatible but not pixel-identical</strong>. Read together<br />
+with the region grid:</p>
+<ol><li><strong>Palette agreement.</strong> Both images are dominated by deep navy. The reference</li></ol>
+<p>clusters on <code>#00182f</code> / <code>#001124</code>; the implementation clusters on <code>#010f1e</code> /<br />
+<code>#091c2c</code>. These are the same navy family a few steps apart. The difference is<br />
+a tonal choice, not a different brand colour.</p>
+<ol><li><strong>Structural divergence is concentrated at the top-left and middle rows.</strong> The</li></ol>
+<p>highest divergence (rows 1–3, columns 1–3: 26–52) is where the reference<br />
+carries the hero headline, statistics and its photographic tiles. The<br />
+implementation reproduces the layout and the tiles, but its tiles are<br />
+<strong>original vector artwork</strong> (<code>scripts/generate-tile-art.py</code>) rather than the<br />
+reference&#39;s photography — so those regions differ in content even where they<br />
+agree in placement. The reference is never used as artwork (defect 5 in<br />
+<code>04_FIXED_DEFECTS.md</code>).</p>
+<ol><li><strong>The bottom band agrees closely</strong> (row 4: 15.4–19.1). This is the dense</li></ol>
+<p>tabular area, where both use the same navy panels and light text.</p>
+<ol><li>**The lightest region of the reference (<code>#818281</code>, 10%) has no counterpart in</li></ol>
+<p>the live capture.** That grey is photographic and neutral-toned content. The<br />
+implementation has no such neutral mass, which is consistent with the missing<br />
+original photography.</p>
+<h2 id="what-cannot-be-claimed">What cannot be claimed</h2>
+<p>The official ORYX logo is present (<code>docs/assets/logo.png.jpeg</code>, owner upload<br />
+<code>699560c</code>) and drives the admin sidebar, the admin login page and the customer<br />
+header through <code>.run/gen-brand.cjs</code>. The original approved photography was never<br />
+supplied, however, and the reference screenshot itself is the only approved<br />
+design asset present. Consequently:</p>
+<ul><li>The logo is the owner&#39;s real mark, colourway-swapped per theme. It is not a</li></ul>
+<p>placeholder.</p>
+<ul><li>Module tiles use original vector artwork generated in-repo</li></ul>
+<p>(<code>scripts/generate-tile-art.py</code>), served as SVG. They are real, purpose-drawn<br />
+automotive motifs, but they are not the owner&#39;s original photography at native<br />
+resolution. The approved reference is never used as artwork.</p>
+<ul><li><strong>Full visual parity is therefore not claimed.</strong> The navy/gold identity,</li></ul>
+<p>layout, tile-led structure, RTL support and theming follow the approved<br />
+reference; the source photography is still required from the owner.</p>
+<h2 id="artifacts">Artifacts</h2>
+<div class="table-wrap"><table><thead><tr><th>File</th><th>Contents</th></tr></thead><tbody><tr><td><code>docs/audit/comparison/live-side-by-side.png</code></td><td>reference and implementation at equal scale</td></tr><tr><td><code>docs/audit/comparison/live-diff-amplified.png</code></td><td>4× amplified difference heatmap</td></tr><tr><td><code>docs/audit/screenshots/dashboard-{ar,en}-{dark,light}.png</code></td><td>bilingual and themed captures</td></tr><tr><td><code>docs/audit/screenshots/dashboard-{tablet,mobile}-ar-dark.png</code></td><td>responsive captures</td></tr><tr><td><code>docs/audit/screenshots/dashboard-reference-viewport-ar-dark.png</code></td><td>the like-for-like capture</td></tr></tbody></table></div>
+<h2 id="required-to-close-the-gap">Required to close the gap</h2>
+<ol><li>The official ORYX logo as a transparent vector or high-resolution PNG.</li><li>The original approved dashboard photography at native resolution.</li><li>Confirmation of the exact navy and gold brand values if they differ from the</li></ol>
+<p>current tokens.</p>
+<p>With those three items the tiles and the brand mark can be replaced and this<br />
+report can be re-run to measure true parity.</p></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>aa1569d</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-24T02:32:08.728Z</span>
+  </div>
+</footer>
+</body>
+</html>

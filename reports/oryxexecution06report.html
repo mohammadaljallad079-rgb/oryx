@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>ORYX — Execution 06 Report: iPad Authentication, Dual Super Admin, Responsive QA &amp; Dashboard Asset Acceptance · ORYX design preview</title>
+<meta name="description" content="ORYX — Execution 06 Report: iPad Authentication, Dual Super Admin, Responsive QA &amp; Dashboard Asset Acceptance" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Execution reports</p>
+        <h1>ORYX — Execution 06 Report: iPad Authentication, Dual Super Admin, Responsive QA &amp; Dashboard Asset Acceptance</h1>
+        <p class="card__meta">Rendered from <code>docs/execution-reports/ORYX_EXECUTION_06_REPORT.md</code> at <code>aa1569d</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/execution-reports/ORYX_EXECUTION_06_REPORT.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#1-scope">1. Scope</a></li><li><a href="#2-task-1-ipad-authentication-lockout">2. Task 1 — iPad authentication lockout</a></li><li><a href="#3-task-2-two-independent-super-admin-accounts">3. Task 2 — Two independent Super Admin accounts</a></li><li><a href="#4-task-3-unique-dashboard-artwork">4. Task 3 — Unique dashboard artwork</a></li><li><a href="#5-task-4-responsive-qa-sweep">5. Task 4 — Responsive QA sweep</a></li><li><a href="#6-audit-continuation-two-defensive-input-defects">6. Audit continuation — two defensive-input defects</a></li><li><a href="#7-test-and-ci-results">7. Test and CI results</a></li><li><a href="#8-live-preview">8. Live preview</a></li><li><a href="#9-visual-identity">9. Visual identity</a></li><li><a href="#10-remaining-blockers">10. Remaining blockers</a></li><li><a href="#11-commit-state">11. Commit state</a></li></ul></nav>
+        <article><h1 id="oryx-execution-06-report-ipad-authentication-dual-super-admin-responsive-qa-dashboard-asset-acceptance">ORYX — Execution 06 Report: iPad Authentication, Dual Super Admin, Responsive QA &amp; Dashboard Asset Acceptance</h1>
+<p>Status: <strong>implemented, tested and ready for owner review</strong>. Nothing is merged and<br />
+nothing is deployed to production.</p>
+<p>Branch: <code>audit/execution-05-verification</code> · PR <a href="https://github.com/mohammadaljallad079-rgb/oryx/pull/6" target="_blank" rel="noopener noreferrer">#6</a> (draft, open, base <code>main</code>).</p>
+<h2 id="1-scope">1. Scope</h2>
+<p>Execution 06 was requested as a follow-up on top of the completed Executions<br />
+01–05. It was <strong>not</strong> a restart: no completed execution was rebuilt, no existing<br />
+work was overwritten, reset or force-pushed, and nothing outside the four task<br />
+areas plus the audit and preview work was touched.</p>
+<div class="table-wrap"><table><thead><tr><th>Task</th><th>Requirement</th><th>Status</th></tr></thead><tbody><tr><td>1</td><td>Recover iPad authentication (a device that held a stale refresh cookie could no longer sign in)</td><td><strong>Done</strong></td></tr><tr><td>2</td><td>Two independent Super Admin accounts</td><td><strong>Done</strong></td></tr><tr><td>3</td><td>Every dashboard card owns unique, original artwork</td><td><strong>Done</strong></td></tr><tr><td>4</td><td>Responsive QA sweep across widths, orientations and touch targets</td><td><strong>Done</strong></td></tr><tr><td>5</td><td>Continue the platform audit and keep the live preview working</td><td><strong>Done</strong></td></tr><tr><td>6</td><td>Finalise the report and acceptance evidence</td><td><strong>This document</strong></td></tr></tbody></table></div>
+<h2 id="2-task-1-ipad-authentication-lockout">2. Task 1 — iPad authentication lockout</h2>
+<p><strong>Defect.</strong> <code>CsrfGuard</code> rejected <em>any</em> unsafe request that carried the <code>oryx_rt</code><br />
+refresh cookie without a matching <code>oryx_csrf</code> cookie — including<br />
+<code>POST /auth/login</code>. The refresh cookie is HttpOnly, so a client cannot read it to<br />
+build the header. An iPad (or any device) that held a stale <code>oryx_rt</code> therefore<br />
+could never sign in again: every attempt failed with 403 before the credentials<br />
+were even checked.</p>
+<p><strong>Fix.</strong> Session-establishing endpoints — login, MFA completion and invitation<br />
+acceptance — are now marked <code>@CsrfExempt()</code> in<br />
+<code>apps/api/src/auth/auth.decorators.ts</code> and rely on an explicit **Origin<br />
+allowlist** instead. Routes that authenticate <em>by</em> cookie (refresh, logout,<br />
+logout-all) keep the double-submit check, because for those the cookie <em>is</em> the<br />
+credential. The three clients (<code>apps/admin</code>, <code>apps/customer</code>, <code>apps/mobile</code>) now<br />
+distinguish an <code>expired</code> refresh from an <code>unavailable</code> one, so a transient API<br />
+outage no longer tears down a valid session.</p>
+<p><strong>Regression guard.</strong> <code>apps/api/test/reauth-stale-cookie.e2e-spec.ts</code> (12 tests)<br />
+covers: login with a stale refresh cookie and no CSRF header, login from a<br />
+disallowed Origin, refresh still requiring the double-submit, and the<br />
+expired-vs-unavailable distinction.</p>
+<h2 id="3-task-2-two-independent-super-admin-accounts">3. Task 2 — Two independent Super Admin accounts</h2>
+<p><code>scripts/provision-super-admin.mjs</code> provisions a second platform Super Admin. It<br />
+is deliberately hard to misuse:</p>
+<ul><li>It refuses to run without <code>--authorize</code>.</li><li>It refuses without <code>--actor</code>, which must name an existing <strong>active</strong> Super</li></ul>
+<p>Admin, so a second principal is only ever created by an existing one.</p>
+<ul><li>It writes an audit record naming the actor and the new account.</li><li>It prints the generated password once and can write it to a <code>0600</code> file.</li></ul>
+<p>The role is resolved by the <code>platform_super_admin</code> code, so both accounts share<br />
+the platform permission set while keeping separate credentials, sessions and<br />
+audit records.</p>
+<p><strong>Regression guard.</strong> <code>apps/api/test/dual-super-admin.e2e-spec.ts</code> (8 tests)<br />
+asserts both principals authenticate, both resolve the full platform permission<br />
+catalogue, their sessions are independent, and one cannot be used to bypass the<br />
+other&#39;s audit trail.</p>
+<h2 id="4-task-3-unique-dashboard-artwork">4. Task 3 — Unique dashboard artwork</h2>
+<p>Eight dashboard cards presented another module&#39;s artwork: Users &amp; Permissions and<br />
+Human Resources shared <code>tile-users</code>; Booking &amp; Scheduling and Automotive<br />
+Inspections shared <code>tile-inspection</code>; Provider Portal and Spare Parts shared<br />
+<code>tile-parts</code>; Payments and Financial Accounting shared <code>tile-accounting</code>. Each<br />
+now has original SVG art. All 21 cards map to 21 distinct SVGs and no raster crop<br />
+remains.</p>
+<p><strong>Regression guard.</strong> <code>apps/admin/e2e/branding.spec.ts</code> asserts every card owns a<br />
+unique asset, and <code>scripts/audit-dashboard-assets.mjs</code> writes<br />
+<code>docs/audit/evidence/dashboard-card-inventory.json</code> recording the card → asset<br />
+mapping.</p>
+<h2 id="5-task-4-responsive-qa-sweep">5. Task 4 — Responsive QA sweep</h2>
+<p>New <code>apps/admin/e2e/responsive-matrix.spec.ts</code> (33 tests) sweeps 11 widths in<br />
+both directions, every routed surface at 320 px and 390 px, the ERP surface at<br />
+390 / 768 / 1440 px, touch targets and iPad portrait (820×1180) and landscape<br />
+(1180×820).</p>
+<p>It found <strong>two real 320 px overflows</strong>, both now fixed in CSS with the desktop<br />
+layout unchanged:</p>
+<ol><li>The KPI label and value could not wrap inside a two-up card.</li><li>The MFA card&#39;s action button kept its row wider than the viewport.</li></ol>
+<h2 id="6-audit-continuation-two-defensive-input-defects">6. Audit continuation — two defensive-input defects</h2>
+<p>The module-by-module live probe (<code>.run/probe-modules.mjs</code>) and the bad-input<br />
+probe (<code>.run/probe-bad-dates.mjs</code>, <code>.run/probe-booking-cal.mjs</code>) found two<br />
+endpoints that turned a client mistake into an unhandled 500:</p>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Endpoint</th><th>Before</th><th>After</th></tr></thead><tbody><tr><td>17</td><td><code>GET /reports/{accounting,sales,purchasing,inventory}</code></td><td><code>500</code> on <code>?from=not-a-date</code></td><td><code>400</code> with a field-level message</td></tr><tr><td>18</td><td><code>GET /bookings/calendar</code></td><td><code>500</code> with no range or a malformed one</td><td><code>400</code>; a valid range returns <code>200</code></td></tr></tbody></table></div>
+<p>Both are recorded with their fixes and guards in<br />
+<code>docs/audit/04_FIXED_DEFECTS.md</code>. The fix is a DTO change only — <code>@IsISO8601()</code><br />
+on the report filters (matching the accounting DTOs that already behaved) and a<br />
+new <code>CalendarQueryDto</code> for the calendar — so no business logic changed.</p>
+<p><strong>Regression guard.</strong> <code>apps/api/test/input-validation.e2e-spec.ts</code> (11 tests)<br />
+pins the 400-not-500 contract on all eight date-filtered read paths and the three<br />
+calendar cases.</p>
+<h2 id="7-test-and-ci-results">7. Test and CI results</h2>
+<p>All suites were run on the staging stack after the fixes. Full detail and<br />
+reproduction commands are in <code>docs/audit/06_TEST_AND_CI_RESULTS.md</code>.</p>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Command</th><th>Result</th></tr></thead><tbody><tr><td>Shared unit</td><td><code>pnpm --filter @oryx/shared test</code></td><td><strong>96 passed</strong> (5 files)</td></tr><tr><td>API integration</td><td><code>pnpm --filter @oryx/api test:e2e</code></td><td><strong>277 passed</strong> (13 suites)</td></tr><tr><td>Admin browser</td><td><code>ORYX_ADMIN_URL=http://localhost:12000 pnpm --filter @oryx/admin exec playwright test</code></td><td><strong>184 passed, 1 skipped, 0 failed</strong></td></tr><tr><td>Mobile unit</td><td><code>pnpm --filter @oryx/mobile test</code></td><td><strong>20 passed</strong> (3 files)</td></tr><tr><td>Public preview sweep</td><td><code>.run/sweep-preview.mjs</code></td><td><strong>39/39 routes, 0 failed requests</strong></td></tr><tr><td>Module API probe</td><td><code>.run/probe-modules.mjs</code></td><td><strong>96/96 surfaces returned 200</strong></td></tr><tr><td><strong>Total (test runners)</strong></td><td></td><td><strong>577 passed, 0 failed</strong></td></tr></tbody></table></div>
+<blockquote><p>Note on the browser suite origin. The preview builds use a relative API base<br />
+(<code>NEXT_PUBLIC_API_BASE_URL=/api</code>) so the public HTTPS host is same-origin and<br />
+the HttpOnly refresh cookie and CSRF double-submit work without CORS. Nothing<br />
+proxies <code>/api</code> on the bare Next port 3000, so the suite must run against the<br />
+preview proxy origin (<code>http://localhost:12000</code>). Running it against<br />
+<code>http://localhost:3000</code> directly times out in <code>signIn</code> — an environment fact,<br />
+not a product defect. CI builds with an absolute API base and runs against<br />
+3000/3001 directly.</p></blockquote>
+<h2 id="8-live-preview">8. Live preview</h2>
+<p>The staging stack is live and externally verified from outside the sandbox. Full<br />
+link list and credentials are in <code>docs/audit/07_LIVE_PREVIEW_AND_CREDENTIALS.md</code>.</p>
+<div class="table-wrap"><table><thead><tr><th>Host</th><th>Serves</th></tr></thead><tbody><tr><td><code>https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev</code></td><td>Super Admin control plane and every ERP module</td></tr><tr><td><code>https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev</code></td><td>Customer website, customer dashboard and the mobile web preview</td></tr></tbody></table></div>
+<p>Verified with <code>curl</code> from outside the sandbox: <code>/login</code>, <code>/dashboard</code>, the<br />
+customer root and <code>/mobile/</code> each return <code>200</code>, and <code>/api/health</code> returns<br />
+<code>{&quot;status&quot;:&quot;ok&quot;,&quot;service&quot;:&quot;oryx-api&quot;,&quot;version&quot;:&quot;0.1.0&quot;,&quot;database&quot;:&quot;up&quot;}</code>.</p>
+<p>Demo credentials (synthetic staging data only; passwords are development values<br />
+from <code>.env.example</code>, not production secrets):</p>
+<div class="table-wrap"><table><thead><tr><th>Role</th><th>Email</th><th>Password</th></tr></thead><tbody><tr><td>Super Admin (platform)</td><td><code>superadmin@oryx.local</code></td><td><code>ChangeMe!Oryx2026</code></td></tr><tr><td>Enterprise company admin</td><td><code>admin@oryx-auto.local</code></td><td><code>ChangeMe!Oryx2026</code></td></tr><tr><td>Demo SaaS tenant admin</td><td><code>admin@demo-alnoor.local</code></td><td><code>ChangeMe!Oryx2026</code></td></tr><tr><td>Customer / consumer</td><td><code>customer@oryx-demo.local</code></td><td><code>OryxDemo!2026</code></td></tr></tbody></table></div>
+<h2 id="9-visual-identity">9. Visual identity</h2>
+<p>The official logo (<code>docs/assets/logo.png.jpeg</code>, the owner&#39;s upload <code>699560c</code>) is<br />
+used by both front ends and follows the theme. Every dashboard tile is original<br />
+vector art; the approved design reference<br />
+(<code>docs/assets/ORYX Auto Services Dashboard.png</code>) is no longer used as dashboard<br />
+artwork. <strong>Full visual parity is not claimed</strong>: the approved dashboard<br />
+photography is still missing from the repository and there is no approved<br />
+light-theme reference. See <code>docs/audit/03_VISUAL_COMPARISON.md</code> and<br />
+<code>docs/audit/08_VISUAL_IDENTITY_AND_PREVIEW_VERIFICATION.md</code>.</p>
+<h2 id="10-remaining-blockers">10. Remaining blockers</h2>
+<ol><li><strong>Approved dashboard photography is missing.</strong> The tiles use generated vector</li></ol>
+<p>art. This is the main reason full visual parity is not claimed.</p>
+<ol><li><strong>No approved light-theme reference.</strong> The dark theme can be compared to the</li></ol>
+<p>reference; the light theme cannot.</p>
+<ol><li><strong>No production deployment target or credentials were provided.</strong> The preview</li></ol>
+<p>runs on the sandbox&#39;s own ingress hosts against an isolated staging database.<br />
+A production deployment additionally needs a managed PostgreSQL instance, a<br />
+real domain with TLS, and production secrets (<code>JWT_*</code>, <code>MFA_ENCRYPTION_KEY</code>,<br />
+<code>INTEGRATION_ENCRYPTION_KEY</code>, <code>MFA_REQUIRE_SUPER_ADMIN=true</code>).</p>
+<ol><li><strong>No external gateway credentials.</strong> All external integrations correctly</li></ol>
+<p>report <code>AWAITING_CREDENTIALS</code> / <code>ADAPTER_ONLY</code>.</p>
+<h2 id="11-commit-state">11. Commit state</h2>
+<div class="table-wrap"><table><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody><tr><td>Branch</td><td><code>audit/execution-05-verification</code></td></tr><tr><td>PR</td><td><a href="https://github.com/mohammadaljallad079-rgb/oryx/pull/6" target="_blank" rel="noopener noreferrer">#6</a> (draft, open, base <code>main</code>)</td></tr><tr><td>Pushed head</td><td><code>bc77426</code> (pushed this session; <code>5636f4e..bc77426</code>)</td></tr><tr><td><code>b1e2f7b</code></td><td>iPad auth, dual Super Admin, unique art, responsive sweep</td></tr><tr><td><code>a2e4f82</code></td><td>date-filter validation hardening, audit docs and evidence, Execution 06 report</td></tr><tr><td><code>715b1d2</code>, <code>1032edf</code>, <code>bc77426</code></td><td>doc pointers and refreshed screenshots</td></tr></tbody></table></div>
+<p><code>bc77426</code> is the head of PR #6. CI<br />
+(<a href="https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39123892149" target="_blank" rel="noopener noreferrer">run 39123892149</a>)<br />
+is green on it — all three jobs:</p>
+<div class="table-wrap"><table><thead><tr><th>Job</th><th>Result</th></tr></thead><tbody><tr><td><code>Typecheck and build</code></td><td><strong>success</strong></td></tr><tr><td><code>Unit and API integration tests</code></td><td><strong>success</strong></td></tr><tr><td><code>Browser acceptance tests</code></td><td><strong>success</strong></td></tr></tbody></table></div></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>aa1569d</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-24T02:32:08.728Z</span>
+  </div>
+</footer>
+</body>
+</html>

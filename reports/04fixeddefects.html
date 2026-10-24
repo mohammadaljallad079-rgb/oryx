@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>ORYX — Fixed Defects · ORYX design preview</title>
+<meta name="description" content="ORYX — Fixed Defects" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Audit</p>
+        <h1>ORYX — Fixed Defects</h1>
+        <p class="card__meta">Rendered from <code>docs/audit/04_FIXED_DEFECTS.md</code> at <code>aa1569d</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/audit/04_FIXED_DEFECTS.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#1-module-catalog-route-drift-subscription-vs-subscriptions">1. Module catalog route drift — /subscription vs /subscriptions</a></li><li><a href="#2-mobile-web-session-storage-threw-in-a-browser">2. Mobile web session storage threw in a browser</a></li><li><a href="#3-mobile-web-export-was-not-served-under-its-base-path">3. Mobile web export was not served under its base path</a></li><li><a href="#5-the-approved-design-reference-was-used-as-dashboard-artwork">5. The approved design reference was used as dashboard artwork</a></li><li><a href="#6-branding-regression-test-matched-two-lockups">6. Branding regression test matched two lockups</a></li><li><a href="#7-the-browser-suite-could-not-authenticate-against-the-direct-app-port">7. The browser suite could not authenticate against the direct app port</a></li><li><a href="#closed-the-reference-is-no-longer-artwork">Closed — the reference is no longer artwork</a></li><li><a href="#recovery-session-2026-10-17-additional-defects">Recovery session (2026-10-17) — additional defects</a></li><li><a href="#8-the-sidebar-had-no-sign-out-control">8. The sidebar had no sign-out control</a></li><li><a href="#9-every-sign-in-failure-was-reported-as-bad-credentials">9. Every sign-in failure was reported as bad credentials</a></li><li><a href="#10-a-configured-v1-suffix-produced-a-404-that-looked-like-a-routing-bug">10. A configured /v1 suffix produced a 404 that looked like a routing bug</a></li><li><a href="#11-the-preview-stack-did-not-survive-a-sandbox-recycle">11. The preview stack did not survive a sandbox recycle</a></li><li><a href="#12-a-concurrent-refresh-in-a-second-tab-silently-signed-the-user-out">12. A concurrent refresh in a second tab silently signed the user out</a></li><li><a href="#13-super-admin-sign-in-rejected-a-padded-or-mixed-case-email">13. Super Admin sign-in rejected a padded or mixed-case email</a></li><li><a href="#14-sourcing-the-root-env-overrode-the-admins-relative-api-base">14. Sourcing the root .env overrode the admin&#39;s relative API base</a></li><li><a href="#15-a-stored-light-theme-flashed-dark-and-could-be-silently-reverted">15. A stored light theme flashed dark and could be silently reverted</a></li><li><a href="#16-super-admin-lost-every-tenant-permission-after-a-re-seed">16. Super Admin lost every tenant permission after a re-seed</a></li><li><a href="#execution-06-follow-up-2026-10-18-two-defensive-input-defects">Execution 06 follow-up (2026-10-18) — two defensive-input defects</a></li><li><a href="#17-a-malformed-report-date-returned-500-instead-of-400">17. A malformed report date returned 500 instead of 400</a></li><li><a href="#18-the-bookings-calendar-required-a-range-but-did-not-say-so">18. The bookings calendar required a range but did not say so</a></li><li><a href="#note-the-preview-bundle-must-be-built-with-a-relative-api-base">Note — the preview bundle must be built with a relative API base</a></li><li><a href="#defect-18-customer-refresh-answered-404-where-the-staff-plane-answers-401">Defect 18 — customer refresh answered 404 where the staff plane answers 401</a></li><li><a href="#defect-19-three-category-vocabularies-made-every-category-filter-return-nothing">Defect 19 — three category vocabularies made every category filter return nothing</a></li></ul></nav>
+        <article><h1 id="oryx-fixed-defects">ORYX — Fixed Defects</h1>
+<p>Audit date: 2026-10-16</p>
+<p>Each entry states the defect, how it was found, the fix and the regression guard<br />
+that now prevents it.</p>
+<h2 id="1-module-catalog-route-drift-subscription-vs-subscriptions">1. Module catalog route drift — <code>/subscription</code> vs <code>/subscriptions</code></h2>
+<p><strong>Severity:</strong> functional, user-visible.</p>
+<p><strong>Found by:</strong> the live module audit walkthrough (<code>audit.spec.ts</code>), which loads<br />
+every <code>AVAILABLE</code> module&#39;s catalog <code>route</code> and fails on a 404 or an error<br />
+boundary.</p>
+<p><strong>Defect:</strong> the <code>subscription_management</code> catalog entry declared<br />
+<code>route: &#39;/subscription&#39;</code>, but the admin app only has a page at <code>/subscriptions</code>.<br />
+The dashboard tile and the sidebar link both sent the user to a Next.js 404.</p>
+<p><strong>Fix:</strong> <code>packages/shared/src/modules.ts</code> — the catalog route now reads<br />
+<code>/subscriptions</code>, matching the page that exists.</p>
+<pre><code class="language-diff">-  M(&#39;subscription_management&#39;, …, &#39;/subscription&#39;, &#39;AVAILABLE&#39;, …),
++  M(&#39;subscription_management&#39;, …, &#39;/subscriptions&#39;, &#39;AVAILABLE&#39;, …),</code></pre>
+<p><strong>Regression guard:</strong> <code>apps/admin/e2e/audit.spec.ts</code>, test &quot;every AVAILABLE<br />
+module route resolves to a real page&quot;. It iterates the catalog and asserts a 200<br />
+with no error boundary for each route, so a future drift fails the suite instead<br />
+of shipping a dead link. Verified passing after the fix (21/21 modules).</p>
+<h2 id="2-mobile-web-session-storage-threw-in-a-browser">2. Mobile web session storage threw in a browser</h2>
+<p><strong>Severity:</strong> functional, blocked the owner&#39;s mobile preview.</p>
+<p><strong>Found by:</strong> driving the Expo web export in a browser; login failed because<br />
+<code>expo-secure-store</code> has no web backend.</p>
+<p><strong>Defect:</strong> <code>apps/mobile/src/lib/api.ts</code> called <code>SecureStore.setItemAsync</code><br />
+directly. <code>expo-secure-store</code>&#39;s web entry point is an empty object, so the call<br />
+threw and the refresh token was never stored.</p>
+<p><strong>Fix:</strong> introduced <code>apps/mobile/src/lib/session-storage.ts</code>, which uses the<br />
+platform keychain on Android and iOS and <code>localStorage</code> in a browser. A native<br />
+build never reaches the browser branch. <code>api.ts</code> now goes through that module.<br />
+The CSRF cookie the API sets alongside the customer session is echoed on unsafe<br />
+requests so <code>CsrfGuard</code> accepts them in the shared-origin web preview.</p>
+<p><strong>Regression guard:</strong> <code>apps/mobile/test/session-storage.test.ts</code> pins both<br />
+branches — a web round-trip through <code>localStorage</code> and a device build that uses<br />
+the keychain and does not touch <code>localStorage</code>.</p>
+<h2 id="3-mobile-web-export-was-not-served-under-its-base-path">3. Mobile web export was not served under its base path</h2>
+<p><strong>Severity:</strong> functional, blocked the owner&#39;s mobile preview.</p>
+<p><strong>Found by:</strong> requesting <code>/mobile/</code> through the reverse proxy returned a page<br />
+whose assets 404&#39;d.</p>
+<p><strong>Defect:</strong> the Expo web export was built with <code>experiments.baseUrl = &#39;/mobile&#39;</code>,<br />
+so its asset URLs carry that prefix, but the static server and the proxy had no<br />
+matching arrangement.</p>
+<p><strong>Fix:</strong> <code>apps/mobile/app.config.ts</code> reads <code>EXPO_BASE_PATH</code> into<br />
+<code>experiments.baseUrl</code> (empty keeps root hosting for native builds), and the<br />
+reverse proxy routes <code>/mobile/</code> to the static server without stripping the<br />
+prefix, matching the export. <code>.run/serve-mobile-web.mjs</code> serves the export.</p>
+<p><strong>Regression guard:</strong> <code>apps/mobile/test/tabs.test.ts</code> derives the route list from<br />
+the filesystem, and the browser check logs in and navigates to <code>/mobile/garage</code>.</p>
+<h2 id="5-the-approved-design-reference-was-used-as-dashboard-artwork">5. The approved design reference was used as dashboard artwork</h2>
+<p><strong>Severity:</strong> high — it violates the owner&#39;s explicit design rule that the<br />
+approved reference image must never be used as dashboard artwork.</p>
+<p><strong>Found by:</strong> auditing every module tile reference against the tile files on<br />
+disk, then driving the live dashboard in a real browser<br />
+(<code>.run/verify-tile.mjs</code>) and reading the computed background of each surface.</p>
+<p><strong>Defect:</strong> <code>scripts/extract-approved-assets.py</code> treated<br />
+<code>docs/assets/ORYX Auto Services Dashboard.png</code> — the owner&#39;s approved *design<br />
+reference screenshot* — as an image source and cropped photographic regions out<br />
+of it into <code>apps/admin/public/tiles/*.jpg</code>. The dashboard hero had already been<br />
+moved to a purpose-drawn vector banner, but <strong>every module tile</strong> still rendered<br />
+a crop of the reference. The dashboard tile pointed at the crop directly:</p>
+<pre><code class="language-diff">-  M(&#39;dashboard&#39;, …, &#39;hero-automotive&#39;, &#39;/dashboard/overview&#39;, …),
++  M(&#39;dashboard&#39;, …, &#39;tile-dashboard&#39;, &#39;/dashboard/overview&#39;, …),</code></pre>
+<p><code>tileImageUrl()</code> resolved a tile name to <code>/tiles/&lt;name&gt;.jpg</code>, so the grid served<br />
+22 upscaled crops of the reference as product artwork.</p>
+<p><strong>Fix — the reference is no longer artwork at all:</strong></p>
+<div class="table-wrap"><table><thead><tr><th>Change</th><th>File</th></tr></thead><tbody><tr><td><code>tileImageUrl()</code> resolves <code>.svg</code>, not <code>.jpg</code></td><td><code>packages/shared/src/modules.ts</code></td></tr><tr><td>Original vector motifs for all 23 tiles (was already the source of truth, but its raster output was being overwritten)</td><td><code>scripts/generate-tile-art.py</code></td></tr><tr><td><code>preserveAspectRatio=&quot;xMidYMid slice&quot;</code> so vector tiles fill the media box like the raster crops did</td><td><code>scripts/generate-tile-art.py</code></td></tr><tr><td>Reference-crop pipeline retired to a no-op tombstone that writes nothing and exits non-zero</td><td><code>scripts/extract-approved-assets.py</code></td></tr><tr><td>All 24 crop JPEGs (<code>tile-*.jpg</code>, <code>hero-automotive.jpg</code>, <code>automotive-hero.jpg</code>) deleted</td><td><code>apps/admin/public/tiles/</code></td></tr></tbody></table></div>
+<p><strong>Verified live</strong>, through the public HTTPS ingress:</p>
+<div class="table-wrap"><table><thead><tr><th>Probe</th><th>Result</th></tr></thead><tbody><tr><td><code>.oryx-hero__media</code> background</td><td><code>…/tiles/banner-automotive.svg</code></td></tr><tr><td><code>tile-dashboard</code> background</td><td><code>…/tiles/tile-dashboard.svg</code> (640 × 420)</td></tr><tr><td>Module tiles swept on the dashboard</td><td><strong>21</strong></td></tr><tr><td>Tiles still served as raster crops</td><td><strong>none</strong></td></tr><tr><td>Tiles that failed to decode</td><td><strong>none</strong></td></tr><tr><td>Elements referencing <code>hero-automotive</code></td><td><strong>none</strong></td></tr></tbody></table></div>
+<p><strong>Regression guard:</strong> <code>apps/admin/e2e/branding.spec.ts</code>, test &quot;the approved<br />
+design reference is never used as dashboard artwork&quot; — it now sweeps <strong>every</strong><br />
+module tile, asserts each URL ends in <code>.svg</code>, and asserts each one decodes. The<br />
+guard fails if a raster crop is reintroduced, which is what a future run of the<br />
+old crop script would have done.</p>
+<p><strong>Closed:</strong> the previous revision of this report disclosed that the other<br />
+<code>tile-*.jpg</code> crops remained. They no longer exist. No file under<br />
+<code>apps/admin/public/tiles/</code> is derived from the owner&#39;s reference.</p>
+<h2 id="6-branding-regression-test-matched-two-lockups">6. Branding regression test matched two lockups</h2>
+<p><strong>Severity:</strong> low — a test defect, not a product defect.</p>
+<p><strong>Found by:</strong> the full browser suite, after the hero gained its own <code>BrandLogo</code>.</p>
+<p><strong>Defect:</strong> <code>locator(&#39;.oryx-brand-logo&#39;)</code> resolved to two elements — the sidebar<br />
+lockup and the hero lockup — so Playwright failed with a strict-mode violation.</p>
+<p><strong>Fix:</strong> scope the locators to <code>.oryx-sidebar</code> in<br />
+<code>apps/admin/e2e/branding.spec.ts</code>, which is what the test always meant to assert.</p>
+<h2 id="7-the-browser-suite-could-not-authenticate-against-the-direct-app-port">7. The browser suite could not authenticate against the direct app port</h2>
+<p><strong>Severity:</strong> medium — it made every authenticated test fail identically and<br />
+masked real defects.</p>
+<p><strong>Found by:</strong> the suite reporting 117 failures, all<br />
+<code>TimeoutError: page.waitForURL: … waiting for navigation to &quot;**/dashboard&quot;</code>, with<br />
+<code>404 POST /api/v1/auth/login</code> in the browser console.</p>
+<p><strong>Defect:</strong> <code>apps/admin/.env.local</code> sets <code>NEXT_PUBLIC_API_BASE_URL=/api</code>, so the<br />
+client bundle calls the API same-origin. That resolves only when the app is<br />
+served through the reverse proxy, which routes <code>/api/</code> to the API. The Playwright<br />
+default <code>baseURL</code> is the bare app port <code>http://localhost:3000</code>, where <code>/api/*</code> is<br />
+unrouted, so login 404&#39;d.</p>
+<p><strong>Fix:</strong> run the suite through the proxy —<br />
+<code>ORYX_ADMIN_URL=http://localhost:12000 pnpm --filter @oryx/admin test:ui</code>.<br />
+No source change was needed; the committed configuration was already correct.</p>
+<p><strong>Regression guard:</strong> documented as a gotcha in <code>AGENTS.md</code>, because one repeated<br />
+timeout hid every real failure behind it.</p>
+<h2 id="closed-the-reference-is-no-longer-artwork">Closed — the reference is no longer artwork</h2>
+<p>Defect 5&#39;s follow-up is complete. The remaining <code>tile-*.jpg</code> photographic crops<br />
+derived from the approved design reference have been deleted, and every tile is<br />
+now original vector art generated in-repo and served as SVG. The owner no longer<br />
+needs to supply the original photography for the reference to stop being reused;<br />
+supplying it would only raise fidelity, not correctness.</p>
+<p>What is still open for the owner is <strong>fidelity, not reuse</strong>: the official brand<br />
+mark and the original automotive photography are still required for full visual<br />
+parity. That is disclosed in <code>03_VISUAL_COMPARISON.md</code>.</p>
+<hr />
+<h2 id="recovery-session-2026-10-17-additional-defects">Recovery session (2026-10-17) — additional defects</h2>
+<p>The previous conversation crashed and the sandbox image was recycled. Recovering<br />
+the preview surfaced four more defects, each fixed and verified.</p>
+<h2 id="8-the-sidebar-had-no-sign-out-control">8. The sidebar had no sign-out control</h2>
+<p><strong>Severity:</strong> high — a signed-in user could not end their session from the UI.</p>
+<p><strong>Found by:</strong> the owner asking where the sign-out button was, then a sweep of the<br />
+rendered shell, which contained no logout element at all.</p>
+<p><strong>Defect:</strong> <code>apps/admin/src/components/sidebar.tsx</code> rendered only navigation<br />
+groups. <code>useAuth()</code> exposed <code>logout()</code> but nothing called it, so the only way out<br />
+was to clear cookies out of band.</p>
+<p><strong>Fix:</strong> a footer button outside the nav groups, pinned to the bottom of the rail<br />
+with <code>margin-top: auto</code> and a sticky position so it stays reachable when the nav<br />
+list scrolls. It is present in both the expanded and the collapsed rail, and it<br />
+carries <code>data-testid=&quot;sidebar-logout&quot;</code>. <code>onLogout()</code> awaits the API call that<br />
+revokes the refresh token and clears the HttpOnly cookie <strong>before</strong> navigating to<br />
+<code>/login</code>, so the user never lands on a protected page holding a live session.</p>
+<p><strong>Verified live</strong> over public HTTPS by <code>.run/verify-logout.mjs</code>: <code>oryx_rt</code><br />
+present before, <code>logout API status: 200</code>, cookies empty afterwards, a protected<br />
+route then refused, and the control visible in <strong>21 / 21</strong> module captures.</p>
+<p><strong>Regression guard:</strong> <code>auth-lifecycle.spec.ts</code> › *the sidebar sign-out revokes<br />
+the session and blocks protected pages*.</p>
+<h2 id="9-every-sign-in-failure-was-reported-as-bad-credentials">9. Every sign-in failure was reported as bad credentials</h2>
+<p><strong>Severity:</strong> medium — it actively misled a throttled or locked user.</p>
+<p><strong>Found by:</strong> reading the login handler while adding the logout test.</p>
+<p><strong>Defect:</strong> <code>apps/admin/src/app/login/page.tsx</code> caught every error and set<br />
+<code>auth.invalid</code>, so a <code>429</code> from the auth throttle and a <code>403</code> from an account<br />
+lock both read as &quot;Invalid email or password.&quot; A user with a correct password<br />
+would keep retrying and stay locked out.</p>
+<p><strong>Fix:</strong> <code>signInErrorMessage()</code> maps the failure to an actionable message —<br />
+<code>429</code> to throttling, <code>auth.account_locked</code> / <code>auth.account_inactive</code> by code,<br />
+<code>5xx</code> to unavailable, and only <code>401</code> to invalid credentials. Four new dictionary<br />
+keys were added in <strong>both</strong> Arabic and English.</p>
+<p><strong>Regression guard:</strong> three tests in <code>auth-lifecycle.spec.ts</code> — a mocked 429, a<br />
+mocked 403 lock, and a genuine 401 — assert the message text differs per cause.</p>
+<h2 id="10-a-configured-v1-suffix-produced-a-404-that-looked-like-a-routing-bug">10. A configured <code>/v1</code> suffix produced a 404 that looked like a routing bug</h2>
+<p><strong>Severity:</strong> low — a configuration foot-gun, not a product fault.</p>
+<p><strong>Defect:</strong> <code>API_BASE</code> in <code>apps/admin/src/lib/api.ts</code> was used verbatim while<br />
+callers append <code>/v1/...</code>. A <code>NEXT_PUBLIC_API_BASE_URL</code> that already ended in<br />
+<code>/v1</code> produced <code>/api/v1/v1/auth/login</code>.</p>
+<p><strong>Fix:</strong> trailing slashes and a terminal <code>/v1</code> are trimmed from the base, so the<br />
+documented origin-plus-<code>/api</code> form and the mistaken form both work.</p>
+<h2 id="11-the-preview-stack-did-not-survive-a-sandbox-recycle">11. The preview stack did not survive a sandbox recycle</h2>
+<p><strong>Severity:</strong> high for the deliverable — the owner&#39;s preview links went dark.</p>
+<p><strong>Found by:</strong> every port returning <code>000</code> after the crash, with<br />
+<code>PrismaClientInitializationError: Can&#39;t reach database server at 127.0.0.1:5432</code>.</p>
+<p><strong>Defect:</strong> three separate failures. The <code>postgresql-17</code> package was removed from<br />
+the image while the seeded cluster under <code>.run/pgdata</code> survived; the reinstall<br />
+widened that directory to <code>2770</code>, which PostgreSQL refuses to start from; and the<br />
+nginx reverse proxy plus <code>pnpm</code> were both gone. <code>start-stack.sh</code> also probed<br />
+readiness with <code>ss</code>, which is absent from the image, so it reported every healthy<br />
+service as <code>FAILED</code>.</p>
+<p><strong>Fix:</strong> <code>start-stack.sh</code> is now self-healing — it reinstalls PostgreSQL, restores<br />
+<code>pgdata</code> to <code>0700</code>, restores a <code>pnpm</code> shim through corepack, and starts one<br />
+<code>preview-proxy.mjs</code> per public host (12000 → admin, 12001 → customer) with a<br />
+<code>/mobile</code> route. Readiness uses a bash <code>/dev/tcp</code> probe instead of <code>ss</code>. nginx is<br />
+no longer required: the proxies serve the two ingress ports directly. The seeded<br />
+database was preserved throughout, so no re-seed was needed.</p>
+<p><strong>Verified:</strong> cold recovery to <code>47 / 47</code> public routes returning <code>200</code>.</p>
+<h2 id="12-a-concurrent-refresh-in-a-second-tab-silently-signed-the-user-out">12. A concurrent refresh in a second tab silently signed the user out</h2>
+<p><strong>Severity:</strong> high — a real session-loss bug in the shipped auth flow.</p>
+<p><strong>Found by:</strong> CI run <code>39050023690</code> (head <code>06ed1c0</code>), where the browser suite<br />
+failed 1 of 134 with <code>two tabs refreshing at once both stay usable</code>. The<br />
+Playwright trace showed the second tab&#39;s <code>POST /api/v1/auth/refresh</code> returning<br />
+<code>403</code> and the page falling back to <code>/login</code>.</p>
+<p><strong>Defect:</strong> the server-side rotation was already race-safe — the guarded<br />
+<code>updateMany</code> claim, the grace window and <code>issueSibling</code> all behaved correctly,<br />
+and a direct 12-iteration concurrent-refresh probe passed 12/12. The fault was<br />
+the CSRF double-submit token. <code>CookieService.setSession</code> minted a <strong>new</strong><br />
+<code>oryx_csrf</code> on every response, including refresh. When two tabs refreshed at<br />
+once, both requests carried the same pre-rotation header, but the first response<br />
+rotated the cookie; the second request then presented a header that no longer<br />
+matched the rotated cookie, so <code>CsrfGuard</code> rejected it with<br />
+<code>auth.csrf_token_invalid</code> and that tab lost its session.</p>
+<p><strong>Reproduced deterministically</strong> with <code>node</code> against the public host: login,<br />
+refresh once (cookie rotated, <code>rotated=true</code>), then replay the pre-rotation<br />
+header against the new cookie — <code>403</code>. A 12-iteration concurrent probe that<br />
+happened to pair identical headers passed, which is why the defect looked<br />
+intermittent.</p>
+<p><strong>Fix:</strong> the CSRF token is not a credential and gains nothing from per-request<br />
+rotation, so it is now preserved for the life of the session and minted fresh<br />
+only at login. <code>setSession</code> and <code>setCustomerSession</code> accept an <code>existingCsrf</code><br />
+argument, and the refresh handlers pass the caller&#39;s current token through. The<br />
+identical defect existed on the customer plane<br />
+(<code>CustomerAuthController.complete</code>) and is fixed the same way.</p>
+<p><strong>Verified:</strong> after the fix the repro reports <code>rotated=false</code> and the stale<br />
+header returns <code>200</code>; the 12-iteration concurrent probe is still 12/12; the<br />
+multi-tab browser test passes 5/5 consecutively (previously the failure was<br />
+reproducible). Two regression tests were added to <code>session.e2e-spec.ts</code> — one<br />
+asserting the token survives rotation and a pre-rotation header still verifies,<br />
+one asserting a genuinely wrong token is still rejected with<br />
+<code>auth.csrf_token_invalid</code>, so the guard is demonstrably not weakened. The API<br />
+suite grew from 218 to 220 tests, all passing.</p>
+<p><strong>Security note:</strong> no check was relaxed. <code>CsrfGuard</code> still requires the header<br />
+to match the cookie on every unsafe method that presents the refresh cookie; only<br />
+the <em>value&#39;s lifetime</em> changed, from per-response to per-session.</p>
+<h2 id="13-super-admin-sign-in-rejected-a-padded-or-mixed-case-email">13. Super Admin sign-in rejected a padded or mixed-case email</h2>
+<p><strong>Found:</strong> 2026-10-17, during the crash-recovery session, from the owner&#39;s report<br />
+that <code>info@oryxbhr.com</code> could not sign in permanently.</p>
+<p><strong>Defect:</strong> <code>LoginDto.email</code> carried <code>@IsEmail()</code> with no normalisation, so a<br />
+value pasted from a mobile keyboard or an email client with a trailing space<br />
+failed validation with a <code>400 &quot;email must be an email&quot;</code> before the service ever<br />
+lowered the case or trimmed it. To the user that reads as a broken account rather<br />
+than a stray character.</p>
+<p><strong>Fix:</strong> a <code>TrimString()</code> transform decorator was added to<br />
+<code>apps/api/src/common/transformers.ts</code> and applied to <code>LoginDto.email</code> (and the<br />
+customer, marketplace and RBAC DTOs that take an email). The email is trimmed<br />
+before validation, and the service already lower-cases before lookup.</p>
+<p><strong>Verified:</strong> <code>apps/api/test/super-admin-access.e2e-spec.ts</code> signs in with a<br />
+leading and trailing space and with mixed case, both against the seeded Super<br />
+Admin. Regression test in the API suite (9 tests in that spec).</p>
+<p><strong>Note on the owner&#39;s account:</strong> <code>info@oryxbhr.com</code> is not a seeded account in<br />
+this repository — the seeded platform principal is <code>superadmin@oryx.local</code><br />
+(<code>SEED_SUPER_ADMIN_EMAIL</code>). The owner&#39;s address can be seeded by setting<br />
+<code>SEED_SUPER_ADMIN_EMAIL=info@oryxbhr.com</code> before <code>pnpm db:seed</code>, which is how the<br />
+production principal should be provisioned. No production credential is stored in<br />
+the repository.</p>
+<h2 id="14-sourcing-the-root-env-overrode-the-admins-relative-api-base">14. Sourcing the root <code>.env</code> overrode the admin&#39;s relative API base</h2>
+<p><strong>Found:</strong> 2026-10-17, during the crash-recovery session, when the external<br />
+preview sweep reported CORS blocks on<br />
+<code>http://localhost:3001/api/v1/auth/login</code> from the public HTTPS origin.</p>
+<p><strong>Defect:</strong> <code>apps/admin/.env.local</code> correctly sets<br />
+<code>NEXT_PUBLIC_API_BASE_URL=/api</code> so the preview bundle calls the API same-origin.<br />
+But the root <code>.env</code> sets the same variable to an absolute<br />
+<code>http://localhost:3001/api</code>, and Next gives an exported shell variable precedence<br />
+over <code>.env.local</code>. A build that sources the root <code>.env</code> first — which the other<br />
+workspace builds need for <code>DATABASE_URL</code> — therefore baked the absolute localhost<br />
+URL into the served bundle. The reviewer&#39;s browser then called its own<br />
+<code>localhost:3001</code>, so every authenticated page rendered its shell with no data and<br />
+the console filled with CORS errors. A status-code-only check would have missed<br />
+this, because the pages still returned <code>200</code>.</p>
+<p><strong>Fix:</strong> the preview build exports <code>NEXT_PUBLIC_API_BASE_URL=/api</code> explicitly for<br />
+the admin build, so the relative value wins regardless of the ambient shell<br />
+environment.</p>
+<p><strong>Verified:</strong> the external sweep now records <strong>0 failed requests</strong> across all 39<br />
+routes, and the failing-request list (which previously named the localhost CORS<br />
+block) is empty. The check is in <code>docs/audit/evidence/preview-sweep-2026-10-17.json</code>.</p>
+<p><strong>Note for the next operator:</strong> any command that builds the admin app must not<br />
+leave the root <code>.env</code>&#39;s absolute <code>NEXT_PUBLIC_API_BASE_URL</code> exported, or the<br />
+served preview loses its same-origin API.</p>
+<h2 id="15-a-stored-light-theme-flashed-dark-and-could-be-silently-reverted">15. A stored light theme flashed dark and could be silently reverted</h2>
+<p><strong>Found by:</strong> CI. The browser-acceptance job failed on<br />
+<code>execution04.spec.ts:70</code> (&quot;every Execution 04 screen renders in both languages<br />
+and both themes&quot;) with <code>Expected: &quot;dark&quot;</code> but <code>unexpected value &quot;light&quot;</code>, on a<br />
+commit that changed only audit markdown. The same code had passed on the<br />
+previous head, which is the signature of a race rather than a deterministic<br />
+failure.</p>
+<p><strong>Cause:</strong> two effects in <code>UiProvider</code> (<code>apps/admin/src/lib/ui-context.tsx</code>,<br />
+and the same shape in <code>apps/customer</code>).</p>
+<ol><li>The root layout hard-codes <code>data-theme=&quot;dark&quot;</code> server-side, and the stored</li></ol>
+<p>preference was applied only inside a <code>useEffect</code> after hydration. A<br />
+light-theme user therefore saw a dark first paint on every navigation — a<br />
+real visual defect, not just a test artefact.</p>
+<ol><li>The theme effect ran on mount and wrote <code>localStorage[&#39;oryx.theme&#39;] = theme</code></li></ol>
+<p>unconditionally. On the hydration pass <code>theme</code> is still the server default<br />
+(<code>dark</code>), so the mount wrote <code>dark</code> back over whatever the user had stored.<br />
+When a test (or a user) changed the stored value between the mount write and<br />
+the next read, the two writes raced and the stored preference lost<br />
+intermittently.</p>
+<p><strong>Fix:</strong> both front ends now</p>
+<ul><li>render a tiny blocking <code>&lt;script&gt;</code> at the top of <code>&lt;body&gt;</code> that reads the stored</li></ul>
+<p>theme and locale and sets <code>data-theme</code>/<code>data-dir</code>/<code>lang</code> on <code>&lt;html&gt;</code> before<br />
+the first paint, so there is no flash and the attribute is already correct<br />
+when React hydrates; and</p>
+<ul><li>guard the persistence effects with a <code>mounted</code> ref declared last, so the</li></ul>
+<p>hydration pass never writes the server defaults back over the stored values.</p>
+<p><strong>Verified:</strong> <code>.run/theme-verify.mjs</code> drives a real browser against the public<br />
+preview and asserts, for both <code>light</code> and <code>dark</code>, that the attribute at first<br />
+paint, the attribute after hydration and the stored value all agree. Three<br />
+consecutive runs report <code>light_ok: true, dark_ok: true</code>. Before the fix the<br />
+first-paint probe reported <code>null</code> (the attribute was not set until after<br />
+hydration) and the stored value reverted to <code>light</code> when <code>dark</code> was requested.</p>
+<h2 id="16-super-admin-lost-every-tenant-permission-after-a-re-seed">16. Super Admin lost every tenant permission after a re-seed</h2>
+<p><strong>Severity:</strong> critical, user-visible. A platform Super Admin could sign in and<br />
+see the platform screens, but every company-scoped ERP endpoint answered <code>403</code><br />
+once a company was selected. The owner reported exactly this: &quot;Super Admin full<br />
+access&quot; did not work.</p>
+<p><strong>Found by:</strong> the API integration suite. <code>super-admin-access.e2e-spec.ts</code><br />
+(&quot;resolves the whole permission catalog once a company is selected&quot;) and<br />
+<code>permissions-verification.e2e-spec.ts</code> both failed after the sandbox was<br />
+recycled, while the same commit had passed before the crash. That signature —<br />
+same code, different database state — pointed at data drift rather than a code<br />
+change.</p>
+<p><strong>Cause:</strong> two defects stacked on one another.</p>
+<ol><li><code>seedPlatformRoles()</code> in <code>packages/database/prisma/seed.ts</code> resolved the</li></ol>
+<p>platform role with<br />
+<code>upsert({ where: { companyId_code: { companyId: &#39;&#39;, code: &#39;platform_super_admin&#39; } } })</code>.<br />
+A platform role has <code>companyId = NULL</code>, and Postgres treats <code>NULL</code> as<br />
+distinct in a unique index, so <code>(NULL, &#39;platform_super_admin&#39;)</code> never matched<br />
+the sentinel key <code>(&#39;&#39;, &#39;platform_super_admin&#39;)</code>. The create path therefore<br />
+ran and inserted a <strong>second</strong> <code>platform_super_admin</code> row on every re-seed.<br />
+This is the same nullable-unique-key trap already documented for<br />
+<code>IntegrationProvider</code>, but <code>Role</code> had no partial index to prevent it.</p>
+<ol><li>The consumers — <code>PrincipalGuard.buildPrincipal</code>,</li></ol>
+<p><code>AuthService.effectivePermissionCodes</code> and <code>RbacService</code> — all resolve the<br />
+role with <code>findFirst({ where: { isPlatform: true, code: &#39;platform_super_admin&#39; } })</code>,<br />
+which has no <code>orderBy</code>. It returned the first row Postgres offered, which<br />
+after the drift was the stale row created before commit <code>a14d7b2</code> widened<br />
+<code>PLATFORM_SUPER_ADMIN_PERMISSIONS</code> from the 18 PLATFORM-scope codes to the<br />
+full 153-code catalog. The principal therefore received 18 permissions, and<br />
+<code>resolveEffectivePermissions</code> correctly refused to widen them: only the<br />
+PLATFORM-scope subset survived, and every <code>erp.*</code> permission was absent.</p>
+<p><strong>Fix:</strong> <code>seedPlatformRoles()</code> now resolves the row with<br />
+<code>findFirst({ where: { companyId: null, code: &#39;platform_super_admin&#39; } })</code> and<br />
+updates it in place, creating it only when it is genuinely absent. This is the<br />
+only idempotent form for a nullable unique key, and it matches the pattern<br />
+already used for the platform integration provider.</p>
+<p>The stale duplicate row was removed from the staging database. The repaired role<br />
+holds all 153 permission codes.</p>
+<p><strong>Verified:</strong> <code>node .run/live-login-https.mjs</code> against the public HTTPS preview<br />
+now reports <code>Super Admin … perms=18 scoped=200 scopedPerms=153</code>, where the same<br />
+probe previously reported <code>scopedPerms=18</code>. <code>.run/verify-super-admin-erp.mjs</code><br />
+then reaches real tenant data over public HTTPS: accounting accounts <code>200</code><br />
+(21 rows), sales customers <code>200</code>, inventory products <code>200</code>, HR employees <code>200</code>,<br />
+CRM leads <code>200</code> and the module catalog <code>200</code> (21 modules). Re-running<br />
+<code>pnpm db:seed</code> a second time leaves exactly one platform role row with 153<br />
+permissions, so the drift cannot recur.</p>
+<p><strong>Regression guard:</strong> <code>apps/api/test/super-admin-access.e2e-spec.ts</code>, test &quot;has<br />
+exactly one platform super admin role carrying the whole catalog&quot;. It asserts a<br />
+single <code>(companyId: null, code: &#39;platform_super_admin&#39;)</code> row holding more than<br />
+100 permissions including <code>erp.accounting.read</code>, so a duplicated or truncated<br />
+platform role fails the suite instead of silently degrading the Super Admin.</p>
+<h2 id="execution-06-follow-up-2026-10-18-two-defensive-input-defects">Execution 06 follow-up (2026-10-18) — two defensive-input defects</h2>
+<p>Both were found by the module-by-module live probe (<code>.run/probe-bad-dates.mjs</code>,<br />
+<code>.run/probe-booking-cal.mjs</code>), which sends deliberately malformed query strings<br />
+to every date-filtered endpoint. Neither is a data-integrity bug; both turned a<br />
+client mistake into an unhandled 500 and a stack trace in the API log.</p>
+<h2 id="17-a-malformed-report-date-returned-500-instead-of-400">17. A malformed report date returned 500 instead of 400</h2>
+<p><strong>Found:</strong> 2026-10-18, live probe against the staging API.</p>
+<p><strong>Defect:</strong> the four report endpoints — <code>GET /reports/accounting</code>,<br />
+<code>/reports/sales</code>, <code>/reports/purchasing</code> and <code>/reports/inventory</code> — declared their<br />
+<code>from</code> and <code>to</code> filters with <code>@IsString()</code>. Any string passed validation, so<br />
+<code>?from=not-a-date</code> reached the service, which handed it to <code>new Date(...)</code> and<br />
+then to Prisma; the resulting <code>Invalid Date</code> threw inside the query and the<br />
+global filter returned a 500. The accounting statement endpoints<br />
+(<code>general-ledger</code>, <code>trial-balance</code>, <code>income-statement</code>, <code>balance-sheet</code>) already<br />
+used <code>@IsISO8601()</code> and correctly returned 400, so the two families disagreed<br />
+about the same input.</p>
+<p><strong>Fix:</strong> <code>apps/api/src/reports/reports.dto.ts</code> now declares <code>from</code> and <code>to</code> with<br />
+<code>@IsISO8601()</code>, matching the accounting DTOs. The class-validator message names<br />
+the field, so the client gets <code>from must be a valid ISO 8601 date string</code>.</p>
+<p><strong>Verified:</strong> <code>.run/probe-bad-dates.mjs</code> now reports <code>400</code> for all six families<br />
+with the field-level message; a valid ISO range still returns <code>200</code>.</p>
+<p><strong>Regression guard:</strong> <code>apps/api/test/input-validation.e2e-spec.ts</code>, the<br />
+&quot;a malformed date filter is a 400, not a 500&quot; group — eight tests covering all<br />
+four reports plus the four accounting statements.</p>
+<h2 id="18-the-bookings-calendar-required-a-range-but-did-not-say-so">18. The bookings calendar required a range but did not say so</h2>
+<p><strong>Found:</strong> 2026-10-18, same probe run.</p>
+<p><strong>Defect:</strong> <code>GET /bookings/calendar</code> read <code>from</code>, <code>to</code> and <code>resourceId</code> straight<br />
+from <code>@Query()</code> with no DTO. With no range, or with a malformed one, the<br />
+controller passed <code>undefined</code>/<code>Invalid Date</code> into the availability query, which<br />
+threw and returned a 500. A caller had no way to know the range was mandatory,<br />
+and the failure mode was a server error rather than a validation message.</p>
+<p><strong>Fix:</strong> <code>apps/api/src/customer/booking.dto.ts</code> gains <code>CalendarQueryDto</code><br />
+(<code>@IsDateString()</code> on <code>from</code> and <code>to</code>, <code>@IsOptional() @IsString()</code> on<br />
+<code>resourceId</code>), and <code>booking.controller.ts</code> takes `@Query() query:<br />
+CalendarQueryDto`. A missing or malformed range is now a 400 naming the field.</p>
+<p><strong>Verified:</strong> <code>.run/probe-booking-cal.mjs</code> reports <code>400</code> with no params,<br />
+<code>400</code> for <code>from=bad</code>, and <code>200 []</code> for a valid October range.</p>
+<p><strong>Regression guard:</strong> <code>apps/api/test/input-validation.e2e-spec.ts</code>, the<br />
+&quot;bookings calendar requires a real date range&quot; group — three tests.</p>
+<h2 id="note-the-preview-bundle-must-be-built-with-a-relative-api-base">Note — the preview bundle must be built with a relative API base</h2>
+<p>This is not a new defect; it is the recurring operational trap documented as<br />
+defect 14, and the crash-recovery session hit it again. <code>start-stack.sh</code> sources<br />
+the root <code>.env</code>, which sets <code>NEXT_PUBLIC_API_BASE_URL=http://localhost:3001/api</code>.<br />
+Next gives an exported shell variable precedence over <code>apps/admin/.env.local</code>, so<br />
+a rebuild after sourcing the root <code>.env</code> bakes the absolute localhost URL into<br />
+the served bundle. The public HTTPS pages then return <code>200</code> while every<br />
+authenticated fetch is CORS-blocked — a status-code-only check passes while the<br />
+product is broken.</p>
+<p>Any rebuild of <code>apps/admin</code> or <code>apps/customer</code> for the preview must export<br />
+<code>NEXT_PUBLIC_API_BASE_URL=/api</code> for the build, and the running <code>next start</code><br />
+processes must be restarted afterwards (<code>pgrep -f &quot;next start&quot;</code> does not match<br />
+them; they appear as <code>next-server</code>, so kill by port or by PID).</p>
+<p><strong>Verified:</strong> after the rebuild the external sweep records **39/39 routes, 0<br />
+failed requests**, and <code>grep -rho &quot;localhost:3001&quot; apps/admin/.next/static/chunks</code><br />
+returns nothing.</p>
+<h2 id="defect-18-customer-refresh-answered-404-where-the-staff-plane-answers-401">Defect 18 — customer refresh answered <code>404</code> where the staff plane answers <code>401</code></h2>
+<p><strong>Found:</strong> 2026-10-18, by attributing every <code>&gt;= 400</code> response to the page that<br />
+produced it (<code>.run/diag-http-errors.mjs</code>) during the Execution 07 re-verification.<br />
+The 39-surface sweep reported <code>2</code> console errors; a status-code-only check had<br />
+hidden both.</p>
+<p><strong>Defect:</strong> <code>CustomerAuthController.refresh</code> threw<br />
+<code>notFound(ERROR_CODES.AUTH_TOKEN_INVALID, &#39;No refresh token was presented.&#39;)</code><br />
+when the request carried no refresh cookie. The equivalent staff handler,<br />
+<code>AuthController.refresh</code>, throws <code>unauthorized(...)</code> for the same condition.<br />
+Two problems followed:</p>
+<ol><li><code>404</code> is semantically wrong — the route exists; the caller has no session.</li><li>The customer client treats <code>401</code>/<code>403</code> as <em>expired</em> and anything else as a</li></ol>
+<p><em>transient outage</em>, so <code>restoreCustomerSession()</code> retried the call three<br />
+times with backoff. A first-time visitor&#39;s page load produced three failed<br />
+requests before rendering.</p>
+<p><strong>Fix:</strong> <code>apps/api/src/customer/customer-auth.controller.ts</code> throws<br />
+<code>unauthorized(...)</code> instead, matching the staff plane. The import changed from<br />
+<code>notFound</code> to <code>unauthorized</code>.</p>
+<p><strong>Verified:</strong> <code>.run/diag-http-errors.mjs</code> now reports <code>401</code> on every anonymous<br />
+customer surface; <code>.run/check-refresh-count.mjs</code> reports <strong>1</strong> refresh request<br />
+per anonymous homepage load (was 3); the external sweep&#39;s console-error count<br />
+fell from 2 to 1, the remaining one being the expected bootstrap <code>401</code>.</p>
+<p><strong>Regression guard:</strong> <code>apps/api/test/execution04.e2e-spec.ts</code>, section *A.<br />
+customer identity* — <code>answers a cookieless refresh with 401, never 404</code>.</p>
+<h2 id="defect-19-three-category-vocabularies-made-every-category-filter-return-nothing">Defect 19 — three category vocabularies made every category filter return nothing</h2>
+<p><strong>Found:</strong> 2026-10-18, during the Execution 07 Phase D verification. The<br />
+homepage category cards rendered the bundled vector fallback instead of the CMS<br />
+photograph (<code>categoryCardsFromCms: 0</code>), and a direct probe showed<br />
+<code>GET /marketplace/providers?categoryKey=automotive_maintenance</code> returning <code>0</code>.</p>
+<p><strong>Defect:</strong> three layers each used a different key for the same concept.</p>
+<div class="table-wrap"><table><thead><tr><th>Layer</th><th>Keys it used</th></tr></thead><tbody><tr><td>Customer website and mobile <code>SERVICE_CATEGORIES</code></td><td><code>automotive_maintenance</code>, <code>automotive_inspection</code>, <code>automotive_tyres</code>, <code>automotive_bodywork</code>, <code>automotive_recovery</code></td></tr><tr><td>Seeded <code>ServiceCategory</code> rows (the CMS imagery target)</td><td><code>vehicle_inspection</code>, <code>maintenance</code>, <code>spare_parts</code>, <code>recovery</code>, <code>car_wash</code></td></tr><tr><td>Seeded <code>MarketplaceProvider.categoryKey</code></td><td><code>WORKSHOP</code></td></tr></tbody></table></div>
+<p>The provider directory filters on <code>categoryKey</code>, so each category chip sent a key<br />
+no provider carried and the directory returned an empty list. The homepage looked<br />
+up <code>content.categories</code> by the website key, found no row, and fell back to vector<br />
+art. Neither failure raised an error; both rendered a plausible but empty result,<br />
+which is why the earlier status-code-only sweeps missed it.</p>
+<p><strong>Fix:</strong> the catalogue now lives once, in<br />
+<code>packages/shared/src/service-categories.ts</code>. The seed writes the <code>ServiceCategory</code><br />
+rows and the provider <code>categoryKey</code> values from it and creates one approved<br />
+provider per category; the customer website and the mobile app re-export it. The<br />
+keys are the persisted <code>ServiceCategory.key</code> values, so the CMS rows, the<br />
+photography and the provider directory agree by construction.</p>
+<p><strong>Verified:</strong> every canonical key now returns providers<br />
+(<code>vehicle_inspection</code> / <code>maintenance</code> / <code>spare_parts</code> / <code>recovery</code> / <code>car_wash</code><br />
+→ <code>27</code> each; the retired <code>automotive_maintenance</code> and <code>WORKSHOP</code> → <code>0</code>).<br />
+<code>.run/verify-category-filter.mjs</code> drives the live UI and records 27 rendered<br />
+provider cards for each of the five categories in<br />
+<code>docs/audit/exec07/phase-d/category-filter-verification.json</code>.<br />
+<code>.run/capture-exec07-phase-d.mjs</code> now reports <code>categoryCardsFromCms: 5</code> in all<br />
+four locale/theme captures (was <code>0</code>).</p>
+<p><strong>Regression guard:</strong> <code>packages/shared/test/service-categories.test.ts</code> (7 tests,<br />
+including explicit rejection of the retired keys) and three tests in<br />
+<code>apps/api/test/execution07.e2e-spec.ts</code>: the CMS category keys and the provider<br />
+directory agree, a retired key matches nothing, and every catalogue category is a<br />
+seeded <code>ServiceCategory</code> row.</p></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>aa1569d</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-24T02:32:08.728Z</span>
+  </div>
+</footer>
+</body>
+</html>

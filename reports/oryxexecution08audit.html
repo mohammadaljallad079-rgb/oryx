@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>ORYX — Execution 08 Phase 1: Complete Platform Audit · ORYX design preview</title>
+<meta name="description" content="ORYX — Execution 08 Phase 1: Complete Platform Audit" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Execution reports</p>
+        <h1>ORYX — Execution 08 Phase 1: Complete Platform Audit</h1>
+        <p class="card__meta">Rendered from <code>docs/execution-reports/ORYX_EXECUTION_08_AUDIT.md</code> at <code>aa1569d</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/execution-reports/ORYX_EXECUTION_08_AUDIT.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#1-scale">1. Scale</a></li><li><a href="#2-classification">2. Classification</a></li><li><a href="#3-bahrain-configuration-phase-4">3. Bahrain configuration (Phase 4)</a></li><li><a href="#4-deployment-package-phase-9">4. Deployment package (Phase 9)</a></li><li><a href="#5-seed-safety-phase-5">5. Seed safety (Phase 5)</a></li><li><a href="#6-security-posture-phase-6">6. Security posture (Phase 6)</a></li><li><a href="#7-what-is-genuinely-missing">7. What is genuinely missing</a></li><li><a href="#8-honest-limitations-of-this-audit">8. Honest limitations of this audit</a></li></ul></nav>
+        <article><h1 id="oryx-execution-08-phase-1-complete-platform-audit">ORYX — Execution 08 Phase 1: Complete Platform Audit</h1>
+<p>Status: <strong>audit complete.</strong> This document is an inventory of what exists and a<br />
+classification of what works. It is not a claim of production readiness; the<br />
+gaps it records are what Phases 2–9 address.</p>
+<p>Method: the classification below was derived from the source tree, the database<br />
+schema, the route tables and the automated suites — not from the marketing<br />
+documentation. Where a claim is made, the file or command that supports it is<br />
+named. A feature is <strong>WORKING</strong> only when its API endpoint is DB-backed <em>and</em><br />
+its screen calls that endpoint. A screen that renders bundled preview data is<br />
+<strong>PARTIAL</strong>, however polished it looks.</p>
+<hr />
+<h2 id="1-scale">1. Scale</h2>
+<div class="table-wrap"><table><thead><tr><th>Measure</th><th>Value</th></tr></thead><tbody><tr><td>Prisma models</td><td>163</td></tr><tr><td>Prisma migrations</td><td>13 (+1 migration lock)</td></tr><tr><td>Schema drift against migrations</td><td><strong>none</strong> (<code>prisma migrate diff</code> → &quot;No difference detected&quot;)</td></tr><tr><td>API controllers</td><td>34</td></tr><tr><td>API endpoints</td><td>425</td></tr><tr><td>API source</td><td>32,787 lines</td></tr><tr><td>Admin source</td><td>19,940 lines</td></tr><tr><td>Customer source</td><td>6,468 lines</td></tr><tr><td>Shared source</td><td>3,361 lines</td></tr><tr><td>API integration suites</td><td>14</td></tr><tr><td>Shared unit suites</td><td>7</td></tr><tr><td>Browser suites (Playwright)</td><td>17</td></tr><tr><td>Mobile unit suites</td><td>3</td></tr></tbody></table></div>
+<hr />
+<h2 id="2-classification">2. Classification</h2>
+<h3 id="21-public-website-appscustomer">2.1 Public website (<code>apps/customer</code>)</h3>
+<div class="table-wrap"><table><thead><tr><th>Feature</th><th>Status</th><th>Evidence</th></tr></thead><tbody><tr><td>Marketing homepage (hero, categories, how-it-works, FAQ, contact, footer)</td><td><strong>WORKING</strong></td><td><code>apps/customer/src/app/page.tsx</code>; content read from the CMS endpoint via <code>use-website-content.ts</code></td></tr><tr><td>Services catalogue, Arabic and English</td><td><strong>WORKING</strong></td><td><code>/services/page.tsx</code>; categories from <code>@oryx/shared</code></td></tr><tr><td>Provider directory</td><td><strong>WORKING</strong> (read)</td><td><code>/providers/page.tsx</code> → <code>GET /v1/marketplace/providers</code></td></tr><tr><td>Provider detail</td><td><strong>WORKING</strong> (read)</td><td><code>/providers/[id]/page.tsx</code></td></tr><tr><td>Provider self-application</td><td><strong>WORKING</strong></td><td><code>/providers/apply/page.tsx</code> → <code>POST /v1/marketplace/providers/apply</code></td></tr><tr><td>Light and dark themes, RTL and LTR</td><td><strong>WORKING</strong></td><td>verified in Execution 07; 60 captures</td></tr><tr><td>Static GitHub Pages preview</td><td><strong>WORKING (read-only by design)</strong></td><td><code>IS_STATIC_PREVIEW</code>; mutating calls throw <code>501 preview_read_only</code> (<code>api.ts:375</code>)</td></tr><tr><td>Booking wizard on the public site</td><td><strong>PARTIAL</strong></td><td>the wizard exists in the mobile app and the API; the customer site routes bookings through the dashboard</td></tr></tbody></table></div>
+<h3 id="22-customer-dashboard-appscustomer">2.2 Customer dashboard (<code>apps/customer</code>)</h3>
+<div class="table-wrap"><table><thead><tr><th>Feature</th><th>Status</th><th>Evidence</th></tr></thead><tbody><tr><td>Consumer identity, sessions, CSRF</td><td><strong>WORKING</strong></td><td><code>customer-auth.service.ts</code>; consumer plane <code>aud= customer</code></td></tr><tr><td>Registration and login</td><td><strong>WORKING</strong></td><td><code>/register</code>, <code>/login</code></td></tr><tr><td>Vehicle garage (add, edit, list)</td><td><strong>WORKING</strong></td><td><code>/garage/page.tsx</code> → <code>customer-platform.controller.ts</code></td></tr><tr><td>Addresses</td><td><strong>WORKING</strong></td><td><code>PREVIEW_ADDRESSES</code> mirrored by real API in <code>customer-profile.controller.ts</code></td></tr><tr><td>Bookings list and detail</td><td><strong>WORKING</strong></td><td><code>/bookings/page.tsx</code> → <code>booking.controller.ts</code></td></tr><tr><td>Invoices and payments</td><td><strong>WORKING</strong></td><td><code>/invoices/page.tsx</code> → payments module</td></tr><tr><td>Notifications and preferences</td><td><strong>WORKING</strong></td><td><code>/notifications/page.tsx</code>; preference matrix persisted</td></tr><tr><td>Support tickets</td><td><strong>WORKING</strong></td><td><code>/support/page.tsx</code></td></tr><tr><td>Profile and privacy, data export and deletion</td><td><strong>WORKING</strong></td><td><code>/profile/page.tsx</code>; export/deletion request records</td></tr><tr><td>Credits</td><td><strong>WORKING</strong></td><td><code>/credits/page.tsx</code></td></tr></tbody></table></div>
+<h3 id="23-administration-dashboard-appsadmin">2.3 Administration dashboard (<code>apps/admin</code>)</h3>
+<p>35 of 36 route pages import the real API client (<code>apps/admin/src/lib/api.ts</code>);<br />
+the one exception is <code>app/page.tsx</code>, which is a redirect. No admin page renders<br />
+bundled operational data.</p>
+<div class="table-wrap"><table><thead><tr><th>Feature</th><th>Status</th><th>Evidence</th></tr></thead><tbody><tr><td>Authentication, MFA (TOTP), sessions</td><td><strong>WORKING</strong></td><td><code>auth/</code>, <code>mfa.service.ts</code>, <code>mfa-enrollment.service.ts</code></td></tr><tr><td>Organization hierarchy, tenant isolation</td><td><strong>WORKING</strong></td><td><code>organizations/</code></td></tr><tr><td>RBAC, delegated administration</td><td><strong>WORKING</strong></td><td><code>rbac/</code>; <code>validateDelegation</code> in <code>@oryx/shared</code></td></tr><tr><td>Companies, branches, users, roles, invitations</td><td><strong>WORKING</strong></td><td>admin routes + API</td></tr><tr><td>Plans, subscriptions, entitlements</td><td><strong>WORKING</strong></td><td><code>plans/</code>; entitlements are a snapshot</td></tr><tr><td>Module catalog</td><td><strong>WORKING</strong></td><td><code>modules/</code>; every module <code>AVAILABLE</code></td></tr><tr><td>Website and application CMS</td><td><strong>WORKING</strong></td><td><code>cms/</code>, <code>/website</code>, <code>/application</code></td></tr><tr><td>Media library (upload, variants, replace, delete)</td><td><strong>WORKING</strong></td><td><code>media.controller.ts</code>; 3 variants via <code>sharp</code></td></tr><tr><td>Audit trail</td><td><strong>WORKING</strong></td><td><code>audit/</code></td></tr><tr><td>Support sessions (reasoned, time-bounded)</td><td><strong>WORKING</strong></td><td><code>support/</code></td></tr><tr><td>Dashboard metrics</td><td><strong>WORKING</strong></td><td><code>dashboard/</code> — DB-backed</td></tr><tr><td>Accounting (CoA, journals, GL, TB, AR/AP)</td><td><strong>WORKING</strong></td><td><code>accounting/</code></td></tr><tr><td>Sales and POS</td><td><strong>WORKING</strong></td><td><code>sales/</code></td></tr><tr><td>Purchasing and procurement</td><td><strong>WORKING</strong></td><td><code>purchasing/</code></td></tr><tr><td>Inventory and stock ledger</td><td><strong>WORKING</strong></td><td><code>inventory/</code></td></tr><tr><td>HR and payroll</td><td><strong>WORKING</strong></td><td><code>hr/</code></td></tr><tr><td>CRM</td><td><strong>WORKING</strong></td><td><code>crm/</code></td></tr><tr><td>Operations, work orders, approvals</td><td><strong>WORKING</strong></td><td><code>operations/</code></td></tr><tr><td>Automotive: vehicles, inspections, job cards, warranties</td><td><strong>WORKING</strong></td><td><code>automotive/</code></td></tr><tr><td>Providers and workshop management</td><td><strong>WORKING</strong></td><td><code>marketplace/</code> provider portal</td></tr><tr><td>Bookings and scheduling</td><td><strong>WORKING</strong></td><td><code>customer/booking.service.ts</code></td></tr><tr><td>Payments, refunds, reconciliation, settlements</td><td><strong>WORKING</strong> (gateways adapter-only)</td><td><code>payments/</code>; <code>BENEFITPAY</code> and <code>CARD_ONLINE</code> report unconfigured without credentials — deliberately</td></tr><tr><td>Reports and analytics</td><td><strong>WORKING</strong></td><td><code>reports/</code></td></tr><tr><td>Notifications (in-app, email, SMS, WhatsApp, push)</td><td><strong>WORKING</strong> (adapters report unconfigured)</td><td><code>notifications/</code></td></tr><tr><td>Integrations center (20 providers)</td><td><strong>WORKING</strong></td><td><code>integrations/</code></td></tr><tr><td>Platform settings</td><td><strong>PARTIAL</strong></td><td>the <code>PlatformSetting</code> model exists and is unused; settings are per-company, not platform-wide</td></tr></tbody></table></div>
+<h3 id="24-mobile-application-appsmobile">2.4 Mobile application (<code>apps/mobile</code>)</h3>
+<div class="table-wrap"><table><thead><tr><th>Feature</th><th>Status</th><th>Evidence</th></tr></thead><tbody><tr><td>Expo/React Native app, tabs, booking wizard</td><td><strong>WORKING</strong></td><td>3 unit suites, 20 tests</td></tr><tr><td>Native store build and release</td><td><strong>MISSING</strong></td><td>no EAS configuration, no signing material, no store listing</td></tr></tbody></table></div>
+<h3 id="25-cross-cutting">2.5 Cross-cutting</h3>
+<div class="table-wrap"><table><thead><tr><th>Feature</th><th>Status</th><th>Evidence</th></tr></thead><tbody><tr><td>Authentication and authorization</td><td><strong>WORKING</strong></td><td><code>PrincipalGuard</code> → <code>PermissionsGuard</code> → <code>ModuleEntitlementGuard</code>, after <code>CsrfGuard</code></td></tr><tr><td>Input validation</td><td><strong>WORKING</strong></td><td>global <code>ValidationPipe</code> with <code>whitelist</code> and <code>forbidNonWhitelisted</code></td></tr><tr><td>Rate limiting</td><td><strong>WORKING</strong></td><td><code>ThrottlerGuard</code>; separate ceilings for auth and refresh</td></tr><tr><td>File upload security</td><td><strong>WORKING</strong></td><td>type allow-list, decode check, dimension floor, size cap, path-traversal guard (<code>media-storage.service.ts:105</code>)</td></tr><tr><td>Audit logging</td><td><strong>WORKING</strong></td><td>append-only, by key never by value</td></tr><tr><td>AI functionality</td><td><strong>MISSING (by design)</strong></td><td>no AI feature is documented in the business requirements; none is implemented and none is claimed</td></tr></tbody></table></div>
+<hr />
+<h2 id="3-bahrain-configuration-phase-4">3. Bahrain configuration (Phase 4)</h2>
+<div class="table-wrap"><table><thead><tr><th>Requirement</th><th>Current state</th><th>Classification</th></tr></thead><tbody><tr><td>Primary currency BHD, three decimals</td><td><code>packages/shared/src/currency.ts</code> — <code>{ code: &#39;BHD&#39;, scale: 3 }</code>, <code>DEFAULT_CURRENCY = &#39;BHD&#39;</code>; integer minor units throughout</td><td><strong>WORKING</strong></td></tr><tr><td>Money never a float</td><td><code>money.ts</code> uses integer minor units; percentages in basis points</td><td><strong>WORKING</strong></td></tr><tr><td>Bahrain phone validation</td><td>no Bahrain-specific validator; DTOs use <code>@IsString() @MaxLength(40)</code></td><td><strong>MISSING</strong></td></tr><tr><td>Arabic RTL primary locale</td><td><code>DEFAULT_LOCALE = &#39;ar&#39;</code>; admin and customer default to Arabic</td><td><strong>WORKING</strong></td></tr><tr><td>English LTR support</td><td>verified in Execution 07</td><td><strong>WORKING</strong></td></tr><tr><td><code>Asia/Bahrain</code> timezone</td><td>branch default is <code>&#39;Asia/Riyadh&#39;</code> (<code>organizations.service.ts:334</code>)</td><td><strong>MISSING</strong></td></tr><tr><td>Configurable service areas</td><td>no <code>ServiceArea</code> model</td><td><strong>MISSING</strong></td></tr><tr><td>Configurable VAT / financial settings</td><td><code>taxRateBp</code> / <code>taxPercentBp</code> columns exist per company and document; no platform-level default and no rate is invented</td><td><strong>PARTIAL</strong></td></tr></tbody></table></div>
+<p>The three <strong>MISSING</strong> rows are the Phase 4 work. No tax rate, payment<br />
+integration or regulatory approval is invented anywhere.</p>
+<hr />
+<h2 id="4-deployment-package-phase-9">4. Deployment package (Phase 9)</h2>
+<div class="table-wrap"><table><thead><tr><th>Artifact</th><th>State</th></tr></thead><tbody><tr><td>Dockerfile (API, admin, customer)</td><td><strong>MISSING</strong></td></tr><tr><td>Docker Compose production configuration</td><td><strong>MISSING</strong></td></tr><tr><td>Reverse proxy / TLS configuration</td><td><strong>MISSING</strong></td></tr><tr><td><code>.env.example</code></td><td><strong>PRESENT</strong> — 104 lines, no real secrets</td></tr><tr><td><code>docs/DEPLOYMENT.md</code></td><td><strong>PRESENT</strong> — 317 lines, describes required variables and steps</td></tr><tr><td>Database migration procedure</td><td><strong>PRESENT</strong> — <code>pnpm db:migrate</code> (<code>prisma migrate deploy</code>)</td></tr><tr><td>Automated backup and restore scripts</td><td><strong>MISSING</strong></td></tr><tr><td>Health check endpoint</td><td><strong>PRESENT</strong> — <code>GET /api/health</code>, version-neutral, probes the database</td></tr><tr><td>Rollback scripts</td><td><strong>MISSING</strong></td></tr><tr><td>GitHub Actions deployment workflow</td><td><strong>MISSING</strong> — only <code>ci.yml</code> and <code>preview.yml</code> exist</td></tr><tr><td>Persistent storage for uploads</td><td><code>MEDIA_ROOT</code> env var, defaults to <code>&lt;cwd&gt;/.media</code></td><td><strong>PARTIAL</strong> — the variable exists but is not documented in <code>.env.example</code></td></tr><tr><td>cPanel capability</td><td>not assumed; the stack needs Node 20+ and PostgreSQL 15+ with a long-running process</td><td><strong>UNVERIFIED</strong></td></tr></tbody></table></div>
+<hr />
+<h2 id="5-seed-safety-phase-5">5. Seed safety (Phase 5)</h2>
+<div class="table-wrap"><table><thead><tr><th>Requirement</th><th>State</th></tr></thead><tbody><tr><td>Demo data clearly fictional</td><td><strong>WORKING</strong> — tenants carry <code>SEED_DEMO_DATA: synthetic tenant for dashboard demonstration</code>; demo emails end <code>.local</code></td></tr><tr><td>Repeatable seeders</td><td><strong>WORKING</strong> — idempotent upserts</td></tr><tr><td>Seed refuses to run against production</td><td><strong>MISSING</strong> — <code>seed.ts</code> has no <code>NODE_ENV</code> guard</td></tr><tr><td>Production initialization path (configuration + owner accounts only)</td><td><strong>PARTIAL</strong> — <code>scripts/provision-super-admin.mjs</code> exists and is deliberately guarded, but there is no single production-init entry point</td></tr></tbody></table></div>
+<hr />
+<h2 id="6-security-posture-phase-6">6. Security posture (Phase 6)</h2>
+<p>Verified present: helmet, cookie-parser, explicit CORS origin list with<br />
+credentials, double-submit CSRF, Argon2 password hashing, TOTP MFA with<br />
+AES-256-GCM secret encryption and replay protection, hashed single-use recovery<br />
+codes, per-route permission and entitlement guards, global input validation,<br />
+upload hardening, path-traversal guard, rate limiting, append-only audit trail,<br />
+and a version-neutral health probe.</p>
+<div class="table-wrap"><table><thead><tr><th>Finding</th><th>Severity</th><th>Detail</th></tr></thead><tbody><tr><td>Reachable advisories in the API runtime</td><td>high</td><td><code>path-to-regexp@8.3.0</code> (via <code>@nestjs/swagger</code>), <code>lodash@4.17.21</code> (via <code>@nestjs/config</code>), <code>js-yaml@4.1.0</code> (via <code>@nestjs/swagger</code>)</td></tr><tr><td>Reachable advisory in the admin runtime</td><td>high</td><td><code>postcss@8.4.31</code> (via <code>next</code>)</td></tr><tr><td><code>deepmerge-ts</code></td><td>high</td><td>dev-time only, via the Prisma CLI (<code>prisma@6.19.3</code>)</td></tr><tr><td><code>braces</code>, <code>node-forge</code>, <code>image-size</code></td><td>high</td><td>no patch available upstream; present via build tooling, not the request path</td></tr><tr><td>Seed has no production guard</td><td>medium</td><td>see §5</td></tr></tbody></table></div>
+<p>The reachable ones are pinned by a parent package&#39;s own range, so the fix is a<br />
+<code>pnpm.overrides</code> entry, not a direct upgrade. Phase 6 applies those overrides<br />
+and re-runs the suite.</p>
+<hr />
+<h2 id="7-what-is-genuinely-missing">7. What is genuinely missing</h2>
+<p>Only four things are missing rather than partial:</p>
+<ol><li><strong>The deployment package</strong> (§4) — Dockerfiles, compose, proxy/TLS, backups,</li></ol>
+<p>rollback, deploy workflow, install guide.</p>
+<ol><li><strong>Bahrain localisation</strong> (§3) — phone validation, <code>Asia/Bahrain</code>, service</li></ol>
+<p>areas, platform-level VAT defaults.</p>
+<ol><li><strong>The seed production guard and a production-init entry point</strong> (§5).</li><li><strong>Native mobile release configuration</strong> (§2.4) — out of scope for a server</li></ol>
+<p>deployment, recorded so it is not mistaken for done.</p>
+<p>Everything else in the owner&#39;s inventory exists and is DB-backed. The task is to<br />
+verify it end to end, harden it, and package it — not to build it.</p>
+<hr />
+<h2 id="8-honest-limitations-of-this-audit">8. Honest limitations of this audit</h2>
+<ul><li>The classification is from static reading plus the existing automated suites.</li></ul>
+<p>Phase 8 re-runs those suites against an isolated staging database; a feature<br />
+that fails there moves to <strong>PARTIAL</strong> in the final report.</p>
+<ul><li>&quot;WORKING&quot; for a payment gateway means the adapter architecture works and the</li></ul>
+<p>unconfigured state is reported truthfully. It does <strong>not</strong> mean a live vendor<br />
+integration exists; none does, and none is claimed.</p>
+<ul><li>The GitHub Pages preview is a static export. It is not evidence of API</li></ul>
+<p>behaviour and is not treated as such.</p></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>aa1569d</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-24T02:32:08.728Z</span>
+  </div>
+</footer>
+</body>
+</html>

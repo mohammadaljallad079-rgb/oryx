@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>ORYX — Execution 08 Report · ORYX design preview</title>
+<meta name="description" content="ORYX — Execution 08 Report" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Execution reports</p>
+        <h1>ORYX — Execution 08 Report</h1>
+        <p class="card__meta">Rendered from <code>docs/execution-reports/ORYX_EXECUTION_08_REPORT.md</code> at <code>aa1569d</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/execution-reports/ORYX_EXECUTION_08_REPORT.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#1-recovery">1. Recovery</a></li><li><a href="#2-what-this-session-added">2. What this session added</a></li><li><a href="#3-light-theme">3. Light theme</a></li><li><a href="#4-preview-evidence">4. Preview evidence</a></li><li><a href="#5-verification">5. Verification</a></li><li><a href="#6-honest-limitations">6. Honest limitations</a></li></ul></nav>
+        <article><h1 id="oryx-execution-08-report">ORYX — Execution 08 Report</h1>
+<p><strong>Complete Platform, Production Readiness &amp; Server Deployment Package</strong></p>
+<p>Branch: <code>feature/execution-07-premium-web</code> · PR: <a href="https://github.com/mohammadaljallad079-rgb/oryx/pull/7" target="_blank" rel="noopener noreferrer">#7</a></p>
+<p>This report is written after the crash of the previous sandbox, so it opens with<br />
+what was recovered and what was not. It does not claim a recovery that did not<br />
+happen.</p>
+<hr />
+<h2 id="1-recovery">1. Recovery</h2>
+<div class="table-wrap"><table><thead><tr><th>Question</th><th>Answer</th></tr></thead><tbody><tr><td>Last commit the owner knew about</td><td><code>b3c9a71</code> — <em>docs(exec07): record green CI run 39161406862 in the Phase D report</em></td></tr><tr><td>Did the crashed session push beyond it?</td><td><strong>Yes.</strong> The remote branch tip is <strong><code>488e637</code></strong>, 17 commits ahead of <code>b3c9a71</code></td></tr><tr><td>Was anything pushed and then lost?</td><td><strong>No.</strong> Local <code>HEAD</code> and the remote branch tip are the same commit. <code>git log origin/…..HEAD</code> is empty</td></tr><tr><td>Is <code>b3c9a71</code> on the remote?</td><td>It is an <strong>ancestor of the pushed tip</strong> (17 commits behind it), so its content is present. It is not a branch tip itself</td></tr><tr><td>Uncommitted work in the tree</td><td>Execution 08 Phases 1, 4, 5, 6 and 9 — recovered and committed in this session (below)</td></tr><tr><td>Stashes</td><td>none</td></tr><tr><td>Stale artifacts found</td><td>four dangling commits from interrupted sessions; all are <strong>older</strong> than the pushed tip and were left untouched</td></tr></tbody></table></div>
+<p>The four dangling commits (<code>339672c</code>, <code>ae003d7</code>, <code>7aed52c</code>, <code>50946c9</code>) are<br />
+recovery snapshots and <code>stash</code>-style commits created by earlier interrupted<br />
+sessions. They were compared against the current tip and are <strong>stale</strong>: their<br />
+<code>globals.css</code> predates the finished light-theme correction (it still carries the<br />
+superseded <code>12.5px</code>/<code>13px</code> override that <code>5302b88</code> later removed), and their<br />
+captures differ from the signed-off evidence only by PNG recompression. Nothing<br />
+unique was lost, so nothing was restored from them — restoring them would have<br />
+regressed the light theme.</p>
+<p>**The premium website, CMS, real photography, category fixes, authentication and<br />
+security improvements are all present on the branch and were not touched.**</p>
+<h2 id="2-what-this-session-added">2. What this session added</h2>
+<p>The working tree held finished but uncommitted Execution 08 work. It was<br />
+verified, one consistency defect was fixed, and it was committed in three<br />
+grouped commits.</p>
+<h3 id="21-bahrain-market-configuration-phase-4">2.1 Bahrain market configuration (Phase 4)</h3>
+<ul><li><code>packages/shared/src/bahrain.ts</code> declares the launch market once — country,</li></ul>
+<p>currency, timezone, VAT and twelve administrative service areas in Arabic and<br />
+English. The API, the seed, the bootstrap and the website read the same<br />
+declaration.</p>
+<ul><li><code>ServiceArea</code> is a platform catalogue table, deliberately <strong>without</strong></li></ul>
+<p><code>companyId</code>: every tenant in the launch market shares the same administrative<br />
+areas, and a tenant narrows coverage through its own branches.</p>
+<ul><li>Platform settings are served by a new <code>PlatformModule</code> behind</li></ul>
+<p><code>platform.settings.read</code> / <code>platform.settings.manage</code>. Both permissions are<br />
+non-delegable, so a company administrator can never grant them.</p>
+<ul><li>Currency, timezone and country defaults move from Saudi to Bahrain</li></ul>
+<p>(<code>BHD</code>, <code>Asia/Bahrain</code>, <code>BH</code>). The migration alters <strong>column defaults only</strong>;<br />
+existing rows keep their values.</p>
+<ul><li><code>IsBahrainPhone</code> / <code>NormaliseBahrainPhone</code> accept a Bahraini mobile number and</li></ul>
+<p>store canonical E.164. The accepted forms and rejection reasons live in<br />
+<code>bahrain.ts</code>, so the API and the site cannot disagree.</p>
+<p><strong>Defect fixed this session:</strong> <code>organizations.service.ts</code> had been part-migrated<br />
+— currency and timezone defaulted to Bahrain while <code>countryCode</code> still defaulted<br />
+to <code>&#39;SA&#39;</code>. A newly provisioned company would have been created with a Bahraini<br />
+currency in Saudi Arabia. The country default now reads <code>DEFAULT_COUNTRY_CODE</code>.</p>
+<h3 id="22-shared-plan-catalogue">2.2 Shared plan catalogue</h3>
+<p><code>PLANS</code> moved from the seed into <code>packages/shared/src/plans.ts</code>, so the<br />
+development seed and the production bootstrap cannot disagree about a plan.<br />
+Enterprise resolves its modules from <code>MODULES</code>. Module counts are unchanged:<br />
+<strong>8 / 16 / 21</strong>.</p>
+<h3 id="23-production-bootstrap-phase-5">2.3 Production bootstrap (Phase 5)</h3>
+<p><code>packages/database/scripts/production-init.mjs</code> initialises a production<br />
+database with the catalogue and exactly one Super Admin. It writes no tenants,<br />
+staff, CMS content or demo data. It requires <code>--authorize</code>, refuses a<br />
+development database unless <code>--allow-dev-database</code> is given, and leaves an<br />
+existing password alone unless <code>--rotate-password</code> is passed. Wired as<br />
+<code>pnpm production:init</code>.</p>
+<h3 id="24-deployment-package-phase-9">2.4 Deployment package (Phase 9)</h3>
+<p><code>deploy/</code> holds three multi-stage Dockerfiles, a production compose file, an<br />
+nginx TLS/proxy configuration, backup / restore / deploy / health-check scripts,<br />
+and a production env template. <code>.github/workflows/deploy.yml</code> deploys a chosen<br />
+tag over SSH and is <strong>manual only</strong>.</p>
+<p>Design points that matter:</p>
+<ul><li>Only nginx publishes ports; the API, admin and customer containers are on an</li></ul>
+<p>internal network.</p>
+<ul><li>The API is proxied under <code>/api/</code> on <strong>every</strong> host, so the browser sees a</li></ul>
+<p>same-origin API. That keeps the HttpOnly refresh cookie first-party and the<br />
+CSRF double-submit check meaningful without widening CORS.</p>
+<ul><li><code>deploy.sh</code> never reverses a migration. It restores the previous images and</li></ul>
+<p>stops, because guessing a down migration is worse than stopping.</p>
+<ul><li><code>backup.sh</code> verifies the dump with <code>pg_restore --list</code> before declaring</li></ul>
+<p>success.</p>
+<h3 id="25-dependency-hardening-phase-6">2.5 Dependency hardening (Phase 6)</h3>
+<p><code>pnpm.overrides</code> pins <code>lodash</code>, <code>path-to-regexp</code>, <code>js-yaml</code>, <code>postcss</code> and<br />
+<code>deepmerge-ts</code> past their reachable advisories. Each is held by a parent<br />
+package&#39;s own range, so an override is the fix rather than a direct upgrade.</p>
+<h2 id="3-light-theme">3. Light theme</h2>
+<p>The owner&#39;s last request — *&quot;the Light Theme colors still look inconsistent and<br />
+need professional correction&quot;* — was completed before the crash and is on the<br />
+branch at <code>6ea99ba</code> and <code>5302b88</code>. It is <strong>not</strong> re-done here.</p>
+<p>The correction is centralised in <code>apps/customer/src/app/globals.css</code>: a<br />
+<code>[data-theme=&#39;light&#39;]</code> token block sets the ivory field (<code>#f7f4ed</code>), white and<br />
+warm-neutral surfaces, deep charcoal type and metallic gold accents, and the<br />
+components read those tokens. The dark theme block is untouched, and every<br />
+light-only override is scoped so the approved dark render cannot move.</p>
+<p>Verified against the signed-off Execution 07 evidence by pixel sampling: the<br />
+ivory field, the white surface and the navy hero band are <strong>identical</strong> between<br />
+the new captures and <code>docs/audit/exec07/phase-e/after/</code>.</p>
+<h2 id="4-preview-evidence">4. Preview evidence</h2>
+<p>Captured from the live GitHub Pages preview<br />
+(<code>https://mohammadaljallad079-rgb.github.io/oryx/</code>), not from a local build, so<br />
+the images show what a visitor receives.</p>
+<div class="table-wrap"><table><thead><tr><th>Surface</th><th>Viewports</th><th>Locales</th><th>Themes</th><th>Captures</th></tr></thead><tbody><tr><td>Homepage</td><td>mobile 390, tablet 768, desktop 1440</td><td>ar, en</td><td>light, dark</td><td>12</td></tr><tr><td>Customer dashboard</td><td>mobile, tablet, desktop</td><td>ar, en</td><td>light, dark</td><td>12</td></tr><tr><td>Provider directory</td><td>mobile, tablet, desktop</td><td>ar, en</td><td>light, dark</td><td>12</td></tr><tr><td>Login</td><td>mobile, tablet, desktop</td><td>ar, en</td><td>light, dark</td><td>12</td></tr></tbody></table></div>
+<p><code>docs/execution-reports/exec08-preview/</code> holds the 48 captures;<br />
+<code>comparisons/</code> holds 24 light-vs-dark sheets (light on the left, dark on the<br />
+right). Arabic is captured RTL, English LTR.</p>
+<p><strong>Note on the preview.</strong> It is a static export, so it is read-only by design: it<br />
+proves the markup, the tokens, the typography, the photography and the RTL/LTR<br />
+layout. It is <strong>not</strong> evidence of API behaviour and is not presented as such.</p>
+<h2 id="5-verification">5. Verification</h2>
+<div class="table-wrap"><table><thead><tr><th>Check</th><th>Result</th></tr></thead><tbody><tr><td><code>pnpm db:seed</code></td><td>pass — modules 21, plans 3, service areas 12</td></tr><tr><td><code>prisma migrate diff</code> (migrations vs schema)</td><td><strong>no drift</strong></td></tr><tr><td><code>pnpm --filter @oryx/shared test</code></td><td><strong>152 / 152</strong>, 8 suites</td></tr><tr><td><code>pnpm --filter @oryx/api test:e2e</code></td><td><strong>302 / 302</strong>, 14 suites</td></tr><tr><td><code>pnpm typecheck</code></td><td>clean, 6 packages</td></tr><tr><td><code>pnpm lint</code></td><td>clean (<code>--max-warnings=0</code>)</td></tr><tr><td><code>pnpm build</code></td><td>all six packages build; admin and customer <code>next build</code> compile</td></tr><tr><td>Live preview</td><td>homepage, login, providers all HTTP 200</td></tr></tbody></table></div>
+<h3 id="incident-during-this-session">Incident during this session</h3>
+<p><code>prisma migrate diff</code> was run with <code>--shadow-database-url</code> pointing at<br />
+<code>oryx_dev</code>. Prisma resets its shadow database, so it **destroyed the development<br />
+database&#39;s data**. This was a development database only; it was restored with<br />
+<code>prisma migrate reset</code> + <code>pnpm db:seed</code> and the API suite then passed 302/302.<br />
+No production data was involved and no committed artifact was affected. The<br />
+correct form is a dedicated throwaway shadow database, not the one the tests<br />
+read.</p>
+<h2 id="6-honest-limitations">6. Honest limitations</h2>
+<ul><li>Nothing here is deployed. The compose stack has not been run on a real host;</li></ul>
+<p>it is packaged and documented, not proven on target hardware.</p>
+<ul><li>The nginx configuration has not been validated with <code>nginx -t</code> in this</li></ul>
+<p>session.</p>
+<ul><li>Payment, SMS, WhatsApp, push and email providers remain unconfigured by</li></ul>
+<p>design. <code>health-check.sh</code> and the capabilities endpoint report that<br />
+truthfully; no vendor call is claimed.</p>
+<ul><li>The GitHub Pages preview is static and is not treated as API evidence.</li><li>Native mobile release configuration is out of scope for a server deployment</li></ul>
+<p>and is unchanged.</p></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>aa1569d</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-24T02:32:08.728Z</span>
+  </div>
+</footer>
+</body>
+</html>

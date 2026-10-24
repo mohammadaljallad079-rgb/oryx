@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>ORYX — Execution 04 Report: Customer Platform, Automotive Marketplace &amp; Mobile Applications · ORYX design preview</title>
+<meta name="description" content="ORYX — Execution 04 Report: Customer Platform, Automotive Marketplace &amp; Mobile Applications" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Execution reports</p>
+        <h1>ORYX — Execution 04 Report: Customer Platform, Automotive Marketplace &amp; Mobile Applications</h1>
+        <p class="card__meta">Rendered from <code>docs/execution-reports/ORYX_EXECUTION_04_REPORT.md</code> at <code>aa1569d</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/execution-reports/ORYX_EXECUTION_04_REPORT.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#1-recovered-github-state">1. Recovered GitHub state</a></li><li><a href="#2-branch-and-commit">2. Branch and commit</a></li><li><a href="#3-baseline-verification-before-this-sessions-changes">3. Baseline verification (before this session&#39;s changes)</a></li><li><a href="#4-what-execution-04-delivers">4. What Execution 04 delivers</a></li><li><a href="#5-database-migrations">5. Database migrations</a></li><li><a href="#6-api-endpoints">6. API endpoints</a></li><li><a href="#7-functional-cross-module-workflows-verified">7. Functional cross-module workflows verified</a></li><li><a href="#8-mobile-build-results">8. Mobile build results</a></li><li><a href="#9-test-results">9. Test results</a></li><li><a href="#10-github-actions-ci">10. GitHub Actions CI</a></li><li><a href="#11-screenshots">11. Screenshots</a></li><li><a href="#12-migration-and-rollback-notes">12. Migration and rollback notes</a></li><li><a href="#13-remaining-external-integrations">13. Remaining external integrations</a></li><li><a href="#14-known-limitations">14. Known limitations</a></li><li><a href="#15-pull-request">15. Pull request</a></li></ul></nav>
+        <article><h1 id="oryx-execution-04-report-customer-platform-automotive-marketplace-mobile-applications">ORYX — Execution 04 Report: Customer Platform, Automotive Marketplace &amp; Mobile Applications</h1>
+<p>Status: <strong>implemented, tested and ready for owner review</strong>. Nothing is merged<br />
+and nothing is deployed.</p>
+<h2 id="1-recovered-github-state">1. Recovered GitHub state</h2>
+<p>GitHub was the source of truth.</p>
+<div class="table-wrap"><table><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody><tr><td>Repository</td><td><code>mohammadaljallad079-rgb/oryx</code></td></tr><tr><td>PR #1 (<code>feature/execution-01-super-admin-foundation</code>)</td><td><strong>merged</strong> into <code>main</code></td></tr><tr><td>PR #2 (<code>feature/execution-02-erp-core</code>)</td><td><strong>merged</strong> into <code>main</code></td></tr><tr><td>PR #3 (<code>feature/execution-03-hr-crm-automotive</code>)</td><td><strong>merged</strong> into <code>main</code> at <code>20dd8b471103d138011dd8be8381027a586d85aa</code></td></tr><tr><td>Execution 04 branch before this session</td><td>did not exist; created from the latest verified <code>main</code></td></tr></tbody></table></div>
+<p>The branch was created from <code>main</code> @ <code>20dd8b4</code> (the Execution 03 merge commit).<br />
+No prior work was overwritten, reset or force-pushed, and Executions 01–03 were<br />
+not restarted.</p>
+<h2 id="2-branch-and-commit">2. Branch and commit</h2>
+<div class="table-wrap"><table><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody><tr><td>Branch</td><td><code>feature/execution-04-customer-marketplace-mobile</code></td></tr><tr><td>Base</td><td><code>main</code> @ <code>20dd8b471103d138011dd8be8381027a586d85aa</code></td></tr><tr><td>Head at time of writing</td><td><code>1cf9051a95305f1d4effe7567f6476e29082014d</code></td></tr><tr><td>Pull request</td><td><a href="https://github.com/mohammadaljallad079-rgb/oryx/pull/4" target="_blank" rel="noopener noreferrer">#4</a> (draft, open)</td></tr></tbody></table></div>
+<h2 id="3-baseline-verification-before-this-sessions-changes">3. Baseline verification (before this session&#39;s changes)</h2>
+<ul><li><code>pnpm --filter @oryx/shared test</code> — 85 passed.</li><li><code>pnpm --filter @oryx/api test:e2e</code> — 196 passed (7 suites).</li><li><code>pnpm --filter @oryx/mobile test</code> — 14 passed.</li><li>All Execution 01–03 correctness invariants (balanced ledger, atomic and</li></ul>
+<p>idempotent posting, row-locked inventory, tenant isolation, payroll snapshot)<br />
+are preserved and still asserted by the existing suites.</p>
+<p>One regression was found and fixed during recovery: the new mobile workspace<br />
+pinned React <code>19.1.0</code> while the web apps use <code>19.3.0</code>. Under the repository&#39;s<br />
+<code>node-linker=hoisted</code> install this hoisted <code>react@19.1.0</code> next to<br />
+<code>react-dom@19.3.0</code>, and <code>next build</code> failed at prerender with<br />
+<code>Cannot read properties of null (reading &#39;useRef&#39;)</code>. The mobile app was aligned<br />
+to React <code>19.3.0</code> (react-native&#39;s peer range is <code>^19.1.0</code>, so this is in range)<br />
+and the React type overrides were aligned to <code>19.3.0</code>. Admin, customer and mobile<br />
+now resolve one React version.</p>
+<h2 id="4-what-execution-04-delivers">4. What Execution 04 delivers</h2>
+<h3 id="a-customer-identity">A. Customer identity</h3>
+<p>Consumer registration and login are a <strong>separate identity plane</strong> from staff<br />
+auth: a consumer principal carries <code>audience: customer</code> and a staff token is<br />
+rejected on a consumer route and vice versa (asserted). Delivered:</p>
+<ul><li>registration, login, refresh, logout, logout-all and session listing;</li><li>password reset by single-use, hashed, expiring token (the token is never the</li></ul>
+<p>password, and an unknown email does not reveal whether the account exists);</p>
+<ul><li>optional TOTP MFA for consumers (enrol, confirm, disable);</li><li>customer profile;</li><li>multiple vehicles per customer with VIN uniqueness and per-owner isolation;</li><li>customer addresses (create, list, update, delete);</li><li>notification preferences;</li><li>privacy controls: data-export request recorded as a pending request rather</li></ul>
+<p>than exporting inline, plus a deletion request.</p>
+<h3 id="b-customer-website-appscustomer">B. Customer website (<code>apps/customer</code>)</h3>
+<p>A real Next.js customer site, database-backed end to end: homepage, service<br />
+categories and discovery, provider directory and profiles, vehicle garage,<br />
+inspection and maintenance booking, service requests, quotations and approvals,<br />
+booking management, service tracking, invoices and payment history, vehicle<br />
+service history, support and a customer dashboard.</p>
+<h3 id="c-automotive-marketplace">C. Automotive marketplace</h3>
+<p>Provider onboarding by public application, platform approval with commission,<br />
+provider profiles, service listings and pricing, provider availability, customer<br />
+service requests, provider acceptance/rejection, booking assignment, service<br />
+completion, reviews and ratings (gated on completed work, range-validated,<br />
+moderated before publication), complaints/disputes, marketplace commissions and<br />
+provider settlement records that post to the shared ledger.</p>
+<h3 id="d-booking-engine">D. Booking engine</h3>
+<p>One reusable scheduling engine shared by inspections, workshops and providers:<br />
+bookable resources with working hours and exceptions, service duration, slot<br />
+generation inside opening hours, confirmation, rescheduling, cancellation and<br />
+reminder state. Double booking is prevented with a database-backed uniqueness<br />
+constraint plus a transactional row lock; a cancelled slot is released for reuse<br />
+(both asserted).</p>
+<h3 id="e-service-integration">E. Service integration</h3>
+<p>Customer workflows are wired to the Execution 02/03 modules rather than<br />
+duplicating them:</p>
+<ul><li>inspection booking → inspection report → invoice;</li><li>maintenance booking → estimate → approval → workshop job card → spare-parts</li></ul>
+<p>consumption through the shared stock ledger → invoice;</p>
+<ul><li>marketplace request → provider assignment → service completion → settlement.</li></ul>
+<p>Invoices go through <code>SalesService.issueInvoice</code>; parts go through<br />
+<code>InventoryService.recordMovement</code>; every posting goes through<br />
+<code>AccountingPostingService.postJournal</code>. No second ledger was created.</p>
+<h3 id="f-payments">F. Payments</h3>
+<p>Cash, card-terminal and bank-transfer records, an online-gateway adapter<br />
+architecture, payment intents, verified confirmations, refunds, idempotent<br />
+webhooks (signature verified; a redelivery is deduplicated), reconciliation and<br />
+commissions/settlements. BenefitPay is prepared as a <code>REDIRECT</code> adapter: with no<br />
+merchant credentials in the repository it reports itself <strong>unconfigured</strong> and<br />
+creates no transaction, and an unconfigured online gateway leaves the intent<br />
+unpaid rather than pretending money was collected (asserted). No live gateway is<br />
+claimed operational.</p>
+<h3 id="g-notifications">G. Notifications</h3>
+<p>In-app notifications are persisted and functional. Email, SMS, WhatsApp Business<br />
+and push are implemented as adapters that report themselves <strong>configured</strong> only<br />
+when their provider credentials are present; with no credentials they transmit<br />
+nothing and record the reason. Templates and per-customer preferences are stored,<br />
+and delivery attempts are tracked with retries. Configured providers and<br />
+integrations still awaiting credentials are distinguished in the UI.</p>
+<h3 id="h-provider-portal">H. Provider portal</h3>
+<p>A real provider portal for profile, services, bookings, work orders,<br />
+availability, commissions, settlements, reviews and reports. Provider scope comes<br />
+from membership, not merely permission: a peer administrator who is not linked to<br />
+a provider cannot read or act on that provider&#39;s work (asserted).</p>
+<h3 id="i-mobile-applications-appsmobile">I. Mobile applications (<code>apps/mobile</code>)</h3>
+<p>A React Native / Expo (SDK 54, expo-router) customer application consuming the<br />
+<strong>same</strong> backend APIs as the website: onboarding, authentication, dashboard,<br />
+vehicle garage, service discovery, provider profiles, inspection and maintenance<br />
+bookings, booking tracking, service history, invoices and payment history,<br />
+notifications, support, Arabic RTL / English LTR, dark and light themes, and<br />
+secure credential storage through <code>expo-secure-store</code>. See section 8 for build<br />
+results.</p>
+<h2 id="5-database-migrations">5. Database migrations</h2>
+<p>Three additive migrations:</p>
+<div class="table-wrap"><table><thead><tr><th>Migration</th><th>Contents</th></tr></thead><tbody><tr><td><code>20261015055303_execution_04_customer_marketplace_mobile</code></td><td>Consumer accounts, sessions, reset tokens, vehicles, addresses, privacy and preference tables; bookable resources, working hours, exceptions and bookings; provider listings, availability, requests, reviews and settlements; payment intents, transactions, refunds, reconciliation, webhook events; notification state</td></tr><tr><td><code>20261015055400_execution_04_booking_concurrency</code></td><td>The uniqueness constraint and index that make double booking impossible</td></tr><tr><td><code>20261015070252_execution_04_journal_sources_and_notification_state</code></td><td>New journal source types and notification delivery state</td></tr></tbody></table></div>
+<p>Every tenant-owned table carries <code>companyId</code>. Money is integer minor units;<br />
+percentages are basis points. No Execution 01–03 table was altered destructively;<br />
+only new relations were added.</p>
+<h2 id="6-api-endpoints">6. API endpoints</h2>
+<p>New routes under <code>/api/v1</code>:</p>
+<ul><li><code>/customer/auth</code> — 14 routes (register, login, refresh, logout, logout-all,</li></ul>
+<p>sessions, password reset, MFA, profile);</p>
+<ul><li><code>/customer</code> — addresses, privacy, data export/deletion, notification</li></ul>
+<p>preferences, vehicles and vehicle history;</p>
+<ul><li><code>/customer-platform</code> — the staff-facing console (summary, accounts, link,</li></ul>
+<p>status);</p>
+<ul><li><code>/bookings</code> — availability, list, calendar, create, confirm, reschedule,</li></ul>
+<p>cancel, start, complete, no-show and resource/hours/exceptions management;</p>
+<ul><li><code>/customer/bookings</code> — the consumer-facing subset (availability, create, list,</li></ul>
+<p>cancel);</p>
+<ul><li><code>/customer/payments</code> — consumer payment history;</li><li><code>/payments</code> — provider readiness, intents (create/list/get), refunds, refund</li></ul>
+<p>approval, reconciliation, and the idempotent <code>/payments/webhooks/:provider</code><br />
+endpoint;</p>
+<ul><li><code>/automotive</code> — provider applications, provider decisions, listings, requests,</li></ul>
+<p>assignments, completion, reviews and moderation, complaints and settlements.</p>
+<p>Every route uses the existing <code>@RequireModule</code> + permission guards and is<br />
+company-scoped server-side. The full per-route permission table is in<br />
+<code>docs/api/API_REFERENCE.md</code>.</p>
+<h2 id="7-functional-cross-module-workflows-verified">7. Functional cross-module workflows verified</h2>
+<p>Each is asserted by the integration suite against the real HTTP surface and the<br />
+seeded database:</p>
+<ol><li><strong>Customer identity:</strong> register → login → a staff token is refused on a</li></ol>
+<p>consumer route and a consumer token on a staff route.</p>
+<ol><li><strong>Ownership:</strong> customer A cannot read customer B&#39;s vehicle or its history.</li><li><strong>Booking concurrency:</strong> two bookings for the same resource and time — the</li></ol>
+<p>second is refused; a cancelled slot becomes bookable again.</p>
+<ol><li><strong>Payment idempotency:</strong> a repeated idempotency key returns the original</li></ol>
+<p>intent and posts exactly one ledger entry; a repeated signed webhook is<br />
+processed once.</p>
+<ol><li><strong>Honest gateway:</strong> an unconfigured online gateway leaves the intent unpaid; a</li></ol>
+<p>bank transfer stays awaiting confirmation until an operator confirms it.</p>
+<ol><li><strong>Refunds:</strong> a settled payment refunds and mirrors the entry; a refund larger</li></ol>
+<p>than the amount collected is refused.</p>
+<ol><li><strong>Marketplace:</strong> application → approval with commission → listing → request →</li></ol>
+<p>assignment → completion → commission → settlement posted to the ledger.</p>
+<ol><li><strong>Reviews:</strong> a review before completion is refused; an out-of-range rating is</li></ol>
+<p>refused; a pending review stays out of the public profile until published,<br />
+after which the real average rating is exposed.</p>
+<ol><li><strong>Provider isolation:</strong> a provider cannot read or act on another provider&#39;s</li></ol>
+<p>work.</p>
+<h2 id="8-mobile-build-results">8. Mobile build results</h2>
+<div class="table-wrap"><table><thead><tr><th>Check</th><th>Command</th><th>Result</th></tr></thead><tbody><tr><td>Typecheck</td><td><code>pnpm --filter @oryx/mobile typecheck</code></td><td>passed</td></tr><tr><td>Unit tests</td><td><code>pnpm --filter @oryx/mobile test</code></td><td><strong>14 passed</strong></td></tr><tr><td>Android bundle</td><td><code>expo export --platform android</code></td><td>passed (Hermes bytecode bundle emitted)</td></tr><tr><td>iOS bundle</td><td><code>expo export --platform ios</code></td><td>passed (Hermes bytecode bundle emitted)</td></tr></tbody></table></div>
+<p>Bundling runs Metro over every screen for both platforms, which is real proof<br />
+that the app resolves and links without needing Xcode or the Android SDK. The<br />
+repository also ships <code>expo prebuild</code> scripts (<code>prebuild:android</code>,<br />
+<code>prebuild:ios</code>) and <code>expo run:*</code> scripts for producing native projects locally.<br />
+<strong>No app-store publication is claimed</strong> — nothing has been distributed, and no<br />
+store submission was performed.</p>
+<h2 id="9-test-results">9. Test results</h2>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Command</th><th>Result</th></tr></thead><tbody><tr><td>Shared unit tests</td><td><code>pnpm --filter @oryx/shared test</code></td><td><strong>85 passed</strong></td></tr><tr><td>API integration (e2e)</td><td><code>pnpm --filter @oryx/api test:e2e</code></td><td><strong>196 passed</strong> (7 suites)</td></tr><tr><td>Mobile unit tests</td><td><code>pnpm --filter @oryx/mobile test</code></td><td><strong>14 passed</strong></td></tr><tr><td>Browser acceptance (Playwright)</td><td><code>pnpm --filter @oryx/admin test:ui</code></td><td><strong>113 passed</strong> (incl. 5 new E04 UI tests)</td></tr></tbody></table></div>
+<p>Total: <strong>408 automated tests passing.</strong></p>
+<p>The new Execution 04 coverage is 64 API integration tests in<br />
+<code>apps/api/test/execution04.e2e-spec.ts</code> plus 5 browser tests in<br />
+<code>apps/admin/e2e/execution04.spec.ts</code>. No existing test was removed or weakened;<br />
+the Execution 01–03 suites still pass unchanged.</p>
+<h2 id="10-github-actions-ci">10. GitHub Actions CI</h2>
+<p>The existing CI workflow runs the shared unit tests, the API integration suite<br />
+and the full Playwright suite against a PostgreSQL 17 service. Execution 04 adds<br />
+a mobile stage to the <code>quality</code> job — typecheck, lint, unit tests and an Android<br />
+and iOS bundle — and the Execution 04 branch is on the <code>push</code> trigger. CI status<br />
+is shown on the PR; all jobs must pass on the final commit.</p>
+<h2 id="11-screenshots">11. Screenshots</h2>
+<p>Captured by the Playwright screenshot suite into<br />
+<code>docs/execution-reports/screenshots/</code>:</p>
+<ul><li><code>e04-customer-dark.png</code></li><li><code>e04-bookings-dark.png</code></li><li><code>e04-providers-dark.png</code></li><li><code>e04-payments-dark.png</code></li></ul>
+<p>The approved navy/gold design, right-side Arabic navigation, image-led module<br />
+cards, responsive layout and both themes are preserved and extended to the new<br />
+screens. The official logo is still absent from the repository; the neutral<br />
+monogram placeholder remains and no brand mark was invented. Approved dashboard<br />
+photography is likewise still not supplied; generated vector tile art is used.</p>
+<h2 id="12-migration-and-rollback-notes">12. Migration and rollback notes</h2>
+<ul><li><strong>Apply:</strong> <code>pnpm db:migrate</code>. The migrations are additive and safe to apply to a</li></ul>
+<p>database that already has Executions 01–03.</p>
+<ul><li><strong>Seed:</strong> <code>pnpm db:seed</code> is idempotent and adds the Execution 04 modules, their</li></ul>
+<p>plan entitlements and an approved provider per active company.</p>
+<ul><li><strong>Rollback:</strong> dropping the Execution 04 objects restores the Execution 03</li></ul>
+<p>schema. No Execution 01–03 column or row is modified, so a rollback cannot lose<br />
+prior data.</p>
+<h2 id="13-remaining-external-integrations">13. Remaining external integrations</h2>
+<p>These are <strong>not</strong> operational and are not claimed to be:</p>
+<ul><li><strong>BenefitPay</strong> — adapter written, credentials absent. Needs</li></ul>
+<p><code>BENEFITPAY_MERCHANT_ID</code>, <code>BENEFITPAY_API_KEY</code>, <code>BENEFITPAY_API_SECRET</code> and<br />
+<code>BENEFITPAY_BASE_URL</code>, plus a verified sandbox transaction, before any claim.</p>
+<ul><li><strong>Card online gateway</strong> — adapter written, no gateway configured.</li><li><strong>Email / SMS / WhatsApp / push</strong> — adapters written; each reports unconfigured</li></ul>
+<p>until its provider credentials are supplied. In-app notifications work today.</p>
+<ul><li><strong>Mobile distribution</strong> — build configuration is present and bundles pass; no</li></ul>
+<p>Apple/Google developer account, signing certificate or store listing exists.</p>
+<h2 id="14-known-limitations">14. Known limitations</h2>
+<ul><li><strong>Payments do not move money.</strong> Cash, card-terminal and bank-transfer are</li></ul>
+<p>recorded and posted to the ledger; no live gateway charges a card.</p>
+<ul><li><strong>No jurisdiction compliance.</strong> Payroll (Execution 03) still does not implement</li></ul>
+<p>Bahrain labour law, social insurance or WPS.</p>
+<ul><li><strong>Inspection is not accreditation.</strong> The inspection workflow remains an internal</li></ul>
+<p>ORYX process, not government certification.</p>
+<ul><li><strong>Marketplace settlement is administrative.</strong> Commissions and settlement</li></ul>
+<p>records post to the ledger; no money is disbursed to providers.</p>
+<ul><li><strong>Mobile is not published.</strong> Android and iOS bundles build; nothing is in a</li></ul>
+<p>store.</p>
+<ul><li><strong>Admin lint is a pre-existing gap.</strong> <code>apps/admin</code> has no ESLint configuration,</li></ul>
+<p>so <code>pnpm -r lint</code> cannot run it; CI does not run admin lint. This predates<br />
+Execution 04 and was not changed.</p>
+<h2 id="15-pull-request">15. Pull request</h2>
+<p>The Execution 04 pull request targets <code>main</code>:<br />
+<strong>https://github.com/mohammadaljallad079-rgb/oryx/pull/4</strong> (draft, open for owner<br />
+review).</p>
+<p>All six CI checks pass on both the push and the pull-request runs: typecheck and<br />
+build, unit and API integration tests, and browser acceptance tests.</p>
+<p><strong>It is not merged and nothing is deployed.</strong></p></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>aa1569d</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-24T02:32:08.728Z</span>
+  </div>
+</footer>
+</body>
+</html>

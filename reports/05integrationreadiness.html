@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>ORYX — Integration Readiness Audit · ORYX design preview</title>
+<meta name="description" content="ORYX — Integration Readiness Audit" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Audit</p>
+        <h1>ORYX — Integration Readiness Audit</h1>
+        <p class="card__meta">Rendered from <code>docs/audit/05_INTEGRATION_READINESS.md</code> at <code>aa1569d</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/audit/05_INTEGRATION_READINESS.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#catalogue">Catalogue</a></li><li><a href="#state-model">State model</a></li><li><a href="#live-state-on-staging">Live state on staging</a></li><li><a href="#credential-handling">Credential handling</a></li><li><a href="#customer-capabilities-endpoint">Customer capabilities endpoint</a></li><li><a href="#payment-adapters">Payment adapters</a></li><li><a href="#database-constraint">Database constraint</a></li><li><a href="#readiness-summary">Readiness summary</a></li><li><a href="#blockers">Blockers</a></li></ul></nav>
+        <article><h1 id="oryx-integration-readiness-audit">ORYX — Integration Readiness Audit</h1>
+<p>Audit date: 2026-10-16<br />
+Source of truth: <code>packages/shared/src/integrations.ts</code></p>
+<h2 id="catalogue">Catalogue</h2>
+<p><code>INTEGRATION_PROVIDERS</code> is declared once and feeds the API, the admin page and the<br />
+customer capabilities endpoint. The catalogue contains <strong>8 providers</strong>, not 20:</p>
+<div class="table-wrap"><table><thead><tr><th>Key</th><th>Category</th><th>Implementation</th><th>Configurable</th><th>Per-company</th><th>Credential fields</th></tr></thead><tbody><tr><td><code>BENEFITPAY</code></td><td>PAYMENTS</td><td>ADAPTER_ONLY</td><td>yes</td><td>yes</td><td>5</td></tr><tr><td><code>CARD_ONLINE</code></td><td>PAYMENTS</td><td>ADAPTER_ONLY</td><td>yes</td><td>yes</td><td>2</td></tr><tr><td><code>CASH</code></td><td>PAYMENTS</td><td>IMPLEMENTED</td><td>no</td><td>no</td><td>0</td></tr><tr><td><code>EMAIL</code></td><td>MESSAGING</td><td>ADAPTER_ONLY</td><td>yes</td><td>yes</td><td>3</td></tr><tr><td><code>SMS</code></td><td>MESSAGING</td><td>ADAPTER_ONLY</td><td>yes</td><td>yes</td><td>3</td></tr><tr><td><code>WHATSAPP</code></td><td>MESSAGING</td><td>ADAPTER_ONLY</td><td>yes</td><td>yes</td><td>2</td></tr><tr><td><code>PUSH</code></td><td>MESSAGING</td><td>ADAPTER_ONLY</td><td>yes</td><td>yes</td><td>2</td></tr><tr><td><code>IN_APP</code></td><td>MESSAGING</td><td>IMPLEMENTED</td><td>no</td><td>no</td><td>0</td></tr></tbody></table></div>
+<blockquote><p><strong>Documentation discrepancy (corrected 2026-10-16).</strong> <code>AGENTS.md</code> described<br />
+&quot;a 20-provider catalogue&quot;. The code declares 8, and the guide now says 8 to<br />
+match <code>packages/shared/src/integrations.ts</code>.</p></blockquote>
+<h2 id="state-model">State model</h2>
+<p><code>deriveState</code> in <code>apps/api/src/integrations/integrations.service.ts</code> is the single<br />
+place that decides a provider&#39;s state. <code>AWAITING_CREDENTIALS</code> is checked <strong>before</strong><br />
+a stored <code>verificationStatus</code> is trusted, so a gateway holding credentials that<br />
+have never produced a verified call is <code>CONFIGURED</code>, not <code>OPERATIONAL</code>.</p>
+<div class="table-wrap"><table><thead><tr><th>State</th><th>Meaning</th></tr></thead><tbody><tr><td><code>OPERATIONAL</code></td><td>Works and is verified. The only state advertised to customers.</td></tr><tr><td><code>CONFIGURED</code></td><td>Credentials present, no verified call yet.</td></tr><tr><td><code>AWAITING_CREDENTIALS</code></td><td>One or more required credentials missing.</td></tr><tr><td><code>NOT_STARTED</code></td><td>No adapter behaviour.</td></tr><tr><td><code>DISABLED</code></td><td>Turned off.</td></tr><tr><td><code>ERROR</code></td><td>Last check failed.</td></tr></tbody></table></div>
+<h2 id="live-state-on-staging">Live state on staging</h2>
+<p>Verified in the browser at <code>/integrations</code> (Super Admin, Arabic RTL):</p>
+<div class="table-wrap"><table><thead><tr><th>State</th><th>Count</th><th>Providers</th></tr></thead><tbody><tr><td><code>OPERATIONAL</code></td><td>2</td><td>Cash &amp; card terminal, In-app notifications</td></tr><tr><td><code>AWAITING_CREDENTIALS</code></td><td>6</td><td>BenefitPay, Online card gateway, Email, SMS, WhatsApp, Push</td></tr></tbody></table></div>
+<p>The two <code>OPERATIONAL</code> providers are the <code>IMPLEMENTED</code> internal ones, which need no<br />
+credentials. This is the correct reading: no external gateway is claimed to work.</p>
+<h2 id="credential-handling">Credential handling</h2>
+<div class="table-wrap"><table><thead><tr><th>Rule</th><th>Where it is enforced</th><th>Check</th></tr></thead><tbody><tr><td>Reads return a <code>hint</code> only, never a value</td><td>integrations service read path</td><td><code>execution05.e2e-spec.ts</code></td></tr><tr><td>An empty value in <code>PUT /integrations/:key/credentials</code> deletes the row</td><td>update path</td><td><code>execution05.e2e-spec.ts</code></td></tr><tr><td>Changing a credential clears the verification</td><td>update path</td><td><code>execution05.e2e-spec.ts</code></td></tr><tr><td>Values are sealed with AES-256-GCM</td><td>credential sealing service</td><td>code review</td></tr><tr><td>Audit logs by credential key, never by value</td><td><code>AuditService</code> call site</td><td><code>execution05.e2e-spec.ts</code></td></tr><tr><td>Enabling a provider with a missing required credential is refused</td><td>enablement guard</td><td><code>execution05.e2e-spec.ts</code></td></tr></tbody></table></div>
+<h2 id="customer-capabilities-endpoint">Customer capabilities endpoint</h2>
+<p><code>GET /customer/capabilities</code> advertises only <code>OPERATIONAL</code> providers. With the<br />
+current staging state it advertises 2. The rule is not widened to make a screen<br />
+look better.</p>
+<h2 id="payment-adapters">Payment adapters</h2>
+<div class="table-wrap"><table><thead><tr><th>Method</th><th>Behaviour</th><th>Verified by</th></tr></thead><tbody><tr><td><code>CASH</code></td><td>Always configured; the receipt is the confirmation</td><td><code>execution04.e2e-spec.ts</code></td></tr><tr><td><code>CARD_TERMINAL</code></td><td>Always configured; the receipt is the confirmation</td><td><code>execution04.e2e-spec.ts</code></td></tr><tr><td><code>BANK_TRANSFER</code></td><td>Awaiting confirmation until an operator confirms</td><td><code>execution04.e2e-spec.ts</code></td></tr><tr><td><code>BENEFITPAY</code></td><td>Reports itself unconfigured without credentials; leaves the intent unpaid</td><td><code>execution04.e2e-spec.ts</code></td></tr><tr><td><code>CARD_ONLINE</code></td><td>Reports itself unconfigured without credentials; leaves the intent unpaid</td><td><code>execution04.e2e-spec.ts</code></td></tr></tbody></table></div>
+<p>No path marks an intent paid without a verified provider confirmation.</p>
+<h2 id="database-constraint">Database constraint</h2>
+<p>The <code>(providerKey, scope, companyId)</code> compound unique does not accept <code>null</code>, and<br />
+Postgres treats <code>NULL</code> as distinct, so a platform row is created with<br />
+<code>findFirst</code> + <code>create</code>. The <code>IntegrationProvider_platform_key</code> partial index,<br />
+hand-written in the migration and not expressible in the Prisma schema, is what<br />
+enforces one platform row per provider.</p>
+<h2 id="readiness-summary">Readiness summary</h2>
+<div class="table-wrap"><table><thead><tr><th>Question</th><th>Answer</th></tr></thead><tbody><tr><td>Is the catalogue declared once?</td><td>Yes — <code>INTEGRATION_PROVIDERS</code></td></tr><tr><td>Are credentials sealed and never echoed?</td><td>Yes</td></tr><tr><td>Is the &quot;operational&quot; claim trustworthy?</td><td>Yes — <code>OPERATIONAL</code> requires a verified call</td></tr><tr><td>Can the owner enable an external gateway today?</td><td>No — the vendor calls are <code>ADAPTER_ONLY</code>, so <code>verify</code> reports &quot;not implemented&quot;</td></tr><tr><td>What is needed to go live with a gateway?</td><td>The merchant agreement and production credentials listed in each provider&#39;s <code>activationRequirement</code></td></tr></tbody></table></div>
+<h2 id="blockers">Blockers</h2>
+<ol><li><strong>No external gateway is implemented.</strong> Every external provider is</li></ol>
+<p><code>ADAPTER_ONLY</code>: the adapter exists but the vendor call is not implemented, so<br />
+<code>verify</code> correctly reports &quot;not implemented&quot; rather than a success. This is by<br />
+design, not a defect.</p>
+<ol><li><strong>No production credentials are present</strong>, and none may be committed. A live</li></ol>
+<p>gateway needs credentials supplied through the environment or the<br />
+Integrations Center at deploy time.</p>
+<ol><li><strong><code>AGENTS.md</code> overstated the catalogue size</strong> (20 vs 8). Corrected in the</li></ol>
+<p>guide as part of this audit.</p></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>aa1569d</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-24T02:32:08.728Z</span>
+  </div>
+</footer>
+</body>
+</html>

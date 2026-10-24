@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>ORYX — Execution 01 Merge Readiness Report · ORYX design preview</title>
+<meta name="description" content="ORYX — Execution 01 Merge Readiness Report" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Execution reports</p>
+        <h1>ORYX — Execution 01 Merge Readiness Report</h1>
+        <p class="card__meta">Rendered from <code>docs/execution-reports/ORYX_EXECUTION_01_MERGE_READINESS.md</code> at <code>aa1569d</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/execution-reports/ORYX_EXECUTION_01_MERGE_READINESS.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#1-exact-commit-sha">1. Exact commit SHA</a></li><li><a href="#2-github-actions-workflow-url">2. GitHub Actions workflow URL</a></li><li><a href="#3-ci-execution-status-and-results">3. CI execution status and results</a></li><li><a href="#4-complete-test-counts">4. Complete test counts</a></li><li><a href="#5-authentication-security-changes">5. Authentication security changes</a></li><li><a href="#6-mfa-regression-results">6. MFA regression results</a></li><li><a href="#7-csrf-regression-results">7. CSRF regression results</a></li><li><a href="#8-browser-screenshots">8. Browser screenshots</a></li><li><a href="#9-side-by-side-design-comparison">9. Side-by-side design comparison</a></li><li><a href="#10-missing-assets">10. Missing assets</a></li><li><a href="#11-remaining-limitations">11. Remaining limitations</a></li><li><a href="#12-production-deployment-prerequisites">12. Production deployment prerequisites</a></li><li><a href="#13-merge-readiness-recommendation">13. Merge-readiness recommendation</a></li></ul></nav>
+        <article><h1 id="oryx-execution-01-merge-readiness-report">ORYX — Execution 01 Merge Readiness Report</h1>
+<p><strong>Execution:</strong> 01.2 — Final CI, Authentication Security &amp; Visual Acceptance<br />
+<strong>Repository:</strong> <code>mohammadaljallad079-rgb/oryx</code><br />
+<strong>Branch:</strong> <code>feature/execution-01-super-admin-foundation</code><br />
+<strong>Base branch:</strong> <code>main</code><br />
+<strong>Pull request:</strong> <a href="https://github.com/mohammadaljallad079-rgb/oryx/pull/1" target="_blank" rel="noopener noreferrer">#1</a><br />
+<strong>Date:</strong> 2026-10-14</p>
+<hr />
+<h2 id="1-exact-commit-sha">1. Exact commit SHA</h2>
+<pre><code>8b12fb81e4cdeddca76da276b78a4a78543c3302</code></pre>
+<p>This is the commit that CI ran against and that this report describes. The only<br />
+change after it is a CI-only Node version bump (section 3), which touches no<br />
+application code.</p>
+<p>Commit history of this execution:</p>
+<pre><code>8b12fb8 test: remove step-boundary fragility from the MFA suites
+b9f153e fix(auth): make the refresh claim atomic so revoked tokens are always refused
+9aaf487 fix(auth): close the rotation race window; stabilise three flaky assertions
+ed7fb34 test: make the rotation concurrency tests deterministic
+995bea2 ci: add GitHub Actions pipeline
+42c6992 feat(auth): in-memory access tokens and correct refresh rotation
+3c8de0a chore: refresh screenshots from the final verified build   &lt;- verified previous HEAD</code></pre>
+<hr />
+<h2 id="2-github-actions-workflow-url">2. GitHub Actions workflow URL</h2>
+<div class="table-wrap"><table><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody><tr><td>Workflow file</td><td><code>.github/workflows/ci.yml</code></td></tr><tr><td>Successful run</td><td><a href="https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/38568436720" target="_blank" rel="noopener noreferrer">https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/38568436720</a></td></tr><tr><td>Run ID</td><td><code>38568436720</code></td></tr><tr><td>Trigger</td><td><code>pull_request</code> targeting <code>main</code></td></tr><tr><td>Commit</td><td><code>8b12fb8</code></td></tr></tbody></table></div>
+<hr />
+<h2 id="3-ci-execution-status-and-results">3. CI execution status and results</h2>
+<h3 id="result-pass-all-three-jobs-green-on-the-actual-pr-commit">Result: <strong>PASS</strong> — all three jobs green on the actual PR commit</h3>
+<div class="table-wrap"><table><thead><tr><th>Job</th><th>Duration</th><th>Result</th></tr></thead><tbody><tr><td>Typecheck and build</td><td>1m14s</td><td>pass</td></tr><tr><td>Unit and API integration tests</td><td>1m06s</td><td>pass</td></tr><tr><td>Browser acceptance tests</td><td>3m21s</td><td>pass</td></tr></tbody></table></div>
+<p>A second run of the same commit also passed (<code>38568430516</code>), confirming the<br />
+result is reproducible rather than a lucky scheduling outcome.</p>
+<h3 id="what-the-workflow-does">What the workflow does</h3>
+<p><strong>Triggers.</strong> Pull requests targeting <code>main</code>, pushes to <code>main</code> and the feature<br />
+branch, and manual dispatch. Concurrency cancels superseded runs. Permissions are<br />
+read-only (<code>contents: read</code>).</p>
+<p><strong><code>quality</code></strong> — installs with <code>--frozen-lockfile</code> on Node 22 + pnpm 9.15.9,<br />
+generates the Prisma client, builds the workspace packages (the apps resolve them<br />
+from <code>dist</code>, so this must happen first), then runs both typechecks and both<br />
+production builds.</p>
+<p><strong><code>test-api</code></strong> — provisions a <code>postgres:17</code> service with a <code>pg_isready</code> health<br />
+check, applies migrations with <code>prisma migrate deploy</code>, seeds the baseline<br />
+catalog, asserts the schema is in sync, then runs the authorization unit suite<br />
+and the full API integration suite (authorization, session lifecycle, MFA/CSRF,<br />
+rate limiting). Uploads the test report.</p>
+<p><strong><code>test-ui</code></strong> — the same database setup, builds the API and admin app, installs<br />
+Playwright Chromium, starts both servers with <strong>explicit readiness polling</strong> (the<br />
+health endpoint must report <code>&quot;database&quot;:&quot;up&quot;</code>, then the login page must return</p>
+<ol><li>before any browser test runs. On failure it prints both server logs; it</li></ol>
+<p>always uploads the Playwright report, failure traces and the captured<br />
+screenshots.</p>
+<h3 id="credentials">Credentials</h3>
+<p>No repository secret is required. Every credential is a throwaway value defined<br />
+inside the workflow (<code>oryx_test</code> database, CI-only JWT and MFA keys, a CI-only<br />
+seed password). Nothing is printed to the log, so the pipeline is safe for fork<br />
+pull requests.</p>
+<h3 id="failures-found-and-fixed-during-this-execution">Failures found and fixed during this execution</h3>
+<p>CI earned its place immediately: it failed three times before passing, and every<br />
+failure was a genuine defect rather than a CI misconfiguration.</p>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Failure</th><th>Root cause</th><th>Resolution</th></tr></thead><tbody><tr><td>1</td><td><code>session.e2e-spec</code> — concurrent rotation audit</td><td>The test relied on two HTTP requests actually interleaving, which is timing dependent</td><td>Forced the losing state deterministically (rotate, then present the revoked token while its successor is live)</td></tr><tr><td>2</td><td><code>auth-lifecycle.spec</code> — two tabs refreshing</td><td>The test reloaded both tabs and asserted before they finished restoring</td><td>Wait for each tab to finish restoring</td></tr><tr><td>3</td><td><code>admin.spec</code> / <code>responsive.spec</code> — option and chart counts</td><td>Assertions read asynchronously loaded content immediately</td><td>Both now poll</td></tr><tr><td>4</td><td><strong><code>auth-lifecycle.spec</code> — two tabs refreshing (real product defect)</strong></td><td>The losing caller could read a token after the winner set <code>revokedAt</code> but before it wrote <code>replacedBy</code>, so it saw a revoked token with no successor and was refused</td><td>See section 5.2</td></tr><tr><td>5</td><td><code>mfa.e2e-spec</code> — session for a valid code</td><td>The test advanced the TOTP clock by +31s, which can cross two 30-second steps and fall outside the server&#39;s ±1 tolerance</td><td>Clears the replay counter and uses the current step</td></tr><tr><td>6</td><td><code>screenshots.spec</code> — MFA login challenge</td><td>Same +31s step-boundary fragility</td><td>Uses exactly +30s, one step ahead at any offset</td></tr></tbody></table></div>
+<h3 id="post-run-change">Post-run change</h3>
+<p>One CI-only change was made after the passing run: <code>NODE_VERSION</code> moved from<br />
+<code>&#39;20&#39;</code> to <code>&#39;22&#39;</code> to clear the runner&#39;s Node 20 deprecation annotation and match<br />
+what the runners actually execute. It touches no application code.</p>
+<hr />
+<h2 id="4-complete-test-counts">4. Complete test counts</h2>
+<p>All figures verified locally on the same commit. The API and browser suites were<br />
+re-run repeatedly to confirm they are not flaky.</p>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Command</th><th>Tests</th><th>Result</th></tr></thead><tbody><tr><td>Authorization invariants (unit)</td><td><code>pnpm --filter @oryx/shared test</code></td><td>22</td><td><strong>22 passed</strong></td></tr><tr><td>API integration — authorization</td><td><code>pnpm --filter @oryx/api test:e2e</code></td><td>45</td><td><strong>45 passed</strong></td></tr><tr><td>API integration — session lifecycle</td><td>(same run)</td><td>17</td><td><strong>17 passed</strong></td></tr><tr><td>API integration — MFA and CSRF</td><td>(same run)</td><td>16</td><td><strong>16 passed</strong></td></tr><tr><td>API integration — rate limiting</td><td>(same run)</td><td>1</td><td><strong>1 passed</strong></td></tr><tr><td>UI — admin acceptance</td><td><code>pnpm --filter @oryx/admin test:ui</code></td><td>18</td><td><strong>18 passed</strong></td></tr><tr><td>UI — authentication lifecycle</td><td>(same run)</td><td>14</td><td><strong>14 passed</strong></td></tr><tr><td>UI — MFA and session transport</td><td>(same run)</td><td>10</td><td><strong>10 passed</strong></td></tr><tr><td>UI — responsive and bilingual</td><td>(same run)</td><td>19</td><td><strong>19 passed</strong></td></tr><tr><td>UI — functional audit</td><td>(same run)</td><td>13</td><td><strong>13 passed</strong></td></tr><tr><td>UI — screenshots</td><td>(same run)</td><td>16</td><td><strong>16 passed</strong></td></tr><tr><td>Security flow script</td><td><code>node scripts/verify-security-flow.mjs</code></td><td>23 checks</td><td><strong>23 passed</strong></td></tr><tr><td><strong>Total</strong></td><td></td><td><strong>213</strong></td><td><strong>0 failures</strong></td></tr></tbody></table></div>
+<p>Stability evidence (local, same commit):</p>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Runs</th><th>Result each time</th></tr></thead><tbody><tr><td>Session lifecycle (includes the forced race)</td><td>5</td><td>17/17</td></tr><tr><td>Full API</td><td>4</td><td>79/79</td></tr><tr><td>Screenshots</td><td>1</td><td>16/16</td></tr><tr><td>Full UI</td><td>2</td><td>90/90</td></tr></tbody></table></div>
+<p>Growth across the execution: unit 22 (unchanged), API 45 to 79, UI 29 to 90.</p>
+<hr />
+<h2 id="5-authentication-security-changes">5. Authentication security changes</h2>
+<h3 id="51-no-token-in-javascript-accessible-persistent-storage">5.1 No token in JavaScript-accessible persistent storage</h3>
+<div class="table-wrap"><table><thead><tr><th>Before</th><th>After</th></tr></thead><tbody><tr><td>Access token written to <code>localStorage</code> under <code>oryx.accessToken</code></td><td>Held in a module-scoped variable for the lifetime of the tab</td></tr><tr><td>Readable by any script on the page</td><td>Not reachable from page script; a raw <code>fetch</code> from page context returns 401</td></tr><tr><td>Survived tab close</td><td>Discarded on tab close; restored from the HttpOnly refresh cookie</td></tr></tbody></table></div>
+<p>Only non-secret UI preferences (the selected company and branch ids) remain<br />
+persisted. The refresh token stays in the HttpOnly <code>oryx_rt</code> cookie, scoped to<br />
+<code>/api/v1/auth</code>.</p>
+<p>Two production defects were also found while auditing this:</p>
+<ul><li>The API-management screen built a raw request with a token read from</li></ul>
+<p><code>localStorage</code>, bypassing the API client and therefore the CSRF header. It now<br />
+goes through the client.</p>
+<ul><li>The <code>apiToken</code> test helper logged in on every call; it now rotates the existing</li></ul>
+<p>session, so it neither consumes the login rate limit nor disturbs MFA state.</p>
+<h3 id="52-refresh-rotation-and-the-concurrency-defect">5.2 Refresh rotation and the concurrency defect</h3>
+<p>This is the most significant change in the execution. It took two attempts, and<br />
+the first attempt introduced a security regression that the test suite caught<br />
+immediately — worth recording in full.</p>
+<p><strong>Original behaviour.</strong> Rotation was single-use with immediate family-wide<br />
+revocation. Two tabs refreshing at once destroyed the session: one rotated, the<br />
+other was treated as a replay and revoked the family.</p>
+<p><strong>First attempt (insufficient).</strong> A losing caller inside a grace window received<br />
+a sibling token. This fixed the two-tab case but left a window: <code>revokedAt</code> and<br />
+<code>replacedBy</code> were written in two statements, so a caller could observe a revoked<br />
+token with no successor. Worse, when the grace path was broadened to cover that<br />
+window, tokens revoked by <strong>logout</strong> were misclassified as concurrent rotations<br />
+and <strong>accepted</strong> — a genuine authentication bypass. Three tests caught it.</p>
+<p><strong>Final behaviour (atomic).</strong> The successor row is created first, and the claim<br />
+then sets <code>revokedAt</code> and <code>replacedBy</code> together in one guarded <code>updateMany</code>:</p>
+<pre><code>create successor
+claimed = updateMany({ id, revokedAt: null }, { revokedAt: now, replacedBy: successor.id })
+if claimed.count === 0:            // another caller won the race
+    discard our unused successor
+    if the token has a live successor  -&gt; concurrent rotation: issue a sibling
+    otherwise                          -&gt; revoked by logout / family: refuse</code></pre>
+<p>Because the write is atomic, the winner&#39;s successor is always visible to the<br />
+loser, so a single read classifies the request correctly.</p>
+<div class="table-wrap"><table><thead><tr><th>Case</th><th>Behaviour</th></tr></thead><tbody><tr><td>Single rotation</td><td>New token; old one revoked and linked</td></tr><tr><td>Two requests race the same token</td><td>Both receive usable sessions; the loser gets a sibling in the same family; nothing is revoked</td></tr><tr><td>Replay inside the grace window of a <strong>rotated</strong> token</td><td>Sibling issued, audited as <code>auth.refresh_concurrent_rotation</code></td></tr><tr><td>Replay outside the grace window</td><td>Family revoked, audited as <code>auth.refresh_reuse_detected</code>, 401</td></tr><tr><td>Token revoked by logout or logout-all</td><td><strong>Refused</strong> — no successor, so never treated as a race</td></tr><tr><td>Malformed or unsigned token</td><td>401 <code>auth.token_invalid</code> before any database lookup</td></tr></tbody></table></div>
+<p><strong>Token families.</strong> <code>RefreshToken.familyId</code> groups every rotation of one login.<br />
+Revoking a compromised chain no longer signs the user out of unrelated devices.<br />
+The migration adds the column nullable, backfills each existing row as its own<br />
+family root, then makes it required — verified safe on a populated table (940<br />
+rows locally).</p>
+<p><strong>Rate limits.</strong> The refresh and invitation-acceptance ceilings were hard-coded<br />
+at 20/minute, which a browser with several tabs can legitimately exceed. Both are<br />
+now configurable (<code>REFRESH_THROTTLE_LIMIT</code>, <code>INVITATION_THROTTLE_LIMIT</code>), and a<br />
+dedicated suite still asserts HTTP 429 beyond the login limit.</p>
+<h3 id="53-cookie-attributes">5.3 Cookie attributes</h3>
+<div class="table-wrap"><table><thead><tr><th>Attribute</th><th>Value</th><th>Verified by</th></tr></thead><tbody><tr><td><code>HttpOnly</code></td><td>true on <code>oryx_rt</code></td><td>API test and browser test</td></tr><tr><td><code>Secure</code></td><td>derived from <code>NODE_ENV</code>, overridable via <code>COOKIE_SECURE</code></td><td>Configuration; documented in the runbook</td></tr><tr><td><code>SameSite</code></td><td><code>lax</code> default; <code>none</code> only honoured with <code>Secure</code></td><td>Configuration</td></tr><tr><td><code>Path</code></td><td><code>/api/v1/auth</code></td><td>API test</td></tr><tr><td><code>oryx_csrf</code></td><td>readable; not a credential on its own</td><td>API test</td></tr></tbody></table></div>
+<h3 id="54-client-behaviour">5.4 Client behaviour</h3>
+<ul><li><strong>Reload</strong> — the in-memory token is gone, so <code>restoreSession()</code> performs one</li></ul>
+<p>cookie refresh. Verified for a plain reload and a deep-link reload.</p>
+<ul><li><strong>Single-flight refresh</strong> — every 401 shares one rotation promise, so several</li></ul>
+<p>widgets loading at once produce at most one rotation. Verified by counting<br />
+refresh requests during a dashboard reload.</p>
+<ul><li><strong>Multiple tabs</strong> — signing out in one tab signs the others out; two tabs</li></ul>
+<p>reloading simultaneously both stay usable.</p>
+<ul><li><strong>Session loss</strong> — a failed refresh clears state and redirects to sign-in</li></ul>
+<p>rather than showing a broken screen.</p>
+<ul><li><strong>No refresh loop</strong> — refresh counts are asserted stable after a failed login</li></ul>
+<p>and after an unauthenticated visit to a protected route.</p>
+<ul><li><strong>No token in a URL</strong> — asserted.</li></ul>
+<hr />
+<h2 id="6-mfa-regression-results">6. MFA regression results</h2>
+<div class="table-wrap"><table><thead><tr><th>Property</th><th>Result</th></tr></thead><tbody><tr><td>Enrollment issues ten recovery codes</td><td>pass</td></tr><tr><td>Codes stored only as SHA-256 hashes</td><td>pass</td></tr><tr><td>TOTP secret stored encrypted (<code>v1.</code> AES-256-GCM prefix), never plaintext</td><td>pass</td></tr><tr><td>Invalid code rejected with <code>auth.mfa_invalid_code</code></td><td>pass</td></tr><tr><td>No session issued from the password step once MFA is on</td><td>pass</td></tr><tr><td>Challenge rejects an invalid code without setting a cookie</td><td>pass</td></tr><tr><td>Valid code issues a session</td><td>pass</td></tr><tr><td>Replay of an accepted code rejected</td><td>pass</td></tr><tr><td>Tampered challenge token rejected</td><td>pass</td></tr><tr><td>Recovery code works exactly once</td><td>pass</td></tr><tr><td>Regeneration invalidates the previous set</td><td>pass</td></tr><tr><td>Regeneration requires a valid current code</td><td>pass</td></tr><tr><td>Disable requires a valid code and clears all MFA material</td><td>pass</td></tr><tr><td>Administrative reset is platform-only and revokes sessions</td><td>pass</td></tr><tr><td>Browser: QR code rendered as a PNG data URL with a manual key</td><td>pass</td></tr><tr><td>Browser: login challenge appears and stays on <code>/login</code> without a session cookie</td><td>pass</td></tr><tr><td>Browser: platform-only reset visible to Super Admin, absent for a company admin</td><td>pass</td></tr></tbody></table></div>
+<p>16 API tests and 10 browser tests cover these; all pass, and the API suite was<br />
+re-run four times to confirm the timing fixes hold.</p>
+<hr />
+<h2 id="7-csrf-regression-results">7. CSRF regression results</h2>
+<div class="table-wrap"><table><thead><tr><th>Property</th><th>Result</th></tr></thead><tbody><tr><td>Refresh without the CSRF header → 403 <code>auth.csrf_token_invalid</code></td><td>pass</td></tr><tr><td>Refresh with a mismatched CSRF header → 403</td><td>pass</td></tr><tr><td>State-changing request without the header → 403</td><td>pass</td></tr><tr><td>State-changing request with the header → 200</td><td>pass</td></tr><tr><td>GET without the CSRF header → allowed (CSRF guards writes only)</td><td>pass</td></tr><tr><td><code>oryx_csrf</code> cookie readable; <code>oryx_rt</code> HttpOnly</td><td>pass</td></tr><tr><td>Browser: no refresh token in <code>document.cookie</code>, <code>localStorage</code> or <code>sessionStorage</code></td><td>pass</td></tr></tbody></table></div>
+<hr />
+<h2 id="8-browser-screenshots">8. Browser screenshots</h2>
+<p>All in <code>docs/execution-reports/screenshots/</code>, captured in a real browser against<br />
+the running application.</p>
+<div class="table-wrap"><table><thead><tr><th>Requirement</th><th>File</th></tr></thead><tbody><tr><td>Arabic desktop — Dark</td><td><code>dashboard-ar-dark.png</code> (+ <code>dashboard-ar-dark-full.png</code>)</td></tr><tr><td>Arabic desktop — Light</td><td><code>dashboard-ar-light.png</code></td></tr><tr><td>English desktop — Dark</td><td><code>dashboard-en-dark.png</code> (+ <code>dashboard-en-dark-full.png</code>)</td></tr><tr><td>English desktop — Light</td><td><code>dashboard-en-light.png</code></td></tr><tr><td>Arabic mobile — Dark</td><td><code>dashboard-mobile-ar-dark.png</code></td></tr><tr><td>Arabic mobile — Light</td><td><code>dashboard-mobile-ar-light.png</code></td></tr><tr><td>English mobile — Dark</td><td><code>dashboard-mobile-en-dark.png</code></td></tr><tr><td>English mobile — Light</td><td><code>dashboard-mobile-en-light.png</code></td></tr><tr><td>Super Admin login</td><td><code>login-dark.png</code>, <code>login-light.png</code></td></tr><tr><td>Company management</td><td><code>companies-dark.png</code>, <code>companies-light.png</code></td></tr><tr><td>Subscription plans</td><td><code>plans-dark.png</code></td></tr><tr><td>Permissions</td><td><code>roles-dark.png</code></td></tr><tr><td>Reference viewport (1536×1024, Arabic dark)</td><td><code>dashboard-reference-viewport-ar-dark.png</code></td></tr><tr><td>Additional</td><td><code>dashboard-tablet-dark.png</code>, <code>mfa-enrollment-dark.png</code>, <code>mfa-login-challenge-dark.png</code>, <code>mfa-settings-dark.png</code>, <code>planned-module-dark.png</code>, <code>company-admin-dark.png</code></td></tr></tbody></table></div>
+<p>The mobile captures use Arabic because the approved reference is an Arabic RTL<br />
+dashboard; English mobile variants are included for completeness.</p>
+<hr />
+<h2 id="9-side-by-side-design-comparison">9. Side-by-side design comparison</h2>
+<p>Generated by <code>scripts/build-design-comparison.py</code>, in<br />
+<code>docs/execution-reports/comparison/</code>:</p>
+<div class="table-wrap"><table><thead><tr><th>File</th><th>Contents</th></tr></thead><tbody><tr><td><code>side-by-side.png</code></td><td>Approved reference beside the implementation, equal height, labelled</td></tr><tr><td><code>side-by-side-detail.png</code></td><td>Top 45% of each — header, hero and first tile row</td></tr><tr><td><code>overlay.png</code></td><td>The implementation at 50% over the reference</td></tr></tbody></table></div>
+<p>Both source images are <strong>1536 × 1024</strong>, so the comparison is like for like.</p>
+<h3 id="measured-against-the-approved-reference">Measured against the approved reference</h3>
+<div class="table-wrap"><table><thead><tr><th>Aspect</th><th>Reference</th><th>Implementation</th><th>Assessment</th></tr></thead><tbody><tr><td>Navy field</td><td><code>#021529</code> (top-left <code>2,21,41</code>)</td><td><code>#001020</code> (<code>0,16,32</code>)</td><td>Same family; implementation slightly darker</td></tr><tr><td>Gold accent</td><td><code>#d4af37</code></td><td><code>#d4af37</code></td><td>Matches</td></tr><tr><td>Sidebar position (RTL, inline-start = right)</td><td>panel begins ≈ x1290</td><td>panel begins ≈ x1290</td><td>Matches</td></tr><tr><td>Header height</td><td>≈ 66 px</td><td>68 px</td><td>Matches within tolerance</td></tr><tr><td>Hero band mean luminance</td><td>56.3</td><td>25.6</td><td><strong>Implementation markedly darker</strong></td></tr><tr><td>Tile rows mean luminance</td><td>38.5 – 49.0</td><td>30.1 – 32.4</td><td><strong>Implementation flatter and darker</strong></td></tr><tr><td>Whole-image mean luminance</td><td>48.1</td><td>28.7</td><td><strong>Implementation darker overall</strong></td></tr></tbody></table></div>
+<h3 id="what-matches">What matches</h3>
+<ul><li>Composition: header, hero banner, KPI band, then the image-led module tile grid.</li><li>The navy/gold identity, including the exact gold <code>#d4af37</code>.</li><li>The RTL sidebar on the right, its grouping and the gold active state.</li><li>The premium top bar with the scope selector, theme and language controls.</li><li>The hero banner using the owner&#39;s own approved automotive photograph.</li><li>Image-led module rectangles with a navy gradient scrim and legible captions.</li><li>Typography hierarchy, hairline gold-tinted borders, and KPI card structure.</li></ul>
+<h3 id="remaining-deviations">Remaining deviations</h3>
+<ol><li><strong>The implementation is measurably darker and flatter</strong> (mean luminance 28.7</li></ol>
+<p>vs 48.1). The reference lifts its panels and photography; the implementation<br />
+keeps a deeper navy throughout. This is the most significant visual difference<br />
+and the clearest improvement opportunity.</p>
+<ol><li><strong>The official logo is absent</strong> (section 10). The brand slot shows a neutral</li></ol>
+<p>monogram placeholder.</p>
+<ol><li><strong>Photography is cropped from the approved screenshot</strong>, not the original</li></ol>
+<p>image files, which were never supplied. <code>scripts/extract-approved-assets.py</code><br />
+crops them at native resolution; supplying originals completes the match with<br />
+no code change.</p>
+<ol><li><strong>Metrics are real, not illustrative.</strong> The reference shows fixed sample</li></ol>
+<p>figures; the implementation queries the database for the authorized scope and<br />
+shows a labelled demo notice when only seeded records exist. Required by the<br />
+execution rules.</p>
+<ol><li><strong>Tiles carry an availability badge.</strong> Modules not implemented in Execution 01</li></ol>
+<p>are desaturated and labelled &quot;Planned&quot;.</p>
+<ol><li><strong>Extra operational chrome</strong> — a company/branch scope selector, and analytics</li></ol>
+<p>panels that carry meaning rather than decoration.</p>
+<p>No claim of pixel-perfect fidelity is made. The structural match is strong; the<br />
+tonal difference in item 1 is real and documented.</p>
+<hr />
+<h2 id="10-missing-assets">10. Missing assets</h2>
+<div class="table-wrap"><table><thead><tr><th>Asset</th><th>Expected path</th><th>Status</th><th>Consequence</th></tr></thead><tbody><tr><td>Official ORYX logo (<code>WhatsApp Image 2026-10-06 at 1.25.18 PM(3).jpeg</code>)</td><td><code>docs/assets/oryx-logo-original.jpg</code></td><td><strong>ABSENT</strong></td><td>The brand slot uses a neutral monogram placeholder. No mark was invented, following the visual reference&#39;s own instruction</td></tr><tr><td>Original dashboard photography</td><td><code>apps/admin/public/tiles/</code></td><td><strong>ABSENT</strong>; crops of the approved screenshot are used</td><td>Tiles show genuine approved imagery but at screenshot resolution</td></tr></tbody></table></div>
+<p><code>docs/assets/</code> contains only <code>ORYX Auto Services Dashboard.png</code> and <code>README.md</code>.<br />
+A repository-wide search found no logo file. **This is a blocker for exact brand<br />
+fidelity, not for functionality.**</p>
+<hr />
+<h2 id="11-remaining-limitations">11. Remaining limitations</h2>
+<ol><li><strong>The implementation is darker than the approved reference</strong> (section 9,</li></ol>
+<p>deviation 1). A visual-design pass is the highest-value follow-up.</p>
+<ol><li><strong><code>MFA_REQUIRE_SUPER_ADMIN</code> defaults to <code>false</code>.</strong> Set it to <code>true</code> in</li></ol>
+<p>production; the deployment checklist covers it.</p>
+<ol><li><strong>No MFA key versioning.</strong> Rotating <code>MFA_ENCRYPTION_KEY</code> makes existing</li></ol>
+<p>enrollments unreadable; affected users must re-enroll.</p>
+<ol><li><strong>No storage or API-request metering.</strong> <code>storageMb</code> and <code>apiRequestsPerMonth</code></li></ol>
+<p>are stored and displayed but not enforced. <code>maxCompanies</code> is likewise not<br />
+enforced; the Super Admin provisions companies.</p>
+<ol><li><strong>No payment gateway.</strong> Subscriptions record price, period and immutable</li></ol>
+<p>history; no charge is attempted and no integration is claimed.</p>
+<ol><li><strong>No email, SMS or push delivery.</strong> Invitation tokens are returned once by the</li></ol>
+<p>API and must be delivered out of band.</p>
+<ol><li><strong>Swagger UI is exposed</strong> at <code>/api/docs</code>. Restrict or disable in production.</li><li><strong>Migrations are forward-only.</strong> Rollback is a restore from the pre-migration</li></ol>
+<p>backup.</p>
+<ol><li><strong>Mobile has no interaction suite.</strong> Mobile is covered by screenshots and</li></ol>
+<p>overflow assertions, not workflow interaction at phone width.</p>
+<ol><li><strong>The rate limiter is per IP.</strong> Behind a proxy that does not forward the real</li></ol>
+<p>client IP, all users share one bucket.</p>
+<ol><li><strong>ERP operational modules are unimplemented.</strong> Accounting, sales, purchasing,</li></ol>
+<p>inventory, HR, CRM, operations and the automotive modules are routed and<br />
+permission-protected but explicitly labelled &quot;Planned&quot;. They show no<br />
+fabricated data.</p>
+<ol><li><strong>The consumer mobile application is out of scope</strong> for Execution 01.</li></ol>
+<hr />
+<h2 id="12-production-deployment-prerequisites">12. Production deployment prerequisites</h2>
+<p>Full detail in <code>docs/DEPLOYMENT.md</code>. Summary:</p>
+<div class="table-wrap"><table><thead><tr><th>Prerequisite</th><th>Requirement</th></tr></thead><tbody><tr><td>Database</td><td>PostgreSQL 15+ (CI and local verification use 17), reachable over TLS</td></tr><tr><td>Runtime</td><td>Node.js 20+ (CI uses 22)</td></tr><tr><td>HTTPS</td><td>Mandatory; session cookies are <code>Secure</code> in production</td></tr><tr><td>Secrets</td><td><code>JWT_ACCESS_SECRET</code>, <code>JWT_REFRESH_SECRET</code>, <code>MFA_ENCRYPTION_KEY</code> — each at least 32 random characters, from a secret manager, never committed</td></tr><tr><td>CORS</td><td>The admin origin listed exactly in <code>CORS_ORIGINS</code></td></tr><tr><td>Reverse proxy</td><td>Must forward <code>X-Forwarded-For</code> so rate limiting and audit see the real client IP; must not rewrite <code>/api/v1/auth</code></td></tr><tr><td>Migrations</td><td><code>pnpm db:migrate</code> (<code>prisma migrate deploy</code>). Never <code>migrate dev</code> against production</td></tr><tr><td>Backup</td><td>A verified <code>pg_dump</code> immediately before every migration</td></tr><tr><td>Health probe</td><td><code>GET /api/health</code> must return <code>&quot;database&quot;:&quot;up&quot;</code></td></tr><tr><td>Development defaults removed</td><td>Change the seeded Super Admin password, archive the demo tenants (<code>SEED_DEMO_DATA</code>), restrict Swagger</td></tr><tr><td>Post-deploy validation</td><td>The checklist in <code>docs/DEPLOYMENT.md</code> section 9, including the cookie, CSRF, MFA and tenant-isolation checks</td></tr></tbody></table></div>
+<p><strong>Prepared but not performed. Nothing is deployed.</strong></p>
+<hr />
+<h2 id="13-merge-readiness-recommendation">13. Merge-readiness recommendation</h2>
+<h3 id="recommendation-ready-for-owner-review-do-not-merge-without-owner-approval">Recommendation: <strong>READY FOR OWNER REVIEW — do not merge without owner approval</strong></h3>
+<p>Every mandatory criterion is met, with two items met subject to disclosed asset<br />
+and design limitations.</p>
+<div class="table-wrap"><table><thead><tr><th>Acceptance criterion</th><th>Status</th><th>Evidence</th></tr></thead><tbody><tr><td>GitHub Actions CI passes on the actual PR commit</td><td><strong>Met</strong></td><td>Run <code>38568436720</code>, commit <code>8b12fb8</code>, all three jobs green; a second run of the same commit also passed</td></tr><tr><td>No authentication tokens in persistent JavaScript-accessible storage</td><td><strong>Met</strong></td><td>Access token in memory only; refresh token in an HttpOnly cookie; browser tests assert absence from storage, cookies and URLs</td></tr><tr><td>MFA, CSRF, token rotation and session revocation remain secure and tested</td><td><strong>Met</strong></td><td>16 MFA + 17 session + CSRF tests; the atomic claim guarantees revoked tokens are refused</td></tr><tr><td>Tenant isolation and permissions pass regression tests</td><td><strong>Met</strong></td><td>Authorization suite re-asserted at the API layer, including cross-tenant, branch-scope and delegation limits</td></tr><tr><td>The approved dashboard compared against real browser screenshots</td><td><strong>Met</strong></td><td>Three comparison images at matched 1536×1024, with measured differences</td></tr><tr><td>Dark and Light themes work across implemented pages</td><td><strong>Met</strong></td><td>Screenshots plus automated theme/direction assertions and a no-flash check</td></tr><tr><td>All critical tests and builds pass</td><td><strong>Met</strong></td><td>213 tests, 0 failures; four clean builds; 27 admin routes</td></tr><tr><td>Missing logo and other asset limitations documented</td><td><strong>Met</strong></td><td>Section 10</td></tr><tr><td>PR #1 ready for owner review, not merged</td><td><strong>Met</strong></td><td>PR updated; still open and unmerged</td></tr></tbody></table></div>
+<h3 id="blockers">Blockers</h3>
+<p><strong>None for merge.</strong> The two non-blocking gaps are the missing official logo and<br />
+the tonal difference from the approved reference. Neither affects functionality,<br />
+security or tenancy.</p>
+<h3 id="recommended-before-production-in-priority-order">Recommended before production, in priority order</h3>
+<ol><li>Upload the official ORYX logo and the original dashboard photography.</li><li>A visual pass to lift panel and hero luminance toward the reference (28.7</li></ol>
+<p>toward nearer 48.1).</p>
+<ol><li>Set <code>MFA_REQUIRE_SUPER_ADMIN=true</code> and enroll MFA on the production Super</li></ol>
+<p>Admin before loading real data.</p>
+<ol><li>Begin Execution 02 (Financial Accounting, Sales &amp; POS, Purchasing, Reports) as</li></ol>
+<p>real DB-backed workflows, promoting each module from <code>PLANNED</code> to <code>AVAILABLE</code>.</p>
+<ol><li>Add storage and API-request metering so those plan limits are enforced.</li></ol>
+<h3 id="what-this-execution-deliberately-did-not-do">What this execution deliberately did not do</h3>
+<ul><li>Did not merge PR #1.</li><li>Did not deploy.</li><li>Did not start Execution 02.</li><li>Did not remove or weaken any failing test to obtain a green result. Every CI</li></ul>
+<p>failure was traced to a real cause and fixed at the source; one of them was an<br />
+authentication bypass in the rotation logic that the suite caught before it<br />
+could ship.</p></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>aa1569d</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-24T02:32:08.728Z</span>
+  </div>
+</footer>
+</body>
+</html>

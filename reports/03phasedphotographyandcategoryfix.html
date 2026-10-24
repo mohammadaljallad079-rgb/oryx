@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Execution 07 — Phase D: Real Photography, Dynamic CMS and the Category Defect · ORYX design preview</title>
+<meta name="description" content="Execution 07 — Phase D: Real Photography, Dynamic CMS and the Category Defect" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Execution 07 — the current execution</p>
+        <h1>Execution 07 — Phase D: Real Photography, Dynamic CMS and the Category Defect</h1>
+        <p class="card__meta">Rendered from <code>docs/audit/exec07/03_PHASE_D_PHOTOGRAPHY_AND_CATEGORY_FIX.md</code> at <code>aa1569d</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/audit/exec07/03_PHASE_D_PHOTOGRAPHY_AND_CATEGORY_FIX.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#1-what-phase-d-delivered">1. What Phase D delivered</a></li><li><a href="#2-defect-d1-three-category-vocabularies-one-silent-failure">2. Defect D1 — three category vocabularies, one silent failure</a></li><li><a href="#3-regression-tests">3. Regression tests</a></li><li><a href="#4-test-results">4. Test results</a></li><li><a href="#5-live-preview">5. Live preview</a></li><li><a href="#6-honest-limitations">6. Honest limitations</a></li></ul></nav>
+        <article><h1 id="execution-07-phase-d-real-photography-dynamic-cms-and-the-category-defect">Execution 07 — Phase D: Real Photography, Dynamic CMS and the Category Defect</h1>
+<p>Report date: 2026-10-18<br />
+Branch: <code>feature/execution-07-premium-web</code><br />
+Pull request: <a href="https://github.com/mohammadaljallad079-rgb/oryx/pull/7" target="_blank" rel="noopener noreferrer">#7</a><br />
+Verified head before this phase: <code>30268f2</code><br />
+Status: <strong>Phase D complete, externally verified; owner review pending</strong></p>
+<p>This report covers the Phase D work and the defect found and fixed while<br />
+verifying it. Every claim names the script that produced it and the artifact it<br />
+wrote.</p>
+<h2 id="1-what-phase-d-delivered">1. What Phase D delivered</h2>
+<p>The owner asked for a premium luxury automotive experience with **real licensed<br />
+photography wired through the dynamic CMS into the customer homepage**. Phase D<br />
+did that, and in doing so exposed a defect that had been silently breaking the<br />
+category filters.</p>
+<div class="table-wrap"><table><thead><tr><th>Piece</th><th>Where</th></tr></thead><tbody><tr><td>CMS admin endpoints for categories and banners</td><td><code>apps/api/src/cms/content.controller.ts</code>, <code>content.service.ts</code>, <code>cms.dto.ts</code></td></tr><tr><td>Media library seeded with 10 photographs, processed to WebP variants</td><td><code>scripts/seed-exec07-content.mjs</code></td></tr><tr><td>Customer hook that reads published website content</td><td><code>apps/customer/src/lib/use-website-content.ts</code></td></tr><tr><td>Homepage hero, category cards and partner strip driven by the CMS</td><td><code>apps/customer/src/app/page.tsx</code></td></tr><tr><td>One shared category catalogue</td><td><code>packages/shared/src/service-categories.ts</code></td></tr><tr><td>Regression tests</td><td><code>packages/shared/test/service-categories.test.ts</code>, <code>apps/api/test/execution07.e2e-spec.ts</code></td></tr></tbody></table></div>
+<p>The ten source photographs are tracked under <code>apps/customer/public/media/</code>. The<br />
+uploaded bytes and the WebP variants they produce are runtime state under<br />
+<code>apps/api/.media/</code>, now ignored by git.</p>
+<h2 id="2-defect-d1-three-category-vocabularies-one-silent-failure">2. Defect D1 — three category vocabularies, one silent failure</h2>
+<p><strong>Symptom.</strong> Every service category chip and card on the customer website linked<br />
+to <code>/providers?category=&lt;key&gt;</code>, and every one of those links returned an **empty<br />
+provider directory**. On the homepage the five category cards also rendered the<br />
+bundled vector fallback instead of the CMS photograph, so the Phase D<br />
+photography never appeared on a card.</p>
+<p><strong>Root cause.</strong> Three layers each used a different key for the same concept:</p>
+<div class="table-wrap"><table><thead><tr><th>Layer</th><th>Keys it used</th></tr></thead><tbody><tr><td>Customer website and mobile <code>SERVICE_CATEGORIES</code></td><td><code>automotive_maintenance</code>, <code>automotive_inspection</code>, <code>automotive_tyres</code>, <code>automotive_bodywork</code>, <code>automotive_recovery</code></td></tr><tr><td>Seeded <code>ServiceCategory</code> rows (which the CMS attaches imagery to)</td><td><code>vehicle_inspection</code>, <code>maintenance</code>, <code>spare_parts</code>, <code>recovery</code>, <code>car_wash</code></td></tr><tr><td>Seeded <code>MarketplaceProvider.categoryKey</code></td><td><code>WORKSHOP</code></td></tr></tbody></table></div>
+<p>The provider directory filters on <code>categoryKey</code>, so a chip sent a key no provider<br />
+carried and the directory correctly returned nothing. The homepage looked up<br />
+<code>content.categories</code> by the website key, found no row, and fell back to vector<br />
+art. Neither failure logged an error; both simply rendered an empty or generic<br />
+result.</p>
+<p><strong>Fix.</strong> The catalogue now lives once, in <code>packages/shared/src/service-categories.ts</code>,<br />
+and every consumer imports it:</p>
+<ul><li>the seed writes the <code>ServiceCategory</code> rows <strong>and</strong> the provider <code>categoryKey</code></li></ul>
+<p>values from it, creating one approved provider per category;</p>
+<ul><li>the customer website and the mobile app re-export it instead of declaring</li></ul>
+<p>their own list;</p>
+<ul><li>the keys are the persisted <code>ServiceCategory.key</code> values, so the CMS rows, the</li></ul>
+<p>photography and the provider directory agree by construction.</p>
+<p>The provider seed now creates five approved providers per company, one per<br />
+category, so each filter has real rows to return.</p>
+<p><strong>Evidence — the API.</strong></p>
+<div class="table-wrap"><table><thead><tr><th>Probe</th><th>Before</th><th>After</th></tr></thead><tbody><tr><td><code>GET /marketplace/providers?categoryKey=automotive_maintenance</code></td><td><code>0</code></td><td><code>0</code> (retired key, correctly empty)</td></tr><tr><td><code>GET /marketplace/providers?categoryKey=vehicle_inspection</code></td><td><code>0</code></td><td><code>27</code></td></tr><tr><td><code>GET /marketplace/providers?categoryKey=maintenance</code></td><td><code>0</code></td><td><code>27</code></td></tr><tr><td><code>GET /marketplace/providers?categoryKey=spare_parts</code></td><td><code>0</code></td><td><code>27</code></td></tr><tr><td><code>GET /marketplace/providers?categoryKey=recovery</code></td><td><code>0</code></td><td><code>27</code></td></tr><tr><td><code>GET /marketplace/providers?categoryKey=car_wash</code></td><td><code>0</code></td><td><code>27</code></td></tr><tr><td><code>GET /marketplace/providers</code> (no filter)</td><td><code>20</code></td><td><code>135</code></td></tr></tbody></table></div>
+<p><strong>Evidence — the live UI.</strong> <code>.run/verify-category-filter.mjs</code> drives the real<br />
+preview: it reads the category chips the site itself renders, opens each<br />
+<code>/providers?category=</code> URL, and counts the rendered provider cards. Output:<br />
+<code>docs/audit/exec07/phase-d/category-filter-verification.json</code>.</p>
+<div class="table-wrap"><table><thead><tr><th>Category</th><th>Provider cards rendered</th><th>Empty state shown</th></tr></thead><tbody><tr><td><code>vehicle_inspection</code></td><td>27</td><td>no</td></tr><tr><td><code>maintenance</code></td><td>27</td><td>no</td></tr><tr><td><code>spare_parts</code></td><td>27</td><td>no</td></tr><tr><td><code>recovery</code></td><td>27</td><td>no</td></tr><tr><td><code>car_wash</code></td><td>27</td><td>no</td></tr></tbody></table></div>
+<p><strong>Evidence — the CMS photography.</strong> <code>.run/capture-exec07-phase-d.mjs</code> asserts<br />
+that the hero background and every category card art resolve to a <code>cms/media</code><br />
+URL rather than the bundled SVG:</p>
+<div class="table-wrap"><table><thead><tr><th>Capture</th><th>Hero from CMS</th><th>Category cards</th><th>Cards from CMS</th><th>Horizontal overflow</th></tr></thead><tbody><tr><td><code>home-ar-dark</code></td><td>yes</td><td>5</td><td><strong>5</strong></td><td>no</td></tr><tr><td><code>home-en-dark</code></td><td>yes</td><td>5</td><td><strong>5</strong></td><td>no</td></tr><tr><td><code>home-ar-light</code></td><td>yes</td><td>5</td><td><strong>5</strong></td><td>no</td></tr><tr><td><code>home-en-light</code></td><td>yes</td><td>5</td><td><strong>5</strong></td><td>no</td></tr></tbody></table></div>
+<p>Before the fix the same script reported <code>categoryCardsFromCms: 0</code>. The four<br />
+full-page captures are in <code>docs/audit/exec07/phase-d/</code>.</p>
+<h2 id="3-regression-tests">3. Regression tests</h2>
+<p>The fix is pinned by tests that fail if a second vocabulary returns.</p>
+<p><strong>Unit — <code>packages/shared/test/service-categories.test.ts</code></strong> (7 tests): unique<br />
+keys, the persisted identifier shape, both locales of copy and artwork per<br />
+category, distinct sort order, and explicit rejection of the retired<br />
+<code>automotive_maintenance</code> and <code>WORKSHOP</code> keys.</p>
+<p><strong>API — <code>apps/api/test/execution07.e2e-spec.ts</code></strong> (3 new tests):</p>
+<ul><li><em>serves the provider directory under the same category keys the CMS publishes</em> —</li></ul>
+<p>reads the public CMS category keys and asserts each one returns at least one<br />
+provider;</p>
+<ul><li><em>returns no provider for a retired category key</em> — asserts the two old keys</li></ul>
+<p>match nothing;</p>
+<ul><li><em>persists every catalogue category as a seeded <code>ServiceCategory</code> row</em> — asserts</li></ul>
+<p>the database and the code catalogue agree.</p>
+<h2 id="4-test-results">4. Test results</h2>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Command</th><th>Result</th></tr></thead><tbody><tr><td>Shared unit</td><td><code>pnpm --filter @oryx/shared test</code></td><td><strong>103 passed</strong> (6 files)</td></tr><tr><td>API integration</td><td><code>pnpm --filter @oryx/api test:e2e</code></td><td><strong>302 passed</strong> (14 suites)</td></tr><tr><td>Mobile unit</td><td><code>pnpm --filter @oryx/mobile test</code></td><td><strong>20 passed</strong> (3 files)</td></tr><tr><td>Typecheck</td><td>customer, mobile, api, admin</td><td><strong>clean</strong></td></tr><tr><td>Lint</td><td>customer, admin</td><td><strong>clean</strong> (<code>--max-warnings=0</code>)</td></tr><tr><td>External preview sweep</td><td><code>.run/sweep-preview.mjs</code></td><td><strong>39 / 39 surfaces, 0 failed requests</strong></td></tr><tr><td>CI run <a href="https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39161406862" target="_blank" rel="noopener noreferrer"><code>39161406862</code></a></td><td>head <code>a9b1db4</code></td><td><strong>all 3 jobs success</strong> (typecheck+build, unit+API integration, browser acceptance)</td></tr></tbody></table></div>
+<p>The full API run log is <code>.run/api-e2e-full.log</code>; the sweep log is<br />
+<code>.run/sweep-phase-d-final2.log</code> and its machine-readable output is<br />
+<code>docs/audit/evidence/exec06-preview-sweep.json</code>.</p>
+<h2 id="5-live-preview">5. Live preview</h2>
+<p>The staging previews were re-verified from outside the sandbox after this<br />
+change. The links and demo credentials are unchanged and are listed in<br />
+<code>docs/audit/07_LIVE_PREVIEW_AND_CREDENTIALS.md</code>.</p>
+<div class="table-wrap"><table><thead><tr><th>Surface</th><th>URL</th></tr></thead><tbody><tr><td>Super Admin and every ERP module</td><td><code>https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev</code></td></tr><tr><td>Customer website, dashboard and mobile web</td><td><code>https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev</code></td></tr><tr><td>Customer homepage (Phase D photography)</td><td><code>https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/</code></td></tr><tr><td>Category filter proof</td><td><code>https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/providers?category=maintenance</code></td></tr></tbody></table></div>
+<p>Demo logins re-verified with <code>.run/check-demo-credentials.mjs</code>: Super Admin,<br />
+Enterprise tenant admin, Demo SaaS tenant admin and Demo consumer all sign in<br />
+and reach a rendered dashboard.</p>
+<h2 id="6-honest-limitations">6. Honest limitations</h2>
+<ul><li>The category cards now use <strong>real licensed photography</strong> from the seeded media</li></ul>
+<p>library. The official ORYX brand logo is present; the approved dashboard<br />
+photography named in <code>docs/assets/ORYX Auto Services Dashboard.png</code> is still<br />
+not in the repository, so full visual parity with that reference is <strong>not</strong><br />
+claimed.</p>
+<ul><li>This is a staging preview on the sandbox ingress, not a production deployment.</li><li>The provider count per category (27) reflects the seeded demo tenants plus E2E</li></ul>
+<p>fixtures; it is not a production figure.</p></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>aa1569d</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-24T02:32:08.728Z</span>
+  </div>
+</footer>
+</body>
+</html>

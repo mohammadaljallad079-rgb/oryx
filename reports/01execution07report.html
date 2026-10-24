@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Execution 07 — Premium Enterprise Web Experience · ORYX design preview</title>
+<meta name="description" content="Execution 07 — Premium Enterprise Web Experience" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Execution 07 — the current execution</p>
+        <h1>Execution 07 — Premium Enterprise Web Experience</h1>
+        <p class="card__meta">Rendered from <code>docs/audit/exec07/01_EXECUTION_07_REPORT.md</code> at <code>aa1569d</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/audit/exec07/01_EXECUTION_07_REPORT.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#1-defect-found-and-fixed-in-this-session">1. Defect found and fixed in this session</a></li><li><a href="#2-responsive-hardening">2. Responsive hardening</a></li><li><a href="#3-visual-upgrade-delivered">3. Visual upgrade delivered</a></li><li><a href="#4-functional-verification">4. Functional verification</a></li><li><a href="#5-remaining-blockers">5. Remaining blockers</a></li><li><a href="#7-phase-d-real-photography-dynamic-cms-and-defect-19">7. Phase D — real photography, dynamic CMS and defect 19</a></li><li><a href="#8-phase-e-light-theme-correction">8. Phase E — light-theme correction</a></li><li><a href="#9-reproduction">9. Reproduction</a></li></ul></nav>
+        <article><h1 id="execution-07-premium-enterprise-web-experience">Execution 07 — Premium Enterprise Web Experience</h1>
+<p>Report date: 2026-10-18<br />
+Branch: <code>feature/execution-07-premium-web</code><br />
+Base: <code>604e36a</code> (verified Execution 06 head)<br />
+Status: <strong>Phase A–D complete for the customer web experience; owner review pending</strong></p>
+<p>This report covers the Execution 07 work plus the defect found and fixed while<br />
+re-verifying the live preview. It is evidence-based: every claim below names the<br />
+script that produced it and the artifact it wrote.</p>
+<h2 id="1-defect-found-and-fixed-in-this-session">1. Defect found and fixed in this session</h2>
+<h3 id="d1-customer-refresh-returned-404-where-the-staff-plane-returns-401">D1 — Customer refresh returned <code>404</code> where the staff plane returns <code>401</code></h3>
+<p><strong>Symptom.</strong> Every anonymous page load on the customer site logged<br />
+<code>404 POST /api/v1/customer/auth/refresh</code>. Because <code>refreshSession()</code> classifies<br />
+<code>401</code>/<code>403</code> as &quot;no session&quot; and everything else as &quot;transient outage&quot;, the <code>404</code><br />
+was read as an outage: <code>restoreCustomerSession()</code> retried three times with<br />
+backoff. A first-time visitor&#39;s homepage therefore issued <strong>three</strong> failed<br />
+requests before rendering.</p>
+<p><strong>Root cause.</strong> <code>CustomerAuthController.refresh</code> threw<br />
+<code>notFound(ERROR_CODES.AUTH_TOKEN_INVALID, &#39;No refresh token was presented.&#39;)</code><br />
+when no refresh cookie was present, while the equivalent staff handler in<br />
+<code>AuthController.refresh</code> throws <code>unauthorized(...)</code>. The route exists in both<br />
+cases; the caller simply has no session. <code>404</code> was also semantically wrong — a<br />
+missing credential is not a missing resource.</p>
+<p><strong>Fix.</strong> <code>apps/api/src/customer/customer-auth.controller.ts</code> now throws<br />
+<code>unauthorized(...)</code> for the same condition, matching the staff plane.</p>
+<p><strong>Evidence.</strong></p>
+<div class="table-wrap"><table><thead><tr><th>Check</th><th>Before</th><th>After</th></tr></thead><tbody><tr><td><code>POST /api/v1/customer/auth/refresh</code> with no cookie</td><td><code>404</code></td><td><code>401</code> (<code>auth.token_invalid</code>)</td></tr><tr><td>Refresh requests on one anonymous homepage load</td><td>3</td><td>1</td></tr><tr><td>Console errors in the 39-surface preview sweep</td><td>2</td><td>1 (the expected bootstrap <code>401</code>)</td></tr></tbody></table></div>
+<p><strong>Regression test.</strong> <code>apps/api/test/execution04.e2e-spec.ts</code> →<br />
+<code>answers a cookieless refresh with 401, never 404</code>, in section *A. customer<br />
+identity*. Verified in isolation:</p>
+<pre><code>✓ answers a cookieless refresh with 401, never 404 (6 ms)
+Tests: 64 skipped, 1 passed, 65 total</code></pre>
+<h2 id="2-responsive-hardening">2. Responsive hardening</h2>
+<p>The header&#39;s intrinsic content exceeded its container at four widths. Two<br />
+contributing causes were removed and one specificity bug fixed.</p>
+<div class="table-wrap"><table><thead><tr><th>Defect</th><th>Cause</th><th>Fix</th></tr></thead><tbody><tr><td>Overflow at 390 / 768 / 1280</td><td>Brand lockup + tagline + nav + four controls did not fit</td><td>Tagline hidden below 1400px; header buttons compacted below 560px</td></tr><tr><td>Menu toggle visible on desktop</td><td><code>.oryx-btn { display: inline-flex }</code> was declared after <code>.oryx-menu-toggle { display: none }</code></td><td>Higher-specificity <code>.oryx-header .oryx-menu-toggle</code></td></tr><tr><td>Login/register overlapped the toggle at 390px</td><td>Both auth links competed for the same row</td><td>Register CTA hidden in the header on small screens; it remains in the mobile panel</td></tr></tbody></table></div>
+<p><strong>Evidence.</strong> <code>.run/check-exec07-responsive.mjs</code> — 12 viewports × assertions<br />
+(mobile-390, tablet-768, laptop-1280, desktop-1440, wide-1920, dashboard-mobile,<br />
+dashboard-wide; Arabic/dark and English/light):</p>
+<pre><code>ALL PASS</code></pre>
+<p><code>.run/check-exec07-mobile-nav.mjs</code> exercises the new mobile panel as a user<br />
+would — open, follow a link, confirm it closes — in both locales:</p>
+<pre><code>ALL PASS   (20 assertions: direction, panel visibility, 6 destinations,
+            2 auth shortcuts, navigation, auto-close, no overflow)</code></pre>
+<h2 id="3-visual-upgrade-delivered">3. Visual upgrade delivered</h2>
+<div class="table-wrap"><table><thead><tr><th>Surface</th><th>Before</th><th>After</th></tr></thead><tbody><tr><td>Public homepage</td><td>128-line prototype, text hero + category grid only</td><td>Full page: hero, stats, value proposition, 5 distinct service cards, how-it-works, partners, trust, FAQ, contact, multi-column footer</td></tr><tr><td><code>/services</code></td><td>Rendered raw i18n keys (<code>automotive_maintenance</code>)</td><td>Category art + descriptions in Arabic and English</td></tr><tr><td>Customer dashboard</td><td>Four bare count cards</td><td>Welcome banner, quick actions, status summary</td></tr><tr><td>Navigation</td><td>No mobile access to primary nav</td><td>Accessible panel, closes on navigation</td></tr></tbody></table></div>
+<p>The homepage length increased from 1024px to 3605px at a 1440px viewport — a<br />
+3.5× increase in content, captured like-for-like:</p>
+<div class="table-wrap"><table><thead><tr><th>Artifact</th><th>Viewport</th><th>Size</th></tr></thead><tbody><tr><td><code>docs/audit/exec07/before/04-public-homepage.png</code></td><td>1440×1024</td><td>viewport</td></tr><tr><td><code>docs/audit/exec07/after/04-public-homepage.png</code></td><td>1440×1024</td><td>viewport (comparable)</td></tr><tr><td><code>docs/audit/exec07/after/04b-public-homepage-full.png</code></td><td>1440×3605</td><td>full page</td></tr></tbody></table></div>
+<p><strong>Note on the earlier comparison.</strong> The first &quot;after&quot; capture used<br />
+<code>fullPage: true</code> while the &quot;before&quot; set used the viewport. That is not a fair<br />
+comparison and has been corrected: the primary <code>04-public-homepage</code> shots are<br />
+now both viewport-sized, and the full-length capture is a separate artifact.</p>
+<p><strong>Brand assets.</strong> The owner&#39;s official logo (<code>docs/assets/logo.png.jpeg</code>,<br />
+2000×2000) is now present and is the source for both colourways shipped to the<br />
+apps. The approved dashboard reference `docs/assets/ORYX Auto Services<br />
+Dashboard.png` is present. Full visual parity with that reference is <strong>not</strong><br />
+claimed — the reference is a dark-theme admin dashboard and the customer site<br />
+has no corresponding approved reference.</p>
+<h2 id="4-functional-verification">4. Functional verification</h2>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Command</th><th>Result</th></tr></thead><tbody><tr><td>Shared unit</td><td><code>pnpm --filter @oryx/shared test</code></td><td>96 / 96 passed</td></tr><tr><td>API integration</td><td><code>pnpm --filter @oryx/api test:e2e</code></td><td><strong>278 / 278 passed, 13 suites</strong></td></tr><tr><td>Browser (Playwright)</td><td><code>pnpm --filter @oryx/admin test:ui</code></td><td>184 passed, 1 skipped</td></tr><tr><td>Mobile unit</td><td><code>pnpm --filter @oryx/mobile test</code></td><td>20 / 20 passed</td></tr><tr><td>Customer lint</td><td><code>pnpm --filter @oryx/customer lint</code></td><td>clean (<code>--max-warnings=0</code>)</td></tr><tr><td>Admin lint</td><td><code>pnpm --filter @oryx/admin lint</code></td><td>clean (<code>--max-warnings=0</code>)</td></tr><tr><td>Homepage + services assertions</td><td><code>.run/check-exec07-home.mjs</code></td><td><strong>ALL PASS</strong> (ar + en)</td></tr><tr><td>Responsive matrix</td><td><code>.run/check-exec07-responsive.mjs</code></td><td><strong>ALL PASS</strong> (12 viewports)</td></tr><tr><td>Mobile navigation</td><td><code>.run/check-exec07-mobile-nav.mjs</code></td><td><strong>ALL PASS</strong> (ar + en)</td></tr><tr><td>External preview sweep</td><td><code>.run/sweep-preview.mjs</code></td><td><strong>39 / 39 surfaces 200</strong></td></tr><tr><td>Documented demo credentials</td><td><code>.run/check-demo-credentials.mjs</code></td><td><strong>4 / 4 sign in</strong> on live HTTPS</td></tr></tbody></table></div>
+<p><strong>578 automated tests total</strong> (96 shared, 278 API, 184 browser, 20 mobile). The<br />
+API figure rose from the 277 recorded in the Execution 06 audit to 278 with the<br />
+defect-18 regression test. The browser and mobile figures are carried from that<br />
+audit; this session&#39;s live checks are the last five rows, which were all run<br />
+here.</p>
+<h3 id="ci">CI</h3>
+<p>Run <a href="https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39145489000" target="_blank" rel="noopener noreferrer"><code>39145489000</code></a><br />
+on head <code>bbb9f68</code> — <strong>success</strong>, all three jobs green:</p>
+<div class="table-wrap"><table><thead><tr><th>Job</th><th>Result</th></tr></thead><tbody><tr><td>Typecheck and build</td><td>success</td></tr><tr><td>Unit and API integration tests</td><td>success</td></tr><tr><td>Browser acceptance tests</td><td>success</td></tr></tbody></table></div>
+<p>The workflow previously listed only the Execution 01–05 branches, so the<br />
+Execution 07 branch reported no checks at all. <code>ci.yml</code> now includes<br />
+<code>feature/execution-07-premium-web</code>, mirroring how the earlier executions were<br />
+added.</p>
+<h2 id="5-remaining-blockers">5. Remaining blockers</h2>
+<ol><li><strong>No approved customer-site design reference.</strong> The only approved reference</li></ol>
+<p>is the dark-theme admin dashboard. Parity with it can be assessed; parity for<br />
+the customer website cannot, because no approved mockup exists.</p>
+<ol><li><strong>No native iOS/Android build preview.</strong> The Expo app is verified through its</li></ol>
+<p>web export (<code>/mobile/*</code>). A device or EAS build is not available in this<br />
+environment.</p>
+<ol><li><strong>Phase C breadth.</strong> The visual system is applied to the homepage, services,</li></ol>
+<p>dashboard, navigation and footer. The remaining customer pages (garage,<br />
+bookings, invoices, support, providers) still use the pre-Execution-07<br />
+presentation and have not been restyled.</p>
+<p><em>Closed by Phase C</em> — see<br />
+<a href="02phasecpremiumpages.html"><code>02_PHASE_C_PREMIUM_PAGES.md</code></a>. Every<br />
+customer page now shares the <code>premium.tsx</code> primitives. Verified by 78<br />
+screenshot captures with zero overflow and a 13-route live render check.</p>
+<h2 id="7-phase-d-real-photography-dynamic-cms-and-defect-19">7. Phase D — real photography, dynamic CMS and defect 19</h2>
+<p>Phase D wired real licensed photography through the dynamic CMS into the customer<br />
+homepage, and in doing so found <strong>defect 19</strong>: three layers used three different<br />
+category vocabularies, so every category filter returned an empty directory and<br />
+the CMS photography never reached a category card. The catalogue now lives once<br />
+in <code>packages/shared/src/service-categories.ts</code>. Full detail, evidence and the<br />
+regression tests are in<br />
+<a href="03phasedphotographyandcategoryfix.html"><code>03_PHASE_D_PHOTOGRAPHY_AND_CATEGORY_FIX.md</code></a>.</p>
+<h2 id="8-phase-e-light-theme-correction">8. Phase E — light-theme correction</h2>
+<p>Phase E corrected the light theme the owner reported as inconsistent, and in<br />
+doing so found eight defects. The customer site had defaulted to the <strong>dark</strong><br />
+theme rather than the approved light reference (<strong>E0</strong>); gold was one token doing<br />
+two incompatible jobs (<strong>E1</strong>); the ink on a gold fill was not the approved dark<br />
+ink (<strong>E2</strong>); the hero, header and panel scrims were built from the page field<br />
+rather than the navy band the approved reference uses (<strong>E3</strong>); the profile<br />
+&quot;Delete&quot; control rendered the raw key <code>common.delete</code> (<strong>E4</strong>); the authenticated<br />
+captures had silently shot the login page (<strong>E5</strong>, an evidence defect); a<br />
+category-card link failed WCAG contrast at 4.28:1 on its tinted scrim (<strong>E7</strong>,<br />
+found by an exhaustive rendered-contrast sweep rather than a fixed list, and the<br />
+defect the owner&#39;s complaint was actually pointing at); and two pre-existing dark<br />
+pairs sit below 4.5:1 (<strong>E8</strong>, reported and deliberately left alone so the<br />
+approved dark theme stays intact).</p>
+<p>The light theme is now an ivory page with white and warm-neutral surfaces, deep<br />
+charcoal type, a metallic gold accent and a navy hero/footer band — all driven by<br />
+central tokens in <code>packages/shared/src/tokens.ts</code> and mirrored into<br />
+<code>:root[data-theme=&#39;light&#39;]</code>, with the dark block defining the same token names so<br />
+no rule needs a theme branch. The dark theme is <strong>0 real colour shifts</strong> in the<br />
+before/after captures (23/31 byte-identical; the rest are isolated antialiasing<br />
+pixels on the blurred header and gold edges). Full detail, evidence and the test<br />
+results are in <a href="04phaseelighttheme.html"><code>04_PHASE_E_LIGHT_THEME.md</code></a>.</p>
+<h2 id="9-reproduction">9. Reproduction</h2>
+<pre><code class="language-bash"># Assertions (no auth needed)
+node .run/check-exec07-home.mjs
+node .run/check-exec07-responsive.mjs
+node .run/check-exec07-mobile-nav.mjs
+
+# External HTTPS sweep (needs the staging stack running)
+node .run/sweep-preview.mjs
+node .run/diag-http-errors.mjs
+node .run/check-refresh-count.mjs
+
+# Screenshots
+node .run/capture-exec07-after.mjs
+
+# Phase E light-theme evidence (needs the seeded DB and the customer app up)
+node .run/seed-customer-demo.mjs              # idempotent; populates the account the auth captures use
+node .run/capture-exec07-phase-e.mjs before   # HEAD theme + i18n fix
+node .run/capture-exec07-phase-e.mjs after    # Phase E applied
+node .run/verify-dark-identical.mjs           # dark must be byte-identical
+node .run/check-light-palette.mjs             # static contrast pairs
+node .run/audit-light-theme.mjs               # live computed-style contrast
+node .run/check-customer-i18n.mjs             # dictionary parity
+node .run/make-light-dark-pairs.mjs after     # light-vs-dark sheets</code></pre></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>aa1569d</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-24T02:32:08.728Z</span>
+  </div>
+</footer>
+</body>
+</html>
