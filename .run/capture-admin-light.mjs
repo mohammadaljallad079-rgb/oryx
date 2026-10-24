@@ -7,13 +7,31 @@
  * document the inconsistency and the correction.
  *
  * Run with: node .run/capture-admin-light.mjs before|after
+ *
+ * The phase must be passed explicitly. Defaulting to `before` silently
+ * overwrote the committed baseline on an accidental run, and the baseline is
+ * the whole point of a before/after pair, so there is no default.
  */
 import { chromium } from 'playwright';
-import { mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
 
-const PHASE = process.argv[2] === 'after' ? 'after' : 'before';
-const BASE = process.env.ORYX_ADMIN_URL ?? 'http://localhost:3000';
+const PHASE = process.argv[2];
+if (PHASE !== 'before' && PHASE !== 'after') {
+  console.error('usage: node .run/capture-admin-light.mjs before|after');
+  process.exit(2);
+}
+const BASE = process.env.ORYX_ADMIN_URL ?? 'http://127.0.0.1:12000';
 const OUT = `docs/audit/exec07/admin-light/${PHASE}`;
+
+// The `before` shots are a historical record of the pre-correction palette.
+// Re-shooting them after the fix would destroy the comparison.
+if (PHASE === 'before' && existsSync(`${OUT}/manifest.json`)) {
+  console.error(
+    `refusing to overwrite the existing baseline at ${OUT} — it is the pre-correction record.\n` +
+      'Delete it deliberately if a new baseline is intended.',
+  );
+  process.exit(2);
+}
 
 const SUPER = { email: 'superadmin@oryx.local', password: 'ChangeMe!Oryx2026' };
 

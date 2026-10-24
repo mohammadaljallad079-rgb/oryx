@@ -14,7 +14,10 @@ import { chromium } from 'playwright';
 const BASE = process.env.ORYX_CUSTOMER_BASE ?? 'http://127.0.0.1:12001';
 const THEME = process.argv[2] === 'dark' ? 'dark' : 'light';
 const LOCALE = process.argv[3] ?? 'en';
-const USER = { email: 'customer@oryx-demo.local', password: 'OryxDemo!2026' };
+const USER = {
+  email: process.env.ORYX_CUSTOMER_EMAIL ?? 'rider@oryx.local',
+  password: process.env.ORYX_CUSTOMER_PASSWORD ?? 'ChangeMe!Oryx2026',
+};
 
 const PATHS = ['/', '/services', '/providers', '/login', '/dashboard', '/bookings', '/invoices', '/support', '/profile', '/notifications', '/garage'];
 

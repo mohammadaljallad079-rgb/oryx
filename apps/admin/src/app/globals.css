@@ -126,6 +126,12 @@
     radial-gradient(900px 460px at 6% 4%, rgba(74, 168, 255, 0.06), transparent 58%);
   --header-h: 68px;
   --sidebar-w: 268px;
+  /*
+   * One height for every form control, so a select in the header, a filter bar
+   * and a modal all line up. The topbar previously carried an inline
+   * `height: 34`, which made its selects 4px shorter than the rest of the app.
+   */
+  --control-h: 38px;
 }
 
 /*
@@ -393,7 +399,7 @@ body::before {
 .oryx-select,
 .oryx-textarea {
   width: 100%;
-  min-height: 38px;
+  min-height: var(--control-h);
   padding: 8px 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
@@ -1022,6 +1028,13 @@ body::before {
 }
 
 @media (max-width: 860px) {
+  /* The context selector wraps to two rows once the rail collapses, so the
+   * 68px desktop header would clip it. Grow the row here; the shell's grid
+   * track and the drawer's offset both read this token, so they follow. */
+  :root {
+    --header-h: 92px;
+  }
+
   .oryx-shell,
   :root[data-dir='rtl'] .oryx-shell {
     grid-template-columns: 1fr;

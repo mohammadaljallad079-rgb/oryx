@@ -34,7 +34,7 @@ interface InventorySummary {
  * API would refuse the call regardless, so the hiding is a convenience only.
  */
 export default function DashboardScreen() {
-  const { user, companyId, branchId, branches, theme, t, locale, can } = useApp();
+  const { user, companyId, branchId, branches, currency, theme, t, locale, can } = useApp();
   const canSales = can('erp.sales.read');
   const canInventory = can('erp.inventory.read');
 
@@ -62,7 +62,6 @@ export default function DashboardScreen() {
     );
   }
 
-  const currency = 'BHD';
   const branchName = branches.find((b) => b.id === branchId);
   const greeting = locale === 'ar' ? user?.fullNameAr : user?.fullNameEn;
   const salesData = sales.data;

@@ -17,12 +17,12 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(139, 144, 148)",
-      "contrast": 5.05
+      "contrast": 5.07
     },
     "header": {
       "layers": [
@@ -42,12 +42,12 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(246, 244, 238)",
-      "contrast": 14.78
+      "background": "rgb(248, 248, 247)",
+      "contrast": 15.25
     },
     "card": {
       "layers": [
@@ -66,7 +66,7 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "composited-layers",
@@ -94,40 +94,42 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(253, 253, 252)",
-      "contrast": 15.93
+      "contrast": 15.98
     },
     "btn-primary": {
       "layers": [
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
-        "color(srgb 1 1 1 / 0.94)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
         "rgb(247, 244, 237)"
       ],
       "backgroundImage": "linear-gradient(145deg, rgb(224, 193, 104), rgb(201, 162, 39))",
       "color": "rgb(36, 31, 20)",
       "borderColor": "rgba(0, 0, 0, 0)",
       "borderWidth": "1px",
-      "fontSize": "14px",
+      "fontSize": "15px",
       "fontWeight": "600",
-      "ownText": "حساب جديد",
+      "ownText": "احجز موعدًا",
       "isIcon": false,
       "threshold": 4.5,
-      "text": "حساب جديد",
+      "text": "احجز موعدًا",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(214, 181, 79)",
-      "contrast": 8.25
+      "background": "rgb(209, 175, 71)",
+      "contrast": 7.75
     },
     "nav-link": {
       "layers": [
@@ -146,7 +148,7 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
@@ -170,7 +172,7 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "composited-layers",
@@ -184,9 +186,9 @@
         "rgba(0, 0, 0, 0)",
         "rgb(247, 244, 237)"
       ],
-      "backgroundImage": "radial-gradient(90% 120% at 90% 10%, color(srgb 0.521569 0.4 0.0705882 / 0.16), rgba(0, 0, 0, 0) 55%), linear-gradient(1",
+      "backgroundImage": "radial-gradient(90% 120% at 90% 10%, color(srgb 0.490196 0.372549 0.0627451 / 0.16), rgba(0, 0, 0, 0) 55%), linear-gradi",
       "color": "rgb(34, 32, 29)",
-      "borderColor": "rgba(133, 102, 18, 0.5)",
+      "borderColor": "rgba(125, 95, 16, 0.5)",
       "borderWidth": "1px",
       "fontSize": "16px",
       "fontWeight": "400",
@@ -197,7 +199,7 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
@@ -221,7 +223,7 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
@@ -252,7 +254,7 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
@@ -280,7 +282,7 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
@@ -289,12 +291,12 @@
     },
     "feature-icon": {
       "layers": [
-        "color(srgb 0.521569 0.4 0.0705882 / 0.12)",
+        "color(srgb 0.490196 0.372549 0.0627451 / 0.12)",
         "rgb(255, 255, 255)"
       ],
       "backgroundImage": null,
       "color": "rgb(122, 92, 16)",
-      "borderColor": "color(srgb 0.521569 0.4 0.0705882 / 0.26)",
+      "borderColor": "color(srgb 0.490196 0.372549 0.0627451 / 0.26)",
       "borderWidth": "1px",
       "fontSize": "16px",
       "fontWeight": "400",
@@ -305,12 +307,12 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "composited-layers",
-      "background": "rgb(240, 237, 227)",
-      "contrast": 5.32
+      "background": "rgb(239, 236, 226)",
+      "contrast": 5.28
     }
   },
   "/dashboard": {
@@ -331,12 +333,12 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(246, 242, 234)",
-      "contrast": 14.57
+      "background": "rgb(200, 202, 202)",
+      "contrast": 9.84
     },
     "header": {
       "layers": [
@@ -356,36 +358,36 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(246, 245, 239)",
-      "contrast": 14.84
+      "background": "rgb(248, 248, 247)",
+      "contrast": 15.31
     },
-    "input": {
+    "card": {
       "layers": [
         "rgb(255, 255, 255)"
       ],
       "backgroundImage": null,
       "color": "rgb(34, 32, 29)",
-      "borderColor": "rgba(36, 31, 20, 0.18)",
+      "borderColor": "rgba(36, 31, 20, 0.09)",
       "borderWidth": "1px",
-      "fontSize": "14px",
+      "fontSize": "16px",
       "fontWeight": "400",
       "ownText": "",
       "isIcon": false,
       "threshold": 4.5,
-      "text": "",
+      "text": "السيارات0مرآب سياراتي",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(253, 253, 253)",
-      "contrast": 15.97
+      "background": "rgb(253, 252, 251)",
+      "contrast": 15.89
     },
     "btn": {
       "layers": [
@@ -408,19 +410,21 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(253, 253, 252)",
-      "contrast": 15.93
+      "contrast": 15.98
     },
     "btn-primary": {
       "layers": [
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
-        "color(srgb 1 1 1 / 0.94)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
         "rgb(247, 244, 237)"
       ],
       "backgroundImage": "linear-gradient(145deg, rgb(224, 193, 104), rgb(201, 162, 39))",
@@ -429,19 +433,19 @@
       "borderWidth": "1px",
       "fontSize": "14px",
       "fontWeight": "600",
-      "ownText": "حساب جديد",
+      "ownText": "حجز جديد",
       "isIcon": false,
       "threshold": 4.5,
-      "text": "حساب جديد",
+      "text": "حجز جديد",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(214, 181, 79)",
-      "contrast": 8.25
+      "background": "rgb(204, 171, 70)",
+      "contrast": 7.44
     },
     "nav-link": {
       "layers": [
@@ -464,7 +468,7 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
@@ -488,12 +492,12 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
-      "measuredFrom": "composited-layers",
-      "background": "rgb(10, 27, 47)",
-      "contrast": 8.06
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(15, 31, 51)",
+      "contrast": 7.7
     },
     "muted": {
       "layers": [
@@ -516,39 +520,37 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(255, 255, 254)",
       "contrast": 7.48
     },
-    "auth-card": {
+    "kpi-icon": {
       "layers": [
-        "rgba(0, 0, 0, 0)",
-        "rgba(0, 0, 0, 0)",
-        "rgba(0, 0, 0, 0)",
-        "rgb(247, 244, 237)"
+        "color(srgb 0.490196 0.372549 0.0627451 / 0.12)",
+        "rgb(255, 255, 255)"
       ],
-      "backgroundImage": "linear-gradient(color(srgb 0.956549 0.941882 0.903686), rgb(251, 249, 244))",
-      "color": "rgb(34, 32, 29)",
-      "borderColor": "rgba(36, 31, 20, 0.09)",
+      "backgroundImage": null,
+      "color": "rgb(122, 92, 16)",
+      "borderColor": "color(srgb 0.490196 0.372549 0.0627451 / 0.26)",
       "borderWidth": "1px",
       "fontSize": "16px",
       "fontWeight": "400",
       "ownText": "",
-      "isIcon": false,
-      "threshold": 4.5,
-      "text": "ORYXتسجيل الدخولادخل إلى مرآبك وحجوزاتك ",
+      "isIcon": true,
+      "threshold": 3,
+      "text": "",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(242, 237, 221)",
-      "contrast": 13.84
+      "background": "rgb(237, 234, 223)",
+      "contrast": 5.18
     }
   },
   "/providers": {
@@ -569,12 +571,12 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(209, 209, 204)",
-      "contrast": 10.62
+      "background": "rgb(209, 209, 205)",
+      "contrast": 10.65
     },
     "header": {
       "layers": [
@@ -594,12 +596,12 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(246, 244, 238)",
-      "contrast": 14.76
+      "background": "rgb(247, 247, 247)",
+      "contrast": 15.22
     },
     "card": {
       "layers": [
@@ -618,7 +620,7 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
@@ -646,19 +648,19 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(253, 253, 252)",
-      "contrast": 15.93
+      "contrast": 15.98
     },
     "btn-primary": {
       "layers": [
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
-        "color(srgb 1 1 1 / 0.94)",
+        "rgba(0, 0, 0, 0)",
         "rgb(247, 244, 237)"
       ],
       "backgroundImage": "linear-gradient(145deg, rgb(224, 193, 104), rgb(201, 162, 39))",
@@ -667,19 +669,19 @@
       "borderWidth": "1px",
       "fontSize": "14px",
       "fontWeight": "600",
-      "ownText": "حساب جديد",
+      "ownText": "الكل",
       "isIcon": false,
       "threshold": 4.5,
-      "text": "حساب جديد",
+      "text": "الكل",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(214, 181, 79)",
-      "contrast": 8.25
+      "background": "rgb(214, 181, 81)",
+      "contrast": 8.29
     },
     "nav-link": {
       "layers": [
@@ -702,7 +704,7 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
@@ -726,7 +728,7 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "composited-layers",
@@ -754,7 +756,7 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
@@ -781,7 +783,7 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
@@ -807,12 +809,12 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(246, 242, 234)",
-      "contrast": 14.57
+      "background": "rgb(246, 242, 235)",
+      "contrast": 14.59
     },
     "header": {
       "layers": [
@@ -832,12 +834,12 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(246, 245, 239)",
-      "contrast": 14.84
+      "background": "rgb(248, 248, 247)",
+      "contrast": 15.31
     },
     "input": {
       "layers": [
@@ -856,7 +858,7 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
@@ -884,40 +886,41 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(253, 253, 252)",
-      "contrast": 15.93
+      "contrast": 15.98
     },
     "btn-primary": {
       "layers": [
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
-        "color(srgb 1 1 1 / 0.94)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
         "rgb(247, 244, 237)"
       ],
-      "backgroundImage": "linear-gradient(145deg, rgb(224, 193, 104), rgb(201, 162, 39))",
+      "backgroundImage": "linear-gradient(145deg, rgb(212, 175, 55), rgb(184, 145, 42))",
       "color": "rgb(36, 31, 20)",
-      "borderColor": "rgba(0, 0, 0, 0)",
+      "borderColor": "rgba(125, 95, 16, 0.5)",
       "borderWidth": "1px",
       "fontSize": "14px",
       "fontWeight": "600",
-      "ownText": "حساب جديد",
+      "ownText": "دخول",
       "isIcon": false,
       "threshold": 4.5,
-      "text": "حساب جديد",
+      "text": "دخول",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(214, 181, 79)",
-      "contrast": 8.25
+      "background": "rgb(198, 161, 53)",
+      "contrast": 6.66
     },
     "nav-link": {
       "layers": [
@@ -940,7 +943,7 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
@@ -964,7 +967,7 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "composited-layers",
@@ -992,7 +995,7 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
@@ -1006,7 +1009,7 @@
         "rgba(0, 0, 0, 0)",
         "rgb(247, 244, 237)"
       ],
-      "backgroundImage": "linear-gradient(color(srgb 0.956549 0.941882 0.903686), rgb(251, 249, 244))",
+      "backgroundImage": "linear-gradient(color(srgb 0.954667 0.940235 0.903216), rgb(251, 249, 244))",
       "color": "rgb(34, 32, 29)",
       "borderColor": "rgba(36, 31, 20, 0.09)",
       "borderWidth": "1px",
@@ -1019,12 +1022,12 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(242, 237, 221)",
-      "contrast": 13.84
+      "background": "rgb(242, 236, 221)",
+      "contrast": 13.82
     }
   },
   "/profile": {
@@ -1045,12 +1048,12 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(246, 242, 234)",
-      "contrast": 14.57
+      "background": "rgb(222, 222, 222)",
+      "contrast": 12.11
     },
     "header": {
       "layers": [
@@ -1070,12 +1073,36 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(246, 245, 239)",
-      "contrast": 14.84
+      "background": "rgb(248, 248, 247)",
+      "contrast": 15.31
+    },
+    "card": {
+      "layers": [
+        "rgb(255, 255, 255)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgba(36, 31, 20, 0.09)",
+      "borderWidth": "1px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "الملف الشخصيحدّث بياناتك الأساسية المستخ",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(250, 250, 247)",
+      "contrast": 15.5
     },
     "input": {
       "layers": [
@@ -1094,12 +1121,12 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(253, 253, 253)",
-      "contrast": 15.97
+      "contrast": 15.98
     },
     "btn": {
       "layers": [
@@ -1122,20 +1149,18 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(253, 253, 252)",
-      "contrast": 15.93
+      "contrast": 15.98
     },
     "btn-primary": {
       "layers": [
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
-        "rgba(0, 0, 0, 0)",
-        "color(srgb 1 1 1 / 0.94)",
-        "rgb(247, 244, 237)"
+        "rgb(255, 255, 255)"
       ],
       "backgroundImage": "linear-gradient(145deg, rgb(224, 193, 104), rgb(201, 162, 39))",
       "color": "rgb(36, 31, 20)",
@@ -1143,19 +1168,19 @@
       "borderWidth": "1px",
       "fontSize": "14px",
       "fontWeight": "600",
-      "ownText": "حساب جديد",
+      "ownText": "حفظ",
       "isIcon": false,
       "threshold": 4.5,
-      "text": "حساب جديد",
+      "text": "حفظ",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(214, 181, 79)",
-      "contrast": 8.25
+      "background": "rgb(214, 181, 80)",
+      "contrast": 8.27
     },
     "nav-link": {
       "layers": [
@@ -1178,7 +1203,7 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
@@ -1202,7 +1227,7 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "composited-layers",
@@ -1230,39 +1255,39 @@
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
       "background": "rgb(255, 255, 254)",
       "contrast": 7.48
     },
-    "auth-card": {
+    "page-head": {
       "layers": [
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
         "rgba(0, 0, 0, 0)",
         "rgb(247, 244, 237)"
       ],
-      "backgroundImage": "linear-gradient(color(srgb 0.956549 0.941882 0.903686), rgb(251, 249, 244))",
-      "color": "rgb(34, 32, 29)",
-      "borderColor": "rgba(36, 31, 20, 0.09)",
+      "backgroundImage": "radial-gradient(120% 140% at 88% 6%, color(srgb 0.909804 0.780392 0.4 / 0.2), rgba(0, 0, 0, 0) 58%), linear-gradient(150",
+      "color": "rgb(255, 255, 255)",
+      "borderColor": "rgba(36, 31, 20, 0.14)",
       "borderWidth": "1px",
       "fontSize": "16px",
       "fontWeight": "400",
       "ownText": "",
       "isIcon": false,
       "threshold": 4.5,
-      "text": "ORYXتسجيل الدخولادخل إلى مرآبك وحجوزاتك ",
+      "text": "منصة السياراتالملف الشخصيبياناتك الشخصية",
       "tokens": {
         "bg": "#f7f4ed",
         "surface": "#fff",
-        "gold": "#856612",
+        "gold": "#7d5f10",
         "textFaint": "#6b6459"
       },
       "measuredFrom": "rendered-pixels",
-      "background": "rgb(242, 237, 221)",
-      "contrast": 13.84
+      "background": "rgb(13, 30, 49)",
+      "contrast": 16.87
     }
   }
 }

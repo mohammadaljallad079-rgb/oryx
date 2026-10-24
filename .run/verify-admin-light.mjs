@@ -18,7 +18,7 @@
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'fs';
 
-const BASE = process.env.ORYX_ADMIN_URL ?? 'http://localhost:3000';
+const BASE = process.env.ORYX_ADMIN_URL ?? 'http://127.0.0.1:12000';
 const OUT = 'docs/audit/exec07/admin-light/verify';
 mkdirSync(OUT, { recursive: true });
 

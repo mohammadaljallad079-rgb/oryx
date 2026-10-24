@@ -377,7 +377,7 @@ export const api = {
 
   me: () => request<ErpMe>('/auth/me', { noScope: true }),
   updateProfile: (body: { preferredLocale?: 'ar' | 'en'; preferredTheme?: 'dark' | 'light' }) =>
-    request<ErpMe['user']>('/auth/profile', { method: 'POST', body, noScope: true }),
+    request<ErpMe['user']>('/auth/profile', { method: 'PATCH', body, noScope: true }),
 
   // ------------------------------------------------------------- sessions
   sessions: () => request<{ sessions: ErpSessionRow[] }>('/auth/sessions', { noScope: true }),

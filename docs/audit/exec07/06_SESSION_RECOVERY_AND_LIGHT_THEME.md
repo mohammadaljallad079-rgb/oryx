@@ -104,3 +104,57 @@ There is no stash on `HEAD` and no dangling commit whose content is absent from
 
 The crashed session's work was pushed. Recovery is complete and no completed
 work was discarded. The light-theme task continues from `2e3e93e`.
+
+## Continuation — control-height centralisation (this session)
+
+The owner reported that the light theme "still looked inconsistent". Rather than
+re-tune colours by eye, the components were measured across six admin surfaces
+(`/dashboard`, `/settings`, `/companies`, `/users`, `/providers`, `/audit`) with
+`.run/consistency-audit-admin.mjs`. Two genuine defects surfaced:
+
+1. **`.oryx-select` had two heights.** Two selects in the topbar carried an
+   inline `height: 34 / minHeight: 34`, making them 4px shorter than every other
+   control. Fixed by adding a single `--control-h: 38px` token, binding
+   `.oryx-input`, `.oryx-select` and `.oryx-textarea` to
+   `min-height: var(--control-h)`, and deleting both inline overrides.
+2. **The handset topbar was clipped.** At 390px the context selector wraps to
+   two rows, so the fixed 68px header could not contain it. Measured against the
+   pre-change 34px control, the overflow was already present (72px in a 67px
+   box) and the 38px control widened it to 76px. Fixed by raising
+   `--header-h` to 92px inside the existing `max-width: 860px` query; the
+   shell's grid track and the drawer offset both read that token, so they follow.
+
+Two findings were deliberately **not** treated as defects, because measuring
+them as variants rather than pooling them shows they are intentional:
+
+- `PasswordField` reserves trailing space (`paddingInlineEnd: 40`) for its
+  show/hide toggle. The audit now measures it as its own group.
+- Active and resting nav items, and the `--sm` button variant, are separate
+  states; the audit now groups them separately instead of reporting the
+  deliberate difference as a fault.
+
+### Result
+
+- `.run/verify-admin-light.mjs`: **222/222** assertions across six surfaces
+  (light field, charcoal type, AA contrast, RTL/LTR, responsive, dark
+  unchanged).
+- `.run/consistency-audit-admin.mjs light en` and `dark en`: **0 inconsistent
+  properties**.
+- `.run/sweep-light-contrast.mjs light`: **0** WCAG failures.
+- `.run/capture-exec07-phase-e.mjs after`: **60 captures, 0** failures.
+- The dark palette is unchanged. Only `--control-h`, `--header-h` and a
+  `min-height` reference differ in `globals.css`; no dark colour token was
+  touched. The apparent dark diffs in the `after` captures are the header
+  controls' new 4px height and a seventh seeded company row growing the page.
+
+### A build-environment trap worth recording
+
+`NEXT_PUBLIC_*` values are inlined at **build** time. Sourcing the repository
+`.env` into the shell before `next build` bakes
+`http://localhost:3001/api` into the client bundle, which breaks the
+same-origin preview proxy: the refresh cookie is then set on `localhost:3001`
+while the page runs on the proxy origin, so every full page load silently signs
+the user out. This presented as "the branding editor is missing", which was
+really a session loss. `.run/restart-app.sh` now builds and restarts a preview
+app with those variables removed from the environment.
+
