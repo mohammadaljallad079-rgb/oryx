@@ -120,6 +120,8 @@ model User {
   auditLogs         AuditLog[]
   supportSessions   SupportSession[] @relation("SupportSessionActor")
   mfaRecoveryCodes  MfaRecoveryCode[]
+  mediaAssetsCreated CmsMediaAsset[]
+  contentUpdated    CmsContentBlock[]
 
   @@index([status])
 }
@@ -158,6 +160,14 @@ model RefreshToken {
    * compromised family does not disturb the user's other devices.
    */
   familyId   String    @default(cuid())
+  /**
+   * Distinguishes a browser session from a native mobile session. A mobile
+   * session carries its refresh token in the request body, so the row records
+   * which kind of client owns it; the session list shows it and the rotation
+   * path carries it forward.
+   */
+  deviceKind String    @default("WEB")
+  deviceName String?
   userAgent  String?
   ipAddress  String?
   createdAt  DateTime  @default(now())
@@ -181,8 +191,8 @@ model Company {
   status          CompanyStatus @default(PROVISIONING)
   industry        String?
   countryCode     String?
-  currency        String        @default("SAR")
-  timezone        String        @default("Asia/Riyadh")
+  currency        String        @default("BHD")
+  timezone        String        @default("Asia/Bahrain")
   taxNumber       String?
   parentCompanyId String?
   notes           String?
@@ -198,6 +208,7 @@ model Company {
   invitations  Invitation[]
   auditLogs    AuditLog[]
   supportSessions SupportSession[]
+  branding        CompanyBranding?
 
   // Execution 02 — ERP core (all tenant-owned rows carry companyId).
   documentSequences   DocumentSequence[]
@@ -326,7 +337,7 @@ model Branch {
   countryCode String?
   addressLine String?
   phone       String?
-  timezone    String   @default("Asia/Riyadh")
+  timezone    String   @default("Asia/Bahrain")
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -499,7 +510,7 @@ model Plan {
   descriptionAr      String
   monthlyPrice       Decimal  @db.Decimal(12, 2)
   annualPrice        Decimal  @db.Decimal(12, 2)
-  currency           String   @default("SAR")
+  currency           String   @default("BHD")
   isPublic           Boolean  @default(true)
   isActive           Boolean  @default(true)
   trialDays          Int      @default(14)
@@ -536,7 +547,7 @@ model Subscription {
   status           SubscriptionStatus @default(TRIAL)
   billingPeriod    BillingPeriod      @default(MONTHLY)
   price            Decimal            @db.Decimal(12, 2)
-  currency         String             @default("SAR")
+  currency         String             @default("BHD")
   startedAt        DateTime           @default(now())
   currentPeriodEnd DateTime?
   cancelledAt      DateTime?
@@ -642,8 +653,13 @@ model CmsBanner {
   isActive  Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  /** Preferred reference; `imageUrl` is kept for external absolute URLs. */
+  mediaAssetId String?
+
+  mediaAsset CmsMediaAsset? @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
 
   @@index([placement, locale])
+  @@index([mediaAssetId])
 }
 
 model FeatureFlag {
@@ -698,6 +714,15 @@ model ServiceCategory {
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  /** Photography for the category card; replaces the generated vector art. */
+  imageAssetId String?
+  /** Short marketing copy per locale, editable from the admin CMS. */
+  descriptionEn String?
+  descriptionAr String?
+
+  imageAsset CmsMediaAsset? @relation(fields: [imageAssetId], references: [id], onDelete: SetNull)
+
+  @@index([imageAssetId])
 }
 
 model NotificationTemplate {
@@ -720,6 +745,32 @@ model PlatformSetting {
   value     Json
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
+}
+
+/**
+ * Platform-level service-area catalogue.
+ *
+ * Seeded from `BAHRAIN_SERVICE_AREAS` in `@oryx/shared` so a fresh deployment
+ * is usable, but stored in the database so an administrator can rename,
+ * deactivate or add an area without a code change. The `code` is the stable
+ * identifier; the names are display values.
+ *
+ * This is a platform catalogue, not a tenant table: it carries no `companyId`,
+ * because every tenant in the launch market shares the same administrative
+ * areas. A tenant narrows coverage through its own branches.
+ */
+model ServiceArea {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  nameEn      String
+  nameAr      String
+  countryCode String   @default("BH")
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([countryCode, isActive])
 }
 
 // ============================================================================
@@ -941,7 +992,7 @@ model Account {
   isSystem      Boolean              @default(false)
   /** System role tag (e.g. AR_CONTROL, AP_CONTROL, CASH, SALES_REVENUE, VAT_OUTPUT). */
   systemRole    String?
-  currency      String               @default("SAR")
+  currency      String               @default("BHD")
   isActive      Boolean              @default(true)
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
@@ -1023,7 +1074,7 @@ model JournalEntry {
   /** Source document id, used to make posting idempotent. */
   sourceId         String?
   memo             String?
-  currency         String            @default("SAR")
+  currency         String            @default("BHD")
   totalDebitMinor  Int               @default(0)
   totalCreditMinor Int               @default(0)
   reversalOfId     String?
@@ -1099,7 +1150,7 @@ model Payment {
   paymentNumber  String
   method         PaymentMethod    @default(CASH)
   amountMinor    Int
-  currency       String           @default("SAR")
+  currency       String           @default("BHD")
   reference      String?
   notes          String?
   paidAt         DateTime
@@ -1344,7 +1395,7 @@ model Customer {
   paymentTermsDays    Int      @default(0)
   /** Control account for this customer's receivable. */
   receivableAccountId String?
-  currency            String   @default("SAR")
+  currency            String   @default("BHD")
   isActive            Boolean  @default(true)
   notes               String?
   createdAt           DateTime @default(now())
@@ -1387,7 +1438,7 @@ model Quotation {
   discountMinor    Int             @default(0)
   taxMinor         Int             @default(0)
   totalMinor       Int             @default(0)
-  currency         String          @default("SAR")
+  currency         String          @default("BHD")
   notes            String?
   convertedOrderId String?
   createdById      String
@@ -1433,7 +1484,7 @@ model SalesOrder {
   discountMinor Int              @default(0)
   taxMinor      Int              @default(0)
   totalMinor    Int              @default(0)
-  currency      String           @default("SAR")
+  currency      String           @default("BHD")
   notes         String?
   createdById   String
   createdAt     DateTime         @default(now())
@@ -1482,7 +1533,7 @@ model SalesInvoice {
   taxMinor        Int                @default(0)
   totalMinor      Int                @default(0)
   amountPaidMinor Int                @default(0)
-  currency        String             @default("SAR")
+  currency        String             @default("BHD")
   notes           String?
   journalEntryId  String?
   createdById     String
@@ -1539,7 +1590,7 @@ model CreditNote {
   taxMinor         Int            @default(0)
   totalMinor       Int            @default(0)
   reason           String?
-  currency         String         @default("SAR")
+  currency         String         @default("BHD")
   restockInventory Boolean        @default(false)
   journalEntryId   String?
   createdById      String
@@ -1618,7 +1669,7 @@ model PosSale {
   paidMinor        Int           @default(0)
   changeMinor      Int           @default(0)
   paymentMethod    PaymentMethod @default(CASH)
-  currency         String        @default("SAR")
+  currency         String        @default("BHD")
   salesInvoiceId   String?
   journalEntryId   String?
   createdById      String
@@ -1669,7 +1720,7 @@ model Supplier {
   paymentTermsDays Int      @default(0)
   /** Control account for this supplier's payable. */
   payableAccountId String?
-  currency         String   @default("SAR")
+  currency         String   @default("BHD")
   isActive         Boolean  @default(true)
   notes            String?
   createdAt        DateTime @default(now())
@@ -1741,7 +1792,7 @@ model PurchaseOrder {
   subtotalMinor Int                 @default(0)
   taxMinor      Int                 @default(0)
   totalMinor    Int                 @default(0)
-  currency      String              @default("SAR")
+  currency      String              @default("BHD")
   notes         String?
   approvedById  String?
   approvedAt    DateTime?
@@ -1833,7 +1884,7 @@ model SupplierInvoice {
   taxMinor              Int                   @default(0)
   totalMinor            Int                   @default(0)
   amountPaidMinor       Int                   @default(0)
-  currency              String                @default("SAR")
+  currency              String                @default("BHD")
   notes                 String?
   journalEntryId        String?
   createdById           String
@@ -1885,7 +1936,7 @@ model PurchaseReturn {
   taxMinor        Int            @default(0)
   totalMinor      Int            @default(0)
   reason          String?
-  currency        String         @default("SAR")
+  currency        String         @default("BHD")
   journalEntryId  String?
   createdById     String
   postedAt        DateTime?
@@ -2320,7 +2371,7 @@ model EmploymentContract {
   endDate       DateTime?
   /** Contracted base salary at signing, in minor units. */
   baseSalaryMinor Int
-  currency      String         @default("SAR")
+  currency      String         @default("BHD")
   probationDays Int            @default(0)
   notes         String?
   createdAt     DateTime       @default(now())
@@ -2521,7 +2572,7 @@ model SalaryStructure {
   effectiveFrom DateTime
   /** Base monthly salary in minor units. */
   basicMinor    Int
-  currency      String   @default("SAR")
+  currency      String   @default("BHD")
   isActive      Boolean  @default(true)
   notes         String?
   createdAt     DateTime @default(now())
@@ -2588,7 +2639,7 @@ model PayrollRun {
   allowancesMinor Int             @default(0)
   deductionsMinor Int             @default(0)
   netMinor       Int              @default(0)
-  currency       String           @default("SAR")
+  currency       String           @default("BHD")
   journalEntryId String?
   approvedById   String?
   approvedAt     DateTime?
@@ -2621,7 +2672,7 @@ model Payslip {
   deductionsMinor Int    @default(0)
   grossMinor    Int      @default(0)
   netMinor      Int      @default(0)
-  currency      String   @default("SAR")
+  currency      String   @default("BHD")
   advanceDeductionMinor Int @default(0)
   /** Full snapshot of the salary structure and computed components at run time. */
   snapshot      Json?
@@ -2659,7 +2710,7 @@ model EmployeeAdvance {
   amountMinor   Int
   installments  Int           @default(1)
   settledMinor  Int           @default(0)
-  currency      String        @default("SAR")
+  currency      String        @default("BHD")
   status        AdvanceStatus @default(OPEN)
   issuedAt      DateTime
   reason        String?
@@ -2723,7 +2774,7 @@ model Lead {
   status        LeadStatus @default(NEW)
   ownerUserId   String?
   estimatedValueMinor Int  @default(0)
-  currency      String     @default("SAR")
+  currency      String     @default("BHD")
   notes         String?
   /** Set when the lead is converted to a customer. */
   customerId    String?
@@ -2790,7 +2841,7 @@ model Opportunity {
   leadId        String?
   ownerUserId   String?
   amountMinor   Int               @default(0)
-  currency      String            @default("SAR")
+  currency      String            @default("BHD")
   expectedCloseDate DateTime?
   status        OpportunityStatus @default(OPEN)
   /** Set when converted into a quotation. */
@@ -3437,7 +3488,7 @@ model RepairEstimate {
   subtotalMinor Int           @default(0)
   taxMinor      Int           @default(0)
   totalMinor    Int           @default(0)
-  currency      String        @default("SAR")
+  currency      String        @default("BHD")
   customerApprovedById String?
   approvedAt    DateTime?
   expiresAt     DateTime?
@@ -3609,7 +3660,7 @@ model ProviderServiceListing {
   nameAr      String
   description String?
   priceMinor  Int      @default(0)
-  currency    String   @default("SAR")
+  currency    String   @default("BHD")
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -3659,7 +3710,7 @@ model MarketplaceCommission {
   baseMinor        Int
   rateBp           Int
   commissionMinor  Int
-  currency         String           @default("SAR")
+  currency         String           @default("BHD")
   status           CommissionStatus @default(PENDING)
   createdAt        DateTime         @default(now())
 
@@ -3678,7 +3729,7 @@ model ProviderSettlement {
   grossMinor      Int              @default(0)
   commissionMinor Int              @default(0)
   netMinor        Int              @default(0)
-  currency        String           @default("SAR")
+  currency        String           @default("BHD")
   status          SettlementStatus @default(DRAFT)
   approvedById    String?
   paidAt          DateTime?
@@ -4583,4 +4634,174 @@ model IntegrationCheck {
   provider IntegrationProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
   @@index([providerId, createdAt])
+}
+
+// ============================================================ Execution 07
+// Website media library and dynamic content.
+//
+// The public website reads its imagery and copy from these tables rather than
+// from hardcoded asset paths, so an administrator can change the homepage
+// without a redeploy. A `CmsMediaAsset` row is the single source of truth for
+// an uploaded file: the bytes live on disk under MEDIA_ROOT, the row holds the
+// metadata, the optimisation variants and the focal point.
+
+/**
+ * Per-company visual identity.
+ *
+ * One row per company. A company that has never set branding has no row at all,
+ * and the API resolves it to the ORYX default; a partial row inherits the
+ * remaining fields. Every `*AssetId` is a `CmsMediaAsset` id, so a logo is
+ * uploaded, validated and optimised through the existing media pipeline rather
+ * than being pasted in as a base64 blob on the company row.
+ *
+ * A platform-level ORYX logo is not stored here: it is the platform default and
+ * lives in the `branding` platform setting, so a tenant can never overwrite it.
+ */
+model CompanyBranding {
+  companyId String @id
+
+  nameEn String?
+  nameAr String?
+
+  logoAssetId      String?
+  logoDarkAssetId  String?
+  faviconAssetId   String?
+
+  /** 6-digit hex (`#rrggbb`). Validated in the API; never interpolated unvalidated. */
+  primaryColor String?
+  accentColor  String?
+
+  supportEmail String?
+  supportPhone String?
+  websiteUrl   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  logoAsset     CmsMediaAsset? @relation("CompanyLogo", fields: [logoAssetId], references: [id], onDelete: SetNull)
+  logoDarkAsset CmsMediaAsset? @relation("CompanyLogoDark", fields: [logoDarkAssetId], references: [id], onDelete: SetNull)
+  faviconAsset  CmsMediaAsset? @relation("CompanyFavicon", fields: [faviconAssetId], references: [id], onDelete: SetNull)
+}
+
+model CmsMediaFolder {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assets CmsMediaAsset[]
+}
+
+model CmsMediaAsset {
+  id           String   @id @default(cuid())
+  folderId     String?
+  /** Original filename as uploaded, kept for display. Never used as a path. */
+  originalName String
+  /** Content-addressed storage key, e.g. `2026/02/ab12….webp`. */
+  storageKey   String   @unique
+  mimeType     String
+  byteSize     Int
+  width        Int
+  height       Int
+  /** Dominant colour, used as a placeholder background while loading. */
+  dominantColor String?
+  /** Blurred inline placeholder (tiny base64 webp) for progressive loading. */
+  blurDataUrl  String?
+  /** Cropped variants keyed by name (`thumb`, `card`, `hero`). */
+  variants     Json     @default("{}")
+  /** Focal point as a percentage of the source, so cropping stays intentional. */
+  focalX       Float    @default(50)
+  focalY       Float    @default(50)
+  altAr        String?
+  altEn        String?
+  caption      String?
+  credit       String?
+  /** Source/licence note for third-party photography. */
+  licenseNote  String?
+  tags         String[] @default([])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdByUserId String?
+
+  folder       CmsMediaFolder?       @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  createdBy    User?                 @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  versions     CmsMediaAssetVersion[]
+  blocks       CmsContentBlock[]
+  banners      CmsBanner[]
+  categories   ServiceCategory[]
+  companyLogos     CompanyBranding[] @relation("CompanyLogo")
+  companyLogosDark CompanyBranding[] @relation("CompanyLogoDark")
+  companyFavicons  CompanyBranding[] @relation("CompanyFavicon")
+
+  @@index([folderId])
+  @@index([createdAt])
+}
+
+/**
+ * Immutable snapshot of a media asset's editable metadata. Every metadata edit
+ * appends a version, so an administrator can restore a previous caption, alt
+ * text or focal point. The binary is immutable per storage key, so a version
+ * does not duplicate bytes.
+ */
+model CmsMediaAssetVersion {
+  id        String   @id @default(cuid())
+  assetId   String
+  /** Monotonic per asset; 1 is the upload. */
+  revision  Int
+  snapshot  Json
+  actorUserId String?
+  createdAt DateTime @default(now())
+
+  asset CmsMediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, revision])
+  @@index([assetId, createdAt])
+}
+
+/**
+ * A single editable slot on the public website. `key` is stable and referenced
+ * by the frontend; `value` holds locale-specific content. Publishing toggles
+ * `isPublished`, so a draft never reaches the public endpoint.
+ */
+model CmsContentBlock {
+  id          String   @id @default(cuid())
+  /** Stable key the frontend reads, e.g. `home.hero.title`. */
+  key         String
+  locale      Locale
+  /** Plain text for titles and labels. */
+  value       String
+  /** Optional longer rich copy; rendered as text, never as raw HTML. */
+  body        String?
+  mediaAssetId String?
+  linkUrl     String?
+  linkLabel   String?
+  sortOrder   Int      @default(0)
+  isPublished Boolean  @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  updatedByUserId String?
+
+  mediaAsset CmsMediaAsset? @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
+  updatedBy  User?          @relation(fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([key, locale])
+  @@index([isPublished])
+}
+
+/** Ordered, publishable record of every content change for revert. */
+model CmsContentRevision {
+  id        String   @id @default(cuid())
+  blockId   String
+  revision  Int
+  snapshot  Json
+  actorUserId String?
+  createdAt DateTime @default(now())
+
+  @@unique([blockId, revision])
+  @@index([blockId, createdAt])
 }

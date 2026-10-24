@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { basisPointsOfMinor, currencyScale } from '@oryx/shared';
+import { basisPointsOfMinor, currencyScale, DEFAULT_COUNTRY_CODE, DEFAULT_CURRENCY } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import {
@@ -84,7 +84,7 @@ export class MarketplaceService {
         contactPhone: input.contactPhone.trim(),
         registrationNumber: input.registrationNumber ?? null,
         taxNumber: input.taxNumber ?? null,
-        countryCode: (input.countryCode ?? 'BH').toUpperCase(),
+        countryCode: (input.countryCode ?? DEFAULT_COUNTRY_CODE).toUpperCase(),
         city: input.city ?? null,
         addressLine: input.addressLine ?? null,
         categoryKeys: input.categoryKeys ?? [],
@@ -415,7 +415,7 @@ export class MarketplaceService {
         nameAr: input.nameAr.trim(),
         description: input.description ?? null,
         priceMinor: input.priceMinor,
-        currency: input.currency ?? 'BHD',
+        currency: input.currency ?? DEFAULT_CURRENCY,
       },
     });
   }
@@ -770,7 +770,7 @@ export class MarketplaceService {
       where: { id: providerId },
     });
 
-    const currency = input.currency ?? 'BHD';
+    const currency = input.currency ?? DEFAULT_CURRENCY;
     const commissionMinor = basisPointsOfMinor(input.finalAmountMinor, provider.commissionPercentBp);
 
     return this.prisma.$transaction(async (tx) => {
@@ -1198,7 +1198,7 @@ export class MarketplaceService {
     const grossMinor = commissions.reduce((sum, row) => sum + row.baseMinor, 0);
     const commissionMinor = commissions.reduce((sum, row) => sum + row.commissionMinor, 0);
     const netMinor = grossMinor - commissionMinor;
-    const currency = commissions[0]?.currency ?? 'BHD';
+    const currency = commissions[0]?.currency ?? DEFAULT_CURRENCY;
 
     return this.prisma.$transaction(async (tx) => {
       const settlement = await tx.providerSettlement.create({

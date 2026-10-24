@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { DEFAULT_COUNTRY_CODE, DEFAULT_CURRENCY } from '@oryx/shared';
 import { PrismaService } from './prisma.service';
+import type { Tx } from './document-sequence.service';
 import { forbidden, ERROR_CODES, badRequest } from './errors';
 import type { RequestPrincipal } from '../auth/auth.decorators';
 import type { ActorContext } from '../organizations/organizations.service';
@@ -61,6 +63,41 @@ export class ErpContextService {
     const exists = await this.prisma.company.findUnique({ where: { id: companyId } });
     if (!exists) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Unknown company context.');
     return { companyId, branchIds: [] };
+  }
+
+  /**
+   * The currency a company's documents are denominated in.
+   *
+   * A company record carries its own currency, set when the tenant is
+   * provisioned. ERP defaults must follow that record rather than a literal:
+   * hard-coding a code here is what made a Bahraini tenant's documents read as
+   * Saudi Riyals. When a row predates the field (or the tenant is still being
+   * provisioned) the launch-market currency is the correct fallback.
+   *
+   * Callers pass the already-resolved `companyId`, so this is a plain read and
+   * carries no authorisation decision of its own.
+   */
+  async companyCurrency(companyId: string, tx?: Tx): Promise<string> {
+    const client: Tx = tx ?? this.prisma;
+    const company = await client.company.findUnique({
+      where: { id: companyId },
+      select: { currency: true, countryCode: true },
+    });
+    return company?.currency ?? DEFAULT_CURRENCY;
+  }
+
+  /**
+   * The ISO country code a company operates in, for the same reason as
+   * {@link companyCurrency}: a document default must follow the tenant's own
+   * record instead of assuming the first market.
+   */
+  async companyCountryCode(companyId: string, tx?: Tx): Promise<string> {
+    const client: Tx = tx ?? this.prisma;
+    const company = await client.company.findUnique({
+      where: { id: companyId },
+      select: { countryCode: true },
+    });
+    return company?.countryCode ?? DEFAULT_COUNTRY_CODE;
   }
 
   /**

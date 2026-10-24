@@ -33,6 +33,42 @@
   --gold: #d4af37;
   --gold-soft: #e8c766;
   --gold-deep: #a9861f;
+  /*
+   * The metallic gold button ramp. It is separate from the accent tokens
+   * because a fill has different constraints from text: the fill must stay
+   * bright enough that dark ink reads on it, while `--gold` has to be dark
+   * enough to read as text on the page field.
+   */
+  --gold-fill-from: #e8c766;
+  --gold-fill-to: #d4af37;
+  --gold-fill-hover-from: #d4af37;
+  --gold-fill-hover-to: #a9861f;
+  --on-gold: #00121f;
+  /* Gold used as *text* on a gold-tinted chip. In the dark theme the plain
+   * accent already clears 4.5:1 on every chip, so this reproduces it. */
+  --gold-on-tint: #d4af37;
+  /*
+   * The gold-tint ramp. Rules take a step by name instead of writing their own
+   * `color-mix(in srgb, var(--gold) N%, transparent)`, so a chip, a badge and the
+   * nav markers cannot resolve to four different golds.
+   *
+   * The dark percentages are exactly the ones the admin rules already used
+   * (badge 15%/40%, collapsed nav 18%, nav gradient 20%), so the approved dark
+   * render is byte-identical. The light block below tunes the same names, which
+   * is the point of a ramp: the theme changes the steps, not the rules.
+   */
+  --tint-wash: color-mix(in srgb, var(--gold) 6%, transparent);
+  --tint-fill: color-mix(in srgb, var(--gold) 15%, transparent);
+  --tint-focus: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tint-glow: color-mix(in srgb, var(--gold) 20%, transparent);
+  --tint-active: color-mix(in srgb, var(--gold) 18%, transparent);
+  --tint-line: color-mix(in srgb, var(--gold) 26%, transparent);
+  --tint-badge-line: color-mix(in srgb, var(--gold) 40%, transparent);
+  --tint-ring: color-mix(in srgb, var(--gold) 40%, transparent);
+  --tint-panel: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+  /* A hovered table row: subtle on navy, and re-tuned on ivory where the same
+   * lift would disappear into the page. */
+  --row-hover: color-mix(in srgb, var(--surface-raised) 70%, transparent);
   --success: #3ecf8e;
   --warning: #f0b429;
   --danger: #f2555a;
@@ -44,38 +80,170 @@
     rgba(0, 18, 34, 0.94) 100%
   );
   --shadow-card: 0 18px 40px -24px rgba(0, 0, 0, 0.85);
+  --shadow-tile: 0 24px 48px -26px rgba(0, 0, 0, 0.9);
+  --shadow-modal: 0 40px 80px -40px rgba(0, 0, 0, 0.9);
+  /* The focus ring and the modal backdrop are semantic, not literal: the light
+   * theme needs a softer ring and a lighter scrim than a navy page does. */
+  --focus-ring: rgba(212, 175, 55, 0.18);
+  --backdrop: rgba(0, 10, 20, 0.66);
+  /* The shade a company brand colour is mixed toward to derive its pressed and
+   * hover states. It is a token rather than a literal so the branded shell has
+   * no colour value that a theme switch cannot reach. */
+  --brand-shade: #000000;
+  /*
+   * Ink and chrome for photo-backed surfaces (module tiles, the dashboard hero).
+   * These sit on a navy scrim in both themes, so the values are intentionally
+   * identical in both token blocks rather than tracking the page palette.
+   */
+  --on-media: #ffffff;
+  --on-media-muted: rgba(233, 240, 248, 0.82);
+  --on-media-accent: #e8c766;
+  --on-media-shadow: rgba(0, 0, 0, 0.7);
+  --on-media-shadow-soft: rgba(0, 0, 0, 0.75);
+  --media-chip-bg: rgba(0, 15, 30, 0.55);
+  --media-chip-border: rgba(212, 175, 55, 0.5);
+  /*
+   * The hero scrim. Copy sits on the inline-start half, so the near-opaque end
+   * is mirrored in RTL; both are declared here so the rule needs no direction
+   * override of its own.
+   */
+  --hero-scrim: linear-gradient(
+    100deg,
+    rgba(0, 15, 30, 0.62) 0%,
+    rgba(0, 18, 34, 0.34) 34%,
+    rgba(0, 22, 43, 0.08) 62%,
+    rgba(0, 22, 43, 0) 100%
+  );
+  --hero-scrim-rtl: linear-gradient(
+    260deg,
+    rgba(0, 15, 30, 0.62) 0%,
+    rgba(0, 18, 34, 0.34) 34%,
+    rgba(0, 22, 43, 0.08) 62%,
+    rgba(0, 22, 43, 0) 100%
+  );
+  /* Ambient wash behind the shell. */
+  --ambient-wash: radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.09), transparent 62%),
+    radial-gradient(900px 460px at 6% 4%, rgba(74, 168, 255, 0.06), transparent 58%);
   --header-h: 68px;
   --sidebar-w: 268px;
 }
 
+/*
+ * Light theme — elegant ivory field, white and warm-neutral surfaces, deep
+ * charcoal type and a restrained metallic gold.
+ *
+ * These are the same values the approved customer site renders, so the control
+ * plane and the customer platform read as one product rather than two palettes.
+ * The previous admin light theme was a cold blue-grey ramp (`#f5f6f8` field,
+ * `#0d2338` navy type) that fought the ivory/gold identity everywhere else.
+ *
+ * Every foreground/background pair here is measured by
+ * `.run/check-admin-light-palette.mjs`, which asserts the WCAG 2.1 ratio and
+ * fails the build when a future edit breaks contrast.
+ */
 :root[data-theme='light'] {
-  --bg: #f5f6f8;
-  --bg-deep: #eceef2;
+  --bg: #f7f4ed;
+  --bg-deep: #efeae0;
   --surface: #ffffff;
-  --surface-raised: #f0f2f6;
-  --surface-hover: #e8ecf2;
-  --border: rgba(0, 22, 43, 0.12);
-  --border-soft: rgba(0, 22, 43, 0.08);
-  --border-strong: rgba(169, 134, 31, 0.55);
-  --text: #0d2338;
-  --text-muted: #5b6b7d;
-  --text-faint: #8794a3;
-  --text-inverse: #ffffff;
+  --surface-raised: #fbf9f4;
+  --surface-hover: #f4f0e8;
+  --border: rgba(36, 31, 20, 0.14);
+  --border-soft: rgba(36, 31, 20, 0.09);
+  --border-strong: rgba(125, 95, 16, 0.5);
+  --text: #22201d;
+  --text-muted: #5a544b;
+  --text-faint: #6b6459;
+  /* Warm charcoal, not white: the primary button sits on a light gold ramp and
+   * white ink would fall to ~2:1 on its top stop. */
+  --text-inverse: #241f14;
   --navy: #00162b;
-  --gold: #b8912a;
-  --gold-soft: #d4af37;
-  --gold-deep: #8f6f18;
-  --success: #1f9d63;
-  --warning: #b7791f;
-  --danger: #c53030;
-  --info: #2b6cb0;
+  /* Accent gold dark enough to read as text on the deepest ivory (5:1). The
+   * hover step darkens rather than lightens, because a lighter gold loses
+   * contrast on a light surface. */
+  --gold: #7d5f10;
+  --gold-hover: #6f5510;
+  --gold-soft: #d9b447;
+  --gold-deep: #a9821c;
+  /*
+   * The metallic gold fill ramp, mirroring the approved customer theme. Dark
+   * warm ink (`--on-gold`) reads on both stops; the accent `--gold` above is
+   * darker because it is used as text, not as a fill.
+   */
+  --gold-fill-from: #e0c168;
+  --gold-fill-to: #c9a227;
+  --gold-fill-hover-from: #d4af37;
+  --gold-fill-hover-to: #b8912a;
+  --on-gold: #241f14;
+  /* Gold used as *text* on a gold-tinted chip. A 12% chip lifts the surface
+   * enough that the plain accent dips toward the AA floor, so chips use this
+   * slightly deeper gold instead — the same value the customer theme uses. */
+  --gold-on-tint: #7a5c10;
+  /*
+   * The gold-tint ramp, one step lighter than the dark ramp so a chip reads as a
+   * warm tint on a white card rather than a saturated block. The light
+   * percentages match `LIGHT_THEME`, so the control plane and the customer
+   * platform cannot drift apart.
+   */
+  --tint-wash: color-mix(in srgb, var(--gold) 6%, transparent);
+  --tint-fill: color-mix(in srgb, var(--gold) 12%, transparent);
+  --tint-focus: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tint-glow: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tint-active: color-mix(in srgb, var(--gold) 14%, var(--surface-raised));
+  --tint-line: color-mix(in srgb, var(--gold) 26%, transparent);
+  --tint-badge-line: color-mix(in srgb, var(--gold) 34%, transparent);
+  --tint-ring: color-mix(in srgb, var(--gold) 40%, transparent);
+  --tint-panel: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+  /* A warm lift, so a hovered row separates from the ivory field. */
+  --row-hover: color-mix(in srgb, var(--surface-raised) 85%, transparent);
+  --success: #1a7f4f;
+  --warning: #8a5a06;
+  --danger: #b3261e;
+  --info: #1d5fa8;
+  /* Photo tiles keep white ink over a navy scrim in both themes, so this ramp
+   * is deliberately theme-independent. */
   --tile-overlay: linear-gradient(
     180deg,
     rgba(0, 12, 24, 0.1) 0%,
     rgba(0, 22, 43, 0.62) 55%,
     rgba(0, 22, 43, 0.9) 100%
   );
-  --shadow-card: 0 16px 36px -26px rgba(0, 22, 43, 0.45);
+  --shadow-card: 0 16px 36px -26px rgba(58, 48, 30, 0.28);
+  /* See the dark block: a warm charcoal reads as a shade on ivory, whereas
+   * pure black makes a branded button look dirty. */
+  --brand-shade: #241f14;
+  --shadow-tile: 0 24px 48px -26px rgba(58, 48, 30, 0.35);
+  --shadow-modal: 0 40px 80px -40px rgba(58, 48, 30, 0.4);
+  --focus-ring: color-mix(in srgb, var(--gold) 20%, transparent);
+  --backdrop: rgba(26, 22, 14, 0.5);
+  /* Photo surfaces keep the dark-theme ink: the scrim behind them is navy in
+   * both themes, so white type over artwork stays correct on ivory too. */
+  --on-media: #ffffff;
+  --on-media-muted: rgba(233, 240, 248, 0.82);
+  --on-media-accent: #e8c766;
+  --on-media-shadow: rgba(0, 0, 0, 0.7);
+  --on-media-shadow-soft: rgba(0, 0, 0, 0.75);
+  --media-chip-bg: rgba(0, 15, 30, 0.55);
+  --media-chip-border: rgba(212, 175, 55, 0.5);
+  /* The hero scrim is theme-independent: the artwork's own falloff supplies the
+   * light end, so the same navy gradient reads correctly on ivory. */
+  --hero-scrim: linear-gradient(
+    100deg,
+    rgba(0, 15, 30, 0.62) 0%,
+    rgba(0, 18, 34, 0.34) 34%,
+    rgba(0, 22, 43, 0.08) 62%,
+    rgba(0, 22, 43, 0) 100%
+  );
+  --hero-scrim-rtl: linear-gradient(
+    260deg,
+    rgba(0, 15, 30, 0.62) 0%,
+    rgba(0, 18, 34, 0.34) 34%,
+    rgba(0, 22, 43, 0.08) 62%,
+    rgba(0, 22, 43, 0) 100%
+  );
+  /* A warm gold bloom rather than the dark theme's blue one, so the ivory field
+   * does not pick up a cold cast. */
+  --ambient-wash: radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.16), transparent 62%),
+    radial-gradient(900px 460px at 6% 4%, rgba(125, 95, 16, 0.05), transparent 58%);
 }
 
 * {
@@ -105,15 +273,7 @@ body::before {
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background:
-    radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.09), transparent 62%),
-    radial-gradient(900px 460px at 6% 4%, rgba(74, 168, 255, 0.06), transparent 58%);
-}
-
-:root[data-theme='light'] body::before {
-  background:
-    radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.16), transparent 62%),
-    radial-gradient(900px 460px at 6% 4%, rgba(0, 22, 43, 0.05), transparent 58%);
+  background: var(--ambient-wash);
 }
 
 /* ------------------------------------------------------------- primitives */
@@ -188,13 +348,13 @@ body::before {
 }
 
 .oryx-btn--primary {
-  background: linear-gradient(180deg, var(--gold-soft), var(--gold));
+  background: linear-gradient(180deg, var(--gold-fill-from), var(--gold-fill-to));
   border-color: var(--gold-deep);
-  color: var(--text-inverse);
+  color: var(--on-gold);
 }
 
 .oryx-btn--primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, var(--gold), var(--gold-deep));
+  background: linear-gradient(180deg, var(--gold-fill-hover-from), var(--gold-fill-hover-to));
   border-color: var(--gold-deep);
 }
 
@@ -209,7 +369,7 @@ body::before {
 }
 
 .oryx-btn--danger {
-  border-color: rgba(242, 85, 90, 0.5);
+  border-color: color-mix(in srgb, var(--danger) 50%, transparent);
   color: var(--danger);
 }
 
@@ -253,7 +413,7 @@ body::before {
 .oryx-textarea:focus {
   outline: none;
   border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .oryx-input::placeholder,
@@ -307,9 +467,9 @@ body::before {
 }
 
 .oryx-badge--gold {
-  color: var(--gold);
-  background: color-mix(in srgb, var(--gold) 15%, transparent);
-  border-color: color-mix(in srgb, var(--gold) 40%, transparent);
+  color: var(--gold-on-tint);
+  background: var(--tint-fill);
+  border-color: var(--tint-badge-line);
 }
 
 .oryx-badge--neutral {
@@ -346,7 +506,7 @@ body::before {
 }
 
 .oryx-table tbody tr:hover {
-  background: color-mix(in srgb, var(--surface-raised) 70%, transparent);
+  background: var(--row-hover);
 }
 
 /* ------------------------------------------------------------------- tiles */
@@ -363,7 +523,7 @@ body::before {
   border: 1px solid var(--border);
   min-height: 178px;
   text-decoration: none;
-  color: #fff;
+  color: var(--on-media);
   isolation: isolate;
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
@@ -371,7 +531,7 @@ body::before {
 .oryx-tile:hover {
   transform: translateY(-3px);
   border-color: var(--border-strong);
-  box-shadow: 0 24px 48px -26px rgba(0, 0, 0, 0.9);
+  box-shadow: var(--shadow-tile);
 }
 
 .oryx-tile__media {
@@ -406,9 +566,9 @@ body::before {
   height: 38px;
   margin-bottom: auto;
   border-radius: 11px;
-  background: rgba(0, 15, 30, 0.55);
-  border: 1px solid rgba(212, 175, 55, 0.5);
-  color: var(--gold-soft);
+  background: var(--media-chip-bg);
+  border: 1px solid var(--media-chip-border);
+  color: var(--on-media-accent);
   backdrop-filter: blur(3px);
 }
 
@@ -416,14 +576,14 @@ body::before {
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.01em;
-  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
+  text-shadow: 0 1px 12px var(--on-media-shadow);
 }
 
 .oryx-tile__desc {
   font-size: 12.5px;
-  color: rgba(233, 240, 248, 0.82);
+  color: var(--on-media-muted);
   line-height: 1.5;
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.75);
+  text-shadow: 0 1px 10px var(--on-media-shadow-soft);
 }
 
 .oryx-tile--planned .oryx-tile__media {
@@ -563,7 +723,7 @@ body::before {
 
 /* The active marker stays visible in the collapsed rail via the icon colour. */
 .oryx-shell[data-nav='collapsed'] .oryx-nav-item[aria-current='page'] {
-  background: color-mix(in srgb, var(--gold) 18%, transparent);
+  background: var(--tint-active);
 }
 
 /* Sign-out sits at the bottom of the rail. `margin-top: auto` pushes it down
@@ -587,12 +747,12 @@ body::before {
   width: 100%;
   cursor: pointer;
   background: none;
-  color: var(--danger, #e5484d);
+  color: var(--danger);
 }
 
 .oryx-nav-item--logout:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger, #e5484d) 14%, transparent);
-  color: var(--danger, #e5484d);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
 }
 
 .oryx-nav-item--logout:disabled {
@@ -640,14 +800,18 @@ body::before {
   color: var(--text);
 }
 
+/* The active item is marked by a gold wash that fades out, so the marker reads
+ * on the rail without painting an opaque block. The wash is the named
+ * decorative step, so the light theme tunes it with every other gold surface
+ * instead of this rule carrying its own percentage. */
 .oryx-nav-item[aria-current='page'] {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 20%, transparent), transparent);
+  background: linear-gradient(90deg, var(--tint-glow), transparent);
   color: var(--text);
   border-color: var(--border-strong);
 }
 
 :root[data-dir='rtl'] .oryx-nav-item[aria-current='page'] {
-  background: linear-gradient(270deg, color-mix(in srgb, var(--gold) 20%, transparent), transparent);
+  background: linear-gradient(270deg, var(--tint-glow), transparent);
 }
 
 .oryx-nav-item__dot {
@@ -664,7 +828,7 @@ body::before {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(0, 10, 20, 0.66);
+  background: var(--backdrop);
   backdrop-filter: blur(3px);
   display: grid;
   place-items: center;
@@ -678,7 +842,7 @@ body::before {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 18px;
-  box-shadow: 0 40px 80px -40px rgba(0, 0, 0, 0.9);
+  box-shadow: var(--shadow-modal);
 }
 
 /* ----------------------------------------------------------- brand lockup */
@@ -719,6 +883,44 @@ body::before {
   display: block;
 }
 
+/* A tenant-uploaded logo is centred in the lockup slot; the packaged ORYX
+ * lockup is anchored to the reading edge instead. */
+.oryx-brand-logo--custom img {
+  object-position: center;
+}
+
+/*
+ * Tenant brand colours.
+ *
+ * Nothing here applies unless `BrandingProvider` has put real, validated colours
+ * on the shell, so a platform principal and a company with no stored branding
+ * render the approved palette byte for byte. The overrides are scoped to the
+ * shell rather than `:root` so switching tenant cannot leak a colour onto a
+ * screen that is showing the platform's own identity.
+ */
+.oryx-shell[data-branded='true'] .oryx-btn--primary {
+  background: var(--brand-primary);
+  border-color: color-mix(in srgb, var(--brand-primary) 78%, var(--brand-shade));
+  color: var(--brand-primary-foreground);
+}
+
+.oryx-shell[data-branded='true'] .oryx-btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brand-primary) 86%, var(--brand-shade));
+}
+
+.oryx-shell[data-branded='true'] .oryx-nav-item[aria-current='page'] {
+  background: color-mix(in srgb, var(--brand-primary) 16%, transparent);
+}
+
+/* A colour swatch in the branding editor, showing the value before it is saved. */
+.oryx-brand-preview {
+  display: inline-block;
+  height: 24px;
+  width: 24px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
 /* -------------------------------------------------------------------- misc */
 
 .oryx-kpi-value {
@@ -744,7 +946,7 @@ body::before {
   min-height: 268px;
   display: flex;
   align-items: flex-end;
-  color: #fff;
+  color: var(--on-media);
   isolation: isolate;
 }
 
@@ -772,7 +974,7 @@ body::before {
   font-weight: 800;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--gold-soft);
+  color: var(--on-media-accent);
 }
 
 .oryx-hero__media {
@@ -793,28 +995,17 @@ body::before {
 
 /* The artwork carries its own light falloff on the copy side, so this scrim is
  * deliberately light: it only needs to guarantee contrast for the headline and
- * must not bury the vehicle. Keep the car side almost clear. */
+ * must not bury the vehicle. Keep the car side almost clear. The gradient is a
+ * token so the RTL mirror needs no separate rule. */
 .oryx-hero__scrim {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(
-    100deg,
-    rgba(0, 15, 30, 0.62) 0%,
-    rgba(0, 18, 34, 0.34) 34%,
-    rgba(0, 22, 43, 0.08) 62%,
-    rgba(0, 22, 43, 0) 100%
-  );
+  background: var(--hero-scrim);
 }
 
 :root[data-dir='rtl'] .oryx-hero__scrim {
-  background: linear-gradient(
-    260deg,
-    rgba(0, 15, 30, 0.62) 0%,
-    rgba(0, 18, 34, 0.34) 34%,
-    rgba(0, 22, 43, 0.08) 62%,
-    rgba(0, 22, 43, 0) 100%
-  );
+  background: var(--hero-scrim-rtl);
 }
 
 .oryx-focus-ring:focus-visible {

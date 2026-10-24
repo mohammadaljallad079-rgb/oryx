@@ -140,7 +140,28 @@ describe('ORYX Super Admin access and sign-in (e2e)', () => {
     expect(res.status).toBe(403);
   });
 
-  it('keeps the platform principal out of an unlicensed module for the tenant', async () => {
+  it('keeps the platform principal out of an unlicensed module for a SaaS tenant', async () => {
+    const token = await login(ctx.base, SEED_SUPER_ADMIN.email, SEED_SUPER_ADMIN.password);
+    const companies = await call<{ companies: Array<{ id: string; nameEn: string }> }>(
+      ctx.base,
+      '/auth/context',
+      { token },
+    );
+    const tenant = companies.body.companies.find((c) => c.nameEn === 'Al Noor Trading (Demo)');
+    if (!tenant) throw new Error('the seed must include the Al Noor demo tenant');
+
+    // Al Noor is a SaaS tenant on the Professional plan, which does not license
+    // automotive. Entitlement suppression must still apply to a platform
+    // principal, or "full access" would mean "ignores every plan".
+    const res = await call<unknown>(ctx.base, '/automotive/vehicles', {
+      token,
+      headers: { 'x-oryx-company-id': (tenant as { id: string }).id },
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('reaches every module in an ORYX internal company, which is not plan-limited', async () => {
     const token = await login(ctx.base, SEED_SUPER_ADMIN.email, SEED_SUPER_ADMIN.password);
     const companies = await call<{ companies: Array<{ id: string; nameEn: string }> }>(
       ctx.base,
@@ -150,15 +171,53 @@ describe('ORYX Super Admin access and sign-in (e2e)', () => {
     const logistics = companies.body.companies.find((c) => c.nameEn === 'ORYX Logistics');
     if (!logistics) throw new Error('the seed must include the Logistics company');
 
-    // Logistics is on the Starter plan and does not license automotive.
-    // Entitlement suppression must still apply to a platform principal, or
-    // "full access" would mean "ignores every plan".
+    // Logistics is an ORYX *internal* company. It is governed by the group, not
+    // sold as a subscription, so every catalogued module is available even
+    // though it carries no plan of its own.
     const res = await call<unknown>(ctx.base, '/automotive/vehicles', {
       token,
       headers: { 'x-oryx-company-id': (logistics as { id: string }).id },
     });
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
+  });
+
+  it('reports unlimited entitlements for an internal company and none for a tenant without a subscription', async () => {
+    const token = await login(ctx.base, SEED_SUPER_ADMIN.email, SEED_SUPER_ADMIN.password);
+    const companies = await call<{ companies: Array<{ id: string; nameEn: string }> }>(
+      ctx.base,
+      '/auth/context',
+      { token },
+    );
+    const logistics = companies.body.companies.find((c) => c.nameEn === 'ORYX Logistics')!;
+    const auto = companies.body.companies.find((c) => c.nameEn === 'ORYX Auto Services')!;
+
+    const internal = await call<{
+      licensedModules: string[];
+      limits: { maxBranches: number; maxUsers: number };
+      isActive: boolean;
+      isInternal: boolean;
+    }>(ctx.base, `/modules/entitlements?companyId=${logistics.id}`, { token });
+
+    expect(internal.status).toBe(200);
+    expect(internal.body.isInternal).toBe(true);
+    expect(internal.body.isActive).toBe(true);
+    expect(internal.body.limits.maxBranches).toBe(-1);
+    expect(internal.body.limits.maxUsers).toBe(-1);
+    expect(internal.body.licensedModules).toContain('automotive_inspections');
+
+    // An internal company carries no subscription row at all.
+    const rows = await ctx.prisma.subscription.count({ where: { companyId: logistics.id } });
+    expect(rows).toBe(0);
+
+    // The Enterprise internal company is equally unlimited.
+    const autoEnt = await call<{ limits: { maxUsers: number }; isInternal: boolean }>(
+      ctx.base,
+      `/modules/entitlements?companyId=${auto.id}`,
+      { token },
+    );
+    expect(autoEnt.body.isInternal).toBe(true);
+    expect(autoEnt.body.limits.maxUsers).toBe(-1);
   });
 
   it('rotates the password, rejects the old one and revokes sessions', async () => {

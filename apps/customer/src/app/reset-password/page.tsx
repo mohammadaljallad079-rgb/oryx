@@ -6,12 +6,19 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useUi } from '@/lib/ui-context';
 import { customerApi } from '@/lib/api';
 import { messageOf } from '@/lib/hooks';
-import { Alert, Button, Card, Field, Loading } from '@/components/ui';
+import { Alert, Button, Field } from '@/components/ui';
+import { AuthShell, LoadingPanel, StatePanel } from '@/components/premium';
 
 /** Complete a password reset using the single-use token from the email link. */
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={<div className="oryx-container"><Loading /></div>}>
+    <Suspense
+      fallback={
+        <div className="oryx-container oryx-container--narrow">
+          <LoadingPanel rows={3} />
+        </div>
+      }
+    >
       <ResetPasswordForm />
     </Suspense>
   );
@@ -50,24 +57,38 @@ function ResetPasswordForm() {
 
   if (!token) {
     return (
-      <div className="oryx-container" style={{ maxWidth: 460 }}>
-        <Card title={t('auth.forgotTitle')}>
-          <Alert>{t('common.error')}</Alert>
-          <p style={{ marginBottom: 0 }}>
-            <Link href="/forgot-password" className="oryx-muted">
+      <AuthShell title={t('auth.forgotTitle')} subtitle={t('auth.resetInvalid')}>
+        <StatePanel
+          tone="error"
+          title={t('auth.resetInvalid')}
+          message={t('auth.resetInvalidHint')}
+          action={
+            <Link href="/forgot-password" className="oryx-btn">
               {t('auth.forgotTitle')}
             </Link>
-          </p>
-        </Card>
-      </div>
+          }
+        />
+      </AuthShell>
     );
   }
 
   return (
-    <div className="oryx-container" style={{ maxWidth: 460 }}>
-      <Card title={t('auth.forgotTitle')}>
+    <AuthShell
+      title={t('auth.resetTitle')}
+      subtitle={t('auth.resetSubtitle')}
+      aside={
+        <Link href="/login" className="oryx-link">
+          {t('nav.login')}
+        </Link>
+      }
+    >
         {done ? (
-          <Alert tone="success">{t('auth.submitLogin')}</Alert>
+          <StatePanel
+            tone="success"
+            icon="check"
+            title={t('auth.resetDoneTitle')}
+            message={t('auth.resetDone')}
+          />
         ) : (
           <form onSubmit={onSubmit}>
             {error && (
@@ -98,11 +119,10 @@ function ResetPasswordForm() {
               />
             </Field>
             <Button type="submit" variant="primary" disabled={busy}>
-              {t('common.save')}
+              {busy ? t('common.saving') : t('common.save')}
             </Button>
           </form>
         )}
-      </Card>
-    </div>
+    </AuthShell>
   );
 }

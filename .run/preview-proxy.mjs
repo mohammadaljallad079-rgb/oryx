@@ -12,6 +12,8 @@
  * refresh cookie and the CSRF double-submit work without a cross-site policy.
  */
 import http from 'node:http';
+import { createReadStream, statSync } from 'node:fs';
+import path from 'node:path';
 
 const LISTEN_PORT = Number(process.env.PROXY_PORT ?? 12000);
 const API_TARGET = { host: '127.0.0.1', port: Number(process.env.API_PORT ?? 3001) };
@@ -23,6 +25,70 @@ const APP_TARGET = { host: '127.0.0.1', port: Number(process.env.APP_PORT ?? 300
 // `experiments.baseUrl = '/mobile'`, so its asset URLs already carry the
 // prefix and the static server expects `/mobile/...` unchanged.
 const MOBILE_TARGET = { host: '127.0.0.1', port: Number(process.env.MOBILE_PORT ?? 8081) };
+
+// Audit screenshots and renders. Served straight from disk so a fresh capture
+// is reviewable in the browser without rebuilding an app whose `public/`
+// directory is snapshotted at build time. Read-only, and confined to the
+// evidence root: a request cannot climb out with `..`.
+const EVIDENCE_ROOT = path.resolve(
+  process.env.EVIDENCE_ROOT ?? '/workspace/project/oryx/.run/evidence',
+);
+
+const MIME = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+  '.json': 'application/json; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.txt': 'text/plain; charset=utf-8',
+  '.md': 'text/plain; charset=utf-8',
+};
+
+/** Serves the evidence directory; returns false when the path is not ours. */
+function serveEvidence(req, res, url) {
+  if (url !== '/evidence' && !url.startsWith('/evidence/')) return false;
+
+  const rel = decodeURIComponent(url.slice('/evidence'.length)).replace(/^\/+/, '');
+  const target = path.resolve(EVIDENCE_ROOT, rel);
+  if (target !== EVIDENCE_ROOT && !target.startsWith(EVIDENCE_ROOT + path.sep)) {
+    res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end('Forbidden\n');
+    return true;
+  }
+
+  let stat;
+  try {
+    stat = statSync(target);
+  } catch {
+    res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end('Not found\n');
+    return true;
+  }
+
+  if (stat.isDirectory()) {
+    const index = path.join(target, 'index.html');
+    try {
+      statSync(index);
+      res.writeHead(200, { 'content-type': MIME['.html'] });
+      createReadStream(index).pipe(res);
+      return true;
+    } catch {
+      res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+      res.end('Not found\n');
+      return true;
+    }
+  }
+
+  res.writeHead(200, {
+    'content-type': MIME[path.extname(target).toLowerCase()] ?? 'application/octet-stream',
+    'content-length': stat.size,
+    'cache-control': 'no-store',
+  });
+  createReadStream(target).pipe(res);
+  return true;
+}
 
 const HOP_BY_HOP = new Set([
   'connection',
@@ -63,6 +129,7 @@ function forward(req, res, target) {
 
 const server = http.createServer((req, res) => {
   const url = req.url ?? '/';
+  if (serveEvidence(req, res, url)) return;
   let target = APP_TARGET;
   if (url === '/api' || url.startsWith('/api/')) target = API_TARGET;
   else if (url === '/mobile' || url.startsWith('/mobile/')) target = MOBILE_TARGET;

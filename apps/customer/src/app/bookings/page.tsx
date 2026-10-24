@@ -6,16 +6,9 @@ import { useUi } from '@/lib/ui-context';
 import { customerApi, SERVICE_CATEGORIES, type AvailableSlot } from '@/lib/api';
 import { messageOf, useAsync } from '@/lib/hooks';
 import { RequireCustomer } from '@/components/require-customer';
-import {
-  Alert,
-  Button,
-  Card,
-  EmptyState,
-  Field,
-  Loading,
-  StatusBadge,
-  formatDate,
-} from '@/components/ui';
+import { Alert, Button, Card, Field, StatusBadge, formatDate } from '@/components/ui';
+import { LoadingPanel, PageHeader, StatePanel, TableWrap } from '@/components/premium';
+import { Icon } from '@/components/icons';
 
 const DURATIONS: Record<string, number> = {
   INSPECTION: 60,
@@ -31,7 +24,13 @@ function todayIso(): string {
 export default function BookingsPage() {
   return (
     <RequireCustomer>
-      <Suspense fallback={<div className="oryx-container"><Loading /></div>}>
+      <Suspense
+        fallback={
+          <div className="oryx-container">
+            <LoadingPanel rows={4} />
+          </div>
+        }
+      >
         <BookingsContent />
       </Suspense>
     </RequireCustomer>
@@ -123,9 +122,17 @@ function BookingsContent() {
     }
   }
 
+  const active = bookings.data?.items ?? [];
+
   return (
     <div className="oryx-container">
-      <h1 className="oryx-section-title">{t('bookings.new')}</h1>
+      <PageHeader
+        eyebrow={t('brand.tagline')}
+        title={t('bookings.new')}
+        subtitle={t('bookings.subtitle')}
+        art="/art/service-maintenance.svg"
+      />
+
       {error && (
         <div style={{ marginBottom: 16 }}>
           <Alert>{error}</Alert>
@@ -137,8 +144,8 @@ function BookingsContent() {
         </div>
       )}
 
-      <div className="oryx-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))' }}>
-        <Card title={t('bookings.new')}>
+      <div className="oryx-grid oryx-split">
+        <Card title={t('bookings.details')} subtitle={t('bookings.detailsHint')}>
           <Field label={t('bookings.type')}>
             <select
               className="oryx-select"
@@ -205,27 +212,32 @@ function BookingsContent() {
 
         <Card
           title={t('bookings.available')}
-          subtitle={`${date} · ${duration} min`}
+          subtitle={t('bookings.slotHint', { date, duration: String(duration) })}
           actions={
             <Button variant="ghost" onClick={() => void loadSlots()}>
-              {t('common.retry')}
+              <Icon name="clock" size={15} />
+              {t('common.refresh')}
             </Button>
           }
         >
           {slotsLoading ? (
-            <Loading />
+            <LoadingPanel rows={3} />
           ) : slots.length === 0 ? (
-            <EmptyState message={t('bookings.noSlots')} />
+            <StatePanel
+              icon="calendar"
+              title={t('bookings.noSlots')}
+              message={t('bookings.noSlotsHint')}
+            />
           ) : (
             <>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div className="oryx-slot-grid">
                 {slots.map((slot) => {
-                  const active = chosen === slot.startsAt;
+                  const isActive = chosen === slot.startsAt;
                   return (
                     <button
                       key={slot.startsAt}
                       type="button"
-                      className={active ? 'oryx-btn oryx-btn-primary' : 'oryx-btn'}
+                      className={isActive ? 'oryx-slot oryx-slot--active' : 'oryx-slot'}
                       onClick={() => setChosen(slot.startsAt)}
                       dir="ltr"
                       data-testid="booking-slot"
@@ -238,14 +250,14 @@ function BookingsContent() {
                   );
                 })}
               </div>
-              <div style={{ marginTop: 16 }}>
+              <div style={{ marginTop: 18 }}>
                 <Button
                   variant="primary"
                   disabled={!chosen || busy}
                   onClick={() => void confirmBooking()}
-                  className="oryx-btn-primary"
                 >
-                  {t('bookings.confirm')}
+                  <Icon name="check" size={16} />
+                  {busy ? t('common.saving') : t('bookings.confirm')}
                 </Button>
               </div>
             </>
@@ -254,44 +266,50 @@ function BookingsContent() {
       </div>
 
       <div style={{ marginTop: 24 }}>
-        <Card title={t('bookings.title')}>
+        <Card title={t('bookings.title')} subtitle={t('bookings.count', { count: String(active.length) })}>
           {bookings.loading ? (
-            <Loading />
-          ) : (bookings.data?.items.length ?? 0) === 0 ? (
-            <EmptyState message={t('bookings.none')} />
+            <LoadingPanel rows={4} />
+          ) : active.length === 0 ? (
+            <StatePanel
+              icon="calendar"
+              title={t('bookings.none')}
+              message={t('bookings.noneHint')}
+            />
           ) : (
-            <table className="oryx-table">
-              <thead>
-                <tr>
-                  <th>{t('bookings.type')}</th>
-                  <th>{t('common.date')}</th>
-                  <th>{t('common.status')}</th>
-                  <th>{t('common.actions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bookings.data?.items.map((booking) => (
-                  <tr key={booking.id}>
-                    <td>{booking.bookingType}</td>
-                    <td>{formatDate(booking.startsAt, locale)}</td>
-                    <td>
-                      <StatusBadge status={booking.status} />
-                    </td>
-                    <td>
-                      {booking.status !== 'CANCELLED' && booking.status !== 'COMPLETED' && (
-                        <button
-                          type="button"
-                          className="oryx-btn oryx-btn-danger"
-                          onClick={() => void cancelBooking(booking.id)}
-                        >
-                          {t('bookings.cancel')}
-                        </button>
-                      )}
-                    </td>
+            <TableWrap>
+              <table className="oryx-table">
+                <thead>
+                  <tr>
+                    <th>{t('bookings.type')}</th>
+                    <th>{t('common.date')}</th>
+                    <th>{t('common.status')}</th>
+                    <th>{t('common.actions')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {active.map((booking) => (
+                    <tr key={booking.id}>
+                      <td>{booking.bookingType}</td>
+                      <td>{formatDate(booking.startsAt, locale)}</td>
+                      <td>
+                        <StatusBadge status={booking.status} />
+                      </td>
+                      <td>
+                        {booking.status !== 'CANCELLED' && booking.status !== 'COMPLETED' && (
+                          <button
+                            type="button"
+                            className="oryx-btn oryx-btn-danger"
+                            onClick={() => void cancelBooking(booking.id)}
+                          >
+                            {t('bookings.cancel')}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
           )}
         </Card>
       </div>

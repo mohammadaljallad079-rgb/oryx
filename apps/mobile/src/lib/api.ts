@@ -17,6 +17,7 @@
 
 import Constants from 'expo-constants';
 
+import { SERVICE_CATEGORIES as SHARED_SERVICE_CATEGORIES } from '@oryx/shared';
 import { deleteSecret, getSecret, readCsrfToken, setSecret } from './session-storage';
 
 const API_BASE =
@@ -455,11 +456,10 @@ export const api = {
     request<ProviderDetail>(`/marketplace/providers/${id}`, { anonymous: true }),
 };
 
-/** Service categories offered by the platform. */
-export const SERVICE_CATEGORIES = [
-  { key: 'automotive_maintenance', nameEn: 'Maintenance and repair', nameAr: 'الصيانة والإصلاح' },
-  { key: 'automotive_inspection', nameEn: 'Vehicle inspection', nameAr: 'فحص المركبات' },
-  { key: 'automotive_tyres', nameEn: 'Tyres and batteries', nameAr: 'الإطارات والبطاريات' },
-  { key: 'automotive_bodywork', nameEn: 'Bodywork and paint', nameAr: 'الهيكل والدهان' },
-  { key: 'automotive_recovery', nameEn: 'Roadside recovery', nameAr: 'خدمات الطريق' },
-] as const;
+/**
+ * Service categories offered by the platform.
+ *
+ * Re-exported from `@oryx/shared` so the mobile picker, the website and the
+ * provider directory cannot drift onto different keys again.
+ */
+export const SERVICE_CATEGORIES = SHARED_SERVICE_CATEGORIES;

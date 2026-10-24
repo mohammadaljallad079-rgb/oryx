@@ -35,12 +35,16 @@ changes to be pushed to the Execution 05 branch.
 | `06_TEST_AND_CI_RESULTS.md` | 577 passing tests and how to reproduce them |
 | `07_LIVE_PREVIEW_AND_CREDENTIALS.md` | Working HTTPS preview links and demo credentials |
 | `08_VISUAL_IDENTITY_AND_PREVIEW_VERIFICATION.md` | Recovery state, visual identity alignment, externally re-verified preview and the CORS build hazard |
+| `exec07/01_EXECUTION_07_REPORT.md` | Execution 07 premium web experience, responsive hardening, defect 18 and the corrected screenshot comparison |
+| `exec07/04_PHASE_E_LIGHT_THEME.md` | Phase E light-theme correction, the four defects fixed, the dark-integrity proof, the five-surface before/after evidence and the RTL scrim regression |
 
 ## Headline result
 
-- **577 automated tests pass**: 96 shared, 277 API integration, 184 browser
+- **578 automated tests pass**: 96 shared, 278 API integration, 184 browser
   (1 skipped), 20 mobile. Plus a live API probe (96/96 module surfaces 200) and
-  an external preview sweep (39/39 routes, 0 failed requests).
+  an external preview sweep (39/39 routes, 0 failed requests). The API figure
+  rose from 277 to 278 with the Execution 07 cookieless-refresh regression test
+  (defect 18).
 - **Every declared Phase-1 surface is connected end to end** and DB-backed.
 - **Preview links are live and externally verified** — 39 / 39 routes returned a
   success status over public HTTPS — see reports 07 and 08.

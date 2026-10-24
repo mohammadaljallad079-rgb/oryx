@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { useUi } from '@/lib/ui-context';
 import { publicApi, type ProviderDetail } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
-import { Card, EmptyState, Loading, Money, Stars, formatDay } from '@/components/ui';
+import { Card, Money, Stars, formatDay } from '@/components/ui';
+import { LoadingPanel, PageHeader, StatePanel, TableWrap } from '@/components/premium';
+import { Icon } from '@/components/icons';
 
 const DAYS_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 const DAYS_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -19,11 +21,26 @@ export default function ProviderDetailPage() {
     [params.id],
   );
 
-  if (loading) return <div className="oryx-container"><Loading /></div>;
+  if (loading) {
+    return (
+      <div className="oryx-container">
+        <LoadingPanel rows={4} />
+      </div>
+    );
+  }
   if (error || !data) {
     return (
       <div className="oryx-container">
-        <EmptyState message={error ?? t('common.error')} />
+        <StatePanel
+          tone="error"
+          title={t('providers.unavailable')}
+          message={error ?? t('common.error')}
+          action={
+            <Link href="/providers" className="oryx-btn">
+              {t('nav.providers')}
+            </Link>
+          }
+        />
       </div>
     );
   }
@@ -32,28 +49,37 @@ export default function ProviderDetailPage() {
 
   return (
     <div className="oryx-container">
-      <Link href="/providers" className="oryx-muted">
-        ← {t('nav.providers')}
-      </Link>
-
-      <Card title={locale === 'ar' ? data.nameAr : data.nameEn}>
-        {typeof data.averageRating === 'number' && (
-          <p className="oryx-muted" style={{ marginTop: 0 }}>
-            <Stars rating={data.averageRating} /> {data.averageRating} ({data.reviewCount ?? 0})
-          </p>
-        )}
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
+      <PageHeader
+        backHref="/providers"
+        backLabel={t('nav.providers')}
+        eyebrow={t('brand.tagline')}
+        title={locale === 'ar' ? data.nameAr : data.nameEn}
+        subtitle={t('providers.detailSubtitle')}
+        art="/art/service-tyres.svg"
+        actions={
           <Link href="/bookings" className="oryx-btn oryx-btn-primary">
+            <Icon name="calendar" size={16} />
             {t('home.ctaBook')}
           </Link>
-        </div>
-      </Card>
+        }
+      />
 
-      <div className="oryx-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', marginTop: 20 }}>
-        <Card title={t('providers.services')}>
+      {typeof data.averageRating === 'number' && (
+        <div className="oryx-provider-rating">
+          <Stars rating={data.averageRating} />
+          <strong>{data.averageRating.toFixed(1)}</strong>
+          <span className="oryx-muted">
+            {t('providers.reviewCount', { count: String(data.reviewCount ?? 0) })}
+          </span>
+        </div>
+      )}
+
+      <div className="oryx-grid oryx-split">
+        <Card title={t('providers.services')} subtitle={t('providers.servicesHint')}>
           {data.listings.length === 0 ? (
-            <EmptyState message={t('common.empty')} />
+            <StatePanel compact icon="wrench" title={t('providers.noListings')} />
           ) : (
+            <TableWrap>
             <table className="oryx-table">
               <thead>
                 <tr>
@@ -72,24 +98,17 @@ export default function ProviderDetailPage() {
                 ))}
               </tbody>
             </table>
+            </TableWrap>
           )}
         </Card>
 
-        <Card title={t('providers.availability')}>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+        <Card title={t('providers.availability')} subtitle={t('providers.availabilityHint')}>
+          <ul className="oryx-list">
             {data.availability.map((slot) => (
-              <li
-                key={slot.dayOfWeek}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  padding: '8px 0',
-                  borderBottom: '1px solid var(--border-soft)',
-                }}
-              >
+              <li key={slot.dayOfWeek} className="oryx-hours">
                 <span>{days[slot.dayOfWeek]}</span>
-                <span className="oryx-muted" dir="ltr">
-                  {slot.isClosed ? '—' : `${slot.opensAt} – ${slot.closesAt}`}
+                <span className={slot.isClosed ? 'oryx-muted' : 'oryx-mono'} dir="ltr">
+                  {slot.isClosed ? t('providers.closed') : `${slot.opensAt} – ${slot.closesAt}`}
                 </span>
               </li>
             ))}
@@ -97,13 +116,21 @@ export default function ProviderDetailPage() {
         </Card>
       </div>
 
-      <Card title={t('providers.reviews')}>
+      <Card
+        className="oryx-mt"
+        title={t('providers.reviews')}
+        subtitle={t('providers.reviewsCount', { count: String(data.reviews.length) })}
+      >
         {data.reviews.length === 0 ? (
-          <EmptyState message={t('common.empty')} />
+          <StatePanel
+            icon="star"
+            title={t('providers.noReviews')}
+            message={t('providers.noReviewsHint')}
+          />
         ) : (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          <ul className="oryx-list">
             {data.reviews.map((review) => (
-              <li key={review.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--border-soft)' }}>
+              <li key={review.id} className="oryx-list__item">
                 <Stars rating={review.rating} />
                 <div>{review.comment ?? review.title ?? ''}</div>
                 {review.providerReply && (

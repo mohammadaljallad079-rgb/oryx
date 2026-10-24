@@ -31,6 +31,8 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
 import { PaymentsModule } from './payments/payments.module';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { PlatformModule } from './platform/platform.module';
+import { BrandingModule } from './branding/branding.module';
 
 @Module({
   imports: [
@@ -70,6 +72,8 @@ import { IntegrationsModule } from './integrations/integrations.module';
     MarketplaceModule,
     PaymentsModule,
     IntegrationsModule,
+    PlatformModule,
+    BrandingModule,
   ],
   providers: [
     // Global rate limiting; sensitive auth routes override with @Throttle.

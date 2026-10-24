@@ -14,9 +14,11 @@ import {
   ApiError,
   customerApi,
   customerSession,
+  IS_STATIC_PREVIEW,
   restoreCustomerSession,
   type CustomerProfile,
 } from './api';
+import { PREVIEW_PROFILE } from './preview-data';
 
 export type SignInResult = { status: 'ok' } | { status: 'mfa'; challengeToken: string };
 
@@ -63,6 +65,14 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     (async () => {
+      // In the static preview there is no API to authenticate against, so the
+      // sample profile is presented and the header marks the session as a
+      // preview. Nothing is signed in and no token exists.
+      if (IS_STATIC_PREVIEW) {
+        setProfile(PREVIEW_PROFILE);
+        setLoading(false);
+        return;
+      }
       // A session may exist even though this tab has no token yet.
       customerSession.markHint();
       const outcome = await restoreCustomerSession();

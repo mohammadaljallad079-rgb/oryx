@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
-import { customerApi } from '@/lib/api';
+import { customerApi, assetUrl } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 import { RequireCustomer } from '@/components/require-customer';
 import { Card, EmptyState, Loading, StatusBadge, formatDate } from '@/components/ui';
+import { Icon } from '@/components/icons';
 
 /** Customer dashboard: real counts and the latest activity from the API. */
 export default function DashboardPage() {
@@ -29,46 +30,75 @@ function DashboardContent() {
 
   return (
     <div className="oryx-container">
-      <h1 className="oryx-section-title">
-        {t('dashboard.welcome')}
-        {profile ? ` — ${profile.fullName}` : ''}
-      </h1>
+      {/* ------------------------------------------------ welcome banner */}
+      <section className="oryx-dash-hero">
+        <span
+          className="oryx-dash-hero__art"
+          style={{ backgroundImage: `url(${assetUrl('/art/hero-automotive.svg')})` }}
+          aria-hidden
+        />
+        <div className="oryx-dash-hero__body">
+          <p className="oryx-eyebrow">{t('brand.tagline')}</p>
+          <h1 className="oryx-dash-hero__title">
+            {t('dashboard.welcome')}
+            {profile ? ` — ${profile.fullName}` : ''}
+          </h1>
+          <div className="oryx-dash-hero__actions">
+            <Link href="/bookings" className="oryx-btn oryx-btn-primary">
+              <Icon name="calendar" size={16} />
+              {t('bookings.new')}
+            </Link>
+            <Link href="/garage" className="oryx-btn">
+              <Icon name="car" size={16} />
+              {t('garage.add')}
+            </Link>
+          </div>
+        </div>
+      </section>
 
-      <div className="oryx-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-        <Card>
+      <div className="oryx-grid oryx-grid--stats">
+        <Card className="oryx-kpi">
+          <span className="oryx-kpi__icon" aria-hidden>
+            <Icon name="car" size={18} />
+          </span>
           <span className="oryx-muted">{t('dashboard.vehicles')}</span>
-          <p style={{ fontSize: 30, margin: '6px 0 0', fontWeight: 700 }}>
-            {profile?._count.vehicles ?? 0}
-          </p>
-          <Link href="/garage" className="oryx-muted">
-            {t('garage.title')} →
+          <p className="oryx-kpi__value">{profile?._count.vehicles ?? 0}</p>
+          <Link href="/garage" className="oryx-link">
+            {t('garage.title')}
+            <Icon name="arrow" size={14} />
           </Link>
         </Card>
-        <Card>
+        <Card className="oryx-kpi">
+          <span className="oryx-kpi__icon" aria-hidden>
+            <Icon name="calendar" size={18} />
+          </span>
           <span className="oryx-muted">{t('dashboard.bookings')}</span>
-          <p style={{ fontSize: 30, margin: '6px 0 0', fontWeight: 700 }}>
-            {profile?._count.bookings ?? 0}
-          </p>
-          <Link href="/bookings" className="oryx-muted">
-            {t('bookings.title')} →
+          <p className="oryx-kpi__value">{profile?._count.bookings ?? 0}</p>
+          <Link href="/bookings" className="oryx-link">
+            {t('bookings.title')}
+            <Icon name="arrow" size={14} />
           </Link>
         </Card>
-        <Card>
+        <Card className="oryx-kpi">
+          <span className="oryx-kpi__icon" aria-hidden>
+            <Icon name="user" size={18} />
+          </span>
           <span className="oryx-muted">{t('dashboard.addresses')}</span>
-          <p style={{ fontSize: 30, margin: '6px 0 0', fontWeight: 700 }}>
-            {profile?._count.addresses ?? 0}
-          </p>
-          <Link href="/profile" className="oryx-muted">
-            {t('addresses.title')} →
+          <p className="oryx-kpi__value">{profile?._count.addresses ?? 0}</p>
+          <Link href="/profile" className="oryx-link">
+            {t('addresses.title')}
+            <Icon name="arrow" size={14} />
           </Link>
         </Card>
-        <Card>
+        <Card className="oryx-kpi">
+          <span className="oryx-kpi__icon" aria-hidden>
+            <Icon name="bell" size={18} />
+          </span>
           <span className="oryx-muted">{t('notifications.unread')}</span>
-          <p style={{ fontSize: 30, margin: '6px 0 0', fontWeight: 700 }}>
-            {notifications.data?.total ?? 0}
-          </p>
-          <Link href="/notifications" className="oryx-muted">
-            {t('notifications.title')} →
+          <p className="oryx-kpi__value">{notifications.data?.total ?? 0}</p>
+          <Link href="/notifications" className="oryx-link">
+            {t('notifications.title')}
+            <Icon name="arrow" size={14} />
           </Link>
         </Card>
       </div>

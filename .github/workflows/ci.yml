@@ -8,7 +8,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, feature/execution-01-super-admin-foundation, feature/execution-02-erp-core, feature/execution-03-hr-crm-automotive, feature/execution-04-customer-marketplace-mobile, feature/execution-05-platform-completion]
+    branches: [main, feature/execution-01-super-admin-foundation, feature/execution-02-erp-core, feature/execution-03-hr-crm-automotive, feature/execution-04-customer-marketplace-mobile, feature/execution-05-platform-completion, feature/execution-07-premium-web]
   workflow_dispatch:
 
 # Cancel superseded runs on the same ref to conserve CI minutes.
@@ -31,6 +31,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # GitHub rejects an invalid workflow file at the *workflow* level: the run
+      # appears with zero jobs and a failure, which is easy to misread as a code
+      # failure. Lint every workflow before anything else so that cannot happen.
+      # Pinned by image digest; actionlint is a single static binary with no
+      # post-install script.
+      - name: Validate workflow files
+        uses: docker://rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: -color
 
       - uses: pnpm/action-setup@v4
         with:
@@ -185,7 +195,11 @@ jobs:
   # ------------------------------------------------------------- UI suites
   test-ui:
     name: Browser acceptance tests
-    runs-on: ubuntu-latest
+    # Pinned: `ubuntu-latest` now resolves to Ubuntu 26.04, which Playwright
+    # 1.56.1 refuses to install Chromium on ("does not support
+    # chromium on ubuntu26.04-x64"). 24.04 is the newest image this Playwright
+    # release supports. Lift the pin when Playwright gains 26.04 support.
+    runs-on: ubuntu-24.04
     needs: quality
 
     services:

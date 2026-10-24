@@ -1,0 +1,2000 @@
+[
+  {
+    "check": "theme-attr dashboard/en/desktop/light",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr dashboard/en/desktop/light",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "ivory-field dashboard/en/desktop/light",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type dashboard/en/desktop/light",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast dashboard/en/desktop/light",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow dashboard/en/desktop/light",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr dashboard/en/desktop/dark",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr dashboard/en/desktop/dark",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "dark-field-unchanged dashboard/en/desktop/dark",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged dashboard/en/desktop/dark",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow dashboard/en/desktop/dark",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr settings/en/desktop/light",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr settings/en/desktop/light",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "ivory-field settings/en/desktop/light",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type settings/en/desktop/light",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast settings/en/desktop/light",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow settings/en/desktop/light",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr settings/en/desktop/dark",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr settings/en/desktop/dark",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "dark-field-unchanged settings/en/desktop/dark",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged settings/en/desktop/dark",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow settings/en/desktop/dark",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr companies/en/desktop/light",
+    "surface": "companies",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr companies/en/desktop/light",
+    "surface": "companies",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "ivory-field companies/en/desktop/light",
+    "surface": "companies",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type companies/en/desktop/light",
+    "surface": "companies",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast companies/en/desktop/light",
+    "surface": "companies",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow companies/en/desktop/light",
+    "surface": "companies",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr companies/en/desktop/dark",
+    "surface": "companies",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr companies/en/desktop/dark",
+    "surface": "companies",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "dark-field-unchanged companies/en/desktop/dark",
+    "surface": "companies",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged companies/en/desktop/dark",
+    "surface": "companies",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow companies/en/desktop/dark",
+    "surface": "companies",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr users/en/desktop/light",
+    "surface": "users",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr users/en/desktop/light",
+    "surface": "users",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "ivory-field users/en/desktop/light",
+    "surface": "users",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type users/en/desktop/light",
+    "surface": "users",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast users/en/desktop/light",
+    "surface": "users",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow users/en/desktop/light",
+    "surface": "users",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr users/en/desktop/dark",
+    "surface": "users",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr users/en/desktop/dark",
+    "surface": "users",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "dark-field-unchanged users/en/desktop/dark",
+    "surface": "users",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged users/en/desktop/dark",
+    "surface": "users",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow users/en/desktop/dark",
+    "surface": "users",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr providers/en/desktop/light",
+    "surface": "providers",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr providers/en/desktop/light",
+    "surface": "providers",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "ivory-field providers/en/desktop/light",
+    "surface": "providers",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type providers/en/desktop/light",
+    "surface": "providers",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast providers/en/desktop/light",
+    "surface": "providers",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow providers/en/desktop/light",
+    "surface": "providers",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr providers/en/desktop/dark",
+    "surface": "providers",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr providers/en/desktop/dark",
+    "surface": "providers",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "dark-field-unchanged providers/en/desktop/dark",
+    "surface": "providers",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged providers/en/desktop/dark",
+    "surface": "providers",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow providers/en/desktop/dark",
+    "surface": "providers",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr audit/en/desktop/light",
+    "surface": "audit",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr audit/en/desktop/light",
+    "surface": "audit",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "ivory-field audit/en/desktop/light",
+    "surface": "audit",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type audit/en/desktop/light",
+    "surface": "audit",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast audit/en/desktop/light",
+    "surface": "audit",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow audit/en/desktop/light",
+    "surface": "audit",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr audit/en/desktop/dark",
+    "surface": "audit",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr audit/en/desktop/dark",
+    "surface": "audit",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "dark-field-unchanged audit/en/desktop/dark",
+    "surface": "audit",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged audit/en/desktop/dark",
+    "surface": "audit",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow audit/en/desktop/dark",
+    "surface": "audit",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr dashboard/en/tablet/light",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr dashboard/en/tablet/light",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "ivory-field dashboard/en/tablet/light",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type dashboard/en/tablet/light",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast dashboard/en/tablet/light",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow dashboard/en/tablet/light",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "834 vs 834"
+  },
+  {
+    "check": "theme-attr dashboard/en/tablet/dark",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr dashboard/en/tablet/dark",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "dark-field-unchanged dashboard/en/tablet/dark",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged dashboard/en/tablet/dark",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow dashboard/en/tablet/dark",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "834 vs 834"
+  },
+  {
+    "check": "theme-attr settings/en/tablet/light",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr settings/en/tablet/light",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "ivory-field settings/en/tablet/light",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type settings/en/tablet/light",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast settings/en/tablet/light",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow settings/en/tablet/light",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "834 vs 834"
+  },
+  {
+    "check": "theme-attr settings/en/tablet/dark",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr settings/en/tablet/dark",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "dark-field-unchanged settings/en/tablet/dark",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged settings/en/tablet/dark",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow settings/en/tablet/dark",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "834 vs 834"
+  },
+  {
+    "check": "theme-attr dashboard/en/mobile/light",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr dashboard/en/mobile/light",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "ivory-field dashboard/en/mobile/light",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type dashboard/en/mobile/light",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast dashboard/en/mobile/light",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow dashboard/en/mobile/light",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "390 vs 390"
+  },
+  {
+    "check": "theme-attr dashboard/en/mobile/dark",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr dashboard/en/mobile/dark",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "dark-field-unchanged dashboard/en/mobile/dark",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged dashboard/en/mobile/dark",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow dashboard/en/mobile/dark",
+    "surface": "dashboard",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "390 vs 390"
+  },
+  {
+    "check": "theme-attr settings/en/mobile/light",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr settings/en/mobile/light",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "ivory-field settings/en/mobile/light",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type settings/en/mobile/light",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast settings/en/mobile/light",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow settings/en/mobile/light",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "390 vs 390"
+  },
+  {
+    "check": "theme-attr settings/en/mobile/dark",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr settings/en/mobile/dark",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "ltr"
+  },
+  {
+    "check": "dark-field-unchanged settings/en/mobile/dark",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged settings/en/mobile/dark",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow settings/en/mobile/dark",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "390 vs 390"
+  },
+  {
+    "check": "theme-attr dashboard/ar/desktop/light",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr dashboard/ar/desktop/light",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "ivory-field dashboard/ar/desktop/light",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type dashboard/ar/desktop/light",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast dashboard/ar/desktop/light",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow dashboard/ar/desktop/light",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr dashboard/ar/desktop/dark",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr dashboard/ar/desktop/dark",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "dark-field-unchanged dashboard/ar/desktop/dark",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged dashboard/ar/desktop/dark",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow dashboard/ar/desktop/dark",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr settings/ar/desktop/light",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr settings/ar/desktop/light",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "ivory-field settings/ar/desktop/light",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type settings/ar/desktop/light",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast settings/ar/desktop/light",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow settings/ar/desktop/light",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr settings/ar/desktop/dark",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr settings/ar/desktop/dark",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "dark-field-unchanged settings/ar/desktop/dark",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged settings/ar/desktop/dark",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow settings/ar/desktop/dark",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr companies/ar/desktop/light",
+    "surface": "companies",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr companies/ar/desktop/light",
+    "surface": "companies",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "ivory-field companies/ar/desktop/light",
+    "surface": "companies",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type companies/ar/desktop/light",
+    "surface": "companies",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast companies/ar/desktop/light",
+    "surface": "companies",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow companies/ar/desktop/light",
+    "surface": "companies",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr companies/ar/desktop/dark",
+    "surface": "companies",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr companies/ar/desktop/dark",
+    "surface": "companies",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "dark-field-unchanged companies/ar/desktop/dark",
+    "surface": "companies",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged companies/ar/desktop/dark",
+    "surface": "companies",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow companies/ar/desktop/dark",
+    "surface": "companies",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr users/ar/desktop/light",
+    "surface": "users",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr users/ar/desktop/light",
+    "surface": "users",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "ivory-field users/ar/desktop/light",
+    "surface": "users",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type users/ar/desktop/light",
+    "surface": "users",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast users/ar/desktop/light",
+    "surface": "users",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow users/ar/desktop/light",
+    "surface": "users",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr users/ar/desktop/dark",
+    "surface": "users",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr users/ar/desktop/dark",
+    "surface": "users",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "dark-field-unchanged users/ar/desktop/dark",
+    "surface": "users",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged users/ar/desktop/dark",
+    "surface": "users",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow users/ar/desktop/dark",
+    "surface": "users",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr providers/ar/desktop/light",
+    "surface": "providers",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr providers/ar/desktop/light",
+    "surface": "providers",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "ivory-field providers/ar/desktop/light",
+    "surface": "providers",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type providers/ar/desktop/light",
+    "surface": "providers",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast providers/ar/desktop/light",
+    "surface": "providers",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow providers/ar/desktop/light",
+    "surface": "providers",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr providers/ar/desktop/dark",
+    "surface": "providers",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr providers/ar/desktop/dark",
+    "surface": "providers",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "dark-field-unchanged providers/ar/desktop/dark",
+    "surface": "providers",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged providers/ar/desktop/dark",
+    "surface": "providers",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow providers/ar/desktop/dark",
+    "surface": "providers",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr audit/ar/desktop/light",
+    "surface": "audit",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr audit/ar/desktop/light",
+    "surface": "audit",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "ivory-field audit/ar/desktop/light",
+    "surface": "audit",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type audit/ar/desktop/light",
+    "surface": "audit",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast audit/ar/desktop/light",
+    "surface": "audit",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow audit/ar/desktop/light",
+    "surface": "audit",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr audit/ar/desktop/dark",
+    "surface": "audit",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr audit/ar/desktop/dark",
+    "surface": "audit",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "dark-field-unchanged audit/ar/desktop/dark",
+    "surface": "audit",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged audit/ar/desktop/dark",
+    "surface": "audit",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow audit/ar/desktop/dark",
+    "surface": "audit",
+    "locale": "ar",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "1440 vs 1440"
+  },
+  {
+    "check": "theme-attr dashboard/ar/tablet/light",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr dashboard/ar/tablet/light",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "ivory-field dashboard/ar/tablet/light",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type dashboard/ar/tablet/light",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast dashboard/ar/tablet/light",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow dashboard/ar/tablet/light",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "834 vs 834"
+  },
+  {
+    "check": "theme-attr dashboard/ar/tablet/dark",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr dashboard/ar/tablet/dark",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "dark-field-unchanged dashboard/ar/tablet/dark",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged dashboard/ar/tablet/dark",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow dashboard/ar/tablet/dark",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "834 vs 834"
+  },
+  {
+    "check": "theme-attr settings/ar/tablet/light",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr settings/ar/tablet/light",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "ivory-field settings/ar/tablet/light",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type settings/ar/tablet/light",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast settings/ar/tablet/light",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow settings/ar/tablet/light",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "light",
+    "ok": true,
+    "detail": "834 vs 834"
+  },
+  {
+    "check": "theme-attr settings/ar/tablet/dark",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr settings/ar/tablet/dark",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "dark-field-unchanged settings/ar/tablet/dark",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged settings/ar/tablet/dark",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow settings/ar/tablet/dark",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "tablet",
+    "theme": "dark",
+    "ok": true,
+    "detail": "834 vs 834"
+  },
+  {
+    "check": "theme-attr dashboard/ar/mobile/light",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr dashboard/ar/mobile/light",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "ivory-field dashboard/ar/mobile/light",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type dashboard/ar/mobile/light",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast dashboard/ar/mobile/light",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow dashboard/ar/mobile/light",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "390 vs 390"
+  },
+  {
+    "check": "theme-attr dashboard/ar/mobile/dark",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr dashboard/ar/mobile/dark",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "dark-field-unchanged dashboard/ar/mobile/dark",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged dashboard/ar/mobile/dark",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow dashboard/ar/mobile/dark",
+    "surface": "dashboard",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "390 vs 390"
+  },
+  {
+    "check": "theme-attr settings/ar/mobile/light",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "light"
+  },
+  {
+    "check": "dir-attr settings/ar/mobile/light",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "ivory-field settings/ar/mobile/light",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(247, 244, 237)"
+  },
+  {
+    "check": "charcoal-type settings/ar/mobile/light",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "rgb(34, 32, 29)"
+  },
+  {
+    "check": "body-contrast settings/ar/mobile/light",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "14.79"
+  },
+  {
+    "check": "no-horizontal-overflow settings/ar/mobile/light",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "light",
+    "ok": true,
+    "detail": "390 vs 390"
+  },
+  {
+    "check": "theme-attr settings/ar/mobile/dark",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "dark"
+  },
+  {
+    "check": "dir-attr settings/ar/mobile/dark",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rtl"
+  },
+  {
+    "check": "dark-field-unchanged settings/ar/mobile/dark",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(0, 22, 43)"
+  },
+  {
+    "check": "dark-type-unchanged settings/ar/mobile/dark",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "rgb(238, 243, 249)"
+  },
+  {
+    "check": "no-horizontal-overflow settings/ar/mobile/dark",
+    "surface": "settings",
+    "locale": "ar",
+    "vpName": "mobile",
+    "theme": "dark",
+    "ok": true,
+    "detail": "390 vs 390"
+  },
+  {
+    "check": "branding-editor-present settings/company-admin/desktop/light",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "light",
+    "ok": true,
+    "detail": "true"
+  },
+  {
+    "check": "branding-editor-present settings/company-admin/desktop/dark",
+    "surface": "settings",
+    "locale": "en",
+    "vpName": "desktop",
+    "theme": "dark",
+    "ok": true,
+    "detail": "true"
+  }
+]

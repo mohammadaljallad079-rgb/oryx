@@ -1,0 +1,46 @@
+{
+  "base": "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev",
+  "categories": [
+    {
+      "key": "vehicle_inspection",
+      "label": "فحص المركبات",
+      "providerCards": 27,
+      "emptyStateShown": false
+    },
+    {
+      "key": "maintenance",
+      "label": "الصيانة والإصلاح",
+      "providerCards": 27,
+      "emptyStateShown": false
+    },
+    {
+      "key": "spare_parts",
+      "label": "قطع الغيار",
+      "providerCards": 27,
+      "emptyStateShown": false
+    },
+    {
+      "key": "recovery",
+      "label": "خدمات الطريق",
+      "providerCards": 27,
+      "emptyStateShown": false
+    },
+    {
+      "key": "car_wash",
+      "label": "غسيل وتلميع السيارات",
+      "providerCards": 27,
+      "emptyStateShown": false
+    }
+  ],
+  "checks": [
+    {
+      "name": "category chips rendered",
+      "count": 5
+    },
+    {
+      "name": "every category returns at least one provider",
+      "categories": 5,
+      "failures": []
+    }
+  ]
+}

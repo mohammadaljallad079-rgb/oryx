@@ -302,6 +302,13 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `lint` script is `eslint . --max-warnings=0`. `next lint` is deprecated in
   Next 15 and prompts interactively when no config exists, which made
   `pnpm -r lint` hang in CI. CI runs admin and customer lint.
+- **Pin the Chromium jobs to `ubuntu-24.04`, not `ubuntu-latest`.** GitHub moved
+  the `ubuntu-latest` label to Ubuntu 26.04, and Playwright 1.56.1 refuses to
+  install Chromium on it (`Playwright does not support chromium on
+  ubuntu26.04-x64`). The failure lands at `playwright install --with-deps
+  chromium`, before any test runs, so it looks like the commit it happened to be
+  attached to rather than image drift. `test-ui` in `ci.yml` and `verify` in
+  `preview.yml` are pinned; lift the pin when Playwright supports 26.04.
 
 ### Execution 05 gotchas
 
@@ -350,6 +357,78 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   cookie without a matching `x-oryx-csrf` header. The refresh branch above it
   echoes the cookie; the login branch must too.
 
+### Production-readiness gotchas (Execution 09)
+
+- **`MFA_REQUIRE_SUPER_ADMIN=true` must not lock the owner out.** The guard
+  refuses an unenrolled Super Admin on every route, so without an exemption the
+  owner could log in, get a token, and then be 403'd on `auth/me` — the shell
+  drops the session and bounces back to sign-in, forever. `@AllowMfaEnrollment()`
+  on `auth/me`, `auth/mfa/status`, `auth/mfa/enroll` and `auth/mfa/enroll/confirm`
+  is what makes the documented "set the flag, sign in, enrol TOTP" runbook
+  work. Keep the exemption to those routes: every other platform route stays
+  refused until the second factor exists.
+- **The shipped API image must contain `packages/database/scripts/`.** The
+  first-deploy step runs `production-init` inside the API container so it
+  reaches PostgreSQL on the internal network. The runtime stage copies the
+  script and recreates the `packages/database/node_modules/@oryx/shared`
+  symlink the pruned install omits, and `chown`s both to `oryx` — the file is
+  root-owned and mode 660 in the build stage, so without the `chown` the
+  unprivileged runtime user gets `EACCES` reading its own bootstrap script.
+- **Prisma needs `openssl` in the image.** The `node:*-slim` base omits it, so
+  Prisma logs `failed to detect the libssl/openssl version … Defaulting to
+  "openssl-1.1.x"` and loads a 1.1.x engine against Debian 12's OpenSSL 3. It
+  happens to connect, but the warning is a real mismatch — install `openssl` in
+  the base stage.
+- **Contrast must be measured, not eyeballed.** `scripts/verify-theme-matrix.mjs`
+  drives the real pages and computes WCAG contrast per element. The light theme
+  passes; the approved dark theme has one pre-existing miss,
+  `.oryx-stat__label` at 4.42–4.49 against a 4.5 floor (documented as defect E8,
+  left alone under the "do not alter the approved theme" rule).
+
+### Existing-server pre-deployment gotchas (Execution 10)
+
+- **The deployment host is not reachable from the agent sandbox.** There is no
+  SSH client, no key, no `~/.ssh`, no `DEPLOY_*` variable, and no docker daemon.
+  `deploy.yml` reads its host from repository secrets that an integration token
+  cannot read (`403 Resource not accessible by integration`), and the
+  `production` environment does not exist. A pre-deployment task therefore
+  starts by asking for access, not by assuming a hostname — do not invent one.
+- **`deploy/scripts/inspect-server.sh` is the read-only survey.** It answers the
+  OS, resources, ORYX roots, PM2/Docker, nginx, PostgreSQL, DNS, certificate,
+  version, uploads and env-file questions without writing anything. It prints
+  env-file **paths and modes only, never values**. Run it with `sudo` for the
+  root-only sections; without root it skips them and still produces a partial
+  audit.
+- **Staging isolation is the compose project name, not a second compose file.**
+  `docker compose -p oryx-staging … --env-file .env.staging` gives separate
+  volumes automatically, because compose prefixes volume names with the project.
+  Also change `EDGE_HTTP_PORT`/`EDGE_HTTPS_PORT` and `POSTGRES_DB`; sharing any
+  of them disturbs the live stack.
+- **`deploy.sh` never reverses a migration.** It restores the previous image tag
+  on a failed health probe and stops. A schema rollback is a deliberate restore
+  into a separate database, then a promotion — not an automatic down migration.
+- **`--env-file` does not isolate a container; a service's `env_file:` does.**
+  `--env-file` only interpolates `${...}` inside the compose file. The `api`
+  service's `env_file:` injects keys straight into the container and is
+  overridden only by an explicit `environment:` entry. It used to be hard-coded
+  to `../.env.production`, so a staging stack resolved with the **production**
+  JWT, refresh, MFA and database secrets. It is now
+  `${ORYX_API_ENV_FILE:-../.env.production}`, which keeps production unchanged
+  and lets staging point at its own file. Never remove that indirection, and
+  never "simplify" it back to a literal path.
+- **Prove staging isolation with the checker, not by reading the files.**
+  `deploy/scripts/verify-staging-isolation.sh .env.staging` resolves both stacks
+  with `docker compose config` (no daemon needed) and fails on a shared project
+  name, port, resolved volume name, sensitive value or database. It is verified
+  non-vacuous: it fails on the pre-fix compose file. When writing such a check,
+  compare *resolved* volume names (compose prefixes the project) and skip *empty*
+  values (an unconfigured adapter is empty in both files) — both are easy false
+  positives.
+- **`env_file:` in flow-sequence form cannot hold a `:-` default.** `env_file:
+  [${VAR:-x}]` fails to parse (`did not find expected ',' or ']'`); use the block
+  list form.
+
+
 ### Branding and preview gotchas
 
 - **An exported `NEXT_PUBLIC_API_BASE_URL` silently overrides `.env.local`.** A
@@ -358,6 +437,12 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `http://localhost:3001` from the browser and every login fails CORS. `.env.local`
   is correct with `NEXT_PUBLIC_API_BASE_URL=/api`; build from a clean environment
   and confirm with `grep -r 'http://localhost:3001' apps/*/.next/static/`.
+- **`.env.local` is gitignored, so a sandbox recycle deletes it.** The built
+  `.next/` survives the recycle but the source file does not, so the next rebuild
+  silently falls back to the absolute default and every authenticated customer
+  surface starts redirecting to `/login` again. After a recycle, recreate
+  `apps/customer/.env.local` (and `apps/admin/.env.local`) with
+  `NEXT_PUBLIC_API_BASE_URL=/api` *before* rebuilding.
 - **The customer app's preference keys are namespaced.** It reads
   `oryx.customer.locale` and `oryx.customer.theme`, while the admin app reads
   `oryx.locale` and `oryx.theme`. Seeding the wrong pair leaves the app on its
@@ -378,6 +463,24 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 - **`module` is a reserved lint identifier.** `@next/next/no-assign-module-variable`
   rejects a `for (const module of …)` loop in an app that shares the admin ESLint
   config. Name the binding something else.
+- **Capture the customer app over `localhost`, not `127.0.0.1`.** The exported
+  bundle's `NEXT_PUBLIC_API_BASE_URL` points at `http://localhost:3001`, and the
+  customer refresh token is an HttpOnly cookie. A browser opened on
+  `http://127.0.0.1:12001` treats `localhost:3001` as a different site, so the
+  refresh cookie is not sent, every authenticated surface redirects to `/login`,
+  and a capture script that asserts an authenticated route fails with "landed on
+  /login". Use `http://localhost:12001` and the session survives a reload.
+- **The admin light theme is a warm ivory system, not the customer's tokens.**
+  The two apps keep separate token blocks, but the approved identity is the same:
+  field `#f7f4ed`, raised `#fbf9f4`, body type `#22201d`, muted `#5a544b`, gold
+  text `#7d5f10`. Do not reintroduce the old cold ramp (`#f5f6f8` / `#0d2338`);
+  the customer site never used it and the mismatch reads as two products.
+- **Admin light-theme checks are scripts, not specs.**
+  `.run/check-admin-light-palette.mjs` (WCAG pairs) and
+  `.run/verify-admin-light.mjs` (browser assertions) fail loudly and must stay
+  green. The branding editor is company-scoped, so the verifier signs in a second
+  time as a company administrator to assert it; a Super Admin carries no tenant
+  scope and legitimately does not render it.
 
 
 ### Platform seed gotchas
@@ -407,6 +510,50 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   MFA-reset global setup shells out to `scripts/reset-seed-mfa.mjs`, which exits
   non-zero without it. Source the root `.env` before `pnpm db:seed` or `test:ui`:
   `set -a; . ./.env; set +a`.
+
+### Execution 07 light-theme gotchas
+
+- **A screenshot named for a theme is not proof of that theme.** The audit
+  capture runs a locale × theme loop and then captures the tablet and mobile
+  dashboards inside the same test; setting the viewport does not reset the
+  locale or the theme, so `dashboard-{tablet,mobile}-ar-dark.png` held an English
+  light render. Set `ar` and `dark` explicitly and assert `data-dir` and
+  `data-theme` before capturing. `.run/verify-exec11-theme.mjs` reads the
+  dominant colour of each capture and fails when a `-light` file is not ivory or
+  a `-dark` file is not navy.
+- **The customer session lives in memory.** A `page.goto` reload between captures
+  races the refresh and can bounce an authenticated surface to `/login`, which
+  then gets captured under the authenticated surface's name. Capture the
+  dashboard immediately after the sign-in redirect, or assert the landing URL.
+- **The theme and locale keys are per-app.** The bootstrap reads
+  `oryx.customer.theme` / `oryx.customer.locale` in `apps/customer` and
+  `oryx.theme` / `oryx.locale` in `apps/admin`; setting any other key is silently
+  ignored and the capture renders the default.
+- **A tall dark footer can dominate a full-page capture.** Read the dominant
+  colour from the top band, not the whole image, or every light page reads as
+  dark.
+- **Gold is two tokens, not one.** A gold *text* colour on an ivory field must be
+  dark enough for 4.5:1; a gold *tint fill* must be light enough for dark ink to
+  read on it. Painting `--gold` as text on a gold tint puts the label in the same
+  colour family as its own background. The chip foreground is `--gold-on-tint`.
+  This is why the light theme has both and the dark theme can reproduce `--gold`.
+- **The tint percentages differ per theme on purpose.** The admin dark ramp keeps
+  the percentages its rules already used (badge 15%/40%, collapsed nav 18%, nav
+  gradient 20%) so the approved dark render stays byte-identical; the light ramp
+  matches `LIGHT_THEME`. `scripts/check-token-parity.mjs` records the dark values
+  as an explicit exemption. "Fixing" the dark ramp to match the light one changes
+  the approved dark theme — don't.
+- **Measure the computed style, not the screenshot, when judging a theme.** A
+  region-average sampler with a loose selector (`main`, `section`) matches the
+  wrong element and reports nonsense such as a dark "card" in a light theme.
+  `scripts/probe-light-chrome.mjs` reads `getComputedStyle` for the page
+  background and text and asserts they equal `LIGHT_THEME`.
+- **The evidence preview server only maps `/evidence/` onto `.run/evidence/`.**
+  A capture copied to `.run/evidence/exec07-final/x.png` is reachable at
+  `/evidence/exec07-final/x.png` on port 12000. Any other path falls through to
+  the Next app and returns that app's HTML shell with a `404`/`200`, so a link to
+  a file that was never copied looks plausible and serves the wrong thing. Check
+  `content-type` before publishing a link.
 
 ### Mobile gotchas
 
