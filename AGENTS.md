@@ -437,6 +437,12 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `http://localhost:3001` from the browser and every login fails CORS. `.env.local`
   is correct with `NEXT_PUBLIC_API_BASE_URL=/api`; build from a clean environment
   and confirm with `grep -r 'http://localhost:3001' apps/*/.next/static/`.
+- **`.env.local` is gitignored, so a sandbox recycle deletes it.** The built
+  `.next/` survives the recycle but the source file does not, so the next rebuild
+  silently falls back to the absolute default and every authenticated customer
+  surface starts redirecting to `/login` again. After a recycle, recreate
+  `apps/customer/.env.local` (and `apps/admin/.env.local`) with
+  `NEXT_PUBLIC_API_BASE_URL=/api` *before* rebuilding.
 - **The customer app's preference keys are namespaced.** It reads
   `oryx.customer.locale` and `oryx.customer.theme`, while the admin app reads
   `oryx.locale` and `oryx.theme`. Seeding the wrong pair leaves the app on its
