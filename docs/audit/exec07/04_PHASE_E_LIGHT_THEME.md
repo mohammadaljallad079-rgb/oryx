@@ -1021,3 +1021,97 @@ page is served by the preview proxy at `/evidence/exec07-light-theme/`.
   correction to the existing Execution 07 branch and updates the pull request
   with evidence only.
 
+## 14. Sixth continuation session — recovery and the Phase E re-capture
+
+### 14.1 Recovery
+
+The previous conversation ended in a sandbox error. The workspace outlived it,
+so the first step was to establish exactly what existed locally and on the
+remote before touching anything.
+
+| Question | Finding | How it was checked |
+|---|---|---|
+| Local branch | `feature/execution-07-premium-web` | `git branch --show-current` |
+| Local `HEAD` | `99b7f64` — "feat(auth): native (ERP mobile) staff sessions with device-scoped revocation" | `git log --oneline -1` |
+| Remote tip | `828685f` — local is **1 ahead** | `git status` / `git ls-remote` |
+| Last known SHA from the crash report | `b3c9a71` — an ancestor of both `HEAD` and the remote tip | `git merge-base --is-ancestor` |
+| Commits beyond the last known SHA | **present** — the Phase E work and the Execution 08/10 recovery commits | `git log --oneline b3c9a71..HEAD` |
+| Unpushed commits | **one** — `99b7f64`, a native staff-session commit | `git log --oneline origin/feature/execution-07-premium-web..HEAD` |
+| Dangling stashes | none recovered this session | `git stash list` |
+
+**No completed work was lost.** The crashed session had pushed everything except
+the single native-session commit, which was still in the local object store and
+is preserved. Nothing was reset, force-pushed or discarded.
+
+### 14.2 The customer light-theme capture was blocked, and why
+
+The Phase E customer captures could not be reproduced because every
+authenticated surface redirected to `/login` after a reload. The cause was not
+the theme and not a product bug: the preview build of `apps/customer` had been
+compiled with an absolute, cross-origin API base.
+
+| Fact | Evidence |
+|---|---|
+| The bundle called `http://localhost:3001/api` | `grep -rl 'localhost:3001' apps/customer/.next/static/` |
+| `apps/customer/.env.local` was absent | the sandbox recycle drops gitignored files; the file is not tracked |
+| The refresh cookie is `SameSite=Lax` on `Path=/api/v1/customer` | `Set-Cookie` on `POST /api/v1/customer/auth/login` |
+| A cross-site page therefore never sends it | reload → `/login` |
+
+The documented convention (AGENTS.md, "Branding and preview gotchas") is a
+relative base, `NEXT_PUBLIC_API_BASE_URL=/api`, so the client is same-origin with
+the proxy. Restoring `apps/customer/.env.local` and rebuilding produced a bundle
+with no `localhost:3001` reference. With that, `POST /api/v1/customer/auth/login`
+sets `oryx_crt` + `oryx_ccsrf`, and a full reload of `/dashboard` restores the
+session and renders the authenticated surface. The bug was in the preview build
+configuration, not in the application.
+
+The API, PostgreSQL and the Playwright browser download were also re-provisioned
+after the sandbox recycle (the recycle drops system packages and the browser
+cache while keeping the workspace).
+
+### 14.3 Re-capture
+
+`node .run/capture-exec07-phase-e.mjs after` was run against the same-origin
+build. The capture script now takes the customer credentials from the
+environment so it is not tied to one seeded account.
+
+| Result | Value |
+|---|---|
+| Captures written | **60** (five surfaces × two locales × three viewports × two themes) |
+| Status ≥ 400 | 0 |
+| Horizontal overflow | 0 |
+| Authenticated surfaces landing on `/dashboard` | all |
+| Distinct light-theme accent across all light captures | one — `#7d5f10` |
+| Minimum light-theme body contrast | 14.79:1 |
+
+Every light capture reports `bodyBackground: rgb(247, 244, 237)` (the ivory
+field `#f7f4ed`) and `bodyColor: rgb(34, 32, 29)` (the deep charcoal `#22201d`),
+so the light identity is applied consistently across the homepage, the customer
+dashboard, the provider directory, the login page and the profile surface, in
+both Arabic RTL and English LTR, at desktop, tablet and mobile widths.
+
+The manifest also confirms the one accent correction this session: the light
+accent moved from `#856612` to `#7d5f10`, the value that clears 4.5:1 on the
+deepest ivory surface. The comparison sheets (`05-comparison-*`) pair each
+surface's light and dark renders.
+
+### 14.4 Tests
+
+| Suite | Result |
+|---|---|
+| `@oryx/shared` unit | 180 passed (9 files) |
+| `@oryx/mobile-erp` unit | 24 passed (2 files) |
+| `@oryx/customer` lint | clean (`eslint . --max-warnings=0`) |
+| `@oryx/admin` lint | clean (`eslint . --max-warnings=0`) |
+| `@oryx/mobile-erp` typecheck | clean |
+
+### 14.5 Honest limitations
+
+- The dark theme was not changed. The comparison sheets and the manifest show it
+  is byte-identical to the approved build.
+- The ERP mobile app (`apps/mobile-erp`) is a separate deliverable. It is
+  included in the branch because it was already present in the workspace, but it
+  is not part of the Phase E light-theme correction.
+- No deployment was performed and PR #7 was not merged. This session pushes to
+  the existing Execution 07 branch and updates the pull request with evidence.
+

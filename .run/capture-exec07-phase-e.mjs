@@ -24,7 +24,10 @@ const PHASE = process.argv[2] === 'before' ? 'before' : 'after';
 const CUSTOMER = process.env.ORYX_CUSTOMER_BASE ?? 'http://127.0.0.1:12001';
 const OUT = `docs/audit/exec07/phase-e/${PHASE}`;
 
-const CUSTOMER_USER = { email: 'customer@oryx-demo.local', password: 'OryxDemo!2026' };
+const CUSTOMER_USER = {
+  email: process.env.ORYX_CUSTOMER_EMAIL ?? 'rider@oryx.local',
+  password: process.env.ORYX_CUSTOMER_PASSWORD ?? 'ChangeMe!Oryx2026',
+};
 
 const WIDTHS = [
   ['desktop', { width: 1440, height: 1024 }],

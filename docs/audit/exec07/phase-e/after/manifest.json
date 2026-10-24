@@ -15,7 +15,7 @@
     "dir": "ltr",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -36,7 +36,7 @@
     "dir": "rtl",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -57,7 +57,7 @@
     "dir": "ltr",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -78,7 +78,7 @@
     "dir": "rtl",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -99,7 +99,7 @@
     "dir": "ltr",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -120,7 +120,7 @@
     "dir": "rtl",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -141,7 +141,7 @@
     "dir": "ltr",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -162,7 +162,7 @@
     "dir": "rtl",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -183,7 +183,7 @@
     "dir": "ltr",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -204,7 +204,7 @@
     "dir": "rtl",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -435,7 +435,7 @@
     "dir": "ltr",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -456,7 +456,7 @@
     "dir": "rtl",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -477,7 +477,7 @@
     "dir": "ltr",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -498,7 +498,7 @@
     "dir": "rtl",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -519,7 +519,7 @@
     "dir": "ltr",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -540,7 +540,7 @@
     "dir": "rtl",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -561,7 +561,7 @@
     "dir": "ltr",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -582,7 +582,7 @@
     "dir": "rtl",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -603,7 +603,7 @@
     "dir": "ltr",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -624,7 +624,7 @@
     "dir": "rtl",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -855,7 +855,7 @@
     "dir": "ltr",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -876,7 +876,7 @@
     "dir": "rtl",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -897,7 +897,7 @@
     "dir": "ltr",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -918,7 +918,7 @@
     "dir": "rtl",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -939,7 +939,7 @@
     "dir": "ltr",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -960,7 +960,7 @@
     "dir": "rtl",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -981,7 +981,7 @@
     "dir": "ltr",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -1002,7 +1002,7 @@
     "dir": "rtl",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -1023,7 +1023,7 @@
     "dir": "ltr",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
@@ -1044,7 +1044,7 @@
     "dir": "rtl",
     "bodyBackground": "rgb(247, 244, 237)",
     "bodyColor": "rgb(34, 32, 29)",
-    "accent": "#856612",
+    "accent": "#7d5f10",
     "surface": "#fff",
     "bgToken": "#f7f4ed",
     "contrast": 14.79
