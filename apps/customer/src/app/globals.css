@@ -184,6 +184,36 @@
   --dot-muted: color-mix(in srgb, var(--text-faint) 50%, transparent);
   --auth-sheen: color-mix(in srgb, var(--surface-raised) 92%, var(--gold) 8%);
   --band-btn-hover: color-mix(in srgb, var(--band-text) 12%, transparent);
+  /*
+   * Component fields whose value differs per theme. Each was previously a
+   * light-scoped component rule sitting next to the rule it patched, which is
+   * what made the light theme read as assembled from exceptions. They live here
+   * now, so a component rule names a token and the theme supplies the value.
+   *
+   * The dark values are the ones the approved dark render already resolves, so
+   * moving the override into a token does not move a pixel of the dark theme.
+   */
+  --card-desc-size: 12.5px;
+  /* The dashboard banner composites its artwork straight onto the page in the
+   * dark theme, so it has no panel field of its own; the light theme lifts it
+   * onto the navy band. */
+  --dash-hero-bg: transparent;
+  --dash-hero-ink: var(--text);
+  /* Footer controls sit on the navy band, so they take the band ink rather than
+   * the page ink. In the dark theme the band equals the page field, which is why
+   * these resolve to the plain button colours there. */
+  --footer-btn-ink: var(--text);
+  --footer-btn-border: var(--border);
+  --footer-btn-hover-bg: var(--surface-hover);
+  --footer-btn-hover-border: var(--border-strong);
+  /* The homepage hero eyebrow. `.oryx-hero p` outranks `.oryx-eyebrow`, so the
+   * eyebrow inherits the lede's ink and size in the dark theme; the dark value
+   * below reproduces that approved render, and the light value restores the gold
+   * accent every other eyebrow uses. `letter-spacing` stays in `em` in the rule,
+   * so it tracks whichever size the theme selects. */
+  --hero-eyebrow-ink: var(--band-text-muted);
+  --hero-eyebrow-size: 16px;
+  --hero-eyebrow-margin: 0 0 24px;
   --header-h: 68px;
 }
 
@@ -339,6 +369,29 @@
   --dot-muted: color-mix(in srgb, var(--text-faint) 45%, transparent);
   --auth-sheen: color-mix(in srgb, var(--surface-raised) 94%, var(--gold) 6%);
   --band-btn-hover: color-mix(in srgb, var(--band-text) 14%, transparent);
+  /*
+   * The per-theme component fields. See the dark block for what each one drives;
+   * these are the values the light theme used to set through five separate
+   * light-scoped component overrides, now named once.
+   */
+  /* The card description reads at the same 13px as the muted line beside it, so
+   * the two lines of one card agree. */
+  --card-desc-size: 13px;
+  /* The banner is a navy band under the artwork on ivory, so its white ink
+   * reads; the dark theme leaves it transparent. */
+  --dash-hero-bg: var(--panel-bg);
+  --dash-hero-ink: var(--panel-ink);
+  /* The footer bar is a navy band on an ivory page, so its controls take the
+   * band ink rather than the page's charcoal. */
+  --footer-btn-ink: var(--band-text);
+  --footer-btn-border: var(--band-border);
+  --footer-btn-hover-bg: var(--band-btn-hover);
+  --footer-btn-hover-border: var(--band-accent);
+  /* The homepage hero eyebrow: the gold accent every other eyebrow uses, at the
+   * eyebrow's own size rather than the lede's. */
+  --hero-eyebrow-ink: var(--band-accent);
+  --hero-eyebrow-size: 12.5px;
+  --hero-eyebrow-margin: 0 0 10px;
 }
 
 /*
@@ -819,6 +872,20 @@ a {
   text-transform: uppercase;
 }
 
+/*
+ * The homepage hero eyebrow needs its own rule because `.oryx-hero p` is more
+ * specific than `.oryx-eyebrow`, so the eyebrow would otherwise inherit the
+ * lede's muted ink and 16px size instead of the gold accent. The ink, size and
+ * margin come from tokens so each theme states its value once: the light theme
+ * restores the gold accent, and the dark value reproduces the approved render.
+ * `letter-spacing` stays in `em` so it tracks whichever size is selected.
+ */
+.oryx-hero .oryx-eyebrow {
+  margin: var(--hero-eyebrow-margin);
+  color: var(--hero-eyebrow-ink);
+  font-size: var(--hero-eyebrow-size);
+}
+
 .oryx-hero__title {
   margin: 0 0 14px;
   font-size: clamp(28px, 4.4vw, 46px);
@@ -981,19 +1048,9 @@ a {
 }
 
 .oryx-cat-card__desc {
-  font-size: 12.5px;
+  font-size: var(--card-desc-size);
   line-height: 1.5;
   color: var(--text-muted);
-}
-
-/*
- * The card description was the last ad-hoc size in the light theme: it read at
- * 12.5px while the muted text it sits beside reads at 13px, so the two lines of
- * one card disagreed. Corrected for the light theme only, because the dark
- * render is the approved baseline and a 0.5px change re-lays-out every card.
- */
-:root[data-theme='light'] .oryx-cat-card__desc {
-  font-size: 13px;
 }
 
 .oryx-cat-card__link {
@@ -1017,14 +1074,10 @@ a {
   display: flex;
   align-items: center;
   margin-bottom: 20px;
-}
-
-/* In the light theme the banner is a navy band under the artwork, so its white
-   ink reads. The dark theme composites the artwork directly over the page field
-   and is left exactly as the approved dashboard renders it. */
-:root[data-theme='light'] .oryx-dash-hero {
-  background: var(--panel-bg);
-  color: var(--panel-ink);
+  /* The light theme lifts the banner onto the navy band so its white ink reads;
+   * the dark theme composites the artwork straight onto the page field. */
+  background: var(--dash-hero-bg);
+  color: var(--dash-hero-ink);
 }
 
 .oryx-dash-hero__art {
@@ -1412,17 +1465,18 @@ a {
   flex-wrap: wrap;
 }
 
-/* The light theme's footer bar sits on a navy band while the page ink is
-   charcoal, so its controls take the band ink. The dark theme already renders
-   the footer on the page field, so its existing button styling is unchanged. */
-:root[data-theme='light'] .oryx-footer .oryx-btn {
-  color: var(--band-text);
-  border-color: var(--band-border);
+/* The footer bar sits on the navy band in the light theme while the page ink is
+   charcoal, so its controls take the band ink. In the dark theme the band equals
+   the page field, so these tokens resolve to the plain button colours and the
+   approved dark render is unchanged. */
+.oryx-footer .oryx-btn {
+  color: var(--footer-btn-ink);
+  border-color: var(--footer-btn-border);
 }
 
-:root[data-theme='light'] .oryx-footer .oryx-btn:hover:not(:disabled) {
-  background: var(--band-btn-hover);
-  border-color: var(--band-accent);
+.oryx-footer .oryx-btn:hover:not(:disabled) {
+  background: var(--footer-btn-hover-bg);
+  border-color: var(--footer-btn-hover-border);
 }
 
 /*
@@ -1443,24 +1497,6 @@ a {
   max-width: 560px;
   margin: 0 0 24px;
   font-size: 16px;
-}
-
-/*
- * `.oryx-hero p` above is more specific than `.oryx-eyebrow`, so the homepage
- * hero eyebrow inherited the lede's muted colour and 16px size instead of the
- * gold accent every other eyebrow uses — the light-theme inconsistency the owner
- * reported. Restated here at a matching specificity so the accent wins again.
- *
- * Scoped to the light theme on purpose: the dark render is approved and stays
- * byte-identical (see docs/audit/exec07/phase-e/after/dark-invariance.json).
- */
-:root[data-theme='light'] .oryx-hero .oryx-eyebrow {
-  color: var(--band-accent);
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  margin: 0 0 10px;
 }
 
 .oryx-section-title {

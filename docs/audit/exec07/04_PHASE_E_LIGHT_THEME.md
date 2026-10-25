@@ -1115,3 +1115,106 @@ surface's light and dark renders.
 - No deployment was performed and PR #7 was not merged. This session pushes to
   the existing Execution 07 branch and updates the pull request with evidence.
 
+
+## 15. Seventh continuation session — the scattered light-theme overrides
+
+### 15.1 Recovery
+
+The previous conversation ended in another sandbox error. The workspace and the
+remote were both inspected before anything was changed.
+
+| Question | Finding | How it was checked |
+|---|---|---|
+| Local branch | `feature/execution-07-premium-web` | `git branch --show-current` |
+| Local `HEAD` | in step with the remote tip | `git rev-parse HEAD` |
+| Last known SHA from the crash report | `b3c9a71` — an **ancestor** of `HEAD` | `git merge-base --is-ancestor b3c9a71 HEAD` |
+| Commits beyond the last known SHA | **present** — the whole Phase E and Execution 05/08/10 series | `git log --oneline b3c9a71..HEAD` |
+| Unpushed commits | none that had been committed; the surviving ERP-mobile edits were committed in this session | `git status --porcelain` |
+| `origin/...` tracking ref | **stale** — the fetch refspec tracks `main` only, so the tracking ref lagged the real remote tip | `git config --get-all remote.origin.fetch` |
+
+**No pushed work was lost.** Every commit the previous session pushed is on
+`origin`. The only uncommitted work in the workspace was the ERP-mobile edit
+support, which is committed here rather than discarded.
+
+### 15.2 What was actually still inconsistent
+
+Every measurement already passed before this session — 0 contrast failures, 0
+inconsistent component properties, a warm-only neutral set. What remained was the
+*shape* of the light theme: five rules of the form
+`:root[data-theme='light'] <component> { … }`, each patching one component next
+to the rule it overrode instead of driving it from the token block. That is the
+pattern the owner's request names directly ("use centralized theme tokens rather
+than scattered CSS overrides"), and it is what makes a theme read as assembled
+from exceptions even when each exception is defensible.
+
+| # | Scattered override | Now |
+|---|---|---|
+| S1 | `.oryx-cat-card__desc` font size | `--card-desc-size` |
+| S2 | `.oryx-dash-hero` background and ink | `--dash-hero-bg`, `--dash-hero-ink` |
+| S3 | `.oryx-footer .oryx-btn` ink and border | `--footer-btn-ink`, `--footer-btn-border` |
+| S4 | `.oryx-footer .oryx-btn:hover` | `--footer-btn-hover-bg`, `--footer-btn-hover-border` |
+| S5 | `.oryx-hero .oryx-eyebrow` ink, size, margin | `--hero-eyebrow-ink`, `--hero-eyebrow-size`, `--hero-eyebrow-margin` |
+
+S5 is the interesting one. `.oryx-hero p` outranks `.oryx-eyebrow`, so the
+homepage eyebrow inherits the lede's muted ink and 16px size. The previous
+session patched that only in the light theme, because the dark render is
+approved. The rule now sits at `.oryx-hero .oryx-eyebrow` in the base stylesheet
+and reads its three values from tokens; the dark token values reproduce the
+approved dark render, and the light values restore the gold accent. The override
+is gone, and the cascade is correct in both themes.
+
+`--scrim-angle` under `[data-dir='rtl']` and the footer logo colourway toggle
+stay as they are: they are direction and structural rules, not colour overrides.
+
+### 15.3 Why neither theme moved
+
+The refactor is render-preserving by construction — every token's dark value is
+the value the dark render already resolved, and every light value is the value
+the light override already set. That is also measured: the captures taken before
+the change were compared pixel-for-pixel with the captures taken after.
+
+| Comparison | Result |
+|---|---|
+| Images compared | 63 (including the comparison sheets) |
+| Images with any difference | 3 — all `06-profile-*`, each `0.002%` of pixels at a channel delta of `1` |
+| Worst image | `06-profile-tablet-en-dark.png`, `0.002%`, maxΔ `1` |
+| Verdict | antialiasing noise; no colour shift in either theme |
+
+The three-image residue is font antialiasing on a page with no changed rule. A
+real colour shift would move entire regions, not isolated pixels by one level.
+
+### 15.4 Verification
+
+| Check | Result |
+|---|---|
+| `@oryx/shared` unit | 180 passed (9 files) — includes the CSS-token contract |
+| `@oryx/mobile-erp` unit | 31 passed (2 files) |
+| `@oryx/customer` lint / typecheck | clean |
+| `check-light-palette` | 33/33 pairs meet their threshold |
+| `sweep-light-all-routes` | 0 contrast failures across 15 routes |
+| `consistency-audit` (customer, light) | no inconsistent component properties |
+| `consistency-audit-admin` (light) | no inconsistent component properties |
+| `check-admin-light-palette` | all admin light-theme contrast checks passed |
+| `verify-admin-light` | 222/222 assertions across 6 surfaces |
+| `verify-refactor-identical` | 63 images, worst 0.002% at maxΔ 1 |
+| `capture-exec07-phase-e` | 60 captures, 0 with status ≥ 400 or overflow |
+
+The `verify-phase-e-images` script reports 26 "suspect" images. That is its
+heuristic, not a defect: it samples the top band of each PNG and expects the page
+field, but the profile and comparison pages carry a navy page-head there. The
+same images are byte-identical to the pre-change baseline, so the flags pre-date
+this session.
+
+### 15.5 Honest limitations
+
+- The dark theme was not changed; §15.3 measures that.
+- The scattered-override count for the customer stylesheet is now zero. The
+  `--scrim-angle` RTL rule and the logo colourway toggles remain, and are
+  direction and structural rules rather than colour overrides.
+- `verify-light-palette.mjs` and `verify-theme-toggle.mjs` were not used: the
+  former hard-codes a consumer password that the seed no longer sets, and the
+  latter hard-codes a sandbox hostname from a previous session. The equivalent
+  checks (`sweep-light-all-routes`, the Phase E manifest) pass. Fixing those two
+  scripts is left for a follow-up rather than folded into this change.
+- No deployment was performed and PR #7 was not merged.
+
