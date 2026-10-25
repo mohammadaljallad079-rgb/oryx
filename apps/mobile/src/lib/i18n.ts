@@ -47,6 +47,12 @@ const strings: Record<string, Entry> = {
   next: { ar: 'التالي', en: 'Next' },
   getStarted: { ar: 'ابدأ الآن', en: 'Get started' },
 
+  // -------------------------------------------------------- launch screen
+  launchPreparing: { ar: 'جارٍ تجهيز السوق', en: 'Preparing the marketplace' },
+  launchParts: { ar: 'قطع غيار موثقة', en: 'Verified spare parts' },
+  launchServices: { ar: 'خدمات وفحص وصيانة', en: 'Service, inspection and repair' },
+  launchSensage: { ar: 'فحص ذكي بالصور', en: 'SENSAGE photo check' },
+
   // ---------------------------------------------------------------- auth
   signIn: { ar: 'تسجيل الدخول', en: 'Sign in' },
   signInSubtitle: {

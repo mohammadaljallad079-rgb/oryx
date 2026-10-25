@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppProvider, useApp } from '../lib/app-context';
+import { LaunchScreen } from '../components/launch';
 
 /**
  * Root layout.
@@ -14,9 +15,24 @@ import { AppProvider, useApp } from '../lib/app-context';
  * Every screen below the two shells is declared here with `headerShown: false`.
  * They render their own `ScreenHeader`, which carries a back control, so a
  * second platform header would be a duplicate.
+ *
+ * Until the stored session has been read the app shows `LaunchScreen` rather
+ * than an empty themed page. Android 12 and later draw a photographic splash
+ * only on older releases, so this is what carries the brand through start-up on
+ * a current device.
  */
 function RootNavigator() {
-  const { theme } = useApp();
+  const { theme, ready } = useApp();
+
+  if (!ready) {
+    return (
+      <>
+        <StatusBar style="light" />
+        <LaunchScreen />
+      </>
+    );
+  }
+
   return (
     <>
       <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
