@@ -6,7 +6,7 @@ import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
 import { AppHeader } from '../../components/brand';
 import { BookingCard, RecoveryCard } from '../../components/cards';
-import { Body, Button, Card, Chip, Field, Screen, SectionLabel, StateView } from '../../components/ui';
+import { Body, Button, Card, Chip, Field, Notice, Screen, SectionLabel, StateView } from '../../components/ui';
 import { space } from '../../lib/theme';
 
 /**
@@ -20,6 +20,9 @@ export default function MerchantServices() {
   const storeId = account?.storeId ?? 'store-01';
   const [tab, setTab] = useState<'bookings' | 'recovery' | 'services'>('bookings');
   const [draft, setDraft] = useState({ name: '', price: '', duration: '' });
+  const [services, setServices] = useState<Array<{ name: string; price: string; duration: string }>>([]);
+  const [decisions, setDecisions] = useState<Record<string, 'accepted' | 'declined'>>({});
+  const [notice, setNotice] = useState<string | null>(null);
 
   const bookings = useAsync(async () => repository.merchantBookings(storeId), [storeId, dataVersion]);
   const recovery = useAsync(async () => repository.merchantRecoveryRequests(storeId), [storeId, dataVersion]);
@@ -51,10 +54,32 @@ export default function MerchantServices() {
             (recovery.data ?? []).map((job) => (
               <View key={job.id}>
                 <RecoveryCard job={job} />
+                {decisions[job.id] ? (
+                  <Notice
+                    text={`${t('saved')} · ${decisions[job.id] === 'accepted' ? t('acceptRequest') : t('rejectRequest')}`}
+                  />
+                ) : (
                 <View style={[styles.actionRow, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
-                  <Button title={t('acceptRequest')} variant="secondary" onPress={() => undefined} />
-                  <Button title={t('rejectRequest')} variant="danger" onPress={() => undefined} />
+                  <Button
+                    testID={`recovery-accept-${job.id}`}
+                    title={t('acceptRequest')}
+                    variant="secondary"
+                    onPress={() => {
+                      setDecisions((prev) => ({ ...prev, [job.id]: 'accepted' }));
+                      setNotice(`${t('saved')} · ${t('acceptRequest')}`);
+                    }}
+                  />
+                  <Button
+                    testID={`recovery-decline-${job.id}`}
+                    title={t('rejectRequest')}
+                    variant="danger"
+                    onPress={() => {
+                      setDecisions((prev) => ({ ...prev, [job.id]: 'declined' }));
+                      setNotice(`${t('saved')} · ${t('rejectRequest')}`);
+                    }}
+                  />
                 </View>
+                )}
               </View>
             ))
           )
@@ -86,11 +111,32 @@ export default function MerchantServices() {
                 testID="merchant-service-duration"
               />
             </View>
-            <Button title={t('addService')} disabled={!draft.name} onPress={() => setDraft({ name: '', price: '', duration: '' })} />
+            <Button
+              testID="merchant-add-service"
+              title={t('addService')}
+              disabled={!draft.name}
+              onPress={() => {
+                setServices((prev) => [...prev, draft]);
+                setDraft({ name: '', price: '', duration: '' });
+                setNotice(t('saved'));
+              }}
+            />
+            <Notice text={notice} />
             <View style={{ height: space.sm }} />
             <Body size="caption" muted>
               {t('demoNotice')}
             </Body>
+            {services.map((service, index) => (
+              <View key={`${service.name}-${index}`} style={{ marginTop: space.md }}>
+                <Body size="label" style={{ fontWeight: '700' }}>
+                  {service.name}
+                </Body>
+                <Body size="caption" muted>
+                  {service.price ? `${service.price} · ` : ''}
+                  {service.duration ? `${service.duration} ${t('minutes')}` : ''}
+                </Body>
+              </View>
+            ))}
           </Card>
         ) : null}
         <View style={{ height: space.xl }} />

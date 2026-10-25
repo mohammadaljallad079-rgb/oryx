@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -14,7 +14,9 @@ import {
   Chip,
   DetailRow,
   Divider,
+  Field,
   Heading,
+  Notice,
   Photo,
   Screen,
   SectionLabel,
@@ -37,6 +39,9 @@ export default function MerchantProfile() {
 
   const store = useAsync(async () => repository.merchantStore(storeId), [storeId, dataVersion]);
   const customers = useAsync(async () => repository.merchantCustomers(storeId), [storeId, dataVersion]);
+  const [editing, setEditing] = useState(false);
+  const [draftDescription, setDraftDescription] = useState('');
+  const [notice, setNotice] = useState<string | null>(null);
 
   if (!account) return null;
 
@@ -85,12 +90,39 @@ export default function MerchantProfile() {
 
         <Card>
           <SectionLabel>{t('storeProfile')}</SectionLabel>
-          <Body size="caption" muted style={{ marginTop: space.sm }}>
-            {t('storeDescription')}
-          </Body>
-          <View style={{ marginTop: space.md }}>
-            <Button title={t('edit')} variant="secondary" onPress={() => undefined} />
-          </View>
+          {editing ? (
+            <>
+              <View style={{ marginTop: space.sm }}>
+                <Field
+                  label={t('storeDescription')}
+                  testID="store-description"
+                  value={draftDescription}
+                  onChangeText={setDraftDescription}
+                  multiline
+                />
+              </View>
+              <Button
+                testID="store-save"
+                title={t('save')}
+                onPress={() => {
+                  setEditing(false);
+                  setNotice(t('saved'));
+                }}
+              />
+              <View style={{ height: space.sm }} />
+              <Button title={t('cancel')} variant="secondary" onPress={() => setEditing(false)} />
+            </>
+          ) : (
+            <>
+              <Body size="caption" muted style={{ marginTop: space.sm }}>
+                {draftDescription || t('storeDescription')}
+              </Body>
+              <View style={{ marginTop: space.md }}>
+                <Button testID="store-edit" title={t('edit')} variant="secondary" onPress={() => setEditing(true)} />
+              </View>
+            </>
+          )}
+          <Notice text={notice} />
         </Card>
 
         <Card>

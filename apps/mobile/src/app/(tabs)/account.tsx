@@ -31,7 +31,7 @@ import { formatMoney, localizeDigits } from '../../lib/format';
  * screen is one tap too far for a reviewer.
  */
 export default function Account() {
-  const { t, theme, account, locale, setLocale, themeMode, setThemeMode, signOut, resetDemoData, dataVersion } =
+  const { t, theme, account, locale, setLocale, themeMode, setThemeMode, switchRole, signOut, resetDemoData, dataVersion } =
     useApp();
   const router = useRouter();
 
@@ -202,6 +202,15 @@ export default function Account() {
           </View>
         </Card>
 
+        <Button
+          testID="switch-to-merchant"
+          title={t('switchToMerchant')}
+          variant="secondary"
+          onPress={() => {
+            switchRole();
+            router.replace('/merchant/dashboard');
+          }}
+        />
         <Button title={t('signOut')} variant="danger" onPress={() => { void signOut(); router.replace('/login'); }} />
         <Body size="caption" muted align="center">
           ORYX Marketplace · {t('version')} 1.0.0 · {t('demoData')}

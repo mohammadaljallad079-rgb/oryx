@@ -179,6 +179,33 @@ export function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * A confirmation line under an action that changed only local demo state.
+ *
+ * Several demo actions — top up, accept a request, publish an offer — do their
+ * work on the screen's own copy and persist nothing. They need to say so at the
+ * point of the tap, otherwise a press with no visible effect reads as a broken
+ * button. The text is the caller's, because what changed differs per screen.
+ */
+export function Notice({ text, tone = 'gold' }: { text: string | null; tone?: 'gold' | 'muted' }) {
+  const { theme, direction } = useApp();
+  if (!text) return null;
+  return (
+    <Text
+      accessibilityLiveRegion="polite"
+      style={{
+        color: tone === 'gold' ? theme.gold : theme.textMuted,
+        fontSize: typography.label,
+        fontWeight: '600',
+        marginTop: space.sm,
+        textAlign: direction === 'rtl' ? 'right' : 'left',
+      }}
+    >
+      {text}
+    </Text>
+  );
+}
+
 export function Button({
   title,
   onPress,

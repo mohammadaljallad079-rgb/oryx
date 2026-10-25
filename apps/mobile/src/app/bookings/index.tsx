@@ -1,5 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
 import { repository } from '../../lib/repository';
@@ -17,6 +18,7 @@ import { space } from '../../lib/theme';
  */
 export default function Bookings() {
   const { t, account, dataVersion } = useApp();
+  const router = useRouter();
   const bookings = useAsync(
     async () => (account ? repository.bookings(account.id) : []),
     [account?.id, dataVersion],
@@ -37,7 +39,11 @@ export default function Bookings() {
       )}
 
       <View style={{ marginTop: space.md }}>
-        <Button title={t('bookNow')} onPress={() => undefined} />
+        <Button
+          testID="bookings-new"
+          title={t('bookNow')}
+          onPress={() => router.push('/services')}
+        />
       </View>
     </Screen>
   );

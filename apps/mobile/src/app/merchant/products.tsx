@@ -37,8 +37,11 @@ export default function MerchantProducts() {
   const [draftPrice, setDraftPrice] = useState('');
   const [draftStock, setDraftStock] = useState('');
   const [overrides, setOverrides] = useState<Record<string, { price: string; stock: string }>>({});
+  const [removed, setRemoved] = useState<Record<string, boolean>>({});
 
-  const list = (products.data ?? []).map((product) => {
+  const list = (products.data ?? [])
+    .filter((p) => !removed[p.id])
+    .map((product) => {
     const override = overrides[product.id];
     return override ? { ...product, priceMinor: Number(override.price) || product.priceMinor, stock: Number(override.stock) } : product;
   });
@@ -133,9 +136,13 @@ export default function MerchantProducts() {
                       {t('editProduct')}
                     </Text>
                   </Pressable>
-                  <Pressable accessibilityRole="button" onPress={() => undefined}>
+                  <Pressable
+                    accessibilityRole="button"
+                    testID={`product-delete-${product.id}`}
+                    onPress={() => setRemoved((r) => ({ ...r, [product.id]: true }))}
+                  >
                     <Text style={{ color: theme.danger, fontWeight: '600', fontSize: typography.label }}>
-                      {t('deleteProduct')}
+                      {removed[product.id] ? t('confirm') : t('deleteProduct')}
                     </Text>
                   </Pressable>
                 </View>

@@ -405,6 +405,7 @@ const strings: Record<string, Entry> = {
   customers: { ar: 'العملاء', en: 'Customers' },
   promotions: { ar: 'العروض', en: 'Promotions' },
   addPromotion: { ar: 'إضافة عرض', en: 'Add promotion' },
+  publishedOffers: { ar: 'العروض المنشورة', en: 'Published offers' },
   storeProfile: { ar: 'بيانات المتجر', en: 'Store profile' },
   storeName: { ar: 'اسم المتجر', en: 'Store name' },
   storeDescription: { ar: 'وصف المتجر', en: 'Store description' },

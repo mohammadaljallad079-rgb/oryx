@@ -6,10 +6,11 @@ import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
 import { AppHeader } from '../../components/brand';
 import { OrderCard } from '../../components/cards';
-import { Body, Button, Card, Chip, Divider, ListRow, Screen, SectionLabel, StateView } from '../../components/ui';
+import { Body, Button, Card, Chip, Divider, ListRow, Notice, Screen, SectionLabel, StateView } from '../../components/ui';
 import { Text } from 'react-native';
 import { space } from '../../lib/theme';
 import { formatMoney, localizeDigits } from '../../lib/format';
+import type { OrderStatus } from '../../demo/catalogue';
 
 /**
  * The merchant order queue.
@@ -18,7 +19,7 @@ import { formatMoney, localizeDigits } from '../../lib/format';
  * transition is what a real back office does, so the demo shows it rather than
  * hiding it behind an edit form.
  */
-const NEXT: Record<string, string> = {
+const NEXT: Partial<Record<OrderStatus, OrderStatus>> = {
   PENDING: 'PREPARING',
   PREPARING: 'SHIPPED',
   SHIPPED: 'DELIVERED',
@@ -28,10 +29,18 @@ export default function MerchantOrders() {
   const { t, theme, locale, account, direction, dataVersion } = useApp();
   const storeId = account?.storeId ?? 'store-01';
   const [filter, setFilter] = useState('all');
+  const [advanced, setAdvanced] = useState<Record<string, OrderStatus>>({});
+  const [notice, setNotice] = useState<string | null>(null);
 
   const stats = useAsync(async () => repository.merchantStats(storeId), [storeId, dataVersion]);
-  const orders = stats.data?.orders ?? [];
-  const byStatus = stats.data?.byStatus ?? {};
+  const orders = (stats.data?.orders ?? []).map((order) => {
+    const next = advanced[order.id];
+    return next ? { ...order, status: next } : order;
+  });
+  const byStatus = orders.reduce<Record<string, number>>((acc, order) => {
+    acc[order.status] = (acc[order.status] ?? 0) + 1;
+    return acc;
+  }, {});
   const visible = orders.filter((o) => filter === 'all' || o.status === filter);
 
   return (
@@ -72,22 +81,29 @@ export default function MerchantOrders() {
         ) : visible.length === 0 ? (
           <StateView kind="empty" message={t('noOrders')} />
         ) : (
-          visible.map((order) => (
-            <View key={order.id}>
-              <OrderCard order={order} store={repository.store(order.storeId)} />
-              {NEXT[order.status] ? (
-                <View style={{ marginTop: -space.sm, marginBottom: space.md }}>
-                  <Button
-                    testID={`merchant-advance-${order.id}`}
-                    title={`${t('updateStatus')} → ${NEXT[order.status]}`}
-                    variant="secondary"
-                    onPress={() => undefined}
-                  />
-                </View>
-              ) : null}
-            </View>
-          ))
+          visible.map((order) => {
+            const next = NEXT[order.status];
+            return (
+              <View key={order.id}>
+                <OrderCard order={order} store={repository.store(order.storeId)} />
+                {next ? (
+                  <View style={{ marginTop: -space.sm, marginBottom: space.md }}>
+                    <Button
+                      testID={`merchant-advance-${order.id}`}
+                      title={`${t('updateStatus')} → ${next}`}
+                      variant="secondary"
+                      onPress={() => {
+                        setAdvanced((prev) => ({ ...prev, [order.id]: next }));
+                        setNotice(`${t('saved')} · ${next}`);
+                      }}
+                    />
+                  </View>
+                ) : null}
+              </View>
+            );
+          })
         )}
+        <Notice text={notice} />
         <Body size="caption" muted align="center">
           {t('demoNotice')}
         </Body>

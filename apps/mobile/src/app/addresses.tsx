@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useApp } from '../lib/app-context';
@@ -20,6 +20,9 @@ export default function Addresses() {
     async () => (account ? repository.addresses(account.id) : []),
     [account?.id, dataVersion],
   );
+  const [added, setAdded] = useState<Array<{ id: string; labelAr: string; labelEn: string; lineAr: string; lineEn: string; isDefault: boolean }>>([]);
+
+  const list = [...(addresses.data ?? []), ...added];
 
   return (
     <Screen>
@@ -27,10 +30,10 @@ export default function Addresses() {
 
       {addresses.loading ? (
         <StateView kind="loading" />
-      ) : (addresses.data ?? []).length === 0 ? (
+      ) : list.length === 0 ? (
         <StateView kind="empty" message={t('empty')} />
       ) : (
-        (addresses.data ?? []).map((address) => (
+        list.map((address) => (
           <Card key={address.id}>
             <View style={[styles.headRow]}>
               <Body size="label" style={{ fontWeight: '700' }}>
@@ -44,7 +47,23 @@ export default function Addresses() {
         ))
       )}
 
-      <Button title={t('addAddress')} onPress={() => undefined} />
+      <Button
+        testID="add-address"
+        title={t('addAddress')}
+        onPress={() =>
+          setAdded((prev) => [
+            ...prev,
+            {
+              id: `demo-address-${prev.length + 1}`,
+              labelAr: 'عنوان تجريبي',
+              labelEn: 'Demo address',
+              lineAr: `مبنى ${100 + prev.length}، طريق ٤٥، المنامة`,
+              lineEn: `Building ${100 + prev.length}, Road 45, Manama`,
+              isDefault: false,
+            },
+          ])
+        }
+      />
       <Body size="caption" muted align="center" style={{ marginTop: space.md }}>
         {t('demoNotice')}
       </Body>
