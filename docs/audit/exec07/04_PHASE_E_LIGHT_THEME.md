@@ -1126,15 +1126,18 @@ remote were both inspected before anything was changed.
 | Question | Finding | How it was checked |
 |---|---|---|
 | Local branch | `feature/execution-07-premium-web` | `git branch --show-current` |
-| Local `HEAD` | in step with the remote tip | `git rev-parse HEAD` |
+| Local `HEAD` | `01cba05` — "feat(mobile-erp): edit existing records across every writable ERP resource" | `git rev-parse HEAD` |
+| Remote tip before this session | `ea26b6d` — local was **1 ahead** | `git ls-remote origin feature/execution-07-premium-web` |
 | Last known SHA from the crash report | `b3c9a71` — an **ancestor** of `HEAD` | `git merge-base --is-ancestor b3c9a71 HEAD` |
-| Commits beyond the last known SHA | **present** — the whole Phase E and Execution 05/08/10 series | `git log --oneline b3c9a71..HEAD` |
-| Unpushed commits | none that had been committed; the surviving ERP-mobile edits were committed in this session | `git status --porcelain` |
+| Commits beyond the last known SHA | **present** — 55 commits: the Phase E series, the admin control-height fix and the ERP-mobile work | `git log --oneline b3c9a71..HEAD` |
+| Unpushed commit | **one** — `01cba05`, the ERP-mobile record editing, committed by the crashed session and never pushed | `git ls-remote` vs `git log` |
 | `origin/...` tracking ref | **stale** — the fetch refspec tracks `main` only, so the tracking ref lagged the real remote tip | `git config --get-all remote.origin.fetch` |
 
-**No pushed work was lost.** Every commit the previous session pushed is on
-`origin`. The only uncommitted work in the workspace was the ERP-mobile edit
-support, which is committed here rather than discarded.
+**No pushed work was lost, and one unpushed commit was preserved.** Every commit
+the previous session pushed was already on `origin`. The crashed session had also
+committed `01cba05` locally without pushing it; this session's push carries it to
+the remote along with the light-theme change. Nothing was reset, force-pushed or
+discarded.
 
 ### 15.2 What was actually still inconsistent
 
