@@ -138,9 +138,15 @@ byte-identical whole frames; the rest differ only where content sits.
 | Slug / package | `oryx-marketplace` / `com.oryx.marketplace` |
 | Version | `1.0.0` (versionCode 1) |
 | Artefact | `android/app/build/outputs/apk/release/app-release.apk` |
-| Size | 70,019,297 bytes (67 MiB) |
-| SHA-256 | `32ba9d9923d4eed78ac027028fc5dae1b2ed97d2707ebe38a6ef5c9b3aea8156` |
-| Gradle | BUILD SUCCESSFUL |
+| Size | 70,024,885 bytes (67 MiB) |
+| SHA-256 | `cc859c2b7dcfada09ae83ff19dabb40ee33e0b83e5d9dae583c1fe2b4ce1143d` |
+| Gradle | BUILD SUCCESSFUL in 4m 43s |
+
+**Rebuilt after the demo-control fixes.** The first build (`32ba9d99…`) predated
+the work that made every visible control respond, so it shipped nine buttons that
+did nothing. This build replaces it. The bundle inside the archive is checked for
+the fix: `onPress:()=>undefined` appears **0** times, and the new `publishedOffers`
+key appears once.
 
 The APK is not committed: `apps/mobile/.gitignore` excludes `/android`, which is
 correct — it is a build output, and 67 MiB of binary does not belong in the
@@ -307,39 +313,79 @@ design and the repository keeps reviewable evidence under `docs/audit/`.
 
 ---
 
-### 3.9 Commits, and why they are not on the remote
+### 3.9 Commits, and where they live now
 
-Three commits are on `feature/execution-07-premium-web` locally:
+The three commits this section originally recorded as un-pushable — `d7a0a81`,
+`330bfc7` and the evidence pack — **are on the remote**. The credential problem
+described here was resolved later in the same session; the branch is pushed and
+PR #7 tracks it.
 
 | Commit | Subject |
 | --- | --- |
 | `d7a0a81` | chore(mobile): checkpoint the uncommitted marketplace work from the crashed session |
 | `330bfc7` | feat(mobile): carry the brand through start-up on Android 12+ |
-| *(this commit)* | docs(exec07): session recovery, and the marketplace demo evidence pack |
+| `35be477` | docs(exec07): session recovery, and the marketplace demo evidence pack |
+| `1c48106` | fix(mobile): make every visible demo action respond |
+| `954e137` | docs(exec07): Phase E continuation evidence, and the second recovery record |
+| `82a76d7` | docs(exec07): publish the marketplace screen gallery where the brief asks |
 
-**The push did not succeed.** Both available credentials are expired:
+The old text is kept below because it explains why the work sat locally for a
+while, and what the recovery did about it.
+
+<details>
+<summary>The credential failure, as recorded at the time</summary>
+
+Both available credentials were reported expired:
 
 | Credential | Result |
 | --- | --- |
-| `GITHUB_TOKEN` (`ghu_…`, 40 chars) | `401 Bad credentials` — `gh auth status` reports "The token in GITHUB_TOKEN is invalid" |
-| Token embedded in `origin` (`ghu_bah…`) | `401` — `remote: Invalid username or token` |
+| `GITHUB_TOKEN` (`ghu_...`, 40 chars) | `401 Bad credentials` — `gh auth status` reports "The token in GITHUB_TOKEN is invalid" |
+| Token embedded in `origin` (`ghu_bah...`) | `401` — `remote: Invalid username or token` |
 
 There is no credential helper and no `~/.git-credentials`, so no third source.
 `origin` was left exactly as it was found, with the original embedded token.
+</details>
 
-This is an environment problem, not a repository problem. Once a valid token is
-available the work goes up with:
+#### Push recipe, kept for the next time a token expires
 
 ```bash
 git remote set-url origin "https://${GITHUB_TOKEN}@github.com/mohammadaljallad079-rgb/oryx.git"
 git push origin feature/execution-07-premium-web
 ```
 
-Until then the three commits exist only in this workspace. PR #7 still points at
-`8cb372b` and its description has not been updated with this evidence, because
-the branch it describes has not moved.
+---
+
+### 3.10 The seven explicit requirements
+
+The brief listed seven items under the APK delivery heading. Each is answered
+with the evidence that supports it — and one is answered with a limitation rather
+than a claim.
+
+| # | Requirement | Status | Evidence |
+| --- | --- | --- | --- |
+| 1 | APK present and intact, full path given | **Done** | `apps/mobile/android/app/build/outputs/apk/release/app-release.apk`, 70,024,885 bytes; archive opens, 1,316 entries |
+| 2 | Direct download link from this environment | **Done** | `https://work-2-wqqgzexpmdagonjk.prod-runtime.all-hands.dev/evidence/exec07-phase-e/apk/oryx-marketplace-1.0.0.apk` |
+| 3 | Full SHA-256 | **Done** | `cc859c2b7dcfada09ae83ff19dabb40ee33e0b83e5d9dae583c1fe2b4ce1143d` |
+| 4 | Opens with no backend, demo data local | **Done** | No `fetch(`/`axios`, no hard-coded host; 20 photographs packed as `res/*.jpg` |
+| 5 | Links to the screenshot gallery | **Done** | `docs/audit/exec07/marketplace-demo/README.md`, 61 screens, GitHub links |
+| 6 | Two demo accounts and how to switch | **Done** | `customer@oryx.demo` / `merchant@oryx.demo`, password `demo1234`, one-tap cards on sign-in |
+| 7 | Are SENSAGE, recovery, tracking, marketplace and the merchant dashboard complete and testable? | **Answered honestly** | §3.5 — screens and data are real; the SENSAGE analysis and recovery tracking are labelled simulations |
+
+Requirement 7 is the one worth reading closely. "Complete and testable" is not a
+single yes: every screen exists, reads seeded data and can be driven, but the two
+features the brief itself calls simulations — the SENSAGE analysis and the
+recovery tow tracking — remain simulations, and the app says so on the screen.
+
+The APK is debug-signed, which is what the brief asked for. It carries no
+production key.
+
+**The one check that did not happen:** a launch on a handset or emulator. This
+environment has no `/dev/kvm`, so no emulator runs here. Everything above is
+static verification of the archive plus the web build of the same components. A
+device launch is the outstanding step, and it needs the device.
 
 ---
+
 
 ## 4. Verification
 
@@ -349,7 +395,9 @@ the branch it describes has not moved.
 | `@oryx/shared` tests | 180 / 180 passed, 9 files |
 | Light palette contrast | 33 / 33 meet threshold |
 | Dark theme chrome movement | 0 of 31 captures |
-| Gallery render | 26 images, 0 broken |
+| Mobile screen sweep | 61 screens, 0 error pages |
+| Light-theme matrix | 24 captures — desktop, tablet and mobile, ar + en |
+| Gallery render | 61 screens + contact sheet, 0 broken |
 | Typecheck (`@oryx/mobile`, `tsc --noEmit`) | clean |
 | Lint (`@oryx/mobile`, `eslint --max-warnings=0`) | clean |
 
@@ -367,13 +415,13 @@ the branch it describes has not moved.
   instead, through the preview proxy — see §3.1.
 - The web captures in `docs/audit/exec07/phase-e/` predate this session and were
   left as they are; the new captures are the mobile marketplace pack.
-- **The three local commits are not on the remote.** The push is blocked on an
-  expired `GITHUB_TOKEN`; see §3.9. PR #7 is therefore unchanged.
-- **Customer → merchant has no in-app switch.** The merchant profile can switch
-  back to customer, but the customer account tab has no equivalent row, so the
-  route back requires a sign-out. `switchRole` already handles both directions.
-  Recorded in §3.3 rather than fixed, because it is a code change and this
-  session is scoped to the hand-out.
+- **The local commits are on the remote.** PR #7 tracks
+  `feature/execution-07-premium-web` at `82a76d7`. The credential problem recorded
+  in §3.9 was resolved; see that section for the current commit list.
+- **Customer → merchant switches in the app.** Commit `1c48106` added the missing
+  row; `apps/mobile/src/app/(tabs)/account.tsx` renders a `switch-to-merchant`
+  control, verified visible in the running app. The merchant profile's switch back
+  was already there. Both directions work without a sign-out.
 - SENSAGE is an offline demo analysis, and recovery tracking is a labelled
   simulation. Neither is a model call or a live GPS feed. See §3.5.
 - Not merged, no production deployment, no backend connected.
