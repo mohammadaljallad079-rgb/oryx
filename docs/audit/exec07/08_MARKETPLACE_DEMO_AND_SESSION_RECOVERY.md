@@ -196,10 +196,10 @@ Both are seeded in `src/demo/activity.ts` and offered as one-tap cards on the si
 in screen, under "Demo access". The email and password path works too and
 validates against the same records.
 
-| Role | Email | Password | Lands on |
-| --- | --- | --- | --- |
-| Customer | `customer@oryx.demo` | `demo1234` | `/(tabs)/home` |
-| Merchant | `merchant@oryx.demo` | `demo1234` | `/merchant/dashboard` |
+| Role | Email | Password | Name | Lands on |
+| --- | --- | --- | --- | --- |
+| Customer | `customer@oryx.demo` | `demo1234` | Ahmed Al Mannai / أحمد المناعي | `/(tabs)/home` |
+| Merchant | `merchant@oryx.demo` | `demo1234` | Yousef Al Noor / يوسف النور | `/merchant/dashboard` |
 
 Switching between them:
 
