@@ -1,0 +1,322 @@
+[
+  {
+    "name": "01-home-light-desktop-en",
+    "path": "/",
+    "locale": "en",
+    "theme": "light",
+    "viewport": "desktop",
+    "file": "docs/audit/exec07/phase-e-light/01-home-light-desktop-en.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "ltr",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
+    "name": "01-home-light-desktop-ar",
+    "path": "/",
+    "locale": "ar",
+    "theme": "light",
+    "viewport": "desktop",
+    "file": "docs/audit/exec07/phase-e-light/01-home-light-desktop-ar.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "rtl",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
+    "name": "01-home-light-mobile-en",
+    "path": "/",
+    "locale": "en",
+    "theme": "light",
+    "viewport": "mobile",
+    "file": "docs/audit/exec07/phase-e-light/01-home-light-mobile-en.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "ltr",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
+    "name": "01-home-light-mobile-ar",
+    "path": "/",
+    "locale": "ar",
+    "theme": "light",
+    "viewport": "mobile",
+    "file": "docs/audit/exec07/phase-e-light/01-home-light-mobile-ar.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "rtl",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
+    "name": "02-dashboard-light-desktop-en",
+    "path": "/dashboard",
+    "locale": "en",
+    "theme": "light",
+    "viewport": "desktop",
+    "file": "docs/audit/exec07/phase-e-light/02-dashboard-light-desktop-en.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "ltr",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
+    "name": "02-dashboard-light-desktop-ar",
+    "path": "/dashboard",
+    "locale": "ar",
+    "theme": "light",
+    "viewport": "desktop",
+    "file": "docs/audit/exec07/phase-e-light/02-dashboard-light-desktop-ar.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "rtl",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
+    "name": "02-dashboard-light-tablet-en",
+    "path": "/dashboard",
+    "locale": "en",
+    "theme": "light",
+    "viewport": "tablet",
+    "file": "docs/audit/exec07/phase-e-light/02-dashboard-light-tablet-en.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "ltr",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
+    "name": "02-dashboard-light-mobile-en",
+    "path": "/dashboard",
+    "locale": "en",
+    "theme": "light",
+    "viewport": "mobile",
+    "file": "docs/audit/exec07/phase-e-light/02-dashboard-light-mobile-en.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "ltr",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
+    "name": "03-providers-light-desktop-en",
+    "path": "/providers",
+    "locale": "en",
+    "theme": "light",
+    "viewport": "desktop",
+    "file": "docs/audit/exec07/phase-e-light/03-providers-light-desktop-en.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "ltr",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
+    "name": "03-providers-light-desktop-ar",
+    "path": "/providers",
+    "locale": "ar",
+    "theme": "light",
+    "viewport": "desktop",
+    "file": "docs/audit/exec07/phase-e-light/03-providers-light-desktop-ar.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "rtl",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
+    "name": "03-providers-light-tablet-ar",
+    "path": "/providers",
+    "locale": "ar",
+    "theme": "light",
+    "viewport": "tablet",
+    "file": "docs/audit/exec07/phase-e-light/03-providers-light-tablet-ar.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "rtl",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
+    "name": "03-providers-light-mobile-en",
+    "path": "/providers",
+    "locale": "en",
+    "theme": "light",
+    "viewport": "mobile",
+    "file": "docs/audit/exec07/phase-e-light/03-providers-light-mobile-en.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "ltr",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
+    "name": "04-login-light-desktop-en",
+    "path": "/login",
+    "locale": "en",
+    "theme": "light",
+    "viewport": "desktop",
+    "file": "docs/audit/exec07/phase-e-light/04-login-light-desktop-en.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "ltr",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
+    "name": "04-login-light-desktop-ar",
+    "path": "/login",
+    "locale": "ar",
+    "theme": "light",
+    "viewport": "desktop",
+    "file": "docs/audit/exec07/phase-e-light/04-login-light-desktop-ar.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "rtl",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
+    "name": "04-login-light-mobile-en",
+    "path": "/login",
+    "locale": "en",
+    "theme": "light",
+    "viewport": "mobile",
+    "file": "docs/audit/exec07/phase-e-light/04-login-light-mobile-en.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "ltr",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
+    "name": "04-login-light-mobile-ar",
+    "path": "/login",
+    "locale": "ar",
+    "theme": "light",
+    "viewport": "mobile",
+    "file": "docs/audit/exec07/phase-e-light/04-login-light-mobile-ar.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "rtl",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
+    "name": "05-compare-home-dark-desktop-en",
+    "path": "/",
+    "locale": "en",
+    "theme": "dark",
+    "viewport": "desktop",
+    "file": "docs/audit/exec07/phase-e-light/05-compare-home-dark-desktop-en.png",
+    "resolved": {
+      "theme": "dark",
+      "dir": "ltr",
+      "bg": "#00162b",
+      "surface": "#021f3a",
+      "text": "#eef3f9",
+      "gold": "#d4af37"
+    }
+  },
+  {
+    "name": "05-compare-home-light-desktop-en",
+    "path": "/",
+    "locale": "en",
+    "theme": "light",
+    "viewport": "desktop",
+    "file": "docs/audit/exec07/phase-e-light/05-compare-home-light-desktop-en.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "ltr",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
+    "name": "05-compare-home-dark-mobile-ar",
+    "path": "/",
+    "locale": "ar",
+    "theme": "dark",
+    "viewport": "mobile",
+    "file": "docs/audit/exec07/phase-e-light/05-compare-home-dark-mobile-ar.png",
+    "resolved": {
+      "theme": "dark",
+      "dir": "rtl",
+      "bg": "#00162b",
+      "surface": "#021f3a",
+      "text": "#eef3f9",
+      "gold": "#d4af37"
+    }
+  },
+  {
+    "name": "05-compare-home-light-mobile-ar",
+    "path": "/",
+    "locale": "ar",
+    "theme": "light",
+    "viewport": "mobile",
+    "file": "docs/audit/exec07/phase-e-light/05-compare-home-light-mobile-ar.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "rtl",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  }
+]

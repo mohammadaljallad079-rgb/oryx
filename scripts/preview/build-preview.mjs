@@ -479,6 +479,24 @@ async function buildEvidencePages() {
         .join('')
     : '';
 
+  // Phase E continuation — the light-theme correction re-captured from the
+  // running stack. Kept as its own section so the correction is reviewable
+  // without disturbing the committed before/after record above.
+  const continuationDir = 'docs/audit/exec07/phase-e-light';
+  const continuation = [];
+  if (exists(`${continuationDir}/manifest.json`)) {
+    const contManifest = JSON.parse(read(`${continuationDir}/manifest.json`));
+    for (const m of contManifest) {
+      const out = await makeThumb(
+        `${continuationDir}/${m.name}.png`,
+        `assets/evidence/phase-e-light-${m.name}`,
+        1200,
+      );
+      const caption = `${m.name} · ${m.locale.toUpperCase()} · ${m.viewport} · bg ${m.resolved.bg}`;
+      continuation.push(figure(out, escapeHtml(caption), `${m.name} light theme capture`, '../'));
+    }
+  }
+
   // Captures of the published site itself, taken from the live URL. They live
   // in the repository like every other piece of evidence.
   const liveDir = 'docs/audit/exec07/preview';
@@ -498,6 +516,7 @@ async function buildEvidencePages() {
       <strong>Dark theme is the control.</strong> The middle capture of each pair is the dark render. It is the approved theme and must not change; the before/after comparison is what proves it did not.
     </div>
     ${darkStats ? `<h2>Dark-invariance verdict</h2><div class="kpis">${darkStats}</div>` : ''}
+    ${continuation.length ? `<section><div class="section-head"><h2>Phase E continuation — the corrected light theme</h2><p>homepage, customer dashboard, provider directory and sign-in, re-captured from the running stack</p></div><div class="gallery">${continuation.join('')}</div></section>` : ''}
     ${liveCaptures.length ? `<section><div class="section-head"><h2>The published preview</h2><p>captured from the live GitHub Pages URL</p></div><div class="gallery">${liveCaptures.join('')}</div></section>` : ''}
     ${sections.join('')}
     ${sheets.length ? `<section><div class="section-head"><h2>Light vs dark sheets</h2><p>side-by-side composites</p></div><div class="gallery">${sheets.join('')}</div></section>` : ''}
