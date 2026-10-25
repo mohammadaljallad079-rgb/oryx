@@ -26,6 +26,16 @@
   figcaption { padding: 10px 14px; font-size: 13px; color: #c6d3e0; }
   figcaption span { color: #6f8598; float: right; }
   h2 { max-width: 1180px; margin: 44px auto 16px; font-size: 17px; color: #c6d3e0; }
+  .apk { max-width: 1180px; margin: 0 auto 40px; display: flex; flex-wrap: wrap;
+         gap: 18px; align-items: center; justify-content: space-between;
+         border: 1px solid #1e2a36; border-radius: 12px; background: #10161d;
+         padding: 18px 22px; }
+  .apk h2 { margin: 0 0 4px; font-size: 16px; color: #e8eef5; }
+  .apk p { margin: 0; color: #93a4b6; font-size: 13px; }
+  .apk code { color: #c6d3e0; font-size: 12px; word-break: break-all; }
+  .apk a.btn { display: inline-block; padding: 11px 20px; border-radius: 9px;
+               background: #c9a227; color: #14110a; font-weight: 700;
+               text-decoration: none; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -36,6 +46,15 @@
       unchanged; the light theme is the correction under review.</p>
     <p class="meta">Light on the left, dark on the right.</p>
   </header>
+
+  <div class="apk">
+    <div>
+      <h2>Android demo build</h2>
+      <p>Debug-signed release APK &middot; 70,019,297 bytes &middot; works offline, no backend</p>
+      <p><code>SHA-256 32ba9d9923d4eed78ac027028fc5dae1b2ed97d2707ebe38a6ef5c9b3aea8156</code></p>
+    </div>
+    <a class="btn" href="../apk/oryx-marketplace-1.0.0.apk" download>Download APK</a>
+  </div>
 
   <div class="sheets">
     <a href="sheet-light.png"><img src="sheet-light.png" alt="Light theme contact sheet" loading="lazy"><span>Light theme — all screens</span></a>

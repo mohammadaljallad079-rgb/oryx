@@ -44,7 +44,12 @@ const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
   '.md': 'text/plain; charset=utf-8',
+  '.apk': 'application/vnd.android.package-archive',
 };
+
+// Offered as a download rather than rendered inline: a browser has nothing
+// useful to do with an APK, and the filename is what the phone shows.
+const ATTACHMENT = new Set(['.apk']);
 
 /** Serves the evidence directory; returns false when the path is not ours. */
 function serveEvidence(req, res, url) {
@@ -81,10 +86,14 @@ function serveEvidence(req, res, url) {
     }
   }
 
+  const ext = path.extname(target).toLowerCase();
   res.writeHead(200, {
-    'content-type': MIME[path.extname(target).toLowerCase()] ?? 'application/octet-stream',
+    'content-type': MIME[ext] ?? 'application/octet-stream',
     'content-length': stat.size,
     'cache-control': 'no-store',
+    ...(ATTACHMENT.has(ext)
+      ? { 'content-disposition': `attachment; filename="${path.basename(target)}"` }
+      : {}),
   });
   createReadStream(target).pipe(res);
   return true;
