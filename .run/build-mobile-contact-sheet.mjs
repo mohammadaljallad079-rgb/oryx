@@ -13,7 +13,7 @@ import { chromium } from 'playwright';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const SRC = 'docs/audit/exec07/mobile-screens';
+const SRC = 'docs/audit/exec07/marketplace-demo/screenshots';
 const uri = (p) => `data:image/png;base64,${readFileSync(p).toString('base64')}`;
 const tile = (p, label) =>
   `<figure style="margin:0"><img src="${uri(p)}" style="width:100%;display:block;border:1px solid #333">` +

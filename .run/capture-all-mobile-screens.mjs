@@ -18,7 +18,7 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 
 const BASE = process.env.MOBILE_WEB_URL ?? 'http://127.0.0.1:8081/mobile';
-const OUT = 'docs/audit/exec07/mobile-screens';
+const OUT = 'docs/audit/exec07/marketplace-demo/screenshots';
 const CUSTOMER = { email: 'customer@oryx.demo' };
 
 mkdirSync(`${OUT}/en`, { recursive: true });

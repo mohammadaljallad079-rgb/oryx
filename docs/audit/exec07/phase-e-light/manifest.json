@@ -64,6 +64,38 @@
     }
   },
   {
+    "name": "01-home-light-tablet-en",
+    "path": "/",
+    "locale": "en",
+    "theme": "light",
+    "viewport": "tablet",
+    "file": "docs/audit/exec07/phase-e-light/01-home-light-tablet-en.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "ltr",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
+    "name": "01-home-light-tablet-ar",
+    "path": "/",
+    "locale": "ar",
+    "theme": "light",
+    "viewport": "tablet",
+    "file": "docs/audit/exec07/phase-e-light/01-home-light-tablet-ar.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "rtl",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
     "name": "02-dashboard-light-desktop-en",
     "path": "/dashboard",
     "locale": "en",
@@ -112,6 +144,22 @@
     }
   },
   {
+    "name": "02-dashboard-light-tablet-ar",
+    "path": "/dashboard",
+    "locale": "ar",
+    "theme": "light",
+    "viewport": "tablet",
+    "file": "docs/audit/exec07/phase-e-light/02-dashboard-light-tablet-ar.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "rtl",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
     "name": "02-dashboard-light-mobile-en",
     "path": "/dashboard",
     "locale": "en",
@@ -153,6 +201,22 @@
     "resolved": {
       "theme": "light",
       "dir": "rtl",
+      "bg": "#f7f4ed",
+      "surface": "#fff",
+      "text": "#22201d",
+      "gold": "#7d5f10"
+    }
+  },
+  {
+    "name": "03-providers-light-tablet-en",
+    "path": "/providers",
+    "locale": "en",
+    "theme": "light",
+    "viewport": "tablet",
+    "file": "docs/audit/exec07/phase-e-light/03-providers-light-tablet-en.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "ltr",
       "bg": "#f7f4ed",
       "surface": "#fff",
       "text": "#22201d",
