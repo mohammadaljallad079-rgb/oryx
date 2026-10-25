@@ -190,9 +190,10 @@ The light theme is now an ivory page with white and warm-neutral surfaces, deep
 charcoal type, a metallic gold accent and a navy hero/footer band — all driven by
 central tokens in `packages/shared/src/tokens.ts` and mirrored into
 `:root[data-theme='light']`, with the dark block defining the same token names so
-no rule needs a theme branch. The dark theme is **0 real colour shifts** in the
-before/after captures (23/31 byte-identical; the rest are isolated antialiasing
-pixels on the blurred header and gold edges). Full detail, evidence and the test
+no rule needs a theme branch. The dark theme's palette is **unchanged**: the
+theme token layer that paints the header chrome is identical across all 31 dark
+captures, and the whole-frame differences are confined to regions that carry CMS
+photography (see §16 of the Phase E report). Full detail, evidence and the test
 results are in [`04_PHASE_E_LIGHT_THEME.md`](./04_PHASE_E_LIGHT_THEME.md).
 
 ## 9. Reproduction
@@ -215,7 +216,7 @@ node .run/capture-exec07-after.mjs
 node .run/seed-customer-demo.mjs              # idempotent; populates the account the auth captures use
 node .run/capture-exec07-phase-e.mjs before   # HEAD theme + i18n fix
 node .run/capture-exec07-phase-e.mjs after    # Phase E applied
-node .run/verify-dark-identical.mjs           # dark must be byte-identical
+node .run/verify-dark-theme-invariance.mjs     # dark chrome band must be identical
 node .run/check-light-palette.mjs             # static contrast pairs
 node .run/audit-light-theme.mjs               # live computed-style contrast
 node .run/check-customer-i18n.mjs             # dictionary parity

@@ -19,6 +19,14 @@ wrote.
 > content**, with only the theme source differing, and the photography is now
 > seeded. See section 4. The theme change itself is unaffected.
 
+> **Correction (section 16).** The byte-identical counts quoted in sections 4, 12
+> and 15 were produced before the `after` captures were replaced at `33e57ba`, and
+> `dark-invariance.json` shipped with those stale numbers until section 16. The
+> current, regenerated verdict is **0 of 31 dark captures had the theme chrome
+> move**; the whole-frame deltas are CMS photography. Section 16 records the
+> discrepancy, the three checks that separate theme from content, and the one dark
+> token that deliberately changed (`--text-faint`, a WCAG fix).
+
 ## 1. Session recovery
 
 The previous session ended with a sandbox error, so the first step was to
@@ -1219,5 +1227,111 @@ this session.
   latter hard-codes a sandbox hostname from a previous session. The equivalent
   checks (`sweep-light-all-routes`, the Phase E manifest) pass. Fixing those two
   scripts is left for a follow-up rather than folded into this change.
+- No deployment was performed and PR #7 was not merged.
+
+## 16. Eighth continuation session — the dark-invariance record was stale
+
+### 16.1 Recovery
+
+The previous conversation ended in a sandbox error. Nothing was changed before the
+workspace and the remote were inspected.
+
+| Question | Finding | How it was checked |
+|---|---|---|
+| Local branch | `feature/execution-07-premium-web` | `git branch --show-current` |
+| Local `HEAD` | `54abed5` | `git rev-parse HEAD` |
+| Remote tip | `54abed5` — **identical to local** | `git ls-remote origin feature/execution-07-premium-web` |
+| Ahead / behind | `0 / 0` | `git rev-list --left-right --count HEAD...origin/...` |
+| Last known SHA from the crash report | `b3c9a71` — an **ancestor** of `HEAD`, 58 commits back | `git merge-base --is-ancestor b3c9a71 HEAD` |
+| Stashes | **none** | `git stash list` |
+
+**No pushed work was lost, and there was no unpushed commit to recover.** The
+crashed session's last action was a push, so the remote already held everything.
+The uncommitted `apps/mobile` changes in the working tree belong to the *next*
+task (the marketplace demo), not to Execution 07, and were left untouched.
+
+### 16.2 Defect E15 — `dark-invariance.json` did not describe the images it shipped with
+
+The report claimed the dark captures were "23/31 byte-identical" with "0 real
+colour shifts". Re-measuring the committed PNGs gives **51.70% of pixels moved at
+a channel delta of 238** on the homepage. One of the two statements had to be
+wrong, and it was not the images.
+
+The record was written at `5302b88` by `.run/verify-dark-identical.mjs`. The
+`after` PNGs were then replaced at `33e57ba` — the same-origin re-capture — and
+the verifier was not re-run. Measuring the record against its own images at each
+commit isolates the moment:
+
+| Commit | Record claims (homepage dark) | Images actually differ |
+|---|---|---|
+| `5302b88` (record written) | 0 strict pixels, maxΔ 2 | 0.00%, maxΔ 2 — **agrees** |
+| `33e57ba` (`after` replaced) | 0 strict pixels, maxΔ 2 | **51.70%**, maxΔ 238 |
+| `HEAD` | 0 strict pixels, maxΔ 2 | **51.70%**, maxΔ 238 |
+
+So the record was accurate when written and became stale one commit later. It is
+now regenerated from the committed images, and the old whole-frame file is kept
+as `dark-invariance.whole-frame.json` so the discrepancy is auditable rather than
+erased.
+
+### 16.3 The dark delta is photography, not theme
+
+A whole-frame comparison cannot answer "did the theme move", because the `before`
+and `after` sets were captured at different commits and the same-origin fix let
+the CMS content load for the first time. Three independent checks separate the
+two.
+
+**1. The chrome band is the witness.** The header band is painted by the theme
+token layer and never carries a photograph, so it cannot change unless a token
+changed. Across all 31 dark captures the chrome band is identical (`chromeMax`
+0–2, i.e. subpixel antialiasing).
+
+**2. The dark-scoped CSS declarations are identical.** Extracting every rule whose
+selector mentions `dark` from `6ea99ba` and `HEAD`, stripping comments, and
+diffing gives two rules in each and **no declaration difference**.
+
+**3. The hero photograph itself was replaced.** `inspection-bay.jpg` was
+3840×2560 / 2,110,416 bytes at `30268f2` and became 1600×1067 / 256,860 bytes at
+`5302b88`. The homepage hero paints that file as a full-bleed background, which is
+exactly the region that moved; the dashboard and providers, which carry no such
+photo, measure 0.00% on their chrome.
+
+One dark token genuinely did change, and it is documented and deliberate:
+`--text-faint` and `--band-text-faint` were raised from `#6f8598` to `#778da1` in
+`593dfe1` to bring the stat label from 4.43:1 to 5.41:1, resolving defect E8
+(§12.3). That is a contrast correction, not a palette drift, and it is why the
+claim "the dark theme is byte-identical" was never literally true.
+
+### 16.4 Verification
+
+| Check | Result |
+|---|---|
+| Theme chrome moved (31 dark captures) | **0** |
+| Content-only deltas | 19 |
+| Antialiasing-only deltas | 7 |
+| Byte-identical whole frames | 5 |
+| Dark-scoped CSS declarations, `6ea99ba` vs `HEAD` | **identical** |
+| Live light-theme contrast (`sweep-light-contrast`) | **0** pairs below threshold |
+| Component audit (`audit-light-theme`) | **0** pairs below threshold |
+| Hero caption contrast, light / dark | 9.12 / 5.57 (eyebrow), 12.19 / 8.83 (title) |
+| `@oryx/shared` unit | 180 passed |
+| `@oryx/api` e2e | 334 passed |
+| `@oryx/mobile` unit / lint / typecheck | 46 passed / clean / clean |
+
+The `body` element resolves to the ivory page field `#f7f4ed` on every light
+surface. The `page` row in the component audit reads mid-grey on the homepage,
+dashboard and providers because that row is the *mean of the whole viewport*,
+which includes the navy hero and footer; it is not a surface colour and not an
+inconsistency.
+
+### 16.5 Honest limitations
+
+- The whole-frame dark deltas remain large on the photography surfaces. They are
+  explained and bounded by §16.3, not eliminated. The two capture sets were taken
+  at different commits, so they cannot be made byte-identical without
+  re-capturing `before` against the current content, which would change the
+  baseline the light-theme comparison depends on.
+- The dark theme carries two pre-existing contrast pairs below 4.5:1 (a stat label
+  at 4.19:1 and a danger button at 4.36:1) measured live. They are reported, not
+  fixed, because the dark theme is approved and must not move.
 - No deployment was performed and PR #7 was not merged.
 

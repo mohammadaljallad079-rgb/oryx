@@ -68,14 +68,17 @@ const refs = ['ref-home.jpg', 'ref-dash.jpg', 'ref-logo.png']
   })
   .join('');
 
-const comparison = LOCALES.map((locale) =>
-  ['homepage', 'dashboard']
-    .map((slug) => {
-      const l = `05-comparison-${slug}-light.png`;
-      return existsSync(`${OUT_DIR}/${l}`) ? fig(l, `light vs dark — ${slug} (${locale})`) : '';
-    })
-    .join(''),
-).join('');
+const PAIRS = `${ROOT}/docs/audit/exec07/phase-e/comparisons-after`;
+const comparison = ['01-homepage', '02-dashboard', '03-providers', '04-login', '06-profile']
+  .flatMap((slug) =>
+    LOCALES.map((locale) => {
+      const name = `${slug}-desktop-${locale}-light-vs-dark.jpg`;
+      if (!existsSync(`${PAIRS}/${name}`)) return '';
+      copyFileSync(`${PAIRS}/${name}`, `${OUT_DIR}/${name}`);
+      return fig(name, `light vs dark — ${slug.replace(/^\d+-/, '')} (${locale.toUpperCase()}, desktop)`);
+    }),
+  )
+  .join('');
 
 // Measured verdicts, read from the JSON the verifiers write rather than
 // restated by hand, so the index cannot drift from the evidence.
@@ -90,17 +93,19 @@ const belowThreshold = textPairs.filter((p) => p.contrast < p.threshold).length;
 const verdict = `
 <section><h2>Measured verdict</h2>
   <div class="stats">
-    <div class="stat"><b>${dark.byteIdentical}/${dark.captures}</b><span>dark captures byte-identical</span></div>
-    <div class="stat"><b>${dark.realColourShift}</b><span>dark captures with a real colour shift</span></div>
-    <div class="stat"><b>${dark.worst.maxDelta}</b><span>worst dark channel delta</span></div>
+    <div class="stat"><b>${dark.themeChromeMoved}</b><span>dark captures whose theme chrome moved</span></div>
+    <div class="stat"><b>${dark.contentOnlyDelta}</b><span>dark captures whose delta is content only</span></div>
+    <div class="stat"><b>${dark.byteIdenticalWholeFrame}/${dark.captures}</b><span>dark captures byte-identical whole-frame</span></div>
     <div class="stat"><b>${textPairs.length - belowThreshold}/${textPairs.length}</b><span>light text pairs at or above WCAG</span></div>
     <div class="stat"><b>${belowThreshold}</b><span>light text pairs below WCAG</span></div>
   </div>
-  <p class="lede">The dark theme is compared pixel-for-pixel against the pre-change captures of the
-  same routes and viewports: ${dark.byteIdentical} of ${dark.captures} are byte-identical and
-  ${dark.realColourShift} show a real colour shift. The residual deltas of ${Object.keys(dark.histogram).join('/')}
-  are subpixel text antialiasing and one image-edge pixel. The light theme is measured by resolved
-  colour against WCAG 2.1, not by eye.</p>
+  <p class="lede">The dark theme is compared against the pre-change captures of the same routes and
+  viewports. A whole-frame difference cannot on its own mean the theme moved, because the two sets were
+  captured at different commits and the same-origin fix let the CMS photography load for the first time.
+  The header chrome band is painted by the theme token layer and carries no photograph, so it is the
+  witness: <b>${dark.themeChromeMoved}</b> of ${dark.captures} captures moved it. The remaining
+  ${dark.contentOnlyDelta} deltas are the loaded photography. The light theme is measured by resolved
+  colour against WCAG 2.1, not by eye. See §16 of the Phase E report.</p>
 </section>`;
 
 const html = `<!doctype html>

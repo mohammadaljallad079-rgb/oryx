@@ -1,208 +1,290 @@
 {
+  "method": "Whole-frame delta is reported alongside the header-chrome band delta. The chrome band is painted by the theme token layer and carries no photograph, so it witnesses a palette change; a whole-frame delta with an identical chrome band is content (CMS photography), not theme.",
+  "supersedes": "dark-invariance.whole-frame.json",
   "captures": 31,
-  "byteIdentical": 5,
-  "realColourShift": 0,
-  "isolatedPixelDeviation": 1,
-  "thresholdStrictPercent": 0.05,
-  "histogram": {
-    "0": 5,
-    "2": 7,
-    "4": 6,
-    "7": 10,
-    "10": 2,
-    "13": 1
-  },
-  "worst": {
-    "file": "03-providers-mobile-en-dark.png",
-    "moved": 9.662777980313525,
-    "maxDelta": 7
-  },
+  "byteIdenticalWholeFrame": 5,
+  "themeChromeMoved": 0,
+  "contentOnlyDelta": 19,
+  "chromeBandPixels": 64,
   "rows": [
     {
-      "file": "01-homepage-desktop-ar-dark.png",
-      "moved": 2.4752,
-      "strictPixels": 0,
-      "maxDelta": 2
-    },
-    {
-      "file": "01-homepage-desktop-en-dark.png",
-      "moved": 2.8381,
-      "strictPixels": 0,
-      "maxDelta": 2
-    },
-    {
-      "file": "01-homepage-mobile-ar-dark.png",
-      "moved": 2.9296,
-      "strictPixels": 0,
-      "maxDelta": 2
+      "file": "01-homepage-tablet-en-dark.png",
+      "wholeMovedPct": 83.2102,
+      "wholeStrictPct": 66.0144,
+      "wholeMaxDelta": 238,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "CONTENT"
     },
     {
       "file": "01-homepage-mobile-en-dark.png",
-      "moved": 3.4843,
-      "strictPixels": 0,
-      "maxDelta": 2
+      "wholeMovedPct": 79.4103,
+      "wholeStrictPct": 61.6126,
+      "wholeMaxDelta": 238,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "CONTENT"
+    },
+    {
+      "file": "01-homepage-desktop-en-dark.png",
+      "wholeMovedPct": 74.6599,
+      "wholeStrictPct": 51.7024,
+      "wholeMaxDelta": 238,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "CONTENT"
     },
     {
       "file": "01-homepage-tablet-ar-dark.png",
-      "moved": 1.9266,
-      "strictPixels": 0,
-      "maxDelta": 2
+      "wholeMovedPct": 73.1124,
+      "wholeStrictPct": 36.0554,
+      "wholeMaxDelta": 238,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "CONTENT"
     },
     {
-      "file": "01-homepage-tablet-en-dark.png",
-      "moved": 2.475,
-      "strictPixels": 1,
-      "maxDelta": 13
-    },
-    {
-      "file": "02-dashboard-desktop-ar-dark.png",
-      "moved": 0.0488,
-      "strictPixels": 0,
-      "maxDelta": 4
-    },
-    {
-      "file": "02-dashboard-desktop-en-dark.png",
-      "moved": 0.0477,
-      "strictPixels": 0,
-      "maxDelta": 4
-    },
-    {
-      "file": "02-dashboard-mobile-ar-dark.png",
-      "moved": 0.1604,
-      "strictPixels": 0,
-      "maxDelta": 4
-    },
-    {
-      "file": "02-dashboard-mobile-en-dark.png",
-      "moved": 0.1604,
-      "strictPixels": 0,
-      "maxDelta": 4
-    },
-    {
-      "file": "02-dashboard-tablet-ar-dark.png",
-      "moved": 0.0772,
-      "strictPixels": 0,
-      "maxDelta": 4
-    },
-    {
-      "file": "02-dashboard-tablet-en-dark.png",
-      "moved": 0.0776,
-      "strictPixels": 0,
-      "maxDelta": 4
-    },
-    {
-      "file": "03-providers-desktop-ar-dark.png",
-      "moved": 7.0551,
-      "strictPixels": 0,
-      "maxDelta": 7
-    },
-    {
-      "file": "03-providers-desktop-en-dark.png",
-      "moved": 7.3905,
-      "strictPixels": 0,
-      "maxDelta": 7
-    },
-    {
-      "file": "03-providers-mobile-ar-dark.png",
-      "moved": 8.1708,
-      "strictPixels": 0,
-      "maxDelta": 7
-    },
-    {
-      "file": "03-providers-mobile-en-dark.png",
-      "moved": 9.6628,
-      "strictPixels": 0,
-      "maxDelta": 7
-    },
-    {
-      "file": "03-providers-tablet-ar-dark.png",
-      "moved": 7.315,
-      "strictPixels": 0,
-      "maxDelta": 7
-    },
-    {
-      "file": "03-providers-tablet-en-dark.png",
-      "moved": 7.7787,
-      "strictPixels": 0,
-      "maxDelta": 7
-    },
-    {
-      "file": "04-login-desktop-ar-dark.png",
-      "moved": 0,
-      "strictPixels": 0,
-      "maxDelta": 0
-    },
-    {
-      "file": "04-login-desktop-en-dark.png",
-      "moved": 0,
-      "strictPixels": 0,
-      "maxDelta": 0
-    },
-    {
-      "file": "04-login-mobile-ar-dark.png",
-      "moved": 0.0112,
-      "strictPixels": 0,
-      "maxDelta": 2
-    },
-    {
-      "file": "04-login-mobile-en-dark.png",
-      "moved": 0,
-      "strictPixels": 0,
-      "maxDelta": 0
-    },
-    {
-      "file": "04-login-tablet-ar-dark.png",
-      "moved": 0,
-      "strictPixels": 0,
-      "maxDelta": 0
-    },
-    {
-      "file": "04-login-tablet-en-dark.png",
-      "moved": 0,
-      "strictPixels": 0,
-      "maxDelta": 0
+      "file": "01-homepage-desktop-ar-dark.png",
+      "wholeMovedPct": 67.1673,
+      "wholeStrictPct": 31.1364,
+      "wholeMaxDelta": 238,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "CONTENT"
     },
     {
       "file": "05-comparison-homepage-dark.png",
-      "moved": 2.4752,
-      "strictPixels": 0,
-      "maxDelta": 2
+      "wholeMovedPct": 67.1673,
+      "wholeStrictPct": 31.1364,
+      "wholeMaxDelta": 238,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "CONTENT"
     },
     {
-      "file": "06-profile-desktop-ar-dark.png",
-      "moved": 4.2512,
-      "strictPixels": 0,
-      "maxDelta": 10
+      "file": "01-homepage-mobile-ar-dark.png",
+      "wholeMovedPct": 66.4978,
+      "wholeStrictPct": 32.9214,
+      "wholeMaxDelta": 238,
+      "chromeMovedPct": 0.1482,
+      "chromeMaxDelta": 2,
+      "verdict": "CONTENT"
+    },
+    {
+      "file": "02-dashboard-mobile-en-dark.png",
+      "wholeMovedPct": 38.5861,
+      "wholeStrictPct": 19.4829,
+      "wholeMaxDelta": 237,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "CONTENT"
     },
     {
       "file": "06-profile-desktop-en-dark.png",
-      "moved": 4.4004,
-      "strictPixels": 0,
-      "maxDelta": 10
+      "wholeMovedPct": 21.9248,
+      "wholeStrictPct": 7.352,
+      "wholeMaxDelta": 238,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "CONTENT"
     },
     {
-      "file": "06-profile-mobile-ar-dark.png",
-      "moved": 6.1848,
-      "strictPixels": 0,
-      "maxDelta": 7
+      "file": "06-profile-desktop-ar-dark.png",
+      "wholeMovedPct": 21.6814,
+      "wholeStrictPct": 7.1419,
+      "wholeMaxDelta": 238,
+      "chromeMovedPct": 0.013,
+      "chromeMaxDelta": 1,
+      "verdict": "CONTENT"
+    },
+    {
+      "file": "03-providers-mobile-en-dark.png",
+      "wholeMovedPct": 9.6628,
+      "wholeStrictPct": 0,
+      "wholeMaxDelta": 7,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "ANTIALIAS"
+    },
+    {
+      "file": "03-providers-mobile-ar-dark.png",
+      "wholeMovedPct": 8.182,
+      "wholeStrictPct": 0,
+      "wholeMaxDelta": 7,
+      "chromeMovedPct": 0.1482,
+      "chromeMaxDelta": 2,
+      "verdict": "ANTIALIAS"
+    },
+    {
+      "file": "03-providers-tablet-en-dark.png",
+      "wholeMovedPct": 7.7787,
+      "wholeStrictPct": 0,
+      "wholeMaxDelta": 7,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "ANTIALIAS"
+    },
+    {
+      "file": "03-providers-desktop-en-dark.png",
+      "wholeMovedPct": 7.3905,
+      "wholeStrictPct": 0,
+      "wholeMaxDelta": 7,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "ANTIALIAS"
+    },
+    {
+      "file": "03-providers-tablet-ar-dark.png",
+      "wholeMovedPct": 7.315,
+      "wholeStrictPct": 0,
+      "wholeMaxDelta": 7,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "ANTIALIAS"
+    },
+    {
+      "file": "03-providers-desktop-ar-dark.png",
+      "wholeMovedPct": 7.0551,
+      "wholeStrictPct": 0,
+      "wholeMaxDelta": 7,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "ANTIALIAS"
     },
     {
       "file": "06-profile-mobile-en-dark.png",
-      "moved": 6.3887,
-      "strictPixels": 0,
-      "maxDelta": 7
+      "wholeMovedPct": 6.9076,
+      "wholeStrictPct": 0.4852,
+      "wholeMaxDelta": 238,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "CONTENT"
     },
     {
-      "file": "06-profile-tablet-ar-dark.png",
-      "moved": 4.2553,
-      "strictPixels": 0,
-      "maxDelta": 7
+      "file": "06-profile-mobile-ar-dark.png",
+      "wholeMovedPct": 6.7855,
+      "wholeStrictPct": 0.5578,
+      "wholeMaxDelta": 238,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "CONTENT"
     },
     {
       "file": "06-profile-tablet-en-dark.png",
-      "moved": 4.3816,
-      "strictPixels": 0,
-      "maxDelta": 7
+      "wholeMovedPct": 4.6441,
+      "wholeStrictPct": 0.2192,
+      "wholeMaxDelta": 238,
+      "chromeMovedPct": 0.03,
+      "chromeMaxDelta": 1,
+      "verdict": "CONTENT"
+    },
+    {
+      "file": "06-profile-tablet-ar-dark.png",
+      "wholeMovedPct": 4.5472,
+      "wholeStrictPct": 0.245,
+      "wholeMaxDelta": 238,
+      "chromeMovedPct": 0.0225,
+      "chromeMaxDelta": 1,
+      "verdict": "CONTENT"
+    },
+    {
+      "file": "02-dashboard-mobile-ar-dark.png",
+      "wholeMovedPct": 0.7638,
+      "wholeStrictPct": 0.5766,
+      "wholeMaxDelta": 236,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "CONTENT"
+    },
+    {
+      "file": "02-dashboard-tablet-ar-dark.png",
+      "wholeMovedPct": 0.2913,
+      "wholeStrictPct": 0.2045,
+      "wholeMaxDelta": 236,
+      "chromeMovedPct": 0.0225,
+      "chromeMaxDelta": 1,
+      "verdict": "CONTENT"
+    },
+    {
+      "file": "02-dashboard-desktop-ar-dark.png",
+      "wholeMovedPct": 0.2567,
+      "wholeStrictPct": 0.1946,
+      "wholeMaxDelta": 236,
+      "chromeMovedPct": 0.013,
+      "chromeMaxDelta": 1,
+      "verdict": "CONTENT"
+    },
+    {
+      "file": "02-dashboard-tablet-en-dark.png",
+      "wholeMovedPct": 0.2362,
+      "wholeStrictPct": 0.1521,
+      "wholeMaxDelta": 236,
+      "chromeMovedPct": 0.03,
+      "chromeMaxDelta": 1,
+      "verdict": "CONTENT"
+    },
+    {
+      "file": "02-dashboard-desktop-en-dark.png",
+      "wholeMovedPct": 0.2077,
+      "wholeStrictPct": 0.136,
+      "wholeMaxDelta": 236,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "CONTENT"
+    },
+    {
+      "file": "04-login-mobile-ar-dark.png",
+      "wholeMovedPct": 0.0112,
+      "wholeStrictPct": 0,
+      "wholeMaxDelta": 2,
+      "chromeMovedPct": 0.1482,
+      "chromeMaxDelta": 2,
+      "verdict": "ANTIALIAS"
+    },
+    {
+      "file": "04-login-desktop-ar-dark.png",
+      "wholeMovedPct": 0,
+      "wholeStrictPct": 0,
+      "wholeMaxDelta": 0,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "IDENTICAL"
+    },
+    {
+      "file": "04-login-desktop-en-dark.png",
+      "wholeMovedPct": 0,
+      "wholeStrictPct": 0,
+      "wholeMaxDelta": 0,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "IDENTICAL"
+    },
+    {
+      "file": "04-login-mobile-en-dark.png",
+      "wholeMovedPct": 0,
+      "wholeStrictPct": 0,
+      "wholeMaxDelta": 0,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "IDENTICAL"
+    },
+    {
+      "file": "04-login-tablet-ar-dark.png",
+      "wholeMovedPct": 0,
+      "wholeStrictPct": 0,
+      "wholeMaxDelta": 0,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "IDENTICAL"
+    },
+    {
+      "file": "04-login-tablet-en-dark.png",
+      "wholeMovedPct": 0,
+      "wholeStrictPct": 0,
+      "wholeMaxDelta": 0,
+      "chromeMovedPct": 0,
+      "chromeMaxDelta": 0,
+      "verdict": "IDENTICAL"
     }
   ]
 }
