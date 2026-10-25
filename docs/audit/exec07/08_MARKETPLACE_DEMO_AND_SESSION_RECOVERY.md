@@ -165,12 +165,30 @@ hand-out, not for distribution.
 
 ### 3.2 Does it need a backend?
 
-No. The bundle contains no `fetch`, `axios` or `XMLHttpRequest`, and no host is
-hard-coded — `localhost:3001`, `10.0.2.2` and `/api/v1` each appear zero times in
-`assets/index.android.bundle`. Every screen reads `src/lib/repository.ts`, whose
-demo implementation resolves from the seeded catalogue in `src/demo/`. It is
-shaped like the eventual HTTP layer (promises, optional filters) so the API can
-be dropped in later without touching a screen.
+No. Every screen reads `src/lib/repository.ts`, whose demo implementation
+resolves from the seeded catalogue in `src/demo/`. There is no HTTP client in the
+app: no `fetch(`, no `axios`, and no host is hard-coded — `localhost:3001`,
+`10.0.2.2` and `/api/v1` each appear zero times in `assets/index.android.bundle`.
+
+`XMLHttpRequest` does appear, six times, but none of them are calls. They are
+React Native's own internals and error strings ("`XMLHttpRequest` URL needs to be
+defined"), which ship in every bundle. The `https://` hits are the same story:
+`react.dev`, `reactnative.dev`, `expo-router` and similar appear in the string
+table, and `classic-assets.eascdn.net` sits directly against
+`~assets/parts?category=` from the app's own router path — Metro's string table
+has packed two unrelated literals together. `expo-updates` is not a dependency
+and `app.json` has no `updates` block, so there is no over-the-air fetch.
+
+The 20 photographs are real files in the APK, not remote URLs: `assets/media/`
+holds 10 photos and their 10 `-sm` variants, and the build packs all 20 as
+`res/*.jpg`, 2,974,970 bytes. So the imagery renders with the radio off.
+
+**What was not done: a launch on a real device or emulator.** This environment
+has no Android SDK, no `adb` and no `/dev/kvm`, so an emulator cannot run here.
+The evidence above is static — the archive is intact, the bundle is self-
+contained and the imagery is bundled — and the screenshots are the web build of
+the same components. A launch on a handset is the one check still outstanding,
+and it needs a device.
 
 ### 3.3 Demo accounts
 
