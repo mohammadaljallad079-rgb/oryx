@@ -1,13 +1,30 @@
 import { describe, expect, it } from 'vitest';
 
-import { directionFor, translate, type Locale } from '../src/lib/i18n';
-import { formatDate, formatMoney, toDateParam, toTimeLabel } from '../src/lib/format';
+import { directionFor, translate, localized, type Locale } from '../src/lib/i18n';
+import {
+  formatDate,
+  formatDayChip,
+  formatMoney,
+  localizeDigits,
+  toDateParam,
+  upcomingDays,
+} from '../src/lib/format';
 import { statusColor, themes } from '../src/lib/theme';
+import {
+  DEMO_BOOKINGS,
+  DEMO_ORDERS,
+  DEMO_PRODUCTS,
+  DEMO_PROVIDERS,
+  DEMO_STORES,
+  DEMO_VEHICLES,
+} from '../src/demo/activity';
+import { filterProducts } from '../src/lib/repository';
 
 /**
- * The mobile app shares the customer website's contract, so these tests pin the
- * pieces that are pure logic: direction, money, dates and status colours. They
- * run without a device, which keeps them in the fast CI job.
+ * The marketplace demo has no backend to test against, so these tests pin the
+ * pieces that are pure logic and that a reviewer will actually see: direction,
+ * money, dates, the theme tokens and the catalogue filters. They run without a
+ * device, which keeps them in the fast CI job.
  */
 
 describe('direction', () => {
@@ -22,9 +39,10 @@ describe('translate', () => {
     const keys: Array<Parameters<typeof translate>[1]> = [
       'appName',
       'signIn',
-      'garage',
-      'bookInspection',
+      'parts',
+      'recovery',
       'availableSlots',
+      'sensageTitle',
     ];
     for (const key of keys) {
       const value = translate('ar', key);
@@ -38,9 +56,10 @@ describe('translate', () => {
     const keys: Array<Parameters<typeof translate>[1]> = [
       'appName',
       'signIn',
-      'garage',
-      'bookInspection',
+      'parts',
+      'recovery',
       'availableSlots',
+      'sensageTitle',
     ];
     for (const key of keys) {
       expect(translate('en', key)).toBeTruthy();
@@ -48,7 +67,12 @@ describe('translate', () => {
   });
 
   it('translates a key to different text per locale', () => {
-    expect(translate('ar', 'garage')).not.toBe(translate('en', 'garage'));
+    expect(translate('ar', 'parts')).not.toBe(translate('en', 'parts'));
+  });
+
+  it('picks the right side of a bilingual pair', () => {
+    expect(localized('ar', { en: 'Parts', ar: 'قطع' })).toBe('قطع');
+    expect(localized('en', { en: 'Parts', ar: 'قطع' })).toBe('Parts');
   });
 });
 
@@ -64,7 +88,7 @@ describe('money', () => {
 
   it('handles zero and negative amounts', () => {
     expect(formatMoney(0, 'BHD', 3)).toContain('0.000');
-    expect(formatMoney(-4_500, 'BHD', 3)).toContain('4.500');
+    expect(formatMoney(-4_500, 'BHD', 3)).toContain('-4.500');
   });
 });
 
@@ -78,10 +102,29 @@ describe('dates', () => {
     expect(toDateParam(new Date(2026, 0, 5))).toBe('2026-01-05');
   });
 
-  it('formats a date and a time label without throwing', () => {
+  it('formats a date without throwing', () => {
     const iso = new Date(2026, 9, 17, 8, 30).toISOString();
     expect(formatDate(iso)).toBeTruthy();
-    expect(toTimeLabel(iso)).toBeTruthy();
+  });
+
+  it('produces the requested number of consecutive days', () => {
+    const days = upcomingDays(7, new Date(2026, 9, 25));
+    expect(days).toHaveLength(7);
+    expect(days[0]?.getDate()).toBe(25);
+    expect(days[6]?.getDate()).toBe(31);
+  });
+
+  it('labels a day chip in both locales', () => {
+    const date = new Date(2026, 9, 25);
+    expect(formatDayChip(date, 'en').weekday).toMatch(/^[A-Z][a-z]{2}$/);
+    expect(formatDayChip(date, 'ar').weekday).toMatch(/[\u0600-\u06FF]/);
+    // Arabic renders Arabic-Indic digits.
+    expect(formatDayChip(date, 'ar').day).toMatch(/[\u0660-\u0669]/);
+  });
+
+  it('converts Western digits to Arabic-Indic only for Arabic', () => {
+    expect(localizeDigits(2026, 'ar')).toBe('٢٠٢٦');
+    expect(localizeDigits(2026, 'en')).toBe('2026');
   });
 });
 
@@ -90,8 +133,9 @@ describe('status colours', () => {
     for (const mode of ['dark', 'light'] as const) {
       const theme = themes[mode];
       expect(statusColor(theme, 'COMPLETED')).toBe(theme.success);
-      expect(statusColor(theme, 'SUCCEEDED')).toBe(theme.success);
+      expect(statusColor(theme, 'DELIVERED')).toBe(theme.success);
       expect(statusColor(theme, 'PENDING')).toBe(theme.warning);
+      expect(statusColor(theme, 'EN_ROUTE')).toBe(theme.warning);
       expect(statusColor(theme, 'FAILED')).toBe(theme.danger);
       expect(statusColor(theme, 'CANCELLED')).toBe(theme.danger);
     }
@@ -105,6 +149,106 @@ describe('status colours', () => {
     expect(themes.dark.mode).toBe('dark');
     expect(themes.light.mode).toBe('light');
     expect(themes.dark.bg).not.toBe(themes.light.bg);
+  });
+
+  it('keeps the dark theme the approved navy', () => {
+    // The dark theme is the approved identity and must not drift.
+    expect(themes.dark.bg).toBe('#00162b');
+    expect(themes.dark.gold).toBe('#d4af37');
+  });
+});
+
+describe('demo catalogue', () => {
+  it('carries at least fifty products', () => {
+    expect(DEMO_PRODUCTS.length).toBeGreaterThanOrEqual(50);
+  });
+
+  it('carries fifteen stores', () => {
+    expect(DEMO_STORES).toHaveLength(15);
+  });
+
+  it('carries ten inspection, ten maintenance and eight recovery providers', () => {
+    expect(DEMO_PROVIDERS.filter((p) => p.kind === 'inspection')).toHaveLength(10);
+    expect(DEMO_PROVIDERS.filter((p) => p.kind === 'maintenance')).toHaveLength(10);
+    expect(DEMO_PROVIDERS.filter((p) => p.kind === 'recovery')).toHaveLength(8);
+  });
+
+  it('gives every product a positive price and a known store', () => {
+    const storeIds = new Set(DEMO_STORES.map((s) => s.id));
+    for (const product of DEMO_PRODUCTS) {
+      expect(product.priceMinor).toBeGreaterThan(0);
+      expect(storeIds.has(product.storeId)).toBe(true);
+    }
+  });
+
+  it('gives every provider at least one priced service', () => {
+    for (const provider of DEMO_PROVIDERS) {
+      expect(provider.services.length).toBeGreaterThan(0);
+      expect(provider.services[0]?.priceMinor).toBeGreaterThan(0);
+    }
+  });
+
+  it('keeps every order total equal to its subtotal plus delivery', () => {
+    for (const order of DEMO_ORDERS) {
+      expect(order.totalMinor).toBe(order.subtotalMinor + order.deliveryMinor);
+    }
+  });
+
+  it('books every booking against a real provider and vehicle', () => {
+    const providerIds = new Set(DEMO_PROVIDERS.map((p) => p.id));
+    const vehicleIds = new Set(DEMO_VEHICLES.map((v) => v.id));
+    for (const booking of DEMO_BOOKINGS) {
+      expect(providerIds.has(booking.providerId)).toBe(true);
+      expect(vehicleIds.has(booking.vehicleId)).toBe(true);
+    }
+  });
+});
+
+describe('product filtering', () => {
+  it('returns everything when the filter is empty', () => {
+    expect(filterProducts(DEMO_PRODUCTS, {})).toHaveLength(DEMO_PRODUCTS.length);
+  });
+
+  it('filters by part group', () => {
+    const brakes = filterProducts(DEMO_PRODUCTS, { groupEn: 'Brakes' });
+    expect(brakes.length).toBeGreaterThan(0);
+    expect(brakes.every((p) => p.groupEn === 'Brakes')).toBe(true);
+  });
+
+  it('filters by a make the part is listed to fit', () => {
+    const toyota = filterProducts(DEMO_PRODUCTS, { make: 'Toyota' });
+    expect(toyota.every((p) => p.fits.includes('Toyota'))).toBe(true);
+  });
+
+  it('filters by a price ceiling', () => {
+    const cheap = filterProducts(DEMO_PRODUCTS, { maxPriceMinor: 10_000 });
+    expect(cheap.every((p) => p.priceMinor <= 10_000)).toBe(true);
+  });
+
+  it('filters to discounted items only', () => {
+    const discounted = filterProducts(DEMO_PRODUCTS, { discountedOnly: true });
+    expect(discounted.length).toBeGreaterThan(0);
+    expect(discounted.every((p) => p.compareAtMinor != null)).toBe(true);
+  });
+
+  it('sorts by ascending price', () => {
+    const sorted = filterProducts(DEMO_PRODUCTS, { sort: 'price_asc' });
+    for (let i = 1; i < sorted.length; i += 1) {
+      expect((sorted[i]?.priceMinor ?? 0) >= (sorted[i - 1]?.priceMinor ?? 0)).toBe(true);
+    }
+  });
+
+  it('matches a free-text query across both locales', () => {
+    const byEnglish = filterProducts(DEMO_PRODUCTS, { query: 'brake' });
+    expect(byEnglish.length).toBeGreaterThan(0);
+    const byArabic = filterProducts(DEMO_PRODUCTS, { query: 'فرامل' });
+    expect(byArabic.length).toBeGreaterThan(0);
+  });
+
+  it('combines a group filter and a query', () => {
+    const result = filterProducts(DEMO_PRODUCTS, { groupEn: 'Filters', query: 'oil' });
+    expect(result.every((p) => p.groupEn === 'Filters')).toBe(true);
+    expect(result.every((p) => p.nameEn.toLowerCase().includes('oil'))).toBe(true);
   });
 });
 
