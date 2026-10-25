@@ -565,12 +565,34 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `bookings`, and the wrong name silently renders a stray tab instead of the
   screen you meant. `apps/mobile/test/tabs.test.ts` derives the route list from
   the filesystem and fails when a new screen is added without a declaration.
-- **The customer session is in memory.** A full page reload of the Expo web
-  export drops the access token, so an automated check must log in once and then
-  navigate *inside* the app rather than reloading a URL per screen. A reload also
-  makes the browser present the refresh cookie, which the API rejects for a
-  body-carried token — an artefact of running a native client in a browser, not a
-  product path.
+- **The customer session survives a reload on web.** `session-storage.ts` persists
+  the session to `localStorage` (`oryx.marketplace.session`, plus `.cart`,
+  `.favourites`, `.locale`, `.theme`) when running in a browser, so an automated
+  check can sign in once and then navigate to each screen by URL. This replaces
+  the earlier note that the session was in memory only; that is no longer true.
+  A reload still makes the browser present the refresh cookie, which the API
+  rejects for a body-carried token — an artefact of running a native client in a
+  browser, not a product path.
+- **The marketplace tab `href`s are flattened route paths.** The tabs live at
+  `/mobile/{home,parts,services,sensage,account}`, not `/(tabs)/...`. A capture
+  script that drives the tab bar with the group paths finds nothing and silently
+  re-shoots whichever screen it was already on, which looks like 15 identical
+  screenshots rather than an error.
+- **RTL is applied per element, not on `<html>`.** `Screen` and the text
+  components carry `direction` / `writingDirection` from the locale, and rows are
+  reversed with `flexDirection: row-reverse`. There is no `dir` attribute to read
+  on the document element, so assert RTL by counting elements that compute to
+  `rtl` (English ≈ 1, Arabic ≈ 455–678 per screen).
+- **Android 12+ ignores a photographic `splash.png`.** The platform composes the
+  launch screen from a window background and one centred icon, so the splash
+  image is drawn only on older releases. The photography a customer sees on a
+  current device comes from `components/launch.tsx`, which covers the gap until
+  the stored session has been read. Keep its background the same navy as the
+  platform splash or the hand-off shows a colour step.
+- **The APK is a build output and is gitignored.** `apps/mobile/.gitignore`
+  excludes `/android`, so `app-release.apk` never enters the history. The
+  `release` build type points at `signingConfigs.debug` (Expo template default),
+  so it is debug-signed — fine for a demo hand-out, not for a store submission.
 
 ### Adding a new ERP module
 
