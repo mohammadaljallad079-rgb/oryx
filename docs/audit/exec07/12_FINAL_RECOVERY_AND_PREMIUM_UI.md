@@ -257,6 +257,8 @@ needs the device.
 
 ## 6. Verification
 
+### 6.1 Local
+
 | Check | Result |
 | --- | --- |
 | `@oryx/mobile` tests | 46 / 46 passed, 3 files |
@@ -267,7 +269,31 @@ needs the device.
 | Homepage offers rail | present, verified by OCR of `home-light-en-part2.png` |
 | Homepage featured stores | present, verified by OCR of `home-light-en-part3.png` |
 | Screen gallery | 67 screens, manifest consistent with the images |
-| APK build | see §5 and the run summary for the commit, size and SHA-256 |
+
+### 6.2 On the runner, from the tip
+
+[CI run 40274213113](https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/40274213113)
+on `f619784` — **all jobs pass**:
+
+| Job | Result |
+| --- | --- |
+| Typecheck and build | pass |
+| Unit and API integration tests | pass |
+| Browser acceptance tests | pass |
+| Mobile APK ([40272958202](https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/40272958202)) | pass, built from `c7352dd` |
+
+### 6.3 The APK, re-checked after download
+
+| Check | Result |
+| --- | --- |
+| SHA-256 | matches the `.sha256` file and the run summary exactly |
+| Archive integrity | 1,316 entries, 0 corrupt |
+| Restored homepage sections | present in the bundle |
+| Backend hosts | none |
+| Bundled photographs | 20 `res/*.jpg` entries |
+
+`f619784` is documentation-only, so the APK built from `c7352dd` is the tip's
+mobile source.
 
 ---
 
