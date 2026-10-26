@@ -178,14 +178,50 @@ by `.github/workflows/mobile-apk.yml` on a GitHub runner.
 | --- | --- |
 | Workflow | `.github/workflows/mobile-apk.yml` |
 | Trigger | `workflow_dispatch` (manual), plus a path-scoped push on the app, the shared package and the workflow itself |
-| Built commit | `88d3296` |
-| Signing | debug keystore — the Expo template's `release` build type |
-| Artifact | `oryx-marketplace-<short-sha>` (90-day retention) |
+| Run | [40271089404](https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/40271089404) — **success** |
+| Built commit | `88d3296631dd17e9d0e9167b9b16abac0b7b5837` (`88d3296`) |
+| Commit subject | `fix(ci): stop using the setup-android action that cannot install` |
+| APK size | **70,037,349 bytes** (66.8 MiB) |
+| SHA-256 | `e6d4e5e9a0c9f03bfc16b35f73261632003c77fad588339bfe2a699fb9a5a240` |
+| Signature | debug keystore — the Expo template's `release` build type |
+| Artifact | `oryx-marketplace-88d3296`, 32,825,462 bytes (zipped), expires 2027-01-24 |
+
+**Artifact download** — the stable channel. Sign in to GitHub, then either open
+the run above and take `oryx-marketplace-88d3296` from its Artifacts section, or:
+
+```bash
+gh run download 40271089404 --repo mohammadaljallad079-rgb/oryx --name oryx-marketplace-88d3296
+```
+
+That yields `app-release.apk` and `oryx-marketplace.apk.sha256`. The artifact
+holds the raw APK; the smaller number above is the zip's own size.
 
 The workflow typechecks, lints and tests the app; generates the native project
 with `expo prebuild`; builds the release APK; hashes it; writes the commit, the
 size and the SHA-256 into the run summary; and **fails if the bundled JavaScript
 references a backend host**, so the offline claim cannot silently regress.
+
+### 5.1 The APK was verified after download, not assumed
+
+The artifact was downloaded and checked in this session:
+
+| Check | Result |
+| --- | --- |
+| `sha256sum app-release.apk` | matches the `.sha256` file and the run summary exactly |
+| Size | 70,037,349 bytes |
+| Archive integrity (`zipfile.testzip`) | 1,316 entries, **0 corrupt** |
+| `AndroidManifest.xml`, `classes*.dex`, `index.android.bundle` | all present |
+| The bundle carries the restored homepage | `offersAndDiscounts`, `featuredStores`, `Offers and discounts`, `Featured stores`, `offer-card-`, `store-card-` and `exploreNow` each appear |
+| No backend host in the bundle | `localhost:3001` 0, `10.0.2.2` 0, `/api/v1` 0, `axios` 0, `fetch(` 0 |
+| The duplicated splash line is gone | `AUTO SERVICES` appears 0 times as drawn text |
+
+So the APK is the current design, and it is offline: the imagery is bundled and
+no screen reaches a host.
+
+**The APK is the tip's design.** Commits after `88d3296` are documentation only —
+none of them touches `apps/mobile`, `packages/shared` or the workflow, which is
+why none of them retriggered the build. The mobile source in `88d3296` is
+byte-identical to the mobile source on the branch tip.
 
 Three defects were found and fixed while getting it to run — each one only
 visible on the runner:
