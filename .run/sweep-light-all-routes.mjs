@@ -35,6 +35,7 @@ const ROUTES = [
   ['/notifications', true],
   ['/profile', true],
   ['/support', true],
+  ['/this-route-does-not-exist', false],
 ];
 
 const lum = ([r, g, b]) => {

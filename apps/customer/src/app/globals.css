@@ -2417,3 +2417,25 @@ a {
   text-decoration: underline;
 }
 
+/* ------------------------------------------------------------- not found */
+
+/* Centres the 404 panel in the main column so the page reads as a designed dead
+ * end rather than a bare sentence at the top of the viewport. */
+.oryx-not-found {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+}
+
+.oryx-not-found .oryx-state {
+  max-width: 520px;
+}
+
+.oryx-not-found__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
