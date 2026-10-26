@@ -54,6 +54,8 @@ export type PhotoKey =
   | 'goldenHourHero'
   /** The approved hero scene, extracted from the owner's splash mockup. */
   | 'heroApproved'
+  /** The approved splash scene, extracted from the owner's mockup. */
+  | 'splashScene'
   | 'garageBrastad'
   | 'workshopArtdeco'
   | 'evCharging';

@@ -64,13 +64,15 @@ export default function Home() {
       <AppHeader />
 
       {/* ------------------------------------------------------------- hero
-          The reference hero occupies roughly the top third of the screen and
-          carries the tagline, the subtitle and one gold action. */}
+          Measured off the reference: the hero occupies 8-32% of the frame, so
+          with a ~64px header on a 915px handset that is ~265px of hero. It uses
+          the same approved cinematic scene as the splash — the vehicle is the
+          focal point and must not be a different photograph. */}
       <View style={styles.heroWrap}>
-        <Photo source={photo('heroApproved')} radiusValue={0} style={StyleSheet.absoluteFill} />
-        <Scrim color={brand.navy} from={0.5} to={0.0} bands={10} />
+        <Photo source={photo('splashScene')} radiusValue={0} style={StyleSheet.absoluteFill} />
+        <Scrim color={brand.navy} from={0.42} to={0.0} bands={10} />
         <View style={styles.heroLowerFade}>
-          <Scrim color={brand.navyDeep} from={0.0} to={0.96} bands={16} />
+          <Scrim color={brand.navyDeep} from={0.0} to={0.94} bands={16} />
         </View>
 
         <View style={styles.heroContent}>
@@ -273,7 +275,7 @@ export default function Home() {
 const styles = StyleSheet.create({
   // The reference hero fills roughly the top third of the frame and is tall
   // enough for the tagline, the subtitle and one action.
-  heroWrap: { height: 264, overflow: 'hidden', backgroundColor: brand.navy },
+  heroWrap: { height: 265, overflow: 'hidden', backgroundColor: brand.navy },
   heroLowerFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '68%' },
   heroContent: {
     ...StyleSheet.absoluteFillObject,
