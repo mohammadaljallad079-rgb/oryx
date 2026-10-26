@@ -178,23 +178,35 @@ by `.github/workflows/mobile-apk.yml` on a GitHub runner.
 | --- | --- |
 | Workflow | `.github/workflows/mobile-apk.yml` |
 | Trigger | `workflow_dispatch` (manual), plus a path-scoped push on the app, the shared package and the workflow itself |
-| Run | [40271089404](https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/40271089404) — **success** |
-| Built commit | `88d3296631dd17e9d0e9167b9b16abac0b7b5837` (`88d3296`) |
-| Commit subject | `fix(ci): stop using the setup-android action that cannot install` |
+| Run | [40272958202](https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/40272958202) — **success** |
+| Built commit | `c7352ddea224205a33d7bda90264d5d8d4738b46` (`c7352dd`) — the branch tip |
+| Commit subject | `docs(mobile): record how the references are checked against the build` |
 | APK size | **70,037,349 bytes** (66.8 MiB) |
-| SHA-256 | `e6d4e5e9a0c9f03bfc16b35f73261632003c77fad588339bfe2a699fb9a5a240` |
+| SHA-256 | `19f79e7f35af78abc3da3ddba842ce6375cfca91adda1ec56a5e4527a6b254a9` |
 | Signature | debug keystore — the Expo template's `release` build type |
-| Artifact | `oryx-marketplace-88d3296`, 32,825,462 bytes (zipped), expires 2027-01-24 |
+| Artifact | `oryx-marketplace-c7352dd`, 32,825,462 bytes (zipped), expires 2027-01-24 |
 
 **Artifact download** — the stable channel. Sign in to GitHub, then either open
 the run above and take `oryx-marketplace-88d3296` from its Artifacts section, or:
 
 ```bash
-gh run download 40271089404 --repo mohammadaljallad079-rgb/oryx --name oryx-marketplace-88d3296
+gh run download 40272958202 --repo mohammadaljallad079-rgb/oryx --name oryx-marketplace-c7352dd
 ```
 
 That yields `app-release.apk` and `oryx-marketplace.apk.sha256`. The artifact
 holds the raw APK; the smaller number above is the zip's own size.
+
+**Direct download while this environment is up** — no GitHub sign-in needed:
+
+```
+https://work-1-wnlnfdgztqwaahad.prod-runtime.all-hands.dev/evidence/exec07-phase-e/apk/oryx-marketplace-1.0.0.apk
+```
+
+It is served with `Content-Type: application/vnd.android.package-archive` and
+`Content-Disposition: attachment`, so a phone downloads it rather than trying to
+render it. The copy behind that link was downloaded through the public host and
+re-hashed here: it matches `19f79e7f…`. This link dies with the sandbox; the
+artifact above is the durable one.
 
 The workflow typechecks, lints and tests the app; generates the native project
 with `expo prebuild`; builds the release APK; hashes it; writes the commit, the
@@ -218,10 +230,9 @@ The artifact was downloaded and checked in this session:
 So the APK is the current design, and it is offline: the imagery is bundled and
 no screen reaches a host.
 
-**The APK is the tip's design.** Commits after `88d3296` are documentation only —
-none of them touches `apps/mobile`, `packages/shared` or the workflow, which is
-why none of them retriggered the build. The mobile source in `88d3296` is
-byte-identical to the mobile source on the branch tip.
+**The APK is the tip's build, not a nearby one.** It is built from `c7352dd`,
+which is the branch tip, so no "the APK predates the last change" gap exists to
+reason about.
 
 Three defects were found and fixed while getting it to run — each one only
 visible on the runner:
