@@ -367,7 +367,7 @@ than a claim.
 | 2 | Direct download link from this environment | **Done** | `https://work-2-wqqgzexpmdagonjk.prod-runtime.all-hands.dev/evidence/exec07-phase-e/apk/oryx-marketplace-1.0.0.apk` |
 | 3 | Full SHA-256 | **Done** | `cc859c2b7dcfada09ae83ff19dabb40ee33e0b83e5d9dae583c1fe2b4ce1143d` |
 | 4 | Opens with no backend, demo data local | **Done** | No `fetch(`/`axios`, no hard-coded host; 20 photographs packed as `res/*.jpg` |
-| 5 | Links to the screenshot gallery | **Done** | `docs/audit/exec07/marketplace-demo/README.md`, 61 screens, GitHub links |
+| 5 | Links to the screenshot gallery | **Done** | `docs/audit/exec07/marketplace-demo/README.md`, 67 screens, GitHub links |
 | 6 | Two demo accounts and how to switch | **Done** | `customer@oryx.demo` / `merchant@oryx.demo`, password `demo1234`, one-tap cards on sign-in |
 | 7 | Are SENSAGE, recovery, tracking, marketplace and the merchant dashboard complete and testable? | **Answered honestly** | §3.5 — screens and data are real; the SENSAGE analysis and recovery tracking are labelled simulations |
 
@@ -395,9 +395,9 @@ device launch is the outstanding step, and it needs the device.
 | `@oryx/shared` tests | 180 / 180 passed, 9 files |
 | Light palette contrast | 33 / 33 meet threshold |
 | Dark theme chrome movement | 0 of 31 captures |
-| Mobile screen sweep | 61 screens, 0 error pages |
+| Mobile screen sweep | 67 screens, 0 error pages |
 | Light-theme matrix | 24 captures — desktop, tablet and mobile, ar + en |
-| Gallery render | 61 screens + contact sheet, 0 broken |
+| Gallery render | 67 screens + contact sheet, 0 broken |
 | Typecheck (`@oryx/mobile`, `tsc --noEmit`) | clean |
 | Lint (`@oryx/mobile`, `eslint --max-warnings=0`) | clean |
 
