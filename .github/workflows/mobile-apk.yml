@@ -24,6 +24,20 @@ on:
         required: false
         type: string
 
+  # GitHub only offers a `workflow_dispatch` workflow in the Actions UI once it
+  # exists on the default branch, so a dispatch from this feature branch would
+  # not be reachable until the branch merges. A path-scoped push trigger is what
+  # makes the build runnable now. It fires only when the app, the shared package
+  # it resolves from, or this file changes — not on a docs or evidence commit —
+  # so an APK is still tied to a mobile change and to the exact commit that
+  # carried it.
+  push:
+    branches: [main, feature/execution-07-premium-web]
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/shared/**'
+      - '.github/workflows/mobile-apk.yml'
+
 # Least privilege: the workflow reads the repository and writes an artifact.
 permissions:
   contents: read
