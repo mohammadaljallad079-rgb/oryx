@@ -6,7 +6,7 @@
     "route": "/",
     "label": "Launch screen",
     "url": "http://127.0.0.1:8081/mobile/",
-    "text": "ORYX | AUTO SERVICES | Everything Your Car Needs | Parts · Services · Trusted Providers"
+    "text": "Everything Your Car Needs | Parts · Services · Trusted Providers | Verified spare parts"
   },
   {
     "locale": "ar",
@@ -15,7 +15,7 @@
     "route": "/",
     "label": "شاشة البداية",
     "url": "http://127.0.0.1:8081/mobile/",
-    "text": "ORYX | لخدمات السيارات | كل ما تحتاجه سيارتك"
+    "text": "كل ما تحتاجه سيارتك | قطع غيار · خدمات · مزودون موثوقون | قطع غيار موثقة"
   },
   {
     "locale": "en",
@@ -42,7 +42,7 @@
     "route": "/home",
     "label": "Home",
     "url": "http://127.0.0.1:8081/mobile/home",
-    "text": "ع | 🛒 | 🔔 | Everything Your Car Needs | Parts · Services · Trusted Providers | ⌕  Search for parts, services, or providers. | Demo data | A review build. All data is local and not real. | SENSAGE AI"
+    "text": "ع | 🛒 | 🔔 | Everything Your Car Needs | Parts · Services · Trusted Providers | ⌕  Search for parts, services, or providers. | Demo data | A review build. All data is local and not real. | CATEGORIES"
   },
   {
     "locale": "en",
@@ -51,7 +51,7 @@
     "route": "/categories",
     "label": "Categories",
     "url": "http://127.0.0.1:8081/mobile/categories",
-    "text": "ع | 🛒 | 🔔 | Demo data | A review build. All data is local and not real. | CATEGORIES | Spare parts | › See all | Maintenance | › See all | Car inspection | › See all | Towing in progress | › See all"
+    "text": "ع | 🛒 | 🔔 | Demo data | A review build. All data is local and not real. | CATEGORIES | Spare parts | › See all | Maintenance | › See all | Car inspection | › See all | Towing | › See all | Accessori"
   },
   {
     "locale": "en",
@@ -303,7 +303,7 @@
     "route": "/home",
     "label": "Home",
     "url": "http://127.0.0.1:8081/mobile/home",
-    "text": "EN | 🛒 | 🔔 | كل ما تحتاجه سيارتك | قطع غيار · خدمات · مزودون موثوقون | ⌕  ابحث عن قطع غيار، خدمات أو مزودين. | بيانات تجريبية | نسخة تجريبية للمراجعة. البيانات محلية وليست حقيقية. | الفحص الذكي SENS"
+    "text": "EN | 🛒 | 🔔 | كل ما تحتاجه سيارتك | قطع غيار · خدمات · مزودون موثوقون | ⌕  ابحث عن قطع غيار، خدمات أو مزودين. | بيانات تجريبية | نسخة تجريبية للمراجعة. البيانات محلية وليست حقيقية. | التصنيفات | عرض "
   },
   {
     "locale": "ar",
@@ -312,7 +312,7 @@
     "route": "/categories",
     "label": "Categories",
     "url": "http://127.0.0.1:8081/mobile/categories",
-    "text": "EN | 🛒 | 🔔 | بيانات تجريبية | نسخة تجريبية للمراجعة. البيانات محلية وليست حقيقية. | التصنيفات | قطع الغيار | ‹ عرض الكل | الصيانة | ‹ عرض الكل | فحص السيارات | ‹ عرض الكل | جارٍ السحب | ‹ عرض الكل |"
+    "text": "EN | 🛒 | 🔔 | بيانات تجريبية | نسخة تجريبية للمراجعة. البيانات محلية وليست حقيقية. | التصنيفات | قطع الغيار | ‹ عرض الكل | الصيانة | ‹ عرض الكل | فحص السيارات | ‹ عرض الكل | سحب السيارات | ‹ عرض الكل"
   },
   {
     "locale": "ar",
