@@ -64,8 +64,10 @@ for (const locale of ['en', 'ar']) {
     const nav = page.goto(`${BASE}/`, { waitUntil: 'commit', timeout: 90_000 }).catch(() => {});
     let captured = false;
     for (let i = 0; i < 160 && !captured; i += 1) {
+      // The launch screen's own copy: the tagline and the three stage captions.
+      // The wordmark is an image, so it is not visible to `innerText`.
       const text = await page.locator('body').innerText().catch(() => '');
-      if (/AUTO SERVICES|لخدمات السيارات/.test(text)) {
+      if (/Everything Your Car|كل ما تحتاجه سيارتك/.test(text)) {
         await page.waitForTimeout(900); // let the 560ms fade settle
         await page.screenshot({ path: `${OUT}/splash-${locale}-${label}.png` });
         log(`splash-${locale}-${label}`, text.replace(/\n+/g, ' | ').slice(0, 60));

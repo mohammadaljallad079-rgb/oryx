@@ -32,7 +32,7 @@ const FILL_MS = 1700;
 const STAGES = ['launchParts', 'launchServices', 'launchSensage'] as const;
 
 export function LaunchScreen() {
-  const { t, locale, direction } = useApp();
+  const { t, direction } = useApp();
   const [stage, setStage] = useState(0);
   const fill = useRef(new Animated.Value(0)).current;
   const fade = useRef(new Animated.Value(0)).current;
@@ -105,9 +105,6 @@ export function LaunchScreen() {
         <View style={styles.top}>
           <Logo width={224} />
           <View style={styles.rule} />
-          <Text style={[styles.wordmarkSub, { writingDirection: direction }]}>
-            {locale === 'ar' ? 'لخدمات السيارات' : 'AUTO SERVICES'}
-          </Text>
         </View>
 
         <View style={styles.bottom}>
@@ -142,12 +139,6 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: 'rgba(212, 175, 55, 0.55)',
     marginTop: space.xs,
-  },
-  wordmarkSub: {
-    color: 'rgba(212, 175, 55, 0.94)',
-    fontSize: typography.caption,
-    letterSpacing: 5.4,
-    fontWeight: '700',
   },
   bottom: { alignItems: 'center', gap: space.sm },
   tagline: {
