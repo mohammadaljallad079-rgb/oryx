@@ -91,5 +91,24 @@ both languages, in the light and dark themes and at phone, tablet and desktop
 widths. See `docs/audit/exec07/splash-home/` for the captures and the
 reference-versus-implemented sheets.
 
+### What the references are checked against
+
+The references carry no machine-readable structure, so the implementation was
+compared to them programmatically rather than by eye:
+
+- **OCR** (`tesseract`, `eng` + `ara`) for the copy and the order of the sections.
+  This is what established that the two files are named the wrong way round.
+- **Row-wise luminance and horizontal-edge profiles** for the vertical
+  composition — where the photograph is, where the type sits, where the bars begin.
+- **Bright-pixel bounding boxes** for the logo's placement. In the hero reference
+  the lockup is centred; the splash centres it too.
+- **The rendered DOM's text** for what the app actually draws, so a claim about a
+  section is checked against the screen and not against the source.
+
+The homepage is taller than a handset, so the **offers** and the **featured
+stores** — two sections the approved rebuild had dropped and this branch restores
+— only appear in the scrolled captures: `home-<theme>-<locale>-part2.png` and
+`part3.png`.
+
 The remaining demo screens have not been re-measured against these references;
 only the two the owner named were rebuilt.
