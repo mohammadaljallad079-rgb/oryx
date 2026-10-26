@@ -13,7 +13,7 @@ so it needs no session and survives a sandbox restart.
 - [Contact sheet](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/contact-sheet.png) — all of them in one image
 - [Browse the machine-readable manifest](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/manifest.json)
 - [Design preview on GitHub Pages](https://mohammadaljallad079-rgb.github.io/oryx/mobile/) — the same screens as a browsable site
-- [APK release](https://github.com/mohammadaljallad079-rgb/oryx/releases/tag/mobile-apk-1.0.0) — permanent download, no sign-in
+- [APK release](https://github.com/mohammadaljallad079-rgb/oryx/releases/tag/mobile-apk-1.0.1) — permanent download, no sign-in
 
 All of them are the **light theme** — Execution 07 Phase E is the light-theme
 correction, so that is the theme under review. The app's stored default is the

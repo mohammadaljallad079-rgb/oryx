@@ -6,9 +6,9 @@
 **النسخة المعروضة تفاعلياً (GitHub Pages):**
 [mohammadaljallad079-rgb.github.io/oryx/mobile](https://mohammadaljallad079-rgb.github.io/oryx/mobile/)
 
-**تنزيل APK (رابط دائم، بدون تسجيل دخول):**
-[releases/tag/mobile-apk-1.0.0](https://github.com/mohammadaljallad079-rgb/oryx/releases/tag/mobile-apk-1.0.0)
-· الحجم 70,037,349 بايت · SHA-256 `19f79e7f…`
+**تنزيل APK (رابط دائم، بدون تسجيل دخول) — مبني من آخر تصميم:**
+[releases/tag/mobile-apk-1.0.1](https://github.com/mohammadaljallad079-rgb/oryx/releases/tag/mobile-apk-1.0.1)
+· الحجم 70,257,793 بايت · SHA-256 `98110580…`
 
 > **ملاحظة عن أسماء ملفات المرجع.** الصورتان المعتمدتان مسمّاتان بالمقلوب:
 > `ORYX_Splash_Reference.jpg` تحمل صفحة المتجر الكاملة، و`ORYX_Homepage_Reference.jpg`
