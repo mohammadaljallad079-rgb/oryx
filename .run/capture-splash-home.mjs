@@ -126,15 +126,6 @@ for (const theme of ['light', 'dark']) {
       await page.screenshot({ path: `${OUT}/home-${theme}-${locale}-${label}.png` });
       const text = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
       log(`home-${theme}-${locale}-${label}`, text.slice(0, 58));
-      // The homepage is taller than any handset, so the rails below the fold —
-      // offers and the featured stores — are only visible in a full-page capture.
-      if (label === 'phone') {
-        await page.screenshot({
-          path: `${OUT}/home-${theme}-${locale}-full.png`,
-          fullPage: true,
-        });
-        log(`home-${theme}-${locale}-full`, `${text.length} chars`);
-      }
       await ctx.close();
     }
   }

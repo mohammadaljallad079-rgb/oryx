@@ -19,7 +19,7 @@
  * Run with: node .run/capture-mobile-launch.mjs
  */
 import { chromium } from 'playwright';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 
 const BASE = process.env.MOBILE_WEB_URL ?? 'http://127.0.0.1:8081/mobile';
 const OUT = process.env.LAUNCH_OUT ?? 'docs/audit/exec07/marketplace-demo/screenshots';
@@ -27,6 +27,13 @@ const HOLD_MS = Number(process.env.LAUNCH_HOLD_MS ?? 3000);
 mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch();
+
+// The manifest is written by the screen sweep, which does not see this screen
+// (it is gone before the sweep's first navigation). The launch entries are
+// therefore merged in here, keyed by name, so re-running either script alone
+// leaves the gallery consistent rather than dropping a frame from the index.
+const manifestPath = `${OUT}/manifest.json`;
+const launchRows = [];
 
 for (const locale of ['en', 'ar']) {
   // The launch screen reads the device locale, not the stored preference — the
@@ -62,9 +69,9 @@ for (const locale of ['en', 'ar']) {
   const nav = page.goto(`${BASE}/`, { waitUntil: 'commit', timeout: 90_000 }).catch(() => {});
 
   // The launch screen is up from first paint until the restore resolves. Poll for
-  // its own copy so the shot lands inside that window, not after it. The tagline
-  // is the screen's own text; the wordmark is an image, so `innerText` cannot see
-  // it, and the tagline is what distinguishes this screen from the shell.
+  // its own tagline so the shot lands inside that window, not after it. The
+  // wordmark is an image, so `innerText` cannot see it; the tagline is the copy
+  // the screen draws itself.
   let captured = false;
   for (let i = 0; i < 120 && !captured; i += 1) {
     const text = await page.locator('body').innerText().catch(() => '');
@@ -73,6 +80,15 @@ for (const locale of ['en', 'ar']) {
       await page.waitForTimeout(700);
       await page.screenshot({ path: `${OUT}/launch-${locale}.png` });
       console.log(`launch-${locale}: captured :: ${text.replace(/\n+/g, ' | ').slice(0, 70)}`);
+      launchRows.push({
+        locale,
+        theme: 'light',
+        name: `launch-${locale}`,
+        route: '/',
+        label: locale === 'ar' ? 'شاشة البداية' : 'Launch screen',
+        url: `${BASE}/`,
+        text: text.replace(/\n+/g, ' | ').slice(0, 200),
+      });
       captured = true;
     }
     await page.waitForTimeout(100);
@@ -83,3 +99,12 @@ for (const locale of ['en', 'ar']) {
 }
 
 await browser.close();
+
+// Merge the launch rows into the sweep's manifest, replacing any earlier launch
+// entries so the file holds each screen exactly once.
+if (existsSync(manifestPath) && launchRows.length) {
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  const kept = manifest.filter((row) => !row.name?.startsWith('launch-'));
+  writeFileSync(manifestPath, `${JSON.stringify([...launchRows, ...kept], null, 2)}\n`);
+  console.log(`manifest: ${launchRows.length} launch rows merged, ${kept.length + launchRows.length} total`);
+}

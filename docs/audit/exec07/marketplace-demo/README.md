@@ -1,6 +1,6 @@
 # ORYX Marketplace — screen gallery
 
-Every screen of `apps/mobile`, captured from the running app. 65
+Every screen of `apps/mobile`, captured from the running app. 67
 images: 29 customer screens in English, 29 in Arabic,
 7 in the merchant shell, and the launch screen in both locales.
 
@@ -47,6 +47,8 @@ Those are committed as `home-light-en-part2.png` and `home-light-en-part3.png`
 
 | Screen | Route | View | Image |
 | --- | --- | --- | --- |
+| Launch screen | `/` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/launch-en.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/launch-en.png) |
+| شاشة البداية | `/` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/launch-ar.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/launch-ar.png) |
 
 ## Customer — English (LTR)
 
