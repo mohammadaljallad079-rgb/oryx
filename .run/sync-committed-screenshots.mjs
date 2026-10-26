@@ -21,10 +21,17 @@ for (const f of ['contact-sheet.png', 'manifest.json']) {
   if (existsSync(`${SRC}/${f}`)) copyFileSync(`${SRC}/${f}`, `${DEST}/${f}`);
 }
 
+// The launch frame lives at the top level, not under a locale directory.
+for (const f of readdirSync(SRC)) {
+  if (f.startsWith('launch-') && f.endsWith('.png')) copyFileSync(`${SRC}/${f}`, `${DEST}/${f}`);
+}
+
 const manifest = JSON.parse(readFileSync(`${SRC}/manifest.json`, 'utf8'));
+const isLaunch = (x) => x.name.startsWith('launch-');
 const groups = [
-  ['Customer — English (LTR)', 'en', manifest.filter((x) => x.locale === 'en' && !x.route.startsWith('/merchant'))],
-  ['Customer — Arabic (RTL)', 'ar', manifest.filter((x) => x.locale === 'ar' && !x.route.startsWith('/merchant'))],
+  ['Launch frame', '', manifest.filter(isLaunch)],
+  ['Customer — English (LTR)', 'en', manifest.filter((x) => x.locale === 'en' && !x.route.startsWith('/merchant') && !isLaunch(x))],
+  ['Customer — Arabic (RTL)', 'ar', manifest.filter((x) => x.locale === 'ar' && !x.route.startsWith('/merchant') && !isLaunch(x))],
   ['Merchant shell', 'merchant', manifest.filter((x) => x.route.startsWith('/merchant'))],
 ];
 
@@ -35,7 +42,7 @@ const sections = groups
 ${items
   .map(
     (x) =>
-      `    <figure><img src="${dir}/${x.name}.png" alt="${x.label}" loading="lazy"><figcaption>${x.label}<code>${x.route}</code></figcaption></figure>`,
+      `    <figure><img src="${dir ? `${dir}/` : ''}${x.name}.png" alt="${x.label}" loading="lazy"><figcaption>${x.label}<code>${x.route}</code></figcaption></figure>`,
   )
   .join('\n')}
   </div>`,
