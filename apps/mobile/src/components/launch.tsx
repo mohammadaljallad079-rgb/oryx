@@ -99,27 +99,28 @@ export function LaunchScreen() {
 
   const stageKey = STAGES[stage] ?? STAGES[0];
   const width = fill.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
-  const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.22, 0.34] });
+  const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.10, 0.20] });
 
   return (
     <View style={styles.root}>
       {/* The vehicle photograph, full bleed. */}
-      <Photo source={photo('goldenHourHero')} radiusValue={0} style={StyleSheet.absoluteFill} />
+      <Photo source={photo('heroApproved')} radiusValue={0} style={StyleSheet.absoluteFill} />
 
-      {/* Golden-hour light: a warm wash breathing across the middle of the frame,
-          which is where the reference photograph is brightest. */}
+      {/* A gentle warm breath over the centre. The photograph is already the
+          approved lighting, so this only lifts it slightly rather than grading
+          it; a heavier wash would re-tint the scene the owner approved. */}
       <Animated.View style={[styles.sunBand, { opacity: glowOpacity }]}>
-        <Scrim color={GOLDEN_HOUR} from={0.95} to={0.0} bands={12} />
+        <Scrim color={GOLDEN_HOUR} from={0.34} to={0.0} bands={12} />
       </Animated.View>
 
       {/* Navy at the top so the lockup reads, and at the bottom so the tagline
           reads. Both fade out, so the photograph reads through the middle of the
           frame the way the approved hero does. */}
       <View style={styles.topFade}>
-        <Scrim color={NAVY} from={0.92} to={0.0} bands={12} />
+        <Scrim color={NAVY} from={0.62} to={0.0} bands={12} />
       </View>
       <View style={styles.bottomFade}>
-        <Scrim color={NAVY_DEEP} from={0.0} to={0.96} bands={16} />
+        <Scrim color={NAVY_DEEP} from={0.0} to={0.99} bands={18} />
       </View>
 
       {/* The official lockup, centred at 20-29% of the frame height. */}
@@ -147,7 +148,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: NAVY },
   sunBand: { position: 'absolute', left: 0, right: 0, top: '14%', height: '46%' },
   topFade: { position: 'absolute', left: 0, right: 0, top: 0, height: '42%' },
-  bottomFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '64%' },
+  bottomFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '78%' },
   lockup: {
     position: 'absolute',
     left: 0,

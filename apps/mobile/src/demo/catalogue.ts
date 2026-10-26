@@ -52,6 +52,8 @@ export type PhotoKey =
   | 'garageInterior'
   /** The splash hero: the garage photograph graded to the reference's golden hour. */
   | 'goldenHourHero'
+  /** The approved hero scene, extracted from the owner's splash mockup. */
+  | 'heroApproved'
   | 'garageBrastad'
   | 'workshopArtdeco'
   | 'evCharging';

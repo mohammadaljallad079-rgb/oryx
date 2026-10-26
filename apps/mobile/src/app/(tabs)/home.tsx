@@ -67,10 +67,10 @@ export default function Home() {
           The reference hero occupies roughly the top third of the screen and
           carries the tagline, the subtitle and one gold action. */}
       <View style={styles.heroWrap}>
-        <Photo source={photo('goldenHourHero')} radiusValue={0} style={StyleSheet.absoluteFill} />
-        <Scrim color={brand.navy} from={0.34} to={0.0} bands={10} />
+        <Photo source={photo('heroApproved')} radiusValue={0} style={StyleSheet.absoluteFill} />
+        <Scrim color={brand.navy} from={0.5} to={0.0} bands={10} />
         <View style={styles.heroLowerFade}>
-          <Scrim color={brand.navyDeep} from={0.0} to={0.88} bands={14} />
+          <Scrim color={brand.navyDeep} from={0.0} to={0.96} bands={16} />
         </View>
 
         <View style={styles.heroContent}>
@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
   // The reference hero fills roughly the top third of the frame and is tall
   // enough for the tagline, the subtitle and one action.
   heroWrap: { height: 264, overflow: 'hidden', backgroundColor: brand.navy },
-  heroLowerFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '52%' },
+  heroLowerFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '68%' },
   heroContent: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
