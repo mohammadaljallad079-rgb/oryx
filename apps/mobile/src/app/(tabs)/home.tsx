@@ -67,10 +67,10 @@ export default function Home() {
           The reference hero occupies roughly the top third of the screen and
           carries the tagline, the subtitle and one gold action. */}
       <View style={styles.heroWrap}>
-        <Photo source={photo('autoService')} radiusValue={0} style={StyleSheet.absoluteFill} />
-        <Scrim color={brand.navy} from={0.86} to={0.18} bands={12} />
+        <Photo source={photo('goldenHourHero')} radiusValue={0} style={StyleSheet.absoluteFill} />
+        <Scrim color={brand.navy} from={0.34} to={0.0} bands={10} />
         <View style={styles.heroLowerFade}>
-          <Scrim color={brand.navyDeep} from={0.1} to={0.94} bands={14} />
+          <Scrim color={brand.navyDeep} from={0.0} to={0.88} bands={14} />
         </View>
 
         <View style={styles.heroContent}>
@@ -116,15 +116,9 @@ export default function Home() {
       </View>
 
       <View style={styles.body}>
-        {/* -------------------------------------------- service categories */}
-        <View style={styles.sectionHead}>
-          <SectionLabel>{t('categories')}</SectionLabel>
-          <Pressable onPress={() => router.push('/categories')} testID="categories-see-all">
-            <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '700' }}>
-              {t('seeAll')}
-            </Text>
-          </Pressable>
-        </View>
+        {/* -------------------------------------------- service categories
+            The reference shows the tiles directly under the search field with no
+            section heading, so there is none here. */}
         <Rail>
           {categories.map((category) => (
             <Pressable
@@ -137,7 +131,7 @@ export default function Home() {
               <View style={[styles.catTile, { borderColor: theme.border }]}>
                 <Photo
                   source={photoSmall(category.photo)}
-                  height={92}
+                  height={84}
                   width="100%"
                   radiusValue={radius.md}
                 />
@@ -279,8 +273,8 @@ export default function Home() {
 const styles = StyleSheet.create({
   // The reference hero fills roughly the top third of the frame and is tall
   // enough for the tagline, the subtitle and one action.
-  heroWrap: { height: 336, overflow: 'hidden', backgroundColor: brand.navy },
-  heroLowerFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '62%' },
+  heroWrap: { height: 264, overflow: 'hidden', backgroundColor: brand.navy },
+  heroLowerFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '52%' },
   heroContent: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
@@ -289,14 +283,20 @@ const styles = StyleSheet.create({
   },
   heroTagline: {
     color: brand.onNavy,
-    fontSize: 28,
-    lineHeight: 33,
+    fontSize: 26,
+    lineHeight: 31,
     fontWeight: '800',
-    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowColor: 'rgba(0,0,0,0.75)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 10,
+    textShadowRadius: 14,
   },
-  heroSub: { color: 'rgba(255,255,255,0.9)', fontSize: typography.label },
+  heroSub: {
+    color: 'rgba(255,255,255,0.95)',
+    fontSize: typography.label,
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 8,
+  },
   heroCta: {
     alignSelf: 'flex-start',
     backgroundColor: brand.gold,
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
   heroCtaLabel: { color: brand.navy, fontSize: typography.label, fontWeight: '800', letterSpacing: 0.2 },
 
   // The search row sits on the page background, directly under the hero.
-  searchRow: { paddingHorizontal: space.lg, paddingTop: space.lg },
+  searchRow: { paddingHorizontal: space.lg, paddingTop: space.md },
   searchField: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -322,14 +322,14 @@ const styles = StyleSheet.create({
   },
   searchGlyph: { fontSize: 17 },
 
-  body: { padding: space.lg, gap: space.md },
+  body: { padding: space.lg, gap: space.sm },
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: space.sm,
+    marginTop: space.xs,
   },
-  catTile: { borderRadius: radius.md, borderWidth: 1, overflow: 'hidden', height: 92 },
+  catTile: { borderRadius: radius.md, borderWidth: 1, overflow: 'hidden', height: 84 },
   catLabel: {
     position: 'absolute',
     left: space.xs,
@@ -340,14 +340,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
-  tileRow: { gap: space.md, marginTop: space.xs },
+  tileRow: { gap: space.md },
   sensageTile: {
     flex: 1,
     borderWidth: 1,
     borderRadius: radius.lg,
     padding: space.md,
     gap: space.xs,
-    minHeight: 112,
+    minHeight: 104,
   },
   sensageHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   bookTile: {
@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: space.md,
     gap: space.xs,
-    minHeight: 112,
+    minHeight: 104,
   },
   tileTitle: { fontSize: typography.label, fontWeight: '700' },
   tileBody: { fontSize: typography.caption },
