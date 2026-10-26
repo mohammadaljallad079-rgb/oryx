@@ -99,8 +99,27 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
-      - name: Set up the Android SDK
-        uses: android-actions/setup-android@v3
+      # The runner image already ships the Android SDK, so the setup-android
+      # action is not used: its default step installs the legacy `tools` package,
+      # which the SDK repository no longer publishes, and it fails on every run.
+      #
+      # Instead the licences are accepted and AGP is left to download the exact
+      # platform, build-tools and NDK the project asks for. No SDK version is
+      # hard-coded here, so it cannot drift from the one `expo prebuild` generates.
+      - name: Point Gradle at the Android SDK
+        run: |
+          SDK="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          {
+            echo "ANDROID_HOME=$SDK"
+            echo "ANDROID_SDK_ROOT=$SDK"
+          } >> "$GITHUB_ENV"
+          SDKMGR="$(find "$SDK/cmdline-tools" -name sdkmanager -type f 2>/dev/null | sort | tail -1)"
+          if [ -z "$SDKMGR" ]; then
+            echo "::error::sdkmanager not found under $SDK/cmdline-tools"
+            exit 1
+          fi
+          yes | "$SDKMGR" --licenses > /dev/null 2>&1 || true
+          echo "licences accepted; ANDROID_HOME=$SDK"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -122,9 +141,13 @@ jobs:
         working-directory: apps/mobile
         run: pnpm exec expo prebuild --platform android --no-install
 
+      # The first run downloads the Gradle distribution, the Android Gradle Plugin
+      # and — on this image — the platform, build-tools and NDK the project asks
+      # for, so it is given room rather than the default ten-minute ceiling.
       - name: Build the release APK
         working-directory: apps/mobile/android
-        run: ./gradlew assembleRelease --no-daemon
+        timeout-minutes: 45
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Locate the APK
         id: apk
