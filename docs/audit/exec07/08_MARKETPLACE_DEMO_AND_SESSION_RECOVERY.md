@@ -138,15 +138,17 @@ byte-identical whole frames; the rest differ only where content sits.
 | Slug / package | `oryx-marketplace` / `com.oryx.marketplace` |
 | Version | `1.0.0` (versionCode 1) |
 | Artefact | `android/app/build/outputs/apk/release/app-release.apk` |
-| Size | 70,024,885 bytes (67 MiB) |
-| SHA-256 | `cc859c2b7dcfada09ae83ff19dabb40ee33e0b83e5d9dae583c1fe2b4ce1143d` |
-| Gradle | BUILD SUCCESSFUL in 4m 43s |
+| Size | 70,035,329 bytes (67 MiB) |
+| SHA-256 | `9d343c55813323acf85d8d5ae8c8babe4ad52b93d80f4dfc7843c02e2690d457` |
+| Gradle | BUILD SUCCESSFUL in 45s (warm cache) |
 
-**Rebuilt after the demo-control fixes.** The first build (`32ba9d99…`) predated
-the work that made every visible control respond, so it shipped nine buttons that
-did nothing. This build replaces it. The bundle inside the archive is checked for
-the fix: `onPress:()=>undefined` appears **0** times, and the new `publishedOffers`
-key appears once.
+**Rebuilt after the splash and homepage rebuild.** The earlier build
+(`cc859c2b…`) predated `ef3d6d4` and `af8544e`, so its splash still drew the
+duplicated `AUTO SERVICES` line and its homepage was the superseded layout. This
+build is cut from the current tree. The bundle inside the archive is checked for
+both facts: `AUTO SERVICES` appears **0** times as a literal the screen draws
+(the wordmark artwork supplies it, and the artwork is an image, not text), and
+the rebuilt homepage's section copy is present.
 
 The APK is not committed: `apps/mobile/.gitignore` excludes `/android`, which is
 correct — it is a build output, and 67 MiB of binary does not belong in the
@@ -190,7 +192,8 @@ holds 10 photos and their 10 `-sm` variants, and the build packs all 20 as
 `res/*.jpg`, 2,974,970 bytes. So the imagery renders with the radio off.
 
 **What was not done: a launch on a real device or emulator.** This environment
-has no Android SDK, no `adb` and no `/dev/kvm`, so an emulator cannot run here.
+has no `/dev/kvm`, so an emulator cannot run here — the SDK and `adb` are present
+(`/home/openhands/android-sdk`), but a hardware-accelerated virtual device is not.
 The evidence above is static — the archive is intact, the bundle is self-
 contained and the imagery is bundled — and the screenshots are the web build of
 the same components. A launch on a handset is the one check still outstanding,
@@ -363,9 +366,9 @@ than a claim.
 
 | # | Requirement | Status | Evidence |
 | --- | --- | --- | --- |
-| 1 | APK present and intact, full path given | **Done** | `apps/mobile/android/app/build/outputs/apk/release/app-release.apk`, 70,024,885 bytes; archive opens, 1,316 entries |
+| 1 | APK present and intact, full path given | **Done** | `apps/mobile/android/app/build/outputs/apk/release/app-release.apk`, 70,035,329 bytes; archive opens, 1,316 entries |
 | 2 | Direct download link from this environment | **Done** | `https://work-2-wqqgzexpmdagonjk.prod-runtime.all-hands.dev/evidence/exec07-phase-e/apk/oryx-marketplace-1.0.0.apk` |
-| 3 | Full SHA-256 | **Done** | `cc859c2b7dcfada09ae83ff19dabb40ee33e0b83e5d9dae583c1fe2b4ce1143d` |
+| 3 | Full SHA-256 | **Done** | `9d343c55813323acf85d8d5ae8c8babe4ad52b93d80f4dfc7843c02e2690d457` |
 | 4 | Opens with no backend, demo data local | **Done** | No `fetch(`/`axios`, no hard-coded host; 20 photographs packed as `res/*.jpg` |
 | 5 | Links to the screenshot gallery | **Done** | `docs/audit/exec07/marketplace-demo/README.md`, 67 screens, GitHub links |
 | 6 | Two demo accounts and how to switch | **Done** | `customer@oryx.demo` / `merchant@oryx.demo`, password `demo1234`, one-tap cards on sign-in |
