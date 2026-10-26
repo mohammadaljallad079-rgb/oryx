@@ -1,8 +1,9 @@
 # ORYX Marketplace — screen gallery
 
-Every screen of `apps/mobile`, captured from the running app. 61
-images: 27 customer screens in English, 27 in Arabic, and
-7 in the merchant shell.
+Every screen of `apps/mobile`, captured from the running app. 67
+images: 29 customer screens in English, 29 in Arabic,
+7 in the merchant shell, and the launch screen in both locales.
+
 
 - [Contact sheet](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/contact-sheet.png) — all of them in one image
 - [Browse the machine-readable manifest](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/manifest.json)
@@ -28,6 +29,13 @@ captures the real screens.
 The APK is the native build of exactly these components; the imagery is bundled,
 not remote, so the same screens render with the radio off.
 
+## Launch screen
+
+| Screen | Route | View | Image |
+| --- | --- | --- | --- |
+| Launch screen | `/` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/launch-en.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/launch-en.png) |
+| شاشة البداية | `/` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/launch-ar.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/launch-ar.png) |
+
 ## Customer — English (LTR)
 
 | Screen | Route | View | Image |
@@ -35,6 +43,8 @@ not remote, so the same screens render with the radio off.
 | Onboarding | `/onboarding` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/en/onboarding.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/en/onboarding.png) |
 | Sign in | `/login` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/en/login.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/en/login.png) |
 | Home | `/home` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/en/home.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/en/home.png) |
+| Categories | `/categories` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/en/categories.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/en/categories.png) |
+| Search | `/search` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/en/search.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/en/search.png) |
 | Parts shop | `/parts` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/en/parts.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/en/parts.png) |
 | Part detail | `/parts/prod-001` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/en/part-detail.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/en/part-detail.png) |
 | Store | `/parts/store/store-01` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/en/store.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/en/store.png) |
@@ -67,6 +77,8 @@ not remote, so the same screens render with the radio off.
 | Onboarding | `/onboarding` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/ar/onboarding.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/ar/onboarding.png) |
 | Sign in | `/login` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/ar/login.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/ar/login.png) |
 | Home | `/home` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/ar/home.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/ar/home.png) |
+| Categories | `/categories` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/ar/categories.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/ar/categories.png) |
+| Search | `/search` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/ar/search.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/ar/search.png) |
 | Parts shop | `/parts` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/ar/parts.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/ar/parts.png) |
 | Part detail | `/parts/prod-001` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/ar/part-detail.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/ar/part-detail.png) |
 | Store | `/parts/store/store-01` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/ar/store.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/ar/store.png) |

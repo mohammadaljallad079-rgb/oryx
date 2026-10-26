@@ -29,6 +29,8 @@ const ROUTES = [
   ['onboarding', '/onboarding', 'Onboarding'],
   ['login', '/login', 'Sign in'],
   ['home', '/home', 'Home'],
+  ['categories', '/categories', 'Categories'],
+  ['search', '/search', 'Search'],
   ['parts', '/parts', 'Parts shop'],
   ['part-detail', '/parts/prod-001', 'Part detail'],
   ['store', '/parts/store/store-01', 'Store'],

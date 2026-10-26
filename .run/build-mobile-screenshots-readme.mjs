@@ -18,9 +18,14 @@ const FULL = `https://raw.githubusercontent.com/${REPO}/${BRANCH}/${DIR}`;
 
 const manifest = JSON.parse(readFileSync(`${DIR}/manifest.json`, 'utf8'));
 const isMerchant = (x) => x.route.startsWith('/merchant');
-const en = manifest.filter((x) => x.locale === 'en' && !isMerchant(x));
-const ar = manifest.filter((x) => x.locale === 'ar' && !isMerchant(x));
+// The launch screen is captured once per locale but lives at the top level, not
+// under `en/` or `ar/`, because it is a full-bleed brand frame rather than a
+// shell screen. It is listed on its own so its links resolve.
+const isLaunch = (x) => x.name.startsWith('launch-');
+const en = manifest.filter((x) => x.locale === 'en' && !isMerchant(x) && !isLaunch(x));
+const ar = manifest.filter((x) => x.locale === 'ar' && !isMerchant(x) && !isLaunch(x));
 const merchant = manifest.filter(isMerchant);
+const launch = manifest.filter(isLaunch);
 
 /** A row per screen: label, route, a browsable link and the raw image. */
 const table = (items, prefix) =>
@@ -29,16 +34,17 @@ const table = (items, prefix) =>
     '| --- | --- | --- | --- |',
     ...items.map(
       (x) =>
-        `| ${x.label} | \`${x.route}\` | [view](${VIEW}/${prefix}/${x.name}.png) | ` +
-        `[png](${FULL}/${prefix}/${x.name}.png) |`,
+        `| ${x.label} | \`${x.route}\` | [view](${VIEW}/${prefix ? `${prefix}/` : ''}${x.name}.png) | ` +
+        `[png](${FULL}/${prefix ? `${prefix}/` : ''}${x.name}.png) |`,
     ),
   ].join('\n');
 
 const doc = `# ORYX Marketplace — screen gallery
 
 Every screen of \`apps/mobile\`, captured from the running app. ${manifest.length}
-images: ${en.length} customer screens in English, ${ar.length} in Arabic, and
-${merchant.length} in the merchant shell.
+images: ${en.length} customer screens in English, ${ar.length} in Arabic,
+${merchant.length} in the merchant shell, and the launch screen in both locales.
+
 
 - [Contact sheet](${VIEW}/contact-sheet.png) — all of them in one image
 - [Browse the machine-readable manifest](${VIEW}/manifest.json)
@@ -63,6 +69,10 @@ captures the real screens.
 
 The APK is the native build of exactly these components; the imagery is bundled,
 not remote, so the same screens render with the radio off.
+
+## Launch screen
+
+${table(launch, '')}
 
 ## Customer — English (LTR)
 

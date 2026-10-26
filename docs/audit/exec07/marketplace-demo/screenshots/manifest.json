@@ -2,6 +2,24 @@
   {
     "locale": "en",
     "theme": "light",
+    "name": "launch-en",
+    "route": "/",
+    "label": "Launch screen",
+    "url": "http://127.0.0.1:8081/mobile/",
+    "text": "ORYX | AUTO SERVICES | Everything Your Car Needs | Parts · Services · Trusted Providers"
+  },
+  {
+    "locale": "ar",
+    "theme": "light",
+    "name": "launch-ar",
+    "route": "/",
+    "label": "شاشة البداية",
+    "url": "http://127.0.0.1:8081/mobile/",
+    "text": "ORYX | لخدمات السيارات | كل ما تحتاجه سيارتك"
+  },
+  {
+    "locale": "en",
+    "theme": "light",
     "name": "onboarding",
     "route": "/onboarding",
     "label": "Onboarding",
@@ -24,7 +42,25 @@
     "route": "/home",
     "label": "Home",
     "url": "http://127.0.0.1:8081/mobile/home",
-    "text": "ع | 🛒 | 🔔 | Demo data | A review build. All data is local and not real. | ⌕  Search parts, services or stores… | SENSAGE AI vehicle check | Photograph your car and get a demo condition report in min"
+    "text": "ع | 🛒 | 🔔 | Everything Your Car Needs | Parts · Services · Trusted Providers | ⌕  Search for parts, services, or providers. | Demo data | A review build. All data is local and not real. | SENSAGE AI"
+  },
+  {
+    "locale": "en",
+    "theme": "light",
+    "name": "categories",
+    "route": "/categories",
+    "label": "Categories",
+    "url": "http://127.0.0.1:8081/mobile/categories",
+    "text": "ع | 🛒 | 🔔 | Demo data | A review build. All data is local and not real. | CATEGORIES | Spare parts | › See all | Maintenance | › See all | Car inspection | › See all | Towing in progress | › See all"
+  },
+  {
+    "locale": "en",
+    "theme": "light",
+    "name": "search",
+    "route": "/search",
+    "label": "Search",
+    "url": "http://127.0.0.1:8081/mobile/search",
+    "text": "ع | 🛒 | 🔔 | Search | All | Parts | Stores | Services | Search for parts, services, or providers. | ⌂ | ⌂ | Home | ▦ | ▦ | Categories | ⌕ | ⌕ | Search | ▤ | ▤ | Bookings | ◉ | ◉ | Profile"
   },
   {
     "locale": "en",
@@ -267,7 +303,25 @@
     "route": "/home",
     "label": "Home",
     "url": "http://127.0.0.1:8081/mobile/home",
-    "text": "EN | 🛒 | 🔔 | بيانات تجريبية | نسخة تجريبية للمراجعة. البيانات محلية وليست حقيقية. | ⌕  ابحث عن قطعة أو خدمة أو متجر… | الفحص الذكي SENSAGE | صوّر سيارتك واحصل على تقرير حالة تجريبي في دقائق. | ابدأ "
+    "text": "EN | 🛒 | 🔔 | كل ما تحتاجه سيارتك | قطع غيار · خدمات · مزودون موثوقون | ⌕  ابحث عن قطع غيار، خدمات أو مزودين. | بيانات تجريبية | نسخة تجريبية للمراجعة. البيانات محلية وليست حقيقية. | الفحص الذكي SENS"
+  },
+  {
+    "locale": "ar",
+    "theme": "light",
+    "name": "categories",
+    "route": "/categories",
+    "label": "Categories",
+    "url": "http://127.0.0.1:8081/mobile/categories",
+    "text": "EN | 🛒 | 🔔 | بيانات تجريبية | نسخة تجريبية للمراجعة. البيانات محلية وليست حقيقية. | التصنيفات | قطع الغيار | ‹ عرض الكل | الصيانة | ‹ عرض الكل | فحص السيارات | ‹ عرض الكل | جارٍ السحب | ‹ عرض الكل |"
+  },
+  {
+    "locale": "ar",
+    "theme": "light",
+    "name": "search",
+    "route": "/search",
+    "label": "Search",
+    "url": "http://127.0.0.1:8081/mobile/search",
+    "text": "EN | 🛒 | 🔔 | بحث | الكل | قطع الغيار | المتاجر | الخدمات | ابحث عن قطع غيار، خدمات أو مزودين. | ⌂ | ⌂ | الرئيسية | ▦ | ▦ | الأقسام | ⌕ | ⌕ | البحث | ▤ | ▤ | حجوزاتي | ◉ | ◉ | حسابي"
   },
   {
     "locale": "ar",

@@ -25,6 +25,11 @@ const groups = [
   ['Merchant shell · English', `${SRC}/merchant`],
 ];
 
+// The launch frame sits at the top level, not under a locale directory.
+const launchFiles = readdirSync(SRC)
+  .filter((f) => f.startsWith('launch-') && f.endsWith('.png'))
+  .sort();
+
 const sections = groups
   .map(([title, dir]) => {
     const files = readdirSync(dir).filter((f) => f.endsWith('.png')).sort();
@@ -37,11 +42,17 @@ const sections = groups
   })
   .join('');
 
+const total = groups.reduce((n, [, dir]) => n + readdirSync(dir).filter((f) => f.endsWith('.png')).length, 0) + launchFiles.length;
+
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1800, height: 1000 } });
 await page.setContent(`<!doctype html><body style="margin:0;background:#111;padding:20px 24px">
   <h1 style="font:700 24px system-ui;color:#d4af37;margin:0">ORYX Marketplace — every screen</h1>
-  <p style="font:14px system-ui;color:#9aa;margin:6px 0 0">61 screens captured from the running Expo web build: the customer app in both locales, and the merchant shell.</p>
+  <p style="font:14px system-ui;color:#9aa;margin:6px 0 0">${total} screens captured from the running Expo web build: the launch frame, the customer app in both locales, and the merchant shell.</p>
+  <h2 style="font:600 18px system-ui;color:#eee;margin:26px 0 10px">Launch frame · ${launchFiles.length} screens</h2>
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
+    ${launchFiles.map((f) => tile(resolve(SRC, f), f.replace(/\.png$/, ''))).join('')}
+  </div>
   ${sections}
 </body>`);
 await page.waitForTimeout(1500);
