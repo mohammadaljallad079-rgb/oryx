@@ -59,27 +59,31 @@ jobs:
     steps:
       # GitHub rejects an invalid workflow file at the *workflow* level: the run
       # appears with zero jobs and a failure, which is easy to misread as a build
-      # failure. Lint every workflow first so that cannot happen.
-      - name: Validate workflow files
-        uses: docker://rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
-        with:
-          args: -color
-
+      # failure. Lint every workflow first so that cannot happen. The checkout
+      # has to come first — actionlint reads the files from the working tree, and
+      # a container action gets no repository until it is checked out.
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref || github.ref }}
           fetch-depth: 0
 
+      - name: Validate workflow files
+        uses: docker://rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: -color
+
       # Record the exact commit so the artifact can be tied to it. A short SHA is
       # what goes in the artifact name; the full SHA is written to the summary.
       - name: Resolve the commit
         id: commit
         run: |
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
-          echo "subject=$(git log -1 --pretty=%s)" >> "$GITHUB_OUTPUT"
-          echo "date=$(git log -1 --pretty=%cI)" >> "$GITHUB_OUTPUT"
+          {
+            echo "sha=$(git rev-parse HEAD)"
+            echo "short=$(git rev-parse --short HEAD)"
+            echo "subject=$(git log -1 --pretty=%s)"
+            echo "date=$(git log -1 --pretty=%cI)"
+          } >> "$GITHUB_OUTPUT"
 
       - uses: pnpm/action-setup@v4
         with:
@@ -131,8 +135,10 @@ jobs:
             echo "::error::no APK was produced"
             exit 1
           fi
-          echo "path=$APK" >> "$GITHUB_OUTPUT"
-          echo "bytes=$(stat -c%s "$APK")" >> "$GITHUB_OUTPUT"
+          {
+            echo "path=$APK"
+            echo "bytes=$(stat -c%s "$APK")"
+          } >> "$GITHUB_OUTPUT"
 
       # The SHA-256 and the size are the two values the hand-out records, so they
       # are computed here rather than by hand after a download.
@@ -141,7 +147,9 @@ jobs:
         working-directory: apps/mobile
         run: |
           SHA="$(sha256sum "${{ steps.apk.outputs.path }}" | cut -d' ' -f1)"
-          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
+          {
+            echo "sha256=$SHA"
+          } >> "$GITHUB_OUTPUT"
           echo "$SHA  oryx-marketplace.apk" > "${{ github.workspace }}/oryx-marketplace.apk.sha256"
 
       # A self-contained bundle check: the demo must not reach a host. Any of
