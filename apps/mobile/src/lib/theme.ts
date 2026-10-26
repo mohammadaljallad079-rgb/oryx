@@ -113,6 +113,23 @@ export const space = {
   xxxl: 48,
 } as const;
 
+/**
+ * The fixed brand palette.
+ *
+ * These values do not follow the theme. They belong to surfaces that are always
+ * navy regardless of the reader's choice — the platform splash, the launch
+ * screen that hands off from it, and any type sitting directly on photography —
+ * so the identity does not step colour when the theme changes.
+ */
+export const brand = {
+  navy: '#00162b',
+  navyDeep: '#000f1e',
+  gold: '#d4af37',
+  onNavy: '#ffffff',
+  onNavyMuted: '#c8d6e4',
+  onNavyStrong: '#e8eef5',
+} as const;
+
 export const radius = {
   sm: 8,
   md: 12,

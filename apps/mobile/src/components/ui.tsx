@@ -24,7 +24,7 @@ import {
 } from 'react-native';
 
 import { useApp } from '../lib/app-context';
-import { elevation, radius, space, statusColor, typography } from '../lib/theme';
+import { brand, elevation, radius, space, statusColor, typography } from '../lib/theme';
 
 /** The page shell: themed background, correct direction, optional scroll. */
 export function Screen({
@@ -505,7 +505,7 @@ export function Rail({ children }: { children: React.ReactNode }) {
  * differs from its neighbour by only a few percent.
  */
 export function Scrim({
-  color = '#00162b',
+  color = brand.navy,
   from = 0.92,
   to = 0,
   bands = 14,

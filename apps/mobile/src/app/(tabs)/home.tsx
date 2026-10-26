@@ -7,9 +7,9 @@ import { photo, photoSmall } from '../../lib/assets';
 import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
 import { AppHeader, DemoBanner } from '../../components/brand';
-import { ProductCard, ProviderCard } from '../../components/cards';
+import { OfferCard, ProductCard, ProviderCard, StoreCard } from '../../components/cards';
 import { Body, Photo, Rail, Screen, Scrim, SectionLabel, StateView } from '../../components/ui';
-import { radius, space, typography } from '../../lib/theme';
+import { brand, radius, space, typography } from '../../lib/theme';
 import { localizeDigits } from '../../lib/format';
 
 /**
@@ -17,9 +17,10 @@ import { localizeDigits } from '../../lib/format';
  *
  * Built to the approved reference, top to bottom: the wordmark header with the
  * language toggle, cart and notifications; a tall photographic hero carrying the
- * tagline and its search field; the five service categories; the two booking
- * tiles beside the SENSAGE card; featured providers with their ratings; then
- * popular products.
+ * tagline, its search field and the reference's gold call to action; the five
+ * service categories; the two booking tiles beside the SENSAGE card; featured
+ * providers with their ratings; popular products; the published offers; and the
+ * featured stores.
  *
  * The reference places search *inside* the hero rather than above it, so that is
  * where it sits. Every rail reads the repository, so the page is a window onto
@@ -32,6 +33,8 @@ export default function Home() {
 
   const providers = useAsync(() => repository.nearbyProviders(6), [dataVersion]);
   const products = useAsync(() => repository.trendingProducts(8), [dataVersion]);
+  const offers = useAsync(() => repository.offers(), [dataVersion]);
+  const stores = useAsync(() => repository.stores({ sort: 'rating' }), [dataVersion]);
 
   const categories = [
     { key: 'spare_parts', label: t('spareParts'), photo: 'partsStore' as const },
@@ -50,9 +53,9 @@ export default function Home() {
       {/* ------------------------------------------------------------- hero */}
       <View style={styles.heroWrap}>
         <Photo source={photo('autoService')} radiusValue={0} style={StyleSheet.absoluteFill} />
-        <Scrim color="#00162b" from={0.9} to={0.26} bands={12} />
+        <Scrim color={brand.navy} from={0.9} to={0.26} bands={12} />
         <View style={styles.heroLowerFade}>
-          <Scrim color="#000f1e" from={0.16} to={0.95} bands={14} />
+          <Scrim color={brand.navyDeep} from={0.16} to={0.95} bands={14} />
         </View>
 
         <View style={styles.heroContent}>
@@ -72,6 +75,17 @@ export default function Home() {
           >
             <Text style={{ color: 'rgba(255,255,255,0.82)', fontSize: typography.body }}>
               ⌕  {t('searchEverything')}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            testID="home-explore"
+            accessibilityRole="button"
+            onPress={() => router.push('/services')}
+            style={({ pressed }) => [styles.heroCta, pressed && { opacity: 0.9 }]}
+          >
+            <Text style={styles.heroCtaLabel}>
+              {t('exploreNow')} {direction === 'rtl' ? '←' : '→'}
             </Text>
           </Pressable>
         </View>
@@ -196,6 +210,43 @@ export default function Home() {
           ))}
         </Rail>
 
+        {/* -------------------------------------- offers and featured stores */}
+        <View style={styles.sectionHead}>
+          <SectionLabel>{t('offersAndDiscounts')}</SectionLabel>
+          <Pressable onPress={() => router.push('/parts')} testID="offers-see-all">
+            <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '600' }}>
+              {t('seeAll')}
+            </Text>
+          </Pressable>
+        </View>
+        {offers.loading ? (
+          <StateView kind="loading" />
+        ) : (
+          <Rail>
+            {(offers.data ?? []).map((offer) => (
+              <OfferCard key={offer.id} offer={offer} />
+            ))}
+          </Rail>
+        )}
+
+        <View style={styles.sectionHead}>
+          <SectionLabel>{t('featuredStores')}</SectionLabel>
+          <Pressable onPress={() => router.push('/parts?tab=stores')} testID="stores-see-all">
+            <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '600' }}>
+              {t('seeAll')}
+            </Text>
+          </Pressable>
+        </View>
+        {stores.loading ? (
+          <StateView kind="loading" />
+        ) : (
+          <View style={{ gap: space.md }}>
+            {(stores.data ?? []).slice(0, 4).map((store) => (
+              <StoreCard key={store.id} store={store} />
+            ))}
+          </View>
+        )}
+
         {/* ---------------------------------------- the two CTA banners */}
         <View style={[styles.tileRow, { flexDirection: row }]}>
           <Pressable
@@ -246,7 +297,7 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  heroWrap: { height: 392, overflow: 'hidden', backgroundColor: '#00162b' },
+  heroWrap: { height: 392, overflow: 'hidden', backgroundColor: brand.navy },
   heroLowerFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '66%' },
   heroContent: {
     ...StyleSheet.absoluteFillObject,
@@ -255,7 +306,7 @@ const styles = StyleSheet.create({
     gap: space.xs,
   },
   heroTagline: {
-    color: '#ffffff',
+    color: brand.onNavy,
     fontSize: typography.display,
     fontWeight: '700',
     textShadowColor: 'rgba(0,0,0,0.45)',
@@ -275,6 +326,17 @@ const styles = StyleSheet.create({
     minHeight: 48,
     marginTop: space.sm,
   },
+  heroCta: {
+    alignSelf: 'flex-start',
+    backgroundColor: brand.gold,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    marginTop: space.sm,
+    minHeight: 40,
+    justifyContent: 'center',
+  },
+  heroCtaLabel: { color: brand.navy, fontSize: typography.label, fontWeight: '800', letterSpacing: 0.2 },
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -287,7 +349,7 @@ const styles = StyleSheet.create({
     left: space.sm,
     right: space.sm,
     bottom: space.sm,
-    color: '#ffffff',
+    color: brand.onNavy,
     fontSize: typography.caption,
     fontWeight: '700',
     textAlign: 'center',

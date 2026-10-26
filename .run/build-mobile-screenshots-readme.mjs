@@ -70,6 +70,20 @@ captures the real screens.
 The APK is the native build of exactly these components; the imagery is bundled,
 not remote, so the same screens render with the radio off.
 
+## The rebuilt Splash and Homepage
+
+The two screens the owner named are rebuilt against the approved mockups and
+captured in both languages, both themes and three widths. The reference-versus-
+implemented sheets are in
+[\`../splash-home/\`](https://github.com/${REPO}/tree/${BRANCH}/docs/audit/exec07/splash-home)
+— \`compare-splash-en.png\`, \`compare-splash-ar.png\`, \`compare-home-en.png\`
+and \`compare-home-ar.png\`.
+
+The homepage is taller than a handset, so the rails below the fold — **offers and
+discounts** and the **featured stores** — are only visible in a scrolled capture.
+Those are committed as \`home-light-en-part2.png\` and \`home-light-en-part3.png\`
+(and their dark and Arabic counterparts) beside the first-frame shots.
+
 ## Launch screen
 
 ${table(launch, '')}

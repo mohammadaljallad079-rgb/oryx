@@ -1,6 +1,6 @@
 # ORYX Marketplace — screen gallery
 
-Every screen of `apps/mobile`, captured from the running app. 67
+Every screen of `apps/mobile`, captured from the running app. 65
 images: 29 customer screens in English, 29 in Arabic,
 7 in the merchant shell, and the launch screen in both locales.
 
@@ -29,12 +29,24 @@ captures the real screens.
 The APK is the native build of exactly these components; the imagery is bundled,
 not remote, so the same screens render with the radio off.
 
+## The rebuilt Splash and Homepage
+
+The two screens the owner named are rebuilt against the approved mockups and
+captured in both languages, both themes and three widths. The reference-versus-
+implemented sheets are in
+[`../splash-home/`](https://github.com/mohammadaljallad079-rgb/oryx/tree/feature/execution-07-premium-web/docs/audit/exec07/splash-home)
+— `compare-splash-en.png`, `compare-splash-ar.png`, `compare-home-en.png`
+and `compare-home-ar.png`.
+
+The homepage is taller than a handset, so the rails below the fold — **offers and
+discounts** and the **featured stores** — are only visible in a scrolled capture.
+Those are committed as `home-light-en-part2.png` and `home-light-en-part3.png`
+(and their dark and Arabic counterparts) beside the first-frame shots.
+
 ## Launch screen
 
 | Screen | Route | View | Image |
 | --- | --- | --- | --- |
-| Launch screen | `/` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/launch-en.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/launch-en.png) |
-| شاشة البداية | `/` | [view](https://github.com/mohammadaljallad079-rgb/oryx/blob/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/launch-ar.png) | [png](https://raw.githubusercontent.com/mohammadaljallad079-rgb/oryx/feature/execution-07-premium-web/docs/audit/exec07/marketplace-demo/screenshots/launch-ar.png) |
 
 ## Customer — English (LTR)
 

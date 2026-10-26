@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 
 import { useApp } from '../lib/app-context';
 import { photoSmall } from '../lib/assets';
-import { radius, space, typography } from '../lib/theme';
+import { brand, radius, space, typography } from '../lib/theme';
 import { discountPercent, formatAmount, formatDate, formatMoney, localizeDigits } from '../lib/format';
 import type {
   DemoBooking,
@@ -301,7 +301,7 @@ export function OfferCard({ offer, onPress }: { offer: DemoOffer; onPress?: () =
       <Card style={{ padding: 0, overflow: 'hidden' }}>
         <Photo source={photoSmall(offer.photo)} height={104} width="100%" radiusValue={0} overlay />
         <View style={[StyleSheet.absoluteFill, { padding: space.md, justifyContent: 'flex-end' }]}>
-          <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: typography.subheading }}>
+          <Text style={{ color: brand.onNavy, fontWeight: '700', fontSize: typography.subheading }}>
             {l({ en: offer.titleEn, ar: offer.titleAr })}
           </Text>
         </View>
@@ -310,7 +310,11 @@ export function OfferCard({ offer, onPress }: { offer: DemoOffer; onPress?: () =
             {l({ en: offer.subtitleEn, ar: offer.subtitleAr })}
           </Body>
           <View style={styles.priceRow}>
-            <Badge text={`${t('off')} ${localizeDigits(offer.percentOff, locale)}%`} tone="gold" />
+            {offer.percentOff > 0 ? (
+              <Badge text={`${t('off')} ${localizeDigits(offer.percentOff, locale)}%`} tone="gold" />
+            ) : offer.code ? (
+              <Badge text={offer.code} tone="gold" />
+            ) : null}
             <Body size="caption" muted>
               {formatDate(offer.expiresAt)}
             </Body>

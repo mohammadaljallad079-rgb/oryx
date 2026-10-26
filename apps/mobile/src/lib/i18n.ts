@@ -123,6 +123,8 @@ const strings: Record<string, Entry> = {
     ar: 'ابحث عن قطع غيار، خدمات أو مزودين.',
     en: 'Search for parts, services, or providers.',
   },
+  searchShort: { ar: 'ابحث', en: 'Search' },
+  exploreNow: { ar: 'اكتشف الآن', en: 'Explore now' },
 
   // ------------------------------------------------------------ homepage
   searchPlaceholder: {

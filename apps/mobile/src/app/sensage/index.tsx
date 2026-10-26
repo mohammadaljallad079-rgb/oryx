@@ -18,7 +18,7 @@ import {
   SectionLabel,
   StateView,
 } from '../../components/ui';
-import { radius, space, typography } from '../../lib/theme';
+import { brand, radius, space, typography } from '../../lib/theme';
 import { formatDate, localizeDigits } from '../../lib/format';
 
 /**
@@ -107,7 +107,7 @@ export default function SensageHome() {
 const styles = StyleSheet.create({
   hero: { borderRadius: radius.lg, overflow: 'hidden' },
   heroBody: { position: 'absolute', inset: 0, padding: space.lg, justifyContent: 'flex-end', gap: space.xs },
-  heroTitle: { color: '#ffffff', fontSize: typography.heading, fontWeight: '700' },
+  heroTitle: { color: brand.onNavy, fontSize: typography.heading, fontWeight: '700' },
   heroText: { color: 'rgba(255,255,255,0.9)', fontSize: typography.label },
   sectionHead: { marginTop: space.md },
 });

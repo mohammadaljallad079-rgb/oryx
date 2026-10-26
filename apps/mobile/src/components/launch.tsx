@@ -5,7 +5,7 @@ import { useApp } from '../lib/app-context';
 import { photo } from '../lib/assets';
 import { Logo } from '../components/brand';
 import { Photo, Scrim } from '../components/ui';
-import { radius, space, typography } from '../lib/theme';
+import { brand, radius, space, typography } from '../lib/theme';
 
 /**
  * The branded launch screen.
@@ -23,9 +23,9 @@ import { radius, space, typography } from '../lib/theme';
  * the hand-off from the platform splash, which is always navy, so it must not
  * step colour between themes.
  */
-const NAVY = '#00162b';
-const NAVY_DEEP = '#000f1e';
-const GOLD = '#d4af37';
+const NAVY = brand.navy;
+const NAVY_DEEP = brand.navyDeep;
+const GOLD = brand.gold;
 
 /** One sweep of the loader. The stage captions advance independently of it. */
 const FILL_MS = 1700;
@@ -92,13 +92,18 @@ export function LaunchScreen() {
 
       {/* Golden-hour light: a warm film breathing across the middle of the frame. */}
       <Animated.View style={[styles.sunBand, { opacity: glowOpacity }]}>
-        <Scrim color={GOLD} from={0.0} to={0.44} bands={12} />
+        <Scrim color={GOLD} from={0.0} to={0.46} bands={12} />
       </Animated.View>
 
-      {/* Navy at the top so the lockup reads, and at the bottom for the tagline. */}
-      <Scrim color={NAVY} from={0.96} to={0.2} bands={14} />
+      {/* Navy at the top so the lockup reads, and at the bottom for the tagline.
+          Both bands fade out, so the photograph reads through the middle of the
+          frame the way the approved hero does rather than sitting under a flat
+          navy field. */}
+      <View style={styles.topFade}>
+        <Scrim color={NAVY} from={0.94} to={0.0} bands={12} />
+      </View>
       <View style={styles.lowerFade}>
-        <Scrim color={NAVY_DEEP} from={0.12} to={0.97} bands={16} />
+        <Scrim color={NAVY_DEEP} from={0.0} to={0.95} bands={16} />
       </View>
 
       <Animated.View style={[styles.content, { opacity: fade }]}>
@@ -125,6 +130,7 @@ export function LaunchScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: NAVY },
   sunBand: { position: 'absolute', left: 0, right: 0, top: '15%', height: '44%' },
+  topFade: { position: 'absolute', left: 0, right: 0, top: 0, height: '40%' },
   lowerFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '62%' },
   content: {
     ...StyleSheet.absoluteFillObject,
@@ -142,7 +148,7 @@ const styles = StyleSheet.create({
   },
   bottom: { alignItems: 'center', gap: space.sm },
   tagline: {
-    color: '#ffffff',
+    color: brand.onNavy,
     fontSize: typography.display,
     fontWeight: '700',
     textAlign: 'center',
@@ -152,7 +158,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 10,
   },
   sub: {
-    color: '#c8d6e4',
+    color: brand.onNavyMuted,
     fontSize: typography.label,
     textAlign: 'center',
     letterSpacing: 0.6,
@@ -167,7 +173,7 @@ const styles = StyleSheet.create({
   },
   progressFill: { height: '100%', backgroundColor: GOLD },
   stage: {
-    color: '#e8eef5',
+    color: brand.onNavyStrong,
     fontSize: typography.label,
     fontWeight: '600',
     marginTop: space.md,
