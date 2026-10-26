@@ -29,7 +29,16 @@ mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch();
 
 for (const locale of ['en', 'ar']) {
-  const ctx = await browser.newContext({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 2 });
+  // The launch screen reads the device locale, not the stored preference — the
+  // stored one is only applied once the restore resolves, which is after this
+  // screen is gone. Setting localStorage alone therefore produced an English
+  // frame for both languages. The context locale is what the device locale maps
+  // to on web, so it is what decides the launch copy and its direction.
+  const ctx = await browser.newContext({
+    viewport: { width: 430, height: 932 },
+    deviceScaleFactor: 2,
+    locale: locale === 'ar' ? 'ar-SA' : 'en-US',
+  });
   await ctx.addInitScript(
     ([loc, hold]) => {
       localStorage.setItem('oryx.marketplace.locale', JSON.stringify(loc));
