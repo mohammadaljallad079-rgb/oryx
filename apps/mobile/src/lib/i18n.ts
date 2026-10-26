@@ -101,6 +101,28 @@ const strings: Record<string, Entry> = {
   notifications: { ar: 'الإشعارات', en: 'Notifications' },
   seeAll: { ar: 'عرض الكل', en: 'See all' },
   back: { ar: 'رجوع', en: 'Back' },
+  tabCategories: { ar: 'الأقسام', en: 'Categories' },
+  tabSearch: { ar: 'البحث', en: 'Search' },
+  tabBookings: { ar: 'حجوزاتي', en: 'Bookings' },
+  tabProfile: { ar: 'حسابي', en: 'Profile' },
+  spareParts: { ar: 'قطع الغيار', en: 'Spare parts' },
+  carInspection: { ar: 'فحص السيارات', en: 'Car inspection' },
+  catTowing: { ar: 'سحب السيارات', en: 'Towing' },
+  accessories: { ar: 'إكسسوارات', en: 'Accessories' },
+  featuredProviders: { ar: 'المزودون المميزون', en: 'Featured providers' },
+  popularProducts: { ar: 'المنتجات الأكثر طلباً', en: 'Popular products' },
+  bookService: { ar: 'احجز خدمة', en: 'Book a service' },
+  bookInspection: { ar: 'احجز فحصاً', en: 'Book an inspection' },
+  bookMaintenance: { ar: 'احجز صيانة', en: 'Book maintenance' },
+  heroTagline: { ar: 'كل ما تحتاجه سيارتك', en: 'Everything Your Car Needs' },
+  heroSubtitle: {
+    ar: 'قطع غيار · خدمات · مزودون موثوقون',
+    en: 'Parts · Services · Trusted Providers',
+  },
+  searchEverything: {
+    ar: 'ابحث عن قطع غيار، خدمات أو مزودين.',
+    en: 'Search for parts, services, or providers.',
+  },
 
   // ------------------------------------------------------------ homepage
   searchPlaceholder: {

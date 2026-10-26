@@ -1,105 +1,149 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Easing, StyleSheet, Text, View } from 'react-native';
 
 import { useApp } from '../lib/app-context';
 import { photo } from '../lib/assets';
 import { Logo } from '../components/brand';
-import { Photo } from '../components/ui';
-import { space, typography } from '../lib/theme';
+import { Photo, Scrim } from '../components/ui';
+import { radius, space, typography } from '../lib/theme';
 
 /**
  * Branded launch screen.
  *
- * Android 12 and later compose the launch screen from a window background and a
- * single centred icon, so a photographic splash is not drawn by the platform —
- * `assets/splash.png` is only used on older releases. This screen is what makes
- * the photography visible on a modern device: it covers the first moment after
- * the platform splash until the stored session has been read.
+ * Composed to the approved mockup. Measured from the reference: the wordmark sits
+ * in the top sixth of the frame, the hero photograph fills the middle, and the
+ * tagline and the gold progress bar sit in the lower third over a dark fade. The
+ * platform splash on Android 12 and later is a window background plus a single
+ * centred icon, so it cannot carry photography; this screen covers the moment
+ * after it and is what makes the approved design visible.
  *
- * It is deliberately self-contained rather than composed from the theme tokens.
- * The identity here is fixed brand navy, not the user's chosen theme, so the
- * hand-off from the platform splash (always navy) to this screen has no colour
- * step. The gold accent and the wordmark are the approved ones.
+ * The photography is a real bundled asset with a navy scrim over it, and the
+ * wordmark is the approved ORYX file. Nothing here is a flattened mockup.
  *
- * The stage labels advance on a timer purely so the screen does not look frozen;
- * they do not gate anything. `AppProvider` decides when it is ready.
+ * The palette is fixed brand navy rather than the user's theme: the hand-off from
+ * the platform splash, which is always navy, must not step colour.
  */
-const STAGES = ['launchParts', 'launchServices', 'launchSensage'] as const;
-const STAGE_MS = 620;
 const NAVY = '#00162b';
+const NAVY_DEEP = '#000f1e';
 const GOLD = '#d4af37';
 
+/** How long the bar takes to travel once. The stage timer gates nothing. */
+const FILL_MS = 1500;
+const STAGES = ['launchParts', 'launchServices', 'launchSensage'] as const;
+
 export function LaunchScreen() {
-  const { t, locale } = useApp();
+  const { t, locale, direction } = useApp();
   const [stage, setStage] = useState(0);
+  const fill = useRef(new Animated.Value(0)).current;
+  const fade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const timer = setInterval(() => setStage((s) => (s + 1) % STAGES.length), STAGE_MS);
-    return () => clearInterval(timer);
-  }, []);
+    // The bar sweeps to 85% and holds; the last 15% is released when the app
+    // reports ready, so the indicator never claims completion early.
+    const sweep = Animated.timing(fill, {
+      toValue: 0.85,
+      duration: FILL_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    });
+    const reveal = Animated.timing(fade, {
+      toValue: 1,
+      duration: 520,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    });
+    sweep.start();
+    reveal.start();
+    const timer = setInterval(() => setStage((s) => (s + 1) % STAGES.length), 900);
+    return () => {
+      clearInterval(timer);
+      sweep.stop();
+      reveal.stop();
+    };
+  }, [fill, fade]);
 
   const stageKey = STAGES[stage] ?? STAGES[0];
+  const width = fill.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
   return (
     <View style={styles.root}>
-      <Photo source={photo('carwashPremium')} height={300} width="100%" radiusValue={0} overlay />
+      {/* The hero photograph, full bleed. */}
+      <Photo source={photo('garageInterior')} radiusValue={0} style={StyleSheet.absoluteFill} />
 
-      <View style={styles.body}>
-        <Logo width={190} />
-        <Text style={styles.tagline}>{t('appNameFull')}</Text>
-
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${((stage + 1) / STAGES.length) * 100}%` }]} />
-        </View>
-
-        <Text style={styles.stage}>{t(stageKey)}</Text>
-
-        <View style={styles.row}>
-          <ActivityIndicator color={GOLD} size="small" />
-          <Text style={styles.preparing}>{t('launchPreparing')}</Text>
-        </View>
+      {/* Navy fades top and bottom, so the wordmark and the tagline both read. */}
+      <Scrim color={NAVY} from={0.94} to={0.18} bands={12} />
+      <View style={styles.lowerFade}>
+        <Scrim color={NAVY_DEEP} from={0.15} to={0.96} bands={14} />
       </View>
 
-      <Text style={styles.locale}>{locale === 'ar' ? 'العربية' : 'English'}</Text>
+      <Animated.View style={[styles.content, { opacity: fade }]}>
+        <View style={styles.top}>
+          <Logo width={196} />
+          <Text style={[styles.wordmarkSub, { writingDirection: direction }]}>
+            {locale === 'ar' ? 'لخدمات السيارات' : 'AUTO SERVICES'}
+          </Text>
+        </View>
+
+        <View style={styles.bottom}>
+          <Text style={[styles.tagline, { writingDirection: direction }]}>{t('heroTagline')}</Text>
+          <Text style={[styles.sub, { writingDirection: direction }]}>{t('heroSubtitle')}</Text>
+
+          <View style={styles.progressTrack}>
+            <Animated.View style={[styles.progressFill, { width }]} />
+          </View>
+
+          <View style={styles.row}>
+            <ActivityIndicator color={GOLD} size="small" />
+            <Text style={styles.stage}>{t(stageKey)}</Text>
+          </View>
+        </View>
+      </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: NAVY },
-  body: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+  lowerFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '58%' },
+  content: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'space-between',
     paddingHorizontal: space.xl,
+    paddingTop: space.xxxl * 1.6,
+    paddingBottom: space.xxxl,
   },
+  top: { alignItems: 'center', gap: space.sm },
+  wordmarkSub: {
+    color: 'rgba(212, 175, 55, 0.92)',
+    fontSize: typography.caption,
+    letterSpacing: 4.2,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  bottom: { alignItems: 'center', gap: space.sm },
   tagline: {
-    color: '#9fb3c8',
+    color: '#ffffff',
+    fontSize: typography.title,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: 0.3,
+  },
+  sub: {
+    color: '#b9c7d6',
     fontSize: typography.label,
-    marginTop: space.sm,
+    textAlign: 'center',
     letterSpacing: 0.4,
   },
   progressTrack: {
-    width: '62%',
+    width: '64%',
     height: 3,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    marginTop: space.xxl,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    marginTop: space.xl,
     overflow: 'hidden',
   },
   progressFill: { height: '100%', backgroundColor: GOLD },
-  stage: {
-    color: '#eef3f9',
-    fontSize: typography.body,
-    fontWeight: '600',
-    marginTop: space.lg,
-  },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.sm },
-  preparing: { color: '#6f8598', fontSize: typography.caption },
-  locale: {
-    color: '#6f8598',
-    fontSize: typography.caption,
-    textAlign: 'center',
-    paddingBottom: space.xl,
-  },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.md },
+  stage: { color: '#eef3f9', fontSize: typography.label, fontWeight: '600' },
 });
+

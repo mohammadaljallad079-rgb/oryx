@@ -495,6 +495,48 @@ export function Rail({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * A vertical fade drawn as stacked bands.
+ *
+ * The approved look needs a gradient over photography — dark at the top so the
+ * logo reads, dark at the bottom so the tagline reads — but the app ships no
+ * gradient dependency and adding one for this would be a heavier change than the
+ * effect is worth. Banding is invisible at these opacities because each band
+ * differs from its neighbour by only a few percent.
+ */
+export function Scrim({
+  color = '#00162b',
+  from = 0.92,
+  to = 0,
+  bands = 14,
+  style,
+}: {
+  color?: string;
+  from?: number;
+  to?: number;
+  bands?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, style]}>
+      {Array.from({ length: bands }, (_, i) => {
+        const t = bands === 1 ? 1 : i / (bands - 1);
+        const opacity = from + (to - from) * t;
+        return (
+          <View
+            key={i}
+            style={{
+              flex: 1,
+              backgroundColor: color,
+              opacity: Math.max(0, Math.min(1, opacity)),
+            }}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
 /** A tappable list row: leading slot, title/subtitle, trailing slot. */
 export function ListRow({
   title,

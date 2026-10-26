@@ -19,7 +19,7 @@ const APP_DIR = join(__dirname, '..', 'src', 'app');
 
 /** The shells that render a tab bar, with the destinations each one shows. */
 const SHELLS = [
-  { dir: '(tabs)', tabs: ['account', 'home', 'parts', 'sensage', 'services'] },
+  { dir: '(tabs)', tabs: ['account', 'bookings', 'categories', 'home', 'search'] },
   { dir: 'merchant', tabs: ['dashboard', 'orders', 'products', 'profile', 'services'] },
 ];
 

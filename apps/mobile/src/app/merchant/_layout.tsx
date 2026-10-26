@@ -14,10 +14,13 @@ function TabIcon({ glyph, color }: { glyph: string; color: string }) {
  * The merchant shell.
  *
  * Five destinations for the store owner: the dashboard, the catalogue, orders,
- * the service side (bookings and recovery) and the store profile. Every other
- * merchant screen is pushed onto the stack, so each of them is declared with
- * `href: null` — Expo Router otherwise renders every file under this directory as
- * an extra tab.
+ * the service side (bookings and recovery) and the store profile. The bar is the
+ * same tokens as the customer shell, so the merchant side reads as the same
+ * product rather than a separate tool.
+ *
+ * Expo Router registers every file in this directory as a tab, so the plan and
+ * the promotions screens — which are pushed, not destinations — need an explicit
+ * `href: null` or they render as stray tabs labelled with their raw route names.
  */
 export default function MerchantLayout() {
   const { ready, account, theme, t } = useApp();

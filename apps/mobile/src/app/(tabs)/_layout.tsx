@@ -19,10 +19,15 @@ function TabIcon({ glyph, color }: { glyph: string; color: string }) {
 /**
  * The customer shell.
  *
- * Five destinations, as the brief sets out: home, parts, services, SENSAGE and
- * the account. Recovery, cart, orders and the rest are pushed onto the stack, so
- * each of them is declared with `href: null` — Expo Router otherwise renders
- * every file under this directory as an extra tab.
+ * Five destinations, in the order the approved mockup sets out: home, categories,
+ * search, bookings and the profile. The reference's bottom bar is a plain navy
+ * strip with a gold active item and no gold on the inactive ones, which is what
+ * this renders.
+ *
+ * Everything else — a product detail, the cart, checkout, recovery, orders — is
+ * pushed onto the stack, so each of those routes lives outside this group. Expo
+ * Router turns *every* file under a tab group into a tab, so a route that belongs
+ * on the stack must not be here at all; `tabs.test.ts` enforces that.
  */
 export default function TabsLayout() {
   const { ready, account, theme, t } = useApp();
@@ -43,6 +48,7 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: theme.surface,
           borderTopColor: theme.border,
+          borderTopWidth: 1,
           height: 64,
           paddingBottom: 8,
           paddingTop: 6,
@@ -61,30 +67,30 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="parts"
+        name="categories"
         options={{
-          title: t('parts'),
+          title: t('tabCategories'),
           tabBarIcon: ({ color }) => <TabIcon glyph="▦" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="services"
+        name="search"
         options={{
-          title: t('services'),
-          tabBarIcon: ({ color }) => <TabIcon glyph="✦" color={color} />,
+          title: t('tabSearch'),
+          tabBarIcon: ({ color }) => <TabIcon glyph="⌕" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="sensage"
+        name="bookings"
         options={{
-          title: t('sensage'),
-          tabBarIcon: ({ color }) => <TabIcon glyph="◎" color={color} />,
+          title: t('tabBookings'),
+          tabBarIcon: ({ color }) => <TabIcon glyph="▤" color={color} />,
         }}
       />
       <Tabs.Screen
         name="account"
         options={{
-          title: t('account'),
+          title: t('tabProfile'),
           tabBarIcon: ({ color }) => <TabIcon glyph="◉" color={color} />,
         }}
       />

@@ -90,7 +90,9 @@ export default function ProductDetail() {
           </Text>
           {off ? (
             <>
-              <Text style={styles.strike}>{formatMoney(item.compareAtMinor ?? 0)}</Text>
+              <Text style={[styles.strike, { color: theme.textFaint }]}>
+                {formatMoney(item.compareAtMinor ?? 0)}
+              </Text>
               <View style={[styles.offPill, { backgroundColor: theme.gold }]}>
                 <Text style={{ color: theme.onGold, fontSize: typography.caption, fontWeight: '700' }}>
                   {localizeDigits(off, locale)}% {t('off')}
@@ -239,7 +241,7 @@ export default function ProductDetail() {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, flexWrap: 'wrap' },
   priceRow: { alignItems: 'center', gap: space.sm },
-  strike: { color: '#8a8479', textDecorationLine: 'line-through', fontSize: typography.label },
+  strike: { textDecorationLine: 'line-through', fontSize: typography.label },
   offPill: { borderRadius: radius.pill, paddingHorizontal: space.sm, paddingVertical: 2 },
   bar: {
     position: 'absolute',
