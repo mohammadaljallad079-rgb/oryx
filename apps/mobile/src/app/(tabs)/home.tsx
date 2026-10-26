@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -7,53 +7,31 @@ import { photo, photoSmall } from '../../lib/assets';
 import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
 import { AppHeader, DemoBanner } from '../../components/brand';
-import { OfferCard, ProductCard, ProviderCard, StoreCard } from '../../components/cards';
-import {
-  Body,
-  Card,
-  Heading,
-  Photo,
-  Rail,
-  Screen,
-  Scrim,
-  SectionLabel,
-  StateView,
-} from '../../components/ui';
+import { ProductCard, ProviderCard } from '../../components/cards';
+import { Body, Photo, Rail, Screen, Scrim, SectionLabel, StateView } from '../../components/ui';
 import { radius, space, typography } from '../../lib/theme';
 import { localizeDigits } from '../../lib/format';
 
 /**
  * The marketplace home.
  *
- * Laid out to the approved mockup. Read from the reference, top to bottom: the
- * wordmark header with notifications and the cart, the hero photograph carrying
- * the tagline and its search field, the service category rail, the two booking
- * tiles, the SENSAGE card, featured providers, then popular products. The
- * reference puts search *inside* the hero rather than above it, so that is where
- * it sits here.
+ * Built to the approved reference, top to bottom: the wordmark header with the
+ * language toggle, cart and notifications; a tall photographic hero carrying the
+ * tagline and its search field; the five service categories; the two booking
+ * tiles beside the SENSAGE card; featured providers with their ratings; then
+ * popular products.
  *
- * Every rail reads the repository, so the page is a window onto the catalogue
- * rather than a static composition. The hero photograph is a bundled asset with a
- * navy scrim, not a flattened mockup.
+ * The reference places search *inside* the hero rather than above it, so that is
+ * where it sits. Every rail reads the repository, so the page is a window onto
+ * the catalogue rather than a static composition, and the hero photograph is a
+ * bundled asset under a navy scrim, not a flattened mockup.
  */
 export default function Home() {
   const { t, theme, locale, l, direction, dataVersion } = useApp();
   const router = useRouter();
 
-  const banners = useAsync(() => repository.banners(), [dataVersion]);
-  const stores = useAsync(() => repository.stores({ sort: 'rating' }), [dataVersion]);
-  const offers = useAsync(() => repository.offers(), [dataVersion]);
   const providers = useAsync(() => repository.nearbyProviders(6), [dataVersion]);
   const products = useAsync(() => repository.trendingProducts(8), [dataVersion]);
-
-  const [heroIndex, setHeroIndex] = useState(0);
-
-  const quickActions = [
-    { key: 'parts', label: t('parts'), glyph: '▦', href: '/parts' },
-    { key: 'services', label: t('services'), glyph: '✦', href: '/services' },
-    { key: 'sensage', label: t('sensage'), glyph: '◎', href: '/sensage' },
-    { key: 'recovery', label: t('recovery'), glyph: '⛟', href: '/recovery' },
-  ];
 
   const categories = [
     { key: 'spare_parts', label: t('spareParts'), photo: 'partsStore' as const },
@@ -63,20 +41,18 @@ export default function Home() {
     { key: 'accessories', label: t('accessories'), photo: 'carwashPremium' as const },
   ];
 
+  const row = direction === 'rtl' ? 'row-reverse' : 'row';
+
   return (
     <Screen padded={false}>
       <AppHeader />
 
       {/* ------------------------------------------------------------- hero */}
       <View style={styles.heroWrap}>
-        <Photo
-          source={photo('garageInterior')}
-          radiusValue={0}
-          style={StyleSheet.absoluteFill}
-        />
-        <Scrim color="#00162b" from={0.86} to={0.32} bands={12} />
+        <Photo source={photo('autoService')} radiusValue={0} style={StyleSheet.absoluteFill} />
+        <Scrim color="#00162b" from={0.9} to={0.26} bands={12} />
         <View style={styles.heroLowerFade}>
-          <Scrim color="#000f1e" from={0.2} to={0.94} bands={12} />
+          <Scrim color="#000f1e" from={0.16} to={0.95} bands={14} />
         </View>
 
         <View style={styles.heroContent}>
@@ -94,7 +70,7 @@ export default function Home() {
             onPress={() => router.push('/parts')}
             style={({ pressed }) => [styles.heroSearch, pressed && { opacity: 0.92 }]}
           >
-            <Text style={{ color: 'rgba(255,255,255,0.72)', fontSize: typography.body }}>
+            <Text style={{ color: 'rgba(255,255,255,0.82)', fontSize: typography.body }}>
               ⌕  {t('searchEverything')}
             </Text>
           </Pressable>
@@ -104,113 +80,13 @@ export default function Home() {
       <View style={{ padding: space.lg, gap: space.md }}>
         <DemoBanner />
 
-        {/* --------------------------------------------------- hero slider */}
-        {banners.loading ? (
-          <StateView kind="loading" />
-        ) : (banners.data ?? []).length > 0 ? (
-          <View style={{ gap: space.sm }}>
-            <Rail>
-              {(banners.data ?? []).map((banner, i) => (
-                <Pressable
-                  key={banner.id}
-                  testID={`banner-${banner.id}`}
-                  accessibilityRole="button"
-                  onPress={() => {
-                    setHeroIndex(i);
-                    router.push(banner.href);
-                  }}
-                  style={({ pressed }) => [{ width: 292 }, pressed && { opacity: 0.92 }]}
-                >
-                  <View style={[styles.offer, { borderColor: theme.border }]}>
-                    <Photo
-                      source={photo(banner.photo)}
-                      height={168}
-                      width="100%"
-                      radiusValue={radius.lg}
-                    />
-                    <View style={styles.offerBody}>
-                      <Text style={styles.offerTitle}>
-                        {l({ en: banner.titleEn, ar: banner.titleAr })}
-                      </Text>
-                      <Text style={styles.offerText}>
-                        {l({ en: banner.subtitleEn, ar: banner.subtitleAr })}
-                      </Text>
-                      <View style={[styles.offerCta, { backgroundColor: theme.gold }]}>
-                        <Text
-                          style={{
-                            color: theme.onGold,
-                            fontWeight: '700',
-                            fontSize: typography.label,
-                          }}
-                        >
-                          {l({ en: banner.ctaEn, ar: banner.ctaAr })}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                </Pressable>
-              ))}
-            </Rail>
-            <View
-              style={[
-                styles.dots,
-                { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' },
-              ]}
-            >
-              {(banners.data ?? []).map((b, i) => (
-                <View
-                  key={b.id}
-                  style={[
-                    styles.dot,
-                    {
-                      backgroundColor: i === heroIndex ? theme.gold : theme.border,
-                      width: i === heroIndex ? 18 : 6,
-                    },
-                  ]}
-                />
-              ))}
-            </View>
-          </View>
-        ) : null}
-
-        {/* ------------------------------------------------ quick actions */}
-        <View
-          style={[
-            styles.quickRow,
-            { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' },
-          ]}
-        >
-          {quickActions.map((action) => (
-            <Pressable
-              key={action.key}
-              testID={`quick-${action.key}`}
-              accessibilityRole="button"
-              onPress={() => router.push(action.href)}
-              style={({ pressed }) => [styles.quick, pressed && { opacity: 0.85 }]}
-            >
-              <View
-                style={[
-                  styles.quickIcon,
-                  { backgroundColor: theme.surface, borderColor: theme.border },
-                ]}
-              >
-                <Text style={{ color: theme.gold, fontSize: 20 }}>{action.glyph}</Text>
-              </View>
-              <Text
-                style={{ color: theme.text, fontSize: typography.caption, fontWeight: '600' }}
-                numberOfLines={1}
-              >
-                {action.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
         {/* -------------------------------------------- service categories */}
         <View style={styles.sectionHead}>
           <SectionLabel>{t('categories')}</SectionLabel>
           <Pressable onPress={() => router.push('/parts')} testID="categories-see-all">
-            <Text style={{ color: theme.textMuted, fontSize: typography.label }}>{t('seeAll')}</Text>
+            <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '600' }}>
+              {t('seeAll')}
+            </Text>
           </Pressable>
         </View>
         <Rail>
@@ -220,36 +96,50 @@ export default function Home() {
               testID={`category-${category.key}`}
               accessibilityRole="button"
               onPress={() => router.push(`/parts?category=${category.key}`)}
-              style={({ pressed }) => [{ width: 118 }, pressed && { opacity: 0.9 }]}
+              style={({ pressed }) => [{ width: 108 }, pressed && { opacity: 0.9 }]}
             >
               <View style={[styles.catTile, { borderColor: theme.border }]}>
                 <Photo
                   source={photoSmall(category.photo)}
-                  height={82}
+                  height={96}
                   width="100%"
                   radiusValue={radius.md}
                 />
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,22,43,0.42)' }]} />
+                <Text style={styles.catLabel} numberOfLines={2}>
+                  {category.label}
+                </Text>
               </View>
-              <Text
-                style={{
-                  color: theme.text,
-                  fontSize: typography.caption,
-                  fontWeight: '600',
-                  marginTop: space.sm,
-                  textAlign: 'center',
-                }}
-                numberOfLines={2}
-              >
-                {category.label}
-              </Text>
             </Pressable>
           ))}
         </Rail>
 
-        {/* ------------------------------------- the two booking tiles */}
-        <View
-          style={[styles.bookRow, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}
-        >
+        {/* ---------------------------------- SENSAGE and the booking tiles */}
+        <View style={[styles.tileRow, { flexDirection: row }]}>
+          <Pressable
+            testID="sensage-cta"
+            accessibilityRole="button"
+            onPress={() => router.push('/sensage')}
+            style={({ pressed }) => [
+              styles.sensageTile,
+              { backgroundColor: theme.surface, borderColor: theme.borderStrong },
+              pressed && { opacity: 0.92 },
+            ]}
+          >
+            <View style={styles.sensageHead}>
+              <Text style={{ color: theme.gold, fontSize: 18 }}>◎</Text>
+              <Text style={[styles.tileTitle, { color: theme.text }]} numberOfLines={1}>
+                SENSAGE AI
+              </Text>
+            </View>
+            <Text style={[styles.tileBody, { color: theme.textMuted }]} numberOfLines={2}>
+              {l({ en: 'Car inspection with AI', ar: 'فحص السيارة بالذكاء الاصطناعي' })}
+            </Text>
+            <Text style={[styles.tileCta, { color: theme.gold }]}>
+              {t('startAnalysis')} {direction === 'rtl' ? '‹' : '›'}
+            </Text>
+          </Pressable>
+
           <Pressable
             testID="book-service"
             accessibilityRole="button"
@@ -257,91 +147,47 @@ export default function Home() {
             style={({ pressed }) => [
               styles.bookTile,
               { backgroundColor: theme.surface, borderColor: theme.border },
-              pressed && { opacity: 0.9 },
+              pressed && { opacity: 0.92 },
             ]}
           >
-            <Text style={{ color: theme.gold, fontSize: 22 }}>🛠</Text>
-            <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.label }}>
-              {t('bookMaintenance')}
+            <Text style={{ color: theme.gold, fontSize: 18 }}>🛠</Text>
+            <Text style={[styles.tileTitle, { color: theme.text }]} numberOfLines={1}>
+              {t('bookService')}
             </Text>
-            <Text style={{ color: theme.textMuted, fontSize: typography.caption }}>
-              {t('services')}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            testID="book-inspection"
-            accessibilityRole="button"
-            onPress={() => router.push('/bookings/new')}
-            style={({ pressed }) => [
-              styles.bookTile,
-              { backgroundColor: theme.surface, borderColor: theme.border },
-              pressed && { opacity: 0.9 },
-            ]}
-          >
-            <Text style={{ color: theme.gold, fontSize: 22 }}>🔍</Text>
-            <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.label }}>
-              {t('bookInspection')}
-            </Text>
-            <Text style={{ color: theme.textMuted, fontSize: typography.caption }}>
-              {t('carInspection')}
+            <Text style={[styles.tileBody, { color: theme.textMuted }]} numberOfLines={2}>
+              {l({ en: 'Maintenance & repair', ar: 'صيانة وإصلاح' })}
             </Text>
           </Pressable>
         </View>
-
-        {/* ------------------------------------------------------ SENSAGE */}
-        <Card>
-          <View
-            style={[
-              styles.sensageRow,
-              { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' },
-            ]}
-          >
-            <View style={{ flex: 1 }}>
-              <Heading size="subheading">{t('sensageTitle')}</Heading>
-              <Body muted size="label" style={{ marginTop: space.xs }}>
-                {t('sensageIntro')}
-              </Body>
-              <Pressable
-                onPress={() => router.push('/sensage')}
-                style={{ marginTop: space.md }}
-                accessibilityRole="button"
-                testID="sensage-cta"
-              >
-                <Text style={{ color: theme.gold, fontWeight: '700', fontSize: typography.label }}>
-                  {t('startAnalysis')} {direction === 'rtl' ? '‹' : '›'}
-                </Text>
-              </Pressable>
-            </View>
-            <Photo
-              source={photoSmall('evCharging')}
-              height={84}
-              width={84}
-              radiusValue={radius.md}
-            />
-          </View>
-        </Card>
 
         {/* -------------------------------------------- featured providers */}
         <View style={styles.sectionHead}>
           <SectionLabel>{t('featuredProviders')}</SectionLabel>
           <Pressable onPress={() => router.push('/services')} testID="providers-see-all">
-            <Text style={{ color: theme.textMuted, fontSize: typography.label }}>{t('seeAll')}</Text>
+            <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '600' }}>
+              {t('seeAll')}
+            </Text>
           </Pressable>
         </View>
-        <Rail>
-          {(providers.data ?? []).map((provider) => (
-            <View key={provider.id} style={{ width: 268 }}>
-              <ProviderCard provider={provider} />
-            </View>
-          ))}
-        </Rail>
+        {providers.loading ? (
+          <StateView kind="loading" />
+        ) : (
+          <Rail>
+            {(providers.data ?? []).map((provider) => (
+              <View key={provider.id} style={{ width: 252 }}>
+                <ProviderCard provider={provider} />
+              </View>
+            ))}
+          </Rail>
+        )}
 
         {/* --------------------------------------------- popular products */}
         <View style={styles.sectionHead}>
           <SectionLabel>{t('popularProducts')}</SectionLabel>
           <Pressable onPress={() => router.push('/parts')} testID="products-see-all">
-            <Text style={{ color: theme.textMuted, fontSize: typography.label }}>{t('seeAll')}</Text>
+            <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '600' }}>
+              {t('seeAll')}
+            </Text>
           </Pressable>
         </View>
         <Rail>
@@ -350,25 +196,46 @@ export default function Home() {
           ))}
         </Rail>
 
-        {/* ------------------------------------------ offers and stores */}
-        <View style={styles.sectionHead}>
-          <SectionLabel>{t('offersAndDiscounts')}</SectionLabel>
-        </View>
-        <Rail>
-          {(offers.data ?? []).map((offer) => (
-            <OfferCard key={offer.id} offer={offer} />
-          ))}
-        </Rail>
+        {/* ---------------------------------------- the two CTA banners */}
+        <View style={[styles.tileRow, { flexDirection: row }]}>
+          <Pressable
+            testID="book-inspection"
+            accessibilityRole="button"
+            onPress={() => router.push('/bookings/new')}
+            style={({ pressed }) => [
+              styles.bookTile,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+              pressed && { opacity: 0.92 },
+            ]}
+          >
+            <Text style={{ color: theme.gold, fontSize: 18 }}>🔍</Text>
+            <Text style={[styles.tileTitle, { color: theme.text }]} numberOfLines={1}>
+              {t('bookInspection')}
+            </Text>
+            <Text style={[styles.tileBody, { color: theme.textMuted }]} numberOfLines={2}>
+              {t('carInspection')}
+            </Text>
+          </Pressable>
 
-        <View style={styles.sectionHead}>
-          <SectionLabel>{t('featuredStores')}</SectionLabel>
-          <Pressable onPress={() => router.push('/parts?tab=stores')}>
-            <Text style={{ color: theme.textMuted, fontSize: typography.label }}>{t('seeAll')}</Text>
+          <Pressable
+            testID="quick-recovery"
+            accessibilityRole="button"
+            onPress={() => router.push('/recovery')}
+            style={({ pressed }) => [
+              styles.bookTile,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+              pressed && { opacity: 0.92 },
+            ]}
+          >
+            <Text style={{ color: theme.gold, fontSize: 18 }}>⛟</Text>
+            <Text style={[styles.tileTitle, { color: theme.text }]} numberOfLines={1}>
+              {t('recovery')}
+            </Text>
+            <Text style={[styles.tileBody, { color: theme.textMuted }]} numberOfLines={2}>
+              {t('catTowing')}
+            </Text>
           </Pressable>
         </View>
-        {(stores.data ?? []).slice(0, 4).map((store) => (
-          <StoreCard key={store.id} store={store} />
-        ))}
 
         <Body size="caption" muted align="center" style={{ marginTop: space.md }}>
           {localizeDigits(2026, locale)} · ORYX Marketplace · {t('demoData')}
@@ -379,8 +246,8 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  heroWrap: { height: 336, overflow: 'hidden', backgroundColor: '#00162b' },
-  heroLowerFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '62%' },
+  heroWrap: { height: 392, overflow: 'hidden', backgroundColor: '#00162b' },
+  heroLowerFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '66%' },
   heroContent: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
@@ -389,69 +256,61 @@ const styles = StyleSheet.create({
   },
   heroTagline: {
     color: '#ffffff',
-    fontSize: typography.title,
+    fontSize: typography.display,
     fontWeight: '700',
     textShadowColor: 'rgba(0,0,0,0.45)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
-  heroSub: { color: 'rgba(255,255,255,0.86)', fontSize: typography.label },
+  heroSub: { color: 'rgba(255,255,255,0.88)', fontSize: typography.label },
   heroSearch: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.28)',
-    backgroundColor: 'rgba(0,22,43,0.55)',
+    borderColor: 'rgba(255,255,255,0.32)',
+    backgroundColor: 'rgba(0,22,43,0.62)',
     borderRadius: radius.pill,
     paddingHorizontal: space.lg,
     paddingVertical: space.md,
     minHeight: 48,
     marginTop: space.sm,
   },
-  offer: { borderRadius: radius.lg, overflow: 'hidden' },
-  offerBody: {
-    position: 'absolute',
-    inset: 0,
-    padding: space.md,
-    justifyContent: 'flex-end',
-    gap: space.xs,
-  },
-  offerTitle: { color: '#ffffff', fontSize: typography.heading, fontWeight: '700' },
-  offerText: { color: 'rgba(255,255,255,0.88)', fontSize: typography.caption },
-  offerCta: {
-    alignSelf: 'flex-start',
-    borderRadius: radius.pill,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
-    marginTop: space.xs,
-  },
-  dots: { gap: space.sm, justifyContent: 'center', alignItems: 'center' },
-  dot: { height: 6, borderRadius: 3 },
-  quickRow: { gap: space.md, marginTop: space.sm },
-  quick: { flex: 1, alignItems: 'center', gap: space.sm },
-  quickIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: space.md,
+    marginTop: space.sm,
   },
-  catTile: { borderRadius: radius.md, borderWidth: 1, overflow: 'hidden' },
-  bookRow: { gap: space.md, marginTop: space.sm },
+  catTile: { borderRadius: radius.md, borderWidth: 1, overflow: 'hidden', height: 96 },
+  catLabel: {
+    position: 'absolute',
+    left: space.sm,
+    right: space.sm,
+    bottom: space.sm,
+    color: '#ffffff',
+    fontSize: typography.caption,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  tileRow: { gap: space.md, marginTop: space.xs },
+  sensageTile: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    padding: space.md,
+    gap: space.xs,
+    minHeight: 116,
+  },
+  sensageHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   bookTile: {
     flex: 1,
     borderWidth: 1,
     borderRadius: radius.lg,
     padding: space.md,
     gap: space.xs,
-    minHeight: 104,
+    minHeight: 116,
   },
-  sensageRow: { alignItems: 'center', gap: space.md },
+  tileTitle: { fontSize: typography.label, fontWeight: '700' },
+  tileBody: { fontSize: typography.caption },
+  tileCta: { fontSize: typography.caption, fontWeight: '700', marginTop: 'auto' },
 });

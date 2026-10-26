@@ -9,9 +9,10 @@ they survive a lost sandbox.
 | `ORYX_Splash_Reference.jpg` | 1536×1024 | attached by the owner |
 | `ORYX_Homepage_Reference.jpg` | 1536×1024 | attached by the owner |
 
-Both are landscape 3:2 mockups. They are **references, not assets**: no mockup is
-shipped in the bundle and none is used as a flat background image. Every element
-is a React Native component.
+Both are landscape 3:2 mockups, each carrying **two phone screens side by side**
+(English on the left, Arabic on the right). They are **references, not assets**:
+no mockup is shipped in the bundle and none is used as a flat background image.
+Every element is a React Native component.
 
 ## The official logo
 
@@ -31,22 +32,64 @@ plate behind it.
 The logo is never redrawn, recoloured, or regenerated. If a reference mockup
 shows a mark that differs from these files, the files win.
 
-## What the mockups are measured to contain
+## What the mockups actually contain
 
-Measured, not eyeballed — a colour and edge analysis of both files:
+Read by OCR (`tesseract`, `eng` + `ara`) over each phone screen, not eyeballed.
+The extraction is reproducible with `.run/capture-splash-home.mjs`, and the
+reference-versus-implemented sheets are in `docs/audit/exec07/splash-home/`.
 
-- The field is deep navy, `#02101d` to `#0e1a28`, with near-black bars at
-  `#04050a`. This matches the approved `#00162b` family.
-- **Splash:** a gold band across roughly 15–35% of the height, a navy field, then
-  a bottom bar at `#040e18`. Logo high, car through the middle, indicator low.
-- **Homepage:** a large warm gold region from about 30% to 85% of the height —
-  the hero photography — and a dark bottom bar at `#06070b` carrying **no gold at
-  all**, meaning no tab is highlighted in the reference. The active-tab treatment
-  is therefore a decision for this implementation, not something to copy.
+### `ORYX_Splash_Reference.jpg` — carries the **homepage** design
+
+Its two phone screens show the full marketplace home, top to bottom:
+
+- wordmark header, then the hero with **“Everything Your Car Needs”** and
+  **“Parts + Services + Trusted Providers”**;
+- a search field reading *“Search for parts, services, or providers…”*;
+- five category tiles: **Spare Parts, Maintenance, Car Inspection, Towing,
+  Accessories**;
+- the **SENSAGE AI** card beside a **Book a Service** tile;
+- **Featured Providers** — “BMW Service Center 4.8”, “Bridgestone Tires 4.7”,
+  “4.6 (280)”;
+- **Popular Products**;
+- a bottom bar with five items: **Home, Categories, Search, Bookings, Profile**.
+
+That is the homepage. The file name says otherwise.
+
+### `ORYX_Homepage_Reference.jpg` — carries a **hero / splash** composition
+
+Its two phone screens show a large photographic hero under warm golden light with
+the wordmark, the tagline and the three-part subtitle. There is **no bottom
+navigation bar, no category rail, no provider rail and no product rail** — the
+composition is the photograph plus the brand lockup.
+
+### The two names are swapped relative to their content
+
+The owner's brief describes the splash as a cinematic frame and the homepage as
+the full marketplace page. The files carry the opposite names. The implementation
+therefore follows **content**, not file name:
+
+| Implemented screen | Built from |
+| --- | --- |
+| Splash | the hero composition in `ORYX_Homepage_Reference.jpg` + the owner's written brief |
+| Homepage | the marketplace page in `ORYX_Splash_Reference.jpg` |
+
+This is recorded rather than silently worked around, because a future reader who
+trusts the file names will build the wrong screen.
+
+### The reference's bottom bar carries no gold
+
+In the homepage reference the bottom bar is a plain navy strip with **no
+highlighted item** — no tab carries gold. The active-tab treatment is therefore a
+decision for this implementation, not something copied from the reference: the
+app tints the active item with the theme accent so the current destination is
+identifiable.
 
 ## Status
 
-The layout has not been rewritten from these references yet. A vision model is
-required to read the mockups in detail, and the model serving this session is
-text-only. What is committed here is the groundwork: the references preserved,
-the official logo located and verified, and the measurements above.
+The Splash and the Homepage are rebuilt against these references and captured in
+both languages, in the light and dark themes and at phone, tablet and desktop
+widths. See `docs/audit/exec07/splash-home/` for the captures and the
+reference-versus-implemented sheets.
+
+The remaining demo screens have not been re-measured against these references;
+only the two the owner named were rebuilt.
