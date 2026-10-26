@@ -142,6 +142,40 @@ into the manifest so a re-run cannot drop the launch frames — was kept.
 
 All of it is under `docs/audit/exec07/` and committed.
 
+### 4.0 The design preview on GitHub Pages — the permanent link
+
+Everything below is also published as one browsable site, rebuilt by GitHub
+Actions on every push and served from Pages, so the link outlives any editor
+session:
+
+**https://mohammadaljallad079-rgb.github.io/oryx/mobile/**
+
+| Page | URL | What it shows |
+| --- | --- | --- |
+| Mobile app | [/oryx/mobile/](https://mohammadaljallad079-rgb.github.io/oryx/mobile/) | The Splash and Homepage against their references, all 67 screens, the APK details and the demo accounts |
+| Overview | [/oryx/overview/](https://mohammadaljallad079-rgb.github.io/oryx/overview/) | What the preview covers, and what it cannot |
+| The website | [/oryx/](https://mohammadaljallad079-rgb.github.io/oryx/) | The real customer website, statically exported |
+| Design evidence | [/oryx/evidence/](https://mohammadaljallad079-rgb.github.io/oryx/evidence/) | Phase E before/after and light-vs-dark |
+| Reports | [/oryx/reports/](https://mohammadaljallad079-rgb.github.io/oryx/reports/) | Every audit report, rendered |
+| Brand | [/oryx/brand/](https://mohammadaljallad079-rgb.github.io/oryx/brand/) | The approved logo and references |
+
+The mobile section was added this session: the preview previously covered the
+website, the evidence, the reports and the brand, but not the application the
+owner reviews on a phone. It now publishes the four reference-versus-implemented
+sheets, the Splash in both languages at two widths, the Homepage in both
+languages and themes **including the scrolled frames that show the restored
+offers rail and featured stores**, all 67 gallery screens grouped by locale, the
+contact sheet, the APK's commit/size/SHA-256, the artifact link and the demo
+accounts.
+
+Verified against the **published** site, not the local build: `/mobile/` answers
+`200`, all **84** images it references return `200`, and the six entry points
+above all resolve. The build's own checks pass too — 63 page/theme combinations
+render with no issue, and the link crawl reaches 408 pages with 0 bad responses
+and 0 dark-mode issues.
+
+### 4.1 The committed files
+
 | Path | What it holds |
 | --- | --- |
 | `splash-home/` | Splash in both locales at two widths; Home in both languages, both themes and three widths; a three-part scrolled pass per locale and theme; four reference-versus-implemented sheets |
@@ -150,7 +184,7 @@ All of it is under `docs/audit/exec07/` and committed.
 | `marketplace-demo/screenshots/` | The 67-screen gallery, its contact sheet and its manifest |
 | `marketplace-demo/README.md` | The index, with a GitHub link per screen |
 
-### 4.1 Honest limits on the visual comparison
+### 4.2 Honest limits on the visual comparison
 
 **This environment has no working vision.** The image tool reports that a file
 was read; it does not return the pixels, so the composition was **not** judged by
@@ -196,17 +230,24 @@ gh run download 40272958202 --repo mohammadaljallad079-rgb/oryx --name oryx-mark
 That yields `app-release.apk` and `oryx-marketplace.apk.sha256`. The artifact
 holds the raw APK; the smaller number above is the zip's own size.
 
-**Direct download while this environment is up** — no GitHub sign-in needed:
+**Direct download while this environment is up** — no GitHub sign-in needed.
+Four equivalent URLs, on both ingress hosts:
 
 ```
-https://work-1-wnlnfdgztqwaahad.prod-runtime.all-hands.dev/evidence/exec07-phase-e/apk/oryx-marketplace-1.0.0.apk
+https://work-1-wnlnfdgztqwaahad.prod-runtime.all-hands.dev/apk/oryx-marketplace.apk
+https://work-2-wnlnfdgztqwaahad.prod-runtime.all-hands.dev/apk/oryx-marketplace.apk
+https://work-1-wnlnfdgztqwaahad.prod-runtime.all-hands.dev/apk/
+https://work-2-wnlnfdgztqwaahad.prod-runtime.all-hands.dev/apk/
 ```
 
-It is served with `Content-Type: application/vnd.android.package-archive` and
-`Content-Disposition: attachment`, so a phone downloads it rather than trying to
-render it. The copy behind that link was downloaded through the public host and
-re-hashed here: it matches `19f79e7f…`. This link dies with the sandbox; the
-artifact above is the durable one.
+The short path serves a small download page with the install steps and the
+expected hash; `/apk/oryx-marketplace.apk` is the file itself, and
+`/apk/oryx-marketplace.apk.sha256` is the checksum. All of them answer
+`Content-Type: application/vnd.android.package-archive` with
+`Content-Disposition: attachment`, so a phone downloads the file rather than
+trying to render it. The copy behind these links was downloaded through the
+public host and re-hashed here: it matches `19f79e7f…`. These links die with the
+sandbox; the artifact above is the durable one.
 
 The workflow typechecks, lints and tests the app; generates the native project
 with `expo prebuild`; builds the release APK; hashes it; writes the commit, the
