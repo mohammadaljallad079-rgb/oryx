@@ -10,22 +10,38 @@ import { brand, radius, space, typography } from '../lib/theme';
 /**
  * The branded launch screen.
  *
- * Composition, per the approved reference: a full-bleed vehicle photograph under
- * warm golden light, a deep navy field top and bottom so the lockup and the
- * tagline both read, the official ORYX lockup high in the frame, the tagline in
- * the reader's language, and a restrained gold loader low in the frame.
+ * Built to the approved reference, whose composition was measured off the image
+ * rather than estimated:
  *
- * The photographic layer is a real bundled asset with a gold film over it, not a
- * flattened mockup. The warm band reproduces the golden-hour light without
- * shipping a second image.
+ *   - the official ORYX lockup sits at 20-29% of the frame height, centred;
+ *   - the tagline is the largest thing on the screen, two lines centred at
+ *     75% and 80%, with the subtitle under it at 84%;
+ *   - a full-bleed vehicle photograph reads through the middle of the frame,
+ *     brightest between 25% and 45%;
+ *   - navy fields hold the top and the bottom, each fading out so they never
+ *     cover the photograph across its middle;
+ *   - a warm golden-hour film breathes over the centre.
  *
- * The palette is fixed brand navy rather than the user's theme: this screen is
+ * The photographic layer is a real bundled asset under a gold film, not a
+ * flattened mockup.
+ *
+ * The palette is fixed brand navy rather than the reader's theme: this screen is
  * the hand-off from the platform splash, which is always navy, so it must not
  * step colour between themes.
  */
 const NAVY = brand.navy;
 const NAVY_DEEP = brand.navyDeep;
 const GOLD = brand.gold;
+/**
+ * The golden-hour wash.
+ *
+ * A pure gold film over the photograph tinted it, driving the blue channel to
+ * ~55 where the reference measures ~106: the frame read as a gold filter rather
+ * than as warm light. A warm-white wash at this alpha lifts the bundled
+ * photograph's mid-tone (134,109,55) to about (170,148,106), which is the
+ * reference's own (172,140,106).
+ */
+const GOLDEN_HOUR = '#fff0e1';
 
 /** One sweep of the loader. The stage captions advance independently of it. */
 const FILL_MS = 1700;
@@ -83,45 +99,45 @@ export function LaunchScreen() {
 
   const stageKey = STAGES[stage] ?? STAGES[0];
   const width = fill.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
-  const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.18, 0.38] });
+  const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.22, 0.34] });
 
   return (
     <View style={styles.root}>
       {/* The vehicle photograph, full bleed. */}
-      <Photo source={photo('garageInterior')} radiusValue={0} style={StyleSheet.absoluteFill} />
+      <Photo source={photo('goldenHourHero')} radiusValue={0} style={StyleSheet.absoluteFill} />
 
-      {/* Golden-hour light: a warm film breathing across the middle of the frame. */}
+      {/* Golden-hour light: a warm wash breathing across the middle of the frame,
+          which is where the reference photograph is brightest. */}
       <Animated.View style={[styles.sunBand, { opacity: glowOpacity }]}>
-        <Scrim color={GOLD} from={0.0} to={0.46} bands={12} />
+        <Scrim color={GOLDEN_HOUR} from={0.95} to={0.0} bands={12} />
       </Animated.View>
 
-      {/* Navy at the top so the lockup reads, and at the bottom for the tagline.
-          Both bands fade out, so the photograph reads through the middle of the
-          frame the way the approved hero does rather than sitting under a flat
-          navy field. */}
+      {/* Navy at the top so the lockup reads, and at the bottom so the tagline
+          reads. Both fade out, so the photograph reads through the middle of the
+          frame the way the approved hero does. */}
       <View style={styles.topFade}>
-        <Scrim color={NAVY} from={0.94} to={0.0} bands={12} />
+        <Scrim color={NAVY} from={0.92} to={0.0} bands={12} />
       </View>
-      <View style={styles.lowerFade}>
-        <Scrim color={NAVY_DEEP} from={0.0} to={0.95} bands={16} />
+      <View style={styles.bottomFade}>
+        <Scrim color={NAVY_DEEP} from={0.0} to={0.96} bands={16} />
       </View>
 
-      <Animated.View style={[styles.content, { opacity: fade }]}>
-        <View style={styles.top}>
-          <Logo width={224} />
-          <View style={styles.rule} />
+      {/* The official lockup, centred at 20-29% of the frame height. */}
+      <Animated.View style={[styles.lockup, { opacity: fade }]}>
+        <Logo width={236} />
+        <View style={styles.rule} />
+      </Animated.View>
+
+      {/* The tagline is the largest type on the screen, as in the reference. */}
+      <Animated.View style={[styles.copy, { opacity: fade }]}>
+        <Text style={[styles.tagline, { writingDirection: direction }]}>{t('heroTagline')}</Text>
+        <Text style={[styles.sub, { writingDirection: direction }]}>{t('heroSubtitle')}</Text>
+
+        <View style={styles.progressTrack}>
+          <Animated.View style={[styles.progressFill, { width }]} />
         </View>
 
-        <View style={styles.bottom}>
-          <Text style={[styles.tagline, { writingDirection: direction }]}>{t('heroTagline')}</Text>
-          <Text style={[styles.sub, { writingDirection: direction }]}>{t('heroSubtitle')}</Text>
-
-          <View style={styles.progressTrack}>
-            <Animated.View style={[styles.progressFill, { width }]} />
-          </View>
-
-          <Text style={[styles.stage, { writingDirection: direction }]}>{t(stageKey)}</Text>
-        </View>
+        <Text style={[styles.stage, { writingDirection: direction }]}>{t(stageKey)}</Text>
       </Animated.View>
     </View>
   );
@@ -129,45 +145,57 @@ export function LaunchScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: NAVY },
-  sunBand: { position: 'absolute', left: 0, right: 0, top: '15%', height: '44%' },
-  topFade: { position: 'absolute', left: 0, right: 0, top: 0, height: '40%' },
-  lowerFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '62%' },
-  content: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'space-between',
-    paddingHorizontal: space.xl,
-    paddingTop: space.xxxl * 2.1,
-    paddingBottom: space.xxxl * 1.2,
+  sunBand: { position: 'absolute', left: 0, right: 0, top: '14%', height: '46%' },
+  topFade: { position: 'absolute', left: 0, right: 0, top: 0, height: '42%' },
+  bottomFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '64%' },
+  lockup: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: '20%',
+    alignItems: 'center',
+    gap: space.sm,
   },
-  top: { alignItems: 'center', gap: space.md },
   rule: {
-    width: 64,
-    height: 1,
-    backgroundColor: 'rgba(212, 175, 55, 0.55)',
-    marginTop: space.xs,
+    width: 72,
+    height: 2,
+    backgroundColor: 'rgba(212, 175, 55, 0.65)',
+    marginTop: space.sm,
   },
-  bottom: { alignItems: 'center', gap: space.sm },
+  copy: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: '7%',
+    alignItems: 'center',
+    paddingHorizontal: space.xl,
+  },
+  // The reference sets the tagline at roughly 5% of the frame height per line,
+  // which is the largest type in the application.
   tagline: {
     color: brand.onNavy,
-    fontSize: typography.display,
-    fontWeight: '700',
+    fontSize: 33,
+    lineHeight: 39,
+    fontWeight: '800',
     textAlign: 'center',
-    letterSpacing: 0.2,
-    textShadowColor: 'rgba(0,0,0,0.45)',
+    letterSpacing: 0.1,
+    textShadowColor: 'rgba(0,0,0,0.55)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 10,
+    textShadowRadius: 12,
   },
   sub: {
     color: brand.onNavyMuted,
-    fontSize: typography.label,
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: 'center',
-    letterSpacing: 0.6,
+    letterSpacing: 0.5,
+    marginTop: space.sm,
   },
   progressTrack: {
-    width: '58%',
+    width: '54%',
     height: 3,
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
     marginTop: space.xxl,
     overflow: 'hidden',
   },

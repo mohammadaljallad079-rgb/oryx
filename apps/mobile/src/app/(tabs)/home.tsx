@@ -6,29 +6,41 @@ import { useApp } from '../../lib/app-context';
 import { photo, photoSmall } from '../../lib/assets';
 import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
-import { AppHeader, DemoBanner } from '../../components/brand';
+import { AppHeader } from '../../components/brand';
 import { OfferCard, ProductCard, ProviderCard, StoreCard } from '../../components/cards';
-import { Body, Photo, Rail, Screen, Scrim, SectionLabel, StateView } from '../../components/ui';
+import { Photo, Rail, Screen, Scrim, SectionLabel, StateView } from '../../components/ui';
 import { brand, radius, space, typography } from '../../lib/theme';
-import { localizeDigits } from '../../lib/format';
 
 /**
  * The marketplace home.
  *
- * Built to the approved reference, top to bottom: the wordmark header with the
- * language toggle, cart and notifications; a tall photographic hero carrying the
- * tagline, its search field and the reference's gold call to action; the five
- * service categories; the two booking tiles beside the SENSAGE card; featured
- * providers with their ratings; popular products; the published offers; and the
- * featured stores.
+ * Built to the approved reference, whose section order was read off the image
+ * band by band rather than assumed:
  *
- * The reference places search *inside* the hero rather than above it, so that is
- * where it sits. Every rail reads the repository, so the page is a window onto
- * the catalogue rather than a static composition, and the hero photograph is a
- * bundled asset under a navy scrim, not a flattened mockup.
+ *   1. header with the ORYX lockup and the cart / bell actions
+ *   2. photographic hero carrying the tagline and the three-part subtitle
+ *   3. a gold "Explore now" action inside the hero
+ *   4. the search field, on its own row *below* the hero
+ *   5. the five category tiles in one row
+ *   6. the SENSAGE card beside the Book a service tile
+ *   7. Featured providers with "View all"
+ *   8. Popular products with "View all"
+ *   9. a five-item navy bottom bar with a gold active item
+ *
+ * Two of those were wrong before this rewrite: the search sat *inside* the hero
+ * (the reference puts it below), and the hero carried no call to action. Both
+ * are corrected here.
+ *
+ * The offers rail and the featured stores are kept from the previous build. The
+ * reference does not show them, but they existed before the approved rebuild and
+ * the owner's brief names both, so removing them would lose working features.
+ * They follow the rails the reference does show.
+ *
+ * Every rail reads the repository, so the page is a window onto the catalogue
+ * rather than a static composition.
  */
 export default function Home() {
-  const { t, theme, locale, l, direction, dataVersion } = useApp();
+  const { t, theme, direction, dataVersion } = useApp();
   const router = useRouter();
 
   const providers = useAsync(() => repository.nearbyProviders(6), [dataVersion]);
@@ -45,17 +57,20 @@ export default function Home() {
   ];
 
   const row = direction === 'rtl' ? 'row-reverse' : 'row';
+  const arrow = direction === 'rtl' ? '←' : '→';
 
   return (
     <Screen padded={false}>
       <AppHeader />
 
-      {/* ------------------------------------------------------------- hero */}
+      {/* ------------------------------------------------------------- hero
+          The reference hero occupies roughly the top third of the screen and
+          carries the tagline, the subtitle and one gold action. */}
       <View style={styles.heroWrap}>
         <Photo source={photo('autoService')} radiusValue={0} style={StyleSheet.absoluteFill} />
-        <Scrim color={brand.navy} from={0.9} to={0.26} bands={12} />
+        <Scrim color={brand.navy} from={0.86} to={0.18} bands={12} />
         <View style={styles.heroLowerFade}>
-          <Scrim color={brand.navyDeep} from={0.16} to={0.95} bands={14} />
+          <Scrim color={brand.navyDeep} from={0.1} to={0.94} bands={14} />
         </View>
 
         <View style={styles.heroContent}>
@@ -67,38 +82,45 @@ export default function Home() {
           </Text>
 
           <Pressable
-            testID="home-search"
-            accessibilityRole="search"
-            accessibilityLabel={t('searchEverything')}
-            onPress={() => router.push('/parts')}
-            style={({ pressed }) => [styles.heroSearch, pressed && { opacity: 0.92 }]}
-          >
-            <Text style={{ color: 'rgba(255,255,255,0.82)', fontSize: typography.body }}>
-              ⌕  {t('searchEverything')}
-            </Text>
-          </Pressable>
-
-          <Pressable
             testID="home-explore"
             accessibilityRole="button"
             onPress={() => router.push('/services')}
             style={({ pressed }) => [styles.heroCta, pressed && { opacity: 0.9 }]}
           >
             <Text style={styles.heroCtaLabel}>
-              {t('exploreNow')} {direction === 'rtl' ? '←' : '→'}
+              {t('exploreNow')} {arrow}
             </Text>
           </Pressable>
         </View>
       </View>
 
-      <View style={{ padding: space.lg, gap: space.md }}>
-        <DemoBanner />
+      {/* --------------------------------------------------------- search
+          On its own row below the hero, where the reference places it. */}
+      <View style={styles.searchRow}>
+        <Pressable
+          testID="home-search"
+          accessibilityRole="search"
+          accessibilityLabel={t('searchEverything')}
+          onPress={() => router.push('/search')}
+          style={({ pressed }) => [
+            styles.searchField,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+            pressed && { opacity: 0.92 },
+          ]}
+        >
+          <Text style={[styles.searchGlyph, { color: theme.gold }]}>⌕</Text>
+          <Text style={{ color: theme.textFaint, fontSize: typography.body, flexShrink: 1 }}>
+            {t('searchEverything')}
+          </Text>
+        </Pressable>
+      </View>
 
+      <View style={styles.body}>
         {/* -------------------------------------------- service categories */}
         <View style={styles.sectionHead}>
           <SectionLabel>{t('categories')}</SectionLabel>
-          <Pressable onPress={() => router.push('/parts')} testID="categories-see-all">
-            <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '600' }}>
+          <Pressable onPress={() => router.push('/categories')} testID="categories-see-all">
+            <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '700' }}>
               {t('seeAll')}
             </Text>
           </Pressable>
@@ -110,16 +132,16 @@ export default function Home() {
               testID={`category-${category.key}`}
               accessibilityRole="button"
               onPress={() => router.push(`/parts?category=${category.key}`)}
-              style={({ pressed }) => [{ width: 108 }, pressed && { opacity: 0.9 }]}
+              style={({ pressed }) => [{ width: 96 }, pressed && { opacity: 0.9 }]}
             >
               <View style={[styles.catTile, { borderColor: theme.border }]}>
                 <Photo
                   source={photoSmall(category.photo)}
-                  height={96}
+                  height={92}
                   width="100%"
                   radiusValue={radius.md}
                 />
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,22,43,0.42)' }]} />
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,22,43,0.45)' }]} />
                 <Text style={styles.catLabel} numberOfLines={2}>
                   {category.label}
                 </Text>
@@ -147,10 +169,10 @@ export default function Home() {
               </Text>
             </View>
             <Text style={[styles.tileBody, { color: theme.textMuted }]} numberOfLines={2}>
-              {l({ en: 'Car inspection with AI', ar: 'فحص السيارة بالذكاء الاصطناعي' })}
+              {t('carInspection')}
             </Text>
             <Text style={[styles.tileCta, { color: theme.gold }]}>
-              {t('startAnalysis')} {direction === 'rtl' ? '‹' : '›'}
+              {t('startAnalysis')} {arrow}
             </Text>
           </Pressable>
 
@@ -169,7 +191,7 @@ export default function Home() {
               {t('bookService')}
             </Text>
             <Text style={[styles.tileBody, { color: theme.textMuted }]} numberOfLines={2}>
-              {l({ en: 'Maintenance & repair', ar: 'صيانة وإصلاح' })}
+              {t('maintenance')}
             </Text>
           </Pressable>
         </View>
@@ -178,7 +200,7 @@ export default function Home() {
         <View style={styles.sectionHead}>
           <SectionLabel>{t('featuredProviders')}</SectionLabel>
           <Pressable onPress={() => router.push('/services')} testID="providers-see-all">
-            <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '600' }}>
+            <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '700' }}>
               {t('seeAll')}
             </Text>
           </Pressable>
@@ -188,7 +210,7 @@ export default function Home() {
         ) : (
           <Rail>
             {(providers.data ?? []).map((provider) => (
-              <View key={provider.id} style={{ width: 252 }}>
+              <View key={provider.id} style={{ width: 244 }}>
                 <ProviderCard provider={provider} />
               </View>
             ))}
@@ -199,7 +221,7 @@ export default function Home() {
         <View style={styles.sectionHead}>
           <SectionLabel>{t('popularProducts')}</SectionLabel>
           <Pressable onPress={() => router.push('/parts')} testID="products-see-all">
-            <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '600' }}>
+            <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '700' }}>
               {t('seeAll')}
             </Text>
           </Pressable>
@@ -210,11 +232,14 @@ export default function Home() {
           ))}
         </Rail>
 
-        {/* -------------------------------------- offers and featured stores */}
+        {/* --------------------------------------- offers and featured stores
+            Kept from the previous build: the reference does not show them, but
+            the brief names both and they were present before the approved
+            rebuild, so dropping them would lose working features. */}
         <View style={styles.sectionHead}>
           <SectionLabel>{t('offersAndDiscounts')}</SectionLabel>
           <Pressable onPress={() => router.push('/parts')} testID="offers-see-all">
-            <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '600' }}>
+            <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '700' }}>
               {t('seeAll')}
             </Text>
           </Pressable>
@@ -232,7 +257,7 @@ export default function Home() {
         <View style={styles.sectionHead}>
           <SectionLabel>{t('featuredStores')}</SectionLabel>
           <Pressable onPress={() => router.push('/parts?tab=stores')} testID="stores-see-all">
-            <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '600' }}>
+            <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '700' }}>
               {t('seeAll')}
             </Text>
           </Pressable>
@@ -246,59 +271,16 @@ export default function Home() {
             ))}
           </View>
         )}
-
-        {/* ---------------------------------------- the two CTA banners */}
-        <View style={[styles.tileRow, { flexDirection: row }]}>
-          <Pressable
-            testID="book-inspection"
-            accessibilityRole="button"
-            onPress={() => router.push('/bookings/new')}
-            style={({ pressed }) => [
-              styles.bookTile,
-              { backgroundColor: theme.surface, borderColor: theme.border },
-              pressed && { opacity: 0.92 },
-            ]}
-          >
-            <Text style={{ color: theme.gold, fontSize: 18 }}>🔍</Text>
-            <Text style={[styles.tileTitle, { color: theme.text }]} numberOfLines={1}>
-              {t('bookInspection')}
-            </Text>
-            <Text style={[styles.tileBody, { color: theme.textMuted }]} numberOfLines={2}>
-              {t('carInspection')}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            testID="quick-recovery"
-            accessibilityRole="button"
-            onPress={() => router.push('/recovery')}
-            style={({ pressed }) => [
-              styles.bookTile,
-              { backgroundColor: theme.surface, borderColor: theme.border },
-              pressed && { opacity: 0.92 },
-            ]}
-          >
-            <Text style={{ color: theme.gold, fontSize: 18 }}>⛟</Text>
-            <Text style={[styles.tileTitle, { color: theme.text }]} numberOfLines={1}>
-              {t('recovery')}
-            </Text>
-            <Text style={[styles.tileBody, { color: theme.textMuted }]} numberOfLines={2}>
-              {t('catTowing')}
-            </Text>
-          </Pressable>
-        </View>
-
-        <Body size="caption" muted align="center" style={{ marginTop: space.md }}>
-          {localizeDigits(2026, locale)} · ORYX Marketplace · {t('demoData')}
-        </Body>
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  heroWrap: { height: 392, overflow: 'hidden', backgroundColor: brand.navy },
-  heroLowerFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '66%' },
+  // The reference hero fills roughly the top third of the frame and is tall
+  // enough for the tagline, the subtitle and one action.
+  heroWrap: { height: 336, overflow: 'hidden', backgroundColor: brand.navy },
+  heroLowerFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '62%' },
   heroContent: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
@@ -307,25 +289,14 @@ const styles = StyleSheet.create({
   },
   heroTagline: {
     color: brand.onNavy,
-    fontSize: typography.display,
-    fontWeight: '700',
-    textShadowColor: 'rgba(0,0,0,0.45)',
+    fontSize: 28,
+    lineHeight: 33,
+    fontWeight: '800',
+    textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+    textShadowRadius: 10,
   },
-  heroSub: { color: 'rgba(255,255,255,0.88)', fontSize: typography.label },
-  heroSearch: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.32)',
-    backgroundColor: 'rgba(0,22,43,0.62)',
-    borderRadius: radius.pill,
-    paddingHorizontal: space.lg,
-    paddingVertical: space.md,
-    minHeight: 48,
-    marginTop: space.sm,
-  },
+  heroSub: { color: 'rgba(255,255,255,0.9)', fontSize: typography.label },
   heroCta: {
     alignSelf: 'flex-start',
     backgroundColor: brand.gold,
@@ -333,21 +304,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
     paddingVertical: space.sm,
     marginTop: space.sm,
-    minHeight: 40,
+    minHeight: 38,
     justifyContent: 'center',
   },
   heroCtaLabel: { color: brand.navy, fontSize: typography.label, fontWeight: '800', letterSpacing: 0.2 },
+
+  // The search row sits on the page background, directly under the hero.
+  searchRow: { paddingHorizontal: space.lg, paddingTop: space.lg },
+  searchField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.lg,
+    minHeight: 48,
+  },
+  searchGlyph: { fontSize: 17 },
+
+  body: { padding: space.lg, gap: space.md },
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: space.sm,
   },
-  catTile: { borderRadius: radius.md, borderWidth: 1, overflow: 'hidden', height: 96 },
+  catTile: { borderRadius: radius.md, borderWidth: 1, overflow: 'hidden', height: 92 },
   catLabel: {
     position: 'absolute',
-    left: space.sm,
-    right: space.sm,
+    left: space.xs,
+    right: space.xs,
     bottom: space.sm,
     color: brand.onNavy,
     fontSize: typography.caption,
@@ -361,7 +347,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: space.md,
     gap: space.xs,
-    minHeight: 116,
+    minHeight: 112,
   },
   sensageHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   bookTile: {
@@ -370,7 +356,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: space.md,
     gap: space.xs,
-    minHeight: 116,
+    minHeight: 112,
   },
   tileTitle: { fontSize: typography.label, fontWeight: '700' },
   tileBody: { fontSize: typography.caption },

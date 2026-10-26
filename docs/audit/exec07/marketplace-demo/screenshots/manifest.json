@@ -42,7 +42,7 @@
     "route": "/home",
     "label": "Home",
     "url": "http://127.0.0.1:8081/mobile/home",
-    "text": "ع | 🛒 | 🔔 | Everything Your Car Needs | Parts · Services · Trusted Providers | ⌕  Search for parts, services, or providers. | Explore now → | Demo data | A review build. All data is local and not re"
+    "text": "ع | 🛒 | 🔔 | Everything Your Car Needs | Parts · Services · Trusted Providers | Explore now → | ⌕ | Search for parts, services, or providers. | CATEGORIES | See all | Spare parts | Maintenance | Car "
   },
   {
     "locale": "en",
@@ -303,7 +303,7 @@
     "route": "/home",
     "label": "Home",
     "url": "http://127.0.0.1:8081/mobile/home",
-    "text": "EN | 🛒 | 🔔 | كل ما تحتاجه سيارتك | قطع غيار · خدمات · مزودون موثوقون | ⌕  ابحث عن قطع غيار، خدمات أو مزودين. | اكتشف الآن ← | بيانات تجريبية | نسخة تجريبية للمراجعة. البيانات محلية وليست حقيقية. | ا"
+    "text": "EN | 🛒 | 🔔 | كل ما تحتاجه سيارتك | قطع غيار · خدمات · مزودون موثوقون | اكتشف الآن ← | ⌕ | ابحث عن قطع غيار، خدمات أو مزودين. | التصنيفات | عرض الكل | قطع الغيار | الصيانة | فحص السيارات | سحب السيار"
   },
   {
     "locale": "ar",

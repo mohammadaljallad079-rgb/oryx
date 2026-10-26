@@ -50,6 +50,8 @@ export type PhotoKey =
   | 'recoveryTow'
   | 'carwashPremium'
   | 'garageInterior'
+  /** The splash hero: the garage photograph graded to the reference's golden hour. */
+  | 'goldenHourHero'
   | 'garageBrastad'
   | 'workshopArtdeco'
   | 'evCharging';
