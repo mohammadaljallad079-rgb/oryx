@@ -37,6 +37,7 @@ const pages = [
   ['home-mobile', `${SITE}/`, 'mobile'],
   ['providers-mobile', `${SITE}/providers/`, 'mobile'],
   ['overview', '/overview/', 'desktop'],
+  ['mobile', '/mobile/', 'desktop'],
   ['evidence', '/evidence/', 'desktop'],
   ['reports', '/reports/', 'desktop'],
   ['brand', '/brand/', 'desktop'],

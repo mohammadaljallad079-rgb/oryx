@@ -111,6 +111,7 @@ function page({ title, description, body, current = '' }) {
   const nav = [
     ['', 'The website'],
     ['overview/', 'Overview'],
+    ['mobile/', 'Mobile app'],
     ['evidence/', 'Design evidence'],
     ['reports/', 'Reports'],
     ['brand/', 'Brand'],
@@ -186,7 +187,7 @@ cpSync(SITE_SRC, OUT, { recursive: true });
 
 // The evidence, report and brand directories must never shadow a real site
 // route, or a page of the website would be replaced by a document.
-for (const reserved of ['evidence', 'reports', 'brand', 'overview']) {
+for (const reserved of ['evidence', 'reports', 'brand', 'overview', 'mobile']) {
   if (existsSync(path.join(OUT, reserved, 'index.html')) && reserved !== 'overview') {
     // `evidence` and `brand` do not exist in the app; a collision means the
     // site grew a route with the same name and the two would fight.
@@ -538,6 +539,153 @@ async function buildEvidencePages() {
 }
 
 // ======================================================================
+// Mobile app — the approved Splash and Homepage, and every screen
+// ======================================================================
+/**
+ * The mobile section of the preview.
+ *
+ * It publishes the captures the owner asked for — the Splash and the Homepage
+ * against their approved references, and the full screen gallery — plus the
+ * download link for the APK built from this branch. The APK itself is not
+ * committed (it is 67 MB of build output), so the page links to the Actions
+ * artifact rather than pretending the file is in the repository.
+ */
+async function buildMobile() {
+  const SH = 'docs/audit/exec07/splash-home';
+  const GAL = 'docs/audit/exec07/marketplace-demo/screenshots';
+
+  // The reference-versus-implemented sheets, if the pack is present.
+  const compares = [
+    ['compare-splash-en.png', 'Splash — approved reference vs implemented (English)'],
+    ['compare-splash-ar.png', 'Splash — approved reference vs implemented (Arabic)'],
+    ['compare-home-en.png', 'Homepage — approved reference vs implemented (English)'],
+    ['compare-home-ar.png', 'Homepage — approved reference vs implemented (Arabic)'],
+  ].filter(([f]) => exists(`${SH}/${f}`));
+
+  const compareFigs = [];
+  for (const [file, caption] of compares) {
+    const out = await makeThumb(`${SH}/${file}`, `assets/mobile/${file.replace(/\.png$/, '')}`, 1400);
+    compareFigs.push(figure(out, escapeHtml(caption), caption, '../'));
+  }
+
+  // The Splash, both locales, at phone width.
+  const splashFigs = [];
+  for (const [file, caption] of [
+    ['splash-en-phone.png', 'Splash — English'],
+    ['splash-ar-phone.png', 'Splash — العربية'],
+    ['splash-en-tablet.png', 'Splash — English (tablet)'],
+    ['splash-ar-tablet.png', 'Splash — العربية (لوحي)'],
+  ]) {
+    if (!exists(`${SH}/${file}`)) continue;
+    const out = await makeThumb(`${SH}/${file}`, `assets/mobile/${file.replace(/\.png$/, '')}`, 700);
+    splashFigs.push(figure(out, escapeHtml(caption), caption, '../'));
+  }
+
+  // The Homepage: first frame in each theme and locale, then the scrolled pass
+  // that shows the offers rail and the featured stores below the fold.
+  const homeFigs = [];
+  for (const [file, caption] of [
+    ['home-light-en-phone.png', 'Homepage — English, light'],
+    ['home-dark-en-phone.png', 'Homepage — English, dark'],
+    ['home-light-ar-phone.png', 'Homepage — العربية، فاتح'],
+    ['home-dark-ar-phone.png', 'Homepage — العربية، داكن'],
+    ['home-light-en-part2.png', 'Homepage — English, offers rail (scrolled)'],
+    ['home-light-en-part3.png', 'Homepage — English, featured stores (scrolled)'],
+    ['home-light-ar-part2.png', 'Homepage — العربية، العروض (تمرير)'],
+    ['home-light-ar-part3.png', 'Homepage — العربية، المتاجر (تمرير)'],
+  ]) {
+    if (!exists(`${SH}/${file}`)) continue;
+    const out = await makeThumb(`${SH}/${file}`, `assets/mobile/${file.replace(/\.png$/, '')}`, 700);
+    homeFigs.push(figure(out, escapeHtml(caption), caption, '../'));
+  }
+
+  // The whole gallery: launch, then every customer screen in both languages,
+  // then the merchant shell.
+  const galleryFigs = [];
+  const groups = [
+    ['Launch', ''],
+    ['Customer — English (LTR)', 'en'],
+    ['Customer — Arabic (RTL)', 'ar'],
+    ['Merchant shell', 'merchant'],
+  ];
+  let galleryCount = 0;
+  for (const [title, prefix] of groups) {
+    const dir = prefix ? `${GAL}/${prefix}` : GAL;
+    const files = listFiles(dir, ['.png']).filter((f) => (prefix ? true : f.startsWith('launch-')));
+    if (!files.length) continue;
+    galleryFigs.push(`<div class="section-head"><h2>${escapeHtml(title)}</h2><p>${files.length} screens</p></div><div class="gallery">`);
+    for (const f of files) {
+      const out = await makeThumb(`${dir}/${f}`, `assets/mobile/gallery-${prefix ? `${prefix}-` : ''}${f.replace(/\.png$/, '')}`, 520);
+      galleryFigs.push(figure(out, escapeHtml(f.replace(/\.png$/, '')), `${title} — ${f}`, '../'));
+      galleryCount += 1;
+    }
+    galleryFigs.push('</div>');
+  }
+
+  const contactSheet = exists(`${GAL}/contact-sheet.png`)
+    ? figure(await makeThumb(`${GAL}/contact-sheet.png`, 'assets/mobile/contact-sheet', 1600), '<strong>Contact sheet</strong> — every screen in one image', 'contact sheet', '../')
+    : '';
+
+  const body = `
+    <p class="eyebrow">Mobile application</p>
+    <h1>ORYX Marketplace — the approved design</h1>
+    <p class="lede">The customer and merchant application (<code>apps/mobile</code>), built to the two mockups the owner approved. Every element below is a real React Native component captured from the running app, not a screenshot pasted into a page.</p>
+
+    <div class="notice">
+      <strong>How to read the comparison sheets.</strong> Each sheet puts the approved mockup on the left and the running app on the right, at a matched height. The two reference files are named the wrong way round — <code>ORYX_Splash_Reference.jpg</code> carries the marketplace homepage and <code>ORYX_Homepage_Reference.jpg</code> carries the hero-only splash — so the implementation follows the <em>content</em>. That is recorded in <code>apps/mobile/design-reference/README.md</code>.
+    </div>
+
+    <div class="notice">
+      <strong>The judge of the match is the owner, not this page.</strong> The build environment has no working vision, so the comparison was made programmatically — OCR for the copy and section order, luminance and edge profiles for the vertical composition, bright-pixel boxes for the logo, and the rendered DOM for what is actually drawn. No pixel-match is claimed; these sheets exist so you can judge it.
+    </div>
+
+    <div class="section-head"><h2>Reference vs implemented</h2><p>${compareFigs.length} sheets</p></div>
+    <div class="gallery">${compareFigs.join('')}</div>
+
+    <div class="section-head"><h2>Splash</h2><p>both languages, phone and tablet</p></div>
+    <div class="gallery">${splashFigs.join('')}</div>
+
+    <div class="section-head"><h2>Homepage</h2><p>both languages, both themes, with the scrolled offers and stores</p></div>
+    <div class="gallery">${homeFigs.join('')}</div>
+
+    <div class="section-head"><h2>Every screen</h2><p>${galleryCount} screens · contact sheet below</p></div>
+    ${contactSheet ? `<div class="grid">${contactSheet}</div>` : ''}
+    ${galleryFigs.join('')}
+
+    <h2>Download the APK</h2>
+    <p>The Android build of exactly these components, built by GitHub Actions from this branch and debug-signed for review. It is not committed — 67 MB of build output does not belong in the history — so it is served as a workflow artifact.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Item</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Built commit</td><td><code>c7352dd</code></td></tr>
+        <tr><td>Size</td><td>70,037,349 bytes (66.8 MiB)</td></tr>
+        <tr><td>SHA-256</td><td><code>19f79e7f35af78abc3da3ddba842ce6375cfca91adda1ec56a5e4527a6b254a9</code></td></tr>
+        <tr><td>Signature</td><td>debug keystore (review build, not a store artifact)</td></tr>
+        <tr><td>Offline</td><td>yes — no backend host is referenced; the 20 photographs are bundled</td></tr>
+      </tbody>
+    </table></div>
+    <div class="cta">
+      <a class="cta__button" href="${REPO}/actions/runs/40272958202">Open the APK build &rarr;</a>
+      <span class="cta__hint">Download <code>oryx-marketplace-c7352dd</code> from the Artifacts section of that run. A GitHub sign-in is required, because artifacts are private to the repository.</span>
+    </div>
+
+    <h2>Demo accounts</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Role</th><th>Email</th><th>Password</th></tr></thead>
+      <tbody>
+        <tr><td>Customer</td><td><code>customer@oryx.demo</code></td><td><code>demo1234</code></td></tr>
+        <tr><td>Merchant</td><td><code>merchant@oryx.demo</code></td><td><code>demo1234</code></td></tr>
+      </tbody>
+    </table></div>
+    <p>Both are offered as one-tap cards on the sign-in screen. The app never reaches a server: every screen reads seeded local data, so it runs with the radio off.</p>
+
+    <p class="card__meta">Captures from <code>${SH}/</code> and <code>${GAL}/</code>. Full report: <a href="${REPO}/blob/${encodeURIComponent(BRANCH)}/docs/audit/exec07/12_FINAL_RECOVERY_AND_PREMIUM_UI.md">12_FINAL_RECOVERY_AND_PREMIUM_UI.md</a>.</p>
+  `;
+  write('mobile/index.html', page({ title: 'Mobile app', description: 'The approved ORYX Marketplace splash, homepage and every screen.', body, current: 'mobile' }));
+  return galleryCount;
+}
+
+// ======================================================================
 // Reports
 // ======================================================================
 const REPORT_GROUPS = [
@@ -714,11 +862,13 @@ async function buildOverview(stats) {
       <div class="kpi"><div class="kpi__value">${stats.captures}</div><div class="kpi__label">capture pairs</div></div>
       <div class="kpi"><div class="kpi__value">${stats.sheets}</div><div class="kpi__label">light-vs-dark sheets</div></div>
       <div class="kpi"><div class="kpi__value">${stats.brand}</div><div class="kpi__label">brand assets</div></div>
+      <div class="kpi"><div class="kpi__value">${stats.mobile}</div><div class="kpi__label">mobile screens</div></div>
     </div>
 
     <div class="grid">
       <a class="card card--link" href="../evidence/"><h3>Design evidence</h3><p class="card__meta">Homepage, dashboard, provider directory, sign-in and profile — before/after with the dark render beside each, in Arabic RTL and English LTR at three viewports.</p></a>
       <a class="card card--link" href="../reports/"><h3>Reports</h3><p class="card__meta">Every audit and execution report, rendered from the committed Markdown.</p></a>
+      <a class="card card--link" href="../mobile/"><h3>Mobile app</h3><p class="card__meta">The approved Splash and Homepage against their references, plus every customer and merchant screen — and the APK built from this branch.</p></a>
       <a class="card card--link" href="../brand/"><h3>Brand</h3><p class="card__meta">The official logo and the approved design references.</p></a>
     </div>
 
@@ -763,13 +913,16 @@ async function buildOverview(stats) {
 const reports = buildReports();
 const evidence = await buildEvidencePages();
 const brandCount = await buildBrand();
+const mobileScreens = await buildMobile();
 const sitePages = countHtml(SITE_SRC);
 await buildOverview({
+  mobileScreens,
   sitePages,
   reports,
   captures: evidence.captures,
   sheets: evidence.sheets,
   brand: brandCount,
+  mobile: mobileScreens,
 });
 
 // Pages needs a .nojekyll marker so files starting with an underscore or a
@@ -780,5 +933,6 @@ const total = thumbsMade.length;
 console.log(`preview: built ${OUT}`);
 console.log(
   `preview: website at / (${sitePages} pages), ${reports} reports, ` +
-    `${evidence.captures} capture pairs, ${evidence.sheets} sheets, ${brandCount} brand assets, ${total} images`,
+    `${evidence.captures} capture pairs, ${evidence.sheets} sheets, ${brandCount} brand assets, ` +
+    `${mobileScreens} mobile screens, ${total} images`,
 );
