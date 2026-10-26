@@ -45,9 +45,16 @@ Every screen of \`apps/mobile\`, captured from the running app. ${manifest.lengt
 images: ${en.length} customer screens in English, ${ar.length} in Arabic,
 ${merchant.length} in the merchant shell, and the launch screen in both locales.
 
+**Start here:**
+[\`../PREVIEW_GALLERY.md\`](../PREVIEW_GALLERY.md) — the whole preview rendered in
+one page, with the Splash and Homepage beside their approved references, the APK
+download link, and the screens below. It draws every image from this repository,
+so it needs no session and survives a sandbox restart.
 
 - [Contact sheet](${VIEW}/contact-sheet.png) — all of them in one image
 - [Browse the machine-readable manifest](${VIEW}/manifest.json)
+- [Design preview on GitHub Pages](https://mohammadaljallad079-rgb.github.io/oryx/mobile/) — the same screens as a browsable site
+- [APK release](https://github.com/${REPO}/releases/tag/mobile-apk-1.0.0) — permanent download, no sign-in
 
 All of them are the **light theme** — Execution 07 Phase E is the light-theme
 correction, so that is the theme under review. The app's stored default is the
