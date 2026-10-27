@@ -3,12 +3,13 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
-import { photo, photoSmall } from '../../lib/assets';
+import { photo } from '../../lib/assets';
 import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
 import { AppHeader } from '../../components/brand';
 import { OfferCard, ProductCard, ProviderCard, StoreCard } from '../../components/cards';
 import { Photo, Rail, Screen, Scrim, SectionLabel, StateView } from '../../components/ui';
+import { CategoryIcon, type CategoryIconName } from '../../components/category-icons';
 import { brand, radius, space, typography } from '../../lib/theme';
 
 /**
@@ -48,12 +49,17 @@ export default function Home() {
   const offers = useAsync(() => repository.offers(), [dataVersion]);
   const stores = useAsync(() => repository.stores({ sort: 'rating' }), [dataVersion]);
 
-  const categories = [
-    { key: 'spare_parts', label: t('spareParts'), photo: 'partsStore' as const },
-    { key: 'maintenance', label: t('maintenance'), photo: 'mechanicEngine' as const },
-    { key: 'vehicle_inspection', label: t('carInspection'), photo: 'inspectionBay' as const },
-    { key: 'recovery', label: t('catTowing'), photo: 'recoveryTow' as const },
-    { key: 'accessories', label: t('accessories'), photo: 'carwashPremium' as const },
+  // The five service categories, with the exact icons the approved reference
+  // names: gear, wrench, inspection document, tow truck, alloy wheel. The Rail
+  // lays them out in the reading direction, so the Arabic order comes out
+  // reversed — wheel first — which is what the reference's right-hand screen
+  // shows.
+  const categories: Array<{ key: string; label: string; icon: CategoryIconName }> = [
+    { key: 'spare_parts', label: t('spareParts'), icon: 'gear' },
+    { key: 'maintenance', label: t('maintenance'), icon: 'wrench' },
+    { key: 'vehicle_inspection', label: t('carInspection'), icon: 'inspection' },
+    { key: 'recovery', label: t('catTowing'), icon: 'towTruck' },
+    { key: 'accessories', label: t('accessories'), icon: 'wheel' },
   ];
 
   const row = direction === 'rtl' ? 'row-reverse' : 'row';
@@ -128,20 +134,22 @@ export default function Home() {
               testID={`category-${category.key}`}
               accessibilityRole="button"
               onPress={() => router.push(`/parts?category=${category.key}`)}
-              style={({ pressed }) => [{ width: 96 }, pressed && { opacity: 0.9 }]}
+              style={({ pressed }) => [{ width: 68 }, pressed && { opacity: 0.9 }]}
             >
-              <View style={[styles.catTile, { borderColor: theme.border }]}>
-                <Photo
-                  source={photoSmall(category.photo)}
-                  height={84}
-                  width="100%"
-                  radiusValue={radius.md}
-                />
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,22,43,0.45)' }]} />
-                <Text style={styles.catLabel} numberOfLines={2}>
-                  {category.label}
-                </Text>
+              <View
+                style={[
+                  styles.catIcon,
+                  { borderColor: theme.border, backgroundColor: theme.surface },
+                ]}
+              >
+                <CategoryIcon name={category.icon} size={26} color={theme.gold} />
               </View>
+              <Text
+                style={[styles.catLabel, { color: theme.textMuted }]}
+                numberOfLines={2}
+              >
+                {category.label}
+              </Text>
             </Pressable>
           ))}
         </Rail>
@@ -331,15 +339,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: space.xs,
   },
-  catTile: { borderRadius: radius.md, borderWidth: 1, overflow: 'hidden', height: 84 },
+  catIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   catLabel: {
-    position: 'absolute',
-    left: space.xs,
-    right: space.xs,
-    bottom: space.sm,
-    color: brand.onNavy,
+    marginTop: space.sm,
     fontSize: typography.caption,
-    fontWeight: '700',
+    fontWeight: '600',
     textAlign: 'center',
   },
   tileRow: { gap: space.md },
