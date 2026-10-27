@@ -6,9 +6,9 @@
 **النسخة المعروضة تفاعلياً (GitHub Pages):**
 [mohammadaljallad079-rgb.github.io/oryx/mobile](https://mohammadaljallad079-rgb.github.io/oryx/mobile/)
 
-**تنزيل APK 1.0.4 — آخر تصميم للـSplash والـHomepage:**
-`66b4b66da6d993def5145502e49c84c2bf2f77389e75e7a2f74182efda2e7eff` · 70,126,469 بايت
-(رابط GitHub Releases غير متاح مؤقتًا: انتهت صلاحية رمز الوصول — التفاصيل في تقرير التسليم)
+**تنزيل APK 1.0.6 — الكاميرا والمعرض + آخر تصميم معتمد:**
+`d3741f549208c57d0294c5622902f2b0f80a979aee178bb95e85733836540076` · 70,513,804 بايت
+[releases/tag/mobile-apk-1.0.6](https://github.com/mohammadaljallad079-rgb/oryx/releases/tag/mobile-apk-1.0.6)
 
 > **ملاحظة عن أسماء ملفات المرجع.** الصورتان المعتمدتان مسمّاتان بالمقلوب:
 > `ORYX_Splash_Reference.jpg` تحمل صفحة المتجر الكاملة، و`ORYX_Homepage_Reference.jpg`
@@ -185,3 +185,43 @@
 ---
 
 *أُنشئت هذه الصفحة بواسطة وكيل ذكاء اصطناعي (OpenHands) نيابةً عن مالك المستودع.*
+
+---
+
+## 10. أدلة أندرويد الحقيقية — APK 1.0.6
+
+لقطات مأخوذة من **محاكي أندرويد فعلي** (Android 14 / API 34، x86_64) من نفس الـAPK
+المنشور، وليست من معاينة الويب.
+
+| الشاشة | اللقطة |
+| --- | --- |
+| شاشة الفحص بأزرار الكاميرا والمعرض | [1.0.6-inspection.png](android-crash/1.0.6-inspection.png) |
+| كاميرا أندرويد مفتوحة | [1.0.6-final-camera.png](android-crash/1.0.6-final-camera.png) |
+| الصورة بعد التصوير داخل التطبيق | [1.0.6-final-preview.png](android-crash/1.0.6-final-preview.png) |
+| التحليل أثناء التنفيذ | [1.0.6-analysis-progress.png](android-crash/1.0.6-analysis-progress.png) |
+| التقرير جاهز | [1.0.6-report-ready.png](android-crash/1.0.6-report-ready.png) |
+| شاشة 360dp | [responsive-360dp.png](android-crash/responsive-360dp.png) |
+| شاشة 768dp (تابلت) | [responsive-768dp-tablet.png](android-crash/responsive-768dp-tablet.png) |
+
+**ملف يُثبت الأزرار بدل ادّعائها:**
+[1.0.6-final-preview-ui.xml](android-crash/1.0.6-final-preview-ui.xml) — تسلسل الواجهة
+لحظة معاينة الصورة، وفيه `Retake` و`Remove photo` و`Start analysis`.
+
+**نتائج اختبار أندرويد:**
+
+| الخطوة | النتيجة |
+| --- | --- |
+| التثبيت | نجح |
+| التشغيل من حالة إيقاف كامل | نعم |
+| حوار صلاحية الكاميرا | ظهر |
+| فتح كاميرا أندرويد | `com.android.camera2` CaptureActivity |
+| الغالق ثم Done | عادت الصورة إلى التطبيق: PHOTO PREVIEW · 1 |
+| أزرار Retake / Remove / Start analysis | موجودة |
+| فتح معرض النظام | `PhotoPickerActivity` |
+| إلغاء المعرض | عاد التطبيق والصورة سليمة |
+| التحليل | المراحل الأربع ثم «التقرير جاهز» |
+| استثناءات قاتلة | **0** |
+| أحجام الشاشة | 360dp · 390dp · 430dp · 768dp بلا انهيار |
+
+**قيود:** لا تشغيل على هاتف حقيقي — الكاميرا جُرّبت عبر كاميرا أندرويد على محاكي.
+والمحاكي عمل بدون KVM فكان بطيئاً.
