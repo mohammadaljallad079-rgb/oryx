@@ -215,13 +215,33 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 
 ### Execution 04 gotchas
 
-- **React must resolve to one version across the workspace.** The repository uses
-  `node-linker=hoisted`. A workspace that pins a different React minor (the
-  mobile app originally pinned `19.1.0`) hoists that copy to the root, pairs it
-  with the other `react-dom`, and `next build` then fails at prerender with
-  `Cannot read properties of null (reading 'useRef')`. Keep `react` aligned
-  across `apps/admin`, `apps/customer` and `apps/mobile`; react-native's peer
-  range is `^19.1.0`, so `19.3.0` satisfies it.
+- **React must resolve to exactly one version, and it must be the one
+  react-native bundles.** The repository uses `node-linker=hoisted`. Two rules,
+  and the second one is the one that shipped a crashing APK:
+
+  1. Keep `react` aligned across `apps/admin`, `apps/customer`, `apps/mobile`
+     and `apps/mobile-erp`. A workspace pinning a different React minor hoists
+     that copy to the root, pairs it with the other `react-dom`, and `next build`
+     fails at prerender with `Cannot read properties of null (reading 'useRef')`.
+
+  2. **Do not treat react-native's `^19.1.0` peer range as permission to pick a
+     higher patch.** React asserts an *exact* version match against
+     `react-native-renderer`, which ships inside react-native. `react-native`
+     0.81.5 bundles renderer `19.1.0`, so `react` must be `19.1.0`. With
+     `19.3.0` the app crashed on startup on a real device:
+
+         E/ReactNativeJS: Incompatible React versions: The "react" and
+           "react-native-renderer" packages must have the exact same version.
+           - react: 19.3.0
+           - react-native-renderer: 19.1.0
+
+     The web build never caught it, because the renderer only exists on native.
+     `node_modules/expo/bundledNativeModules.json` is the authority: it pins
+     `react` and `react-dom` to `19.1.0` for `react-native` 0.81.5. Read it before
+     changing a React version. Verify the resolved version with
+     `cat node_modules/react/package.json`, and check the renderer's own version
+     with
+     `grep -o '"19\.[0-9]\+\.[0-9]\+"' node_modules/react-native/Libraries/Renderer/implementations/ReactFabric-prod.js | sort -u`.
 - **The consumer identity plane is separate from staff auth.** A consumer access
   token carries `audience: customer`. It is refused on a staff route and a staff
   token is refused on a consumer route; do not relax either check to make a test
