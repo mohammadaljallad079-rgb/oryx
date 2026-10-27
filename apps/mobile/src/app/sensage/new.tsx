@@ -1,45 +1,69 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
-import { photo } from '../../lib/assets';
 import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
+import {
+  capturePhoto,
+  openAppSettings,
+  pickFromGallery,
+  type CaptureFailure,
+} from '../../lib/photo-capture';
 import { ScreenHeader } from '../../components/brand';
 import { VehicleCard } from '../../components/cards';
 import {
   Body,
   Button,
   Card,
-  Chip,
   Heading,
-  Photo,
   ProgressBar,
   Screen,
   SectionLabel,
   StateView,
 } from '../../components/ui';
-import { radius, space, typography } from '../../lib/theme';
+import { brand, radius, space, typography } from '../../lib/theme';
 import { localizeDigits } from '../../lib/format';
 
 /**
- * A new SENSAGE analysis.
+ * A new SENSAGE inspection.
  *
- * Three steps: choose the car, add photographs, then watch four named stages.
- * The stages advance on a timer and the result is a demo report — the screen
- * never claims a diagnosis, and the disclaimer sits under the progress bar.
+ * Three steps: choose the car, add photographs with the device camera or from
+ * the gallery, then watch four named stages and read the result.
+ *
+ * The photographs are the user's own. Nothing is uploaded: the URIs are local
+ * file paths from the picker, and the analysis is the demo report. The screen
+ * says so in the result, so a demo score is never read as a diagnosis.
  */
 const STAGES = ['analysisStep1', 'analysisStep2', 'analysisStep3', 'analysisStep4'] as const;
-const PHOTO_SLOTS = ['mechanicEngine', 'inspectionBay', 'garageInterior', 'autoService'] as const;
+
+/** A captured photo, with the source kept so the label can say where it came from. */
+interface Shot {
+  uri: string;
+  source: 'camera' | 'gallery';
+}
+
+const FAILURE_KEY: Record<CaptureFailure, string> = {
+  cancelled: 'noPhotoChosen',
+  'permission-denied': 'cameraPermissionBody',
+  'too-large': 'photoTooLarge',
+  unsupported: 'unsupportedImage',
+  failed: 'photoPickFailed',
+};
 
 export default function NewSensage() {
   const { t, theme, locale, direction, account, dataVersion } = useApp();
   const router = useRouter();
   const [vehicleId, setVehicleId] = useState('');
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [shots, setShots] = useState<Shot[]>([]);
   const [running, setRunning] = useState(false);
   const [stage, setStage] = useState(0);
+  const [busy, setBusy] = useState(false);
+  /** A message to show under the capture buttons, or null when there is none. */
+  const [notice, setNotice] = useState<string | null>(null);
+  /** True when the notice is a denied permission we cannot re-prompt. */
+  const [canOpenSettings, setCanOpenSettings] = useState(false);
 
   const vehicles = useAsync(
     async () => (account ? repository.vehicles(account.id) : []),
@@ -61,10 +85,45 @@ export default function NewSensage() {
   }, [running]);
 
   const done = running && stage === STAGES.length - 1;
+  const align = direction === 'rtl' ? 'right' : 'left';
+
+  /**
+   * Runs a capture and folds the result into state. A cancelled picker is not an
+   * error and says nothing; every other failure explains itself.
+   */
+  async function capture(source: 'camera' | 'gallery') {
+    if (busy) return;
+    setBusy(true);
+    setNotice(null);
+    setCanOpenSettings(false);
+    try {
+      const result = source === 'camera' ? await capturePhoto() : await pickFromGallery();
+      if (result.ok) {
+        setShots((prev) => [...prev, { uri: result.uri, source: result.source }]);
+        return;
+      }
+      if (result.reason === 'cancelled') return;
+      const title =
+        result.reason === 'permission-denied'
+          ? source === 'camera'
+            ? t('cameraPermissionTitle')
+            : t('galleryPermissionTitle')
+          : null;
+      setNotice(title ? `${title} — ${t(FAILURE_KEY[result.reason])}` : t(FAILURE_KEY[result.reason]));
+      setCanOpenSettings(Boolean(result.canOpenSettings));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function removeShot(uri: string) {
+    setShots((prev) => prev.filter((s) => s.uri !== uri));
+    setNotice(null);
+  }
 
   return (
     <Screen>
-      <ScreenHeader title={t('sensageTitle')} subtitle={t('startAnalysis')} />
+      <ScreenHeader title={t('sensageTitle')} subtitle={t('sensageIntro')} />
 
       <Card>
         <SectionLabel>{t('selectVehicle')}</SectionLabel>
@@ -86,37 +145,91 @@ export default function NewSensage() {
         )}
       </Card>
 
+      {/* ------------------------------------------------ camera and gallery */}
       <Card>
-        <SectionLabel>{t('addPhotos')}</SectionLabel>
-        <Body size="caption" muted style={{ marginTop: space.xs }}>
+        <SectionLabel>{t('addPhotoTitle')}</SectionLabel>
+        <Body size="caption" muted style={{ marginTop: space.xs, textAlign: align }}>
           {t('addPhotosHint')}
         </Body>
-        <View style={[styles.grid, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
-          {PHOTO_SLOTS.map((slot) => {
-            const added = photos.includes(slot);
-            return (
-              <View key={slot} style={{ width: 88 }}>
-                <Photo
-                  source={photo(slot)}
-                  height={88}
-                  width={88}
-                  radiusValue={radius.md}
-                  overlay={added}
-                />
-                <View style={{ marginTop: space.xs }}>
-                  <Chip
-                    testID={`sensage-photo-${slot}`}
-                    label={added ? t('photoAdded') : t('addPhotos')}
-                    active={added}
-                    onPress={() => setPhotos((p) => (added ? p.filter((x) => x !== slot) : [...p, slot]))}
-                  />
-                </View>
-              </View>
-            );
-          })}
+
+        <View style={[styles.actions, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
+          <View style={styles.action}>
+            <Button
+              testID="sensage-take-photo"
+              title={t('takePhoto')}
+              variant="primary"
+              loading={busy}
+              onPress={() => capture('camera')}
+            />
+          </View>
+          <View style={styles.action}>
+            <Button
+              testID="sensage-pick-gallery"
+              title={t('chooseFromGallery')}
+              variant="secondary"
+              disabled={busy}
+              onPress={() => capture('gallery')}
+            />
+          </View>
         </View>
+
+        {/* The failure message. A denied permission offers Settings, because the
+            OS will not show the prompt a second time. */}
+        {notice ? (
+          <View style={[styles.notice, { borderColor: theme.border, backgroundColor: theme.surfaceRaised }]}>
+            <Text style={{ color: theme.textMuted, fontSize: typography.label, textAlign: align }}>
+              {notice}
+            </Text>
+            {canOpenSettings ? (
+              <Pressable testID="sensage-open-settings" onPress={openAppSettings} style={{ marginTop: space.sm }}>
+                <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '700', textAlign: align }}>
+                  {t('openSettings')}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* The previews. Each is the real captured file, shown at its own aspect. */}
+        {shots.length ? (
+          <>
+            <SectionLabel>{`${t('photoPreview')} · ${localizeDigits(shots.length, locale)}`}</SectionLabel>
+            <View style={[styles.previews, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
+              {shots.map((shot) => (
+                <View key={shot.uri} style={styles.preview}>
+                  <Image source={{ uri: shot.uri }} style={styles.previewImage} resizeMode="cover" />
+                  <Text style={[styles.previewSource, { color: theme.textFaint }]} numberOfLines={1}>
+                    {shot.source === 'camera' ? t('takePhoto') : t('chooseFromGallery')}
+                  </Text>
+                  <Pressable
+                    testID={`sensage-remove-${shot.source}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('removePhoto')}
+                    onPress={() => removeShot(shot.uri)}
+                    style={[styles.remove, { borderColor: theme.borderStrong, backgroundColor: theme.surface }]}
+                  >
+                    <Text style={{ color: theme.gold, fontSize: 13, fontWeight: '800' }}>×</Text>
+                  </Pressable>
+                  <Pressable
+                    testID={`sensage-replace-${shot.source}`}
+                    accessibilityRole="button"
+                    onPress={() => {
+                      removeShot(shot.uri);
+                      void capture(shot.source);
+                    }}
+                  >
+                    <Text style={{ color: theme.gold, fontSize: typography.caption, fontWeight: '700', marginTop: 4 }}>
+                      {shot.source === 'camera' ? t('retake') : t('replacePhoto')}
+                    </Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          </>
+        ) : null}
       </Card>
 
+      {/* ------------------------------------------------------- the analysis */}
       {running ? (
         <Card>
           <SectionLabel>{t('analysing')}</SectionLabel>
@@ -130,7 +243,7 @@ export default function NewSensage() {
                 style={{
                   color: i <= stage ? theme.gold : theme.textFaint,
                   fontSize: typography.label,
-                  textAlign: direction === 'rtl' ? 'right' : 'left',
+                  textAlign: align,
                 }}
               >
                 {i < stage ? '✓ ' : i === stage ? '● ' : '○ '}
@@ -138,7 +251,7 @@ export default function NewSensage() {
               </Text>
             ))}
           </View>
-          <Body size="caption" muted style={{ marginTop: space.md }}>
+          <Body size="caption" muted style={{ marginTop: space.md, textAlign: align }}>
             {t('sensageDisclaimer')}
           </Body>
         </Card>
@@ -147,11 +260,31 @@ export default function NewSensage() {
       {done ? (
         <Card>
           <Heading size="subheading">{t('reportReady')}</Heading>
-          <View style={{ marginTop: space.md }}>
+          {/* The demo result is labelled as a demo, on the result itself. */}
+          <View style={[styles.demoTag, { borderColor: theme.borderStrong, backgroundColor: theme.surfaceRaised }]}>
+            <Text style={{ color: theme.gold, fontSize: typography.caption, fontWeight: '700', textAlign: align }}>
+              {t('demoData')}
+            </Text>
+            <Text style={{ color: theme.textMuted, fontSize: typography.caption, textAlign: align }}>
+              {t('demoResultNotice')}
+            </Text>
+          </View>
+          <View style={{ marginTop: space.md, gap: space.sm }}>
             <Button
               testID="sensage-view-report"
               title={t('reportDetails')}
-              onPress={() => router.replace(`/sensage/report-01`)}
+              onPress={() => router.replace('/sensage/report-01')}
+            />
+            <Button
+              testID="sensage-new-inspection"
+              title={t('newInspection')}
+              variant="secondary"
+              onPress={() => {
+                setRunning(false);
+                setStage(0);
+                setShots([]);
+                setVehicleId('');
+              }}
             />
           </View>
         </Card>
@@ -159,18 +292,52 @@ export default function NewSensage() {
         <Button
           testID="sensage-run"
           title={t('startAnalysis')}
-          disabled={!vehicleId || photos.length === 0 || running}
+          disabled={!vehicleId || shots.length === 0 || running}
           onPress={() => setRunning(true)}
         />
       )}
 
       <Body size="caption" muted align="center" style={{ marginTop: space.md }}>
-        {localizeDigits(photos.length, locale)} {t('photosSubmitted')} · {t('demoData')}
+        {localizeDigits(shots.length, locale)} {t('photosSubmitted')} · {t('demoData')}
       </Body>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  grid: { flexWrap: 'wrap', gap: space.md, marginTop: space.md },
+  actions: { gap: space.md, marginTop: space.md },
+  action: { flex: 1 },
+  notice: {
+    marginTop: space.md,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: space.md,
+  },
+  previews: { flexWrap: 'wrap', gap: space.md, marginTop: space.sm },
+  preview: { width: 104, position: 'relative' },
+  previewImage: {
+    width: 104,
+    height: 104,
+    borderRadius: radius.md,
+    backgroundColor: brand.navyDeep,
+  },
+  previewSource: { fontSize: typography.caption, marginTop: 4 },
+  remove: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  demoTag: {
+    marginTop: space.md,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: space.md,
+    gap: space.xs,
+  },
 });

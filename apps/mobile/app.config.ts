@@ -16,7 +16,7 @@ import type { ExpoConfig } from 'expo/config';
 const config: ExpoConfig = {
   name: 'ORYX Marketplace',
   slug: 'oryx-marketplace',
-  version: '1.0.5',
+  version: '1.0.6',
   orientation: 'portrait',
   scheme: 'oryx-marketplace',
   userInterfaceStyle: 'automatic',
@@ -33,17 +33,17 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'com.oryx.marketplace',
-    versionCode: 5,
+    versionCode: 6,
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#00162b',
     },
     edgeToEdgeEnabled: true,
-    permissions: ['POST_NOTIFICATIONS', 'INTERNET'],
+    permissions: ['POST_NOTIFICATIONS', 'INTERNET', 'CAMERA'],
   },
   ios: {
     bundleIdentifier: 'com.oryx.marketplace',
-    buildNumber: '5',
+    buildNumber: '6',
     supportsTablet: true,
     infoPlist: {
       // Arabic is the primary market language; English remains a fallback.
@@ -58,6 +58,16 @@ const config: ExpoConfig = {
       'expo-notifications',
       {
         color: '#d4af37',
+      },
+    ],
+    [
+      // Camera and photo-library access, for the SENSAGE vehicle inspection.
+      // The strings are what Android shows in the permission dialog, so they
+      // say what the photo is for rather than naming the API.
+      'expo-image-picker',
+      {
+        photosPermission: 'ORYX uses your photos so you can attach a picture of your car to an inspection.',
+        cameraPermission: 'ORYX uses the camera so you can photograph your car for an inspection.',
       },
     ],
   ],
