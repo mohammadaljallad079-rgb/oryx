@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 
 import { useApp } from '../lib/app-context';
 import { LOGO } from '../lib/assets';
+import { UiIcon } from './ui-icons';
 import { radius, space, typography } from '../lib/theme';
 
 /** The ORYX wordmark at a chosen width, picking the correct colourway. */
@@ -99,41 +100,55 @@ export function AppHeader({ showLogo = true }: { showLogo?: boolean }) {
       style={[
         styles.header,
         {
-          backgroundColor: theme.bg,
+          backgroundColor: theme.bgDeep,
           borderBottomColor: theme.borderSoft,
         },
       ]}
     >
-      {showLogo ? <Logo width={104} /> : <View />}
+      {/* The official lockup, at the size the specification gives for a 390dp
+          phone. It is `contain`, so it never stretches or crops. */}
+      {showLogo ? <Logo width={182} /> : <View />}
       <View style={styles.headerActions}>
         <Pressable
           testID="locale-toggle"
           accessibilityRole="button"
           accessibilityLabel={t('language')}
           onPress={() => setLocale(nextLocale)}
-          style={({ pressed }) => [
-            styles.localeButton,
-            { borderColor: theme.border },
-            pressed && { opacity: 0.8 },
-          ]}
+          style={({ pressed }) => [styles.localeButton, pressed && { opacity: 0.8 }]}
         >
           <Text style={{ color: theme.gold, fontWeight: '700', fontSize: typography.label }}>
             {nextLocale === 'ar' ? 'ع' : 'EN'}
           </Text>
         </Pressable>
-        <IconButton
-          testID="header-cart"
-          glyph="🛒"
-          label={t('cart')}
-          badge={cartCount}
-          onPress={() => router.push('/cart')}
-        />
-        <IconButton
+        {/* Bell and cart as thin-line vectors, with the cart badge carrying the
+            real count rather than a fixed number. */}
+        <Pressable
           testID="header-notifications"
-          glyph="🔔"
-          label={t('notifications')}
+          accessibilityRole="button"
+          accessibilityLabel={t('notifications')}
           onPress={() => router.push('/notifications')}
-        />
+          hitSlop={10}
+          style={({ pressed }) => [styles.headerIcon, pressed && { opacity: 0.8 }]}
+        >
+          <UiIcon name="bell" size={25} color={theme.text} />
+        </Pressable>
+        <Pressable
+          testID="header-cart"
+          accessibilityRole="button"
+          accessibilityLabel={t('cart')}
+          onPress={() => router.push('/cart')}
+          hitSlop={10}
+          style={({ pressed }) => [styles.headerIcon, pressed && { opacity: 0.8 }]}
+        >
+          <UiIcon name="cart" size={27} color={theme.text} />
+          {cartCount > 0 ? (
+            <View style={[styles.badgeDot, { backgroundColor: theme.gold }]}>
+              <Text style={{ color: theme.onGold, fontSize: 10, fontWeight: '800' }}>
+                {cartCount > 9 ? '9+' : cartCount}
+              </Text>
+            </View>
+          ) : null}
+        </Pressable>
       </View>
     </View>
   );
@@ -206,17 +221,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: space.lg,
+    paddingHorizontal: 16,
     paddingVertical: space.md,
+    minHeight: 84,
     borderBottomWidth: 1,
   },
+  headerIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   localeButton: {
-    borderWidth: 1,
     borderRadius: radius.pill,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
-    minWidth: 44,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    minWidth: 34,
     alignItems: 'center',
   },
   iconButton: {
@@ -229,7 +245,8 @@ const styles = StyleSheet.create({
   },
   badgeDot: {
     position: 'absolute',
-    top: -4,
+    top: -2,
+    right: -2,
     minWidth: 18,
     height: 18,
     borderRadius: 9,

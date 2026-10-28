@@ -1,19 +1,30 @@
 import { Redirect, Tabs } from 'expo-router';
-import { Text } from 'react-native';
+
 
 import { useApp } from '../../lib/app-context';
 import { Screen, StateView } from '../../components/ui';
-import { typography } from '../../lib/theme';
+import { UiIcon, type UiIconName } from '../../components/ui-icons';
+
 
 /**
- * Tab icon.
+ * A tab icon.
  *
- * The approved identity ships no icon set, so the bar uses a plain glyph tinted
- * with the theme accent rather than an invented brand mark. The glyph is a
- * property of the tab, not a decoration, so it stays legible in both themes.
+ * Thin-line vectors, per the specification: a filled gold house for the active
+ * Home tab and outlines elsewhere. The glyphs this replaced were text
+ * characters, which rendered differently on every device.
  */
-function TabIcon({ glyph, color }: { glyph: string; color: string }) {
-  return <Text style={{ color, fontSize: 20 }}>{glyph}</Text>;
+function TabIcon({
+  name,
+  color,
+  focused,
+}: {
+  name: UiIconName;
+  color: string;
+  focused: boolean;
+}) {
+  // Only the house is filled when active; the rest stay outlined so the bar
+  // does not read as five solid blocks.
+  return <UiIcon name={name} size={25} color={color} filled={focused && name === 'house'} />;
 }
 
 /**
@@ -46,16 +57,17 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: theme.surface,
+          backgroundColor: theme.bgDeep,
           borderTopColor: theme.border,
           borderTopWidth: 1,
-          height: 64,
-          paddingBottom: 8,
+          height: 66,
           paddingTop: 6,
+          paddingBottom: 6,
         },
         tabBarActiveTintColor: theme.gold,
         tabBarInactiveTintColor: theme.textFaint,
-        tabBarLabelStyle: { fontSize: typography.caption, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 10.5, fontWeight: '600' },
+        tabBarItemStyle: { paddingVertical: 2 },
         sceneStyle: { backgroundColor: theme.bg },
       }}
     >
@@ -63,35 +75,35 @@ export default function TabsLayout() {
         name="home"
         options={{
           title: t('home'),
-          tabBarIcon: ({ color }) => <TabIcon glyph="⌂" color={color} />,
+          tabBarIcon: ({ color, focused }) => <TabIcon name="house" color={color} focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="categories"
         options={{
           title: t('tabCategories'),
-          tabBarIcon: ({ color }) => <TabIcon glyph="▦" color={color} />,
+          tabBarIcon: ({ color, focused }) => <TabIcon name="grid" color={color} focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="search"
         options={{
           title: t('tabSearch'),
-          tabBarIcon: ({ color }) => <TabIcon glyph="⌕" color={color} />,
+          tabBarIcon: ({ color, focused }) => <TabIcon name="search" color={color} focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="bookings"
         options={{
           title: t('tabBookings'),
-          tabBarIcon: ({ color }) => <TabIcon glyph="▤" color={color} />,
+          tabBarIcon: ({ color, focused }) => <TabIcon name="calendar" color={color} focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="account"
         options={{
           title: t('tabProfile'),
-          tabBarIcon: ({ color }) => <TabIcon glyph="◉" color={color} />,
+          tabBarIcon: ({ color, focused }) => <TabIcon name="person" color={color} focused={focused} />,
         }}
       />
     </Tabs>

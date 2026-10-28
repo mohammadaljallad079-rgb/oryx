@@ -114,11 +114,24 @@ const strings: Record<string, Entry> = {
   bookService: { ar: 'احجز خدمة', en: 'Book a service' },
   bookInspection: { ar: 'احجز فحصاً', en: 'Book an inspection' },
   bookMaintenance: { ar: 'احجز صيانة', en: 'Book maintenance' },
+  // The hero headline is two lines, because the approved design colours the
+  // second Arabic line gold. A single string could not do that.
+  heroLine1: { ar: 'كل ما تحتاجه', en: 'Everything' },
+  heroLine2: { ar: 'لسيارتك', en: 'Your Car Needs' },
   heroTagline: { ar: 'كل ما تحتاجه سيارتك', en: 'Everything Your Car Needs' },
   heroSubtitle: {
-    ar: 'قطع غيار · خدمات · مزودون موثوقون',
-    en: 'Parts · Services · Trusted Providers',
+    ar: 'قطع غيار • خدمات • مزودون موثوقون',
+    en: 'Parts • Services • Trusted Providers',
   },
+  // Splash headline: "Everything Your" / "Car Needs", with the second line gold.
+  splashLine1: { ar: 'كل ما تحتاجه', en: 'Everything Your' },
+  splashLine2: { ar: 'لسيارتك', en: 'Car Needs' },
+  filter: { ar: 'تصفية', en: 'Filter' },
+  viewAll: { ar: 'عرض الكل', en: 'View All' },
+  sensageCardTitle: { ar: 'SENSAGE AI', en: 'SENSAGE AI' },
+  sensageCardBody: { ar: 'فحص السيارة بالذكاء الاصطناعي', en: 'Car Inspection with AI' },
+  bookCardTitle: { ar: 'احجز خدمة الآن', en: 'Book a Service' },
+  bookCardBody: { ar: 'صيانة وإصلاح سيارتك', en: 'Maintenance & Repair' },
   searchEverything: {
     ar: 'ابحث عن قطع غيار، خدمات أو مزودين.',
     en: 'Search for parts, services, or providers.',

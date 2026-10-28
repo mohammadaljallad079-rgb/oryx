@@ -30,6 +30,8 @@ export interface Theme {
   textFaint: string;
   /** Ink that is legible on top of `gold`. */
   onGold: string;
+  /** The search input's own surface, which is lighter than a card. */
+  search: string;
   navy: string;
   gold: string;
   goldSoft: string;
@@ -44,23 +46,26 @@ export interface Theme {
 
 const dark: Theme = {
   mode: 'dark',
-  bg: '#00162b',
-  bgDeep: '#000f1e',
-  surface: '#021f3a',
-  surfaceRaised: '#072a4a',
-  surfaceHover: '#0b3459',
-  scrim: 'rgba(0, 15, 30, 0.55)',
-  border: 'rgba(212, 175, 55, 0.18)',
-  borderSoft: 'rgba(255, 255, 255, 0.08)',
-  borderStrong: 'rgba(212, 175, 55, 0.55)',
-  text: '#eef3f9',
-  textMuted: '#9fb3c8',
-  textFaint: '#6f8598',
+  // The owner's approved palette. Every value here is a token from the written
+  // specification, so a screen reads a name and never a literal.
+  bg: '#00162b',          // background — main screen
+  bgDeep: '#00101f',      // backgroundDeep — header and bottom bar
+  surface: '#061b32',     // card — dark cards
+  surfaceRaised: '#10263e', // surface — elevated surfaces
+  surfaceHover: '#16304c',
+  scrim: 'rgba(0, 16, 31, 0.62)',
+  border: '#30445b',      // border — subtle outlines
+  borderSoft: 'rgba(48, 68, 91, 0.55)',
+  borderStrong: '#c6a15b', // goldDark — borders and details
+  text: '#ffffff',        // white — headings
+  textMuted: '#b6bec9',   // mutedText — supporting text
+  textFaint: '#8995a7',   // inactive — inactive navigation
   onGold: '#00162b',
   navy: '#00162b',
-  gold: '#d4af37',
-  goldSoft: '#e8c766',
-  goldDeep: '#a9861f',
+  gold: '#d7b878',        // gold — buttons and icons
+  goldSoft: '#f0c46c',    // goldBright — highlight
+  goldDeep: '#c6a15b',    // goldDark
+  search: '#1b3047',      // searchSurface — search input
   success: '#3ecf8e',
   warning: '#f0b429',
   danger: '#f2555a',
@@ -89,6 +94,7 @@ const light: Theme = {
   textMuted: '#5b564d',
   textFaint: '#8a8479',
   onGold: '#221c07',
+  search: '#ece6da',
   navy: '#00162b',
   gold: '#7d5f10',
   goldSoft: '#b8912a',

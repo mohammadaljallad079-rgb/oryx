@@ -109,7 +109,14 @@ export function LaunchScreen() {
 
       {/* The tagline at 75.2% / 79.6% and the subtitle at 84.3%. */}
       <Animated.View style={[styles.copy, { opacity: fade }]} pointerEvents="none">
-        <Text style={[styles.tagline, { writingDirection: direction }]}>{t('heroTagline')}</Text>
+        {/* Two lines, the second in gold — the emphasis the specification asks
+            for on "Car Needs" and on "لسيارتك". */}
+        <Text style={[styles.tagline, { writingDirection: direction }]}>{t('splashLine1')}</Text>
+        <Text
+          style={[styles.tagline, styles.taglineGold, { writingDirection: direction }]}
+        >
+          {t('splashLine2')}
+        </Text>
         <Text style={[styles.sub, { writingDirection: direction }]}>{t('heroSubtitle')}</Text>
 
         <View style={styles.progressTrack}>
@@ -145,10 +152,11 @@ const styles = StyleSheet.create({
   },
   // The reference sets the tagline as the largest type on the screen: two lines
   // occupying 75-81% of the frame, which is ~4.5% per line.
+  taglineGold: { color: GOLD },
   tagline: {
     color: '#ffffff',
-    fontSize: 31,
-    lineHeight: 37,
+    fontSize: 29,
+    lineHeight: 35,
     fontWeight: '800',
     textAlign: 'center',
     letterSpacing: 0.1,

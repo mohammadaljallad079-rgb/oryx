@@ -3,14 +3,15 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
-import { photo } from '../../lib/assets';
+import { photo, photoSmall } from '../../lib/assets';
 import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
 import { AppHeader } from '../../components/brand';
 import { OfferCard, ProductCard, ProviderCard, StoreCard } from '../../components/cards';
-import { Photo, Rail, Screen, Scrim, SectionLabel, StateView } from '../../components/ui';
+import { Photo, Rail, Screen, SectionLabel, StateView } from '../../components/ui';
 import { CategoryIcon, type CategoryIconName } from '../../components/category-icons';
-import { brand, radius, space, typography } from '../../lib/theme';
+import { UiIcon } from '../../components/ui-icons';
+import { radius, space, typography } from '../../lib/theme';
 
 /**
  * The marketplace home.
@@ -70,41 +71,62 @@ export default function Home() {
       <AppHeader />
 
       {/* ------------------------------------------------------------- hero
-          Measured off the reference: the hero occupies 8-32% of the frame, so
-          with a ~64px header on a 915px handset that is ~265px of hero. It uses
-          the same approved cinematic scene as the splash — the vehicle is the
-          focal point and must not be a different photograph. */}
+          A wide rounded card, not a full-screen banner: the specification puts
+          it at ~180dp on a 390dp screen so the search, the categories and the
+          promotional cards are all reachable without scrolling far. It carries
+          the approved cinematic scene — the black SUV, the skyline and the
+          golden sunset — under a left-side gradient, so the vehicle stays
+          visible on the right while the type reads on the left. */}
       <View style={styles.heroWrap}>
-        <Photo source={photo('splashScene')} radiusValue={0} style={StyleSheet.absoluteFill} />
-        <Scrim color={brand.navy} from={0.42} to={0.0} bands={10} />
-        <View style={styles.heroLowerFade}>
-          <Scrim color={brand.navyDeep} from={0.0} to={0.94} bands={16} />
+        <View style={[styles.heroCard, { borderColor: theme.border }]}>
+          <Photo source={photo('splashScene')} radiusValue={0} style={StyleSheet.absoluteFill} />
+          {/* Left-side gradient: strong at the left for the type, clear at the
+              right so the vehicle and the sunset are not dimmed. */}
+          <View style={styles.heroLeftShade} pointerEvents="none">
+            <View style={[styles.shadeBand, { opacity: 0.92 }]} />
+            <View style={[styles.shadeBand, { opacity: 0.62 }]} />
+            <View style={[styles.shadeBand, { opacity: 0.3 }]} />
+            <View style={[styles.shadeBand, { opacity: 0.06 }]} />
+          </View>
+
+          <View style={styles.heroContent}>
+            <Text style={[styles.heroLine, { writingDirection: direction }]} numberOfLines={1}>
+              {t('heroLine1')}
+            </Text>
+            <Text style={[styles.heroLine, { writingDirection: direction }]} numberOfLines={1}>
+              {t('heroLine2')}
+            </Text>
+            <Text style={[styles.heroSub, { writingDirection: direction }]} numberOfLines={1}>
+              {t('heroSubtitle')}
+            </Text>
+
+            <Pressable
+              testID="home-explore"
+              accessibilityRole="button"
+              onPress={() => router.push('/services')}
+              style={({ pressed }) => [styles.heroCta, pressed && { opacity: 0.9 }]}
+            >
+              <Text style={styles.heroCtaLabel}>
+                {t('exploreNow')} {arrow}
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
-        <View style={styles.heroContent}>
-          <Text style={[styles.heroTagline, { writingDirection: direction }]}>
-            {t('heroTagline')}
-          </Text>
-          <Text style={[styles.heroSub, { writingDirection: direction }]}>
-            {t('heroSubtitle')}
-          </Text>
-
-          <Pressable
-            testID="home-explore"
-            accessibilityRole="button"
-            onPress={() => router.push('/services')}
-            style={({ pressed }) => [styles.heroCta, pressed && { opacity: 0.9 }]}
-          >
-            <Text style={styles.heroCtaLabel}>
-              {t('exploreNow')} {arrow}
-            </Text>
-          </Pressable>
+        {/* The carousel indicator. One approved scene, so one active dot; the
+            remaining positions are muted rather than filled with photographs
+            nobody approved. */}
+        <View style={styles.dots}>
+          <View style={[styles.dot, styles.dotActive, { backgroundColor: theme.gold }]} />
+          <View style={[styles.dot, { backgroundColor: theme.border }]} />
+          <View style={[styles.dot, { backgroundColor: theme.border }]} />
+          <View style={[styles.dot, { backgroundColor: theme.border }]} />
         </View>
       </View>
 
       {/* --------------------------------------------------------- search
           On its own row below the hero, where the reference places it. */}
-      <View style={styles.searchRow}>
+      <View style={[styles.searchRow, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
         <Pressable
           testID="home-search"
           accessibilityRole="search"
@@ -112,14 +134,30 @@ export default function Home() {
           onPress={() => router.push('/search')}
           style={({ pressed }) => [
             styles.searchField,
-            { backgroundColor: theme.surface, borderColor: theme.border },
+            { backgroundColor: theme.search, borderColor: theme.border },
             pressed && { opacity: 0.92 },
           ]}
         >
-          <Text style={[styles.searchGlyph, { color: theme.gold }]}>⌕</Text>
-          <Text style={{ color: theme.textFaint, fontSize: typography.body, flexShrink: 1 }}>
+          <UiIcon name="search" size={18} color={theme.text} />
+          <Text style={{ color: theme.textFaint, fontSize: typography.label, flexShrink: 1 }} numberOfLines={1}>
             {t('searchEverything')}
           </Text>
+        </Pressable>
+
+        {/* The filter control the specification asks for: a separate button
+            with adjustment sliders, not a funnel. */}
+        <Pressable
+          testID="home-filter"
+          accessibilityRole="button"
+          accessibilityLabel={t('filter')}
+          onPress={() => router.push('/parts')}
+          style={({ pressed }) => [
+            styles.filterButton,
+            { backgroundColor: theme.bgDeep, borderColor: theme.goldDeep },
+            pressed && { opacity: 0.9 },
+          ]}
+        >
+          <UiIcon name="sliders" size={20} color={theme.text} />
         </Pressable>
       </View>
 
@@ -154,30 +192,39 @@ export default function Home() {
           ))}
         </Rail>
 
-        {/* ---------------------------------- SENSAGE and the booking tiles */}
-        <View style={[styles.tileRow, { flexDirection: row }]}>
+        {/* ------------------------------------ the two promotional cards
+            Side by side, each with real automotive imagery on the right and the
+            copy on the left. The specification swaps their order between
+            languages — SENSAGE first in English, Book a Service first in Arabic —
+            which `row-reverse` gives for free in RTL. */}
+        <View style={[styles.promoRow, { flexDirection: row }]}>
           <Pressable
             testID="sensage-cta"
             accessibilityRole="button"
             onPress={() => router.push('/sensage')}
             style={({ pressed }) => [
-              styles.sensageTile,
-              { backgroundColor: theme.surface, borderColor: theme.borderStrong },
+              styles.promoCard,
+              { backgroundColor: theme.surface, borderColor: theme.border },
               pressed && { opacity: 0.92 },
             ]}
           >
-            <View style={styles.sensageHead}>
-              <Text style={{ color: theme.gold, fontSize: 18 }}>◎</Text>
-              <Text style={[styles.tileTitle, { color: theme.text }]} numberOfLines={1}>
-                SENSAGE AI
+            <Photo
+              source={photoSmall('inspectionBay')}
+              radiusValue={0}
+              style={styles.promoImage}
+            />
+            <View style={styles.promoScrim} pointerEvents="none" />
+            <View style={styles.promoCopy}>
+              <Text style={[styles.promoTitle, { color: theme.text }]} numberOfLines={1}>
+                {t('sensageCardTitle')}
               </Text>
+              <Text style={[styles.promoBody, { color: theme.textMuted }]} numberOfLines={2}>
+                {t('sensageCardBody')}
+              </Text>
+              <View style={styles.promoArrow}>
+                <UiIcon name="arrowCircle" size={22} color={theme.gold} />
+              </View>
             </View>
-            <Text style={[styles.tileBody, { color: theme.textMuted }]} numberOfLines={2}>
-              {t('carInspection')}
-            </Text>
-            <Text style={[styles.tileCta, { color: theme.gold }]}>
-              {t('startAnalysis')} {arrow}
-            </Text>
           </Pressable>
 
           <Pressable
@@ -185,28 +232,43 @@ export default function Home() {
             accessibilityRole="button"
             onPress={() => router.push('/bookings/new')}
             style={({ pressed }) => [
-              styles.bookTile,
+              styles.promoCard,
               { backgroundColor: theme.surface, borderColor: theme.border },
               pressed && { opacity: 0.92 },
             ]}
           >
-            <Text style={{ color: theme.gold, fontSize: 18 }}>🛠</Text>
-            <Text style={[styles.tileTitle, { color: theme.text }]} numberOfLines={1}>
-              {t('bookService')}
-            </Text>
-            <Text style={[styles.tileBody, { color: theme.textMuted }]} numberOfLines={2}>
-              {t('maintenance')}
-            </Text>
+            <Photo
+              source={photoSmall('mechanicEngine')}
+              radiusValue={0}
+              style={styles.promoImage}
+            />
+            <View style={styles.promoScrim} pointerEvents="none" />
+            <View style={styles.promoCopy}>
+              <Text style={[styles.promoTitle, { color: theme.text }]} numberOfLines={2}>
+                {t('bookCardTitle')}
+              </Text>
+              <Text style={[styles.promoBody, { color: theme.textMuted }]} numberOfLines={2}>
+                {t('bookCardBody')}
+              </Text>
+              <View style={styles.promoArrow}>
+                <UiIcon name="arrowCircle" size={22} color={theme.gold} />
+              </View>
+            </View>
           </Pressable>
         </View>
 
         {/* -------------------------------------------- featured providers */}
         <View style={styles.sectionHead}>
           <SectionLabel>{t('featuredProviders')}</SectionLabel>
-          <Pressable onPress={() => router.push('/services')} testID="providers-see-all">
-            <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '700' }}>
-              {t('seeAll')}
+          <Pressable
+            onPress={() => router.push('/services')}
+            testID="providers-see-all"
+            style={[styles.viewAll, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}
+          >
+            <Text style={{ color: theme.textMuted, fontSize: typography.label, fontWeight: '600' }}>
+              {t('viewAll')}
             </Text>
+            <UiIcon name="chevron" size={13} color={theme.gold} />
           </Pressable>
         </View>
         {providers.loading ? (
@@ -224,10 +286,15 @@ export default function Home() {
         {/* --------------------------------------------- popular products */}
         <View style={styles.sectionHead}>
           <SectionLabel>{t('popularProducts')}</SectionLabel>
-          <Pressable onPress={() => router.push('/parts')} testID="products-see-all">
-            <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '700' }}>
-              {t('seeAll')}
+          <Pressable
+            onPress={() => router.push('/parts')}
+            testID="products-see-all"
+            style={[styles.viewAll, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}
+          >
+            <Text style={{ color: theme.textMuted, fontSize: typography.label, fontWeight: '600' }}>
+              {t('viewAll')}
             </Text>
+            <UiIcon name="chevron" size={13} color={theme.gold} />
           </Pressable>
         </View>
         <Rail>
@@ -281,97 +348,139 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  // The reference hero fills roughly the top third of the frame and is tall
-  // enough for the tagline, the subtitle and one action.
-  heroWrap: { height: 265, overflow: 'hidden', backgroundColor: brand.navy },
-  heroLowerFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '68%' },
+  // Hero: a wide rounded card, ~180dp on a 390dp screen, not a full-screen
+  // banner. The specification is explicit that it must not swallow the viewport.
+  heroWrap: { paddingHorizontal: space.md, paddingTop: space.md },
+  heroCard: {
+    height: 180,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+    backgroundColor: '#00101f',
+  },
+  heroLeftShade: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: '72%',
+    flexDirection: 'row',
+  },
+  shadeBand: { flex: 1, backgroundColor: '#00162b' },
   heroContent: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-    padding: space.lg,
-    gap: space.xs,
+    justifyContent: 'center',
+    paddingHorizontal: space.lg,
+    gap: 2,
   },
-  heroTagline: {
-    color: brand.onNavy,
+  heroLine: {
+    color: '#ffffff',
     fontSize: 26,
     lineHeight: 31,
     fontWeight: '800',
-    textShadowColor: 'rgba(0,0,0,0.75)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 14,
-  },
-  heroSub: {
-    color: 'rgba(255,255,255,0.95)',
-    fontSize: typography.label,
-    textShadowColor: 'rgba(0,0,0,0.7)',
+    letterSpacing: 0.1,
+    textShadowColor: 'rgba(0,0,0,0.55)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 8,
   },
+  heroSub: {
+    color: 'rgba(255,255,255,0.92)',
+    fontSize: 11.5,
+    lineHeight: 16,
+    marginTop: 2,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+  },
   heroCta: {
     alignSelf: 'flex-start',
-    backgroundColor: brand.gold,
+    backgroundColor: '#d7b878',
     borderRadius: radius.pill,
-    paddingHorizontal: space.lg,
-    paddingVertical: space.sm,
-    marginTop: space.sm,
-    minHeight: 38,
+    paddingHorizontal: 20,
+    height: 40,
     justifyContent: 'center',
+    marginTop: space.sm,
   },
-  heroCtaLabel: { color: brand.navy, fontSize: typography.label, fontWeight: '800', letterSpacing: 0.2 },
+  heroCtaLabel: { color: '#00162b', fontSize: typography.label, fontWeight: '800' },
 
-  // The search row sits on the page background, directly under the hero.
-  searchRow: { paddingHorizontal: space.lg, paddingTop: space.md },
+  // Carousel indicator: one active gold dot, the rest muted.
+  dots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: space.sm,
+  },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  dotActive: { width: 16 },
+
+  // Search row: the field and a separate filter button beside it.
+  searchRow: { paddingHorizontal: space.md, paddingTop: space.md, gap: space.sm },
   searchField: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.sm,
     borderWidth: 1,
-    borderRadius: radius.pill,
-    paddingHorizontal: space.lg,
-    minHeight: 48,
+    borderRadius: radius.lg,
+    paddingHorizontal: space.md,
+    height: 46,
   },
-  searchGlyph: { fontSize: 17 },
+  filterButton: {
+    width: 46,
+    height: 46,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
-  body: { padding: space.lg, gap: space.sm },
+  body: { padding: space.md, gap: space.md },
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: space.xs,
   },
+  viewAll: { alignItems: 'center', gap: 2 },
+
+  // Category: a navy rounded square with a gold vector icon, label beneath.
   catIcon: {
     width: 54,
     height: 54,
-    borderRadius: radius.md,
+    borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   catLabel: {
-    marginTop: space.sm,
-    fontSize: typography.caption,
+    marginTop: 6,
+    fontSize: 11,
     fontWeight: '600',
     textAlign: 'center',
   },
-  tileRow: { gap: space.md },
-  sensageTile: {
+
+  // The two promotional cards: image on the right, copy on the left.
+  promoRow: { gap: 10 },
+  promoCard: {
     flex: 1,
+    height: 110,
     borderWidth: 1,
-    borderRadius: radius.lg,
-    padding: space.md,
-    gap: space.xs,
-    minHeight: 104,
+    borderRadius: radius.md,
+    overflow: 'hidden',
   },
-  sensageHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  bookTile: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: radius.lg,
-    padding: space.md,
-    gap: space.xs,
-    minHeight: 104,
+  promoImage: { position: 'absolute', right: 0, top: 0, bottom: 0, width: '58%' },
+  promoScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 22, 43, 0.55)',
   },
-  tileTitle: { fontSize: typography.label, fontWeight: '700' },
-  tileBody: { fontSize: typography.caption },
-  tileCta: { fontSize: typography.caption, fontWeight: '700', marginTop: 'auto' },
+  promoCopy: {
+    ...StyleSheet.absoluteFillObject,
+    padding: space.md,
+    justifyContent: 'flex-start',
+    width: '78%',
+  },
+  promoTitle: { fontSize: 15, fontWeight: '800' },
+  promoBody: { fontSize: 11, marginTop: 2, lineHeight: 15 },
+  promoArrow: { position: 'absolute', left: space.md, bottom: space.md },
 });

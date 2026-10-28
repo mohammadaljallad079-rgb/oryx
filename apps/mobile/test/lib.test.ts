@@ -152,9 +152,20 @@ describe('status colours', () => {
   });
 
   it('keeps the dark theme the approved navy', () => {
-    // The dark theme is the approved identity and must not drift.
+    // The dark theme is the approved identity and must not drift. The gold is
+    // #d7b878 because the owner's written specification sets that value for the
+    // accent; the earlier #d4af37 was the previous revision of the palette.
     expect(themes.dark.bg).toBe('#00162b');
-    expect(themes.dark.gold).toBe('#d4af37');
+    expect(themes.dark.bgDeep).toBe('#00101f');
+    expect(themes.dark.surface).toBe('#061b32');
+    expect(themes.dark.gold).toBe('#d7b878');
+    expect(themes.dark.goldSoft).toBe('#f0c46c');
+    expect(themes.dark.goldDeep).toBe('#c6a15b');
+    expect(themes.dark.text).toBe('#ffffff');
+    expect(themes.dark.textMuted).toBe('#b6bec9');
+    expect(themes.dark.textFaint).toBe('#8995a7');
+    expect(themes.dark.border).toBe('#30445b');
+    expect(themes.dark.search).toBe('#1b3047');
   });
 });
 

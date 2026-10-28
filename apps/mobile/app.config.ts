@@ -16,7 +16,7 @@ import type { ExpoConfig } from 'expo/config';
 const config: ExpoConfig = {
   name: 'ORYX Marketplace',
   slug: 'oryx-marketplace',
-  version: '1.0.7',
+  version: '1.0.8',
   orientation: 'portrait',
   scheme: 'oryx-marketplace',
   userInterfaceStyle: 'automatic',
@@ -33,7 +33,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'com.oryx.marketplace',
-    versionCode: 7,
+    versionCode: 8,
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#00162b',
@@ -43,7 +43,7 @@ const config: ExpoConfig = {
   },
   ios: {
     bundleIdentifier: 'com.oryx.marketplace',
-    buildNumber: '7',
+    buildNumber: '8',
     supportsTablet: true,
     infoPlist: {
       // Arabic is the primary market language; English remains a fallback.
