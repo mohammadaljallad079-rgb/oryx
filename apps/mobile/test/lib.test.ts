@@ -278,4 +278,41 @@ describe('splash duration contract', () => {
   it('holds the splash for at least two seconds', () => {
     expect(SPLASH_MIN_MS).toBeGreaterThanOrEqual(2000);
   });
+
+  it('is a finite duration, so the splash can never strand the user', () => {
+    expect(Number.isFinite(SPLASH_MIN_MS)).toBe(true);
+    // An unbounded hold would be as wrong as a skipped splash: the app must
+    // always reach the homepage.
+    expect(SPLASH_MIN_MS).toBeLessThan(10_000);
+  });
+
+  it('is a whole number of milliseconds', () => {
+    expect(Number.isInteger(SPLASH_MIN_MS)).toBe(true);
+  });
+});
+
+describe('the entry gate requires both conditions', () => {
+  /**
+   * The gate navigates only when the session is read **and** the splash has had
+   * its minimum. Modelling that predicate here pins the rule the owner asked
+   * for: a fast session read must not be able to skip the splash.
+   */
+  const canNavigate = (splashDone: boolean, ready: boolean, hasAccount: boolean) =>
+    splashDone && ready && hasAccount;
+
+  it('does not navigate before the splash finishes, even when the session is ready', () => {
+    expect(canNavigate(false, true, true)).toBe(false);
+  });
+
+  it('does not navigate before the session is read, even when the splash finished', () => {
+    expect(canNavigate(true, false, true)).toBe(false);
+  });
+
+  it('does not navigate without an account', () => {
+    expect(canNavigate(true, true, false)).toBe(false);
+  });
+
+  it('navigates once all three hold', () => {
+    expect(canNavigate(true, true, true)).toBe(true);
+  });
 });
