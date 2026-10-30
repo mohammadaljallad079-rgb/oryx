@@ -91,9 +91,9 @@ the homepage, cart and favourites added in the previous session.
 | --- | --- |
 | Homepage — hero, categories, providers, products | **connected**, with per-rail fallback |
 | Cart — data layer | **connected** (`LiveCartProvider`) |
-| Cart — screen | **not yet rendered from the live store**; the screen still reads the demo cart |
-| Favorites — data layer | client methods exist |
-| Favorites — screen | not connected |
+| Cart — screen | **connected** — renders the server cart, with a retry on failure |
+| Favorites — data layer | **connected** (`LiveFavoritesProvider`) |
+| Favorites — screen | **connected** — renders the server list and its empty state |
 | Sign-in / register | client methods exist; the screen still uses the demo session |
 | Bookings | client methods exist; screens not connected |
 
@@ -162,7 +162,40 @@ Tests:       362 passed, 362 total
 
 ---
 
-## 5. Two bugs the tests found
+## 5. Three more defects, found by driving the screens
+
+The report above was written before the cart and favourites screens were
+connected. Driving them against the running API surfaced three defects that
+reading the code would not have shown:
+
+**1. `react` and `react-dom` were on different versions** — 19.1.0 against
+19.3.0 — and the web bundle crashed with React error #527. The previous session
+changed the manifests, but the lockfile still resolved `react-dom@19.3.0` in 44
+places, because `react-native-web`'s peer on `react-dom` resolved to the newest
+match. Declaring `react-dom` in the mobile workspace pins that peer. This is the
+same class of bug that crashed APK 1.0.5, so a regression test now asserts both
+versions match and that react is the version react-native bundles.
+
+**2. `x-oryx-client` was missing from the CORS allowed headers.** Every
+native-client request carries it, so the browser's preflight refused every call.
+A web-hosted build of the app could not reach the API at all.
+
+**3. A stale root `react-dom`** — the lockfile had never been regenerated after
+the React fix.
+
+Verified by driving the real screens against the running API:
+
+| Screen | Rendered |
+| --- | --- |
+| Cart | `Cart 1 Items · Front brake pad set · BRAKE-PAD-F · 28.000 BHD · − 2 + · 56.000 BHD · Remove · Subtotal 56.000 BHD · Total 56.000 BHD · Live data` |
+| Favourites | `Favourites 0 · Nothing here yet. · Live data` |
+| Console errors | **none** |
+
+The total is the server's own figure — 2 × 28.000 — never a local multiplication.
+
+---
+
+## 6. Two bugs the tests found
 
 **1. A concurrent first-add returned 500.** Two requests both read "no cart" and
 both inserted; the unique key on `customerAccountId` let one win and the loser's
@@ -182,13 +215,11 @@ written to catch.
 
 ---
 
-## 6. Remaining demo-only functions
+## 7. Remaining demo-only functions
 
 | Function | State |
 | --- | --- |
-| Cart **screen** | renders the demo cart; the live store is wired but not rendered |
-| Favourites screen | demo |
-| Sign-in / register screens | demo session |
+| Sign-in / register screens | demo session — the client methods exist and are tested |
 | Bookings screens | demo records |
 | Offers, stores rails | demo records |
 | Merchant dashboard | demo records |
@@ -200,7 +231,7 @@ a different store from the live one.
 
 ---
 
-## 7. Known limitations
+## 8. Known limitations
 
 - **No Android visual verification.** `screencap` returns black frames on the
   emulator available here — the app's surfaces exist and its activity is visible,
@@ -220,9 +251,9 @@ a different store from the live one.
 
 ---
 
-## 8. Final commit
+## 9. Final commit
 
-`9fcb62e` — plus the report commit that follows it.
+`4fc8718` — plus the report commit that follows it.
 
 ---
 

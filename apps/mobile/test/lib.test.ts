@@ -316,3 +316,30 @@ describe('the entry gate requires both conditions', () => {
     expect(canNavigate(true, true, true)).toBe(true);
   });
 });
+
+describe('React and react-dom stay on one version', () => {
+  /**
+   * React asserts an exact match against its renderer, and react-native-web's
+   * renderer asserts a match against react-dom. Two different React minors has
+   * already crashed the Android build (APK 1.0.5) and the web bundle (React
+   * error #527), so the pin is asserted here rather than left to resolution.
+   */
+  const pkg = require('../package.json') as {
+    dependencies: Record<string, string>;
+    devDependencies: Record<string, string>;
+  };
+  const all = { ...pkg.dependencies, ...pkg.devDependencies };
+
+  it('pins react and react-dom to the same version', () => {
+    expect(all.react).toBeDefined();
+    // react-dom is declared so pnpm resolves react-native-web's peer to the
+    // same version rather than to the newest match.
+    expect(all['react-dom']).toBeDefined();
+    expect(all['react-dom']).toBe(all.react);
+  });
+
+  it('pins react to the version react-native bundles', () => {
+    // react-native 0.81.5 bundles react-native-renderer 19.1.0.
+    expect(all.react).toBe('19.1.0');
+  });
+});
