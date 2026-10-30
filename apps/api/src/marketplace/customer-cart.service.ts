@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -30,6 +31,21 @@ import { PrismaService } from '../common/prisma.service';
  * two rows for the same product. Quantity updates are validated against the
  * available stock in the same transaction.
  */
+/**
+ * True when an error is Prisma's unique-constraint violation (P2002).
+ *
+ * Prisma reports the code on the error itself, but a violation raised inside an
+ * interactive transaction can arrive wrapped, so the cause chain is checked too.
+ */
+function isUniqueViolation(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current !== null && current !== undefined; depth += 1) {
+    if ((current as { code?: string }).code === 'P2002') return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
 @Injectable()
 export class CustomerCartService {
   constructor(private readonly prisma: PrismaService) {}
@@ -89,42 +105,72 @@ export class CustomerCartService {
       throw new BadRequestException('quantity must be a whole number between 1 and 999');
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const product = await tx.product.findUnique({ where: { id: productId } });
-      if (!product || !product.isActive) {
-        throw new NotFoundException('product not found');
-      }
+    const attempt = () =>
+      this.prisma.$transaction(async (tx) => {
+        const product = await tx.product.findUnique({ where: { id: productId } });
+        if (!product || !product.isActive) {
+          throw new NotFoundException('product not found');
+        }
 
-      // The cart's tenant comes from the product being added, not from the
-      // client. An existing cart keeps its own tenant, so a caller cannot move a
-      // cart to another catalogue by adding a product from it.
-      const existingCart = await tx.cart.findUnique({ where: { customerAccountId } });
-      const tenant = existingCart?.companyId ?? product.companyId;
-      if (companyId && existingCart && companyId !== existingCart.companyId) {
-        throw new ForbiddenException('cart belongs to another catalogue');
-      }
-      if (product.companyId !== tenant) {
-        throw new ForbiddenException('product is not in this cart\'s catalogue');
-      }
+        // The cart's tenant comes from the product being added, not from the
+        // client. An existing cart keeps its own tenant, so a caller cannot move
+        // a cart to another catalogue by adding a product from it.
+        let existingCart = await tx.cart.findUnique({ where: { customerAccountId } });
+        const tenant = existingCart?.companyId ?? product.companyId;
+        if (companyId && existingCart && companyId !== existingCart.companyId) {
+          throw new ForbiddenException('cart belongs to another catalogue');
+        }
+        if (product.companyId !== tenant) {
+          throw new ForbiddenException('product is not in this cart\'s catalogue');
+        }
 
-      const cart = existingCart ?? (await tx.cart.create({ data: { customerAccountId, companyId: tenant } }));
+        if (!existingCart) {
+          existingCart = await tx.cart.create({ data: { customerAccountId, companyId: tenant } });
+        }
 
-      const existing = await tx.cartItem.findUnique({
-        where: { cartId_productId: { cartId: cart.id, productId } },
+        const existing = await tx.cartItem.findUnique({
+          where: { cartId_productId: { cartId: existingCart.id, productId } },
+        });
+        const next = (existing?.quantity ?? 0) + quantity;
+        if (next > CustomerCartService.MAX_QTY) {
+          throw new BadRequestException('quantity would exceed the maximum for one line');
+        }
+
+        // The price is the catalogue's, read inside the transaction. A price the
+        // client sent is never used.
+        return tx.cartItem.upsert({
+          where: { cartId_productId: { cartId: existingCart.id, productId } },
+          create: {
+            cartId: existingCart.id,
+            productId,
+            quantity,
+            unitPriceMinor: product.salesPriceMinor,
+          },
+          update: { quantity: next, unitPriceMinor: product.salesPriceMinor },
+        });
       });
-      const next = (existing?.quantity ?? 0) + quantity;
-      if (next > CustomerCartService.MAX_QTY) {
-        throw new BadRequestException('quantity would exceed the maximum for one line');
-      }
 
-      // The price is the catalogue's, read inside the transaction. A price the
-      // client sent is never used.
-      return tx.cartItem.upsert({
-        where: { cartId_productId: { cartId: cart.id, productId } },
-        create: { cartId: cart.id, productId, quantity, unitPriceMinor: product.salesPriceMinor },
-        update: { quantity: next, unitPriceMinor: product.salesPriceMinor },
-      });
-    });
+    // Two first-adds at once both read "no cart" and both insert. The unique key
+    // on `customerAccountId` lets exactly one win; the loser's transaction is
+    // aborted by the violation. That is a legitimate race, not a server fault, so
+    // the whole transaction is retried — a fresh one sees the winner's cart and
+    // proceeds normally.
+    //
+    // The retry wraps the entire transaction rather than catching inside it,
+    // because a failed query aborts a Prisma interactive transaction: a re-read
+    // on the same `tx` after the violation cannot succeed.
+    for (let attemptNo = 0; attemptNo < 3; attemptNo += 1) {
+      try {
+        return await attempt();
+      } catch (error) {
+        if (!isUniqueViolation(error) || attemptNo === 2) throw error;
+        // A short pause, so the winner's transaction has committed and the
+        // retry's read sees it.
+        await new Promise((resolve) => setTimeout(resolve, 25 * (attemptNo + 1)));
+      }
+    }
+    // Unreachable: the loop either returns or throws.
+    throw new ConflictException('the cart could not be created; please retry');
   }
 
   /** Sets an absolute quantity. Zero removes the line, which is what a UI stepper means. */

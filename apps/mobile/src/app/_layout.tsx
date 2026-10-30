@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppProvider, useApp } from '../lib/app-context';
+import { LiveCartProvider } from '../lib/live-cart';
 import { LaunchScreen } from '../components/launch';
 
 /**
@@ -61,7 +62,11 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AppProvider>
-        <RootNavigator />
+        {/* The live cart sits inside the app provider because it reads the
+            session, and outside the navigator so every screen shares one. */}
+        <LiveCartProvider>
+          <RootNavigator />
+        </LiveCartProvider>
       </AppProvider>
     </SafeAreaProvider>
   );
