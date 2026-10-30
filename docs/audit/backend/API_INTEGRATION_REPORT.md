@@ -198,7 +198,27 @@ the homepage, and the API client never substitutes demo records for a failed cal
 
 ---
 
-## 8. Limitations of this verification
+## 8. Existing test suite — no regression
+
+Run against a freshly migrated and seeded `oryx_test` database:
+
+```
+$ pnpm test:e2e
+Test Suites: 18 passed, 18 total
+Tests:       334 passed, 334 total
+Time:        40.704 s
+```
+
+**334 existing API tests pass** with the new models, migration and endpoints in
+place. The additive migration and the two new controllers did not disturb any
+existing behaviour.
+
+Note: `pnpm test` (the unit suite) finds no specs — the repository's API tests are
+all e2e. That is pre-existing, not a result of this change.
+
+---
+
+## 9. Limitations of this verification
 
 - **No Android visual verification.** `screencap` returns black frames on the
   emulator used here — the app's surfaces exist and its activity is visible, but
