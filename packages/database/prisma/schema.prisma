@@ -15,6 +15,95 @@ datasource db {
 
 // ---------------------------------------------------------------- enums
 
+/// A consumer's shopping cart.
+///
+/// One open cart per consumer account, enforced by the unique key below rather
+/// than by convention. The cart belongs to a `CustomerAccount`, which is the
+/// consumer identity — not to the ERP `Customer`, which is a receivable account
+/// in the accounting ledger and a different thing entirely.
+model Cart {
+  id                String   @id @default(cuid())
+  customerAccountId String   @unique
+  /// Which tenant's catalogue the lines came from. A cart does not span tenants.
+  companyId         String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  customerAccount CustomerAccount @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  items           CartItem[]
+
+  @@index([companyId])
+}
+
+/// One line in a cart.
+///
+/// `quantity` is an integer count of units, not a decimal: the marketplace sells
+/// whole parts. The unit price is copied at the time the line is added, so a
+/// later catalogue price change cannot silently alter what the customer was
+/// shown — the same snapshot principle the payroll run uses.
+model CartItem {
+  id            String   @id @default(cuid())
+  cartId        String
+  productId     String
+  quantity      Int      @default(1)
+  /// Unit price captured when the line was added, in minor units.
+  unitPriceMinor Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// A product appears once per cart; adding it again increases the quantity.
+  @@unique([cartId, productId])
+  @@index([cartId])
+  @@index([productId])
+}
+
+/// A product a consumer has saved for later.
+///
+/// The pair is unique, so favouriting twice is idempotent rather than creating a
+/// second row.
+model Favorite {
+  id                String   @id @default(cuid())
+  customerAccountId String
+  productId         String
+  createdAt         DateTime @default(now())
+
+  customerAccount CustomerAccount @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+  product         Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([customerAccountId, productId])
+  @@index([customerAccountId, createdAt])
+  @@index([productId])
+}
+
+/// A catalogue image for a product.
+///
+/// `isPrimary` marks the one image a listing shows. Exactly one image per product
+/// should carry it; the service layer enforces that when setting it, because a
+/// partial unique index is not expressible in the Prisma schema.
+model ProductImage {
+  id           String   @id @default(cuid())
+  productId    String
+  /// Preferred reference; `url` is kept for external absolute URLs.
+  mediaAssetId String?
+  url          String?
+  altEn        String?
+  altAr        String?
+  sortOrder    Int      @default(0)
+  isPrimary    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  product    Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  mediaAsset CmsMediaAsset? @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
+
+  @@index([productId, sortOrder])
+  @@index([mediaAssetId])
+}
+
 enum CompanyType {
   INTERNAL
   SAAS_TENANT
@@ -183,6 +272,8 @@ model RefreshToken {
 
 model Company {
   id              String        @id @default(cuid())
+  /// Carts opened against this tenant's catalogue.
+  carts           Cart[]
   code            String        @unique
   nameEn          String
   nameAr          String
@@ -1250,6 +1341,9 @@ model Product {
   cogsAccount      Account? @relation("ProductCogsAccount", fields: [cogsAccountId], references: [id], onDelete: SetNull)
 
   levels    StockLevel[]
+  images    ProductImage[]
+  cartItems CartItem[]
+  favorites Favorite[]
   movements StockMovement[]
 
   // Execution 03
@@ -3918,6 +4012,8 @@ model CustomerAccount {
   supportTickets  SupportTicket[]
   serviceRequests ServiceRequest[]
   notificationDeliveries NotificationDelivery[]
+  cart            Cart?
+  favorites       Favorite[]
 
   @@index([status])
   @@index([defaultCompanyId])
@@ -4697,6 +4793,8 @@ model CmsMediaFolder {
 }
 
 model CmsMediaAsset {
+  /// Catalogue images that reference this asset.
+  productImages   ProductImage[]
   id           String   @id @default(cuid())
   folderId     String?
   /** Original filename as uploaded, kept for display. Never used as a path. */
