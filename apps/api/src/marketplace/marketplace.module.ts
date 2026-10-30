@@ -8,6 +8,10 @@ import {
 } from './marketplace-public.controller';
 import { CustomerMarketplaceController } from './customer-marketplace.controller';
 import { ProviderPortalController } from './provider-portal.controller';
+import { CustomerHomepageController } from './customer-homepage.controller';
+import { CustomerHomepageService } from './customer-homepage.service';
+import { CustomerCartController } from './customer-cart.controller';
+import { CustomerCartService } from './customer-cart.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { CustomerModule } from '../customer/customer.module';
 import { ErpCommonModule } from '../common/erp-common.module';
@@ -39,8 +43,10 @@ import { ErpCommonModule } from '../common/erp-common.module';
     MarketplaceAdminController,
     CustomerMarketplaceController,
     ProviderPortalController,
+    CustomerHomepageController,
+    CustomerCartController,
   ],
-  providers: [MarketplaceService],
-  exports: [MarketplaceService],
+  providers: [MarketplaceService, CustomerHomepageService, CustomerCartService],
+  exports: [MarketplaceService, CustomerHomepageService, CustomerCartService],
 })
 export class MarketplaceModule {}

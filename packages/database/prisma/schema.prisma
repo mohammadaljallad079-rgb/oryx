@@ -741,7 +741,20 @@ model CmsBanner {
   imageUrl  String?
   actionUrl String?
   sortOrder Int     @default(0)
+  /// Activation: whether this slide is switched on at all.
   isActive  Boolean @default(true)
+  /// Editorial approval: whether the content itself has been signed off.
+  ///
+  /// Distinct from `isActive` on purpose, and the distinction matters for the
+  /// customer homepage. `isActive` is an operator toggling a slide on; `status`
+  /// is a reviewer approving what the slide *says and shows*. A slide can be
+  /// active and still be a draft — an operator switching it on before review
+  /// must not publish an unapproved photograph to customers.
+  ///
+  /// The default is DRAFT, so a newly created banner is never customer-visible
+  /// until someone publishes it explicitly.
+  status    CmsStatus @default(DRAFT)
+  publishedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   /** Preferred reference; `imageUrl` is kept for external absolute URLs. */
