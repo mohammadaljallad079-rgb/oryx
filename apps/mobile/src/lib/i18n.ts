@@ -22,6 +22,7 @@ const strings: Record<string, Entry> = {
   appNameFull: { ar: 'أوريكس ماركت بليس', en: 'ORYX Marketplace' },
   tagline: { ar: 'منصة السيارات المتكاملة', en: 'The integrated automotive platform' },
   demoData: { ar: 'بيانات تجريبية', en: 'Demo data' },
+  liveData: { ar: 'بيانات مباشرة', en: 'Live data' },
   demoNotice: {
     ar: 'نسخة تجريبية للمراجعة. البيانات محلية وليست حقيقية.',
     en: 'A review build. All data is local and not real.',

@@ -14,6 +14,7 @@ import { UiIcon } from '../../components/ui-icons';
 import { radius, space, typography } from '../../lib/theme';
 import { localizeDigits } from '../../lib/format';
 import { api, type HomepageResponse } from '../../lib/api';
+import { toDemoProduct, toDemoProvider } from '../../lib/api-adapters';
 
 /**
  * The marketplace home.
@@ -61,6 +62,18 @@ export default function Home() {
   const heroImage = live.data?.hero[0]?.imageUrl ? { uri: live.data.hero[0].imageUrl } : null;
   const heroTitle = live.data?.hero[0]?.title ?? null;
   const heroSubtitle = live.data?.hero[0]?.subtitle ?? null;
+
+  // The rails prefer live data and fall back to the seeded demo records only
+  // when the API returned nothing for that rail. The two are never blended: a
+  // rail is either showing marketplace records or showing demo records, and the
+  // demo notice on this screen says which.
+  const liveProducts = live.data?.products.length
+    ? live.data.products.map(toDemoProduct)
+    : null;
+  const liveProviders = live.data?.providers.length
+    ? live.data.providers.map(toDemoProvider)
+    : null;
+  const usingDemoRails = liveProducts === null || liveProviders === null;
 
   // The five service categories, with the exact icons the approved reference
   // names: gear, wrench, inspection document, tow truck, alloy wheel. The Rail
@@ -295,11 +308,11 @@ export default function Home() {
             <UiIcon name="chevron" size={13} color={theme.gold} />
           </Pressable>
         </View>
-        {providers.loading ? (
-          <StateView kind="loading" />
+        {(liveProviders ?? providers.data ?? []).length === 0 ? (
+          <StateView kind="empty" />
         ) : (
           <Rail>
-            {(providers.data ?? []).map((provider) => (
+            {(liveProviders ?? providers.data ?? []).map((provider) => (
               <View key={provider.id} style={{ width: 244 }}>
                 <ProviderCard provider={provider} />
               </View>
@@ -322,7 +335,7 @@ export default function Home() {
           </Pressable>
         </View>
         <Rail>
-          {(products.data ?? []).map((product) => (
+          {(liveProducts ?? products.data ?? []).map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
         </Rail>
@@ -368,7 +381,8 @@ export default function Home() {
         )}
 
         <Body size="caption" muted align="center" style={{ marginTop: space.md }}>
-          {localizeDigits(2026, locale)} · ORYX Marketplace · {t('demoData')}
+          {localizeDigits(2026, locale)} · ORYX Marketplace ·{' '}
+          {usingDemoRails ? t('demoData') : t('liveData')}
         </Body>
       </View>
     </Screen>
