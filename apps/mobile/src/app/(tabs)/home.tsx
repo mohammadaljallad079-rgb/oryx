@@ -8,10 +8,12 @@ import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
 import { AppHeader } from '../../components/brand';
 import { OfferCard, ProductCard, ProviderCard, StoreCard } from '../../components/cards';
-import { Photo, Rail, Screen, SectionLabel, StateView } from '../../components/ui';
+import { Body, Photo, Rail, Screen, SectionLabel, StateView } from '../../components/ui';
 import { CategoryIcon, type CategoryIconName } from '../../components/category-icons';
 import { UiIcon } from '../../components/ui-icons';
 import { radius, space, typography } from '../../lib/theme';
+import { localizeDigits } from '../../lib/format';
+import { api, type HomepageResponse } from '../../lib/api';
 
 /**
  * The marketplace home.
@@ -42,13 +44,23 @@ import { radius, space, typography } from '../../lib/theme';
  * rather than a static composition.
  */
 export default function Home() {
-  const { t, theme, direction, dataVersion } = useApp();
+  const { t, theme, direction, dataVersion, locale } = useApp();
   const router = useRouter();
 
   const providers = useAsync(() => repository.nearbyProviders(6), [dataVersion]);
   const products = useAsync(() => repository.trendingProducts(8), [dataVersion]);
   const offers = useAsync(() => repository.offers(), [dataVersion]);
   const stores = useAsync(() => repository.stores({ sort: 'rating' }), [dataVersion]);
+
+  // The homepage content from the API. This is additive: the rails below still
+  // read the local repository, so a failure here degrades to the design the
+  // owner approved rather than to an empty screen.
+  const live = useAsync<HomepageResponse>(() => api.homepage(locale), [locale]);
+  // The approved bundled scene is the fallback whenever the CMS has nothing
+  // published. A CMS record can never replace it with an unreviewed photograph.
+  const heroImage = live.data?.hero[0]?.imageUrl ? { uri: live.data.hero[0].imageUrl } : null;
+  const heroTitle = live.data?.hero[0]?.title ?? null;
+  const heroSubtitle = live.data?.hero[0]?.subtitle ?? null;
 
   // The five service categories, with the exact icons the approved reference
   // names: gear, wrench, inspection document, tow truck, alloy wheel. The Rail
@@ -79,7 +91,11 @@ export default function Home() {
           visible on the right while the type reads on the left. */}
       <View style={styles.heroWrap}>
         <View style={[styles.heroCard, { borderColor: theme.border }]}>
-          <Photo source={photo('splashScene')} radiusValue={0} style={StyleSheet.absoluteFill} />
+          <Photo
+            source={heroImage ?? photo('splashScene')}
+            radiusValue={0}
+            style={StyleSheet.absoluteFill}
+          />
           {/* Left-side gradient: strong at the left for the type, clear at the
               right so the vehicle and the sunset are not dimmed. */}
           <View style={styles.heroLeftShade} pointerEvents="none">
@@ -90,14 +106,22 @@ export default function Home() {
           </View>
 
           <View style={styles.heroContent}>
-            <Text style={[styles.heroLine, { writingDirection: direction }]} numberOfLines={1}>
-              {t('heroLine1')}
-            </Text>
-            <Text style={[styles.heroLine, { writingDirection: direction }]} numberOfLines={1}>
-              {t('heroLine2')}
-            </Text>
-            <Text style={[styles.heroSub, { writingDirection: direction }]} numberOfLines={1}>
-              {t('heroSubtitle')}
+            {heroTitle ? (
+              <Text style={[styles.heroLine, { writingDirection: direction }]} numberOfLines={2}>
+                {heroTitle}
+              </Text>
+            ) : (
+              <>
+                <Text style={[styles.heroLine, { writingDirection: direction }]} numberOfLines={1}>
+                  {t('heroLine1')}
+                </Text>
+                <Text style={[styles.heroLine, { writingDirection: direction }]} numberOfLines={1}>
+                  {t('heroLine2')}
+                </Text>
+              </>
+            )}
+            <Text style={[styles.heroSub, { writingDirection: direction }]} numberOfLines={2}>
+              {heroSubtitle ?? t('heroSubtitle')}
             </Text>
 
             <Pressable
@@ -342,6 +366,10 @@ export default function Home() {
             ))}
           </View>
         )}
+
+        <Body size="caption" muted align="center" style={{ marginTop: space.md }}>
+          {localizeDigits(2026, locale)} · ORYX Marketplace · {t('demoData')}
+        </Body>
       </View>
     </Screen>
   );
