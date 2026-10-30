@@ -157,7 +157,13 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const onAbort = () => controller.abort();
   signal?.addEventListener('abort', onAbort);
 
-  const headers: Record<string, string> = { Accept: 'application/json' };
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    // The API returns the refresh token in the body only for this client kind.
+    // A native app has no cookie jar, so the cookie-only path would leave it
+    // unable to rotate a session.
+    'x-oryx-client': 'mobile',
+  };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (auth && accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
@@ -314,6 +320,103 @@ export const api = {
         method: 'DELETE',
       }),
   },
+};
+
+// ------------------------------------------------------- auth and bookings
+
+export interface CustomerSession {
+  accessToken: string;
+  refreshToken?: string;
+  expiresIn: number;
+  account: {
+    id: string;
+    email: string;
+    fullName: string;
+    preferredLocale: 'ar' | 'en';
+    preferredTheme: 'dark' | 'light';
+    defaultCompanyId: string | null;
+  };
+}
+
+export interface BookingSummary {
+  id: string;
+  reference?: string;
+  bookingType: string;
+  status: string;
+  startsAt: string;
+  endsAt?: string;
+  durationMinutes?: number;
+  serviceRef?: string | null;
+  resourceId?: string | null;
+  notes?: string | null;
+}
+
+export interface AvailabilitySlot {
+  startsAt: string;
+  endsAt?: string;
+  resourceId?: string;
+  available?: boolean;
+}
+
+/** The account endpoints, matching `CustomerAuthController`. */
+export const authApi = {
+  register: (email: string, password: string, fullName: string, preferredLocale: 'ar' | 'en' = 'ar') =>
+    request<CustomerSession>('/customer/auth/register', {
+      method: 'POST',
+      auth: false,
+      body: { email, password, fullName, preferredLocale },
+    }),
+
+  login: (email: string, password: string) =>
+    request<CustomerSession>('/customer/auth/login', {
+      method: 'POST',
+      auth: false,
+      body: { email, password },
+    }),
+
+  /** Rotates the session. The refresh token is presented in the body for a native client. */
+  refresh: (refreshToken: string) =>
+    request<CustomerSession>('/customer/auth/refresh', {
+      method: 'POST',
+      auth: false,
+      body: { refreshToken },
+    }),
+
+  me: (signal?: AbortSignal) => request<CustomerSession['account']>('/customer/auth/me', { signal }),
+
+  logout: () => request<void>('/customer/auth/logout', { method: 'POST' }),
+};
+
+/** The customer booking endpoints, matching `CustomerBookingController`. */
+export const bookingsApi = {
+  availability: (params: { date: string; durationMinutes?: number; serviceRef?: string }, signal?: AbortSignal) => {
+    const q = new URLSearchParams({ date: params.date });
+    if (params.durationMinutes) q.set('durationMinutes', String(params.durationMinutes));
+    if (params.serviceRef) q.set('serviceRef', params.serviceRef);
+    return requestWithRetry<AvailabilitySlot[]>(`/customer/bookings/availability?${q}`, { signal });
+  },
+
+  create: (input: {
+    bookingType: string;
+    startsAt: string;
+    durationMinutes: number;
+    vehicleId?: string;
+    serviceRef?: string;
+    resourceId?: string;
+    notes?: string;
+  }) => request<BookingSummary>('/customer/bookings', { method: 'POST', body: input }),
+
+  list: (page = 1, pageSize = 20, signal?: AbortSignal) =>
+    requestWithRetry<{ items: BookingSummary[]; total?: number }>(
+      `/customer/bookings?page=${page}&pageSize=${pageSize}`,
+      { signal },
+    ),
+
+  cancel: (id: string, reason?: string) =>
+    request<BookingSummary>(`/customer/bookings/${encodeURIComponent(id)}/cancel`, {
+      method: 'POST',
+      body: { reason },
+    }),
 };
 
 /** Whether a refresh token is stored, so a screen knows if a session could be resumed. */
