@@ -10,6 +10,7 @@ import {
   upcomingDays,
 } from '../src/lib/format';
 import { statusColor, themes } from '../src/lib/theme';
+import { SPLASH_MIN_MS } from '../src/lib/splash-timing';
 import {
   DEMO_BOOKINGS,
   DEMO_ORDERS,
@@ -267,5 +268,14 @@ describe('locale type', () => {
   it('covers both supported locales', () => {
     const locales: Locale[] = ['ar', 'en'];
     expect(locales).toHaveLength(2);
+  });
+});
+
+describe('splash duration contract', () => {
+  // The owner rejected an earlier build because the splash was gone before it
+  // painted. The gate must hold the splash for a measurable minimum, and that
+  // minimum has to be a real duration rather than a frame.
+  it('holds the splash for at least two seconds', () => {
+    expect(SPLASH_MIN_MS).toBeGreaterThanOrEqual(2000);
   });
 });

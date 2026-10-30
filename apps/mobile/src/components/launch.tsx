@@ -5,6 +5,7 @@ import { useApp } from '../lib/app-context';
 import { photo } from '../lib/assets';
 import { Logo } from '../components/brand';
 import { brand, radius, space, typography } from '../lib/theme';
+import { SPLASH_MIN_MS } from '../lib/splash-timing';
 
 /**
  * The cinematic launch screen.
@@ -42,7 +43,7 @@ const GOLD = brand.gold;
 const FILL_MS = 1700;
 const STAGES = ['launchParts', 'launchServices', 'launchSensage'] as const;
 
-export function LaunchScreen() {
+export function LaunchScreen({ onReady }: { onReady?: () => void }) {
   const { t, direction } = useApp();
   const [stage, setStage] = useState(0);
   const fill = useRef(new Animated.Value(0)).current;
@@ -73,6 +74,15 @@ export function LaunchScreen() {
     };
   }, [fill, fade]);
 
+  // The splash is only "shown" once its photograph has decoded. Until then it
+  // is a navy field, which is not the approved screen.
+  const [imageReady, setImageReady] = useState(false);
+  useEffect(() => {
+    if (!imageReady) return;
+    const timer = setTimeout(() => onReady?.(), SPLASH_MIN_MS);
+    return () => clearTimeout(timer);
+  }, [imageReady, onReady]);
+
   const stageKey = STAGES[stage] ?? STAGES[0];
   const width = fill.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
@@ -84,6 +94,10 @@ export function LaunchScreen() {
         source={photo('splashScene')}
         style={StyleSheet.absoluteFill}
         resizeMode="cover"
+        onLoad={() => setImageReady(true)}
+        // A decode failure must not strand the user on the splash; the gate
+        // still needs to hear back.
+        onError={() => setImageReady(true)}
       />
 
       {/* Navy at the top so the lockup reads against the bright sky, and at the
