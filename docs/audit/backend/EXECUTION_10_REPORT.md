@@ -326,7 +326,7 @@ renders the banner on every screen.
 
 ## 11. Final commit
 
-`PENDING` — recorded on the branch after this report.
+`97ee79e` — the Execution 10 commit; this report commit follows it.
 
 ---
 
