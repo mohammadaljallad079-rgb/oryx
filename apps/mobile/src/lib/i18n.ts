@@ -519,6 +519,14 @@ const strings: Record<string, Entry> = {
   // ------------------------------------------------------- shared states
   loading: { ar: 'جارٍ التحميل…', en: 'Loading…' },
   retry: { ar: 'إعادة المحاولة', en: 'Retry' },
+  loadFailed: {
+    ar: 'تعذّر تحميل البيانات. تحقّق من اتصالك وأعد المحاولة.',
+    en: 'Could not load the data. Check your connection and try again.',
+  },
+  offlineBody: {
+    ar: 'لا يوجد اتصال بالإنترنت.',
+    en: 'You are offline.',
+  },
   error: { ar: 'حدث خطأ', en: 'Something went wrong' },
   empty: { ar: 'لا يوجد شيء هنا بعد.', en: 'Nothing here yet.' },
   cancel: { ar: 'إلغاء', en: 'Cancel' },

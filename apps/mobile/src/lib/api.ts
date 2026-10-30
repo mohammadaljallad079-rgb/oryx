@@ -102,7 +102,10 @@ async function toError(response: Response): Promise<ApiError> {
  * Module-scoped rather than in React state so a non-component caller can read it
  * without a hook, and so it is dropped when the JS context is destroyed.
  */
-let accessToken: string | null = null;
+let accessToken: string | null =
+  // A check harness may seed a session before the bundle runs. The app itself
+  // never writes here; it calls `setAccessToken` after a real sign-in.
+  (globalThis as { __oryxAccessToken?: string }).__oryxAccessToken ?? null;
 
 export function setAccessToken(token: string | null): void {
   accessToken = token;

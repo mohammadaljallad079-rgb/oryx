@@ -28,6 +28,10 @@ export async function createApp(): Promise<INestApplication> {
       'x-oryx-branch-id',
       'x-oryx-support-session',
       'x-oryx-csrf',
+      // Present on every native-client request. Without it here, the browser's
+      // preflight refuses the call and a web-hosted build of the app cannot
+      // reach the API at all.
+      'x-oryx-client',
     ],
   });
 

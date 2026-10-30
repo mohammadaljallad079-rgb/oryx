@@ -2,7 +2,7 @@
   "name": "oryx",
   "version": "0.1.0",
   "private": true,
-  "description": "ORYX — Holding ERP, Business SaaS ERP and Automotive Ecosystem (Execution 01 foundation)",
+  "description": "ORYX \u2014 Holding ERP, Business SaaS ERP and Automotive Ecosystem (Execution 01 foundation)",
   "packageManager": "pnpm@9.15.9",
   "engines": {
     "node": ">=20"
@@ -40,7 +40,9 @@
       "path-to-regexp": "8.4.2",
       "js-yaml": "4.3.2",
       "postcss": "8.5.31",
-      "deepmerge-ts": "8.0.2"
+      "deepmerge-ts": "8.0.2",
+      "react": "19.1.0",
+      "react-dom": "19.1.0"
     }
   }
 }

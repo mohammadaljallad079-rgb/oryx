@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppProvider, useApp } from '../lib/app-context';
 import { LiveCartProvider } from '../lib/live-cart';
+import { LiveFavoritesProvider } from '../lib/live-favorites';
 import { LaunchScreen } from '../components/launch';
 
 /**
@@ -65,7 +66,9 @@ export default function RootLayout() {
         {/* The live cart sits inside the app provider because it reads the
             session, and outside the navigator so every screen shares one. */}
         <LiveCartProvider>
-          <RootNavigator />
+          <LiveFavoritesProvider>
+            <RootNavigator />
+          </LiveFavoritesProvider>
         </LiveCartProvider>
       </AppProvider>
     </SafeAreaProvider>
