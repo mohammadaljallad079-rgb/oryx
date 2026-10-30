@@ -3,6 +3,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { useApp } from '../lib/app-context';
+import { useLiveSession } from '../lib/live-session';
+import type { TranslateKey } from '../lib/i18n';
 import { Logo } from '../components/brand';
 import { Body, Button, Card, Field, Screen } from '../components/ui';
 import { space, typography } from '../lib/theme';
@@ -10,21 +12,40 @@ import { space, typography } from '../lib/theme';
 /**
  * Create account.
  *
- * A demo build has no server to create an account on, so the form validates its
- * input and then routes to the sign-in screen with a note. It is deliberately not
- * a fake success: claiming an account was created when it was not would be the
- * one dishonest thing this screen could do.
+ * Creates a real consumer account through `POST /customer/auth/register`, then
+ * signs in with the session the API returns. The password rule mirrors the
+ * server's (at least ten characters, higher than the staff baseline because the
+ * account guards a garage and payment history) so the common mistake is caught
+ * before a round trip; the server remains the authority and a rejected
+ * registration is shown verbatim.
  */
 export default function Register() {
-  const { t, theme, direction } = useApp();
+  const { t, theme, direction, locale } = useApp();
+  const { register, busy: liveBusy } = useLiveSession();
   const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = name.trim() && email.trim() && password.length >= 6;
+  const canSubmit = name.trim().length > 1 && email.includes('@') && password.length >= 10;
+
+  const submit = async () => {
+    setError(null);
+    const result = await register({
+      email,
+      password,
+      fullName: name,
+      phone: phone.trim() || undefined,
+      preferredLocale: locale,
+    });
+    if (!result.ok) {
+      setError(t((result.error ?? 'validationFailed') as TranslateKey));
+      return;
+    }
+    router.replace('/(tabs)/home');
+  };
 
   return (
     <Screen>
@@ -35,7 +56,7 @@ export default function Register() {
         >
           {t('signUp')}
         </Text>
-        <Body muted>{t('demoNotice')}</Body>
+        <Body muted>{t('createAccountSubtitle')}</Body>
       </View>
 
       <Card>
@@ -62,19 +83,20 @@ export default function Register() {
           secureTextEntry
           testID="register-password"
         />
-        {notice ? (
-          <Text style={{ color: theme.gold, fontSize: typography.label, marginBottom: space.sm }}>
-            {notice}
+        <Body size="caption" muted style={{ marginBottom: space.sm }}>
+          {t('passwordHint')}
+        </Body>
+        {error ? (
+          <Text style={{ color: theme.danger, fontSize: typography.label, marginBottom: space.sm }}>
+            {error}
           </Text>
         ) : null}
         <Button
           testID="register-submit"
           title={t('signUp')}
           disabled={!canSubmit}
-          onPress={() => {
-            setNotice(t('demoNotice'));
-            setTimeout(() => router.replace('/login'), 900);
-          }}
+          loading={liveBusy}
+          onPress={submit}
         />
         <Pressable onPress={() => router.replace('/login')} style={styles.linkRow}>
           <Text style={{ color: theme.textMuted, fontSize: typography.label }}>

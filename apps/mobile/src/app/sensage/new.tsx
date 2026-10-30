@@ -5,6 +5,9 @@ import { useRouter } from 'expo-router';
 import { useApp } from '../../lib/app-context';
 import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
+import { useLiveSession } from '../../lib/live-session';
+import { ApiError, inspectionPhotosApi, type UploadFile } from '../../lib/api';
+import type { PhotoKey } from '../../demo/catalogue';
 import {
   capturePhoto,
   openAppSettings,
@@ -42,6 +45,23 @@ const STAGES = ['analysisStep1', 'analysisStep2', 'analysisStep3', 'analysisStep
 interface Shot {
   uri: string;
   source: 'camera' | 'gallery';
+  /** Set once the shot has been uploaded to the backend, in a live session. */
+  uploadedId?: string;
+}
+
+/** A live vehicle row, shaped for `VehicleCard` (which is typed for a demo vehicle). */
+interface LiveVehicle {
+  id: string;
+  ownerId: string;
+  make: string;
+  model: string;
+  year: number;
+  plate: string;
+  vin: string;
+  colourEn: string;
+  colourAr: string;
+  mileageKm: number;
+  photo: PhotoKey;
 }
 
 const FAILURE_KEY: Record<CaptureFailure, string> = {
@@ -54,6 +74,7 @@ const FAILURE_KEY: Record<CaptureFailure, string> = {
 
 export default function NewSensage() {
   const { t, theme, locale, direction, account, dataVersion } = useApp();
+  const { isLive } = useLiveSession();
   const router = useRouter();
   const [vehicleId, setVehicleId] = useState('');
   const [shots, setShots] = useState<Shot[]>([]);
@@ -64,11 +85,75 @@ export default function NewSensage() {
   const [notice, setNotice] = useState<string | null>(null);
   /** True when the notice is a denied permission we cannot re-prompt. */
   const [canOpenSettings, setCanOpenSettings] = useState(false);
+  /** Live upload state, only meaningful inside a live session. */
+  const [uploading, setUploading] = useState(false);
+  const [uploadedCount, setUploadedCount] = useState(0);
+  const [history, setHistory] = useState<Array<{ id: string; caption: string | null; createdAt: string }>>([]);
 
   const vehicles = useAsync(
     async () => (account ? repository.vehicles(account.id) : []),
     [account?.id, dataVersion],
   );
+
+  // The real garage, only when a live session is active. A demo session has no
+  // server-side vehicles, so it keeps using the demo list above.
+  const [liveVehicles, setLiveVehicles] = useState<LiveVehicle[]>([]);
+  useEffect(() => {
+    if (!isLive) {
+      setLiveVehicles([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { vehiclesApi } = await import('../../lib/api');
+        const rows = await vehiclesApi.list();
+        if (cancelled) return;
+        setLiveVehicles(
+          rows.map((v) => ({
+            id: v.id,
+            ownerId: 'live',
+            make: v.make,
+            model: v.model,
+            year: v.modelYear,
+            plate: v.plateNumber ?? v.vin,
+            vin: v.vin,
+            colourEn: v.color ?? '',
+            colourAr: v.color ?? '',
+            mileageKm: v.mileage ?? 0,
+            photo: 'inspectionBay' as PhotoKey,
+          })),
+        );
+      } catch {
+        /* leave the list empty; the screen shows "no vehicles" */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLive]);
+
+  // The upload history, so a customer can see what has already been sent.
+  useEffect(() => {
+    if (!isLive) {
+      setHistory([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await inspectionPhotosApi.list();
+        if (!cancelled) {
+          setHistory(rows.map((r) => ({ id: r.id, caption: r.caption, createdAt: r.createdAt })));
+        }
+      } catch {
+        /* history is optional; a failure must not block capture */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLive, uploadedCount]);
 
   useEffect(() => {
     if (!running) return;
@@ -90,6 +175,11 @@ export default function NewSensage() {
   /**
    * Runs a capture and folds the result into state. A cancelled picker is not an
    * error and says nothing; every other failure explains itself.
+   *
+   * Inside a live session the file is uploaded immediately, so the backend holds
+   * the photograph before the (demo) analysis runs and the customer can see it in
+   * their history. An upload failure is reported and the shot is kept locally, so
+   * the user does not silently lose a photo.
    */
   async function capture(source: 'camera' | 'gallery') {
     if (busy) return;
@@ -99,7 +189,11 @@ export default function NewSensage() {
     try {
       const result = source === 'camera' ? await capturePhoto() : await pickFromGallery();
       if (result.ok) {
-        setShots((prev) => [...prev, { uri: result.uri, source: result.source }]);
+        const shot: Shot = { uri: result.uri, source: result.source };
+        setShots((prev) => [...prev, shot]);
+        if (isLive) {
+          void uploadShot(shot);
+        }
         return;
       }
       if (result.reason === 'cancelled') return;
@@ -116,6 +210,34 @@ export default function NewSensage() {
     }
   }
 
+  /** Uploads one shot to the backend and records its id on the shot. */
+  async function uploadShot(shot: Shot) {
+    setUploading(true);
+    try {
+      const file: UploadFile = {
+        uri: shot.uri,
+        name: shot.uri.split('/').pop() ?? 'inspection.jpg',
+        mimeType: 'image/jpeg',
+      };
+      const uploaded = await inspectionPhotosApi.upload(file, {
+        vehicleId: vehicleId || undefined,
+        caption: shot.source === 'camera' ? t('takePhoto') : t('chooseFromGallery'),
+      });
+      setShots((prev) => prev.map((s) => (s.uri === shot.uri ? { ...s, uploadedId: uploaded.id } : s)));
+      setUploadedCount((n) => n + 1);
+    } catch (err) {
+      const key =
+        err instanceof ApiError && err.kind === 'offline'
+          ? 'offlineBody'
+          : err instanceof ApiError && err.kind === 'validation'
+            ? 'validationFailed'
+            : 'uploadFailed';
+      setNotice(t(key as never));
+    } finally {
+      setUploading(false);
+    }
+  }
+
   function removeShot(uri: string) {
     setShots((prev) => prev.filter((s) => s.uri !== uri));
     setNotice(null);
@@ -127,7 +249,22 @@ export default function NewSensage() {
 
       <Card>
         <SectionLabel>{t('selectVehicle')}</SectionLabel>
-        {vehicles.loading ? (
+        {isLive ? (
+          liveVehicles.length === 0 ? (
+            <Body muted size="label" style={{ marginTop: space.sm }}>
+              {t('noVehicles')}
+            </Body>
+          ) : (
+            liveVehicles.map((vehicle) => (
+              <VehicleCard
+                key={vehicle.id}
+                vehicle={vehicle}
+                selected={vehicleId === vehicle.id}
+                onPress={() => setVehicleId(vehicle.id)}
+              />
+            ))
+          )
+        ) : vehicles.loading ? (
           <StateView kind="loading" />
         ) : (vehicles.data ?? []).length === 0 ? (
           <Body muted size="label" style={{ marginTop: space.sm }}>
@@ -159,6 +296,7 @@ export default function NewSensage() {
               title={t('takePhoto')}
               variant="primary"
               loading={busy}
+              disabled={uploading}
               onPress={() => capture('camera')}
             />
           </View>
@@ -167,7 +305,7 @@ export default function NewSensage() {
               testID="sensage-pick-gallery"
               title={t('chooseFromGallery')}
               variant="secondary"
-              disabled={busy}
+              disabled={busy || uploading}
               onPress={() => capture('gallery')}
             />
           </View>
@@ -201,6 +339,18 @@ export default function NewSensage() {
                   <Text style={[styles.previewSource, { color: theme.textFaint }]} numberOfLines={1}>
                     {shot.source === 'camera' ? t('takePhoto') : t('chooseFromGallery')}
                   </Text>
+                  {isLive ? (
+                    <Text
+                      testID={`sensage-upload-${shot.source}`}
+                      style={{
+                        color: shot.uploadedId ? theme.gold : theme.textFaint,
+                        fontSize: typography.caption,
+                        marginTop: 2,
+                      }}
+                    >
+                      {shot.uploadedId ? `✓ ${t('uploaded')}` : t('uploading')}
+                    </Text>
+                  ) : null}
                   <Pressable
                     testID={`sensage-remove-${shot.source}`}
                     accessibilityRole="button"
@@ -228,6 +378,23 @@ export default function NewSensage() {
           </>
         ) : null}
       </Card>
+
+      {/* ------------------------------------------ upload history (live only) */}
+      {isLive && history.length ? (
+        <Card>
+          <SectionLabel>{t('uploadHistory')}</SectionLabel>
+          <View style={{ marginTop: space.sm, gap: space.xs }}>
+            {history.slice(0, 6).map((row) => (
+              <Text key={row.id} style={{ color: theme.textMuted, fontSize: typography.label, textAlign: align }}>
+                {row.caption ?? t('photoPreview')} · {localizeDigits(row.createdAt.slice(0, 10), locale)}
+              </Text>
+            ))}
+          </View>
+          <Body size="caption" muted style={{ marginTop: space.sm, textAlign: align }}>
+            {t('liveModeHint')}
+          </Body>
+        </Card>
+      ) : null}
 
       {/* ------------------------------------------------------- the analysis */}
       {running ? (

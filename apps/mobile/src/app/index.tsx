@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
 
 import { useApp } from '../lib/app-context';
+import { useLiveSession } from '../lib/live-session';
 import { LaunchScreen } from '../components/launch';
 
 /**
@@ -11,10 +12,12 @@ import { LaunchScreen } from '../components/launch';
  *
  *     ANDROID LAUNCH  ->  ORYX PHOTOGRAPHIC SPLASH  ->  HOMEPAGE
  *
- * Two conditions must both be met before the gate navigates:
+ * Three conditions must all hold before the gate navigates:
  *
- *   1. the stored session has been read, so the destination is known;
- *   2. the splash has been on screen for its minimum duration, measured from the
+ *   1. the stored demo session has been read;
+ *   2. the stored customer session has been checked against the API (so a
+ *      returning customer lands signed in rather than as a guest);
+ *   3. the splash has been on screen for its minimum duration, measured from the
  *      moment its photograph rendered.
  *
  * The earlier build only waited for (1). On a fast device the session read
@@ -29,12 +32,13 @@ import { LaunchScreen } from '../components/launch';
  */
 export default function Index() {
   const { ready, account, signInAs } = useApp();
+  const { status } = useLiveSession();
   /** True once the splash has been visible for its minimum duration. */
   const [splashDone, setSplashDone] = useState(false);
 
-  // A first run has no stored session. Sign in as the demo customer so the
+  // A first run has no stored demo session. Enter the demo account so the
   // marketplace is what the owner sees. `signInAs` writes the demo session only;
-  // it is not a network call.
+  // it is not a network call, and it never sets the live token.
   useEffect(() => {
     if (ready && !account) {
       void signInAs('customer');
@@ -45,7 +49,11 @@ export default function Index() {
   // render and reset the two seconds.
   const handleSplashReady = useCallback(() => setSplashDone(true), []);
 
-  if (!splashDone || !ready || !account) {
+  // `restoring` means the stored customer session has not been checked yet; the
+  // gate waits so a returning customer is not briefly shown a guest homepage.
+  const sessionSettled = status !== 'restoring';
+
+  if (!splashDone || !ready || !account || !sessionSettled) {
     return <LaunchScreen onReady={handleSplashReady} />;
   }
 

@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
 import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
+import { useLiveSession } from '../../lib/live-session';
+import { useLiveBookings } from '../../lib/live-bookings';
 import { ScreenHeader } from '../../components/brand';
 import { VehicleCard } from '../../components/cards';
 import {
@@ -14,6 +16,7 @@ import {
   Chip,
   DetailRow,
   Divider,
+  Field,
   Heading,
   Screen,
   SectionLabel,
@@ -26,14 +29,25 @@ import { formatDayChip, formatMoney, localizeDigits, toDateParam, upcomingDays }
  * The booking wizard.
  *
  * Four steps in one screen — service, vehicle, date and time — then a summary.
- * The slots are derived from the provider's published hours and its closed days,
- * so a closed day genuinely offers no times. Confirming produces a confirmation
- * with a reference; nothing is sent anywhere, and the demo says so.
+ *
+ * Two modes, never mixed. Inside a live session the date and time come from the
+ * real engine: `GET /customer/bookings/availability` returns the slots the
+ * provider's working hours and its existing bookings actually leave open, and
+ * the confirmed booking is created through `POST /customer/bookings`, where the
+ * API enforces vehicle ownership and double-booking. A guest or demo session
+ * uses the local demo provider's published hours, and the confirmation says it
+ * is a demo.
+ *
+ * The wizard never synthesises a slot. When the engine returns none the day is
+ * shown as empty, because a fabricated time would let a customer book a moment
+ * the workshop is closed.
  */
-const TIMES = ['09:00', '10:30', '12:00', '14:00', '16:30'];
+const DEMO_TIMES = ['09:00', '10:30', '12:00', '14:00', '16:30'];
 
 export default function NewBooking() {
   const { t, theme, locale, direction, account, dataVersion } = useApp();
+  const { isLive } = useLiveSession();
+  const live = useLiveBookings();
   const params = useLocalSearchParams<{ providerId?: string; service?: string }>();
   const router = useRouter();
 
@@ -42,13 +56,38 @@ export default function NewBooking() {
   const [vehicleId, setVehicleId] = useState('');
   const [date, setDate] = useState(toDateParam(new Date()));
   const [time, setTime] = useState('');
+  const [notes, setNotes] = useState('');
   const [confirmed, setConfirmed] = useState(false);
+  const [liveReference, setLiveReference] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const providers = useAsync(async () => repository.providers({ sort: 'rating' }), [dataVersion]);
-  const vehicles = useAsync(
+  const demoVehicles = useAsync(
     async () => (account ? repository.vehicles(account.id) : []),
     [account?.id, dataVersion],
   );
+  // In a live session the vehicle list is the account's real garage, so the
+  // booking names a car the API will accept; otherwise it is the demo garage.
+  const [liveVehicles, setLiveVehicles] = useState<Array<{ id: string; make: string; model: string; modelYear: number; plateNumber: string | null; vin: string }>>([]);
+  useEffect(() => {
+    if (!isLive) {
+      setLiveVehicles([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { vehiclesApi } = await import('../../lib/api');
+        const rows = await vehiclesApi.list();
+        if (!cancelled) setLiveVehicles(rows);
+      } catch {
+        /* an empty garage is a valid state; the screen shows "no vehicles" */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLive]);
 
   const provider = useMemo(
     () => (providers.data ?? []).find((p) => p.id === providerId),
@@ -61,6 +100,68 @@ export default function NewBooking() {
 
   const service = provider?.services.find((s) => s.nameEn === serviceName);
 
+  // Load the real slots whenever the date changes inside a live session. The
+  // demo path derives its own list and never calls the engine.
+  useEffect(() => {
+    if (!isLive) return;
+    void live.loadSlots({ date, durationMinutes: 60, serviceRef: serviceName || undefined });
+    return () => live.clearSlots();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLive, date, serviceName]);
+
+  const liveSlotLabels = useMemo(
+    () =>
+      live.slots.map((slot) => {
+        const d = new Date(slot.startsAt);
+        return Number.isNaN(d.getTime())
+          ? slot.startsAt
+          : `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+      }),
+    [live.slots],
+  );
+
+  const confirm = async () => {
+    if (!isLive) {
+      setConfirmed(true);
+      return;
+    }
+    setSubmitError(null);
+    const selected = live.slots.find((slot, i) => liveSlotLabels[i] === time);
+    if (!selected) {
+      setSubmitError(t('chooseTime'));
+      return;
+    }
+    const result = await live.create({
+      bookingType: 'PROVIDER_SERVICE',
+      startsAt: selected.startsAt,
+      durationMinutes: 60,
+      vehicleId: vehicleId || undefined,
+      serviceRef: serviceName || undefined,
+      notes: notes || undefined,
+    });
+    if (result.ok) {
+      // A customer booking is created as a hold; confirming it is what turns it
+      // into a real appointment. Without this step the slot is released when the
+      // hold window ends. A confirmation failure is not fatal — the booking
+      // exists and can be confirmed from its detail screen — so it is surfaced
+      // rather than swallowed.
+      const confirmedResult = await live.confirmBooking(result.booking.id);
+      if (!confirmedResult.ok) {
+        setSubmitError(t('bookingConfirmPending'));
+      }
+      setLiveReference(result.booking.reference ?? result.booking.id);
+      setConfirmed(true);
+    } else {
+      setSubmitError(
+        result.error.kind === 'offline'
+          ? t('offlineBody')
+          : result.error.kind === 'forbidden'
+            ? t('forbiddenBody')
+            : t('validationFailed'),
+      );
+    }
+  };
+
   if (confirmed) {
     return (
       <Screen>
@@ -68,14 +169,14 @@ export default function NewBooking() {
         <Card>
           <Heading size="heading">{t('bookingConfirmed')}</Heading>
           <Body muted size="label" style={{ marginTop: space.sm }}>
-            {t('demoNotice')}
+            {isLive ? t('liveModeHint') : t('demoNotice')}
           </Body>
           <Divider />
-          <DetailRow label={t('reference')} value={`BK-${localizeDigits(4821, locale)}`} />
+          <DetailRow label={t('reference')} value={isLive ? (liveReference ?? '—') : `BK-${localizeDigits(4821, locale)}`} />
           <DetailRow label={t('chooseService')} value={serviceName || '—'} />
           <DetailRow label={t('chooseDate')} value={localizeDigits(date, locale)} />
           <DetailRow label={t('chooseTime')} value={localizeDigits(time, locale)} />
-          <DetailRow label={t('total')} value={formatMoney(service?.priceMinor ?? 0)} />
+          {!isLive ? <DetailRow label={t('total')} value={formatMoney(service?.priceMinor ?? 0)} /> : null}
         </Card>
         <Button title={t('myBookings')} onPress={() => router.replace('/bookings')} />
         <View style={{ height: space.sm }} />
@@ -132,14 +233,38 @@ export default function NewBooking() {
 
           <Card>
             <SectionLabel>{t('chooseVehicle')}</SectionLabel>
-            {vehicles.loading ? (
+            {isLive ? (
+              liveVehicles.length === 0 ? (
+                <Body muted size="label" style={{ marginTop: space.sm }}>
+                  {t('noVehicles')}
+                </Body>
+              ) : (
+                <View style={{ marginTop: space.sm, gap: space.xs }}>
+                  {liveVehicles.map((vehicle) => (
+                    <Card
+                      key={vehicle.id}
+                      testID={`booking-live-vehicle-${vehicle.id}`}
+                      onPress={() => setVehicleId(vehicle.id)}
+                      style={vehicleId === vehicle.id ? { borderColor: theme.gold } : undefined}
+                    >
+                      <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.body }}>
+                        {vehicle.make} {vehicle.model} · {localizeDigits(vehicle.modelYear, locale)}
+                      </Text>
+                      <Body size="caption" muted>
+                        {vehicle.plateNumber ?? vehicle.vin}
+                      </Body>
+                    </Card>
+                  ))}
+                </View>
+              )
+            ) : demoVehicles.loading ? (
               <StateView kind="loading" />
-            ) : (vehicles.data ?? []).length === 0 ? (
+            ) : (demoVehicles.data ?? []).length === 0 ? (
               <Body muted size="label" style={{ marginTop: space.sm }}>
                 {t('noVehicles')}
               </Body>
             ) : (
-              (vehicles.data ?? []).map((vehicle) => (
+              (demoVehicles.data ?? []).map((vehicle) => (
                 <VehicleCard
                   key={vehicle.id}
                   vehicle={vehicle}
@@ -155,7 +280,8 @@ export default function NewBooking() {
             <View style={[styles.row, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
               {days.map((day) => {
                 const chip = formatDayChip(day, locale);
-                const closed = closedWeekday.includes(weekdayName(day));
+                // A live session trusts the engine, not the demo's closed days.
+                const closed = !isLive && closedWeekday.includes(weekdayName(day));
                 return (
                   <Chip
                     key={toDateParam(day)}
@@ -176,17 +302,39 @@ export default function NewBooking() {
 
           <Card>
             <SectionLabel>{t('availableSlots')}</SectionLabel>
-            <View style={[styles.row, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
-              {TIMES.map((slot) => (
-                <Chip
-                  key={slot}
-                  testID={`booking-time-${slot}`}
-                  label={localizeDigits(slot, locale)}
-                  active={time === slot}
-                  onPress={() => setTime(slot)}
-                />
-              ))}
-            </View>
+            {isLive ? (
+              live.slotsLoading ? (
+                <StateView kind="loading" />
+              ) : liveSlotLabels.length === 0 ? (
+                <Body muted size="label" style={{ marginTop: space.sm }}>
+                  {t('noSlots')}
+                </Body>
+              ) : (
+                <View style={[styles.row, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
+                  {liveSlotLabels.map((slot) => (
+                    <Chip
+                      key={slot}
+                      testID={`booking-live-slot-${slot}`}
+                      label={localizeDigits(slot, locale)}
+                      active={time === slot}
+                      onPress={() => setTime(slot)}
+                    />
+                  ))}
+                </View>
+              )
+            ) : (
+              <View style={[styles.row, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
+                {DEMO_TIMES.map((slot) => (
+                  <Chip
+                    key={slot}
+                    testID={`booking-time-${slot}`}
+                    label={localizeDigits(slot, locale)}
+                    active={time === slot}
+                    onPress={() => setTime(slot)}
+                  />
+                ))}
+              </View>
+            )}
           </Card>
 
           <Card>
@@ -196,14 +344,27 @@ export default function NewBooking() {
             <DetailRow label={t('chooseService')} value={serviceName || '—'} />
             <DetailRow label={t('chooseDate')} value={localizeDigits(date, locale)} />
             <DetailRow label={t('chooseTime')} value={time ? localizeDigits(time, locale) : '—'} />
-            <DetailRow label={t('total')} value={formatMoney(service?.priceMinor ?? 0)} />
+            {!isLive ? <DetailRow label={t('total')} value={formatMoney(service?.priceMinor ?? 0)} /> : null}
           </Card>
+
+          {isLive ? (
+            <Card>
+              <Field label={t('notes')} value={notes} onChangeText={setNotes} testID="booking-notes" />
+            </Card>
+          ) : null}
+
+          {submitError ? (
+            <Body size="caption" align="center" style={{ color: theme.danger }}>
+              {submitError}
+            </Body>
+          ) : null}
 
           <Button
             testID="booking-confirm"
             title={t('confirmBooking')}
+            loading={live.busy}
             disabled={!serviceName || !vehicleId || !time}
-            onPress={() => setConfirmed(true)}
+            onPress={() => void confirm()}
           />
           <View style={{ height: space.xl }} />
         </>

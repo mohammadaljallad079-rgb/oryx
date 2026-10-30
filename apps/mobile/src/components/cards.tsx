@@ -14,6 +14,7 @@ import { useApp } from '../lib/app-context';
 import { photoSmall } from '../lib/assets';
 import { brand, radius, space, typography } from '../lib/theme';
 import { discountPercent, formatAmount, formatDate, formatMoney, localizeDigits } from '../lib/format';
+import type { BookingSummary as LiveBookingSummary } from '../lib/api';
 import type {
   DemoBooking,
   DemoOffer,
@@ -54,7 +55,7 @@ export function ProductCard({
     >
       <Card style={{ padding: 0, overflow: 'hidden' }} elevated={1}>
         <View>
-          <Photo source={photoSmall(product.photo)} height={112} width="100%" radiusValue={0} />
+          <Photo source={photoSmall(product.photo)} uri={product.imageUrl ?? null} height={112} width="100%" radiusValue={0} />
           {off ? (
             <View style={[styles.ribbon, ribbonEdge, { backgroundColor: theme.gold }]}>
               <Text style={{ color: theme.onGold, fontSize: typography.caption, fontWeight: '700' }}>
@@ -218,6 +219,50 @@ export function BookingCard({ booking, provider }: { booking: DemoBooking; provi
         </Text>
         <Text style={{ color: theme.gold, fontWeight: '700', fontSize: typography.body }}>
           {formatMoney(booking.totalMinor)}
+        </Text>
+      </View>
+    </Card>
+  );
+}
+
+/**
+ * A booking row for the live, server-backed list.
+ *
+ * The shape differs from the demo row — a live booking has an ISO start, a
+ * status from the API and no demo provider — so it gets its own card rather
+ * than being forced into the demo type and losing information.
+ */
+export function LiveBookingCard({
+  booking,
+  onPress,
+}: {
+  booking: LiveBookingSummary;
+  onPress?: () => void;
+}) {
+  const { theme, locale, t } = useApp();
+  const when = new Date(booking.startsAt);
+  const dateLabel = Number.isNaN(when.getTime()) ? booking.startsAt : when.toISOString().slice(0, 10);
+  const timeLabel = Number.isNaN(when.getTime())
+    ? ''
+    : `${String(when.getUTCHours()).padStart(2, '0')}:${String(when.getUTCMinutes()).padStart(2, '0')}`;
+  return (
+    <Card onPress={onPress} testID={`live-booking-card-${booking.id}`}>
+      <View style={styles.titleRow}>
+        <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.body, flexShrink: 1 }}>
+          {booking.reference ?? booking.bookingType}
+        </Text>
+        <Badge text={booking.status} status={booking.status} />
+      </View>
+      <Body size="caption" muted style={{ marginTop: space.xs }}>
+        {booking.serviceRef ?? booking.bookingType}
+      </Body>
+      <View style={[styles.priceRow, { marginTop: space.sm }]}>
+        <Text style={{ color: theme.text, fontSize: typography.label }}>
+          {localizeDigits(dateLabel, locale)}
+          {timeLabel ? ` · ${localizeDigits(timeLabel, locale)}` : ''}
+        </Text>
+        <Text style={{ color: theme.gold, fontWeight: '700', fontSize: typography.label }}>
+          {t('liveMode')}
         </Text>
       </View>
     </Card>

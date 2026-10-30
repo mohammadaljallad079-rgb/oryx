@@ -2,6 +2,7 @@ import { Redirect, Tabs } from 'expo-router';
 import { Text } from 'react-native';
 
 import { useApp } from '../../lib/app-context';
+import { useMerchantSession } from '../../lib/merchant-session';
 import { Screen, StateView } from '../../components/ui';
 import { typography } from '../../lib/theme';
 
@@ -18,12 +19,22 @@ function TabIcon({ glyph, color }: { glyph: string; color: string }) {
  * same tokens as the customer shell, so the merchant side reads as the same
  * product rather than a separate tool.
  *
+ * Two ways in are allowed, and they are distinct:
+ *
+ *   - a **live merchant session** — a staff account linked to a provider, signed
+ *     in against the real API. This is the real path.
+ *   - the **demo merchant** — the local, offline role the review build offers.
+ *
+ * Anything else is sent to the merchant sign-in rather than the customer login,
+ * because a customer is not a merchant and the portal's calls would all fail.
+ *
  * Expo Router registers every file in this directory as a tab, so the plan and
  * the promotions screens — which are pushed, not destinations — need an explicit
  * `href: null` or they render as stray tabs labelled with their raw route names.
  */
 export default function MerchantLayout() {
   const { ready, account, theme, t } = useApp();
+  const { isSignedIn, status } = useMerchantSession();
 
   if (!ready) {
     return (
@@ -32,8 +43,20 @@ export default function MerchantLayout() {
       </Screen>
     );
   }
-  if (!account) return <Redirect href="/login" />;
-  if (account.role !== 'merchant') return <Redirect href="/(tabs)" />;
+
+  const demoMerchant = account?.role === 'merchant';
+  if (!demoMerchant && !isSignedIn) {
+    // A live session that is still being restored is not a reason to bounce the
+    // user out; wait for it to settle first.
+    if (status === 'restoring') {
+      return (
+        <Screen scroll={false}>
+          <StateView kind="loading" />
+        </Screen>
+      );
+    }
+    return <Redirect href="/merchant-login" />;
+  }
 
   return (
     <Tabs

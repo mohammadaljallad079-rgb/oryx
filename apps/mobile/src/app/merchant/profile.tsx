@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -6,6 +6,8 @@ import { useApp } from '../../lib/app-context';
 import { photo } from '../../lib/assets';
 import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
+import { useMerchantSession } from '../../lib/merchant-session';
+import { ApiError, providerApi } from '../../lib/api';
 import { AppHeader, Monogram } from '../../components/brand';
 import {
   Body,
@@ -31,22 +33,60 @@ import { formatMoney, localizeDigits } from '../../lib/format';
  * The store's public details, its subscription and the ERP tools that plan
  * unlocks. The plan card is honest about what is licensed: a tool the plan does
  * not include is shown locked, not hidden.
+ *
+ * A **live merchant session** reads and writes the real provider profile through
+ * `/provider/profile`, where the API resolves the provider from the staff
+ * account's membership. The **demo merchant** shows the local review data.
  */
 export default function MerchantProfile() {
   const { t, theme, locale, account, direction, switchRole, signOut, dataVersion } = useApp();
   const router = useRouter();
+  const { isSignedIn, account: merchant, refreshProfile } = useMerchantSession();
   const storeId = account?.storeId ?? 'store-01';
 
   const store = useAsync(async () => repository.merchantStore(storeId), [storeId, dataVersion]);
   const customers = useAsync(async () => repository.merchantCustomers(storeId), [storeId, dataVersion]);
   const [editing, setEditing] = useState(false);
+  const [draftNameEn, setDraftNameEn] = useState('');
+  const [draftNameAr, setDraftNameAr] = useState('');
+  const [draftPhone, setDraftPhone] = useState('');
   const [draftDescription, setDraftDescription] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  if (!account) return null;
+  // Seed the editor from the live profile once it arrives.
+  useEffect(() => {
+    if (!isSignedIn || !merchant?.provider) return;
+    setDraftNameEn(merchant.provider.nameEn);
+    setDraftNameAr(merchant.provider.nameAr);
+    setDraftPhone(merchant.provider.phone ?? '');
+    setDraftDescription('');
+  }, [isSignedIn, merchant?.provider]);
+
+  if (!account && !isSignedIn) return null;
 
   const tools = ['salesTool', 'inventoryTool', 'purchasingTool', 'accountingTool', 'hrTool', 'reportsTool'];
   const licensed = ['salesTool', 'inventoryTool', 'reportsTool'];
+
+  const saveLive = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await providerApi.updateProfile({
+        nameEn: draftNameEn,
+        nameAr: draftNameAr,
+        ...(draftPhone ? { phone: draftPhone } : {}),
+      });
+      await refreshProfile();
+      setEditing(false);
+      setNotice(t('saved'));
+    } catch (err) {
+      setError(err instanceof ApiError && err.kind === 'forbidden' ? t('forbiddenBody') : t('serverError'));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Screen padded={false}>
@@ -54,22 +94,40 @@ export default function MerchantProfile() {
       <View style={{ padding: space.lg, gap: space.md }}>
         <Card>
           <View style={[styles.headRow, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
-            <Monogram initials={account.avatarInitials} size={56} />
+            <Monogram initials={isSignedIn && merchant ? merchant.fullNameEn.slice(0, 2).toUpperCase() : account?.avatarInitials ?? 'OR'} size={56} />
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.heading }}>
-                {locale === 'ar' ? account.fullNameAr : account.fullNameEn}
+                {isSignedIn && merchant
+                  ? (locale === 'ar' ? merchant.fullNameAr : merchant.fullNameEn)
+                  : locale === 'ar'
+                    ? account?.fullNameAr
+                    : account?.fullNameEn}
               </Text>
               <Body size="caption" muted>
-                {account.email}
+                {isSignedIn && merchant ? merchant.email : account?.email}
               </Body>
-              <Body size="caption" muted>
-                {account.phone}
-              </Body>
+              {!isSignedIn && account?.phone ? (
+                <Body size="caption" muted>
+                  {account.phone}
+                </Body>
+              ) : null}
             </View>
           </View>
         </Card>
 
-        {store.loading ? (
+        {isSignedIn && merchant?.provider ? (
+          <Card style={{ padding: space.lg }}>
+            <Heading size="subheading">{locale === 'ar' ? merchant.provider.nameAr : merchant.provider.nameEn}</Heading>
+            <View style={[styles.row, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
+              <Chip label={merchant.provider.status} active />
+              <Chip label={merchant.provider.categoryKey} />
+            </View>
+            <Divider />
+            <DetailRow label={t('commission')} value={`${(merchant.provider.commissionPercentBp / 100).toFixed(1)}%`} />
+            {merchant.provider.phone ? <DetailRow label={t('phone')} value={merchant.provider.phone} /> : null}
+            {merchant.provider.email ? <DetailRow label={t('email')} value={merchant.provider.email} /> : null}
+          </Card>
+        ) : store.loading ? (
           <StateView kind="loading" />
         ) : store.data ? (
           <Card style={{ padding: 0, overflow: 'hidden' }}>
@@ -93,29 +151,59 @@ export default function MerchantProfile() {
           {editing ? (
             <>
               <View style={{ marginTop: space.sm }}>
-                <Field
-                  label={t('storeDescription')}
-                  testID="store-description"
-                  value={draftDescription}
-                  onChangeText={setDraftDescription}
-                  multiline
-                />
+                {isSignedIn ? (
+                  <>
+                    <Field
+                      label={t('listingNameEn')}
+                      testID="store-name-en"
+                      value={draftNameEn}
+                      onChangeText={setDraftNameEn}
+                    />
+                    <Field
+                      label={t('listingNameAr')}
+                      testID="store-name-ar"
+                      value={draftNameAr}
+                      onChangeText={setDraftNameAr}
+                    />
+                    <Field label={t('phone')} testID="store-phone" value={draftPhone} onChangeText={setDraftPhone} keyboardType="phone-pad" />
+                  </>
+                ) : (
+                  <Field
+                    label={t('storeDescription')}
+                    testID="store-description"
+                    value={draftDescription}
+                    onChangeText={setDraftDescription}
+                    multiline
+                  />
+                )}
               </View>
               <Button
                 testID="store-save"
                 title={t('save')}
+                loading={saving}
                 onPress={() => {
-                  setEditing(false);
-                  setNotice(t('saved'));
+                  if (isSignedIn) {
+                    void saveLive();
+                  } else {
+                    setEditing(false);
+                    setNotice(t('saved'));
+                  }
                 }}
               />
               <View style={{ height: space.sm }} />
               <Button title={t('cancel')} variant="secondary" onPress={() => setEditing(false)} />
+              {error ? (
+                <Body size="caption" style={{ color: theme.danger, marginTop: space.sm }}>
+                  {error}
+                </Body>
+              ) : null}
             </>
           ) : (
             <>
               <Body size="caption" muted style={{ marginTop: space.sm }}>
-                {draftDescription || t('storeDescription')}
+                {isSignedIn && merchant?.provider
+                  ? `${merchant.provider.nameEn} · ${merchant.provider.nameAr}`
+                  : draftDescription || t('storeDescription')}
               </Body>
               <View style={{ marginTop: space.md }}>
                 <Button testID="store-edit" title={t('edit')} variant="secondary" onPress={() => setEditing(true)} />
@@ -128,7 +216,7 @@ export default function MerchantProfile() {
         <Card>
           <SectionLabel>{t('subscription')}</SectionLabel>
           <Divider />
-          <DetailRow label={t('currentPlan')} value={account.planId ?? t('none')} />
+          <DetailRow label={t('currentPlan')} value={account?.planId ?? t('none')} />
           <DetailRow label={t('commission')} value="1.5%" />
           <View style={{ marginTop: space.md }}>
             <Button title={t('upgradePlan')} onPress={() => router.push('/merchant/plan')} />
@@ -147,20 +235,22 @@ export default function MerchantProfile() {
           </Body>
         </Card>
 
-        <Card>
-          <SectionLabel>{t('customers')}</SectionLabel>
-          {customers.loading ? (
-            <StateView kind="loading" />
-          ) : (
-            (customers.data ?? []).map((row) => (
-              <DetailRow
-                key={row.account.id}
-                label={locale === 'ar' ? row.account.fullNameAr : row.account.fullNameEn}
-                value={`${localizeDigits(row.orderCount, locale)} · ${formatMoney(row.spendMinor)}`}
-              />
-            ))
-          )}
-        </Card>
+        {!isSignedIn ? (
+          <Card>
+            <SectionLabel>{t('customers')}</SectionLabel>
+            {customers.loading ? (
+              <StateView kind="loading" />
+            ) : (
+              (customers.data ?? []).map((row) => (
+                <DetailRow
+                  key={row.account.id}
+                  label={locale === 'ar' ? row.account.fullNameAr : row.account.fullNameEn}
+                  value={`${localizeDigits(row.orderCount, locale)} · ${formatMoney(row.spendMinor)}`}
+                />
+              ))
+            )}
+          </Card>
+        ) : null}
 
         <Button title={t('switchToCustomer')} variant="secondary" onPress={() => { switchRole(); router.replace('/(tabs)/home'); }} />
         <View style={{ height: space.sm }} />

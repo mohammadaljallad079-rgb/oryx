@@ -5,6 +5,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from '../lib/app-context';
 import { LiveCartProvider } from '../lib/live-cart';
 import { LiveFavoritesProvider } from '../lib/live-favorites';
+import { LiveSessionProvider } from '../lib/live-session';
+import { LiveBookingsProvider } from '../lib/live-bookings';
+import { MerchantSessionProvider } from '../lib/merchant-session';
 import { LaunchScreen } from '../components/launch';
 
 /**
@@ -54,6 +57,7 @@ function RootNavigator() {
         <Stack.Screen name="register" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="merchant" />
+        <Stack.Screen name="merchant-login" />
       </Stack>
     </>
   );
@@ -63,13 +67,21 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AppProvider>
-        {/* The live cart sits inside the app provider because it reads the
-            session, and outside the navigator so every screen shares one. */}
-        <LiveCartProvider>
-          <LiveFavoritesProvider>
-            <RootNavigator />
-          </LiveFavoritesProvider>
-        </LiveCartProvider>
+        {/* The live session wraps everything that talks to the API, because the
+            cart, favourites and bookings all need the access token it installs.
+            It sits outside the navigator so a single restore happens per launch
+            rather than once per screen. */}
+        <LiveSessionProvider>
+          <LiveCartProvider>
+            <LiveFavoritesProvider>
+              <LiveBookingsProvider>
+                <MerchantSessionProvider>
+                  <RootNavigator />
+                </MerchantSessionProvider>
+              </LiveBookingsProvider>
+            </LiveFavoritesProvider>
+          </LiveCartProvider>
+        </LiveSessionProvider>
       </AppProvider>
     </SafeAreaProvider>
   );

@@ -3343,6 +3343,7 @@ model Vehicle {
   maintenance    MaintenanceBooking[]
   jobCards       JobCard[]
   warranties     WarrantyRecord[]
+  inspectionPhotos CustomerInspectionPhoto[]
   bookingSlots   BookingSlot[]
 
   @@unique([companyId, vin])
@@ -4027,9 +4028,42 @@ model CustomerAccount {
   notificationDeliveries NotificationDelivery[]
   cart            Cart?
   favorites       Favorite[]
+  /** SENSAGE inspection photographs this consumer uploaded. */
+  inspectionPhotos CustomerInspectionPhoto[]
 
   @@index([status])
   @@index([defaultCompanyId])
+}
+
+/**
+ * A photograph a customer uploaded for a SENSAGE inspection.
+ *
+ * Ownership is the `customerAccountId` from the verified token, never a request
+ * field. The bytes live in the shared media library (`CmsMediaAsset`) and are
+ * re-encoded on the way in by `MediaStorageService`, so this row only records
+ * which account uploaded what and when. There is deliberately no analysis field:
+ * the app's report is a demo and must never be stored as if it were a diagnosis.
+ */
+model CustomerInspectionPhoto {
+  id                String   @id @default(cuid())
+  customerAccountId String
+  vehicleId         String?
+  mediaAssetId      String?
+  originalName      String
+  mimeType          String
+  byteSize          Int
+  width             Int
+  height            Int
+  caption           String?
+  createdAt         DateTime @default(now())
+
+  customerAccount CustomerAccount @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+  vehicle         Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  mediaAsset      CmsMediaAsset?  @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
+
+  @@index([customerAccountId, createdAt])
+  @@index([mediaAssetId])
+  @@index([vehicleId])
 }
 
 model CustomerAddress {
@@ -4808,6 +4842,8 @@ model CmsMediaFolder {
 model CmsMediaAsset {
   /// Catalogue images that reference this asset.
   productImages   ProductImage[]
+  /// SENSAGE inspection photographs stored against this asset.
+  inspectionPhotos CustomerInspectionPhoto[]
   id           String   @id @default(cuid())
   folderId     String?
   /** Original filename as uploaded, kept for display. Never used as a path. */

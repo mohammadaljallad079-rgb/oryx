@@ -16,7 +16,7 @@
  *     placeholder rather than a new one on every render.
  */
 import type { DemoProduct, DemoProvider, PhotoKey, CategoryKey } from '../demo/catalogue';
-import type { FavoriteResponse, HomepageResponse } from './api';
+import { mediaUrl, type FavoriteResponse, type HomepageResponse } from './api';
 
 /** The bundled photographs, used when the API has no image for a record. */
 const FALLBACK_PHOTOS: PhotoKey[] = [
@@ -69,6 +69,9 @@ export function toDemoProduct(product: ApiProduct): DemoProduct {
     reviewCount: 0,
     stock: 0,
     photo: fallbackPhoto(product.id),
+    // A real uploaded photograph wins over the bundled fallback art. `mediaUrl`
+    // resolves the API's relative path against the API origin.
+    imageUrl: mediaUrl(product.imageUrl),
     fits: [],
     warrantyMonths: 0,
   };

@@ -3,6 +3,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { useApp } from '../lib/app-context';
+import { useLiveSession } from '../lib/live-session';
+import type { TranslateKey } from '../lib/i18n';
 import { photo } from '../lib/assets';
 import { Logo } from '../components/brand';
 import { Body, Button, Card, Field, Photo, Screen } from '../components/ui';
@@ -11,13 +13,21 @@ import { radius, space, typography } from '../lib/theme';
 /**
  * Sign in.
  *
- * The demo has no backend, so the two seeded accounts are also offered as
- * one-tap buttons. The email and password path works too — it validates against
- * the same seeded records — so the screen behaves like the real thing rather
- * than a shortcut-only mock.
+ * Two distinct paths, kept visibly apart:
+ *
+ *   - **Live** signs in against the real customer API. The access token is held
+ *     in memory and the refresh token in the keychain, so the session survives a
+ *     restart without the app ever writing an access token to storage.
+ *   - **Demo** enters the offline demo account, which is local and never touches
+ *     the network. It is labelled as a demo so a reviewer cannot mistake local
+ *     records for real ones.
+ *
+ * The two are separate stores by design: a demo session must never be able to
+ * masquerade as an authenticated one.
  */
 export default function Login() {
-  const { t, theme, direction, signIn, signInAs } = useApp();
+  const { t, theme, direction, signInAs } = useApp();
+  const { signIn, busy: liveBusy } = useLiveSession();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,10 +40,13 @@ export default function Login() {
     const result = await signIn(email, password);
     setBusy(false);
     if (!result.ok) {
-      setError(t('invalidCredentials'));
+      // `result.error` is an i18n key resolved by the session layer, so a
+      // validation or offline failure is described accurately rather than always
+      // blamed on the credentials.
+      setError(t((result.error ?? 'invalidCredentials') as TranslateKey));
       return;
     }
-    router.replace(email.toLowerCase().startsWith('merchant') ? '/merchant/dashboard' : '/(tabs)/home');
+    router.replace('/(tabs)/home');
   };
 
   const quick = async (role: 'customer' | 'merchant') => {
@@ -63,7 +76,7 @@ export default function Login() {
           onChangeText={setEmail}
           autoCapitalize="none"
           keyboardType="email-address"
-          placeholder="customer@oryx.demo"
+          placeholder="you@example.com"
           testID="login-email"
         />
         <Field
@@ -71,7 +84,7 @@ export default function Login() {
           value={password}
           onChangeText={setPassword}
           secureTextEntry
-          placeholder="demo1234"
+          placeholder="••••••••"
           testID="login-password"
         />
         {error ? (
@@ -83,7 +96,8 @@ export default function Login() {
           testID="login-submit"
           title={t('signIn')}
           onPress={submit}
-          loading={busy}
+          loading={busy || liveBusy}
+          disabled={!email.trim() || password.length === 0}
         />
         <Pressable onPress={() => router.push('/register')} style={styles.linkRow}>
           <Text style={{ color: theme.textMuted, fontSize: typography.label }}>
@@ -117,6 +131,22 @@ export default function Login() {
             </Text>
             <Body size="caption" muted>
               {t('demoMerchantHint')}
+            </Body>
+          </View>
+          <Text style={{ color: theme.gold, fontSize: 20 }}>›</Text>
+        </View>
+      </Card>
+
+      <Text style={[styles.section, { color: theme.textMuted }]}>{t('merchantAccess')}</Text>
+      <Card onPress={() => router.push('/merchant-login')} testID="merchant-login">
+        <View style={styles.demoRow}>
+          <Photo source={photo('partsStore')} height={48} width={48} radiusValue={radius.md} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.body }}>
+              {t('merchantAccess')}
+            </Text>
+            <Body size="caption" muted>
+              {t('merchantAccessHint')}
             </Body>
           </View>
           <Text style={{ color: theme.gold, fontSize: 20 }}>›</Text>

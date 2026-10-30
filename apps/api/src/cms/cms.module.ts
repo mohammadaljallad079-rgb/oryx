@@ -15,6 +15,6 @@ import { ContentService } from './content.service';
 @Module({
   controllers: [CmsController, MediaController, ContentController],
   providers: [CmsService, MediaService, MediaStorageService, ContentService],
-  exports: [CmsService, MediaService, ContentService],
+  exports: [CmsService, MediaService, ContentService, MediaStorageService],
 })
 export class CmsModule {}

@@ -116,6 +116,26 @@ export function getAccessToken(): string | null {
 }
 
 /**
+ * The staff (merchant) access token, kept apart from the consumer token.
+ *
+ * The API enforces two identity planes — a consumer token is refused on a staff
+ * route and the reverse — so the client keeps two slots rather than one. Sharing
+ * a single slot would mean signing in as a merchant silently replaced a customer
+ * session, and the failure would surface later as a confusing 401 on the wrong
+ * screen. Two slots make the separation explicit here as well as on the server.
+ */
+let staffAccessToken: string | null =
+  (globalThis as { __oryxStaffAccessToken?: string }).__oryxStaffAccessToken ?? null;
+
+export function setStaffAccessToken(token: string | null): void {
+  staffAccessToken = token;
+}
+
+export function getStaffAccessToken(): string | null {
+  return staffAccessToken;
+}
+
+/**
  * Whether the device currently has a usable connection.
  *
  * Read from the platform's own signal rather than inferred from a failed request,
@@ -133,6 +153,8 @@ interface RequestOptions {
   body?: unknown;
   /** Attach the bearer token. Default true. */
   auth?: boolean;
+  /** Which identity plane's token to attach. Default `customer`. */
+  plane?: 'customer' | 'staff';
   /** Abort after this many milliseconds instead of the default. */
   timeoutMs?: number;
   /** A caller-supplied signal, for a screen that unmounts mid-request. */
@@ -147,7 +169,7 @@ interface RequestOptions {
  * and no screen has to wrap a call in try/catch for the common cases.
  */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, auth = true, timeoutMs = TIMEOUT_MS, signal } = options;
+  const { method = 'GET', body, auth = true, plane = 'customer', timeoutMs = TIMEOUT_MS, signal } = options;
 
   // A known-offline device is not worth a 12-second wait.
   if (isOffline()) {
@@ -168,7 +190,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     'x-oryx-client': 'mobile',
   };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
-  if (auth && accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  const token = plane === 'staff' ? staffAccessToken : accessToken;
+  if (auth && token) headers.Authorization = `Bearer ${token}`;
 
   try {
     const response = await fetch(`${V1}${path}`, {
@@ -352,22 +375,31 @@ export interface BookingSummary {
   serviceRef?: string | null;
   resourceId?: string | null;
   notes?: string | null;
+  /** Present on a held booking; the instant the hold is released if unconfirmed. */
+  holdExpiresAt?: string | null;
+  cancellationReason?: string | null;
+  /** Present on `GET /customer/bookings/:id`; absent from the list projection. */
+  resource?: { id: string; code: string; nameEn: string; nameAr: string } | null;
+  branch?: { id: string; code: string; nameEn: string; nameAr: string; phone?: string | null } | null;
 }
 
+/** A bookable slot as `GET /customer/bookings/availability` returns it. */
 export interface AvailabilitySlot {
+  /** ISO instant. */
   startsAt: string;
-  endsAt?: string;
-  resourceId?: string;
-  available?: boolean;
+  endsAt: string;
+  /** Minutes from the local midnight the day was planned from. */
+  startMinute: number;
+  endMinute: number;
 }
 
 /** The account endpoints, matching `CustomerAuthController`. */
 export const authApi = {
-  register: (email: string, password: string, fullName: string, preferredLocale: 'ar' | 'en' = 'ar') =>
+  register: (email: string, password: string, fullName: string, preferredLocale: 'ar' | 'en' = 'ar', phone?: string) =>
     request<CustomerSession>('/customer/auth/register', {
       method: 'POST',
       auth: false,
-      body: { email, password, fullName, preferredLocale },
+      body: phone ? { email, password, fullName, preferredLocale, phone } : { email, password, fullName, preferredLocale },
     }),
 
   login: (email: string, password: string) =>
@@ -387,7 +419,73 @@ export const authApi = {
 
   me: (signal?: AbortSignal) => request<CustomerSession['account']>('/customer/auth/me', { signal }),
 
-  logout: () => request<void>('/customer/auth/logout', { method: 'POST' }),
+  /**
+   * Revokes the session server-side, then the caller clears local state.
+   *
+   * The refresh token must travel in the body: a native client holds no cookie,
+   * so without it the API has nothing to revoke and the token stays usable until
+   * it expires. The stored token is supplied by the session layer.
+   */
+  logout: (refreshToken?: string) =>
+    request<void>('/customer/auth/logout', {
+      method: 'POST',
+      body: refreshToken ? { refreshToken } : {},
+    }),
+};
+
+/**
+ * The staff sign-in, used by the merchant/provider side.
+ *
+ * A provider user is a staff account, not a consumer account: a provider
+ * operates a business and must be subject to the staff audit and session rules.
+ * The refresh token is requested in the body because the device has no cookie
+ * jar, exactly as the consumer client does.
+ */
+export interface StaffSession {
+  accessToken: string;
+  refreshToken?: string;
+  expiresIn: number;
+  user: {
+    id: string;
+    email: string;
+    fullNameEn: string;
+    fullNameAr: string;
+    isSuperAdmin: boolean;
+  };
+  memberships?: Array<{
+    companyId: string;
+    companyNameEn?: string;
+    companyNameAr?: string;
+    roleId?: string;
+    roleNameEn?: string;
+    roleNameAr?: string;
+  }>;
+}
+
+export const staffAuthApi = {
+  login: (email: string, password: string) =>
+    request<StaffSession>('/auth/login', {
+      method: 'POST',
+      auth: false,
+      body: { email, password },
+    }),
+
+  refresh: (refreshToken: string) =>
+    request<StaffSession>('/auth/refresh', {
+      method: 'POST',
+      auth: false,
+      body: { refreshToken },
+    }),
+
+  me: (signal?: AbortSignal) => request<StaffSession['user']>('/auth/me', { signal }),
+
+  /** Same reason as the customer logout: a native client has no cookie to revoke. */
+  logout: (refreshToken?: string) =>
+    request<void>('/auth/logout', {
+      method: 'POST',
+      body: refreshToken ? { refreshToken } : {},
+      plane: 'staff',
+    }),
 };
 
 /** The customer booking endpoints, matching `CustomerBookingController`. */
@@ -415,6 +513,21 @@ export const bookingsApi = {
       { signal },
     ),
 
+  get: (id: string, signal?: AbortSignal) =>
+    requestWithRetry<BookingSummary>(`/customer/bookings/${encodeURIComponent(id)}`, { signal }),
+
+  /**
+   * Confirm a held booking.
+   *
+   * A customer booking is created as a hold, so it must be confirmed within the
+   * hold window or it is released. Confirmation is a customer-owned operation:
+   * the API resolves the booking from the caller's account, never from the id.
+   */
+  confirm: (id: string) =>
+    request<BookingSummary>(`/customer/bookings/${encodeURIComponent(id)}/confirm`, {
+      method: 'POST',
+    }),
+
   cancel: (id: string, reason?: string) =>
     request<BookingSummary>(`/customer/bookings/${encodeURIComponent(id)}/cancel`, {
       method: 'POST',
@@ -426,3 +539,377 @@ export const bookingsApi = {
 export async function hasStoredSession(): Promise<boolean> {
   return (await getSecret(SESSION_KEY)) !== null;
 }
+
+// ------------------------------------------------------------- uploads
+
+/**
+ * A file to upload, as the picker hands it over.
+ *
+ * `uri` is a local file path on the device. On native it is passed straight to
+ * `fetch` as a blob part; in the web preview it is a `blob:` URL that `fetch`
+ * can also read.
+ */
+export interface UploadFile {
+  uri: string;
+  name: string;
+  mimeType: string;
+}
+
+/**
+ * Uploads a file as `multipart/form-data`.
+ *
+ * Deliberately separate from `request`: a multipart body must not set a JSON
+ * `Content-Type`, the platform has to set the boundary itself, and an upload is
+ * long enough that the default timeout is too short. Retries are never
+ * automatic — a retried upload could attach the same image twice — so the caller
+ * decides whether to try again.
+ */
+export async function uploadFile<T>(
+  path: string,
+  file: UploadFile,
+  fields: Record<string, string> = {},
+  options: { timeoutMs?: number; signal?: AbortSignal; plane?: 'customer' | 'staff' } = {},
+): Promise<T> {
+  if (isOffline()) throw new ApiError('offline', null, 'No internet connection');
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 60_000);
+  const onAbort = () => controller.abort();
+  options.signal?.addEventListener('abort', onAbort);
+
+  const form = new FormData();
+  for (const [key, value] of Object.entries(fields)) form.append(key, value);
+  // React Native's FormData accepts a `{ uri, name, type }` part; the web
+  // `FormData` accepts a Blob, so the file is fetched into one first.
+  if (typeof (globalThis as { document?: unknown }).document !== 'undefined') {
+    const blob = await (await fetch(file.uri)).blob();
+    form.append('file', blob, file.name);
+  } else {
+    form.append('file', { uri: file.uri, name: file.name, type: file.mimeType } as never);
+  }
+
+  const headers: Record<string, string> = { Accept: 'application/json', 'x-oryx-client': 'mobile' };
+  const token = options.plane === 'staff' ? staffAccessToken : accessToken;
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  try {
+    const response = await fetch(`${V1}${path}`, {
+      method: 'POST',
+      headers,
+      body: form,
+      signal: controller.signal,
+    });
+    if (!response.ok) throw await toError(response);
+    if (response.status === 204) return undefined as T;
+    return (await response.json()) as T;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (error instanceof Error && error.name === 'AbortError') {
+      if (options.signal?.aborted) throw new ApiError('unknown', null, 'Upload cancelled');
+      throw new ApiError('timeout', null, 'The upload took too long');
+    }
+    throw new ApiError('offline', null, 'Could not reach the server');
+  } finally {
+    clearTimeout(timer);
+    options.signal?.removeEventListener('abort', onAbort);
+  }
+}
+
+/** A stock item as `GET /inventory/products` returns it. */
+export interface InventoryProduct {
+  id: string;
+  sku: string;
+  nameEn: string;
+  nameAr: string;
+  type: string;
+  unit: string;
+  barcode: string | null;
+  salesPriceMinor: number;
+  costPriceMinor: number;
+  reorderLevel: number;
+  reorderQuantity: number;
+  trackStock: boolean;
+  isActive: boolean;
+}
+
+/**
+ * The company's stock catalogue.
+ *
+ * Staff-plane routes: the API resolves the tenant from the bearer token, so the
+ * client never sends a company id and cannot read another tenant's catalogue.
+ * The merchant screens use this to list products and to attach photographs.
+ */
+export const inventoryApi = {
+  products: (params: { search?: string; page?: number; pageSize?: number } = {}, signal?: AbortSignal) => {
+    const q = new URLSearchParams();
+    if (params.search) q.set('search', params.search);
+    q.set('page', String(params.page ?? 1));
+    q.set('pageSize', String(params.pageSize ?? 200));
+    return requestWithRetry<{ items: InventoryProduct[]; total: number; page: number; pageSize: number }>(
+      `/inventory/products?${q}`,
+      { signal, plane: 'staff' },
+    );
+  },
+
+  createProduct: (input: {
+    sku: string;
+    nameEn: string;
+    nameAr: string;
+    type?: 'PRODUCT' | 'SERVICE';
+    salesPriceMinor?: number;
+    costPriceMinor?: number;
+  }) => request<InventoryProduct>('/inventory/products', { method: 'POST', body: input, plane: 'staff' }),
+
+  updateProduct: (id: string, patch: Partial<{ nameEn: string; nameAr: string; salesPriceMinor: number; costPriceMinor: number; isActive: boolean }>) =>
+    request<InventoryProduct>(`/inventory/products/${id}`, { method: 'PATCH', body: patch, plane: 'staff' }),
+};
+
+/** A product image as the catalogue API returns it. */
+export interface ProductImage {
+  id: string;
+  productId: string;
+  url: string | null;
+  altEn: string | null;
+  altAr: string | null;
+  sortOrder: number;
+  isPrimary: boolean;
+}
+
+/** An inspection photo as the customer API returns it. */
+export interface InspectionPhoto {
+  id: string;
+  vehicleId: string | null;
+  url: string | null;
+  originalName: string;
+  mimeType: string;
+  byteSize: number;
+  width: number;
+  height: number;
+  caption: string | null;
+  createdAt: string;
+}
+
+/** Product photography. Company-scoped: the API resolves the tenant from the token. */
+export const productImagesApi = {
+  list: (productId: string, signal?: AbortSignal) =>
+    requestWithRetry<ProductImage[]>(`/inventory/products/${productId}/images`, { signal, plane: 'staff' }),
+
+  upload: (
+    productId: string,
+    file: UploadFile,
+    fields: { altEn?: string; altAr?: string; isPrimary?: boolean } = {},
+  ) => {
+    const body: Record<string, string> = {};
+    if (fields.altEn) body.altEn = fields.altEn;
+    if (fields.altAr) body.altAr = fields.altAr;
+    if (fields.isPrimary !== undefined) body.isPrimary = String(fields.isPrimary);
+    return uploadFile<ProductImage>(`/inventory/products/${productId}/images`, file, body, { plane: 'staff' });
+  },
+
+  update: (productId: string, imageId: string, patch: Partial<Pick<ProductImage, 'altEn' | 'altAr' | 'sortOrder' | 'isPrimary'>>) =>
+    request<ProductImage>(`/inventory/products/${productId}/images/${imageId}`, {
+      method: 'PATCH',
+      body: patch,
+      plane: 'staff',
+    }),
+
+  remove: (productId: string, imageId: string) =>
+    request<{ removed: boolean }>(`/inventory/products/${productId}/images/${imageId}`, {
+      method: 'DELETE',
+      plane: 'staff',
+    }),
+};
+
+/** SENSAGE inspection photographs. Ownership is enforced from the bearer token. */
+export const inspectionPhotosApi = {
+  list: (vehicleId?: string, signal?: AbortSignal) =>
+    requestWithRetry<InspectionPhoto[]>(
+      `/customer/inspection-photos${vehicleId ? `?vehicleId=${encodeURIComponent(vehicleId)}` : ''}`,
+      { signal },
+    ),
+
+  upload: (file: UploadFile, fields: { vehicleId?: string; caption?: string } = {}) => {
+    const body: Record<string, string> = {};
+    if (fields.vehicleId) body.vehicleId = fields.vehicleId;
+    if (fields.caption) body.caption = fields.caption;
+    return uploadFile<InspectionPhoto>('/customer/inspection-photos', file, body);
+  },
+
+  remove: (id: string) =>
+    request<{ removed: boolean }>(`/customer/inspection-photos/${id}`, { method: 'DELETE' }),
+};
+
+/** A vehicle in the customer's own garage, as the API returns it. */
+export interface CustomerVehicle {
+  id: string;
+  vin: string;
+  plateNumber: string | null;
+  make: string;
+  model: string;
+  modelYear: number;
+  color: string | null;
+  mileage: number | null;
+}
+
+/**
+ * The customer's own garage.
+ *
+ * Every route resolves the account from the bearer token, so the client never
+ * sends an account id and cannot address another customer's vehicle.
+ */
+export const vehiclesApi = {
+  list: (signal?: AbortSignal) =>
+    requestWithRetry<CustomerVehicle[]>('/customer/vehicles', { signal }),
+
+  create: (input: {
+    vin: string;
+    plateNumber?: string;
+    make: string;
+    model: string;
+    modelYear: number;
+    color?: string;
+    mileage?: number;
+    notes?: string;
+  }) => request<CustomerVehicle>('/customer/vehicles', { method: 'POST', body: input }),
+
+  update: (
+    id: string,
+    patch: Partial<{ plateNumber: string; color: string; mileage: number; notes: string }>,
+  ) => request<CustomerVehicle>(`/customer/vehicles/${id}`, { method: 'PATCH', body: patch }),
+
+  remove: (id: string) =>
+    request<{ removed: boolean }>(`/customer/vehicles/${id}`, { method: 'DELETE' }),
+};
+
+/**
+ * Turns a media reference from the API into an absolute URL the `<Image>` can load.
+ *
+ * The API returns paths (`/api/v1/cms/media/…/file?variant=card`), not absolute
+ * URLs, so the device would otherwise try to load them from its own origin. This
+ * resolves them against the API base.
+ */
+export function mediaUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (/^https?:\/\//.test(path)) return path;
+  // `BASE_URL` already includes `/api`; the returned path starts with `/api/v1`.
+  const origin = BASE_URL.replace(/\/api$/, '');
+  return `${origin}${path}`;
+}
+
+// ---------------------------------------------------------- provider portal
+
+/** A provider profile as `GET /provider/profile` returns it. */
+export interface ProviderProfile {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  categoryKey: string;
+  phone: string | null;
+  email: string | null;
+  status: string;
+  commissionPercentBp: number;
+}
+
+/** A service listing as `GET /provider/listings` returns it. */
+export interface ProviderListing {
+  id: string;
+  providerId: string;
+  categoryKey: string;
+  nameEn: string;
+  nameAr: string;
+  description: string | null;
+  priceMinor: number;
+  currency: string;
+  isActive: boolean;
+}
+
+/** A service request offered to or assigned to the provider. */
+export interface ProviderRequest {
+  id: string;
+  requestNumber: string;
+  categoryKey: string;
+  description: string | null;
+  status: string;
+  createdAt: string;
+  assignedAt: string | null;
+  completedAt: string | null;
+}
+
+/** The provider earnings summary, as `GET /provider/earnings` returns it. */
+export interface ProviderEarnings {
+  pending: { count: number; grossMinor: number; commissionMinor: number };
+  awaitingPayment: { count: number; netMinor: number };
+  paidToDate: { count: number; netMinor: number };
+}
+
+/**
+ * The merchant/provider portal.
+ *
+ * These routes are staff routes: the provider user is a staff account linked to
+ * a `MarketplaceProvider` through `ProviderUser`, not a consumer account. The
+ * API resolves the provider from that membership, never from the URL, so a
+ * provider user cannot read or act on another provider's work. The mobile client
+ * sends no provider id, which is what makes that isolation unbypassable here.
+ *
+ * Every call carries the staff token (`plane: 'staff'`), because a consumer token
+ * would be refused by the staff guards — correctly so.
+ */
+export const providerApi = {
+  profile: (signal?: AbortSignal) =>
+    requestWithRetry<ProviderProfile>('/provider/profile', { signal, plane: 'staff' }),
+
+  updateProfile: (patch: { nameEn?: string; nameAr?: string; phone?: string; email?: string }) =>
+    request<ProviderProfile>('/provider/profile', { method: 'PATCH', body: patch, plane: 'staff' }),
+
+  listings: (signal?: AbortSignal) =>
+    requestWithRetry<ProviderListing[]>('/provider/listings', { signal, plane: 'staff' }),
+
+  createListing: (input: {
+    categoryKey: string;
+    nameEn: string;
+    nameAr: string;
+    description?: string;
+    priceMinor: number;
+    currency?: string;
+  }) => request<ProviderListing>('/provider/listings', { method: 'POST', body: input, plane: 'staff' }),
+
+  updateListing: (
+    id: string,
+    patch: Partial<{
+      nameEn: string;
+      nameAr: string;
+      description: string;
+      priceMinor: number;
+      isActive: boolean;
+    }>,
+  ) => request<ProviderListing>(`/provider/listings/${id}`, { method: 'PATCH', body: patch, plane: 'staff' }),
+
+  requests: (params: { status?: string; page?: number; pageSize?: number } = {}, signal?: AbortSignal) => {
+    const q = new URLSearchParams();
+    if (params.status) q.set('status', params.status);
+    q.set('page', String(params.page ?? 1));
+    q.set('pageSize', String(params.pageSize ?? 20));
+    return requestWithRetry<{ items: ProviderRequest[]; total?: number }>(`/provider/requests?${q}`, {
+      signal,
+      plane: 'staff',
+    });
+  },
+
+  acceptRequest: (id: string) =>
+    request<ProviderRequest>(`/provider/requests/${id}/accept`, { method: 'POST', plane: 'staff' }),
+  declineRequest: (id: string, reason?: string) =>
+    request<ProviderRequest>(`/provider/requests/${id}/decline`, { method: 'POST', body: { reason }, plane: 'staff' }),
+  startRequest: (id: string) =>
+    request<ProviderRequest>(`/provider/requests/${id}/start`, { method: 'POST', plane: 'staff' }),
+  completeRequest: (id: string, input: { finalAmountMinor: number; currency?: string }) =>
+    request<ProviderRequest>(`/provider/requests/${id}/complete`, { method: 'POST', body: input, plane: 'staff' }),
+  cancelRequest: (id: string, reason?: string) =>
+    request<ProviderRequest>(`/provider/requests/${id}/cancel`, { method: 'POST', body: { reason }, plane: 'staff' }),
+
+  earnings: (signal?: AbortSignal) =>
+    requestWithRetry<ProviderEarnings>('/provider/earnings', { signal, plane: 'staff' }),
+  settlements: (signal?: AbortSignal) =>
+    requestWithRetry<unknown[]>('/provider/settlements', { signal, plane: 'staff' }),
+  reviews: (signal?: AbortSignal) => requestWithRetry<unknown[]>('/provider/reviews', { signal, plane: 'staff' }),
+};

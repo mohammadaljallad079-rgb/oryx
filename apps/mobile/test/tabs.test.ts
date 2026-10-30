@@ -155,7 +155,15 @@ describe('route tree', () => {
     const declared = [...root.matchAll(/<Stack\.Screen\s+name="([^"]+)"/g)].flatMap((m) =>
       m[1] === undefined ? [] : [m[1]],
     );
-    expect(declared.sort()).toEqual(['(tabs)', 'index', 'login', 'merchant', 'onboarding', 'register']);
+    expect(declared.sort()).toEqual([
+      '(tabs)',
+      'index',
+      'login',
+      'merchant',
+      'merchant-login',
+      'onboarding',
+      'register',
+    ]);
   });
 
   it('resolves every literal router target to a real route file', () => {

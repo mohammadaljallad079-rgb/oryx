@@ -448,5 +448,65 @@ describe('Execution 09 — customer integration (e2e)', () => {
       expect(res.status).toBe(200);
       expect(res.body.email).toBe(`${PREFIX.toLowerCase()}-a@test.local`);
     });
+
+    it('revokes the presented refresh token on logout', async () => {
+      // A native client has no cookie, so the token must travel in the body.
+      // Without it the server has nothing to revoke and the token stays usable
+      // until it expires — a real sign-out failure.
+      const login = await call<{ accessToken: string; refreshToken?: string }>(
+        base,
+        '/customer/auth/login',
+        {
+          method: 'POST',
+          headers: { 'x-oryx-client': 'mobile' },
+          body: { email: `${PREFIX.toLowerCase()}-a@test.local`, password },
+        },
+      );
+      expect(login.status).toBe(200);
+      const refreshToken = login.body.refreshToken;
+      expect(typeof refreshToken).toBe('string');
+
+      const out = await call(base, '/customer/auth/logout', {
+        method: 'POST',
+        headers: { 'x-oryx-client': 'mobile' },
+        body: { refreshToken },
+      });
+      expect(out.status).toBe(204);
+
+      const afterLogout = await call(base, '/customer/auth/refresh', {
+        method: 'POST',
+        headers: { 'x-oryx-client': 'mobile' },
+        body: { refreshToken },
+      });
+      expect(afterLogout.status).toBe(401);
+    });
+
+    it('leaves an un-revoked session usable after a logout that carries no token', async () => {
+      // The contrast case: an empty body cannot revoke anything, which is the
+      // shape a client regresses to when it forgets to send the token.
+      const login = await call<{ refreshToken?: string }>(base, '/customer/auth/login', {
+        method: 'POST',
+        headers: { 'x-oryx-client': 'mobile' },
+        body: { email: `${PREFIX.toLowerCase()}-b@test.local`, password },
+      });
+      const refreshToken = login.body.refreshToken;
+      expect(typeof refreshToken).toBe('string');
+
+      const out = await call(base, '/customer/auth/logout', {
+        method: 'POST',
+        headers: { 'x-oryx-client': 'mobile' },
+        body: {},
+      });
+      expect(out.status).toBe(204);
+
+      const stillValid = await call(base, '/customer/auth/refresh', {
+        method: 'POST',
+        headers: { 'x-oryx-client': 'mobile' },
+        body: { refreshToken },
+      });
+      // Revoking requires the token; the server is honest about that rather than
+      // pretending an empty logout ended every session.
+      expect(stillValid.status).toBe(200);
+    });
   });
 });

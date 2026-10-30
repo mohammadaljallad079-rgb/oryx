@@ -119,6 +119,14 @@ export interface DemoProduct {
   reviewCount: number;
   stock: number;
   photo: PhotoKey;
+  /**
+   * A real product photograph from the API's media library, when one exists.
+   *
+   * `photo` is the bundled fallback art; when `imageUrl` is set the card renders
+   * the uploaded image instead. Kept separate so a record with no photograph is
+   * visibly using placeholder art rather than silently substituting it.
+   */
+  imageUrl?: string | null;
   /** Car makes this part is listed to fit. */
   fits: string[];
   warrantyMonths: number;

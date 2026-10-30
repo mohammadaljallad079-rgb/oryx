@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentPrincipal,
   RequireAnyPermission,
@@ -9,6 +10,7 @@ import {
 } from '../auth/auth.decorators';
 import { actorFrom } from '../common/erp-context.service';
 import { InventoryService } from './inventory.service';
+import { ProductImageService } from './product-image.service';
 import {
   CreateAdjustmentDto,
   CreateProductDto,
@@ -17,7 +19,9 @@ import {
   ListQueryDto,
   RecordMovementDto,
   UpdateProductDto,
+  UpdateProductImageDto,
   UpdateWarehouseDto,
+  UploadProductImageDto,
 } from './inventory.dto';
 
 interface RequestLike {
@@ -30,7 +34,10 @@ interface RequestLike {
 @RequireModule('warehouses_inventory')
 @Controller('inventory')
 export class InventoryController {
-  constructor(private readonly inventory: InventoryService) {}
+  constructor(
+    private readonly inventory: InventoryService,
+    private readonly productImages: ProductImageService,
+  ) {}
 
   // -------------------------------------------------------------- warehouses
   @Get('warehouses')
@@ -158,5 +165,72 @@ export class InventoryController {
   @ApiOperation({ summary: 'Products at or below their reorder level' })
   reorderAlerts(@Query('companyId') companyId: string | undefined, @CurrentPrincipal() p: RequestPrincipal) {
     return this.inventory.reorderAlerts(p, companyId);
+  }
+
+  // ---------------------------------------------------------- product images
+  /**
+   * Product photography.
+   *
+   * A product image is catalogue data a company administrator manages, so the
+   * routes take `erp.inventory.item.manage`. The bytes are validated and
+   * re-encoded by the shared media storage service; the client only supplies the
+   * file and its alt text.
+   */
+  @Get('products/:productId/images')
+  @RequireAnyPermission('erp.inventory.read', 'erp.inventory.item.manage')
+  @ApiOperation({ summary: 'List a product\'s images' })
+  listProductImages(@Param('productId') productId: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.productImages.list(productId, p);
+  }
+
+  @Post('products/:productId/images')
+  @RequirePermissions('erp.inventory.item.manage')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 12 * 1024 * 1024, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload a product image' })
+  uploadProductImage(
+    @Param('productId') productId: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() dto: UploadProductImageDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    ProductImageService.assertFile(file);
+    return this.productImages.upload(
+      productId,
+      file,
+      {
+        altEn: dto.altEn,
+        altAr: dto.altAr,
+        isPrimary: dto.isPrimary === 'true',
+      },
+      p,
+      actorFrom(p, req),
+    );
+  }
+
+  @Patch('products/:productId/images/:imageId')
+  @RequirePermissions('erp.inventory.item.manage')
+  @ApiOperation({ summary: 'Update a product image' })
+  updateProductImage(
+    @Param('productId') productId: string,
+    @Param('imageId') imageId: string,
+    @Body() dto: UpdateProductImageDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.productImages.update(productId, imageId, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('products/:productId/images/:imageId')
+  @RequirePermissions('erp.inventory.item.manage')
+  @ApiOperation({ summary: 'Remove a product image' })
+  removeProductImage(
+    @Param('productId') productId: string,
+    @Param('imageId') imageId: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.productImages.remove(productId, imageId, p, actorFrom(p, req));
   }
 }

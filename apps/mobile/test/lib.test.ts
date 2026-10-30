@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { directionFor, translate, localized, type Locale } from '../src/lib/i18n';
@@ -324,7 +327,9 @@ describe('React and react-dom stay on one version', () => {
    * already crashed the Android build (APK 1.0.5) and the web bundle (React
    * error #527), so the pin is asserted here rather than left to resolution.
    */
-  const pkg = require('../package.json') as {
+  const pkg = JSON.parse(
+    readFileSync(join(__dirname, '..', 'package.json'), 'utf8'),
+  ) as {
     dependencies: Record<string, string>;
     devDependencies: Record<string, string>;
   };

@@ -453,13 +453,17 @@ export function StateView({
 /** An image with a themed placeholder background and rounded corners. */
 export function Photo({
   source,
+  uri,
   height,
   width,
   style,
   radiusValue = radius.lg,
   overlay = false,
 }: {
-  source: ImageSourcePropType;
+  /** A bundled asset. Ignored when `uri` is set. */
+  source?: ImageSourcePropType;
+  /** A remote image, used in preference to `source` when present. */
+  uri?: string | null;
   height?: number;
   width?: number | `${number}%`;
   style?: StyleProp<ViewStyle>;
@@ -467,6 +471,7 @@ export function Photo({
   overlay?: boolean;
 }) {
   const { theme } = useApp();
+  const resolved: ImageSourcePropType | null = uri ? { uri } : source ?? null;
   return (
     <View
       style={[
@@ -474,7 +479,7 @@ export function Photo({
         style,
       ]}
     >
-      <Image source={source} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      {resolved ? <Image source={resolved} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
       {overlay ? <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.scrim }]} /> : null}
     </View>
   );
