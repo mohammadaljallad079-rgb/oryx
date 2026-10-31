@@ -646,6 +646,33 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `scripts/exec10-smoke.sh` generates an 80x80 RGB PNG for exactly this reason.
 
 
+### Execution 11 gotchas
+
+- **A merchant account resolves its provider from `ProviderUser`, not from a
+  permission.** The portal looks up the membership link; an account with the
+  right permission but no link gets `403`. The seed links `admin@oryx-auto.local`
+  to the ORYX-AUTO company's first provider so the merchant portal works on a
+  fresh database — without it every `/provider/...` call answers `403` and looks
+  like a routing bug.
+- **`ProviderUser` has no `upsert`-able name beyond `@@unique([providerId, userId])`.** Seeding the link uses `findFirst` + `create`/`update` rather than `upsert` so the script stays readable.
+- **`GET /subscriptions` scopes to the token's company.** A company administrator
+  reads only their own subscription; sending a `companyId` query does nothing on
+  the company plane. The mobile `subscriptionApi.current()` deliberately sends no
+  id.
+- **`GET /plans` needs `company.subscription.read`,** which every company
+  administrator holds. The catalogue is the same one the platform edits; the
+  mobile screen shows `monthlyPrice` (major units) and the modules each plan
+  licenses.
+- **A plan screen cannot switch plans.** Assigning a subscription is a platform
+  action (`POST /subscriptions/companies/:id/assign`); the mobile screen states
+  that rather than offering a button that changes nothing.
+- **The offer feed filters in SQL, not on the client.** `GET /customer/catalog/offers`
+  returns only `isActive` offers inside their `startsAt`/`endsAt` window, so a
+  withdrawn or expired offer never reaches the app. Do not "fix" an empty rail by
+  relaxing the query.
+- **`percentOffBp` is basis points.** `20000` (200%) is rejected with `400`; the
+  bound is enforced in the DTO, not the screen.
+
 ### Adding a new ERP module
 
 1. Add a `ModuleDefinition` to `packages/shared/src/modules.ts`.
