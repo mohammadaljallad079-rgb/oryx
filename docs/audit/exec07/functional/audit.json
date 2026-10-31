@@ -1,0 +1,372 @@
+[
+  {
+    "tag": "cust",
+    "name": "onboarding",
+    "route": "/onboarding",
+    "chars": 141,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "Skip The parts marketplace Fifty-plus parts from fifteen verified Bahraini stores, with cl"
+  },
+  {
+    "tag": "cust",
+    "name": "login",
+    "route": "/login",
+    "chars": 240,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "Sign in Enter your details, or use a one-tap demo sign-in. Email Password Sign in No accou"
+  },
+  {
+    "tag": "cust",
+    "name": "register",
+    "route": "/register",
+    "chars": 148,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "Create account A review build. All data is local and not real. Full name Email Phone numbe"
+  },
+  {
+    "tag": "cust",
+    "name": "home",
+    "route": "/home",
+    "chars": 1966,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "ع 🛒 🔔 Everything Your Car Needs Parts · Services · Trusted Providers Explore now → ⌕ Sea"
+  },
+  {
+    "tag": "cust",
+    "name": "categories",
+    "route": "/categories",
+    "chars": 936,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "ع 🛒 🔔 Demo data A review build. All data is local and not real. CATEGORIES Spare parts ›"
+  },
+  {
+    "tag": "cust",
+    "name": "search",
+    "route": "/search",
+    "chars": 142,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "ع 🛒 🔔 Search All Parts Stores Services Search for parts, services, or providers. ⌂ ⌂ Hom"
+  },
+  {
+    "tag": "cust",
+    "name": "parts",
+    "route": "/parts",
+    "chars": 3049,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "ع 🛒 🔔 Parts Stores Search Filters 56 results Brake Caliper Assembly Valeo 29.501 BHD ★ 5"
+  },
+  {
+    "tag": "cust",
+    "name": "part-detail",
+    "route": "/parts/prod-001",
+    "chars": 880,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back Front Brake Pad Set SKF ★ 3.8 (36) SKF In stock 4.200 BHD 5.349 BHD 21% off Al Noor"
+  },
+  {
+    "tag": "cust",
+    "name": "store",
+    "route": "/parts/store/store-01",
+    "chars": 630,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back Al Noor Auto Parts ★ 4.1 (343) Verified 2023 Delivery Free Subtotal from 10.000 BHD"
+  },
+  {
+    "tag": "cust",
+    "name": "services",
+    "route": "/services",
+    "chars": 2693,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "ع 🛒 🔔 Search All Inspection Maintenance Recovery All Manama Riffa Muharraq Isa Town Hama"
+  },
+  {
+    "tag": "cust",
+    "name": "service-detail",
+    "route": "/services/inspection-01",
+    "chars": 897,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back National Inspection Centre Licensed inspection station with factory-trained technic"
+  },
+  {
+    "tag": "cust",
+    "name": "sensage",
+    "route": "/sensage",
+    "chars": 649,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "ع 🛒 🔔 Demo data A review build. All data is local and not real. SENSAGE smart check Pick"
+  },
+  {
+    "tag": "cust",
+    "name": "sensage-new",
+    "route": "/sensage/new",
+    "chars": 355,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back SENSAGE smart check Start analysis SELECT A VEHICLE Toyota Land Cruiser Prado 2021 "
+  },
+  {
+    "tag": "cust",
+    "name": "sensage-detail",
+    "route": "/sensage/sensage-001",
+    "chars": 1167,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back SNS-2026-9100 Toyota Land Cruiser Prado · 1234 ABC CONDITION SCORE 68 out of 100 · "
+  },
+  {
+    "tag": "cust",
+    "name": "recovery",
+    "route": "/recovery",
+    "chars": 804,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back Vehicle recovery CONFIRM REQUEST Vehicle location Destination PROBLEM Battery is de"
+  },
+  {
+    "tag": "cust",
+    "name": "recovery-detail",
+    "route": "/recovery/recovery-001",
+    "chars": 449,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back RCV-2026-3300 Live tracking (demo) COMPLETED 23.200 BHD Arrives in: 18 min · A revi"
+  },
+  {
+    "tag": "cust",
+    "name": "bookings",
+    "route": "/bookings",
+    "chars": 937,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back My bookings 10 Pre-purchase inspection CONFIRMED National Inspection Centre 2026-10"
+  },
+  {
+    "tag": "cust",
+    "name": "bookings-new",
+    "route": "/bookings/new",
+    "chars": 402,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back Book now SERVICE PROVIDERS National Inspection Centre 4 Services and prices Riffa V"
+  },
+  {
+    "tag": "cust",
+    "name": "cart",
+    "route": "/cart",
+    "chars": 57,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back Cart 0 Items Your cart is empty. Continue shopping"
+  },
+  {
+    "tag": "cust",
+    "name": "checkout",
+    "route": "/checkout",
+    "chars": 127,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back Checkout Delivery address Delivery address Payment method Order summary Order place"
+  },
+  {
+    "tag": "cust",
+    "name": "orders",
+    "route": "/orders",
+    "chars": 1617,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back My orders 20 All PENDING PREPARING SHIPPED DELIVERED CANCELLED ORD-2026-4119 PREPAR"
+  },
+  {
+    "tag": "cust",
+    "name": "order-detail",
+    "route": "/orders/order-001",
+    "chars": 501,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back ORD-2026-4100 Al Noor Auto Parts PENDING 443.741 BHD Placed Preparing Out for deliv"
+  },
+  {
+    "tag": "cust",
+    "name": "wallet",
+    "route": "/wallet",
+    "chars": 315,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back Demo wallet BALANCE 47.500 BHD Demo data TOP UP 5.000 BHD 10.000 BHD 25.000 BHD Top"
+  },
+  {
+    "tag": "cust",
+    "name": "favourites",
+    "route": "/favourites",
+    "chars": 343,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back Favourites 5 PARTS Timing Belt Kit NGK 64.852 BHD ★ 4.3 (44) 21% off Front Brake Pa"
+  },
+  {
+    "tag": "cust",
+    "name": "vehicles",
+    "route": "/vehicles/veh-01",
+    "chars": 711,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back Toyota Land Cruiser Prado 1234 ABC Make Toyota Model Land Cruiser Prado Model year "
+  },
+  {
+    "tag": "cust",
+    "name": "vehicles-new",
+    "route": "/vehicles/new",
+    "chars": 94,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back Add vehicle MY VEHICLES Make Model Model year Plate number VIN Colour Mileage (km) "
+  },
+  {
+    "tag": "cust",
+    "name": "addresses",
+    "route": "/addresses",
+    "chars": 255,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back Addresses Home Default Addresses Villa 214, Road 1907, Block 719, Riffa Work Addres"
+  },
+  {
+    "tag": "cust",
+    "name": "notifications",
+    "route": "/notifications",
+    "chars": 551,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back Notifications 5 Your order is on the way Order ORD-2026-4102 has left Al Noor Auto "
+  },
+  {
+    "tag": "cust",
+    "name": "support",
+    "route": "/support",
+    "chars": 213,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back Support For questions and help, get in touch. SUPPORT +973 1700 0000 support@oryx.b"
+  },
+  {
+    "tag": "cust",
+    "name": "account",
+    "route": "/account",
+    "chars": 1074,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "ع 🛒 🔔 Demo data A review build. All data is local and not real. AM Ahmed Al Mannai custo"
+  },
+  {
+    "tag": "mch",
+    "name": "merchant-dashboard",
+    "route": "/merchant/dashboard",
+    "chars": 855,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "ع 🛒 🔔 Demo data A review build. All data is local and not real. Al Noor Auto Parts Store"
+  },
+  {
+    "tag": "mch",
+    "name": "merchant-orders",
+    "route": "/merchant/orders",
+    "chars": 429,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "ع 🛒 🔔 MANAGE ORDERS All PENDING (1) PREPARING SHIPPED DELIVERED (1) CANCELLED Total sale"
+  },
+  {
+    "tag": "mch",
+    "name": "merchant-products",
+    "route": "/merchant/products",
+    "chars": 590,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "ع 🛒 🔔 PRODUCTS 5 Products Low stock: 1 Reorder alerts Add product Front Brake Pad Set OR"
+  },
+  {
+    "tag": "mch",
+    "name": "merchant-services",
+    "route": "/merchant/services",
+    "chars": 640,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "ع 🛒 🔔 My bookings Recovery requests Manage services Pre-purchase inspection CONFIRMED Na"
+  },
+  {
+    "tag": "mch",
+    "name": "merchant-promotions",
+    "route": "/merchant/promotions",
+    "chars": 524,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back Promotions ADD PROMOTION Product name off percentage, e.g. 15 Categories Save A rev"
+  },
+  {
+    "tag": "mch",
+    "name": "merchant-profile",
+    "route": "/merchant/profile",
+    "chars": 549,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "ع 🛒 🔔 YN Yousef Al Noor merchant@oryx.demo +973 3944 1188 Al Noor Auto Parts Verified fr"
+  },
+  {
+    "tag": "mch",
+    "name": "merchant-plan",
+    "route": "/merchant/plan",
+    "chars": 865,
+    "consoleErrors": 0,
+    "white": false,
+    "errState": false,
+    "first": "‹ Back Subscription and plans Choose this plan Starter 12.000 BHD per month Platform commi"
+  }
+]

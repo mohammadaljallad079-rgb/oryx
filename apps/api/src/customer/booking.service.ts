@@ -453,6 +453,71 @@ export class BookingService {
   }
 
   /**
+   * Confirm a held slot the customer owns.
+   *
+   * A customer booking is always created as a hold, so without this the slot
+   * would expire after the hold window and never become a real appointment.
+   * Ownership is asserted before the transition, exactly as cancellation is, so
+   * a customer cannot confirm someone else's booking by id.
+   */
+  async confirmCustomerBooking(accountId: string, slotId: string) {
+    const slot = await this.prisma.bookingSlot.findFirst({
+      where: { id: slotId, customerAccountId: accountId },
+    });
+    if (!slot) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Booking not found.');
+    if (slot.status === 'CONFIRMED' || slot.status === 'RESCHEDULED') return slot;
+    if (slot.status !== 'HELD') {
+      throw conflict(ERROR_CODES.BOOKING_STATE, `A ${slot.status} booking cannot be confirmed.`);
+    }
+    if (slot.holdExpiresAt && slot.holdExpiresAt < new Date()) {
+      throw conflict(ERROR_CODES.BOOKING_HOLD_EXPIRED, 'This hold has expired. Please book again.');
+    }
+
+    const updated = await this.prisma.bookingSlot.update({
+      where: { id: slot.id },
+      data: {
+        status: 'CONFIRMED',
+        holdExpiresAt: null,
+        events: {
+          create: {
+            companyId: slot.companyId,
+            kind: 'CONFIRMED',
+            fromStatus: slot.status as never,
+            toStatus: 'CONFIRMED' as never,
+            message: 'Booking confirmed by the customer.',
+            actorKind: 'CUSTOMER',
+            actorId: accountId,
+          },
+        },
+      },
+    });
+
+    await this.audit.record({
+      action: 'booking.confirmed',
+      companyId: slot.companyId,
+      targetType: 'BOOKING_SLOT',
+      targetId: slot.id,
+      summary: `Customer confirmed booking ${slot.reference}.`,
+    });
+
+    return updated;
+  }
+
+  /** Read a booking the customer owns, with its resource and branch. */
+  async getCustomerBooking(accountId: string, slotId: string) {
+    const slot = await this.prisma.bookingSlot.findFirst({
+      where: { id: slotId, customerAccountId: accountId },
+      include: {
+        resource: { select: { id: true, code: true, nameEn: true, nameAr: true } },
+        branch: { select: { id: true, code: true, nameEn: true, nameAr: true, phone: true } },
+        events: { orderBy: { createdAt: 'asc' } },
+      },
+    });
+    if (!slot) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Booking not found.');
+    return slot;
+  }
+
+  /**
    * Move a booking to a new time.
    *
    * The row keeps its identity, so its event trail and linked documents survive.

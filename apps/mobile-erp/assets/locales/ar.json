@@ -1,0 +1,10 @@
+{
+  "android": {
+    "app_name": "أوريكس ERP"
+  },
+  "ios": {
+    "CFBundleDisplayName": "أوريكس",
+    "NSMicrophoneUsageDescription": "أوريكس لا يستخدم الميكروفون.",
+    "NSLocationWhenInUseUsageDescription": "يُستخدم موقعك لعرض المزودين الأقرب إليك."
+  }
+}

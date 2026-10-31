@@ -1,18 +1,24 @@
 import type { ExpoConfig } from 'expo/config';
 
 /**
- * ORYX customer mobile application.
+ * ORYX Marketplace — the design-approval build.
  *
- * The bundle identifier and package name are the ones the owner must own before
- * any store submission; they are declared here so `expo prebuild` produces
- * verifiable Android and iOS projects. No signing material is committed.
+ * This application is the customer-facing marketplace: the parts shop, the
+ * service and inspection directory, the SENSAGE vehicle check and the recovery
+ * request flow, plus a merchant dashboard. It is the demo the owner reviews
+ * before any backend work begins, so it runs entirely on local demo data.
+ *
+ * It is deliberately a *separate* bundle from the ORYX ERP staff application
+ * (`apps/mobile-erp`) and from the customer website, so installing it cannot
+ * disturb either. The package name is the identifier the owner must hold before
+ * a store submission; nothing here is signing material.
  */
 const config: ExpoConfig = {
-  name: 'ORYX',
-  slug: 'oryx-customer',
-  version: '0.1.0',
+  name: 'ORYX Marketplace',
+  slug: 'oryx-marketplace',
+  version: '1.0.8',
   orientation: 'portrait',
-  scheme: 'oryx',
+  scheme: 'oryx-marketplace',
   userInterfaceStyle: 'automatic',
   newArchEnabled: true,
   icon: './assets/icon.png',
@@ -26,18 +32,18 @@ const config: ExpoConfig = {
     backgroundColor: '#00162b',
   },
   android: {
-    package: 'com.oryx.customer',
-    versionCode: 1,
+    package: 'com.oryx.marketplace',
+    versionCode: 8,
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#00162b',
     },
     edgeToEdgeEnabled: true,
-    permissions: ['POST_NOTIFICATIONS', 'INTERNET'],
+    permissions: ['POST_NOTIFICATIONS', 'INTERNET', 'CAMERA'],
   },
   ios: {
-    bundleIdentifier: 'com.oryx.customer',
-    buildNumber: '1',
+    bundleIdentifier: 'com.oryx.marketplace',
+    buildNumber: '8',
     supportsTablet: true,
     infoPlist: {
       // Arabic is the primary market language; English remains a fallback.
@@ -54,16 +60,28 @@ const config: ExpoConfig = {
         color: '#d4af37',
       },
     ],
+    [
+      // Camera and photo-library access, for the SENSAGE vehicle inspection.
+      // The strings are what Android shows in the permission dialog, so they
+      // say what the photo is for rather than naming the API.
+      'expo-image-picker',
+      {
+        photosPermission: 'ORYX uses your photos so you can attach a picture of your car to an inspection.',
+        cameraPermission: 'ORYX uses the camera so you can photograph your car for an inspection.',
+      },
+    ],
   ],
   experiments: {
-    typedRoutes: true,
-    // Web exports are hosted under a sub-path on the customer origin. Native
-    // builds ignore this; leaving it empty keeps the default root hosting.
+    // Typed routes are off on purpose. This is a self-contained demo build and
+    // generated route types are not committed, so leaving them on would make a
+    // clean checkout typecheck differently from a developer machine.
+    typedRoutes: false,
     baseUrl: process.env.EXPO_BASE_PATH || undefined,
   },
   extra: {
-    // Overridable at build time with EXPO_PUBLIC_API_BASE_URL.
+    // Present for the eventual API wiring; the demo never reads it.
     apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api',
+    demoBuild: true,
   },
 };
 

@@ -28,12 +28,30 @@
   --border-strong: rgba(212, 175, 55, 0.55);
   --text: #eef3f9;
   --text-muted: #9fb3c8;
-  --text-faint: #6f8598;
+  /*
+   * Raised from #6f8598, which measured 4.43:1 on the gradient stat panel —
+   * just under the 4.5:1 the contrast harness enforces. This is the smallest
+   * lightening that clears AA on every surface the token lands on (4.93:1 on
+   * the lightest), so the approved dark render shifts imperceptibly.
+   */
+  --text-faint: #778da1;
   --text-inverse: #00121f;
   --navy: #00162b;
   --gold: #d4af37;
+  --gold-hover: #e8c766;
   --gold-soft: #e8c766;
   --gold-deep: #a9861f;
+  /*
+   * Gold is overloaded in a design system: it is both an accent *text* colour
+   * (which must be dark on a light surface) and a metallic *fill* (which must
+   * be light enough for dark ink). One token cannot satisfy both, so the fill
+   * ramp is separate. The dark values reproduce the previous
+   * `gold-soft → gold` and `gold → gold-deep` gradients exactly.
+   */
+  --gold-fill-from: #e8c766;
+  --gold-fill-to: #d4af37;
+  --gold-fill-hover-from: #d4af37;
+  --gold-fill-hover-to: #a9861f;
   --success: #3ecf8e;
   --warning: #f0b429;
   --danger: #f2555a;
@@ -44,38 +62,346 @@
     rgba(0, 15, 30, 0.72) 55%,
     rgba(0, 18, 34, 0.94) 100%
   );
+  /* Category cards sit on the page surface rather than a photograph, so they
+   * get their own scrim that follows the theme. */
+  --card-scrim: linear-gradient(
+    180deg,
+    rgba(0, 12, 24, 0.15) 0%,
+    rgba(0, 15, 30, 0.72) 55%,
+    rgba(0, 18, 34, 0.94) 100%
+  );
+  /*
+   * Ink on a metallic gold fill. The dark value is the original `--navy`, so
+   * this split leaves the approved dark theme pixel-identical; the light value
+   * is the warm charcoal that reads on the lighter light-theme gold ramp.
+   */
+  --on-gold: #00162b;
+  /*
+   * The full-bleed hero and the footer are navy bands in both themes. In the
+   * dark theme the page field is already navy, so the band equals `--bg` and
+   * the approved dark render is unchanged; the light theme keeps the approved
+   * navy band on an ivory page.
+   */
+  --band: #00162b;
+  --band-footer: #000f1e;
+  --band-text: #eef3f9;
+  --band-text-muted: #9fb3c8;
+  /*
+   * Raised from #6f8598 alongside `--text-faint`: the stat label sits on the
+   * gradient stat panel, where the old value measured 4.43:1 — just under the
+   * 4.5:1 the contrast harness enforces.
+   */
+  --band-text-faint: #778da1;
+  --band-accent: #d4af37;
+  --band-border: rgba(255, 255, 255, 0.08);
+  /*
+   * Accent gold for text on a warm gold-tinted chip. In the dark theme the
+   * plain gold already clears 4.5:1 on every chip, so this reproduces it and
+   * the approved dark render is unchanged.
+   */
+  --gold-on-tint: #d4af37;
+  /*
+   * The gold-tint ramp. Every chip, wash, hairline and inset panel takes one of
+   * these seven steps instead of its own `color-mix(... var(--gold) N% ...)`,
+   * which is what made the light theme read as assembled rather than designed.
+   * The dark values are the percentages the rules already used most often, so
+   * the approved dark render moves by at most one step.
+   */
+  --tint-wash: color-mix(in srgb, var(--gold) 6%, transparent);
+  --tint-fill: color-mix(in srgb, var(--gold) 12%, transparent);
+  --tint-focus: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tint-glow: color-mix(in srgb, var(--gold) 22%, transparent);
+  --tint-active: color-mix(in srgb, var(--gold) 18%, var(--surface-raised));
+  --tint-line: color-mix(in srgb, var(--gold) 26%, transparent);
+  --tint-badge-line: color-mix(in srgb, var(--gold) 34%, transparent);
+  --tint-ring: color-mix(in srgb, var(--gold) 40%, transparent);
+  --tint-panel: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+  /*
+   * Photo panels (the homepage hero, page headers and the dashboard banner).
+   * In the dark theme the panel field is the existing navy gradient, so the
+   * approved render is unchanged; the light theme uses a navy band so the white
+   * panel ink reads, exactly as the approved reference does.
+   */
+  --panel-bg: radial-gradient(
+      120% 140% at 88% 6%,
+      var(--tint-fill),
+      transparent 58%
+    ),
+    linear-gradient(150deg, var(--surface-raised), var(--bg-deep));
+  --panel-ink: var(--text);
+  --panel-ink-muted: var(--text-muted);
+  /*
+   * The photo scrims run across the caption, so their angle is a token rather
+   * than a literal: the caption starts at the inline-start edge, which is the
+   * left in LTR and the right in RTL, and the opaque end must follow it. The
+   * light theme flips the angle under `[data-dir='rtl']`; the dark theme leaves
+   * it at 100deg, where the band equals the page field and the approved render
+   * is already direction-neutral.
+   */
+  --scrim-angle: 100deg;
+  --hero-scrim: linear-gradient(
+    var(--scrim-angle),
+    color-mix(in srgb, var(--band) 94%, transparent) 8%,
+    color-mix(in srgb, var(--band) 74%, transparent) 48%,
+    color-mix(in srgb, var(--band) 34%, transparent) 100%
+  );
+  --panel-scrim: linear-gradient(
+    var(--scrim-angle),
+    color-mix(in srgb, var(--band) 92%, transparent) 10%,
+    color-mix(in srgb, var(--band) 62%, transparent) 70%
+  );
+  --head-scrim: linear-gradient(
+    var(--scrim-angle),
+    color-mix(in srgb, var(--band) 94%, transparent) 8%,
+    color-mix(in srgb, var(--band) 66%, transparent) 72%
+  );
   --shadow-card: 0 18px 40px -24px rgba(0, 0, 0, 0.85);
+  --shadow-panel: 0 24px 60px rgba(0, 0, 0, 0.32);
+  --header-bg: color-mix(in srgb, var(--bg-deep) 92%, transparent);
+  /* Field well: darker than the card so the input reads as inset. */
+  --field-bg: var(--bg-deep);
+  --field-border: var(--border-soft);
+  /*
+   * The status ramp. A badge or an alert is a *tinted chip*, so the strength of
+   * its wash belongs to the theme, not to the rule that draws it. A rule names
+   * `var(--status-fill)` and declares only *which* status it is, through
+   * `--status-color` (a badge needs no declaration — its `color` already is the
+   * status colour). This is the only place the strength lives, which is what
+   * lets the light theme tune the chips without a scattered override.
+   */
+  --status-line: color-mix(in srgb, var(--status-color, currentColor) 40%, transparent);
+  --status-fill: color-mix(in srgb, var(--status-color, currentColor) 12%, transparent);
+  /*
+   * The neutral overlay ramp. Hover washes, inset wells, skeletons and the
+   * muted dot were each a different magic percentage in the rules; they are
+   * named here so both themes share one scale and the light theme can deepen it
+   * for contrast on ivory without touching a component.
+   */
+  --overlay-hover: color-mix(in srgb, var(--text) 4%, transparent);
+  --well-bg: color-mix(in srgb, var(--surface-raised) 40%, transparent);
+  --skeleton-from: color-mix(in srgb, var(--text) 6%, transparent);
+  --skeleton-to: color-mix(in srgb, var(--text) 13%, transparent);
+  --dot-muted: color-mix(in srgb, var(--text-faint) 50%, transparent);
+  --auth-sheen: color-mix(in srgb, var(--surface-raised) 92%, var(--gold) 8%);
+  --band-btn-hover: color-mix(in srgb, var(--band-text) 12%, transparent);
+  /*
+   * Component fields whose value differs per theme. Each was previously a
+   * light-scoped component rule sitting next to the rule it patched, which is
+   * what made the light theme read as assembled from exceptions. They live here
+   * now, so a component rule names a token and the theme supplies the value.
+   *
+   * The dark values are the ones the approved dark render already resolves, so
+   * moving the override into a token does not move a pixel of the dark theme.
+   */
+  --card-desc-size: 12.5px;
+  /* The dashboard banner composites its artwork straight onto the page in the
+   * dark theme, so it has no panel field of its own; the light theme lifts it
+   * onto the navy band. */
+  --dash-hero-bg: transparent;
+  --dash-hero-ink: var(--text);
+  /* Footer controls sit on the navy band, so they take the band ink rather than
+   * the page ink. In the dark theme the band equals the page field, which is why
+   * these resolve to the plain button colours there. */
+  --footer-btn-ink: var(--text);
+  --footer-btn-border: var(--border);
+  --footer-btn-hover-bg: var(--surface-hover);
+  --footer-btn-hover-border: var(--border-strong);
+  /* The homepage hero eyebrow. `.oryx-hero p` outranks `.oryx-eyebrow`, so the
+   * eyebrow inherits the lede's ink and size in the dark theme; the dark value
+   * below reproduces that approved render, and the light value restores the gold
+   * accent every other eyebrow uses. `letter-spacing` stays in `em` in the rule,
+   * so it tracks whichever size the theme selects. */
+  --hero-eyebrow-ink: var(--band-text-muted);
+  --hero-eyebrow-size: 16px;
+  --hero-eyebrow-margin: 0 0 24px;
   --header-h: 68px;
 }
 
+/*
+ * Light theme — elegant ivory field, white and warm-neutral surfaces, deep
+ * charcoal type and a restrained metallic gold.
+ *
+ * Every value here is measured: `.run/check-light-palette.mjs` asserts the
+ * WCAG 2.1 ratio of each foreground/background pair this theme renders, so a
+ * future edit that breaks contrast fails a test instead of shipping.
+ */
 :root[data-theme='light'] {
-  --bg: #f5f6f8;
-  --bg-deep: #eceef2;
+  --bg: #f7f4ed;
+  --bg-deep: #efeae0;
   --surface: #ffffff;
-  --surface-raised: #f0f2f6;
-  --surface-hover: #e8ecf2;
-  --border: rgba(0, 22, 43, 0.12);
-  --border-soft: rgba(0, 22, 43, 0.08);
-  --border-strong: rgba(169, 134, 31, 0.55);
-  --text: #0d2338;
-  --text-muted: #5b6b7d;
-  --text-faint: #8794a3;
-  --text-inverse: #ffffff;
+  --surface-raised: #fbf9f4;
+  --surface-hover: #f4f0e8;
+  --border: rgba(36, 31, 20, 0.14);
+  --border-soft: rgba(36, 31, 20, 0.09);
+  --border-strong: rgba(125, 95, 16, 0.5);
+  --text: #22201d;
+  --text-muted: #5a544b;
+  --text-faint: #6b6459;
+  --text-inverse: #241f14;
   --navy: #00162b;
-  --gold: #b8912a;
-  --gold-soft: #d4af37;
-  --gold-deep: #8f6f18;
-  --success: #1f9d63;
-  --warning: #b7791f;
-  --danger: #c53030;
-  --info: #2b6cb0;
+  /* Accent text and hairlines: the one light-theme gold, deep enough to read on
+   * every ivory surface including the deepest (`bg-deep`, 5.0:1). Kept equal to
+   * `LIGHT_THEME.gold` so the admin and customer themes cannot drift. */
+  --gold: #7d5f10;
+  --gold-hover: #6f5510;
+  --gold-soft: #d9b447;
+  --gold-deep: #a9821c;
+  --gold-fill-from: #e0c168;
+  --gold-fill-to: #c9a227;
+  --gold-fill-hover-from: #d4af37;
+  --gold-fill-hover-to: #b8912a;
+  --success: #1a7f4f;
+  --warning: #8a5a06;
+  --danger: #b3261e;
+  --info: #1d5fa8;
   --tile-overlay: linear-gradient(
     180deg,
     rgba(0, 12, 24, 0.1) 0%,
     rgba(0, 22, 43, 0.62) 55%,
     rgba(0, 22, 43, 0.9) 100%
   );
-  --shadow-card: 0 16px 36px -26px rgba(0, 22, 43, 0.45);
+  /* Ivory scrim so the charcoal caption keeps its contrast over artwork. */
+  --card-scrim: linear-gradient(
+    180deg,
+    rgba(247, 244, 237, 0.55) 0%,
+    rgba(247, 244, 237, 0.82) 55%,
+    rgba(247, 244, 237, 0.94) 100%
+  );
+  /*
+   * The hero caption spans the left ~60% of the panel, so the scrim stays
+   * near-opaque across that band and only thins out on the right, where the
+   * photograph is meant to show. It is built from the navy band token so the
+   * caption keeps white-ink contrast in both themes; in the dark theme the band
+   * equals the page field, so the approved render is unchanged.
+   */
+  --hero-scrim: linear-gradient(
+    var(--scrim-angle),
+    color-mix(in srgb, var(--band) 96%, transparent) 4%,
+    color-mix(in srgb, var(--band) 92%, transparent) 55%,
+    color-mix(in srgb, var(--band) 70%, transparent) 100%
+  );
+  --panel-scrim: linear-gradient(
+    var(--scrim-angle),
+    color-mix(in srgb, var(--band) 96%, transparent) 8%,
+    color-mix(in srgb, var(--band) 88%, transparent) 70%
+  );
+  --head-scrim: linear-gradient(
+    var(--scrim-angle),
+    color-mix(in srgb, var(--band) 97%, transparent) 8%,
+    color-mix(in srgb, var(--band) 90%, transparent) 72%
+  );
+  --shadow-card: 0 16px 36px -26px rgba(58, 48, 30, 0.28);
+  --shadow-panel: 0 24px 60px -28px rgba(58, 48, 30, 0.35);
+  /* Opaque white so the sticky band never shows a seam over page content. */
+  --header-bg: color-mix(in srgb, var(--surface) 94%, transparent);
+  /* White field on a warm well so inputs read as inset on white cards. */
+  --field-bg: #ffffff;
+  --field-border: rgba(36, 31, 20, 0.18);
+  /* Warm charcoal on the lighter light-theme gold ramp (9.4:1 on the light end). */
+  --on-gold: #241f14;
+  /*
+   * The approved light homepage keeps a navy hero band and a navy footer on an
+   * ivory page. The band tokens carry white ink and the light metallic gold, so
+   * the hero, the page headers and the footer read as one navy family without
+   * scattering colour values through the rules.
+   */
+  --band: #0a1b2f;
+  --band-footer: #0a1b2f;
+  --band-text: #ffffff;
+  --band-text-muted: #cdd8e6;
+  --band-text-faint: #9fb3c8;
+  --band-accent: #e8c766;
+  --band-border: rgba(232, 199, 102, 0.24);
+  /*
+   * A 10–12% gold chip fill lifts the surface enough that the plain accent gold
+   * falls to ~3.9:1; this darker gold clears 4.5:1 on every tinted chip, so the
+   * chips share one value rather than each carrying its own override.
+   */
+  --gold-on-tint: #7a5c10;
+  /*
+   * The gold-tint ramp. A chip takes one named step instead of carrying its own
+   * percentage, so every chip, wash and hairline in the light theme shares one
+   * warm gold rather than the sixteen ad-hoc values the rules used to mix.
+   * `--tint-fill` is the 12% chip the `goldOnTint` value above is measured
+   * against, so its contrast is unchanged.
+   */
+  --tint-wash: color-mix(in srgb, var(--gold) 6%, transparent);
+  --tint-fill: color-mix(in srgb, var(--gold) 12%, transparent);
+  --tint-focus: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tint-glow: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tint-active: color-mix(in srgb, var(--gold) 14%, var(--surface-raised));
+  --tint-line: color-mix(in srgb, var(--gold) 26%, transparent);
+  --tint-badge-line: color-mix(in srgb, var(--gold) 34%, transparent);
+  --tint-ring: color-mix(in srgb, var(--gold) 40%, transparent);
+  --tint-panel: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+  /*
+   * Photo panels are navy bands in the approved light homepage, so the panel
+   * field is the navy band with a faint gold bloom. The panel ink is white for
+   * the same reason the hero's is.
+   */
+  --panel-bg: radial-gradient(
+      120% 140% at 88% 6%,
+      color-mix(in srgb, var(--band-accent) 20%, transparent),
+      transparent 58%
+    ),
+    linear-gradient(150deg, var(--band), color-mix(in srgb, var(--band) 82%, #000000));
+  --panel-ink: var(--band-text);
+  --panel-ink-muted: var(--band-text-muted);
+  /*
+   * Status chips on ivory. The dark theme's 40%/12% were tuned against bright
+   * status colours; the light theme uses *darker* status colours (so the text
+   * clears 4.5:1 on white), and the same percentages then produce a wash too
+   * faint to see and a hairline too strong to sit under it. The strength is
+   * therefore raised here, in the token, so every badge and alert moves together
+   * and no component carries an override.
+   */
+  --status-line: color-mix(in srgb, var(--status-color, currentColor) 38%, transparent);
+  --status-fill: color-mix(in srgb, var(--status-color, currentColor) 10%, transparent);
+  /*
+   * The neutral overlay ramp, deepened for ivory. A 4% charcoal hover that reads
+   * on navy is nearly invisible on white, and a 40% well that reads as an inset
+   * on navy looks like a dirty patch on ivory. One scale, tuned once.
+   */
+  --overlay-hover: color-mix(in srgb, var(--text) 6%, transparent);
+  --well-bg: color-mix(in srgb, var(--surface) 70%, var(--bg-deep));
+  --skeleton-from: color-mix(in srgb, var(--text) 8%, transparent);
+  --skeleton-to: color-mix(in srgb, var(--text) 16%, transparent);
+  --dot-muted: color-mix(in srgb, var(--text-faint) 45%, transparent);
+  --auth-sheen: color-mix(in srgb, var(--surface-raised) 94%, var(--gold) 6%);
+  --band-btn-hover: color-mix(in srgb, var(--band-text) 14%, transparent);
+  /*
+   * The per-theme component fields. See the dark block for what each one drives;
+   * these are the values the light theme used to set through five separate
+   * light-scoped component overrides, now named once.
+   */
+  /* The card description reads at the same 13px as the muted line beside it, so
+   * the two lines of one card agree. */
+  --card-desc-size: 13px;
+  /* The banner is a navy band under the artwork on ivory, so its white ink
+   * reads; the dark theme leaves it transparent. */
+  --dash-hero-bg: var(--panel-bg);
+  --dash-hero-ink: var(--panel-ink);
+  /* The footer bar is a navy band on an ivory page, so its controls take the
+   * band ink rather than the page's charcoal. */
+  --footer-btn-ink: var(--band-text);
+  --footer-btn-border: var(--band-border);
+  --footer-btn-hover-bg: var(--band-btn-hover);
+  --footer-btn-hover-border: var(--band-accent);
+  /* The homepage hero eyebrow: the gold accent every other eyebrow uses, at the
+   * eyebrow's own size rather than the lede's. */
+  --hero-eyebrow-ink: var(--band-accent);
+  --hero-eyebrow-size: 12.5px;
+  --hero-eyebrow-margin: 0 0 10px;
+}
+
+/*
+ * The light theme's photo scrims are anchored to the caption, which sits at the
+ * inline-start edge: the left in LTR and the right in RTL. Mirroring the angle
+ * keeps the near-opaque end over the caption in both directions, so the white
+ * band ink holds its contrast instead of falling onto the 70%-opaque tail.
+ */
+:root[data-theme='light'][data-dir='rtl'] {
+  --scrim-angle: 260deg;
 }
 
 * {
@@ -122,7 +448,7 @@ a {
   top: 0;
   z-index: 40;
   height: var(--header-h);
-  background: color-mix(in srgb, var(--bg-deep) 92%, transparent);
+  background: var(--header-bg);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-soft);
 }
@@ -141,6 +467,75 @@ a {
   font-weight: 700;
   letter-spacing: 0.14em;
   font-size: 17px;
+  flex: none;
+  min-width: 0;
+}
+
+.oryx-brand__tagline {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+
+/* The tagline is decorative and is the first thing to go when space is tight;
+ * the logotype alone still identifies the site. */
+@media (max-width: 1400px) {
+  .oryx-brand__tagline {
+    display: none;
+  }
+}
+
+.oryx-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
+  flex: none;
+}
+
+/* Hidden on desktop. These must out-specify `.oryx-btn`'s `display: inline-flex`,
+ * which is declared later in this sheet, so the header context is included. */
+.oryx-header .oryx-menu-toggle {
+  display: none;
+}
+
+.oryx-mobile-nav {
+  position: absolute;
+  inset-inline: 0;
+  top: var(--header-h);
+  z-index: 45;
+  display: grid;
+  gap: 4px;
+  padding: 14px 20px 20px;
+  background: var(--bg-deep);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+}
+
+.oryx-mobile-nav a {
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 15px;
+  color: var(--text-muted);
+}
+
+.oryx-mobile-nav a[aria-current='page'],
+.oryx-mobile-nav a:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.oryx-mobile-nav__auth {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.oryx-mobile-nav__auth .oryx-btn {
+  flex: 1;
 }
 
 .oryx-brand-mark {
@@ -149,8 +544,8 @@ a {
   border-radius: 10px;
   display: grid;
   place-items: center;
-  background: linear-gradient(145deg, var(--gold-soft), var(--gold-deep));
-  color: var(--navy);
+  background: linear-gradient(145deg, var(--gold-fill-from), var(--gold-fill-to));
+  color: var(--on-gold);
   font-weight: 800;
   letter-spacing: 0;
   box-shadow: var(--shadow-card);
@@ -269,13 +664,13 @@ a {
 }
 
 .oryx-btn-primary {
-  background: linear-gradient(145deg, var(--gold-soft), var(--gold));
+  background: linear-gradient(145deg, var(--gold-fill-from), var(--gold-fill-to));
   border-color: transparent;
-  color: var(--navy);
+  color: var(--on-gold);
 }
 
 .oryx-btn-primary:hover:not(:disabled) {
-  background: linear-gradient(145deg, var(--gold), var(--gold-deep));
+  background: linear-gradient(145deg, var(--gold-fill-hover-from), var(--gold-fill-hover-to));
 }
 
 .oryx-btn-ghost {
@@ -283,7 +678,7 @@ a {
 }
 
 .oryx-btn-danger {
-  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  border-color: var(--status-line);
   color: var(--danger);
 }
 
@@ -291,8 +686,8 @@ a {
 .oryx-select,
 .oryx-textarea {
   width: 100%;
-  background: var(--bg-deep);
-  border: 1px solid var(--border-soft);
+  background: var(--field-bg);
+  border: 1px solid var(--field-border);
   border-radius: 10px;
   color: var(--text);
   padding: 10px 12px;
@@ -305,6 +700,12 @@ a {
 .oryx-textarea:focus {
   outline: none;
   border-color: var(--border-strong);
+  box-shadow: 0 0 0 3px var(--tint-focus);
+}
+
+.oryx-input::placeholder,
+.oryx-textarea::placeholder {
+  color: var(--text-faint);
 }
 
 .oryx-label {
@@ -333,33 +734,33 @@ a {
 
 .oryx-badge-success {
   color: var(--success);
-  border-color: color-mix(in srgb, var(--success) 40%, transparent);
+  border-color: var(--status-line);
 }
 .oryx-badge-warning {
   color: var(--warning);
-  border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+  border-color: var(--status-line);
 }
 .oryx-badge-danger {
   color: var(--danger);
-  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  border-color: var(--status-line);
 }
 .oryx-badge-info {
   color: var(--info);
-  border-color: color-mix(in srgb, var(--info) 40%, transparent);
+  border-color: var(--status-line);
 }
 
 .oryx-alert {
+  --status-color: var(--danger);
   border-radius: 12px;
   padding: 12px 14px;
   font-size: 14px;
-  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border: 1px solid var(--status-line);
+  background: var(--status-fill);
   color: var(--text);
 }
 
 .oryx-alert-success {
-  border-color: color-mix(in srgb, var(--success) 40%, transparent);
-  background: color-mix(in srgb, var(--success) 12%, transparent);
+  --status-color: var(--success);
 }
 
 .oryx-table {
@@ -406,7 +807,7 @@ a {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--gold) 22%, transparent), transparent 60%),
+    radial-gradient(120% 90% at 85% 0%, var(--tint-glow), transparent 60%),
     linear-gradient(160deg, var(--surface-raised), var(--bg-deep));
 }
 
@@ -422,10 +823,668 @@ a {
   padding: 56px 40px;
   border: 1px solid var(--border);
   background:
-    radial-gradient(90% 120% at 90% 10%, color-mix(in srgb, var(--gold) 20%, transparent), transparent 55%),
+    radial-gradient(90% 120% at 90% 10%, var(--tint-glow), transparent 55%),
     linear-gradient(150deg, var(--surface-raised), var(--bg-deep));
 }
 
+/* ------------------------------------------------------------ premium home */
+
+.oryx-home {
+  padding-bottom: 8px;
+}
+
+.oryx-hero--home {
+  min-height: 440px;
+  display: flex;
+  align-items: flex-end;
+  padding: 0;
+  border-color: var(--border-strong);
+}
+
+.oryx-hero__media {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.9;
+}
+
+.oryx-hero__scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--hero-scrim);
+}
+
+.oryx-hero__content {
+  position: relative;
+  z-index: 1;
+  padding: 56px 44px;
+  width: 100%;
+  max-width: 720px;
+}
+
+.oryx-eyebrow {
+  margin: 0 0 10px;
+  color: var(--band-accent);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/*
+ * The homepage hero eyebrow needs its own rule because `.oryx-hero p` is more
+ * specific than `.oryx-eyebrow`, so the eyebrow would otherwise inherit the
+ * lede's muted ink and 16px size instead of the gold accent. The ink, size and
+ * margin come from tokens so each theme states its value once: the light theme
+ * restores the gold accent, and the dark value reproduces the approved render.
+ * `letter-spacing` stays in `em` so it tracks whichever size is selected.
+ */
+.oryx-hero .oryx-eyebrow {
+  margin: var(--hero-eyebrow-margin);
+  color: var(--hero-eyebrow-ink);
+  font-size: var(--hero-eyebrow-size);
+}
+
+.oryx-hero__title {
+  margin: 0 0 14px;
+  font-size: clamp(28px, 4.4vw, 46px);
+  line-height: 1.14;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--band-text);
+}
+
+.oryx-hero__lede {
+  margin: 0 0 26px;
+  color: var(--band-text-muted);
+  font-size: clamp(14px, 1.5vw, 17px);
+  max-width: 60ch;
+}
+
+.oryx-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.oryx-btn-lg {
+  height: 46px;
+  padding: 0 22px;
+  font-size: 15px;
+  border-radius: 12px;
+}
+
+.oryx-stat-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 34px 0 0;
+  padding: 18px 0 0;
+  border-top: 1px solid var(--band-border);
+}
+
+.oryx-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.oryx-stat__label {
+  color: var(--band-text-faint);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.oryx-stat__value {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 750;
+  color: var(--band-text);
+}
+
+/* ------------------------------------------------------------- sections */
+
+.oryx-section {
+  margin-top: 64px;
+}
+
+.oryx-section-head {
+  margin-bottom: 22px;
+  max-width: 68ch;
+}
+
+.oryx-section-head--row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: none;
+  flex-wrap: wrap;
+}
+
+.oryx-section-head p {
+  margin: 6px 0 0;
+}
+
+.oryx-grid--cards {
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+}
+
+.oryx-section-cta {
+  margin-top: 22px;
+}
+
+.oryx-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--gold);
+  font-weight: 600;
+  font-size: 13.5px;
+  text-decoration: none;
+}
+.oryx-link:hover {
+  color: var(--gold-hover);
+}
+
+/* ------------------------------------------------- category cards (art) */
+
+.oryx-cat-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 236px;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  background: var(--surface-raised);
+  text-decoration: none;
+  color: var(--text);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.oryx-cat-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-card);
+}
+
+.oryx-cat-card__art {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.92;
+}
+
+.oryx-cat-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--card-scrim);
+}
+
+/*
+ * The caption sits on the scrim, not on the page surface. In light theme the
+ * scrim is ivory, so the type has to be the ink colour rather than the muted
+ * one, and the accent link needs the dark gold to stay legible.
+ */
+.oryx-cat-card__body {
+  position: relative;
+  z-index: 1;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text);
+}
+
+.oryx-cat-card__body strong {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.oryx-cat-card__desc {
+  font-size: var(--card-desc-size);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.oryx-cat-card__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--gold-on-tint);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+/* --------------------------------------------------------- dashboard */
+
+.oryx-dash-hero {
+  position: relative;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  min-height: 190px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+  /* The light theme lifts the banner onto the navy band so its white ink reads;
+   * the dark theme composites the artwork straight onto the page field. */
+  background: var(--dash-hero-bg);
+  color: var(--dash-hero-ink);
+}
+
+.oryx-dash-hero__art {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.85;
+}
+
+.oryx-dash-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--panel-scrim);
+}
+
+.oryx-dash-hero__body {
+  position: relative;
+  z-index: 1;
+  padding: 28px 30px;
+  width: 100%;
+}
+
+.oryx-dash-hero__title {
+  margin: 0 0 16px;
+  font-size: clamp(20px, 2.4vw, 27px);
+  font-weight: 800;
+}
+
+.oryx-dash-hero__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.oryx-grid--stats {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.oryx-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.oryx-kpi__icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--gold-on-tint);
+  background: var(--tint-fill);
+  border: 1px solid var(--tint-line);
+  margin-bottom: 2px;
+}
+
+.oryx-kpi__value {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 750;
+  line-height: 1.1;
+}
+
+/* ------------------------------------------------- service cards (/services) */
+
+.oryx-service-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.oryx-service-card__art {
+  display: block;
+  height: 150px;
+  background-size: cover;
+  background-position: center;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.oryx-service-card__body {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.oryx-service-card__desc {
+  margin: 0;
+  line-height: 1.6;
+  flex: 1;
+}
+
+.oryx-service-card__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+/* --------------------------------------------------------- feature cards */
+
+.oryx-feature {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.oryx-feature__icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--gold-on-tint);
+  background: var(--tint-fill);
+  border: 1px solid var(--tint-line);
+}
+
+.oryx-feature__body {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.oryx-feature--compact {
+  gap: 8px;
+}
+
+/* ------------------------------------------------------------- steps */
+
+.oryx-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  counter-reset: step;
+}
+
+.oryx-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 22px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+}
+
+.oryx-step__num {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  font-weight: 800;
+  color: var(--text-inverse);
+  background: linear-gradient(180deg, var(--gold-fill-from), var(--gold-fill-to));
+}
+
+.oryx-step__text {
+  margin: 4px 0 0;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+/* --------------------------------------------------------- provider card */
+
+.oryx-provider-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.oryx-provider-card__rating {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ------------------------------------------------------------ partner */
+
+.oryx-partner {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 0;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.oryx-partner__copy {
+  padding: 36px;
+}
+
+.oryx-partner__copy p {
+  margin: 8px 0 18px;
+  max-width: 56ch;
+}
+
+.oryx-partner__art {
+  position: relative;
+  min-height: 260px;
+}
+
+.oryx-partner__art-img {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+.oryx-checklist {
+  list-style: none;
+  margin: 0 0 22px;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.oryx-checklist li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.oryx-checklist svg {
+  color: var(--gold);
+  flex: none;
+}
+
+/* ---------------------------------------------------------------- faq */
+
+.oryx-faq {
+  display: grid;
+  gap: 10px;
+  max-width: 860px;
+}
+
+.oryx-faq__item {
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 4px 18px;
+}
+
+.oryx-faq__q {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 0;
+  cursor: pointer;
+  font-weight: 650;
+  font-size: 14.5px;
+  list-style: none;
+}
+
+.oryx-faq__q::-webkit-details-marker {
+  display: none;
+}
+
+.oryx-faq__q svg {
+  color: var(--gold);
+  transition: transform 0.18s ease;
+  flex: none;
+}
+
+.oryx-faq__item[open] .oryx-faq__q svg {
+  transform: rotate(180deg);
+}
+
+.oryx-faq__a {
+  margin: 0 0 16px;
+  line-height: 1.6;
+}
+
+/* ------------------------------------------------------------- contact */
+
+.oryx-contact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 32px 36px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(80% 140% at 100% 0%, var(--tint-glow), transparent 60%),
+    var(--surface);
+}
+
+.oryx-contact p {
+  margin: 6px 0 0;
+}
+
+/* -------------------------------------------------------------- footer */
+
+.oryx-footer {
+  margin-top: 72px;
+  border-top: 1px solid var(--border-soft);
+  background: var(--band-footer);
+  padding: 28px 0;
+  color: var(--band-text-faint);
+  font-size: 13px;
+}
+
+/* The footer is a navy band in both themes, so the lockup always uses the
+   light-on-navy colourway rather than following the page theme. */
+.oryx-footer .oryx-brand-logo__on-dark,
+:root[data-theme='light'] .oryx-footer .oryx-brand-logo__on-dark {
+  display: block;
+}
+
+.oryx-footer .oryx-brand-logo__on-light,
+:root[data-theme='light'] .oryx-footer .oryx-brand-logo__on-light {
+  display: none;
+}
+
+.oryx-footer__grid {
+  display: grid;
+  grid-template-columns: 1.4fr repeat(3, 1fr);
+  gap: 28px;
+}
+
+.oryx-footer__brand {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 34ch;
+}
+
+.oryx-footer__tagline {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.oryx-footer__col h3 {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--band-text-muted);
+  font-weight: 700;
+}
+
+.oryx-footer__col ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 9px;
+}
+
+.oryx-footer__col a {
+  color: var(--band-text-faint);
+  text-decoration: none;
+}
+
+.oryx-footer__col a:hover {
+  color: var(--band-accent);
+}
+
+.oryx-footer__bar {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--band-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+/* The footer bar sits on the navy band in the light theme while the page ink is
+   charcoal, so its controls take the band ink. In the dark theme the band equals
+   the page field, so these tokens resolve to the plain button colours and the
+   approved dark render is unchanged. */
+.oryx-footer .oryx-btn {
+  color: var(--footer-btn-ink);
+  border-color: var(--footer-btn-border);
+}
+
+.oryx-footer .oryx-btn:hover:not(:disabled) {
+  background: var(--footer-btn-hover-bg);
+  border-color: var(--footer-btn-hover-border);
+}
+
+/*
+ * These two rules are the legacy hero typography. They are intentionally more
+ * specific than `.oryx-hero__title` / `.oryx-hero__lede`, so they set the
+ * rendered size of the homepage hero. They must stay: removing them changes the
+ * approved dark render.
+ */
 .oryx-hero h1 {
   font-size: 38px;
   line-height: 1.2;
@@ -434,7 +1493,7 @@ a {
 }
 
 .oryx-hero p {
-  color: var(--text-muted);
+  color: var(--band-text-muted);
   max-width: 560px;
   margin: 0 0 24px;
   font-size: 16px;
@@ -459,13 +1518,6 @@ a {
   letter-spacing: 2px;
 }
 
-.oryx-footer {
-  border-top: 1px solid var(--border-soft);
-  padding: 28px 0;
-  color: var(--text-faint);
-  font-size: 13px;
-}
-
 .oryx-skip {
   position: absolute;
   inset-inline-start: -9999px;
@@ -484,10 +1536,906 @@ a {
   .oryx-nav {
     display: none;
   }
+  .oryx-header .oryx-menu-toggle {
+    display: inline-flex;
+  }
   .oryx-hero {
     padding: 36px 22px;
   }
   .oryx-hero h1 {
     font-size: 28px;
   }
+  .oryx-hero--home {
+    padding: 0;
+    min-height: 380px;
+  }
+  .oryx-hero__content {
+    padding: 36px 22px;
+  }
+  .oryx-stat-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .oryx-partner {
+    grid-template-columns: 1fr;
+  }
+  .oryx-partner__copy {
+    padding: 26px 22px;
+  }
+  .oryx-partner__art {
+    min-height: 200px;
+    order: -1;
+  }
+  .oryx-footer__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+  }
+  .oryx-section {
+    margin-top: 48px;
+  }
+  .oryx-contact {
+    padding: 26px 22px;
+  }
 }
+
+@media (max-width: 560px) {
+  .oryx-container {
+    padding: 0 16px;
+  }
+  .oryx-footer__grid {
+    grid-template-columns: 1fr;
+  }
+  .oryx-hero__actions {
+    width: 100%;
+  }
+  .oryx-hero__actions .oryx-btn {
+    flex: 1 1 auto;
+  }
+  /* The tagline and the sign-in shortcut both live in the mobile panel, so the
+   * bar keeps only the logo, the two toggles, the primary CTA and the menu. */
+  .oryx-brand__tagline,
+  .oryx-header-auth {
+    display: none;
+  }
+  .oryx-brand-logo {
+    height: 26px;
+  }
+  .oryx-header-inner {
+    gap: 8px;
+  }
+  .oryx-header-actions {
+    gap: 4px;
+  }
+  /* Compact controls: the header must fit four controls beside the logo on a
+   * 360px-wide phone without clipping the primary call to action. */
+  .oryx-header-actions .oryx-btn {
+    padding: 8px 10px;
+  }
+}
+
+/* ==================================================== Execution 07 Phase C
+ * Shared premium page furniture.
+ *
+ * These classes are what make every portal page read as one product: a
+ * consistent page header, one state panel for empty/error/success, a skeleton
+ * loader and a scroll-safe table shell.
+ */
+
+.oryx-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ------------------------------------------------------------- page header */
+
+.oryx-page-head {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--panel-bg);
+  color: var(--panel-ink);
+  margin-bottom: 22px;
+}
+
+.oryx-page-head__art {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.42;
+}
+
+.oryx-page-head::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--head-scrim);
+}
+
+.oryx-page-head__body {
+  position: relative;
+  z-index: 1;
+  padding: 26px 28px;
+}
+
+.oryx-page-head__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--panel-ink-muted);
+  margin-bottom: 10px;
+}
+
+.oryx-page-head__back:hover {
+  color: var(--band-accent);
+}
+
+/* The shared arrow glyph points along the reading direction, so the "back"
+   affordance has to be mirrored explicitly in RTL. */
+:root[data-dir='rtl'] .oryx-page-head__back svg {
+  transform: scaleX(-1);
+}
+
+.oryx-page-head__title {
+  margin: 0;
+  font-size: clamp(21px, 2.5vw, 29px);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.oryx-page-head__subtitle {
+  margin: 8px 0 0;
+  color: var(--panel-ink-muted);
+  max-width: 70ch;
+}
+
+.oryx-page-head__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+/* -------------------------------------------------------------- state panel */
+
+.oryx-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 42px 24px;
+  border: 1px dashed var(--border-soft);
+  border-radius: 16px;
+  background: var(--well-bg);
+}
+
+.oryx-state--compact {
+  padding: 22px 16px;
+}
+
+.oryx-state__icon {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: var(--gold-on-tint);
+  background: var(--tint-fill);
+  border: 1px solid var(--tint-line);
+}
+
+.oryx-state--error .oryx-state__icon {
+  color: var(--danger);
+  background: var(--status-fill);
+  border-color: var(--status-line);
+}
+
+.oryx-state--success .oryx-state__icon {
+  color: var(--success);
+  background: var(--status-fill);
+  border-color: var(--status-line);
+}
+
+.oryx-state__title {
+  margin: 4px 0 0;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.oryx-state__message {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  max-width: 46ch;
+}
+
+.oryx-state__action {
+  margin-top: 8px;
+}
+
+/* ---------------------------------------------------------------- loading */
+
+.oryx-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.oryx-skeleton {
+  display: block;
+  height: 14px;
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-from) 0%,
+    var(--skeleton-to) 50%,
+    var(--skeleton-from) 100%
+  );
+  background-size: 200% 100%;
+  animation: oryx-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes oryx-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oryx-skeleton {
+    animation: none;
+  }
+}
+
+/* ----------------------------------------------------------------- tables */
+
+.oryx-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.oryx-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.oryx-table tbody tr:hover {
+  background: var(--overlay-hover);
+}
+
+/* ------------------------------------------------------- layout + list shell */
+
+/* Two-panel layout that collapses to one column on narrow screens. */
+.oryx-split {
+  grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+  align-items: start;
+}
+
+@media (max-width: 1023px) {
+  .oryx-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.oryx-field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.oryx-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.oryx-list__item {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.oryx-list__item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.oryx-vehicle {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.oryx-vehicle__icon {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--gold-on-tint);
+  background: var(--tint-fill);
+  border: 1px solid var(--tint-line);
+}
+
+.oryx-vehicle__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.oryx-vehicle__name {
+  font-size: 15px;
+}
+
+.oryx-vehicle__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.oryx-vehicle__history {
+  margin-top: 14px;
+}
+
+/* --------------------------------------------------------------- booking */
+
+.oryx-booking {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.oryx-booking__when {
+  flex: 0 0 auto;
+  width: 76px;
+  text-align: center;
+  border-radius: 12px;
+  padding: 10px 6px;
+  background: var(--tint-wash);
+  border: 1px solid var(--tint-line);
+}
+
+.oryx-booking__day {
+  display: block;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.oryx-booking__month {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.oryx-booking__body {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.oryx-booking__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-weight: 700;
+}
+
+/* --------------------------------------------------------- notification */
+
+.oryx-notice {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.oryx-notice--unread {
+  background: var(--tint-wash);
+}
+
+.oryx-notice__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  margin-top: 7px;
+  background: var(--gold);
+}
+
+.oryx-notice__dot--read {
+  background: var(--dot-muted);
+}
+
+.oryx-notice__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.oryx-notice__title {
+  font-weight: 650;
+}
+
+.oryx-notice__title--read {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.oryx-notice__meta {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-top: 4px;
+}
+
+/* ------------------------------------------------------------ invoice card */
+
+.oryx-invoice-summary {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.oryx-invoice-summary__item {
+  flex: 1 1 150px;
+  border-radius: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-soft);
+  background: var(--tint-panel);
+}
+
+.oryx-invoice-summary__label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.oryx-invoice-summary__value {
+  display: block;
+  font-size: 22px;
+  font-weight: 750;
+  margin-top: 4px;
+}
+
+.oryx-mono {
+  font-family: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+
+.oryx-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 10px;
+}
+
+.oryx-slot {
+  padding: 12px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.oryx-slot:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.oryx-slot--active {
+  border-color: var(--gold-on-tint);
+  background: var(--tint-active);
+  color: var(--text);
+  box-shadow: 0 0 0 1px var(--tint-ring);
+}
+
+.oryx-address {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-soft);
+  flex-wrap: wrap;
+}
+
+.oryx-address:last-child {
+  border-bottom: 0;
+}
+
+.oryx-address__icon {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--gold-on-tint);
+  background: var(--tint-fill);
+  border: 1px solid var(--tint-line);
+}
+
+.oryx-address__body {
+  flex: 1;
+  min-width: 140px;
+}
+
+/* Preferences / privacy checklist rows. */
+.oryx-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border-soft);
+  cursor: pointer;
+}
+
+.oryx-check:last-of-type {
+  border-bottom: 0;
+}
+
+.oryx-check input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+
+.oryx-mt {
+  margin-top: 20px;
+}
+
+.oryx-provider-rating {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--border-soft);
+  background: var(--tint-panel);
+  margin-bottom: 20px;
+}
+
+.oryx-hours {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.oryx-hours:last-child {
+  border-bottom: 0;
+}
+
+/* Provider directory card. */
+.oryx-provider-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.oryx-provider-card__mark {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--gold-on-tint);
+  background: var(--tint-fill);
+  border: 1px solid var(--tint-line);
+  font-weight: 800;
+}
+
+.oryx-provider-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0 14px;
+}
+
+.oryx-container--narrow {
+  max-width: 660px;
+}
+
+/* Multi-select choice tiles (provider categories). */
+.oryx-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.oryx-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  background: var(--surface-raised);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.oryx-choice:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.oryx-choice--on {
+  border-color: var(--gold-on-tint);
+  background: var(--tint-active);
+  box-shadow: 0 0 0 1px var(--tint-ring);
+}
+
+.oryx-choice input[type='checkbox'] {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------- auth shell */
+.oryx-auth {
+  position: relative;
+  min-height: calc(100vh - 160px);
+  display: grid;
+  place-items: center;
+  padding: 40px 18px;
+  overflow: hidden;
+}
+
+.oryx-auth__glow {
+  position: absolute;
+  inset: -20% 30% 40%;
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    var(--tint-fill),
+    transparent 70%
+  );
+  pointer-events: none;
+}
+
+.oryx-auth__card {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  padding: 34px 30px 30px;
+  border-radius: 20px;
+  border: 1px solid var(--border-soft);
+  background: linear-gradient(
+    180deg,
+    var(--auth-sheen),
+    var(--surface-raised)
+  );
+  box-shadow: var(--shadow-panel);
+}
+
+.oryx-auth__mark {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--tint-badge-line);
+  background: var(--tint-fill);
+  color: var(--gold-on-tint);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  margin-bottom: 16px;
+}
+
+.oryx-auth__title {
+  margin: 0 0 6px;
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+.oryx-auth__subtitle {
+  margin: 0 0 22px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.oryx-auth__aside {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+
+.oryx-auth .oryx-btn-primary {
+  width: 100%;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+@media (max-width: 560px) {
+  .oryx-auth__card {
+    padding: 26px 20px 22px;
+  }
+  .oryx-auth__title {
+    font-size: 21px;
+  }
+}
+
+/* ---------------------------------------------------------- preview strip
+ *
+ * Marks the static GitHub Pages export. It sits at the top of the header so the
+ * preview can never be mistaken for the live platform, and it renders only when
+ * ORYX_STATIC_EXPORT is set.
+ *
+ * It is a navy band in both themes, so its ink and its gold come from the band
+ * tokens rather than the page tokens. Using the page gold here was a real
+ * defect: `--gold` is tuned to read on ivory (4.9:1), and on the navy band it
+ * falls to 3.2:1.
+ */
+.oryx-preview-strip {
+  background: var(--band);
+  border-bottom: 1px solid var(--band-accent);
+  color: var(--band-text);
+}
+
+.oryx-preview-strip__inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.oryx-preview-strip__badge {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--band-accent);
+  color: var(--band-accent);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.oryx-preview-strip__text {
+  color: var(--band-text);
+  opacity: 0.88;
+}
+
+@media (max-width: 640px) {
+  .oryx-preview-strip__inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 9px 0;
+  }
+}
+
+/* ------------------------------------------------------------- credits */
+
+.oryx-credits__intro {
+  margin-bottom: 22px;
+}
+
+.oryx-credits__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.oryx-credit {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.oryx-credit img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--surface-hover);
+}
+
+.oryx-credit figcaption {
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.oryx-credit__caption {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.oryx-credit__byline {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.oryx-credit__licence {
+  margin: 0;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+}
+
+.oryx-credit__licence a {
+  color: var(--gold);
+  text-decoration: none;
+}
+
+.oryx-credit__licence a:hover {
+  text-decoration: underline;
+}
+
+/* ------------------------------------------------------------- not found */
+
+/* Centres the 404 panel in the main column so the page reads as a designed dead
+ * end rather than a bare sentence at the top of the viewport. */
+.oryx-not-found {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+}
+
+.oryx-not-found .oryx-state {
+  max-width: 520px;
+}
+
+.oryx-not-found__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+

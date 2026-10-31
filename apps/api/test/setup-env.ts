@@ -15,3 +15,7 @@ process.env.REFRESH_THROTTLE_LIMIT = '100000';
 // Required so the MFA secret cipher can be constructed at boot.
 process.env.MFA_ENCRYPTION_KEY =
   process.env.MFA_ENCRYPTION_KEY ?? 'test-mfa-encryption-key-min-32-characters-xyz';
+
+// Media uploads must never touch the development media root, or a test run
+// would leave stray files behind (and could delete a real image).
+process.env.MEDIA_ROOT = process.env.MEDIA_ROOT ?? '/tmp/oryx-media-test';

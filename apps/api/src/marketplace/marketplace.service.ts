@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { basisPointsOfMinor, currencyScale } from '@oryx/shared';
+import { basisPointsOfMinor, currencyScale, DEFAULT_COUNTRY_CODE, DEFAULT_CURRENCY } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import {
@@ -84,7 +84,7 @@ export class MarketplaceService {
         contactPhone: input.contactPhone.trim(),
         registrationNumber: input.registrationNumber ?? null,
         taxNumber: input.taxNumber ?? null,
-        countryCode: (input.countryCode ?? 'BH').toUpperCase(),
+        countryCode: (input.countryCode ?? DEFAULT_COUNTRY_CODE).toUpperCase(),
         city: input.city ?? null,
         addressLine: input.addressLine ?? null,
         categoryKeys: input.categoryKeys ?? [],
@@ -415,7 +415,7 @@ export class MarketplaceService {
         nameAr: input.nameAr.trim(),
         description: input.description ?? null,
         priceMinor: input.priceMinor,
-        currency: input.currency ?? 'BHD',
+        currency: input.currency ?? DEFAULT_CURRENCY,
       },
     });
   }
@@ -448,6 +448,118 @@ export class MarketplaceService {
     }
     if (Object.keys(data).length === 0) return listing;
     return this.prisma.providerServiceListing.update({ where: { id: listingId }, data });
+  }
+
+  // ------------------------------------------------------------------ offers
+
+  /**
+   * A provider's promotional offers.
+   *
+   * Scoped by `providerId`, which the controller resolves from the caller's
+   * `ProviderUser` membership, so a provider user can only ever read its own.
+   */
+  async listOffers(providerId: string, includeInactive = false) {
+    return this.prisma.providerOffer.findMany({
+      where: { providerId, ...(includeInactive ? {} : { isActive: true }) },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async createOffer(
+    providerId: string,
+    input: {
+      titleEn: string;
+      titleAr: string;
+      description?: string;
+      categoryKey?: string;
+      percentOffBp: number;
+      startsAt?: string;
+      endsAt?: string;
+    },
+  ) {
+    if (input.percentOffBp < 0 || input.percentOffBp > 10_000) {
+      throw badRequest(
+        ERROR_CODES.VALIDATION_FAILED,
+        'A discount must be between 0% and 100% (0–10000 basis points).',
+      );
+    }
+    const startsAt = input.startsAt ? new Date(input.startsAt) : null;
+    const endsAt = input.endsAt ? new Date(input.endsAt) : null;
+    if (startsAt && endsAt && endsAt <= startsAt) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'The offer must end after it starts.');
+    }
+    return this.prisma.providerOffer.create({
+      data: {
+        providerId,
+        titleEn: input.titleEn.trim(),
+        titleAr: input.titleAr.trim(),
+        description: input.description?.trim() || null,
+        categoryKey: input.categoryKey?.trim() || null,
+        percentOffBp: input.percentOffBp,
+        startsAt,
+        endsAt,
+      },
+    });
+  }
+
+  async updateOffer(
+    providerId: string,
+    offerId: string,
+    input: {
+      titleEn?: string;
+      titleAr?: string;
+      description?: string;
+      categoryKey?: string;
+      percentOffBp?: number;
+      isActive?: boolean;
+      startsAt?: string | null;
+      endsAt?: string | null;
+    },
+  ) {
+    const offer = await this.prisma.providerOffer.findFirst({ where: { id: offerId, providerId } });
+    if (!offer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Offer not found.');
+    if (input.percentOffBp !== undefined && (input.percentOffBp < 0 || input.percentOffBp > 10_000)) {
+      throw badRequest(
+        ERROR_CODES.VALIDATION_FAILED,
+        'A discount must be between 0% and 100% (0–10000 basis points).',
+      );
+    }
+
+    const data: Record<string, unknown> = {};
+    for (const key of ['titleEn', 'titleAr', 'description', 'categoryKey', 'isActive'] as const) {
+      if (input[key] !== undefined) data[key] = input[key];
+    }
+    if (input.percentOffBp !== undefined) data.percentOffBp = input.percentOffBp;
+    if (input.startsAt !== undefined) data.startsAt = input.startsAt ? new Date(input.startsAt) : null;
+    if (input.endsAt !== undefined) data.endsAt = input.endsAt ? new Date(input.endsAt) : null;
+    if (Object.keys(data).length === 0) return offer;
+    return this.prisma.providerOffer.update({ where: { id: offerId }, data });
+  }
+
+  /**
+   * The offers a customer may see right now.
+   *
+   * Only active offers from approved providers, and only inside their window:
+   * an offer with no window is always valid, one whose window has passed is not
+   * returned. This is the query behind the customer "special offers" rail, so
+   * the filter lives here rather than in the client.
+   */
+  async listPublicOffers(params: { categoryKey?: string; limit?: number } = {}) {
+    const now = new Date();
+    return this.prisma.providerOffer.findMany({
+      where: {
+        isActive: true,
+        provider: { status: 'APPROVED' },
+        ...(params.categoryKey ? { categoryKey: params.categoryKey } : {}),
+        AND: [
+          { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+          { OR: [{ endsAt: null }, { endsAt: { gte: now } }] },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(50, Math.max(1, params.limit ?? 20)),
+      include: { provider: { select: { id: true, code: true, nameEn: true, nameAr: true } } },
+    });
   }
 
   // ------------------------------------------------------------- availability
@@ -770,7 +882,7 @@ export class MarketplaceService {
       where: { id: providerId },
     });
 
-    const currency = input.currency ?? 'BHD';
+    const currency = input.currency ?? DEFAULT_CURRENCY;
     const commissionMinor = basisPointsOfMinor(input.finalAmountMinor, provider.commissionPercentBp);
 
     return this.prisma.$transaction(async (tx) => {
@@ -1198,7 +1310,7 @@ export class MarketplaceService {
     const grossMinor = commissions.reduce((sum, row) => sum + row.baseMinor, 0);
     const commissionMinor = commissions.reduce((sum, row) => sum + row.commissionMinor, 0);
     const netMinor = grossMinor - commissionMinor;
-    const currency = commissions[0]?.currency ?? 'BHD';
+    const currency = commissions[0]?.currency ?? DEFAULT_CURRENCY;
 
     return this.prisma.$transaction(async (tx) => {
       const settlement = await tx.providerSettlement.create({

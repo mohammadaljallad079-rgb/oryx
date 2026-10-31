@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { DEFAULT_COUNTRY_CODE } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { TenantCompanyService } from '../common/tenant-company.service';
@@ -74,7 +75,7 @@ export class CustomerProfileService {
           addressLine2: input.addressLine2 ?? null,
           city: input.city,
           area: input.area ?? null,
-          countryCode: (input.countryCode ?? 'BH').toUpperCase(),
+          countryCode: (input.countryCode ?? DEFAULT_COUNTRY_CODE).toUpperCase(),
           postalCode: input.postalCode ?? null,
           latitude: input.latitude ?? null,
           longitude: input.longitude ?? null,

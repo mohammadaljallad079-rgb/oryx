@@ -1,0 +1,220 @@
+name: Mobile APK
+
+# Builds the ORYX Marketplace Android APK from a chosen commit and publishes it
+# as a workflow artifact.
+#
+# This is a **manual only** workflow. It does not run on a push: an APK is a
+# review hand-out, not a release, and the owner asked for the file to be tied to
+# a named commit rather than to whatever the branch happened to be at. The
+# operator dispatches it, reads the commit and the SHA-256 out of the run
+# summary, and downloads the artifact.
+#
+# The build is **debug-signed** by the Expo template's `release` build type. It
+# installs with "unknown sources" enabled and is not a store artefact. No signing
+# material is committed and no secret is required, so the workflow is safe for a
+# fork pull request.
+#
+# See docs/audit/exec07/11_APK_BUILD_AND_DESIGN_RECOVERY.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Commit, branch or tag to build (defaults to the dispatched ref)'
+        required: false
+        type: string
+
+  # GitHub only offers a `workflow_dispatch` workflow in the Actions UI once it
+  # exists on the default branch, so a dispatch from this feature branch would
+  # not be reachable until the branch merges. A path-scoped push trigger is what
+  # makes the build runnable now. It fires only when the app, the shared package
+  # it resolves from, or this file changes — not on a docs or evidence commit —
+  # so an APK is still tied to a mobile change and to the exact commit that
+  # carried it.
+  push:
+    branches: [main, feature/execution-07-premium-web]
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/shared/**'
+      - '.github/workflows/mobile-apk.yml'
+
+# Least privilege: the workflow reads the repository and writes an artifact.
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '9.15.9'
+  JAVA_VERSION: '17'
+
+concurrency:
+  group: mobile-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-apk:
+    name: Build the debug-signed release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      # GitHub rejects an invalid workflow file at the *workflow* level: the run
+      # appears with zero jobs and a failure, which is easy to misread as a build
+      # failure. Lint every workflow first so that cannot happen. The checkout
+      # has to come first — actionlint reads the files from the working tree, and
+      # a container action gets no repository until it is checked out.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Validate workflow files
+        uses: docker://rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: -color
+
+      # Record the exact commit so the artifact can be tied to it. A short SHA is
+      # what goes in the artifact name; the full SHA is written to the summary.
+      - name: Resolve the commit
+        id: commit
+        run: |
+          {
+            echo "sha=$(git rev-parse HEAD)"
+            echo "short=$(git rev-parse --short HEAD)"
+            echo "subject=$(git log -1 --pretty=%s)"
+            echo "date=$(git log -1 --pretty=%cI)"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      # The runner image already ships the Android SDK, so the setup-android
+      # action is not used: its default step installs the legacy `tools` package,
+      # which the SDK repository no longer publishes, and it fails on every run.
+      #
+      # Instead the licences are accepted and AGP is left to download the exact
+      # platform, build-tools and NDK the project asks for. No SDK version is
+      # hard-coded here, so it cannot drift from the one `expo prebuild` generates.
+      - name: Point Gradle at the Android SDK
+        run: |
+          SDK="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          {
+            echo "ANDROID_HOME=$SDK"
+            echo "ANDROID_SDK_ROOT=$SDK"
+          } >> "$GITHUB_ENV"
+          SDKMGR="$(find "$SDK/cmdline-tools" -name sdkmanager -type f 2>/dev/null | sort | tail -1)"
+          if [ -z "$SDKMGR" ]; then
+            echo "::error::sdkmanager not found under $SDK/cmdline-tools"
+            exit 1
+          fi
+          yes | "$SDKMGR" --licenses > /dev/null 2>&1 || true
+          echo "licences accepted; ANDROID_HOME=$SDK"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The app resolves @oryx/shared from its compiled dist, so the package has
+      # to be built before Metro runs or the bundle fails on a missing module.
+      - name: Build the shared package
+        run: pnpm --filter @oryx/shared build
+
+      - name: Typecheck, lint and test the mobile app
+        run: |
+          pnpm --filter @oryx/mobile typecheck
+          pnpm --filter @oryx/mobile lint
+          pnpm --filter @oryx/mobile test
+
+      # `expo prebuild` generates the native `android/` project from app.config.ts.
+      # It is gitignored — it is build output, not source — so it is generated here.
+      - name: Generate the native Android project
+        working-directory: apps/mobile
+        run: pnpm exec expo prebuild --platform android --no-install
+
+      # The first run downloads the Gradle distribution, the Android Gradle Plugin
+      # and — on this image — the platform, build-tools and NDK the project asks
+      # for, so it is given room rather than the default ten-minute ceiling.
+      - name: Build the release APK
+        working-directory: apps/mobile/android
+        timeout-minutes: 45
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Locate the APK
+        id: apk
+        working-directory: apps/mobile
+        run: |
+          APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -1)"
+          if [ -z "$APK" ]; then
+            echo "::error::no APK was produced"
+            exit 1
+          fi
+          {
+            echo "path=$APK"
+            echo "bytes=$(stat -c%s "$APK")"
+          } >> "$GITHUB_OUTPUT"
+
+      # The SHA-256 and the size are the two values the hand-out records, so they
+      # are computed here rather than by hand after a download.
+      - name: Hash the APK
+        id: hash
+        working-directory: apps/mobile
+        run: |
+          SHA="$(sha256sum "${{ steps.apk.outputs.path }}" | cut -d' ' -f1)"
+          {
+            echo "sha256=$SHA"
+          } >> "$GITHUB_OUTPUT"
+          echo "$SHA  oryx-marketplace.apk" > "${{ github.workspace }}/oryx-marketplace.apk.sha256"
+
+      # A self-contained bundle check: the demo must not reach a host. Any of
+      # these literals in the bundled JS would mean the app expects a backend.
+      - name: Assert the bundle is self-contained
+        working-directory: apps/mobile
+        run: |
+          set -e
+          BUNDLE="$(find android/app/build -name 'index.android.bundle' | head -1)"
+          if [ -z "$BUNDLE" ]; then
+            echo "::warning::no index.android.bundle found; skipping the self-contained check"
+            exit 0
+          fi
+          for needle in 'localhost:3001' '10.0.2.2' 'http://127.0.0.1:3001'; do
+            if grep -qF "$needle" "$BUNDLE"; then
+              echo "::error::the bundle references $needle; the demo is not offline"
+              exit 1
+            fi
+          done
+          echo "bundle is self-contained"
+
+      - name: Write the run summary
+        run: |
+          {
+            echo "## ORYX Marketplace APK"
+            echo
+            echo "| Item | Value |"
+            echo "| --- | --- |"
+            echo "| Commit | \`${{ steps.commit.outputs.sha }}\` |"
+            echo "| Commit subject | ${{ steps.commit.outputs.subject }} |"
+            echo "| Committed at | ${{ steps.commit.outputs.date }} |"
+            echo "| APK size | ${{ steps.apk.outputs.bytes }} bytes |"
+            echo "| SHA-256 | \`${{ steps.hash.outputs.sha256 }}\` |"
+            echo
+            echo "Debug-signed review build. Install with \"unknown sources\" enabled."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: oryx-marketplace-${{ steps.commit.outputs.short }}
+          path: |
+            apps/mobile/${{ steps.apk.outputs.path }}
+            oryx-marketplace.apk.sha256
+          retention-days: 90

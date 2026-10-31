@@ -348,6 +348,7 @@ export async function cleanupFixtures(prisma: PrismaService): Promise<void> {
   await prisma.providerSettlement.deleteMany({ where: { provider: { OR: [{ providerCompanyId: { in: ids } }, { code: { startsWith: FIXTURE_PREFIX } }] } } });
   await prisma.marketplaceCommission.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.serviceRequest.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.providerOffer.deleteMany({ where: { provider: { OR: [{ providerCompanyId: { in: ids } }, { code: { startsWith: FIXTURE_PREFIX } }] } } });
   await prisma.providerServiceListing.deleteMany({ where: { provider: { OR: [{ providerCompanyId: { in: ids } }, { code: { startsWith: FIXTURE_PREFIX } }] } } });
   await prisma.marketplaceProvider.deleteMany({ where: { OR: [{ providerCompanyId: { in: ids } }, { code: { startsWith: FIXTURE_PREFIX } }] } });
   await prisma.warrantyRecord.deleteMany({ where: { companyId: { in: ids } } });
@@ -416,6 +417,9 @@ export async function cleanupFixtures(prisma: PrismaService): Promise<void> {
     where: { provider: { code: { startsWith: FIXTURE_PREFIX } } },
   });
   await prisma.providerAvailability.deleteMany({
+    where: { provider: { code: { startsWith: FIXTURE_PREFIX } } },
+  });
+  await prisma.providerOffer.deleteMany({
     where: { provider: { code: { startsWith: FIXTURE_PREFIX } } },
   });
   await prisma.providerServiceListing.deleteMany({

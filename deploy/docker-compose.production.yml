@@ -1,0 +1,157 @@
+# ORYX — single-server production stack.
+#
+# Four long-running services plus a one-shot migration job:
+#
+#   postgres   PostgreSQL 16, data on a named volume
+#   migrate    applies pending migrations, then exits 0
+#   api        NestJS API on the internal network only
+#   admin      admin control plane on the internal network only
+#   customer   customer website on the internal network only
+#   edge       nginx: the only service that publishes ports (80/443)
+#
+# Only `edge` is reachable from outside. The API, admin and customer ports are
+# not published, so a misconfigured firewall cannot expose them directly.
+#
+# Usage:
+#   cp deploy/env/production.env.example .env.production
+#   # edit .env.production, then:
+#   docker compose -f deploy/docker-compose.production.yml --env-file .env.production up -d --build
+#
+# See docs/DEPLOYMENT.md for the full runbook.
+
+name: oryx
+
+services:
+  postgres:
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
+      # Deterministic collation, so index ordering matches a restore target.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks: [oryx-internal]
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.api
+      # The migration job needs the Prisma CLI, which is a devDependency and so
+      # is absent from the runtime image. The `migrator` stage keeps it.
+      target: migrator
+    image: oryx-migrator:${ORYX_IMAGE_TAG:-latest}
+    # One-shot: apply migrations, then exit. `restart: "no"` keeps a failed
+    # migration from looping and masking the error.
+    restart: "no"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [oryx-internal]
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.api
+    image: oryx-api:${ORYX_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    # Path is relative to this file's directory. It defaults to the production
+    # env so the documented production command is unchanged, but a staging stack
+    # sets ORYX_API_ENV_FILE in its own --env-file so the API container does not
+    # inherit the production secrets. Without this, `--env-file .env.staging`
+    # only interpolates ${...} in this file; the container would still be handed
+    # every key in .env.production.
+    env_file:
+      - "${ORYX_API_ENV_FILE:-../.env.production}"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      MEDIA_ROOT: /data/media
+    volumes:
+      - media-data:/data/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks: [oryx-internal]
+
+  admin:
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.admin
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?set NEXT_PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_DEFAULT_LOCALE: ${NEXT_PUBLIC_DEFAULT_LOCALE:-ar}
+        NEXT_PUBLIC_DEFAULT_THEME: ${NEXT_PUBLIC_DEFAULT_THEME:-light}
+    image: oryx-admin:${ORYX_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    depends_on:
+      api:
+        condition: service_started
+    networks: [oryx-internal]
+
+  customer:
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.customer
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?set NEXT_PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_DEFAULT_LOCALE: ${NEXT_PUBLIC_DEFAULT_LOCALE:-ar}
+        NEXT_PUBLIC_DEFAULT_THEME: ${NEXT_PUBLIC_DEFAULT_THEME:-light}
+    image: oryx-customer:${ORYX_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3002"
+    depends_on:
+      api:
+        condition: service_started
+    networks: [oryx-internal]
+
+  edge:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "${EDGE_HTTP_PORT:-80}:80"
+      - "${EDGE_HTTPS_PORT:-443}:443"
+    environment:
+      # Only these two variables are substituted into the template. nginx's own
+      # `$host`, `$request_uri` and `$http_upgrade` are left untouched, which is
+      # why the list is explicit rather than "substitute everything".
+      ORYX_ADMIN_HOST: ${ORYX_ADMIN_HOST:?set ORYX_ADMIN_HOST}
+      ORYX_CUSTOMER_HOST: ${ORYX_CUSTOMER_HOST:?set ORYX_CUSTOMER_HOST}
+      NGINX_ENVSUBST_OUTPUT_DIR: /etc/nginx/conf.d
+      NGINX_ENVSUBST_FILTER: "^ORYX_"
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./nginx/snippets:/etc/nginx/snippets:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - api
+      - admin
+      - customer
+    networks: [oryx-internal]
+
+volumes:
+  postgres-data:
+  media-data:
+
+networks:
+  oryx-internal:
+    driver: bridge

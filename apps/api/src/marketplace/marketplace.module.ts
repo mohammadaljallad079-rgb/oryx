@@ -8,9 +8,18 @@ import {
 } from './marketplace-public.controller';
 import { CustomerMarketplaceController } from './customer-marketplace.controller';
 import { ProviderPortalController } from './provider-portal.controller';
+import { CustomerHomepageController } from './customer-homepage.controller';
+import { CustomerHomepageService } from './customer-homepage.service';
+import { CustomerCartController } from './customer-cart.controller';
+import { CustomerCartService } from './customer-cart.service';
+import { CustomerOrderController } from './customer-order.controller';
+import { CustomerOrderService } from './customer-order.service';
+import { CustomerCatalogController } from './customer-catalog.controller';
+import { CustomerCatalogService } from './customer-catalog.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { CustomerModule } from '../customer/customer.module';
 import { ErpCommonModule } from '../common/erp-common.module';
+import { InventoryModule } from '../inventory/inventory.module';
 
 /**
  * The automotive marketplace and provider portal.
@@ -25,6 +34,7 @@ import { ErpCommonModule } from '../common/erp-common.module';
     NotificationsModule,
     CustomerModule,
     ErpCommonModule,
+    InventoryModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -39,8 +49,24 @@ import { ErpCommonModule } from '../common/erp-common.module';
     MarketplaceAdminController,
     CustomerMarketplaceController,
     ProviderPortalController,
+    CustomerHomepageController,
+    CustomerCartController,
+    CustomerOrderController,
+    CustomerCatalogController,
   ],
-  providers: [MarketplaceService],
-  exports: [MarketplaceService],
+  providers: [
+    MarketplaceService,
+    CustomerHomepageService,
+    CustomerCartService,
+    CustomerOrderService,
+    CustomerCatalogService,
+  ],
+  exports: [
+    MarketplaceService,
+    CustomerHomepageService,
+    CustomerCartService,
+    CustomerOrderService,
+    CustomerCatalogService,
+  ],
 })
 export class MarketplaceModule {}

@@ -16,15 +16,20 @@ import { PrincipalGuard } from '../auth/principal.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { CurrentPrincipal, type RequestPrincipal } from '../auth/auth.decorators';
 import { MarketplaceService } from './marketplace.service';
+import { CustomerOrderService } from './customer-order.service';
+import { ERROR_CODES, notFound } from '../common/errors';
 import {
   CancelRequestDto,
   CompleteServiceRequestDto,
   DeclineRequestDto,
   DisputeMessageDto,
+  OrderStatusDto,
   ProviderListingDto,
+  ProviderOfferDto,
   ReviewReplyDto,
   SetAvailabilityDto,
   UpdateProviderListingDto,
+  UpdateProviderOfferDto,
   UpdateProviderProfileDto,
 } from './marketplace.dto';
 
@@ -48,7 +53,10 @@ import {
 @Controller('provider')
 @UseGuards(PrincipalGuard, PermissionsGuard)
 export class ProviderPortalController {
-  constructor(private readonly marketplace: MarketplaceService) {}
+  constructor(
+    private readonly marketplace: MarketplaceService,
+    private readonly orders: CustomerOrderService,
+  ) {}
 
   /** Resolve and authorise the provider this request acts for. */
   private async provider(principal: RequestPrincipal, claimedId?: string) {
@@ -108,6 +116,39 @@ export class ProviderPortalController {
   ) {
     const provider = await this.provider(principal);
     return this.marketplace.updateListing(provider.id, id, dto);
+  }
+
+  // ---------------------------------------------------------------- offers
+
+  @Get('offers')
+  @RequirePermissions('erp.provider_portal.manage')
+  @ApiOperation({ summary: 'List the provider promotional offers' })
+  async listOffers(
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Query('includeInactive') includeInactive?: string,
+  ) {
+    const provider = await this.provider(principal);
+    return this.marketplace.listOffers(provider.id, includeInactive === 'true');
+  }
+
+  @Post('offers')
+  @RequirePermissions('erp.provider_portal.manage')
+  @ApiOperation({ summary: 'Publish a promotional offer' })
+  async createOffer(@CurrentPrincipal() principal: RequestPrincipal, @Body() dto: ProviderOfferDto) {
+    const provider = await this.provider(principal);
+    return this.marketplace.createOffer(provider.id, dto);
+  }
+
+  @Patch('offers/:id')
+  @RequirePermissions('erp.provider_portal.manage')
+  @ApiOperation({ summary: 'Update or withdraw a promotional offer' })
+  async updateOffer(
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Param('id') id: string,
+    @Body() dto: UpdateProviderOfferDto,
+  ) {
+    const provider = await this.provider(principal);
+    return this.marketplace.updateOffer(provider.id, id, dto);
   }
 
   // ------------------------------------------------------------ availability
@@ -291,6 +332,59 @@ export class ProviderPortalController {
       body: dto.body,
       // A provider can never post a platform-internal note.
       isInternal: false,
+    });
+  }
+
+  // ----------------------------------------------------------------- orders
+
+  /**
+   * Consumer orders placed against the provider's own catalogue.
+   *
+   * The company is resolved from the provider's membership, so a merchant sees
+   * only orders for its own tenant. A merchant with no linked company sees an
+   * empty list rather than every order on the platform.
+   */
+  @Get('orders')
+  @RequirePermissions('erp.provider_portal.manage')
+  @ApiOperation({ summary: 'List consumer orders for the provider company' })
+  async listOrders(
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Query('page') page = '1',
+    @Query('pageSize') pageSize = '20',
+    @Query('status') status?: string,
+  ) {
+    const provider = await this.provider(principal);
+    if (!provider.providerCompanyId) {
+      return { items: [], total: 0, page: 1, pageSize: 20 };
+    }
+    return this.orders.listForCompany(provider.providerCompanyId, {
+      page: Math.max(1, Number(page) || 1),
+      pageSize: Math.min(50, Math.max(1, Number(pageSize) || 20)),
+      status,
+    });
+  }
+
+  @Get('orders/:id')
+  @RequirePermissions('erp.provider_portal.manage')
+  @ApiOperation({ summary: 'Read one consumer order for the provider company' })
+  async order(@CurrentPrincipal() principal: RequestPrincipal, @Param('id') id: string) {
+    const provider = await this.provider(principal);
+    if (!provider.providerCompanyId) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Order not found.');
+    return this.orders.getForCompany(provider.providerCompanyId, id);
+  }
+
+  @Post('orders/:id/status')
+  @RequirePermissions('erp.provider_portal.manage')
+  @ApiOperation({ summary: 'Advance a consumer order through its status machine' })
+  async setOrderStatus(
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Param('id') id: string,
+    @Body() dto: OrderStatusDto,
+  ) {
+    const provider = await this.provider(principal);
+    if (!provider.providerCompanyId) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Order not found.');
+    return this.orders.transition(id, dto.status, 'MERCHANT', dto.note ?? null, {
+      companyId: provider.providerCompanyId,
     });
   }
 }

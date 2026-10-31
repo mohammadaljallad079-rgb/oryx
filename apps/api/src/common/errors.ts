@@ -128,4 +128,16 @@ export const ERROR_CODES = {
   SETTLEMENT_STATE: 'marketplace.settlement_invalid_state',
   PAYMENT_STATE: 'payment.invalid_state',
   NOTIFICATION_CHANNEL_UNAVAILABLE: 'notification.channel_unavailable',
+
+  // ------------------------------------------------------------ Execution 07
+  MEDIA_TYPE_NOT_ALLOWED: 'media.type_not_allowed',
+  MEDIA_TOO_LARGE: 'media.too_large',
+  MEDIA_DIMENSIONS_INVALID: 'media.dimensions_invalid',
+  MEDIA_NOT_FOUND: 'media.not_found',
+  MEDIA_IN_USE: 'media.in_use',
+  MEDIA_STORAGE_UNAVAILABLE: 'media.storage_unavailable',
+  CONTENT_BLOCK_NOT_FOUND: 'cms.content_block_not_found',
+  CONTENT_REVISION_NOT_FOUND: 'cms.content_revision_not_found',
+  MEDIA_ASSET_NOT_FOUND: 'cms.media_asset_not_found',
+  SERVICE_CATEGORY_NOT_FOUND: 'cms.service_category_not_found',
 } as const;

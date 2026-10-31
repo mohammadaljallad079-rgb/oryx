@@ -1,3 +1,5 @@
+import { currencyScale, DEFAULT_CURRENCY } from './currency';
+
 /**
  * ORYX monetary arithmetic.
  *
@@ -194,9 +196,9 @@ export function isBalanced(amounts: number[]): boolean {
 /** Format minor units for display with a currency code. */
 export function formatMinor(
   minor: number,
-  currency = 'SAR',
+  currency = DEFAULT_CURRENCY,
   locale: 'ar' | 'en' = 'en',
-  scale = 2,
+  scale = currencyScale(currency),
 ): string {
   const major = toMajor(minor, scale);
   try {

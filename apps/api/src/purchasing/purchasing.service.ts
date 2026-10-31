@@ -62,6 +62,11 @@ export class PurchasingService {
 
   async createSupplier(dto: CreateSupplierDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    // A new supplier inherits the tenant's own market, not a hard-coded one.
+    const [defaultCurrency, defaultCountry] = await Promise.all([
+      this.context.companyCurrency(companyId),
+      this.context.companyCountryCode(companyId),
+    ]);
     const dup = await this.prisma.supplier.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Supplier code ${dto.code} already exists.`);
     const supplier = await this.prisma.supplier.create({
@@ -75,9 +80,9 @@ export class PurchasingService {
         taxNumber: dto.taxNumber ?? null,
         addressLine: dto.addressLine ?? null,
         city: dto.city ?? null,
-        countryCode: dto.countryCode ?? 'SA',
+        countryCode: dto.countryCode ?? defaultCountry,
         paymentTermsDays: dto.paymentTermsDays ?? 0,
-        currency: dto.currency ?? 'SAR',
+        currency: dto.currency ?? defaultCurrency,
         notes: dto.notes ?? null,
       },
     });
@@ -200,6 +205,7 @@ export class PurchasingService {
   /** Convert an approved requisition into a purchase order. */
   async convertRequisition(id: string, supplierId: string, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
       const req = await tx.purchaseRequisition.findFirst({ where: { id, companyId }, include: { lines: true } });
       if (!req) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Requisition not found.');
@@ -231,7 +237,7 @@ export class PurchasingService {
           subtotalMinor: totals.subtotalMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
-          currency: 'SAR',
+          currency: companyCurrency,
           createdById: actor.userId,
           lines: {
             create: lineInputs.map((l, i) => ({
@@ -290,6 +296,7 @@ export class PurchasingService {
     await this.assertSupplier(companyId, dto.supplierId);
     if (dto.warehouseId) await this.assertWarehouse(companyId, dto.warehouseId);
 
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const totals = computePurchaseTotals(dto.lines);
     const order = await this.posting.withTransaction(async (tx) => {
       const orderNumber = await this.sequences.next(tx, companyId, 'purchaseOrder');
@@ -306,7 +313,7 @@ export class PurchasingService {
           subtotalMinor: totals.subtotalMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? companyCurrency,
           notes: dto.notes ?? null,
           approvedById: dto.approve ? actor.userId : null,
           approvedAt: dto.approve ? new Date() : null,
@@ -555,6 +562,7 @@ export class PurchasingService {
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     await this.assertSupplier(companyId, dto.supplierId);
 
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
       const totals = computePurchaseTotals(dto.lines);
       const invoiceDate = new Date(dto.invoiceDate);
@@ -588,7 +596,7 @@ export class PurchasingService {
           subtotalMinor: totals.subtotalMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? companyCurrency,
           notes: dto.notes ?? null,
           createdById: actor.userId,
           lines: {
@@ -678,6 +686,7 @@ export class PurchasingService {
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     await this.assertSupplier(companyId, dto.supplierId);
 
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
       await this.assertWarehouseTx(tx, companyId, dto.warehouseId);
       const totals = computePurchaseTotals(dto.lines);
@@ -698,7 +707,7 @@ export class PurchasingService {
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
           reason: dto.reason ?? null,
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? companyCurrency,
           createdById: actor.userId,
           postedAt: new Date(),
           lines: {

@@ -15,6 +15,226 @@ datasource db {
 
 // ---------------------------------------------------------------- enums
 
+/// A consumer's shopping cart.
+///
+/// One open cart per consumer account, enforced by the unique key below rather
+/// than by convention. The cart belongs to a `CustomerAccount`, which is the
+/// consumer identity — not to the ERP `Customer`, which is a receivable account
+/// in the accounting ledger and a different thing entirely.
+model Cart {
+  id                String   @id @default(cuid())
+  customerAccountId String   @unique
+  /// Which tenant's catalogue the lines came from. A cart does not span tenants.
+  companyId         String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  customerAccount CustomerAccount @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  items           CartItem[]
+
+  @@index([companyId])
+}
+
+/// One line in a cart.
+///
+/// `quantity` is an integer count of units, not a decimal: the marketplace sells
+/// whole parts. The unit price is copied at the time the line is added, so a
+/// later catalogue price change cannot silently alter what the customer was
+/// shown — the same snapshot principle the payroll run uses.
+model CartItem {
+  id            String   @id @default(cuid())
+  cartId        String
+  productId     String
+  quantity      Int      @default(1)
+  /// Unit price captured when the line was added, in minor units.
+  unitPriceMinor Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// A product appears once per cart; adding it again increases the quantity.
+  @@unique([cartId, productId])
+  @@index([cartId])
+  @@index([productId])
+}
+
+/// A product a consumer has saved for later.
+///
+/// The pair is unique, so favouriting twice is idempotent rather than creating a
+/// second row.
+model Favorite {
+  id                String   @id @default(cuid())
+  customerAccountId String
+  productId         String
+  createdAt         DateTime @default(now())
+
+  customerAccount CustomerAccount @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+  product         Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([customerAccountId, productId])
+  @@index([customerAccountId, createdAt])
+  @@index([productId])
+}
+
+/// A consumer order placed from the marketplace cart.
+///
+/// ## Why this is separate from `SalesOrder`
+///
+/// `SalesOrder` is the ERP's B2B document: it belongs to a company's own
+/// customer list, feeds the sales invoice and the accounting ledger, and is
+/// created by staff. A consumer order is a different thing — it is placed by a
+/// `CustomerAccount`, it may span several sellers, and the customer reads it in
+/// the app. Modelling it as a `SalesOrder` would mean either exposing the ERP
+/// document to consumers or inventing a company customer for every consumer.
+///
+/// ## What is authoritative
+///
+/// `subtotalMinor`, `taxMinor` and `totalMinor` are computed server-side at
+/// placement from the catalogue price and the product's own tax rate. A total in
+/// the request is ignored. The line's `unitPriceMinor` is a snapshot taken at
+/// placement, so a later catalogue price change cannot rewrite a historical
+/// order — the same principle the payroll run uses.
+model CustomerOrder {
+  id                String   @id @default(cuid())
+  /// Human-facing reference, e.g. ORD-2026-000123. Unique per company.
+  reference         String
+  customerAccountId String
+  /// The catalogue tenant the order was placed against.
+  companyId         String
+  status            CustomerOrderStatus @default(PENDING)
+  /** Payment intent, when the order was paid through a gateway. Null for cash/terminal. */
+  paymentIntentId   String?
+  /** How the customer chose to pay. Never a claim that money moved. */
+  paymentMethod     CustomerOrderPaymentMethod @default(CASH)
+  /** Denormalised address text, so a later address edit cannot rewrite history. */
+  addressLabel      String?
+  addressLine1      String?
+  addressLine2      String?
+  addressCity       String?
+  addressCountryCode String?
+  subtotalMinor     Int
+  taxMinor          Int      @default(0)
+  deliveryMinor     Int      @default(0)
+  totalMinor        Int
+  currency          String   @default("BHD")
+  notes             String?
+  /** Set when the customer cancels; a reason the operator can act on. */
+  cancellationReason String?
+  placedAt          DateTime @default(now())
+  confirmedAt       DateTime?
+  cancelledAt       DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  customerAccount CustomerAccount      @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+  company         Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  paymentIntent   PaymentIntent?       @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
+  lines           CustomerOrderLine[]
+  events          CustomerOrderEvent[]
+
+  /// A retried checkout with the same key returns the original order rather than
+  /// placing a second one. Null for orders created before the key was supplied.
+  idempotencyKey String?
+  @@unique([companyId, reference])
+  @@unique([customerAccountId, idempotencyKey])
+  @@index([customerAccountId, placedAt])
+  @@index([companyId, status])
+  @@index([paymentIntentId])
+}
+
+/// One line of a consumer order. The unit price is a placement-time snapshot.
+model CustomerOrderLine {
+  id             String   @id @default(cuid())
+  orderId        String
+  productId      String
+  /** Snapshot of the catalogue identity, so a renamed product does not rewrite history. */
+  sku            String
+  nameEn         String
+  nameAr         String
+  quantity       Int
+  unitPriceMinor Int
+  /** Basis points, copied from the product at placement. 1500 = 15%. */
+  taxRateBp      Int      @default(0)
+  lineSubtotalMinor Int
+  lineTaxMinor   Int      @default(0)
+  lineTotalMinor Int
+  createdAt      DateTime @default(now())
+
+  order   CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+/// The append-only status trail for a consumer order.
+///
+/// A status is never edited in place; a transition writes a row. That keeps the
+/// order's history readable and makes an accidental double transition visible
+/// rather than silent.
+model CustomerOrderEvent {
+  id        String   @id @default(cuid())
+  orderId   String
+  status    CustomerOrderStatus
+  note      String?
+  /** Who caused it: the customer, the merchant, or the system. */
+  actor     String   @default("SYSTEM")
+  createdAt DateTime @default(now())
+
+  order CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+enum CustomerOrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  OUT_FOR_DELIVERY
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+/// How a consumer chose to pay. This records the choice, not a settlement.
+enum CustomerOrderPaymentMethod {
+  CASH
+  CARD_TERMINAL
+  BANK_TRANSFER
+  BENEFITPAY
+  CARD_ONLINE
+}
+
+/// A catalogue image for a product.
+///
+/// `isPrimary` marks the one image a listing shows. Exactly one image per product
+/// should carry it; the service layer enforces that when setting it, because a
+/// partial unique index is not expressible in the Prisma schema.
+model ProductImage {
+  id           String   @id @default(cuid())
+  productId    String
+  /// Preferred reference; `url` is kept for external absolute URLs.
+  mediaAssetId String?
+  url          String?
+  altEn        String?
+  altAr        String?
+  sortOrder    Int      @default(0)
+  isPrimary    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  product    Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  mediaAsset CmsMediaAsset? @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
+
+  @@index([productId, sortOrder])
+  @@index([mediaAssetId])
+}
+
 enum CompanyType {
   INTERNAL
   SAAS_TENANT
@@ -120,6 +340,8 @@ model User {
   auditLogs         AuditLog[]
   supportSessions   SupportSession[] @relation("SupportSessionActor")
   mfaRecoveryCodes  MfaRecoveryCode[]
+  mediaAssetsCreated CmsMediaAsset[]
+  contentUpdated    CmsContentBlock[]
 
   @@index([status])
 }
@@ -158,6 +380,14 @@ model RefreshToken {
    * compromised family does not disturb the user's other devices.
    */
   familyId   String    @default(cuid())
+  /**
+   * Distinguishes a browser session from a native mobile session. A mobile
+   * session carries its refresh token in the request body, so the row records
+   * which kind of client owns it; the session list shows it and the rotation
+   * path carries it forward.
+   */
+  deviceKind String    @default("WEB")
+  deviceName String?
   userAgent  String?
   ipAddress  String?
   createdAt  DateTime  @default(now())
@@ -173,6 +403,10 @@ model RefreshToken {
 
 model Company {
   id              String        @id @default(cuid())
+  /// Carts opened against this tenant's catalogue.
+  carts           Cart[]
+  /** Consumer orders placed against this tenant's catalogue. */
+  orders          CustomerOrder[]
   code            String        @unique
   nameEn          String
   nameAr          String
@@ -181,8 +415,8 @@ model Company {
   status          CompanyStatus @default(PROVISIONING)
   industry        String?
   countryCode     String?
-  currency        String        @default("SAR")
-  timezone        String        @default("Asia/Riyadh")
+  currency        String        @default("BHD")
+  timezone        String        @default("Asia/Bahrain")
   taxNumber       String?
   parentCompanyId String?
   notes           String?
@@ -198,6 +432,7 @@ model Company {
   invitations  Invitation[]
   auditLogs    AuditLog[]
   supportSessions SupportSession[]
+  branding        CompanyBranding?
 
   // Execution 02 — ERP core (all tenant-owned rows carry companyId).
   documentSequences   DocumentSequence[]
@@ -326,7 +561,7 @@ model Branch {
   countryCode String?
   addressLine String?
   phone       String?
-  timezone    String   @default("Asia/Riyadh")
+  timezone    String   @default("Asia/Bahrain")
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -499,7 +734,7 @@ model Plan {
   descriptionAr      String
   monthlyPrice       Decimal  @db.Decimal(12, 2)
   annualPrice        Decimal  @db.Decimal(12, 2)
-  currency           String   @default("SAR")
+  currency           String   @default("BHD")
   isPublic           Boolean  @default(true)
   isActive           Boolean  @default(true)
   trialDays          Int      @default(14)
@@ -536,7 +771,7 @@ model Subscription {
   status           SubscriptionStatus @default(TRIAL)
   billingPeriod    BillingPeriod      @default(MONTHLY)
   price            Decimal            @db.Decimal(12, 2)
-  currency         String             @default("SAR")
+  currency         String             @default("BHD")
   startedAt        DateTime           @default(now())
   currentPeriodEnd DateTime?
   cancelledAt      DateTime?
@@ -639,11 +874,29 @@ model CmsBanner {
   imageUrl  String?
   actionUrl String?
   sortOrder Int     @default(0)
+  /// Activation: whether this slide is switched on at all.
   isActive  Boolean @default(true)
+  /// Editorial approval: whether the content itself has been signed off.
+  ///
+  /// Distinct from `isActive` on purpose, and the distinction matters for the
+  /// customer homepage. `isActive` is an operator toggling a slide on; `status`
+  /// is a reviewer approving what the slide *says and shows*. A slide can be
+  /// active and still be a draft — an operator switching it on before review
+  /// must not publish an unapproved photograph to customers.
+  ///
+  /// The default is DRAFT, so a newly created banner is never customer-visible
+  /// until someone publishes it explicitly.
+  status    CmsStatus @default(DRAFT)
+  publishedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  /** Preferred reference; `imageUrl` is kept for external absolute URLs. */
+  mediaAssetId String?
+
+  mediaAsset CmsMediaAsset? @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
 
   @@index([placement, locale])
+  @@index([mediaAssetId])
 }
 
 model FeatureFlag {
@@ -698,6 +951,15 @@ model ServiceCategory {
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  /** Photography for the category card; replaces the generated vector art. */
+  imageAssetId String?
+  /** Short marketing copy per locale, editable from the admin CMS. */
+  descriptionEn String?
+  descriptionAr String?
+
+  imageAsset CmsMediaAsset? @relation(fields: [imageAssetId], references: [id], onDelete: SetNull)
+
+  @@index([imageAssetId])
 }
 
 model NotificationTemplate {
@@ -720,6 +982,32 @@ model PlatformSetting {
   value     Json
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
+}
+
+/**
+ * Platform-level service-area catalogue.
+ *
+ * Seeded from `BAHRAIN_SERVICE_AREAS` in `@oryx/shared` so a fresh deployment
+ * is usable, but stored in the database so an administrator can rename,
+ * deactivate or add an area without a code change. The `code` is the stable
+ * identifier; the names are display values.
+ *
+ * This is a platform catalogue, not a tenant table: it carries no `companyId`,
+ * because every tenant in the launch market shares the same administrative
+ * areas. A tenant narrows coverage through its own branches.
+ */
+model ServiceArea {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  nameEn      String
+  nameAr      String
+  countryCode String   @default("BH")
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([countryCode, isActive])
 }
 
 // ============================================================================
@@ -827,6 +1115,10 @@ enum StockMovementSource {
   TRANSFER
   ADJUSTMENT
   POS_SALE
+  /// A consumer marketplace order placed from the mobile app.
+  MARKETPLACE_ORDER
+  /// The reversal of a cancelled marketplace order.
+  MARKETPLACE_ORDER_CANCEL
 }
 
 enum TransferStatus {
@@ -941,7 +1233,7 @@ model Account {
   isSystem      Boolean              @default(false)
   /** System role tag (e.g. AR_CONTROL, AP_CONTROL, CASH, SALES_REVENUE, VAT_OUTPUT). */
   systemRole    String?
-  currency      String               @default("SAR")
+  currency      String               @default("BHD")
   isActive      Boolean              @default(true)
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
@@ -1023,7 +1315,7 @@ model JournalEntry {
   /** Source document id, used to make posting idempotent. */
   sourceId         String?
   memo             String?
-  currency         String            @default("SAR")
+  currency         String            @default("BHD")
   totalDebitMinor  Int               @default(0)
   totalCreditMinor Int               @default(0)
   reversalOfId     String?
@@ -1099,7 +1391,7 @@ model Payment {
   paymentNumber  String
   method         PaymentMethod    @default(CASH)
   amountMinor    Int
-  currency       String           @default("SAR")
+  currency       String           @default("BHD")
   reference      String?
   notes          String?
   paidAt         DateTime
@@ -1199,12 +1491,18 @@ model Product {
   cogsAccount      Account? @relation("ProductCogsAccount", fields: [cogsAccountId], references: [id], onDelete: SetNull)
 
   levels    StockLevel[]
+  images    ProductImage[]
+  cartItems CartItem[]
+  favorites Favorite[]
   movements StockMovement[]
 
   // Execution 03
   partReferences   PartReference[]
   partCompatibilities PartCompatibility[]
   reservationLines PartsReservationLine[]
+
+  /** Consumer order lines that reference this product. */
+  orderLines CustomerOrderLine[]
 
   @@unique([companyId, sku])
   @@index([companyId, isActive])
@@ -1344,7 +1642,7 @@ model Customer {
   paymentTermsDays    Int      @default(0)
   /** Control account for this customer's receivable. */
   receivableAccountId String?
-  currency            String   @default("SAR")
+  currency            String   @default("BHD")
   isActive            Boolean  @default(true)
   notes               String?
   createdAt           DateTime @default(now())
@@ -1387,7 +1685,7 @@ model Quotation {
   discountMinor    Int             @default(0)
   taxMinor         Int             @default(0)
   totalMinor       Int             @default(0)
-  currency         String          @default("SAR")
+  currency         String          @default("BHD")
   notes            String?
   convertedOrderId String?
   createdById      String
@@ -1433,7 +1731,7 @@ model SalesOrder {
   discountMinor Int              @default(0)
   taxMinor      Int              @default(0)
   totalMinor    Int              @default(0)
-  currency      String           @default("SAR")
+  currency      String           @default("BHD")
   notes         String?
   createdById   String
   createdAt     DateTime         @default(now())
@@ -1482,7 +1780,7 @@ model SalesInvoice {
   taxMinor        Int                @default(0)
   totalMinor      Int                @default(0)
   amountPaidMinor Int                @default(0)
-  currency        String             @default("SAR")
+  currency        String             @default("BHD")
   notes           String?
   journalEntryId  String?
   createdById     String
@@ -1539,7 +1837,7 @@ model CreditNote {
   taxMinor         Int            @default(0)
   totalMinor       Int            @default(0)
   reason           String?
-  currency         String         @default("SAR")
+  currency         String         @default("BHD")
   restockInventory Boolean        @default(false)
   journalEntryId   String?
   createdById      String
@@ -1618,7 +1916,7 @@ model PosSale {
   paidMinor        Int           @default(0)
   changeMinor      Int           @default(0)
   paymentMethod    PaymentMethod @default(CASH)
-  currency         String        @default("SAR")
+  currency         String        @default("BHD")
   salesInvoiceId   String?
   journalEntryId   String?
   createdById      String
@@ -1669,7 +1967,7 @@ model Supplier {
   paymentTermsDays Int      @default(0)
   /** Control account for this supplier's payable. */
   payableAccountId String?
-  currency         String   @default("SAR")
+  currency         String   @default("BHD")
   isActive         Boolean  @default(true)
   notes            String?
   createdAt        DateTime @default(now())
@@ -1741,7 +2039,7 @@ model PurchaseOrder {
   subtotalMinor Int                 @default(0)
   taxMinor      Int                 @default(0)
   totalMinor    Int                 @default(0)
-  currency      String              @default("SAR")
+  currency      String              @default("BHD")
   notes         String?
   approvedById  String?
   approvedAt    DateTime?
@@ -1833,7 +2131,7 @@ model SupplierInvoice {
   taxMinor              Int                   @default(0)
   totalMinor            Int                   @default(0)
   amountPaidMinor       Int                   @default(0)
-  currency              String                @default("SAR")
+  currency              String                @default("BHD")
   notes                 String?
   journalEntryId        String?
   createdById           String
@@ -1885,7 +2183,7 @@ model PurchaseReturn {
   taxMinor        Int            @default(0)
   totalMinor      Int            @default(0)
   reason          String?
-  currency        String         @default("SAR")
+  currency        String         @default("BHD")
   journalEntryId  String?
   createdById     String
   postedAt        DateTime?
@@ -2320,7 +2618,7 @@ model EmploymentContract {
   endDate       DateTime?
   /** Contracted base salary at signing, in minor units. */
   baseSalaryMinor Int
-  currency      String         @default("SAR")
+  currency      String         @default("BHD")
   probationDays Int            @default(0)
   notes         String?
   createdAt     DateTime       @default(now())
@@ -2521,7 +2819,7 @@ model SalaryStructure {
   effectiveFrom DateTime
   /** Base monthly salary in minor units. */
   basicMinor    Int
-  currency      String   @default("SAR")
+  currency      String   @default("BHD")
   isActive      Boolean  @default(true)
   notes         String?
   createdAt     DateTime @default(now())
@@ -2588,7 +2886,7 @@ model PayrollRun {
   allowancesMinor Int             @default(0)
   deductionsMinor Int             @default(0)
   netMinor       Int              @default(0)
-  currency       String           @default("SAR")
+  currency       String           @default("BHD")
   journalEntryId String?
   approvedById   String?
   approvedAt     DateTime?
@@ -2621,7 +2919,7 @@ model Payslip {
   deductionsMinor Int    @default(0)
   grossMinor    Int      @default(0)
   netMinor      Int      @default(0)
-  currency      String   @default("SAR")
+  currency      String   @default("BHD")
   advanceDeductionMinor Int @default(0)
   /** Full snapshot of the salary structure and computed components at run time. */
   snapshot      Json?
@@ -2659,7 +2957,7 @@ model EmployeeAdvance {
   amountMinor   Int
   installments  Int           @default(1)
   settledMinor  Int           @default(0)
-  currency      String        @default("SAR")
+  currency      String        @default("BHD")
   status        AdvanceStatus @default(OPEN)
   issuedAt      DateTime
   reason        String?
@@ -2723,7 +3021,7 @@ model Lead {
   status        LeadStatus @default(NEW)
   ownerUserId   String?
   estimatedValueMinor Int  @default(0)
-  currency      String     @default("SAR")
+  currency      String     @default("BHD")
   notes         String?
   /** Set when the lead is converted to a customer. */
   customerId    String?
@@ -2790,7 +3088,7 @@ model Opportunity {
   leadId        String?
   ownerUserId   String?
   amountMinor   Int               @default(0)
-  currency      String            @default("SAR")
+  currency      String            @default("BHD")
   expectedCloseDate DateTime?
   status        OpportunityStatus @default(OPEN)
   /** Set when converted into a quotation. */
@@ -3185,6 +3483,7 @@ model Vehicle {
   maintenance    MaintenanceBooking[]
   jobCards       JobCard[]
   warranties     WarrantyRecord[]
+  inspectionPhotos CustomerInspectionPhoto[]
   bookingSlots   BookingSlot[]
 
   @@unique([companyId, vin])
@@ -3437,7 +3736,7 @@ model RepairEstimate {
   subtotalMinor Int           @default(0)
   taxMinor      Int           @default(0)
   totalMinor    Int           @default(0)
-  currency      String        @default("SAR")
+  currency      String        @default("BHD")
   customerApprovedById String?
   approvedAt    DateTime?
   expiresAt     DateTime?
@@ -3597,6 +3896,7 @@ model MarketplaceProvider {
   reviews         ProviderReview[]
   disputes        MarketplaceDispute[]
   bookingResources BookingResource[]
+  offers          ProviderOffer[]
 
   @@index([status])
 }
@@ -3609,7 +3909,7 @@ model ProviderServiceListing {
   nameAr      String
   description String?
   priceMinor  Int      @default(0)
-  currency    String   @default("SAR")
+  currency    String   @default("BHD")
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -3617,6 +3917,40 @@ model ProviderServiceListing {
   provider MarketplaceProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
   @@index([providerId])
+  @@index([categoryKey])
+}
+
+/**
+ * A promotional offer published by a marketplace provider.
+ *
+ * Scoped to the provider, not the tenant, because an offer is a marketplace
+ * artifact: the customer app reads the active ones to show a "special offer"
+ * rail. `percentOffBp` is basis points for the same reason every other
+ * percentage in this schema is (1500 = 15%); `categoryKey` narrows the offer to
+ * one catalogue category and is optional, so an empty value means the whole
+ * catalogue.
+ *
+ * `startsAt`/`endsAt` bound the offer. A null bound is open-ended, and the
+ * customer query filters on `isActive` plus the window, so an expired offer is
+ * never advertised.
+ */
+model ProviderOffer {
+  id           String   @id @default(cuid())
+  providerId   String
+  titleEn      String
+  titleAr      String
+  description  String?
+  categoryKey  String?
+  percentOffBp Int      @default(0)
+  isActive     Boolean  @default(true)
+  startsAt     DateTime?
+  endsAt       DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  provider MarketplaceProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId, isActive])
   @@index([categoryKey])
 }
 
@@ -3659,7 +3993,7 @@ model MarketplaceCommission {
   baseMinor        Int
   rateBp           Int
   commissionMinor  Int
-  currency         String           @default("SAR")
+  currency         String           @default("BHD")
   status           CommissionStatus @default(PENDING)
   createdAt        DateTime         @default(now())
 
@@ -3678,7 +4012,7 @@ model ProviderSettlement {
   grossMinor      Int              @default(0)
   commissionMinor Int              @default(0)
   netMinor        Int              @default(0)
-  currency        String           @default("SAR")
+  currency        String           @default("BHD")
   status          SettlementStatus @default(DRAFT)
   approvedById    String?
   paidAt          DateTime?
@@ -3867,9 +4201,46 @@ model CustomerAccount {
   supportTickets  SupportTicket[]
   serviceRequests ServiceRequest[]
   notificationDeliveries NotificationDelivery[]
+  cart            Cart?
+  favorites       Favorite[]
+  /** SENSAGE inspection photographs this consumer uploaded. */
+  inspectionPhotos CustomerInspectionPhoto[]
+  /** Marketplace orders this consumer placed. */
+  orders          CustomerOrder[]
 
   @@index([status])
   @@index([defaultCompanyId])
+}
+
+/**
+ * A photograph a customer uploaded for a SENSAGE inspection.
+ *
+ * Ownership is the `customerAccountId` from the verified token, never a request
+ * field. The bytes live in the shared media library (`CmsMediaAsset`) and are
+ * re-encoded on the way in by `MediaStorageService`, so this row only records
+ * which account uploaded what and when. There is deliberately no analysis field:
+ * the app's report is a demo and must never be stored as if it were a diagnosis.
+ */
+model CustomerInspectionPhoto {
+  id                String   @id @default(cuid())
+  customerAccountId String
+  vehicleId         String?
+  mediaAssetId      String?
+  originalName      String
+  mimeType          String
+  byteSize          Int
+  width             Int
+  height            Int
+  caption           String?
+  createdAt         DateTime @default(now())
+
+  customerAccount CustomerAccount @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+  vehicle         Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  mediaAsset      CmsMediaAsset?  @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
+
+  @@index([customerAccountId, createdAt])
+  @@index([mediaAssetId])
+  @@index([vehicleId])
 }
 
 model CustomerAddress {
@@ -4327,6 +4698,8 @@ model PaymentIntent {
 
   transactions PaymentTransaction[]
   refunds      Refund[]
+  /** Consumer orders settled through this intent. */
+  orders       CustomerOrder[]
 
   @@unique([companyId, intentNumber])
   @@unique([companyId, idempotencyKey])
@@ -4583,4 +4956,178 @@ model IntegrationCheck {
   provider IntegrationProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
   @@index([providerId, createdAt])
+}
+
+// ============================================================ Execution 07
+// Website media library and dynamic content.
+//
+// The public website reads its imagery and copy from these tables rather than
+// from hardcoded asset paths, so an administrator can change the homepage
+// without a redeploy. A `CmsMediaAsset` row is the single source of truth for
+// an uploaded file: the bytes live on disk under MEDIA_ROOT, the row holds the
+// metadata, the optimisation variants and the focal point.
+
+/**
+ * Per-company visual identity.
+ *
+ * One row per company. A company that has never set branding has no row at all,
+ * and the API resolves it to the ORYX default; a partial row inherits the
+ * remaining fields. Every `*AssetId` is a `CmsMediaAsset` id, so a logo is
+ * uploaded, validated and optimised through the existing media pipeline rather
+ * than being pasted in as a base64 blob on the company row.
+ *
+ * A platform-level ORYX logo is not stored here: it is the platform default and
+ * lives in the `branding` platform setting, so a tenant can never overwrite it.
+ */
+model CompanyBranding {
+  companyId String @id
+
+  nameEn String?
+  nameAr String?
+
+  logoAssetId      String?
+  logoDarkAssetId  String?
+  faviconAssetId   String?
+
+  /** 6-digit hex (`#rrggbb`). Validated in the API; never interpolated unvalidated. */
+  primaryColor String?
+  accentColor  String?
+
+  supportEmail String?
+  supportPhone String?
+  websiteUrl   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  logoAsset     CmsMediaAsset? @relation("CompanyLogo", fields: [logoAssetId], references: [id], onDelete: SetNull)
+  logoDarkAsset CmsMediaAsset? @relation("CompanyLogoDark", fields: [logoDarkAssetId], references: [id], onDelete: SetNull)
+  faviconAsset  CmsMediaAsset? @relation("CompanyFavicon", fields: [faviconAssetId], references: [id], onDelete: SetNull)
+}
+
+model CmsMediaFolder {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assets CmsMediaAsset[]
+}
+
+model CmsMediaAsset {
+  /// Catalogue images that reference this asset.
+  productImages   ProductImage[]
+  /// SENSAGE inspection photographs stored against this asset.
+  inspectionPhotos CustomerInspectionPhoto[]
+  id           String   @id @default(cuid())
+  folderId     String?
+  /** Original filename as uploaded, kept for display. Never used as a path. */
+  originalName String
+  /** Content-addressed storage key, e.g. `2026/02/ab12….webp`. */
+  storageKey   String   @unique
+  mimeType     String
+  byteSize     Int
+  width        Int
+  height       Int
+  /** Dominant colour, used as a placeholder background while loading. */
+  dominantColor String?
+  /** Blurred inline placeholder (tiny base64 webp) for progressive loading. */
+  blurDataUrl  String?
+  /** Cropped variants keyed by name (`thumb`, `card`, `hero`). */
+  variants     Json     @default("{}")
+  /** Focal point as a percentage of the source, so cropping stays intentional. */
+  focalX       Float    @default(50)
+  focalY       Float    @default(50)
+  altAr        String?
+  altEn        String?
+  caption      String?
+  credit       String?
+  /** Source/licence note for third-party photography. */
+  licenseNote  String?
+  tags         String[] @default([])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdByUserId String?
+
+  folder       CmsMediaFolder?       @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  createdBy    User?                 @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  versions     CmsMediaAssetVersion[]
+  blocks       CmsContentBlock[]
+  banners      CmsBanner[]
+  categories   ServiceCategory[]
+  companyLogos     CompanyBranding[] @relation("CompanyLogo")
+  companyLogosDark CompanyBranding[] @relation("CompanyLogoDark")
+  companyFavicons  CompanyBranding[] @relation("CompanyFavicon")
+
+  @@index([folderId])
+  @@index([createdAt])
+}
+
+/**
+ * Immutable snapshot of a media asset's editable metadata. Every metadata edit
+ * appends a version, so an administrator can restore a previous caption, alt
+ * text or focal point. The binary is immutable per storage key, so a version
+ * does not duplicate bytes.
+ */
+model CmsMediaAssetVersion {
+  id        String   @id @default(cuid())
+  assetId   String
+  /** Monotonic per asset; 1 is the upload. */
+  revision  Int
+  snapshot  Json
+  actorUserId String?
+  createdAt DateTime @default(now())
+
+  asset CmsMediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, revision])
+  @@index([assetId, createdAt])
+}
+
+/**
+ * A single editable slot on the public website. `key` is stable and referenced
+ * by the frontend; `value` holds locale-specific content. Publishing toggles
+ * `isPublished`, so a draft never reaches the public endpoint.
+ */
+model CmsContentBlock {
+  id          String   @id @default(cuid())
+  /** Stable key the frontend reads, e.g. `home.hero.title`. */
+  key         String
+  locale      Locale
+  /** Plain text for titles and labels. */
+  value       String
+  /** Optional longer rich copy; rendered as text, never as raw HTML. */
+  body        String?
+  mediaAssetId String?
+  linkUrl     String?
+  linkLabel   String?
+  sortOrder   Int      @default(0)
+  isPublished Boolean  @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  updatedByUserId String?
+
+  mediaAsset CmsMediaAsset? @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
+  updatedBy  User?          @relation(fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([key, locale])
+  @@index([isPublished])
+}
+
+/** Ordered, publishable record of every content change for revert. */
+model CmsContentRevision {
+  id        String   @id @default(cuid())
+  blockId   String
+  revision  Int
+  snapshot  Json
+  actorUserId String?
+  createdAt DateTime @default(now())
+
+  @@unique([blockId, revision])
+  @@index([blockId, createdAt])
 }

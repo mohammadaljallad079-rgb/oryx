@@ -17,11 +17,58 @@
 
 import { PrismaClient, type Prisma } from '@prisma/client';
 import * as argon2 from 'argon2';
-import { MODULES, PERMISSIONS, lineAmountMinor } from '@oryx/shared';
+import {
+  BAHRAIN_SERVICE_AREAS,
+  DEFAULT_COUNTRY_CODE,
+  DEFAULT_CURRENCY,
+  DEFAULT_TIMEZONE,
+  MODULES,
+  PERMISSIONS,
+  PLATFORM_SUPER_ADMIN_PERMISSION_CODES,
+  PLANS,
+  SERVICE_CATEGORIES,
+  lineAmountMinor,
+} from '@oryx/shared';
 
 const prisma = new PrismaClient();
 
 const DEMO_MARKER = 'SEED_DEMO_DATA';
+
+/**
+ * The seed is a **development and demonstration** tool. It creates a known
+ * Super Admin password, two synthetic demo tenants and baseline rows that are
+ * appropriate for a sandbox and dangerous in production.
+ *
+ * It therefore refuses to run when it believes it is pointed at production,
+ * unless the operator has explicitly accepted the risk with
+ * `ALLOW_SEED_IN_PRODUCTION=true`. The refusal is the default: an operator who
+ * has not thought about it should not get demo tenants and a published default
+ * password in their live database.
+ *
+ * The check is deliberately conservative about what counts as production. An
+ * unrecognised environment is treated as production, because the cost of a
+ * false refusal is one environment variable and the cost of a false permit is a
+ * compromised deployment.
+ */
+function assertSeedIsAllowed(): void {
+  const env = (process.env.NODE_ENV ?? '').toLowerCase();
+  const explicitlyAllowed = process.env.ALLOW_SEED_IN_PRODUCTION === 'true';
+  const isProductionLike = env === 'production' || env === 'staging';
+
+  if (isProductionLike && !explicitlyAllowed) {
+    console.error(
+      `\nORYX seed refused: NODE_ENV is "${env}".\n\n` +
+        'This script creates demo tenants and a default Super Admin password and\n' +
+        'must not run against a production database.\n\n' +
+        'For a production deployment, initialise the platform with:\n' +
+        '  pnpm db:migrate\n' +
+        '  node scripts/provision-super-admin.mjs\n\n' +
+        'If this really is a disposable environment, re-run with:\n' +
+        '  ALLOW_SEED_IN_PRODUCTION=true pnpm db:seed\n',
+    );
+    process.exit(1);
+  }
+}
 
 /** Standard chart of accounts mirrored from the accounting service. */
 const STANDARD_CHART: Array<{
@@ -113,80 +160,6 @@ async function seedModules() {
   console.log(`  modules: ${MODULES.length} upserted`);
 }
 
-const CORE_MODULES = [
-  'dashboard',
-  'company_management',
-  'branch_management',
-  'users_permissions',
-  'subscription_management',
-  'settings',
-];
-
-const PLANS = [
-  {
-    code: 'starter',
-    nameEn: 'Starter',
-    nameAr: 'المبتدئ',
-    descriptionEn: 'Core company, branch and user management for small teams.',
-    descriptionAr: 'إدارة الشركات والفروع والمستخدمين للفرق الصغيرة.',
-    monthlyPrice: '499.00',
-    annualPrice: '4990.00',
-    trialDays: 14,
-    maxCompanies: 1,
-    maxBranches: 2,
-    maxUsers: 10,
-    storageMb: 2048,
-    apiRequestsPerMonth: 10000,
-    modules: [...CORE_MODULES, 'crm', 'reports_analytics'],
-  },
-  {
-    code: 'professional',
-    nameEn: 'Professional',
-    nameAr: 'الاحترافي',
-    descriptionEn: 'Adds finance, sales, purchasing, inventory and HR.',
-    descriptionAr: 'يشمل المالية والمبيعات والمشتريات والمخزون والموارد البشرية.',
-    monthlyPrice: '1499.00',
-    annualPrice: '14990.00',
-    trialDays: 14,
-    maxCompanies: 3,
-    maxBranches: 10,
-    maxUsers: 75,
-    storageMb: 20480,
-    apiRequestsPerMonth: 100000,
-    modules: [
-      ...CORE_MODULES,
-      'crm',
-      'reports_analytics',
-      'financial_accounting',
-      'sales_pos',
-      'purchasing_procurement',
-      'warehouses_inventory',
-      'human_resources',
-      'operations',
-      // Execution 04 — the scheduling engine and payment records are useful to
-      // any tenant that runs operations, so they are licensed from Professional.
-      'booking_engine',
-      'payments',
-    ],
-  },
-  {
-    code: 'enterprise',
-    nameEn: 'Enterprise',
-    nameAr: 'المؤسسي',
-    descriptionEn: 'Full ERP including the automotive ecosystem modules.',
-    descriptionAr: 'النظام الكامل بما يشمل وحدات المنظومة اللوجستية للسيارات.',
-    monthlyPrice: '3499.00',
-    annualPrice: '34990.00',
-    trialDays: 30,
-    maxCompanies: 25,
-    maxBranches: -1,
-    maxUsers: -1,
-    storageMb: 204800,
-    apiRequestsPerMonth: -1,
-    modules: MODULES.map((m) => m.key),
-  },
-];
-
 async function seedPlans() {
   for (const plan of PLANS) {
     const record = await prisma.plan.upsert({
@@ -222,7 +195,7 @@ async function seedPlans() {
       },
     });
 
-    for (const moduleKey of plan.modules) {
+    for (const moduleKey of plan.licensedModules) {
       await prisma.planModule.upsert({
         where: { planId_moduleKey: { planId: record.id, moduleKey } },
         update: {},
@@ -231,7 +204,7 @@ async function seedPlans() {
     }
     // Remove modules that are no longer part of the plan definition.
     await prisma.planModule.deleteMany({
-      where: { planId: record.id, moduleKey: { notIn: plan.modules } },
+      where: { planId: record.id, moduleKey: { notIn: plan.licensedModules } },
     });
   }
   console.log(`  plans: ${PLANS.length} upserted`);
@@ -240,13 +213,16 @@ async function seedPlans() {
 /**
  * The platform super admin role carries the whole catalog.
  *
- * `resolveEffectivePermissions` returns only the PLATFORM-scope codes while the
- * principal has no tenant context, and adds the company-scope codes (gated by
- * the selected company's entitlements) once a company is selected. Granting the
- * full catalog here is what lets one role serve both modes without a second
- * role, and without granting anything the selected tenant is not licensed for.
+ * The list itself lives in `@oryx/shared` (`PLATFORM_SUPER_ADMIN_PERMISSION_CODES`)
+ * so the seed, the production bootstrap and the repair script all read one
+ * definition. `resolveEffectivePermissions` returns only the PLATFORM-scope
+ * codes while the principal has no tenant context, and adds the company-scope
+ * codes (gated by the selected company's entitlements) once a company is
+ * selected. Granting the full catalog here is what lets one role serve both
+ * modes without a second role, and without granting anything the selected
+ * tenant is not licensed for.
  */
-const PLATFORM_SUPER_ADMIN_PERMISSIONS = PERMISSIONS.map((p) => p.code);
+const PLATFORM_SUPER_ADMIN_PERMISSIONS = PLATFORM_SUPER_ADMIN_PERMISSION_CODES;
 
 const COMPANY_ADMIN_PERMISSIONS = PERMISSIONS.filter(
   (p) => p.scope !== 'PLATFORM' && p.delegable,
@@ -298,6 +274,24 @@ async function seedPlatformRoles() {
         },
       });
 
+  // Reconcile rather than only add. An upsert-only loop cannot repair a role
+  // that already drifted, and it keeps codes the catalogue has removed. The
+  // same two-directional sync runs in production via
+  // scripts/lib/platform-role.mjs, from the same catalogue constant.
+  const expected = new Set(PLATFORM_SUPER_ADMIN_PERMISSIONS);
+  const current = (
+    await prisma.rolePermission.findMany({
+      where: { roleId: role.id },
+      select: { permissionCode: true },
+    })
+  ).map((p) => p.permissionCode);
+
+  const revoke = current.filter((code) => !expected.has(code));
+  if (revoke.length > 0) {
+    await prisma.rolePermission.deleteMany({
+      where: { roleId: role.id, permissionCode: { in: revoke } },
+    });
+  }
   for (const code of PLATFORM_SUPER_ADMIN_PERMISSIONS) {
     await prisma.rolePermission.upsert({
       where: { roleId_permissionCode: { roleId: role.id, permissionCode: code } },
@@ -486,8 +480,8 @@ async function seedCompanies(superAdminId: string) {
         type: spec.type,
         industry: spec.industry,
         status: 'ACTIVE',
-        countryCode: 'SA',
-        currency: 'SAR',
+        countryCode: DEFAULT_COUNTRY_CODE,
+        currency: DEFAULT_CURRENCY,
         notes,
       },
     });
@@ -503,7 +497,7 @@ async function seedCompanies(superAdminId: string) {
           nameEn: b.nameEn,
           nameAr: b.nameAr,
           city: b.city,
-          countryCode: 'SA',
+          countryCode: DEFAULT_COUNTRY_CODE,
           isActive: true,
         },
       });
@@ -526,11 +520,13 @@ async function seedCompanies(superAdminId: string) {
 }
 
 async function seedSubscriptions(idByCode: Map<string, string>) {
+  // Only SaaS tenants carry a subscription. An ORYX internal company (type
+  // `INTERNAL`) belongs to the group and is governed by the Platform Super
+  // Admin, so it is never plan-gated: `EntitlementService.forCompany` resolves
+  // every catalogued module and no limits for it. Seeding a plan against an
+  // internal company made it behave like a customer, which is the conflation
+  // the two-model rule forbids.
   const assignments: Array<{ companyCode: string; planCode: string; status: 'ACTIVE' | 'TRIAL'; period: 'MONTHLY' | 'ANNUAL' }> = [
-    { companyCode: 'ORYX-HOLDING', planCode: 'enterprise', status: 'ACTIVE', period: 'ANNUAL' },
-    { companyCode: 'ORYX-AUTO', planCode: 'enterprise', status: 'ACTIVE', period: 'ANNUAL' },
-    { companyCode: 'ORYX-REALESTATE', planCode: 'professional', status: 'ACTIVE', period: 'MONTHLY' },
-    { companyCode: 'ORYX-LOGISTICS', planCode: 'starter', status: 'ACTIVE', period: 'MONTHLY' },
     { companyCode: 'DEMO-ALNOOR', planCode: 'professional', status: 'ACTIVE', period: 'MONTHLY' },
     { companyCode: 'DEMO-GULFAUTO', planCode: 'enterprise', status: 'TRIAL', period: 'MONTHLY' },
   ];
@@ -586,7 +582,22 @@ async function seedSubscriptions(idByCode: Map<string, string>) {
       });
     }
   }
-  console.log(`  subscriptions: ${assignments.length} upserted`);
+
+  // Repair any internal company that a previous seed gave a subscription. The
+  // rows are deleted rather than updated: an internal company is not a paying
+  // customer, and leaving a dormant plan row behind would let a later query
+  // mistake it for one.
+  const internal = await prisma.company.findMany({
+    where: { type: 'INTERNAL' },
+    select: { id: true, code: true },
+  });
+  let repaired = 0;
+  for (const company of internal) {
+    const removed = await prisma.subscription.deleteMany({ where: { companyId: company.id } });
+    repaired += removed.count;
+  }
+
+  console.log(`  subscriptions: ${assignments.length} upserted, ${repaired} internal-company rows removed`);
 }
 
 async function seedCompanyAdmin(
@@ -694,13 +705,18 @@ async function seedCms() {
     });
   }
 
-  const categories = [
-    { key: 'vehicle_inspection', nameEn: 'Vehicle Inspection', nameAr: 'فحص المركبات', domain: 'automotive', sortOrder: 1 },
-    { key: 'maintenance', nameEn: 'Maintenance', nameAr: 'الصيانة', domain: 'automotive', sortOrder: 2 },
-    { key: 'spare_parts', nameEn: 'Spare Parts', nameAr: 'قطع الغيار', domain: 'marketplace', sortOrder: 3 },
-    { key: 'recovery', nameEn: 'Recovery', nameAr: 'الإنقاذ', domain: 'automotive', sortOrder: 4 },
-    { key: 'car_wash', nameEn: 'Car Wash', nameAr: 'غسيل السيارات', domain: 'marketplace', sortOrder: 5 },
-  ];
+  // The catalogue comes from @oryx/shared so the seed, the CMS, the provider
+  // directory and both clients agree on one key space. Descriptions and sort
+  // order are kept in step with the code definition.
+  const categories = SERVICE_CATEGORIES.map((c) => ({
+    key: c.key,
+    nameEn: c.nameEn,
+    nameAr: c.nameAr,
+    domain: c.domain,
+    sortOrder: c.sortOrder,
+    descriptionEn: c.descEn,
+    descriptionAr: c.descAr,
+  }));
   for (const c of categories) {
     await prisma.serviceCategory.upsert({ where: { key: c.key }, update: c, create: c });
   }
@@ -967,6 +983,7 @@ async function seedExecution03Baseline(idByCode: Map<string, string>, superAdmin
   let inspectionServices = 0;
   let bays = 0;
   let providers = 0;
+  let bookingResources = 0;
 
   for (const company of companies) {
     const branch = await prisma.branch.findFirst({ where: { companyId: company.id } });
@@ -1139,37 +1156,186 @@ async function seedExecution03Baseline(idByCode: Map<string, string>, superAdmin
       bays += 1;
     }
 
-    // Marketplace provider (approved) with a listing.
-    const provider = await prisma.marketplaceProvider.upsert({
-      where: { code: `${company.code}-P1` },
-      update: {},
-      create: {
-        code: `${company.code}-P1`,
-        nameEn: 'City Auto Care',
-        nameAr: 'رعاية السيارات المدينة',
-        categoryKey: 'WORKSHOP',
-        providerCompanyId: company.id,
-        commissionPercentBp: 1000,
-        status: 'APPROVED',
-        approvedAt: new Date(),
-      },
-    });
-    if ((await prisma.providerServiceListing.count({ where: { providerId: provider.id } })) === 0) {
-      await prisma.providerServiceListing.create({
-        data: { providerId: provider.id, categoryKey: 'WORKSHOP', nameEn: 'General repair', nameAr: 'إصلاح عام', priceMinor: 30000 },
+    // Bookable resources for the customer booking engine. A workshop bay alone
+    // is not bookable: availability is generated from a `BookingResource` and
+    // its `WorkingHours`, so a tenant with bays but no resource offers no slot
+    // to the mobile app. Two bays, open 08:00–20:00 every day, matching the
+    // workshop bays above.
+    for (const r of [
+      { code: 'RES-BAY-1', nameEn: 'Service Bay 1', nameAr: 'منصة الخدمة ١' },
+      { code: 'RES-BAY-2', nameEn: 'Service Bay 2', nameAr: 'منصة الخدمة ٢' },
+    ]) {
+      const resource = await prisma.bookingResource.upsert({
+        where: { companyId_code: { companyId: company.id, code: r.code } },
+        update: {},
+        create: {
+          companyId: company.id,
+          branchId: branch?.id ?? null,
+          resourceType: 'BAY',
+          code: r.code,
+          nameEn: r.nameEn,
+          nameAr: r.nameAr,
+          capacity: 1,
+        },
       });
+      if ((await prisma.workingHours.count({ where: { resourceId: resource.id } })) === 0) {
+        await prisma.workingHours.createMany({
+          data: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+            companyId: company.id,
+            branchId: branch?.id ?? null,
+            resourceId: resource.id,
+            dayOfWeek,
+            opensMinute: 8 * 60,
+            closesMinute: 20 * 60,
+          })),
+        });
+      }
+      bookingResources += 1;
     }
-    providers += 1;
+
+    // Marketplace providers (approved), one per service category, so the
+    // customer directory can answer every category filter with real rows. The
+    // category keys come from @oryx/shared — the same keys the website chips and
+    // the CMS category photography use.
+    const providerNames = [
+      { key: 'maintenance', nameEn: 'City Auto Care', nameAr: 'رعاية السيارات المدينة' },
+      { key: 'vehicle_inspection', nameEn: 'Gulf Inspection Centre', nameAr: 'مركز الخليج للفحص' },
+      { key: 'spare_parts', nameEn: 'Al Noor Parts', nameAr: 'النور لقطع الغيار' },
+      { key: 'recovery', nameEn: 'Rapid Recovery 24', nameAr: 'الإنقاذ السريع ٢٤' },
+      { key: 'car_wash', nameEn: 'Premium Car Wash', nameAr: 'غسيل السيارات المميز' },
+    ];
+    for (const [index, p] of providerNames.entries()) {
+      const provider = await prisma.marketplaceProvider.upsert({
+        where: { code: `${company.code}-P${index + 1}` },
+        update: { categoryKey: p.key },
+        create: {
+          code: `${company.code}-P${index + 1}`,
+          nameEn: p.nameEn,
+          nameAr: p.nameAr,
+          categoryKey: p.key,
+          providerCompanyId: company.id,
+          commissionPercentBp: 1000,
+          status: 'APPROVED',
+          approvedAt: new Date(),
+        },
+      });
+      if ((await prisma.providerServiceListing.count({ where: { providerId: provider.id } })) === 0) {
+        const category = SERVICE_CATEGORIES.find((c) => c.key === p.key)!;
+        await prisma.providerServiceListing.create({
+          data: {
+            providerId: provider.id,
+            categoryKey: p.key,
+            nameEn: category.nameEn,
+            nameAr: category.nameAr,
+            priceMinor: 30000,
+          },
+        });
+      }
+      // A live promotional offer per provider, so the customer app's offers rail
+      // shows real, DB-backed rows. Idempotent by title, and open-ended (no
+      // window) so a re-seed does not silently expire it.
+      const offerTitle = `Special offer — ${p.nameEn}`;
+      if ((await prisma.providerOffer.count({ where: { providerId: provider.id } })) === 0) {
+        await prisma.providerOffer.create({
+          data: {
+            providerId: provider.id,
+            titleEn: offerTitle,
+            titleAr: `عرض خاص — ${p.nameAr}`,
+            description: 'Valid on every service booked through the ORYX app.',
+            categoryKey: p.key,
+            percentOffBp: 1000 + index * 500,
+            isActive: true,
+          },
+        });
+      }
+      providers += 1;
+    }
+  }
+
+  // Link the ORYX-AUTO company administrator to the company's first provider, so
+  // the merchant portal (which resolves the provider from the signed-in account's
+  // membership) has a working account on a freshly seeded database. Without this
+  // link every `/provider/...` route answers 403 for the seeded admins.
+  const autoCompanyId = idByCode.get('ORYX-AUTO');
+  if (autoCompanyId) {
+    const autoAdmin = await prisma.user.findUnique({ where: { email: 'admin@oryx-auto.local' } });
+    const firstProvider = await prisma.marketplaceProvider.findFirst({
+      where: { providerCompanyId: autoCompanyId },
+      orderBy: { code: 'asc' },
+    });
+    if (autoAdmin && firstProvider) {
+      const link = await prisma.providerUser.findFirst({
+        where: { providerId: firstProvider.id, userId: autoAdmin.id },
+      });
+      if (link) {
+        await prisma.providerUser.update({ where: { id: link.id }, data: { isActive: true, role: 'OWNER' } });
+      } else {
+        await prisma.providerUser.create({
+          data: { providerId: firstProvider.id, userId: autoAdmin.id, role: 'OWNER', isActive: true },
+        });
+      }
+    }
   }
 
   console.log(
     `  e03 baseline: ${departments} departments, ${jobTitles} job titles, ${employees} employees, ` +
       `${leaveTypes} leave types, ${shifts} shifts, ${leadSources} lead sources, ${pipelines} pipelines, ` +
-      `${inspectionServices} inspection services, ${bays} bays, ${providers} providers`,
+      `${inspectionServices} inspection services, ${bays} bays, ${bookingResources} booking resources, ` +
+      `${providers} providers`,
   );
 }
 
+/**
+ * Seed the platform-level Bahrain service-area catalogue.
+ *
+ * Idempotent by `code` and never overwrites an existing row, so re-running the
+ * seed after an administrator has renamed or deactivated an area preserves
+ * their change.
+ */
+async function seedServiceAreas(): Promise<number> {
+  let created = 0;
+  for (const [index, area] of BAHRAIN_SERVICE_AREAS.entries()) {
+    const existing = await prisma.serviceArea.findUnique({ where: { code: area.code } });
+    if (existing) continue;
+    await prisma.serviceArea.create({
+      data: {
+        code: area.code,
+        nameEn: area.nameEn,
+        nameAr: area.nameAr,
+        countryCode: DEFAULT_COUNTRY_CODE,
+        sortOrder: index,
+      },
+    });
+    created += 1;
+  }
+  return created;
+}
+
+/**
+ * Record the launch-market defaults as platform settings.
+ *
+ * Written explicitly rather than left to the service's fallback so an operator
+ * can see and edit them, and so the VAT rate is visibly zero rather than
+ * implicitly absent.
+ */
+async function seedPlatformSettings(): Promise<void> {
+  const settings: Array<[string, unknown]> = [
+    ['market.country_code', DEFAULT_COUNTRY_CODE],
+    ['market.currency', DEFAULT_CURRENCY],
+    ['market.timezone', DEFAULT_TIMEZONE],
+    ['finance.default_vat_rate_bp', 0],
+  ];
+  for (const [key, value] of settings) {
+    await prisma.platformSetting.upsert({
+      where: { key },
+      update: { value: value as never },
+      create: { key, value: value as never },
+    });
+  }
+}
+
 async function main() {
+  assertSeedIsAllowed();
   console.log('ORYX seed — start');
   await seedModules();
   await seedPlans();
@@ -1182,6 +1348,9 @@ async function main() {
   await seedErpBaseline(idByCode, superAdmin.id);
   await seedExecution03Baseline(idByCode, superAdmin.id);
   await seedAuditBaseline(superAdmin.id, idByCode);
+  const areas = await seedServiceAreas();
+  await seedPlatformSettings();
+  console.log(`  e08 baseline: ${areas} new service area(s), platform settings written`);
   console.log('ORYX seed — done');
 }
 

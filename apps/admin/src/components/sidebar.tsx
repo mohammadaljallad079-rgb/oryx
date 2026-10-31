@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
+import { useBranding } from '@/lib/branding-context';
 import { ALL_NAV_GROUPS, type NavItem } from '@/lib/navigation';
 import { Icon } from './icons';
 import { Badge } from './ui';
@@ -45,6 +46,7 @@ export function Sidebar({
   const router = useRouter();
   const { t } = useUi();
   const { isPlatform, can, canAny, hasModule, companyId, logout } = useAuth();
+  const { logoAssetId, displayName, branding } = useBranding();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [signingOut, setSigningOut] = useState(false);
 
@@ -80,11 +82,12 @@ export function Sidebar({
         href="/dashboard"
         onClick={onNavigate}
         className="oryx-sidebar__brand"
-        title={t('brand.tagline')}
+        title={branding.isDefault ? t('brand.tagline') : displayName}
+        data-testid="sidebar-brand"
       >
-        <BrandLogo height={26} />
+        <BrandLogo height={26} assetId={logoAssetId} alt={displayName} />
         <span className="oryx-sidebar__brand-text oryx-faint block truncate text-[10.5px]">
-          {t('brand.tagline')}
+          {branding.isDefault ? t('brand.tagline') : displayName}
         </span>
       </Link>
 

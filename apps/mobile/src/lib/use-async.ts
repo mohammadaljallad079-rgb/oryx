@@ -1,56 +1,60 @@
 /**
- * Small async-data hook used by every screen.
+ * A tiny data-loading hook.
  *
- * It deliberately exposes `reload` rather than a cache: the mobile app reads
- * live operational data (slots, booking status, payments), so a stale cache is
- * worse than a refetch.
+ * Every screen that reads from `repository` needs the same three states, and the
+ * brief asks for real loading, empty and error states rather than a spinner that
+ * never appears. This hook owns that shape so a screen cannot forget one.
+ *
+ * The `deps` array re-runs the loader, which is how a filter change or a demo
+ * reset refreshes a list.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { ApiError } from './api';
-
 export interface AsyncState<T> {
   data: T | null;
   loading: boolean;
-  error: string | null;
+  error: Error | null;
   reload: () => void;
 }
 
-export function useAsync<T>(loader: () => Promise<T>, deps: unknown[] = []): AsyncState<T> {
+export function useAsync<T>(loader: () => Promise<T>, deps: readonly unknown[]): AsyncState<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const [nonce, setNonce] = useState(0);
 
-  // Guards against a resolved request from a previous dependency set overwriting
-  // the result of the current one (for example when the selected date changes).
-  const generation = useRef(0);
+  // A slow loader that resolves after the screen unmounts must not set state.
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  // The loader identity changes every render, so it is held in a ref and the
+  // effect is keyed on the caller's deps instead.
+  const loaderRef = useRef(loader);
+  loaderRef.current = loader;
 
   useEffect(() => {
-    const current = ++generation.current;
-    let active = true;
     setLoading(true);
     setError(null);
-
-    loader()
-      .then((result) => {
-        if (active && current === generation.current) setData(result);
+    loaderRef
+      .current()
+      .then((value) => {
+        if (alive.current) setData(value);
       })
       .catch((err: unknown) => {
-        if (!active || current !== generation.current) return;
-        setError(err instanceof ApiError ? err.message : 'Network request failed');
+        if (alive.current) setError(err instanceof Error ? err : new Error(String(err)));
       })
       .finally(() => {
-        if (active && current === generation.current) setLoading(false);
+        if (alive.current) setLoading(false);
       });
-
-    return () => {
-      active = false;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, nonce]);
 
-  const reload = useCallback(() => setNonce((value) => value + 1), []);
+  const reload = useCallback(() => setNonce((n) => n + 1), []);
   return { data, loading, error, reload };
 }

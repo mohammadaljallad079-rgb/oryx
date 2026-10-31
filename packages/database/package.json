@@ -14,7 +14,8 @@
     "build": "prisma generate && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "echo \"database: schema tests run via @oryx/api\" && exit 0",
-    "lint": "echo \"database: no lint configured\" && exit 0"
+    "lint": "echo \"database: no lint configured\" && exit 0",
+    "production:init": "node scripts/production-init.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

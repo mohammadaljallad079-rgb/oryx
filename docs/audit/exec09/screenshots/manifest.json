@@ -1,0 +1,111 @@
+{
+  "base": "https://www.oryx.local",
+  "generatedAt": "2026-10-21T03:17:57.294Z",
+  "shots": [
+    {
+      "name": "light-homepage-desktop-rtl",
+      "file": "docs/audit/exec09/screenshots/light-homepage-desktop-rtl.png",
+      "url": "https://www.oryx.local/"
+    },
+    {
+      "name": "light-homepage-tablet-rtl",
+      "file": "docs/audit/exec09/screenshots/light-homepage-tablet-rtl.png",
+      "url": "https://www.oryx.local/"
+    },
+    {
+      "name": "light-homepage-mobile-rtl",
+      "file": "docs/audit/exec09/screenshots/light-homepage-mobile-rtl.png",
+      "url": "https://www.oryx.local/"
+    },
+    {
+      "name": "light-homepage-desktop-ltr",
+      "file": "docs/audit/exec09/screenshots/light-homepage-desktop-ltr.png",
+      "url": "https://www.oryx.local/"
+    },
+    {
+      "name": "light-providers-desktop-rtl",
+      "file": "docs/audit/exec09/screenshots/light-providers-desktop-rtl.png",
+      "url": "https://www.oryx.local/providers"
+    },
+    {
+      "name": "light-providers-tablet-rtl",
+      "file": "docs/audit/exec09/screenshots/light-providers-tablet-rtl.png",
+      "url": "https://www.oryx.local/providers"
+    },
+    {
+      "name": "light-providers-mobile-rtl",
+      "file": "docs/audit/exec09/screenshots/light-providers-mobile-rtl.png",
+      "url": "https://www.oryx.local/providers"
+    },
+    {
+      "name": "light-providers-desktop-ltr",
+      "file": "docs/audit/exec09/screenshots/light-providers-desktop-ltr.png",
+      "url": "https://www.oryx.local/providers"
+    },
+    {
+      "name": "light-login-desktop-rtl",
+      "file": "docs/audit/exec09/screenshots/light-login-desktop-rtl.png",
+      "url": "https://www.oryx.local/login"
+    },
+    {
+      "name": "light-login-tablet-rtl",
+      "file": "docs/audit/exec09/screenshots/light-login-tablet-rtl.png",
+      "url": "https://www.oryx.local/login"
+    },
+    {
+      "name": "light-login-mobile-rtl",
+      "file": "docs/audit/exec09/screenshots/light-login-mobile-rtl.png",
+      "url": "https://www.oryx.local/login"
+    },
+    {
+      "name": "light-login-desktop-ltr",
+      "file": "docs/audit/exec09/screenshots/light-login-desktop-ltr.png",
+      "url": "https://www.oryx.local/login"
+    },
+    {
+      "name": "light-dashboard-desktop-rtl",
+      "file": "docs/audit/exec09/screenshots/light-dashboard-desktop-rtl.png",
+      "url": "https://www.oryx.local/dashboard"
+    },
+    {
+      "name": "compare-homepage-desktop-rtl-light",
+      "file": "docs/audit/exec09/screenshots/compare-homepage-desktop-rtl-light.png",
+      "url": "https://www.oryx.local/"
+    },
+    {
+      "name": "compare-homepage-tablet-rtl-light",
+      "file": "docs/audit/exec09/screenshots/compare-homepage-tablet-rtl-light.png",
+      "url": "https://www.oryx.local/"
+    },
+    {
+      "name": "compare-homepage-mobile-rtl-light",
+      "file": "docs/audit/exec09/screenshots/compare-homepage-mobile-rtl-light.png",
+      "url": "https://www.oryx.local/"
+    },
+    {
+      "name": "compare-homepage-desktop-ltr-light",
+      "file": "docs/audit/exec09/screenshots/compare-homepage-desktop-ltr-light.png",
+      "url": "https://www.oryx.local/"
+    },
+    {
+      "name": "compare-homepage-desktop-rtl-dark",
+      "file": "docs/audit/exec09/screenshots/compare-homepage-desktop-rtl-dark.png",
+      "url": "https://www.oryx.local/"
+    },
+    {
+      "name": "compare-homepage-tablet-rtl-dark",
+      "file": "docs/audit/exec09/screenshots/compare-homepage-tablet-rtl-dark.png",
+      "url": "https://www.oryx.local/"
+    },
+    {
+      "name": "compare-homepage-mobile-rtl-dark",
+      "file": "docs/audit/exec09/screenshots/compare-homepage-mobile-rtl-dark.png",
+      "url": "https://www.oryx.local/"
+    },
+    {
+      "name": "compare-homepage-desktop-ltr-dark",
+      "file": "docs/audit/exec09/screenshots/compare-homepage-desktop-ltr-dark.png",
+      "url": "https://www.oryx.local/"
+    }
+  ]
+}

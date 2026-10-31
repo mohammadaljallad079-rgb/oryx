@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
 import { messageOf } from '@/lib/hooks';
-import { Alert, Button, Card, Field } from '@/components/ui';
+import { Alert, Button, Field } from '@/components/ui';
+import { AuthShell } from '@/components/premium';
 
 /**
  * Consumer sign-in.
@@ -50,8 +51,22 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="oryx-container" style={{ maxWidth: 460 }}>
-      <Card title={challengeToken ? t('auth.mfaTitle') : t('auth.loginTitle')}>
+    <AuthShell
+      title={challengeToken ? t('auth.mfaTitle') : t('auth.loginTitle')}
+      subtitle={challengeToken ? t('auth.mfaHint') : t('auth.loginSubtitle')}
+      aside={
+        !challengeToken && (
+          <>
+            <Link href="/forgot-password" className="oryx-link">
+              {t('auth.forgot')}
+            </Link>
+            <Link href="/register" className="oryx-link">
+              {t('nav.register')}
+            </Link>
+          </>
+        )
+      }
+    >
         <form onSubmit={onSubmit}>
           {error && <div style={{ marginBottom: 14 }}><Alert>{error}</Alert></div>}
 
@@ -93,22 +108,10 @@ export default function LoginPage() {
             </>
           )}
 
-          <Button type="submit" variant="primary" disabled={busy} className="oryx-btn-primary">
-            {challengeToken ? t('auth.verify') : t('auth.submitLogin')}
+          <Button type="submit" variant="primary" disabled={busy}>
+            {busy ? t('common.saving') : challengeToken ? t('auth.verify') : t('auth.submitLogin')}
           </Button>
         </form>
-
-        {!challengeToken && (
-          <p style={{ marginTop: 16, marginBottom: 0, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <Link href="/forgot-password" className="oryx-muted">
-              {t('auth.forgot')}
-            </Link>
-            <Link href="/register" className="oryx-muted">
-              {t('nav.register')}
-            </Link>
-          </p>
-        )}
-      </Card>
-    </div>
+    </AuthShell>
   );
 }

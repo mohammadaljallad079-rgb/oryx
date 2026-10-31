@@ -7,13 +7,19 @@ import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
 import { Badge, Button, Card, EmptyState, ErrorBanner, Field, SectionHeader, Skeleton } from '@/components/ui';
+import { BrandingPanel } from '@/components/branding-panel';
 
 export default function SettingsPage() {
   const { t, locale, theme, setLocale, setTheme } = useUi();
-  const { user, companyId, isPlatform, updatePreferences, refreshSession } = useAuth();
+  const { user, companyId, isPlatform, can, updatePreferences, refreshSession } = useAuth();
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState({ fullNameEn: '', fullNameAr: '' });
+
+  // Writes need `company.settings.update`; a Super Admin holds the platform
+  // variant of that check through its own role. Rendering the editor without
+  // the permission would show controls that the API rejects with a 403.
+  const canEditBranding = can('company.settings.update');
 
   const entitlements = useAsync(
     () => (companyId ? api.entitlements(companyId) : Promise.resolve(null)),
@@ -138,6 +144,14 @@ export default function SettingsPage() {
           </div>
         </Card>
       </div>
+
+      {companyId && canEditBranding ? (
+        <Card className="p-5" data-testid="settings-branding">
+          <p className="oryx-panel-title m-0 mb-1">{t('branding.title')}</p>
+          <p className="oryx-muted m-0 mb-4 text-[12px]">{t('branding.subtitle')}</p>
+          <BrandingPanel companyId={companyId} />
+        </Card>
+      ) : null}
 
       {companyId ? (
         <Card className="p-5" data-testid="settings-entitlements">
