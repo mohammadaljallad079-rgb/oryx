@@ -26,7 +26,11 @@ export function formatAmount(amountMinor: number, scale: number = DEMO_CURRENCY_
 
 /** `17 Oct 2026`. */
 export function formatDate(iso: string): string {
+  // An absent bound (an open-ended offer) is not a date, and must not render as
+  // "Invalid Date" or as the epoch.
+  if (!iso) return '';
   const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return `${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }

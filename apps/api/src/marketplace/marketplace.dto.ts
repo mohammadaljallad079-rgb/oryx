@@ -92,6 +92,84 @@ export class RejectApplicationDto {
 
 // ------------------------------------------------------------------ listings
 
+export class ProviderOfferDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(160)
+  titleEn!: string;
+
+  @IsString()
+  @MinLength(2)
+  @MaxLength(160)
+  titleAr!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  categoryKey?: string;
+
+  /** Basis points, so 1500 is 15%. */
+  @IsInt()
+  @Min(0)
+  @Max(10_000)
+  percentOffBp!: number;
+
+  @IsOptional()
+  @IsDateString()
+  startsAt?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endsAt?: string;
+}
+
+export class UpdateProviderOfferDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(160)
+  titleEn?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(160)
+  titleAr?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  categoryKey?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10_000)
+  percentOffBp?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsDateString()
+  startsAt?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endsAt?: string;
+}
+
 export class ProviderListingDto {
   @IsString()
   @MinLength(2)

@@ -7,14 +7,19 @@ import { photo, photoSmall } from '../../lib/assets';
 import { useAsync } from '../../lib/use-async';
 import { useLiveCatalog, useLiveProviders } from '../../lib/live-catalog';
 import { AppHeader } from '../../components/brand';
-import { ProductCard, ProviderCard, StoreCard } from '../../components/cards';
+import { OfferCard, ProductCard, ProviderCard, StoreCard } from '../../components/cards';
 import { Body, Photo, Rail, Screen, SectionLabel, StateView } from '../../components/ui';
 import { CategoryIcon, type CategoryIconName } from '../../components/category-icons';
 import { UiIcon } from '../../components/ui-icons';
 import { radius, space, typography } from '../../lib/theme';
 import { localizeDigits } from '../../lib/format';
-import { api, type HomepageResponse } from '../../lib/api';
-import { catalogStoreToDemo, publicProviderToDemo, toDemoProduct } from '../../lib/api-adapters';
+import { api, catalogApi, type CatalogOffer, type HomepageResponse } from '../../lib/api';
+import {
+  catalogOfferToDemo,
+  catalogStoreToDemo,
+  publicProviderToDemo,
+  toDemoProduct,
+} from '../../lib/api-adapters';
 
 /**
  * The marketplace home.
@@ -56,6 +61,11 @@ export default function Home() {
   // nothing published the screen degrades to the design the owner approved
   // rather than to a blank card.
   const live = useAsync<HomepageResponse>(() => api.homepage(locale), [locale]);
+  // The live promotional offers published by approved providers. Public data, so
+  // a guest sees the same rail. The rail is hidden entirely when nothing is
+  // advertised rather than padded with an invented discount.
+  const liveOffers = useAsync<CatalogOffer[]>(() => catalogApi.offers({ limit: 10 }), []);
+  const offers = (liveOffers.data ?? []).map(catalogOfferToDemo);
   // The approved bundled scene is the fallback whenever the CMS has nothing
   // published. A CMS record can never replace it with an unreviewed photograph.
   const heroImage = live.data?.hero[0]?.imageUrl ? { uri: live.data.hero[0].imageUrl } : null;
@@ -333,11 +343,30 @@ export default function Home() {
           ))}
         </Rail>
 
+        {/* -------------------------------------------------- live offers
+            The promotional offers approved providers have published, read from
+            the real catalogue. Nothing is shown when no offer is live: the rail
+            is omitted rather than filled with an invented discount. */}
+        {offers.length > 0 ? (
+          <>
+            <View style={styles.sectionHead}>
+              <SectionLabel>{t('offersAndDiscounts')}</SectionLabel>
+              <Pressable onPress={() => router.push('/promotions')} testID="offers-see-all">
+                <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '700' }}>
+                  {t('seeAll')}
+                </Text>
+              </Pressable>
+            </View>
+            <Rail>
+              {offers.map((offer) => (
+                <OfferCard key={offer.id} offer={offer} />
+              ))}
+            </Rail>
+          </>
+        ) : null}
+
         {/* ------------------------------------------------- featured stores
-            The store directory, from the live catalogue. The previous build's
-            "offers" rail was removed: there is no promotions record in the
-            platform, so every discount code on it was a demo value that no
-            customer could redeem. */}
+            The store directory, from the live catalogue. */}
         <View style={styles.sectionHead}>
           <SectionLabel>{t('featuredStores')}</SectionLabel>
           <Pressable onPress={() => router.push('/parts?tab=stores')} testID="stores-see-all">

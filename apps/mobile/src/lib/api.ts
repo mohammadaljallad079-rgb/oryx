@@ -441,7 +441,36 @@ export const catalogApi = {
       `/customer/catalog/categories?locale=${locale}`,
       { auth: false, signal },
     ),
+
+  /**
+   * The live promotional offers published by approved providers.
+   *
+   * Public, like the rest of the catalogue. The API filters to active offers
+   * inside their window, so the client shows exactly what is advertised.
+   */
+  offers: (params: { categoryKey?: string; limit?: number } = {}, signal?: AbortSignal) => {
+    const q = new URLSearchParams();
+    if (params.categoryKey) q.set('categoryKey', params.categoryKey);
+    if (params.limit) q.set('limit', String(params.limit));
+    const suffix = q.toString() ? `?${q}` : '';
+    return requestWithRetry<CatalogOffer[]>(`/customer/catalog/offers${suffix}`, { auth: false, signal });
+  },
 };
+
+/** A promotional offer as the customer app receives it. */
+export interface CatalogOffer {
+  id: string;
+  providerId: string;
+  titleEn: string;
+  titleAr: string;
+  description: string | null;
+  categoryKey: string | null;
+  percentOffBp: number;
+  isActive: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
+  provider: { id: string; code: string; nameEn: string; nameAr: string };
+}
 
 // -------------------------------------------------------- consumer orders
 
@@ -867,6 +896,50 @@ export const authApi = {
     }),
 
   me: (signal?: AbortSignal) => request<CustomerSession['account']>('/customer/auth/me', { signal }),
+
+  /**
+   * Request a password reset.
+   *
+   * The server answers `{ requested: true }` whether or not the address is
+   * registered, so this endpoint cannot be used to enumerate accounts. Outside
+   * production it also returns the reset token because no email provider is
+   * configured; the screen passes that straight through so the flow is testable
+   * without a mailbox.
+   */
+  forgotPassword: (email: string) =>
+    request<{ requested: boolean; resetToken?: string }>('/customer/auth/forgot-password', {
+      method: 'POST',
+      auth: false,
+      body: { email },
+    }),
+
+  /** Complete a password reset with the token from the email. */
+  resetPassword: (token: string, password: string) =>
+    request<{ reset: boolean }>('/customer/auth/reset-password', {
+      method: 'POST',
+      auth: false,
+      body: { token, password },
+    }),
+
+  /**
+   * Update the signed-in customer's own profile.
+   *
+   * The API scopes this to the token's account, so the client sends no account
+   * id and cannot edit another customer's profile.
+   */
+  updateProfile: (patch: { fullName?: string; phone?: string; preferredLocale?: 'ar' | 'en' }) =>
+    request<CustomerSession['account']>('/customer/auth/profile', { method: 'POST', body: patch }),
+
+  /** Change the password of the signed-in customer. The server verifies the current one. */
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ changed: boolean }>('/customer/auth/change-password', {
+      method: 'POST',
+      body: { currentPassword, newPassword },
+    }),
+
+  /** Revoke every other device's session. */
+  logoutAll: () =>
+    request<{ revoked: number }>('/customer/auth/logout-all', { method: 'POST' }),
 
   /**
    * Revokes the session server-side, then the caller clears local state.
@@ -1322,6 +1395,22 @@ export interface ProviderListing {
   isActive: boolean;
 }
 
+/** A promotional offer published by a provider, as the portal returns it. */
+export interface ProviderOffer {
+  id: string;
+  providerId: string;
+  titleEn: string;
+  titleAr: string;
+  description: string | null;
+  categoryKey: string | null;
+  percentOffBp: number;
+  isActive: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** A service request offered to or assigned to the provider. */
 export interface ProviderRequest {
   id: string;
@@ -1353,6 +1442,57 @@ export interface ProviderEarnings {
  * Every call carries the staff token (`plane: 'staff'`), because a consumer token
  * would be refused by the staff guards — correctly so.
  */
+/** A subscription plan as the plans catalogue returns it. */
+export interface SubscriptionPlan {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  monthlyPrice: number;
+  annualPrice: number;
+  currency: string;
+  isActive: boolean;
+  trialDays: number;
+  maxBranches: number;
+  maxUsers: number;
+  modules: Array<{ moduleKey: string; nameEn: string; nameAr: string; group: string }>;
+  subscriberCount?: number;
+}
+
+/** The tenant's own subscription, as the API resolves it from the token. */
+export interface CompanySubscription {
+  id: string;
+  companyId: string;
+  planId: string;
+  planNameEn: string;
+  planNameAr: string;
+  status: string;
+  billingPeriod: string;
+  price: number;
+  currency: string;
+  startedAt: string;
+  currentPeriodEnd: string | null;
+  licensedModules: string[];
+}
+
+/**
+ * The plan catalogue and the tenant's own subscription, both on the staff plane.
+ *
+ * `plans()` needs `company.subscription.read`, which every company administrator
+ * holds. `current()` returns only the caller's company subscription: the API
+ * scopes the query from the token's company, so no company id is sent and
+ * another tenant's billing cannot be read.
+ */
+export const subscriptionApi = {
+  plans: (signal?: AbortSignal) =>
+    requestWithRetry<SubscriptionPlan[]>('/plans?includeInactive=false', { signal, plane: 'staff' }),
+
+  current: (signal?: AbortSignal) =>
+    requestWithRetry<CompanySubscription[]>('/subscriptions', { signal, plane: 'staff' }),
+};
+
 export const providerApi = {
   profile: (signal?: AbortSignal) =>
     requestWithRetry<ProviderProfile>('/provider/profile', { signal, plane: 'staff' }),
@@ -1404,6 +1544,35 @@ export const providerApi = {
     request<ProviderRequest>(`/provider/requests/${id}/complete`, { method: 'POST', body: input, plane: 'staff' }),
   cancelRequest: (id: string, reason?: string) =>
     request<ProviderRequest>(`/provider/requests/${id}/cancel`, { method: 'POST', body: { reason }, plane: 'staff' }),
+
+  offers: (params: { includeInactive?: boolean } = {}, signal?: AbortSignal) => {
+    const q = params.includeInactive ? '?includeInactive=true' : '';
+    return requestWithRetry<ProviderOffer[]>(`/provider/offers${q}`, { signal, plane: 'staff' });
+  },
+
+  createOffer: (input: {
+    titleEn: string;
+    titleAr: string;
+    description?: string;
+    categoryKey?: string;
+    percentOffBp: number;
+    startsAt?: string;
+    endsAt?: string;
+  }) => request<ProviderOffer>('/provider/offers', { method: 'POST', body: input, plane: 'staff' }),
+
+  updateOffer: (
+    id: string,
+    patch: Partial<{
+      titleEn: string;
+      titleAr: string;
+      description: string;
+      categoryKey: string;
+      percentOffBp: number;
+      isActive: boolean;
+      startsAt: string;
+      endsAt: string;
+    }>,
+  ) => request<ProviderOffer>(`/provider/offers/${encodeURIComponent(id)}`, { method: 'PATCH', body: patch, plane: 'staff' }),
 
   earnings: (signal?: AbortSignal) =>
     requestWithRetry<ProviderEarnings>('/provider/earnings', { signal, plane: 'staff' }),

@@ -3896,6 +3896,7 @@ model MarketplaceProvider {
   reviews         ProviderReview[]
   disputes        MarketplaceDispute[]
   bookingResources BookingResource[]
+  offers          ProviderOffer[]
 
   @@index([status])
 }
@@ -3916,6 +3917,40 @@ model ProviderServiceListing {
   provider MarketplaceProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
   @@index([providerId])
+  @@index([categoryKey])
+}
+
+/**
+ * A promotional offer published by a marketplace provider.
+ *
+ * Scoped to the provider, not the tenant, because an offer is a marketplace
+ * artifact: the customer app reads the active ones to show a "special offer"
+ * rail. `percentOffBp` is basis points for the same reason every other
+ * percentage in this schema is (1500 = 15%); `categoryKey` narrows the offer to
+ * one catalogue category and is optional, so an empty value means the whole
+ * catalogue.
+ *
+ * `startsAt`/`endsAt` bound the offer. A null bound is open-ended, and the
+ * customer query filters on `isActive` plus the window, so an expired offer is
+ * never advertised.
+ */
+model ProviderOffer {
+  id           String   @id @default(cuid())
+  providerId   String
+  titleEn      String
+  titleAr      String
+  description  String?
+  categoryKey  String?
+  percentOffBp Int      @default(0)
+  isActive     Boolean  @default(true)
+  startsAt     DateTime?
+  endsAt       DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  provider MarketplaceProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId, isActive])
   @@index([categoryKey])
 }
 

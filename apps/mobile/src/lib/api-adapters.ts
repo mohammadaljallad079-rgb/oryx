@@ -15,7 +15,9 @@
  *     from the record's own key so the same product always shows the same
  *     placeholder rather than a new one on every render.
  */
+import { CATEGORY_PHOTO } from '../demo/catalogue';
 import type {
+  DemoOffer,
   DemoOrder,
   DemoProduct,
   DemoProvider,
@@ -27,6 +29,7 @@ import type {
 } from '../demo/catalogue';
 import {
   mediaUrl,
+  type CatalogOffer,
   type CatalogProduct,
   type CatalogStore,
   type CustomerServiceRequest,
@@ -205,6 +208,33 @@ export function catalogProductToDemo(product: CatalogProduct): DemoProduct {
  * and the card's "free delivery" line is not claimed — the card is given no
  * rating count, so it draws no rating pill.
  */
+/**
+ * Maps a live promotional offer onto the offer card's type.
+ *
+ * The percentage arrives in basis points (1500 = 15%), so it is divided for
+ * display. `expiresAt` is a real bound when the provider set one and an empty
+ * string otherwise; the card formats an empty string as absent rather than as a
+ * date. The photograph is chosen from the offer's category so the card shows a
+ * picture that matches the service, falling back deterministically on the id.
+ */
+export function catalogOfferToDemo(offer: CatalogOffer): DemoOffer {
+  const category = (offer.categoryKey ?? null) as CategoryKey | null;
+  const photo = (category && CATEGORY_PHOTO[category]) || fallbackPhoto(offer.id);
+  return {
+    id: offer.id,
+    titleEn: offer.titleEn,
+    titleAr: offer.titleAr,
+    subtitleEn: offer.description ?? offer.provider.nameEn,
+    subtitleAr: offer.description ?? offer.provider.nameAr,
+    percentOff: Math.round(offer.percentOffBp / 100),
+    storeId: null,
+    categoryKey: category,
+    photo,
+    expiresAt: offer.endsAt ?? '',
+    code: '',
+  };
+}
+
 export function catalogStoreToDemo(store: CatalogStore): DemoStore {
   return {
     id: store.id,

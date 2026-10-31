@@ -99,6 +99,15 @@ export default function Login() {
           loading={busy || liveBusy}
           disabled={!email.trim() || password.length === 0}
         />
+        <Pressable
+          testID="login-forgot"
+          onPress={() => router.push('/forgot-password')}
+          style={styles.linkRow}
+        >
+          <Text style={{ color: theme.gold, fontWeight: '700', fontSize: typography.label }}>
+            {t('forgotPassword')}
+          </Text>
+        </Pressable>
         <Pressable onPress={() => router.push('/register')} style={styles.linkRow}>
           <Text style={{ color: theme.textMuted, fontSize: typography.label }}>
             {t('noAccount')}{' '}

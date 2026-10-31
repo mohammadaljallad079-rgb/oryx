@@ -79,7 +79,9 @@ export default function SensageReport() {
   }
 
   const record = report.data;
-  const vehicle = repository.vehicle(record.vehicleId);
+  // Only the demo path reaches here (a live session returns early above), but
+  // the guard makes that explicit rather than relying on the early return.
+  const vehicle = isLive ? null : repository.vehicle(record.vehicleId);
   const tone = record.score >= 80 ? theme.success : record.score >= 65 ? theme.warning : theme.danger;
 
   return (

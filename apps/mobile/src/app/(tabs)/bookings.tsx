@@ -30,9 +30,11 @@ export default function Bookings() {
   const live = useLiveBookings();
   const router = useRouter();
 
+  // The demo list is only read when no live session is active, so a real
+  // booking can never appear beside a local one.
   const demoBookings = useAsync(
-    async () => (account ? repository.bookings(account.id) : []),
-    [account?.id, dataVersion],
+    async () => (account && !isLive ? repository.bookings(account.id) : []),
+    [account?.id, dataVersion, isLive],
   );
 
   const count = isLive ? live.items.length : (demoBookings.data ?? []).length;

@@ -25,9 +25,11 @@ import {
   DisputeMessageDto,
   OrderStatusDto,
   ProviderListingDto,
+  ProviderOfferDto,
   ReviewReplyDto,
   SetAvailabilityDto,
   UpdateProviderListingDto,
+  UpdateProviderOfferDto,
   UpdateProviderProfileDto,
 } from './marketplace.dto';
 
@@ -114,6 +116,39 @@ export class ProviderPortalController {
   ) {
     const provider = await this.provider(principal);
     return this.marketplace.updateListing(provider.id, id, dto);
+  }
+
+  // ---------------------------------------------------------------- offers
+
+  @Get('offers')
+  @RequirePermissions('erp.provider_portal.manage')
+  @ApiOperation({ summary: 'List the provider promotional offers' })
+  async listOffers(
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Query('includeInactive') includeInactive?: string,
+  ) {
+    const provider = await this.provider(principal);
+    return this.marketplace.listOffers(provider.id, includeInactive === 'true');
+  }
+
+  @Post('offers')
+  @RequirePermissions('erp.provider_portal.manage')
+  @ApiOperation({ summary: 'Publish a promotional offer' })
+  async createOffer(@CurrentPrincipal() principal: RequestPrincipal, @Body() dto: ProviderOfferDto) {
+    const provider = await this.provider(principal);
+    return this.marketplace.createOffer(provider.id, dto);
+  }
+
+  @Patch('offers/:id')
+  @RequirePermissions('erp.provider_portal.manage')
+  @ApiOperation({ summary: 'Update or withdraw a promotional offer' })
+  async updateOffer(
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Param('id') id: string,
+    @Body() dto: UpdateProviderOfferDto,
+  ) {
+    const provider = await this.provider(principal);
+    return this.marketplace.updateOffer(provider.id, id, dto);
   }
 
   // ------------------------------------------------------------ availability

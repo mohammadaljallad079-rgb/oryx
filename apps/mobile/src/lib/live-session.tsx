@@ -35,6 +35,8 @@ export interface CustomerAccount {
   id: string;
   email: string;
   fullName: string;
+  /** Null until the customer sets one; the profile screen hides an absent value. */
+  phone?: string | null;
   preferredLocale: 'ar' | 'en';
   preferredTheme: 'dark' | 'light';
   defaultCompanyId: string | null;
@@ -62,6 +64,19 @@ interface LiveSessionState {
   signOut: () => Promise<void>;
   /** Re-reads the account from the API. Used after a profile change. */
   refreshAccount: () => Promise<void>;
+  /**
+   * Saves the customer's own profile and adopts the server's copy.
+   *
+   * The API scopes the write to the token's account, so no account id is sent.
+   * The response replaces the cached account rather than being merged locally,
+   * so the screen shows what the server actually stored.
+   */
+  saveProfile: (patch: {
+    fullName?: string;
+    phone?: string;
+    preferredLocale?: 'ar' | 'en';
+    preferredTheme?: 'dark' | 'light';
+  }) => Promise<{ ok: boolean; error?: string }>;
   /** A human-readable message for the last error, keyed for the i18n layer. */
   errorKey: string | null;
 }
@@ -204,6 +219,29 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
     await clear();
   }, [clear]);
 
+  const saveProfile = useCallback(
+    async (patch: {
+      fullName?: string;
+      phone?: string;
+      preferredLocale?: 'ar' | 'en';
+      preferredTheme?: 'dark' | 'light';
+    }) => {
+      setBusy(true);
+      setError(null);
+      try {
+        const me = await authApi.updateProfile(patch);
+        setAccount(me as unknown as CustomerAccount);
+        return { ok: true as const };
+      } catch (err) {
+        setError(err as ApiError);
+        return { ok: false as const, error: errorKeyFor(err) };
+      } finally {
+        setBusy(false);
+      }
+    },
+    [],
+  );
+
   const refreshAccount = useCallback(async () => {
     if (status !== 'live') return;
     try {
@@ -225,9 +263,10 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
       register,
       signOut,
       refreshAccount,
+      saveProfile,
       errorKey: error ? errorKeyFor(error) : null,
     }),
-    [status, account, error, busy, signIn, register, signOut, refreshAccount],
+    [status, account, error, busy, signIn, register, signOut, refreshAccount, saveProfile],
   );
 
   return <LiveSessionContext.Provider value={value}>{children}</LiveSessionContext.Provider>;

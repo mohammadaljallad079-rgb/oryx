@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  catalogApi,
   getAccessToken,
   getStaffAccessToken,
   paymentsApi,
@@ -8,6 +9,7 @@ import {
   request,
   serviceRequestsApi,
   setAccessToken,
+  subscriptionApi,
   setStaffAccessToken,
   vehiclesApi,
 } from '../src/lib/api';
@@ -144,6 +146,77 @@ describe('service requests', () => {
     expect(captured[0]?.url).toContain('/customer/marketplace/requests/r1/cancel');
     expect(captured[0]?.method).toBe('POST');
     expect(JSON.parse(captured[0]?.body as string)).toEqual({ reason: 'changed my mind' });
+  });
+});
+
+describe('promotional offers', () => {
+  it('reads the public customer feed with no token', async () => {
+    stubFetch(200, []);
+    setAccessToken(null);
+    await catalogApi.offers();
+    expect(captured[0]?.url).toContain('/customer/catalog/offers');
+    expect(captured[0]?.headers.Authorization).toBeUndefined();
+  });
+
+  it('passes the category filter through to the server', async () => {
+    stubFetch(200, []);
+    await catalogApi.offers({ categoryKey: 'maintenance', limit: 5 });
+    expect(captured[0]?.url).toContain('categoryKey=maintenance');
+    expect(captured[0]?.url).toContain('limit=5');
+  });
+
+  it('lists the merchant own offers on the staff plane', async () => {
+    stubFetch(200, []);
+    setAccessToken('consumer-token');
+    setStaffAccessToken('staff-token');
+    await providerApi.offers({ includeInactive: true });
+    expect(captured[0]?.url).toContain('/provider/offers');
+    expect(captured[0]?.url).toContain('includeInactive=true');
+    expect(captured[0]?.headers.Authorization).toBe('Bearer staff-token');
+  });
+
+  it('creates an offer with the basis-point discount the server expects', async () => {
+    stubFetch(201, { id: 'o1' });
+    setStaffAccessToken('staff-token');
+    await providerApi.createOffer({
+      titleEn: 'Winter',
+      titleAr: 'شتاء',
+      percentOffBp: 1500,
+    });
+    expect(captured[0]?.method).toBe('POST');
+    expect(JSON.parse(captured[0]?.body as string)).toEqual({
+      titleEn: 'Winter',
+      titleAr: 'شتاء',
+      percentOffBp: 1500,
+    });
+  });
+
+  it('withdraws through the offer-specific patch route', async () => {
+    stubFetch(200, { id: 'o1', isActive: false });
+    setStaffAccessToken('staff-token');
+    await providerApi.updateOffer('o1', { isActive: false });
+    expect(captured[0]?.url).toContain('/provider/offers/o1');
+    expect(captured[0]?.method).toBe('PATCH');
+    expect(JSON.parse(captured[0]?.body as string)).toEqual({ isActive: false });
+  });
+});
+
+describe('subscription reads', () => {
+  it('reads the plan catalogue on the staff plane', async () => {
+    stubFetch(200, []);
+    setAccessToken('consumer-token');
+    setStaffAccessToken('staff-token');
+    await subscriptionApi.plans();
+    expect(captured[0]?.url).toContain('/plans?includeInactive=false');
+    expect(captured[0]?.headers.Authorization).toBe('Bearer staff-token');
+  });
+
+  it('reads the tenant own subscription without sending a company id', async () => {
+    stubFetch(200, []);
+    setStaffAccessToken('staff-token');
+    await subscriptionApi.current();
+    expect(captured[0]?.url).toContain('/subscriptions');
+    expect(captured[0]?.url).not.toContain('companyId');
   });
 });
 

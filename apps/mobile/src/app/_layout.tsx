@@ -57,6 +57,9 @@ function RootNavigator() {
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="login" />
         <Stack.Screen name="register" />
+        <Stack.Screen name="forgot-password" />
+        <Stack.Screen name="promotions" />
+        <Stack.Screen name="account-security" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="merchant" />
         <Stack.Screen name="merchant-login" />

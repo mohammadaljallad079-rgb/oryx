@@ -1231,7 +1231,49 @@ async function seedExecution03Baseline(idByCode: Map<string, string>, superAdmin
           },
         });
       }
+      // A live promotional offer per provider, so the customer app's offers rail
+      // shows real, DB-backed rows. Idempotent by title, and open-ended (no
+      // window) so a re-seed does not silently expire it.
+      const offerTitle = `Special offer — ${p.nameEn}`;
+      if ((await prisma.providerOffer.count({ where: { providerId: provider.id } })) === 0) {
+        await prisma.providerOffer.create({
+          data: {
+            providerId: provider.id,
+            titleEn: offerTitle,
+            titleAr: `عرض خاص — ${p.nameAr}`,
+            description: 'Valid on every service booked through the ORYX app.',
+            categoryKey: p.key,
+            percentOffBp: 1000 + index * 500,
+            isActive: true,
+          },
+        });
+      }
       providers += 1;
+    }
+  }
+
+  // Link the ORYX-AUTO company administrator to the company's first provider, so
+  // the merchant portal (which resolves the provider from the signed-in account's
+  // membership) has a working account on a freshly seeded database. Without this
+  // link every `/provider/...` route answers 403 for the seeded admins.
+  const autoCompanyId = idByCode.get('ORYX-AUTO');
+  if (autoCompanyId) {
+    const autoAdmin = await prisma.user.findUnique({ where: { email: 'admin@oryx-auto.local' } });
+    const firstProvider = await prisma.marketplaceProvider.findFirst({
+      where: { providerCompanyId: autoCompanyId },
+      orderBy: { code: 'asc' },
+    });
+    if (autoAdmin && firstProvider) {
+      const link = await prisma.providerUser.findFirst({
+        where: { providerId: firstProvider.id, userId: autoAdmin.id },
+      });
+      if (link) {
+        await prisma.providerUser.update({ where: { id: link.id }, data: { isActive: true, role: 'OWNER' } });
+      } else {
+        await prisma.providerUser.create({
+          data: { providerId: firstProvider.id, userId: autoAdmin.id, role: 'OWNER', isActive: true },
+        });
+      }
     }
   }
 

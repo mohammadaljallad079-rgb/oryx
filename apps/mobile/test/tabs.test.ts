@@ -157,11 +157,14 @@ describe('route tree', () => {
     );
     expect(declared.sort()).toEqual([
       '(tabs)',
+      'account-security',
+      'forgot-password',
       'index',
       'login',
       'merchant',
       'merchant-login',
       'onboarding',
+      'promotions',
       'register',
     ]);
   });

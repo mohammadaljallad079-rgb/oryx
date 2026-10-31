@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -17,8 +17,10 @@ import {
   Button,
   Card,
   Chip,
+  Field,
   Heading,
   ListRow,
+  Notice,
   Screen,
   SectionLabel,
   StateView,
@@ -42,6 +44,14 @@ export default function Account() {
   const liveOrders = useLiveOrders();
   const router = useRouter();
   const isLive = session.isLive;
+
+  // Profile editing. Only a live session can save: the demo account is local, so
+  // offering an edit form there would be a button that changes nothing real.
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [profilePhone, setProfilePhone] = useState('');
+  const [profileNotice, setProfileNotice] = useState<string | null>(null);
+  const [profileBusy, setProfileBusy] = useState(false);
 
   // The garage and the activity come from the API inside a live session and from
   // the local demo otherwise. The two are never blended, so a demo record cannot
@@ -112,13 +122,84 @@ export default function Account() {
               <Body size="caption" muted>
                 {email}
               </Body>
-              {isLive ? null : (
+              {isLive ? (
+                session.account?.phone ? (
+                  <Body size="caption" muted>
+                    {session.account.phone}
+                  </Body>
+                ) : null
+              ) : (
                 <Body size="caption" muted>
                   {account?.phone}
                 </Body>
               )}
             </View>
           </View>
+
+          {isLive ? (
+            editingProfile ? (
+              <View style={{ marginTop: space.md }}>
+                <Field
+                  label={t('fullName')}
+                  value={profileName}
+                  onChangeText={setProfileName}
+                  testID="profile-name"
+                />
+                <Field
+                  label={t('phone')}
+                  value={profilePhone}
+                  onChangeText={setProfilePhone}
+                  keyboardType="phone-pad"
+                  testID="profile-phone"
+                />
+                <View style={{ flexDirection: 'row', gap: space.sm }}>
+                  <Button
+                    testID="profile-save"
+                    title={t('save')}
+                    loading={profileBusy}
+                    disabled={profileName.trim().length < 2}
+                    onPress={async () => {
+                      setProfileBusy(true);
+                      setProfileNotice(null);
+                      const result = await session.saveProfile({
+                        fullName: profileName.trim(),
+                        phone: profilePhone.trim() || undefined,
+                      });
+                      setProfileBusy(false);
+                      if (result.ok) {
+                        setEditingProfile(false);
+                        setProfileNotice(t('profileSaved'));
+                      } else {
+                        setProfileNotice(t('profileSaveFailed'));
+                      }
+                    }}
+                    style={{ flex: 1 }}
+                  />
+                  <Button
+                    title={t('cancel')}
+                    variant="secondary"
+                    onPress={() => setEditingProfile(false)}
+                    style={{ flex: 1 }}
+                  />
+                </View>
+              </View>
+            ) : (
+              <View style={{ marginTop: space.md }}>
+                <Button
+                  testID="profile-edit"
+                  title={t('editProfile')}
+                  variant="secondary"
+                  onPress={() => {
+                    setProfileName(session.account?.fullName ?? '');
+                    setProfilePhone(session.account?.phone ?? '');
+                    setProfileNotice(null);
+                    setEditingProfile(true);
+                  }}
+                />
+              </View>
+            )
+          ) : null}
+          <Notice text={profileNotice} />
         </Card>
 
         <SectionLabel>{t('myVehicles')}</SectionLabel>
@@ -249,6 +330,7 @@ export default function Account() {
           <ListRow title={t('myRecoveryRequests')} onPress={() => router.push('/recovery')} />
           <ListRow title={t('notifications')} onPress={() => router.push('/notifications')} />
           <ListRow title={t('addresses')} onPress={() => router.push('/addresses')} />
+          <ListRow title={t('accountSecurity')} onPress={() => router.push('/account-security')} />
           <ListRow title={t('support')} subtitle={t('supportHint')} onPress={() => router.push('/support')} />
         </Card>
 

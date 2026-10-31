@@ -34,7 +34,12 @@ export default function Cart() {
   const router = useRouter();
 
   const isLive = live.mode === 'live';
-  const products = useAsync(async () => repository.products(), [dataVersion]);
+  // The demo catalogue is only read outside a live session; a live cart's lines
+  // carry their own product data from the server.
+  const products = useAsync(
+    async () => (isLive ? [] : repository.products()),
+    [dataVersion, isLive],
+  );
 
   const demoLines = cart.flatMap((line) => {
     const product = (products.data ?? []).find((p) => p.id === line.productId);

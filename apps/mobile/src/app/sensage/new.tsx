@@ -90,9 +90,11 @@ export default function NewSensage() {
   const [uploadedCount, setUploadedCount] = useState(0);
   const [history, setHistory] = useState<Array<{ id: string; caption: string | null; createdAt: string }>>([]);
 
+  // The demo garage is only read outside a live session, so a server vehicle is
+  // never listed beside a local one.
   const vehicles = useAsync(
-    async () => (account ? repository.vehicles(account.id) : []),
-    [account?.id, dataVersion],
+    async () => (account && !isLive ? repository.vehicles(account.id) : []),
+    [account?.id, dataVersion, isLive],
   );
 
   // The real garage, only when a live session is active. A demo session has no
