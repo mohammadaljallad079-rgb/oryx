@@ -614,6 +614,38 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `release` build type points at `signingConfigs.debug` (Expo template default),
   so it is debug-signed — fine for a demo hand-out, not for a store submission.
 
+### Execution 10 gotchas
+
+- **A seeded deployment had zero bookable slots.** Availability is generated from
+  a `BookingResource` plus its `WorkingHours`, and the seed created only workshop
+  bays, so `GET /customer/bookings/availability` returned `[]` and the mobile
+  wizard showed an empty day with no error. The seed now creates two `BAY`
+  resources per company, open 08:00-20:00 daily. If availability is ever empty
+  again, check the resources before the client.
+- **A write on a pushed screen is invisible to the tab underneath.** The account
+  tab and the address list stay mounted while a detail screen is pushed on top,
+  and their `useAsync` deps do not change, so a vehicle or address created on the
+  pushed screen does not appear until a manual reload. `useReloadOnFocus`
+  (`apps/mobile/src/lib/use-reload-on-focus.ts`) refetches on focus; use it for
+  any list a sibling screen can mutate.
+- **The live-orders store exposes `refresh`, the async hook exposes `reload`.**
+  They are different names for the same idea and mixing them up is a type error
+  rather than a silent bug.
+- **A demo rail must be gated by the session, not by an empty response.**
+  `parts/index.tsx` originally showed the demo product rail whenever the live
+  catalogue came back empty, which is the live case on a fresh tenant. Gate demo
+  data on the absence of a session (`!isLive` / `!isSignedIn`).
+  `apps/mobile/test/demo-gating.test.ts` walks every screen file and fails if one
+  reads the demo `repository` without also reading the session; add a screen to
+  its `ALLOWED` map only when there is genuinely no session to branch on.
+- **`MediaStorageService` sniffs magic bytes and ignores the declared
+  content-type.** A real PNG posted as `application/pdf` is accepted, and
+  non-image bytes posted as `image/png` are refused. A test that asserts on the
+  declared type alone will assert the wrong thing.
+- **A 1x1 PNG is refused by the image pipeline.** Smoke tests need a real image;
+  `scripts/exec10-smoke.sh` generates an 80x80 RGB PNG for exactly this reason.
+
+
 ### Adding a new ERP module
 
 1. Add a `ModuleDefinition` to `packages/shared/src/modules.ts`.
