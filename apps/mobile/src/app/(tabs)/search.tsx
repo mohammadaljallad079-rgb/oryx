@@ -4,8 +4,8 @@ import { useRouter } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
 import { photoSmall } from '../../lib/assets';
-import { repository } from '../../lib/repository';
-import { useAsync } from '../../lib/use-async';
+import { useLiveCatalog, useLiveProviders } from '../../lib/live-catalog';
+import { catalogProductToDemo, catalogStoreToDemo, publicProviderToDemo } from '../../lib/api-adapters';
 import { AppHeader } from '../../components/brand';
 import { ProviderCard, StoreCard } from '../../components/cards';
 import {
@@ -22,23 +22,25 @@ import { radius, space, typography } from '../../lib/theme';
 /**
  * The search tab.
  *
- * One field over the whole demo catalogue — products, stores and providers — with
- * the result kind as a filter chip. The three lookups run through the repository
- * the same way the other screens do, so a term that finds nothing says so rather
- * than showing an empty list.
+ * One field over the live marketplace — products, stores and approved providers —
+ * with the result kind as a filter chip. Products and stores are narrowed by the
+ * API's own `query` parameter, so the catalogue is searched server-side; the
+ * provider directory has no search parameter, so its (bounded) list is narrowed
+ * locally. A term that finds nothing says so rather than showing an empty list.
  */
 export default function Search() {
-  const { t, theme, direction, dataVersion } = useApp();
+  const { t, theme, direction } = useApp();
   const router = useRouter();
 
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<'all' | 'products' | 'stores' | 'providers'>('all');
 
-  const products = useAsync(() => repository.products(), [dataVersion]);
-  const stores = useAsync(() => repository.stores({}), [dataVersion]);
-  const providers = useAsync(() => repository.providers({}), [dataVersion]);
-
   const term = query.trim().toLowerCase();
+  const enabled = term.length > 0;
+
+  // Products and stores are searched by the API; a blank term loads nothing.
+  const liveCatalog = useLiveCatalog({ query: term, enabled });
+  const liveProviders = useLiveProviders({ enabled });
 
   const results = useMemo(() => {
     if (term.length === 0) {
@@ -46,15 +48,14 @@ export default function Search() {
     }
     const has = (...values: Array<string | undefined>) =>
       values.some((v) => (v ?? '').toLowerCase().includes(term));
-
     return {
-      products: (products.data ?? []).filter((p) =>
-        has(p.nameEn, p.nameAr, p.sku, p.brand),
-      ),
-      stores: (stores.data ?? []).filter((s) => has(s.nameEn, s.nameAr, s.cityKey)),
-      providers: (providers.data ?? []).filter((p) => has(p.nameEn, p.nameAr, p.cityKey)),
+      products: liveCatalog.products.map(catalogProductToDemo),
+      stores: liveCatalog.stores.map(catalogStoreToDemo),
+      providers: liveProviders.providers
+        .filter((p) => has(p.nameEn, p.nameAr))
+        .map(publicProviderToDemo),
     };
-  }, [term, products.data, stores.data, providers.data]);
+  }, [term, liveCatalog.products, liveCatalog.stores, liveProviders.providers]);
 
   const total = results.products.length + results.stores.length + results.providers.length;
   const show = (k: typeof kind) => kind === 'all' || kind === k;

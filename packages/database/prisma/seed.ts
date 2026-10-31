@@ -983,6 +983,7 @@ async function seedExecution03Baseline(idByCode: Map<string, string>, superAdmin
   let inspectionServices = 0;
   let bays = 0;
   let providers = 0;
+  let bookingResources = 0;
 
   for (const company of companies) {
     const branch = await prisma.branch.findFirst({ where: { companyId: company.id } });
@@ -1155,6 +1156,43 @@ async function seedExecution03Baseline(idByCode: Map<string, string>, superAdmin
       bays += 1;
     }
 
+    // Bookable resources for the customer booking engine. A workshop bay alone
+    // is not bookable: availability is generated from a `BookingResource` and
+    // its `WorkingHours`, so a tenant with bays but no resource offers no slot
+    // to the mobile app. Two bays, open 08:00–20:00 every day, matching the
+    // workshop bays above.
+    for (const r of [
+      { code: 'RES-BAY-1', nameEn: 'Service Bay 1', nameAr: 'منصة الخدمة ١' },
+      { code: 'RES-BAY-2', nameEn: 'Service Bay 2', nameAr: 'منصة الخدمة ٢' },
+    ]) {
+      const resource = await prisma.bookingResource.upsert({
+        where: { companyId_code: { companyId: company.id, code: r.code } },
+        update: {},
+        create: {
+          companyId: company.id,
+          branchId: branch?.id ?? null,
+          resourceType: 'BAY',
+          code: r.code,
+          nameEn: r.nameEn,
+          nameAr: r.nameAr,
+          capacity: 1,
+        },
+      });
+      if ((await prisma.workingHours.count({ where: { resourceId: resource.id } })) === 0) {
+        await prisma.workingHours.createMany({
+          data: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+            companyId: company.id,
+            branchId: branch?.id ?? null,
+            resourceId: resource.id,
+            dayOfWeek,
+            opensMinute: 8 * 60,
+            closesMinute: 20 * 60,
+          })),
+        });
+      }
+      bookingResources += 1;
+    }
+
     // Marketplace providers (approved), one per service category, so the
     // customer directory can answer every category filter with real rows. The
     // category keys come from @oryx/shared — the same keys the website chips and
@@ -1200,7 +1238,8 @@ async function seedExecution03Baseline(idByCode: Map<string, string>, superAdmin
   console.log(
     `  e03 baseline: ${departments} departments, ${jobTitles} job titles, ${employees} employees, ` +
       `${leaveTypes} leave types, ${shifts} shifts, ${leadSources} lead sources, ${pipelines} pipelines, ` +
-      `${inspectionServices} inspection services, ${bays} bays, ${providers} providers`,
+      `${inspectionServices} inspection services, ${bays} bays, ${bookingResources} booking resources, ` +
+      `${providers} providers`,
   );
 }
 

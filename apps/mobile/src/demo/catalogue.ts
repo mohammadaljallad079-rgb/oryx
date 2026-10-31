@@ -99,6 +99,14 @@ export interface DemoStore {
   minimumOrderMinor: number;
   since: number;
   tags: string[];
+  /**
+   * The number of products in the store's published catalogue.
+   *
+   * Present only on a live record, where the API counted it. The demo records
+   * leave it undefined and are rendered from `since` and `deliveryMinor` as
+   * before.
+   */
+  productCount?: number;
 }
 
 export interface DemoProduct {
@@ -183,7 +191,23 @@ export interface DemoOrderItem {
   unitPriceMinor: number;
 }
 
-export type OrderStatus = 'PENDING' | 'PREPARING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+/**
+ * Order statuses the UI renders.
+ *
+ * The wider set is the API's own `CustomerOrderStatus` machine; the demo data
+ * only ever uses a subset, but the type must accept a real server order so the
+ * order history and detail screens can render one without a cast.
+ */
+export type OrderStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'PREPARING'
+  | 'READY'
+  | 'OUT_FOR_DELIVERY'
+  | 'SHIPPED'
+  | 'DELIVERED'
+  | 'COMPLETED'
+  | 'CANCELLED';
 
 export interface DemoOrder {
   id: string;

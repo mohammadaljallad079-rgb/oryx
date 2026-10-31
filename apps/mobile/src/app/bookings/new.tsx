@@ -7,6 +7,8 @@ import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
 import { useLiveSession } from '../../lib/live-session';
 import { useLiveBookings } from '../../lib/live-bookings';
+import { useLiveProviders } from '../../lib/live-catalog';
+import { publicProviderToDemo } from '../../lib/api-adapters';
 import { ScreenHeader } from '../../components/brand';
 import { VehicleCard } from '../../components/cards';
 import {
@@ -61,7 +63,22 @@ export default function NewBooking() {
   const [liveReference, setLiveReference] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const providers = useAsync(async () => repository.providers({ sort: 'rating' }), [dataVersion]);
+  // In a live session the provider directory is the approved, real one and its
+  // listings are the bookable services; the demo directory is only read offline.
+  const liveProviders = useLiveProviders();
+  const demoProviders = useAsync(
+    async () => (!isLive ? repository.providers({ sort: 'rating' }) : []),
+    [dataVersion, isLive],
+  );
+  const providers = useMemo(
+    () => ({
+      data: isLive
+        ? liveProviders.providers.map(publicProviderToDemo)
+        : (demoProviders.data ?? []),
+      loading: isLive ? liveProviders.loading : demoProviders.loading,
+    }),
+    [isLive, liveProviders.providers, liveProviders.loading, demoProviders.data, demoProviders.loading],
+  );
   const demoVehicles = useAsync(
     async () => (account ? repository.vehicles(account.id) : []),
     [account?.id, dataVersion],

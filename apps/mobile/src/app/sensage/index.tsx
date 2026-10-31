@@ -6,6 +6,8 @@ import { useApp } from '../../lib/app-context';
 import { photo } from '../../lib/assets';
 import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
+import { useLiveSession } from '../../lib/live-session';
+import { inspectionPhotosApi, mediaUrl, type InspectionPhoto } from '../../lib/api';
 import { AppHeader, DemoBanner } from '../../components/brand';
 import { ReportCard } from '../../components/cards';
 import {
@@ -30,10 +32,19 @@ import { formatDate, localizeDigits } from '../../lib/format';
  */
 export default function SensageHome() {
   const { t, theme, locale, account, dataVersion } = useApp();
+  const { isLive } = useLiveSession();
   const router = useRouter();
+
+  // The demo reports exist only in the offline demo. In a live session the real
+  // content is the photographs the customer uploaded, so the demo reports are
+  // never shown beside them.
   const reports = useAsync(
-    () => (account ? repository.sensageReports(account.id) : Promise.resolve([])),
-    [account?.id, dataVersion],
+    () => (account && !isLive ? repository.sensageReports(account.id) : Promise.resolve([])),
+    [account?.id, dataVersion, isLive],
+  );
+  const photos = useAsync(
+    () => (isLive ? inspectionPhotosApi.list() : Promise.resolve([] as InspectionPhoto[])),
+    [isLive, dataVersion],
   );
 
   return (
@@ -65,10 +76,29 @@ export default function SensageHome() {
         </Card>
 
         <View style={styles.sectionHead}>
-          <SectionLabel>{t('myReports')}</SectionLabel>
+          <SectionLabel>{isLive ? t('myPhotos') : t('myReports')}</SectionLabel>
         </View>
 
-        {reports.loading ? (
+        {isLive ? (
+          photos.loading ? (
+            <StateView kind="loading" />
+          ) : (photos.data ?? []).length === 0 ? (
+            <StateView kind="empty" message={t('noReports')} />
+          ) : (
+            <View style={styles.photoGrid}>
+              {(photos.data ?? []).map((shot) => (
+                <Photo
+                  key={shot.id}
+                  source={photo('inspectionBay')}
+                  uri={mediaUrl(shot.url)}
+                  height={104}
+                  width={104}
+                  radiusValue={radius.md}
+                />
+              ))}
+            </View>
+          )
+        ) : reports.loading ? (
           <StateView kind="loading" />
         ) : (reports.data ?? []).length === 0 ? (
           <StateView kind="empty" message={t('noReports')} />
@@ -96,8 +126,9 @@ export default function SensageHome() {
         </Pressable>
 
         <Body size="caption" muted align="center">
-          {t('demoData')} · {localizeDigits(reports.data?.length ?? 0, locale)} {t('myReports')} ·{' '}
-          {formatDate(new Date().toISOString())}
+          {isLive ? t('liveData') : t('demoData')} ·{' '}
+          {localizeDigits((isLive ? photos.data?.length : reports.data?.length) ?? 0, locale)}{' '}
+          {isLive ? t('myPhotos') : t('myReports')} · {formatDate(new Date().toISOString())}
         </Body>
       </View>
     </Screen>
@@ -106,6 +137,7 @@ export default function SensageHome() {
 
 const styles = StyleSheet.create({
   hero: { borderRadius: radius.lg, overflow: 'hidden' },
+  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   heroBody: { position: 'absolute', inset: 0, padding: space.lg, justifyContent: 'flex-end', gap: space.xs },
   heroTitle: { color: brand.onNavy, fontSize: typography.heading, fontWeight: '700' },
   heroText: { color: 'rgba(255,255,255,0.9)', fontSize: typography.label },

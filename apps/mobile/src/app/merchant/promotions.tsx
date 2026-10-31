@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { useApp } from '../../lib/app-context';
 import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
+import { useMerchantSession } from '../../lib/merchant-session';
 import { ScreenHeader } from '../../components/brand';
 import { OfferCard } from '../../components/cards';
 import { Body, Button, Card, Field, Notice, Screen, SectionLabel, StateView } from '../../components/ui';
@@ -14,13 +15,30 @@ import { space } from '../../lib/theme';
  *
  * The offers already published and a form for a new one. Publishing is a demo
  * action; the form validates its fields and says what it did.
+ *
+ * A **live merchant** has no promotions route on the provider portal — there is
+ * no promotions record in the schema — so this screen refuses to show the local
+ * demo offers as though they were the tenant's. It states the limitation instead.
  */
 export default function MerchantPromotions() {
   const { t, direction, dataVersion } = useApp();
-  const offers = useAsync(async () => repository.offers(), [dataVersion]);
+  const { isSignedIn } = useMerchantSession();
+  const offers = useAsync(async () => (isSignedIn ? [] : repository.offers()), [dataVersion, isSignedIn]);
   const [draft, setDraft] = useState({ title: '', percent: '', category: '' });
   const [published, setPublished] = useState<Array<{ title: string; percent: string; category: string }>>([]);
   const [notice, setNotice] = useState<string | null>(null);
+
+  if (isSignedIn) {
+    return (
+      <Screen>
+        <ScreenHeader title={t('promotions')} />
+        <Card>
+          <StateView kind="empty" message={t('promotionsUnavailable')} />
+        </Card>
+        <View style={{ height: space.xl }} />
+      </Screen>
+    );
+  }
 
   return (
     <Screen>

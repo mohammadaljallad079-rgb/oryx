@@ -4,17 +4,17 @@ import { useRouter } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
 import { photo, photoSmall } from '../../lib/assets';
-import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
+import { useLiveCatalog, useLiveProviders } from '../../lib/live-catalog';
 import { AppHeader } from '../../components/brand';
-import { OfferCard, ProductCard, ProviderCard, StoreCard } from '../../components/cards';
+import { ProductCard, ProviderCard, StoreCard } from '../../components/cards';
 import { Body, Photo, Rail, Screen, SectionLabel, StateView } from '../../components/ui';
 import { CategoryIcon, type CategoryIconName } from '../../components/category-icons';
 import { UiIcon } from '../../components/ui-icons';
 import { radius, space, typography } from '../../lib/theme';
 import { localizeDigits } from '../../lib/format';
 import { api, type HomepageResponse } from '../../lib/api';
-import { toDemoProduct, toDemoProvider } from '../../lib/api-adapters';
+import { catalogStoreToDemo, publicProviderToDemo, toDemoProduct } from '../../lib/api-adapters';
 
 /**
  * The marketplace home.
@@ -36,26 +36,25 @@ import { toDemoProduct, toDemoProvider } from '../../lib/api-adapters';
  * (the reference puts it below), and the hero carried no call to action. Both
  * are corrected here.
  *
- * The offers rail and the featured stores are kept from the previous build. The
- * reference does not show them, but they existed before the approved rebuild and
- * the owner's brief names both, so removing them would lose working features.
- * They follow the rails the reference does show.
- *
- * Every rail reads the repository, so the page is a window onto the catalogue
- * rather than a static composition.
+ * Every rail reads the live marketplace — the catalogue, the store directory and
+ * the approved provider directory. A rail with no live records is shown empty
+ * rather than filled with a demo record the platform never held, so nothing on
+ * this page presents invented data as real.
  */
 export default function Home() {
-  const { t, theme, direction, dataVersion, locale } = useApp();
+  const { t, theme, direction, locale } = useApp();
   const router = useRouter();
 
-  const providers = useAsync(() => repository.nearbyProviders(6), [dataVersion]);
-  const products = useAsync(() => repository.trendingProducts(8), [dataVersion]);
-  const offers = useAsync(() => repository.offers(), [dataVersion]);
-  const stores = useAsync(() => repository.stores({ sort: 'rating' }), [dataVersion]);
+  // The rails read the real marketplace. A rail that has no live records is
+  // shown empty rather than filled with a demo record the platform never held.
+  const liveCatalog = useLiveCatalog({});
+  const liveProvidersState = useLiveProviders();
+  const stores = liveCatalog.stores.map(catalogStoreToDemo);
+  const providers = liveProvidersState.providers.map(publicProviderToDemo);
 
-  // The homepage content from the API. This is additive: the rails below still
-  // read the local repository, so a failure here degrades to the design the
-  // owner approved rather than to an empty screen.
+  // The homepage content from the API. This is additive: when the CMS has
+  // nothing published the screen degrades to the design the owner approved
+  // rather than to a blank card.
   const live = useAsync<HomepageResponse>(() => api.homepage(locale), [locale]);
   // The approved bundled scene is the fallback whenever the CMS has nothing
   // published. A CMS record can never replace it with an unreviewed photograph.
@@ -63,17 +62,11 @@ export default function Home() {
   const heroTitle = live.data?.hero[0]?.title ?? null;
   const heroSubtitle = live.data?.hero[0]?.subtitle ?? null;
 
-  // The rails prefer live data and fall back to the seeded demo records only
-  // when the API returned nothing for that rail. The two are never blended: a
-  // rail is either showing marketplace records or showing demo records, and the
-  // demo notice on this screen says which.
+  // The homepage endpoint's own product rail wins when the CMS has published
+  // content; otherwise the catalogue rail above is the live source.
   const liveProducts = live.data?.products.length
     ? live.data.products.map(toDemoProduct)
     : null;
-  const liveProviders = live.data?.providers.length
-    ? live.data.providers.map(toDemoProvider)
-    : null;
-  const usingDemoRails = liveProducts === null || liveProviders === null;
 
   // The five service categories, with the exact icons the approved reference
   // names: gear, wrench, inspection document, tow truck, alloy wheel. The Rail
@@ -308,11 +301,11 @@ export default function Home() {
             <UiIcon name="chevron" size={13} color={theme.gold} />
           </Pressable>
         </View>
-        {(liveProviders ?? providers.data ?? []).length === 0 ? (
+        {providers.length === 0 ? (
           <StateView kind="empty" />
         ) : (
           <Rail>
-            {(liveProviders ?? providers.data ?? []).map((provider) => (
+            {providers.map((provider) => (
               <View key={provider.id} style={{ width: 244 }}>
                 <ProviderCard provider={provider} />
               </View>
@@ -335,33 +328,16 @@ export default function Home() {
           </Pressable>
         </View>
         <Rail>
-          {(liveProducts ?? products.data ?? []).map((product) => (
+          {(liveProducts ?? liveCatalog.products.map(toDemoProduct)).map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
         </Rail>
 
-        {/* --------------------------------------- offers and featured stores
-            Kept from the previous build: the reference does not show them, but
-            the brief names both and they were present before the approved
-            rebuild, so dropping them would lose working features. */}
-        <View style={styles.sectionHead}>
-          <SectionLabel>{t('offersAndDiscounts')}</SectionLabel>
-          <Pressable onPress={() => router.push('/parts')} testID="offers-see-all">
-            <Text style={{ color: theme.gold, fontSize: typography.label, fontWeight: '700' }}>
-              {t('seeAll')}
-            </Text>
-          </Pressable>
-        </View>
-        {offers.loading ? (
-          <StateView kind="loading" />
-        ) : (
-          <Rail>
-            {(offers.data ?? []).map((offer) => (
-              <OfferCard key={offer.id} offer={offer} />
-            ))}
-          </Rail>
-        )}
-
+        {/* ------------------------------------------------- featured stores
+            The store directory, from the live catalogue. The previous build's
+            "offers" rail was removed: there is no promotions record in the
+            platform, so every discount code on it was a demo value that no
+            customer could redeem. */}
         <View style={styles.sectionHead}>
           <SectionLabel>{t('featuredStores')}</SectionLabel>
           <Pressable onPress={() => router.push('/parts?tab=stores')} testID="stores-see-all">
@@ -370,19 +346,20 @@ export default function Home() {
             </Text>
           </Pressable>
         </View>
-        {stores.loading ? (
+        {liveCatalog.loading && stores.length === 0 ? (
           <StateView kind="loading" />
+        ) : stores.length === 0 ? (
+          <StateView kind="empty" />
         ) : (
           <View style={{ gap: space.md }}>
-            {(stores.data ?? []).slice(0, 4).map((store) => (
+            {stores.slice(0, 4).map((store) => (
               <StoreCard key={store.id} store={store} />
             ))}
           </View>
         )}
 
         <Body size="caption" muted align="center" style={{ marginTop: space.md }}>
-          {localizeDigits(2026, locale)} · ORYX Marketplace ·{' '}
-          {usingDemoRails ? t('demoData') : t('liveData')}
+          {localizeDigits(2026, locale)} · ORYX Marketplace · {t('liveData')}
         </Body>
       </View>
     </Screen>

@@ -4,9 +4,9 @@ import { useRouter } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
 import { photo } from '../../lib/assets';
-import { repository } from '../../lib/repository';
-import { useAsync } from '../../lib/use-async';
-import { AppHeader, DemoBanner } from '../../components/brand';
+import { useLiveCatalog, useLiveProviders } from '../../lib/live-catalog';
+import { catalogStoreToDemo, publicProviderToDemo } from '../../lib/api-adapters';
+import { AppHeader } from '../../components/brand';
 import { ProviderCard, StoreCard } from '../../components/cards';
 import { Body, Photo, Screen, SectionLabel, StateView } from '../../components/ui';
 import { radius, space, typography } from '../../lib/theme';
@@ -23,11 +23,15 @@ import { radius, space, typography } from '../../lib/theme';
  * that category, so the tab is a way into the catalogue rather than a static list.
  */
 export default function Categories() {
-  const { t, theme, direction, dataVersion } = useApp();
+  const { t, theme, direction } = useApp();
   const router = useRouter();
 
-  const stores = useAsync(() => repository.stores({ sort: 'rating' }), [dataVersion]);
-  const providers = useAsync(() => repository.nearbyProviders(4), [dataVersion]);
+  // The live catalogue and the approved provider directory. Both are public, so
+  // a guest sees real records rather than a bundled demo list.
+  const liveCatalog = useLiveCatalog({});
+  const liveProviders = useLiveProviders();
+  const stores = liveCatalog.stores.map(catalogStoreToDemo);
+  const providers = liveProviders.providers.slice(0, 4).map(publicProviderToDemo);
 
   const categories = [
     {
@@ -66,8 +70,6 @@ export default function Categories() {
     <Screen padded={false}>
       <AppHeader />
       <View style={{ padding: space.lg, gap: space.md }}>
-        <DemoBanner />
-
         <SectionLabel>{t('categories')}</SectionLabel>
         <View style={{ gap: space.md }}>
           {categories.map((category) => (
@@ -112,9 +114,11 @@ export default function Categories() {
             <Text style={{ color: theme.textMuted, fontSize: typography.label }}>{t('seeAll')}</Text>
           </Pressable>
         </View>
-        {(stores.data ?? []).slice(0, 4).map((store) => (
-          <StoreCard key={store.id} store={store} />
-        ))}
+        {stores.length === 0 ? (
+          <StateView kind="empty" />
+        ) : (
+          stores.slice(0, 4).map((store) => <StoreCard key={store.id} store={store} />)
+        )}
 
         <View style={styles.sectionHead}>
           <SectionLabel>{t('featuredProviders')}</SectionLabel>
@@ -122,16 +126,14 @@ export default function Categories() {
             <Text style={{ color: theme.textMuted, fontSize: typography.label }}>{t('seeAll')}</Text>
           </Pressable>
         </View>
-        {(providers.data ?? []).length === 0 ? (
+        {providers.length === 0 ? (
           <StateView kind="empty" />
         ) : (
-          (providers.data ?? []).map((provider) => (
-            <ProviderCard key={provider.id} provider={provider} />
-          ))
+          providers.map((provider) => <ProviderCard key={provider.id} provider={provider} />)
         )}
 
         <Body size="caption" muted align="center" style={{ marginTop: space.md }}>
-          {t('demoData')}
+          {t('liveData')}
         </Body>
       </View>
     </Screen>

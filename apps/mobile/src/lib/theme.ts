@@ -197,6 +197,8 @@ export function statusColor(theme: Theme, status: string): string {
     case 'ASSIGNED':
     case 'REQUIRES_ACTION':
     case 'PREPARING':
+    case 'READY':
+    case 'OUT_FOR_DELIVERY':
     case 'SHIPPED':
     case 'SEARCHING':
     case 'ACCEPTED':

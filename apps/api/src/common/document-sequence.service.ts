@@ -39,6 +39,8 @@ export const DOCUMENT_SEQUENCE_KEYS = {
   jobCard: { key: 'JOB_CARD', prefix: 'JC' },
   repairEstimate: { key: 'REPAIR_ESTIMATE', prefix: 'EST' },
   serviceRequest: { key: 'SERVICE_REQUEST', prefix: 'SR' },
+  // Execution 11 — the consumer marketplace order placed from the mobile app.
+  customerOrder: { key: 'CUSTOMER_ORDER', prefix: 'ORD' },
 } as const;
 
 export type DocumentSequenceName = keyof typeof DOCUMENT_SEQUENCE_KEYS;

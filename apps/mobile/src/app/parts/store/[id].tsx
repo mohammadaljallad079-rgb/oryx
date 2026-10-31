@@ -1,44 +1,47 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useApp } from '../../../lib/app-context';
+import { useLiveStore } from '../../../lib/live-catalog';
+import { catalogProductToDemo, catalogStoreToDemo } from '../../../lib/api-adapters';
 import { photo } from '../../../lib/assets';
-import { repository } from '../../../lib/repository';
-import { useAsync } from '../../../lib/use-async';
 import { ScreenHeader } from '../../../components/brand';
 import { ProductCard } from '../../../components/cards';
 import {
   Body,
+  Button,
   Card,
   Chip,
   DetailRow,
-  Divider,
   Photo,
-  RatingPill,
   Screen,
   SectionLabel,
   StateView,
 } from '../../../components/ui';
-import { space, typography } from '../../../lib/theme';
-import { formatMoney, localizeDigits } from '../../../lib/format';
+import { space } from '../../../lib/theme';
+import { localizeDigits } from '../../../lib/format';
+import { isOffline } from '../../../lib/api';
 
 /**
  * A storefront.
  *
- * The store header, its published terms and its whole catalogue. A customer who
- * arrives here from a product card or the directory can see everything the store
- * sells without going back.
+ * The store header and its whole published catalogue, both from the real
+ * consumer catalogue: `GET /customer/catalog/stores/:id` returns the store and
+ * the products it publishes.
+ *
+ * The public projection carries no rating, no review count, no delivery fee, no
+ * minimum order and no founding year, so the header states only what the API
+ * returned — the number of published products — instead of asserting terms the
+ * marketplace does not hold.
  */
 export default function StoreDetail() {
-  const { t, theme, locale, direction, dataVersion } = useApp();
+  const { t, locale, direction } = useApp();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [sort, setSort] = useState<'relevance' | 'price_asc' | 'price_desc'>('relevance');
 
-  const store = useAsync(async () => repository.store(id), [id, dataVersion]);
-  const products = useAsync(async () => repository.products({ storeId: id, sort }), [id, sort, dataVersion]);
-  const reviews = useAsync(async () => repository.reviews(id), [id, dataVersion]);
+  const store = useLiveStore(id);
 
   if (store.loading) {
     return (
@@ -51,38 +54,37 @@ export default function StoreDetail() {
     return (
       <Screen>
         <ScreenHeader title={t('error')} />
-        <StateView kind="error" message={t('noResults')} />
+        <StateView kind="error" message={isOffline() ? t('offlineBody') : t('noResults')} />
+        <Button title={t('retry')} onPress={store.reload} />
       </Screen>
     );
   }
 
   const shop = store.data;
+  const demoShop = catalogStoreToDemo(shop);
   const name = locale === 'ar' ? shop.nameAr : shop.nameEn;
+
+  const sorted = [...shop.products].sort((a, b) => {
+    if (sort === 'price_asc') return a.priceMinor - b.priceMinor;
+    if (sort === 'price_desc') return b.priceMinor - a.priceMinor;
+    return 0;
+  });
+  const products = sorted.map(catalogProductToDemo);
 
   return (
     <Screen padded={false}>
-      <Photo source={photo(shop.photo)} height={200} width="100%" radiusValue={0} />
+      <Photo source={photo(demoShop.photo)} height={200} width="100%" radiusValue={0} />
       <View style={{ padding: space.lg, gap: space.md }}>
         <ScreenHeader title={name} />
 
         <View style={[styles.row, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
-          <RatingPill rating={shop.rating} count={shop.reviewCount} />
-          {shop.verified ? <Chip label={t('verified')} active /> : null}
-          <Chip label={localizeDigits(shop.since, locale)} />
+          {demoShop.verified ? <Chip label={t('verified')} active /> : null}
+          <Chip label={`${localizeDigits(shop.productTotal, locale)} ${t('parts')}`} />
         </View>
 
         <Card>
-          <DetailRow
-            label={t('delivery')}
-            value={shop.deliveryMinor === 0 ? t('freeDelivery') : formatMoney(shop.deliveryMinor)}
-          />
-          <DetailRow label={t('subtotal')} value={`${t('from')} ${formatMoney(shop.minimumOrderMinor)}`} />
-          <Divider />
-          <View style={[styles.row, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
-            {shop.tags.map((tag) => (
-              <Chip key={tag} label={tag} />
-            ))}
-          </View>
+          <DetailRow label={t('store')} value={shop.code} />
+          {shop.countryCode ? <DetailRow label={t('city')} value={shop.countryCode} /> : null}
         </Card>
 
         <SectionLabel>{t('products')}</SectionLabel>
@@ -92,13 +94,11 @@ export default function StoreDetail() {
           <Chip label={t('sortPriceDesc')} active={sort === 'price_desc'} onPress={() => setSort('price_desc')} />
         </View>
 
-        {products.loading ? (
-          <StateView kind="loading" />
-        ) : (products.data ?? []).length === 0 ? (
+        {products.length === 0 ? (
           <StateView kind="empty" message={t('noResults')} />
         ) : (
           <View style={[styles.grid, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
-            {(products.data ?? []).map((product) => (
+            {products.map((product) => (
               <ProductCard
                 key={product.id}
                 product={product}
@@ -109,28 +109,10 @@ export default function StoreDetail() {
           </View>
         )}
 
-        <SectionLabel>{t('reviews')}</SectionLabel>
-        {(reviews.data ?? []).length === 0 ? (
-          <Body muted size="label">
-            {t('noReviews')}
-          </Body>
-        ) : (
-          (reviews.data ?? []).map((review) => (
-            <Card key={review.id}>
-              <View style={styles.row}>
-                <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.label }}>
-                  {locale === 'ar' ? review.authorAr : review.authorEn}
-                </Text>
-                <Text style={{ color: theme.gold, fontSize: typography.caption }}>
-                  {'★'.repeat(Math.max(1, Math.round(review.rating)))}
-                </Text>
-              </View>
-              <Body size="caption" muted style={{ marginTop: 2 }}>
-                {locale === 'ar' ? review.bodyAr : review.bodyEn}
-              </Body>
-            </Card>
-          ))
-        )}
+        <Body size="caption" muted align="center">
+          {t('liveData')}
+        </Body>
+        <View style={{ height: space.xl }} />
       </View>
     </Screen>
   );

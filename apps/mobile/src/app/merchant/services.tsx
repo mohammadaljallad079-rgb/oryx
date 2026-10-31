@@ -64,6 +64,10 @@ export default function MerchantServices() {
     void loadLive();
   }, [isSignedIn, loadLive]);
 
+  // The recovery queue is the subset of the provider's own requests whose
+  // category is recovery; the portal returns every request this provider owns.
+  const recoveryRequests = requests.filter((r) => r.categoryKey === 'recovery');
+
   const act = async (id: string, run: () => Promise<unknown>) => {
     setBusyId(id);
     setError(null);
@@ -193,7 +197,81 @@ export default function MerchantServices() {
 
         {/* ----------------------------------------------------- recovery queue */}
         {tab === 'recovery' ? (
-          demoRecovery.loading ? (
+          isSignedIn ? (
+            loading ? (
+              <StateView kind="loading" />
+            ) : recoveryRequests.length === 0 ? (
+              <StateView kind="empty" message={t('noRequests')} />
+            ) : (
+              recoveryRequests.map((request) => (
+                <Card key={request.id} testID={`provider-recovery-${request.id}`}>
+                  <View style={[styles.headRow, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
+                    <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.body }}>
+                      {request.requestNumber}
+                    </Text>
+                    <Chip label={request.status} />
+                  </View>
+                  {request.description ? (
+                    <Body size="caption" muted style={{ marginTop: space.xs }}>
+                      {request.description}
+                    </Body>
+                  ) : null}
+                  <Divider />
+                  <View style={[styles.actionRow, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
+                    {request.status === 'NEW' ? (
+                      <>
+                        <Button
+                          testID={`provider-accept-${request.id}`}
+                          title={t('acceptRequest')}
+                          loading={busyId === request.id}
+                          onPress={() => void act(request.id, () => providerApi.acceptRequest(request.id))}
+                        />
+                        <Button
+                          testID={`provider-decline-${request.id}`}
+                          title={t('rejectRequest')}
+                          variant="danger"
+                          disabled={busyId === request.id}
+                          onPress={() => void act(request.id, () => providerApi.declineRequest(request.id))}
+                        />
+                      </>
+                    ) : null}
+                    {request.status === 'ASSIGNED' ? (
+                      <Button
+                        testID={`provider-start-${request.id}`}
+                        title={t('startWork')}
+                        loading={busyId === request.id}
+                        onPress={() => void act(request.id, () => providerApi.startRequest(request.id))}
+                      />
+                    ) : null}
+                    {request.status === 'IN_PROGRESS' ? (
+                      <>
+                        <Field
+                          label={t('finalAmount')}
+                          value={finalAmount[request.id] ?? ''}
+                          onChangeText={(v) => setFinalAmount((prev) => ({ ...prev, [request.id]: v }))}
+                          keyboardType="number-pad"
+                          testID={`provider-amount-${request.id}`}
+                        />
+                        <Button
+                          testID={`provider-complete-${request.id}`}
+                          title={t('completeWork')}
+                          disabled={busyId === request.id || !Number(finalAmount[request.id])}
+                          onPress={() =>
+                            void act(request.id, () =>
+                              providerApi.completeRequest(request.id, {
+                                finalAmountMinor: Number(finalAmount[request.id]),
+                                currency: 'BHD',
+                              }),
+                            )
+                          }
+                        />
+                      </>
+                    ) : null}
+                  </View>
+                </Card>
+              ))
+            )
+          ) : demoRecovery.loading ? (
             <StateView kind="loading" />
           ) : (
             (demoRecovery.data ?? []).map((job) => (

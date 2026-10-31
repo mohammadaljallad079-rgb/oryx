@@ -4,6 +4,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useApp } from '../lib/app-context';
 import { repository } from '../lib/repository';
 import { useAsync } from '../lib/use-async';
+import { useLiveSession } from '../lib/live-session';
+import { paymentsApi, type CustomerPayment } from '../lib/api';
 import { ScreenHeader } from '../components/brand';
 import { Body, Button, Card, Chip, ListRow, Notice, Screen, SectionLabel, StateView } from '../components/ui';
 import { space, typography } from '../lib/theme';
@@ -12,19 +14,77 @@ import { formatMoney, localizeDigits } from '../lib/format';
 /**
  * The wallet.
  *
- * A balance and its ledger. Top-up is a demo action: it adds a credit to the
- * screen's own list and says it is not a payment, rather than pretending money
- * moved.
+ * Two sources, never mixed. Inside a live session the screen is the customer's
+ * real **payment history** (`GET /customer/payments`): the payments raised by
+ * real obligations such as invoices and bookings, with any refunds. There is no
+ * top-up in live mode, because the API has no route that creates money from a
+ * screen — a balance that could be incremented locally would be a fiction. The
+ * offline demo keeps its local ledger and says so.
  */
 export default function Wallet() {
   const { t, theme, locale, account, dataVersion } = useApp();
+  const { isLive } = useLiveSession();
   const wallet = useAsync(
-    async () => (account ? repository.wallet(account.id) : []),
-    [account?.id, dataVersion],
+    async () => (account && !isLive ? repository.wallet(account.id) : []),
+    [account?.id, dataVersion, isLive],
+  );
+  const live = useAsync(
+    async () => (isLive ? paymentsApi.history({ pageSize: 50 }) : null),
+    [isLive, dataVersion],
   );
   const [selected, setSelected] = useState<number>(10_000);
   const [added, setAdded] = useState<Array<{ id: string; titleAr: string; titleEn: string; createdAt: string; amountMinor: number }>>([]);
   const [notice, setNotice] = useState<string | null>(null);
+
+  if (isLive) {
+    const payments = live.data?.items ?? [];
+    const totalPaidMinor = payments
+      .filter((p) => p.status === 'SUCCEEDED' || p.status === 'PAID' || p.status === 'CONFIRMED')
+      .reduce((sum, p) => sum + p.amountMinor, 0);
+    return (
+      <Screen>
+        <ScreenHeader title={t('wallet')} subtitle={t('liveMode')} />
+
+        <Card style={{ alignItems: 'center' }}>
+          <SectionLabel>{t('paymentsTotal')}</SectionLabel>
+          <Text style={{ color: theme.gold, fontSize: typography.display, fontWeight: '700', marginTop: space.sm }}>
+            {formatMoney(totalPaidMinor)}
+          </Text>
+          <Body size="caption" muted style={{ marginTop: space.xs }}>
+            {t('liveModeHint')}
+          </Body>
+        </Card>
+
+        <SectionLabel>{t('walletHistory')}</SectionLabel>
+        {live.loading ? (
+          <StateView kind="loading" />
+        ) : live.error ? (
+          <Card>
+            <StateView kind="error" message={t('loadFailed')} />
+            <Button title={t('retry')} onPress={() => void live.reload()} />
+          </Card>
+        ) : payments.length === 0 ? (
+          <StateView kind="empty" message={t('noPayments')} />
+        ) : (
+          <Card>
+            {payments.map((payment: CustomerPayment) => (
+              <ListRow
+                key={payment.id}
+                title={payment.description ?? payment.intentNumber}
+                subtitle={`${payment.provider} · ${payment.status}${payment.refunds.length > 0 ? ` · ${t('refunds')}: ${localizeDigits(payment.refunds.length, locale)}` : ''}`}
+                trailing={
+                  <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.label }}>
+                    {formatMoney(payment.amountMinor)}
+                  </Text>
+                }
+              />
+            ))}
+          </Card>
+        )}
+        <View style={{ height: space.xl }} />
+      </Screen>
+    );
+  }
 
   if (!account) return null;
 

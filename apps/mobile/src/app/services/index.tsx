@@ -1,57 +1,84 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
-import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
 import { AppHeader } from '../../components/brand';
 import { ProviderCard } from '../../components/cards';
-import { Body, Chip, Field, Screen, StateView } from '../../components/ui';
+import { Body, Button, Card, Chip, Field, Screen, StateView } from '../../components/ui';
 import { space } from '../../lib/theme';
 import { localizeDigits } from '../../lib/format';
+import { isOffline, marketplaceApi, type PublicProvider } from '../../lib/api';
+import { publicProviderToDemo } from '../../lib/api-adapters';
+
+/** The service categories the marketplace catalogue defines, as filter keys. */
+const KINDS = [
+  { key: 'all', labelKey: 'categoriesAll' },
+  { key: 'vehicle_inspection', labelKey: 'inspection' },
+  { key: 'maintenance', labelKey: 'maintenance' },
+  { key: 'recovery', labelKey: 'recovery' },
+  { key: 'car_wash', labelKey: 'catCarWash' },
+] as const;
 
 /**
  * The service directory.
  *
- * One list of providers, filtered by kind — inspection, maintenance or recovery —
- * and by city and name. Each card links to a detail screen that carries the
- * published prices, which is where a booking starts.
+ * The list is the real public marketplace: `GET /marketplace/providers` returns
+ * only `APPROVED` providers with `isActive` listings, so a pending or suspended
+ * business cannot appear. Filtering is done on the API's `categoryKey`, which is
+ * the same catalogue the admin CMS maintains.
+ *
+ * The API returns no city, no distance and no free-text search, so the screen
+ * does not offer them; a filter it cannot honour would be a control that lies.
+ * The rating shown is the server's aggregate over **published** reviews only.
  */
 export default function Services() {
-  const { t, locale, direction, dataVersion } = useApp();
+  const { t, locale, direction } = useApp();
   const params = useLocalSearchParams<{ kind?: string }>();
   const router = useRouter();
 
-  const [kind, setKind] = useState<'all' | 'inspection' | 'maintenance' | 'recovery'>(
-    params.kind === 'inspection' || params.kind === 'maintenance' || params.kind === 'recovery'
-      ? params.kind
-      : 'all',
+  const [kind, setKind] = useState<string>(
+    typeof params.kind === 'string' && params.kind.length > 0 ? params.kind : 'all',
   );
-  const [city, setCity] = useState<string>('all');
   const [query, setQuery] = useState('');
 
   const providers = useAsync(
-    () => repository.providers({ kind, cityKey: city === 'all' ? undefined : city, query, sort: 'rating' }),
-    [kind, city, query, dataVersion],
+    async () =>
+      marketplaceApi.providers({
+        categoryKey: kind === 'all' ? undefined : kind,
+        pageSize: 50,
+      }),
+    [kind],
   );
 
-  const kinds: Array<{ key: typeof kind; label: string }> = [
-    { key: 'all', label: t('categoriesAll') },
-    { key: 'inspection', label: t('inspection') },
-    { key: 'maintenance', label: t('maintenance') },
-    { key: 'recovery', label: t('recovery') },
-  ];
+  const rows = useMemo<PublicProvider[]>(() => providers.data?.items ?? [], [providers.data]);
 
-  const cities = [
-    { key: 'all', label: t('categoriesAll') },
-    { key: 'manama', label: locale === 'ar' ? 'المنامة' : 'Manama' },
-    { key: 'riffa', label: locale === 'ar' ? 'الرفاع' : 'Riffa' },
-    { key: 'muharraq', label: locale === 'ar' ? 'المحرق' : 'Muharraq' },
-    { key: 'isa', label: locale === 'ar' ? 'مدينة عيسى' : 'Isa Town' },
-    { key: 'hamad', label: locale === 'ar' ? 'مدينة حمد' : 'Hamad Town' },
-    { key: 'sitrah', label: locale === 'ar' ? 'سترة' : 'Sitrah' },
-  ];
+  // A text term is applied locally over the fields the API returned — name and
+  // listing names — because the public endpoint has no search parameter.
+  const filtered = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return rows;
+    return rows.filter((p) =>
+      `${p.nameEn} ${p.nameAr} ${p.listings.map((l) => `${l.nameEn} ${l.nameAr}`).join(' ')}`
+        .toLowerCase()
+        .includes(term),
+    );
+  }, [rows, query]);
+
+  if (providers.error && rows.length === 0) {
+    return (
+      <Screen padded={false}>
+        <AppHeader />
+        <View style={{ padding: space.lg, gap: space.md }}>
+          <Card>
+            <StateView kind="error" message={isOffline() ? t('offlineBody') : t('loadFailed')} />
+            <Button title={t('retry')} onPress={providers.reload} />
+          </Card>
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen padded={false}>
@@ -66,41 +93,39 @@ export default function Services() {
         />
 
         <View style={[styles.row, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
-          {kinds.map((k) => (
+          {KINDS.map((k) => (
             <Chip
               key={k.key}
               testID={`services-kind-${k.key}`}
-              label={k.label}
+              label={t(k.labelKey)}
               active={kind === k.key}
               onPress={() => setKind(k.key)}
             />
           ))}
         </View>
 
-        <View style={[styles.row, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
-          {cities.map((c) => (
-            <Chip key={c.key} label={c.label} active={city === c.key} onPress={() => setCity(c.key)} />
-          ))}
-        </View>
-
-        {providers.loading ? (
+        {providers.loading && rows.length === 0 ? (
           <StateView kind="loading" />
-        ) : (providers.data ?? []).length === 0 ? (
+        ) : filtered.length === 0 ? (
           <StateView kind="empty" message={t('noResults')} />
         ) : (
           <>
             <Body size="caption" muted>
-              {localizeDigits(providers.data?.length ?? 0, locale)} {t('serviceProviders')}
+              {localizeDigits(filtered.length, locale)} {t('serviceProviders')}
             </Body>
-            {(providers.data ?? []).map((provider) => (
+            {filtered.map((provider) => (
               <ProviderCard
                 key={provider.id}
-                provider={provider}
+                provider={publicProviderToDemo(provider)}
                 onPress={() => router.push(`/services/${provider.id}`)}
               />
             ))}
           </>
         )}
+
+        <Body size="caption" muted align="center">
+          {t('liveData')}
+        </Body>
       </View>
     </Screen>
   );

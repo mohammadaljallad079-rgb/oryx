@@ -3,9 +3,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
-import { photo, photoSmall } from '../../lib/assets';
-import { repository } from '../../lib/repository';
-import { useAsync } from '../../lib/use-async';
+import { useLiveCart } from '../../lib/live-cart';
+import { useLiveFavorites } from '../../lib/live-favorites';
+import { useLiveProduct, useLiveStore } from '../../lib/live-catalog';
+import { catalogProductToDemo, catalogStoreToDemo } from '../../lib/api-adapters';
 import { ScreenHeader } from '../../components/brand';
 import { ProductCard } from '../../components/cards';
 import {
@@ -18,35 +19,48 @@ import {
   Heading,
   Photo,
   Rail,
-  RatingPill,
   Screen,
   SectionLabel,
   StateView,
 } from '../../components/ui';
+import { photoSmall } from '../../lib/assets';
 import { radius, space, typography } from '../../lib/theme';
-import { discountPercent, formatMoney, localizeDigits } from '../../lib/format';
+import { formatMoney, localizeDigits } from '../../lib/format';
+import { isOffline } from '../../lib/api';
 
 /**
  * A product.
  *
- * The add-to-cart control is the reason this screen exists, so it is pinned in a
- * bar at the bottom rather than buried after the specifications. The quantity
- * selector and the favourite toggle are both real state.
+ * Everything on this screen is the public catalogue's own record:
+ * `GET /customer/catalog/products/:id` for the product and its images, and the
+ * related rail from the API's own same-tenant selection.
+ *
+ * ## What is not shown
+ *
+ * The public projection carries no rating, no review count, no warranty and no
+ * "fits these cars" list, so none of those are asserted. The specifications card
+ * lists only the fields the API returned — SKU, store, unit, tax rate — and the
+ * stock row reports availability as a boolean rather than a quantity the
+ * catalogue deliberately withholds.
+ *
+ * ## Add to cart
+ *
+ * The button writes to the **real** cart when a session exists
+ * (`POST /customer/cart/items`); as a guest it writes to the local demo cart and
+ * says so.
  */
 export default function ProductDetail() {
-  const { t, theme, locale, direction, addToCart, isFavourite, toggleFavourite, dataVersion } = useApp();
+  const { t, theme, locale, direction, addToCart } = useApp();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
 
-  const product = useAsync(async () => repository.product(id), [id, dataVersion]);
-  const store = useAsync(
-    async () => (product.data ? repository.store(product.data.storeId) : undefined),
-    [product.data?.storeId, dataVersion],
-  );
-  const related = useAsync(async () => repository.relatedProducts(id), [id, dataVersion]);
-  const reviews = useAsync(async () => repository.reviews(id), [id, dataVersion]);
+  const liveCart = useLiveCart();
+  const favorites = useLiveFavorites();
+  const product = useLiveProduct(id);
+  const store = useLiveStore(product.data?.storeId);
 
   if (product.loading) {
     return (
@@ -59,63 +73,75 @@ export default function ProductDetail() {
     return (
       <Screen>
         <ScreenHeader title={t('error')} />
-        <StateView kind="error" message={t('noResults')} />
+        <StateView kind="error" message={isOffline() ? t('offlineBody') : t('noResults')} />
+        <Button title={t('retry')} onPress={product.reload} />
       </Screen>
     );
   }
 
   const item = product.data;
   const name = locale === 'ar' ? item.nameAr : item.nameEn;
-  const off = discountPercent(item.priceMinor, item.compareAtMinor);
-  const favourite = isFavourite(`product:${item.id}`);
+  const isLive = liveCart.mode === 'live';
+  const favourite = favorites.mode === 'live' ? favorites.isFavorite(item.id) : false;
+  const related = (item.related ?? []).map(catalogProductToDemo);
+  const images = (item.images ?? []).map((image) => image.url).filter((url): url is string => Boolean(url));
+  const storeDemo = store.data ? catalogStoreToDemo(store.data) : null;
+
+  const add = async () => {
+    setFailure(null);
+    if (isLive) {
+      try {
+        await liveCart.add(item.id, quantity);
+      } catch {
+        setFailure(t('serverError'));
+        return;
+      }
+    } else {
+      // Guest: the local demo cart. The screen says which cart this is.
+      addToCart(item.id, quantity);
+    }
+    setAdded(true);
+  };
 
   return (
     <Screen padded={false}>
       <View style={{ paddingHorizontal: space.lg, paddingTop: space.lg }}>
-        <ScreenHeader title={name} subtitle={item.brand} />
+        <ScreenHeader title={name} subtitle={item.store.name} />
       </View>
-      <Photo source={photo(item.photo)} height={240} width="100%" radiusValue={0} />
+
+      <Photo
+        source={photoSmall('partsStore')}
+        uri={images[0] ?? item.imageUrl ?? null}
+        height={240}
+        width="100%"
+        radiusValue={0}
+      />
 
       <View style={{ padding: space.lg, gap: space.md }}>
         <View style={[styles.row, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
-          <RatingPill rating={item.rating} count={item.reviewCount} />
-          <Chip label={item.brand} />
-          {item.stock > 0 ? <Chip label={t('inStock')} active /> : <Chip label={t('outOfStock')} />}
-          {item.stock > 0 && item.stock <= 5 ? <Chip label={t('lowStock')} /> : null}
+          <Chip label={item.store.name} />
+          {item.available ? <Chip label={t('inStock')} active /> : <Chip label={t('outOfStock')} />}
         </View>
 
         <View style={[styles.priceRow, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
           <Text style={{ color: theme.gold, fontSize: typography.title, fontWeight: '700' }}>
             {formatMoney(item.priceMinor)}
           </Text>
-          {off ? (
-            <>
-              <Text style={[styles.strike, { color: theme.textFaint }]}>
-                {formatMoney(item.compareAtMinor ?? 0)}
-              </Text>
-              <View style={[styles.offPill, { backgroundColor: theme.gold }]}>
-                <Text style={{ color: theme.onGold, fontSize: typography.caption, fontWeight: '700' }}>
-                  {localizeDigits(off, locale)}% {t('off')}
-                </Text>
-              </View>
-            </>
-          ) : null}
         </View>
 
-        {store.data ? (
-          <Card onPress={() => router.push(`/parts/store/${store.data?.id}`)}>
+        {storeDemo ? (
+          <Card onPress={() => router.push(`/parts/store/${storeDemo.id}`)}>
             <View style={styles.row}>
-              <Photo source={photoSmall(store.data.photo)} height={44} width={44} radiusValue={radius.md} />
+              <Photo source={photoSmall(storeDemo.photo)} height={44} width={44} radiusValue={radius.md} />
               <View style={{ flex: 1 }}>
                 <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.body }}>
-                  {locale === 'ar' ? store.data.nameAr : store.data.nameEn}
+                  {locale === 'ar' ? storeDemo.nameAr : storeDemo.nameEn}
                 </Text>
                 <Body size="caption" muted>
-                  {store.data.deliveryMinor === 0 ? t('freeDelivery') : formatMoney(store.data.deliveryMinor)} ·{' '}
                   {t('soldBy')}
                 </Body>
               </View>
-              {store.data.verified ? <Chip label={t('verified')} active /> : null}
+              {storeDemo.verified ? <Chip label={t('verified')} active /> : null}
             </View>
           </Card>
         ) : null}
@@ -123,66 +149,35 @@ export default function ProductDetail() {
         <Card>
           <Heading size="subheading">{t('description')}</Heading>
           <Body muted size="label" style={{ marginTop: space.sm }}>
-            {locale === 'ar'
-              ? `${item.nameAr} — ${item.groupAr} من ${item.brand}. مطابق للأصناف المدرجة أدناه.`
-              : `${item.nameEn} — ${item.groupEn} by ${item.brand}, listed to fit the models below.`}
+            {locale === 'ar' ? item.nameAr : item.nameEn}
           </Body>
           <Divider />
-          <DetailRow label={t('brand')} value={item.brand} />
           <DetailRow label={t('sku')} value={item.sku} />
-          <DetailRow label={t('warranty')} value={`${localizeDigits(item.warrantyMonths, locale)} ${t('months')}`} />
-          <DetailRow label={t('partGroup')} value={locale === 'ar' ? item.groupAr : item.groupEn} />
-          <DetailRow label={t('inStock')} value={localizeDigits(item.stock, locale)} />
-        </Card>
-
-        <Card>
-          <SectionLabel>{t('fitsTheseCars')}</SectionLabel>
-          <View
-            style={[
-              styles.row,
-              { marginTop: space.sm, flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' },
-            ]}
-          >
-            {item.fits.map((make) => (
-              <Chip key={make} label={make} />
-            ))}
-          </View>
-        </Card>
-
-        <Card>
-          <SectionLabel>{t('reviews')}</SectionLabel>
-          {(reviews.data ?? []).length === 0 ? (
-            <Body muted size="label" style={{ marginTop: space.sm }}>
-              {t('noReviews')}
-            </Body>
-          ) : (
-            (reviews.data ?? []).map((review) => (
-              <View key={review.id} style={{ marginTop: space.md }}>
-                <View style={styles.row}>
-                  <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.label }}>
-                    {locale === 'ar' ? review.authorAr : review.authorEn}
-                  </Text>
-                  <Text style={{ color: theme.gold, fontSize: typography.caption }}>
-                    {'★'.repeat(Math.max(1, Math.round(review.rating)))}
-                  </Text>
-                </View>
-                <Body size="caption" muted style={{ marginTop: 2 }}>
-                  {locale === 'ar' ? review.bodyAr : review.bodyEn}
-                </Body>
-              </View>
-            ))
-          )}
-          <View style={{ marginTop: space.md }}>
-            <Button title={t('writeReview')} variant="secondary" onPress={() => router.push('/support')} />
-          </View>
+          <DetailRow label={t('store')} value={item.store.name} />
+          <DetailRow label={t('unit')} value={item.unit} />
+          <DetailRow label={t('tax')} value={`${localizeDigits(item.taxRateBp / 100, locale)}%`} />
+          <DetailRow label={t('inStock')} value={item.available ? t('yes') : t('no')} />
         </Card>
 
         <SectionLabel>{t('relatedProducts')}</SectionLabel>
-        <Rail>
-          {(related.data ?? []).map((relatedItem) => (
-            <ProductCard key={relatedItem.id} product={relatedItem} />
-          ))}
-        </Rail>
+        {related.length === 0 ? (
+          <StateView kind="empty" message={t('noResults')} />
+        ) : (
+          <Rail>
+            {related.map((relatedItem) => (
+              <ProductCard key={relatedItem.id} product={relatedItem} />
+            ))}
+          </Rail>
+        )}
+
+        {failure ? (
+          <Body size="label" style={{ color: theme.danger }}>
+            {failure}
+          </Body>
+        ) : null}
+        <Body size="caption" muted align="center">
+          {isLive ? t('liveData') : t('demoNotice')}
+        </Body>
 
         <View style={{ height: 96 }} />
       </View>
@@ -200,7 +195,8 @@ export default function ProductDetail() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={favourite ? t('remove') : t('favourites')}
-          onPress={() => toggleFavourite(`product:${item.id}`)}
+          disabled={favorites.mode !== 'live' || favorites.busy}
+          onPress={() => void favorites.toggle(item.id)}
           style={[styles.favButton, { borderColor: theme.border }]}
         >
           <Text style={{ color: favourite ? theme.gold : theme.textMuted, fontSize: 20 }}>
@@ -216,7 +212,7 @@ export default function ProductDetail() {
           </Text>
           <Pressable
             accessibilityRole="button"
-            onPress={() => setQuantity((q) => Math.min(item.stock || 99, q + 1))}
+            onPress={() => setQuantity((q) => Math.min(99, q + 1))}
             style={styles.step}
           >
             <Text style={{ color: theme.text, fontSize: 18 }}>+</Text>
@@ -226,11 +222,8 @@ export default function ProductDetail() {
           <Button
             testID="product-add-to-cart"
             title={added ? t('addedToCart') : t('addToCart')}
-            disabled={item.stock <= 0}
-            onPress={() => {
-              addToCart(item.id, quantity);
-              setAdded(true);
-            }}
+            disabled={!item.available || liveCart.busy}
+            onPress={() => void add()}
           />
         </View>
       </View>
@@ -241,8 +234,6 @@ export default function ProductDetail() {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, flexWrap: 'wrap' },
   priceRow: { alignItems: 'center', gap: space.sm },
-  strike: { textDecorationLine: 'line-through', fontSize: typography.label },
-  offPill: { borderRadius: radius.pill, paddingHorizontal: space.sm, paddingVertical: 2 },
   bar: {
     position: 'absolute',
     left: 0,

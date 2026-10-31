@@ -370,3 +370,27 @@ export class BuildSettlementDto {
   @IsDateString()
   periodEnd!: string;
 }
+
+// ------------------------------------------------------- consumer orders
+
+/** The statuses a merchant may move a consumer order to. */
+export const ORDER_STATUS_VALUES = [
+  'CONFIRMED',
+  'PREPARING',
+  'READY',
+  'OUT_FOR_DELIVERY',
+  'DELIVERED',
+  'COMPLETED',
+  'CANCELLED',
+] as const;
+
+export class OrderStatusDto {
+  @IsString()
+  @IsIn(ORDER_STATUS_VALUES as unknown as string[])
+  status!: (typeof ORDER_STATUS_VALUES)[number];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  note?: string;
+}

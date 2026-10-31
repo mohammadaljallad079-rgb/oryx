@@ -3,10 +3,12 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
-import { DEMO_CAR_MAKES } from '../../demo/catalogue';
-import { filterProducts, repository, type DemoProduct, type ProductFilter } from '../../lib/repository';
+import { repository, type DemoProduct } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
-import { AppHeader } from '../../components/brand';
+import { useLiveCatalog, filterLiveProducts } from '../../lib/live-catalog';
+import { useLiveSession } from '../../lib/live-session';
+import { catalogProductToDemo, catalogStoreToDemo } from '../../lib/api-adapters';
+import { AppHeader, DemoBanner } from '../../components/brand';
 import { ProductCard, StoreCard } from '../../components/cards';
 import {
   Body,
@@ -20,80 +22,73 @@ import {
 } from '../../components/ui';
 import { radius, space, typography } from '../../lib/theme';
 import { localizeDigits } from '../../lib/format';
+import { isOffline } from '../../lib/api';
 
-type SortKey = NonNullable<ProductFilter['sort']>;
+/** The sorts the live catalogue can honour. A rating sort is not offered: the
+ * public projection carries no rating to sort by. */
+type SortKey = 'relevance' | 'price_asc' | 'price_desc' | 'name';
 
 /**
  * The parts catalogue.
  *
- * Two tabs — products and stores — with a filter sheet over the products. The
- * filter is applied by the pure `filterProducts` function the repository exports,
- * so the same logic can be unit tested and later moved behind the API without a
- * screen change.
+ * The default source is the **real** public catalogue from
+ * `/customer/catalog/products`, with the store directory from
+ * `/customer/catalog/stores`. The filters the API can honour — a text term, a
+ * price sort, availability and a store — are applied to the live rows; a filter
+ * that needs a field the public projection does not carry (a discount, a car
+ * make) is not offered against live data rather than faked.
  *
- * The sort and filter state is local; the catalogue itself comes from the
- * repository, which is what the eventual API will serve.
+ * A live failure shows the failure and a retry. It does not silently swap in the
+ * demo catalogue, because a customer must never be shown an invented price.
  */
 export default function Parts() {
-  const { t, theme, direction, locale, dataVersion } = useApp();
+  const { t, theme, direction, locale } = useApp();
+  const { isLive } = useLiveSession();
   const params = useLocalSearchParams<{ category?: string; store?: string; tab?: string }>();
 
   const [tab, setTab] = useState<'products' | 'stores'>(
     params.tab === 'stores' ? 'stores' : 'products',
   );
   const [query, setQuery] = useState('');
-  const [group, setGroup] = useState<string>('all');
-  const [make, setMake] = useState<string>('all');
   const [sort, setSort] = useState<SortKey>('relevance');
-  const [inStockOnly, setInStockOnly] = useState(false);
-  const [discountedOnly, setDiscountedOnly] = useState(false);
+  const [availableOnly, setAvailableOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [storeFilter, setStoreFilter] = useState<string | undefined>(params.store);
 
-  const allProducts = useAsync(() => repository.products(), [dataVersion]);
-  const groups = useAsync(() => repository.productGroups(), [dataVersion]);
-  const stores = useAsync(
-    () => repository.stores({ sort: 'rating', query }),
-    [query, dataVersion],
-  );
+  // Live catalogue. The API also narrows by term and tenant, so a large
+  // catalogue is filtered server-side as well as locally.
+  const live = useLiveCatalog({ query, companyId: storeFilter, sort });
 
-  const filtered: DemoProduct[] = useMemo(
-    () =>
-      filterProducts(allProducts.data ?? [], {
-        query,
-        groupEn: group,
-        make,
-        storeId: storeFilter,
-        sort,
-        inStockOnly,
-        discountedOnly,
-        categoryKey: (params.category as ProductFilter['categoryKey']) ?? 'all',
-      }),
-    [
-      allProducts.data,
-      query,
-      group,
-      make,
-      storeFilter,
-      sort,
-      inStockOnly,
-      discountedOnly,
-      params.category,
-    ],
+  // The demo catalogue is read only so a screen can tell the two apart; it is
+  // never blended into the live list.
+  const demoProducts = useAsync(() => repository.products(), []);
+
+  const liveProducts = useMemo(
+    () => filterLiveProducts(live.products, { query, sort, availableOnly }),
+    [live.products, query, sort, availableOnly],
   );
+  const liveStores = useMemo(() => live.stores.map(catalogStoreToDemo), [live.stores]);
+
+  // A live failure with nothing to show is an error state, not an empty one.
+  if (live.error && live.products.length === 0 && live.stores.length === 0) {
+    return (
+      <Screen padded={false}>
+        <AppHeader />
+        <View style={{ padding: space.lg, gap: space.md }}>
+          <Card>
+            <StateView kind="error" message={isOffline() ? t('offlineBody') : t('loadFailed')} />
+            <Button title={t('retry')} onPress={live.reload} />
+          </Card>
+        </View>
+      </Screen>
+    );
+  }
 
   const activeFilterCount =
-    (group !== 'all' ? 1 : 0) +
-    (make !== 'all' ? 1 : 0) +
-    (inStockOnly ? 1 : 0) +
-    (discountedOnly ? 1 : 0) +
-    (storeFilter ? 1 : 0);
+    (availableOnly ? 1 : 0) + (storeFilter ? 1 : 0) + (sort !== 'relevance' ? 1 : 0);
 
   const clearFilters = () => {
-    setGroup('all');
-    setMake('all');
-    setInStockOnly(false);
-    setDiscountedOnly(false);
+    setAvailableOnly(false);
     setStoreFilter(undefined);
     setSort('relevance');
   };
@@ -102,9 +97,14 @@ export default function Parts() {
     { key: 'relevance', label: t('sortRelevance') },
     { key: 'price_asc', label: t('sortPriceAsc') },
     { key: 'price_desc', label: t('sortPriceDesc') },
-    { key: 'rating', label: t('sortRating') },
-    { key: 'newest', label: t('sortNewest') },
+    { key: 'name', label: t('sortName') },
   ];
+
+  const products: DemoProduct[] = liveProducts.map(catalogProductToDemo);
+  const stores = liveStores;
+  // The demo rail is for the offline demo only. A live session with an empty
+  // catalogue shows the empty state, never an invented product.
+  const usingDemo = !isLive && live.products.length === 0 && live.stores.length === 0 && !live.loading;
 
   return (
     <Screen padded={false}>
@@ -148,39 +148,24 @@ export default function Parts() {
                   },
                 ]}
               >
-                <Text style={{ color: activeFilterCount ? theme.gold : theme.text, fontWeight: '600', fontSize: typography.label }}>
+                <Text
+                  style={{
+                    color: activeFilterCount ? theme.gold : theme.text,
+                    fontWeight: '600',
+                    fontSize: typography.label,
+                  }}
+                >
                   {t('filters')}
                   {activeFilterCount ? ` (${localizeDigits(activeFilterCount, locale)})` : ''}
                 </Text>
               </Pressable>
               <Body size="label" muted>
-                {localizeDigits(filtered.length, locale)} {t('resultsCount')}
+                {localizeDigits(products.length, locale)} {t('resultsCount')}
               </Body>
             </View>
 
             {showFilters ? (
               <Card testID="parts-filters">
-                <SectionLabel>{t('partGroup')}</SectionLabel>
-                <View style={[styles.chipWrap, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
-                  <Chip label={t('categoriesAll')} active={group === 'all'} onPress={() => setGroup('all')} />
-                  {(groups.data ?? []).map((g) => (
-                    <Chip
-                      key={g.en}
-                      label={locale === 'ar' ? g.ar : g.en}
-                      active={group === g.en}
-                      onPress={() => setGroup(g.en)}
-                    />
-                  ))}
-                </View>
-
-                <SectionLabel>{t('fitsMake')}</SectionLabel>
-                <View style={[styles.chipWrap, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
-                  <Chip label={t('categoriesAll')} active={make === 'all'} onPress={() => setMake('all')} />
-                  {DEMO_CAR_MAKES.map((m) => (
-                    <Chip key={m} label={m} active={make === m} onPress={() => setMake(m)} />
-                  ))}
-                </View>
-
                 <SectionLabel>{t('sortBy')}</SectionLabel>
                 <View style={[styles.chipWrap, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
                   {sortOptions.map((option) => (
@@ -194,8 +179,11 @@ export default function Parts() {
                 </View>
 
                 <View style={[styles.chipWrap, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
-                  <Chip label={t('inStockOnly')} active={inStockOnly} onPress={() => setInStockOnly((v) => !v)} />
-                  <Chip label={t('discountedOnly')} active={discountedOnly} onPress={() => setDiscountedOnly((v) => !v)} />
+                  <Chip
+                    label={t('inStockOnly')}
+                    active={availableOnly}
+                    onPress={() => setAvailableOnly((v) => !v)}
+                  />
                 </View>
 
                 <View style={{ marginTop: space.md, gap: space.sm }}>
@@ -208,23 +196,19 @@ export default function Parts() {
             {storeFilter ? (
               <Card onPress={() => setStoreFilter(undefined)}>
                 <Body size="label" muted>
-                  {t('soldBy')}: {stores.data?.find((s) => s.id === storeFilter)?.nameEn ?? storeFilter} · {t('remove')}
+                  {t('soldBy')}: {live.stores.find((s) => s.id === storeFilter)?.name ?? storeFilter} ·{' '}
+                  {t('remove')}
                 </Body>
               </Card>
             ) : null}
 
-            {allProducts.loading ? (
+            {live.loading && products.length === 0 ? (
               <StateView kind="loading" />
-            ) : filtered.length === 0 ? (
+            ) : products.length === 0 ? (
               <StateView kind="empty" message={t('noResults')} />
             ) : (
-              <View
-                style={[
-                  styles.grid,
-                  { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' },
-                ]}
-              >
-                {filtered.map((product) => (
+              <View style={[styles.grid, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
+                {products.map((product) => (
                   <ProductCard key={product.id} product={product} width={160} />
                 ))}
               </View>
@@ -232,12 +216,12 @@ export default function Parts() {
           </>
         ) : (
           <>
-            {stores.loading ? (
+            {live.loading && stores.length === 0 ? (
               <StateView kind="loading" />
-            ) : (stores.data ?? []).length === 0 ? (
+            ) : stores.length === 0 ? (
               <StateView kind="empty" message={t('noResults')} />
             ) : (
-              (stores.data ?? []).map((store) => (
+              stores.map((store) => (
                 <StoreCard
                   key={store.id}
                   store={store}
@@ -250,6 +234,16 @@ export default function Parts() {
             )}
           </>
         )}
+
+        {usingDemo ? (
+          <>
+            <DemoBanner />
+            <SectionLabel>{t('demoData')}</SectionLabel>
+            {(demoProducts.data ?? []).slice(0, 4).map((product) => (
+              <ProductCard key={product.id} product={product} width={160} />
+            ))}
+          </>
+        ) : null}
       </View>
     </Screen>
   );

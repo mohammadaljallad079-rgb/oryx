@@ -97,7 +97,11 @@ export function ProductCard({
               </Text>
             ) : null}
           </View>
-          <RatingPill rating={product.rating} count={product.reviewCount} />
+          {/* A live catalogue product carries no rating, so the pill is drawn
+              only when there is one. An invented "0.0" would be a false claim. */}
+          {product.reviewCount > 0 ? (
+            <RatingPill rating={product.rating} count={product.reviewCount} />
+          ) : null}
         </View>
       </Card>
     </Pressable>
@@ -121,10 +125,18 @@ export function StoreCard({ store, onPress }: { store: DemoStore; onPress?: () =
             </Text>
             {store.verified ? <Badge text={t('verified')} tone="gold" /> : null}
           </View>
-          <RatingPill rating={store.rating} count={store.reviewCount} />
+          {store.reviewCount > 0 ? <RatingPill rating={store.rating} count={store.reviewCount} /> : null}
           <Body size="caption" muted>
-            {store.deliveryMinor === 0 ? t('freeDelivery') : formatMoney(store.deliveryMinor)} ·{' '}
-            {t('from')} {localizeDigits(store.since, 'en')}
+            {/* A live store's fee and founding year are not in the public
+                catalogue, so neither is asserted when the record is empty. */}
+            {store.since > 0 ? (
+              <>
+                {store.deliveryMinor === 0 ? t('freeDelivery') : formatMoney(store.deliveryMinor)} ·{' '}
+                {t('from')} {localizeDigits(store.since, 'en')}
+              </>
+            ) : (
+              `${localizeDigits(store.productCount ?? 0, 'en')} ${t('parts')}`
+            )}
           </Body>
         </View>
       </View>

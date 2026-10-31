@@ -1,19 +1,27 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
+import { useLiveSession } from '../../lib/live-session';
+import { ApiError, vehiclesApi } from '../../lib/api';
 import { ScreenHeader } from '../../components/brand';
-import { Body, Button, Card, Field, Screen, SectionLabel } from '../../components/ui';
+import { Body, Button, Card, Field, Notice, Screen, SectionLabel } from '../../components/ui';
 import { space } from '../../lib/theme';
 
 /**
  * Add a vehicle.
  *
- * The form is real and validates its required fields; saving is a demo action
- * that returns to the garage. It does not claim to have stored anything.
+ * Inside a live session the form posts to `POST /customer/vehicles`, so the car
+ * lands in the server garage and appears in the account tab and in SENSAGE.
+ * Offline the same form is a local demo action that stores nothing, and says so.
  */
 export default function NewVehicle() {
   const { t, theme } = useApp();
+  const session = useLiveSession();
+  const isLive = session.isLive;
+  const router = useRouter();
+
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
   const [year, setYear] = useState('');
@@ -22,8 +30,43 @@ export default function NewVehicle() {
   const [colour, setColour] = useState('');
   const [mileage, setMileage] = useState('');
   const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const complete = make.trim() && model.trim() && year.trim() && plate.trim();
+  const modelYear = Number(year);
+  const complete =
+    make.trim().length > 0 &&
+    model.trim().length > 0 &&
+    vin.trim().length >= 5 &&
+    Number.isInteger(modelYear) &&
+    modelYear >= 1900 &&
+    modelYear <= 2100;
+
+  const submit = async () => {
+    if (!complete || busy) return;
+    if (!isLive) {
+      setSaved(true);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await vehiclesApi.create({
+        vin: vin.trim(),
+        plateNumber: plate.trim() || undefined,
+        make: make.trim(),
+        model: model.trim(),
+        modelYear,
+        color: colour.trim() || undefined,
+        mileage: mileage.trim() ? Number(mileage) : undefined,
+      });
+      router.back();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('serverError'));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <Screen>
@@ -43,10 +86,12 @@ export default function NewVehicle() {
         <Button
           testID="vehicle-save"
           title={t('save')}
-          disabled={!complete}
-          onPress={() => setSaved(true)}
+          loading={busy}
+          disabled={!complete || busy}
+          onPress={() => void submit()}
         />
-        {saved ? (
+        {error ? <Notice text={error} /> : null}
+        {!isLive && saved ? (
           <Body size="caption" muted style={{ marginTop: space.sm, color: theme.gold }}>
             {t('demoNotice')}
           </Body>
@@ -55,4 +100,3 @@ export default function NewVehicle() {
     </Screen>
   );
 }
-

@@ -79,6 +79,137 @@ model Favorite {
   @@index([productId])
 }
 
+/// A consumer order placed from the marketplace cart.
+///
+/// ## Why this is separate from `SalesOrder`
+///
+/// `SalesOrder` is the ERP's B2B document: it belongs to a company's own
+/// customer list, feeds the sales invoice and the accounting ledger, and is
+/// created by staff. A consumer order is a different thing — it is placed by a
+/// `CustomerAccount`, it may span several sellers, and the customer reads it in
+/// the app. Modelling it as a `SalesOrder` would mean either exposing the ERP
+/// document to consumers or inventing a company customer for every consumer.
+///
+/// ## What is authoritative
+///
+/// `subtotalMinor`, `taxMinor` and `totalMinor` are computed server-side at
+/// placement from the catalogue price and the product's own tax rate. A total in
+/// the request is ignored. The line's `unitPriceMinor` is a snapshot taken at
+/// placement, so a later catalogue price change cannot rewrite a historical
+/// order — the same principle the payroll run uses.
+model CustomerOrder {
+  id                String   @id @default(cuid())
+  /// Human-facing reference, e.g. ORD-2026-000123. Unique per company.
+  reference         String
+  customerAccountId String
+  /// The catalogue tenant the order was placed against.
+  companyId         String
+  status            CustomerOrderStatus @default(PENDING)
+  /** Payment intent, when the order was paid through a gateway. Null for cash/terminal. */
+  paymentIntentId   String?
+  /** How the customer chose to pay. Never a claim that money moved. */
+  paymentMethod     CustomerOrderPaymentMethod @default(CASH)
+  /** Denormalised address text, so a later address edit cannot rewrite history. */
+  addressLabel      String?
+  addressLine1      String?
+  addressLine2      String?
+  addressCity       String?
+  addressCountryCode String?
+  subtotalMinor     Int
+  taxMinor          Int      @default(0)
+  deliveryMinor     Int      @default(0)
+  totalMinor        Int
+  currency          String   @default("BHD")
+  notes             String?
+  /** Set when the customer cancels; a reason the operator can act on. */
+  cancellationReason String?
+  placedAt          DateTime @default(now())
+  confirmedAt       DateTime?
+  cancelledAt       DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  customerAccount CustomerAccount      @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+  company         Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  paymentIntent   PaymentIntent?       @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
+  lines           CustomerOrderLine[]
+  events          CustomerOrderEvent[]
+
+  /// A retried checkout with the same key returns the original order rather than
+  /// placing a second one. Null for orders created before the key was supplied.
+  idempotencyKey String?
+  @@unique([companyId, reference])
+  @@unique([customerAccountId, idempotencyKey])
+  @@index([customerAccountId, placedAt])
+  @@index([companyId, status])
+  @@index([paymentIntentId])
+}
+
+/// One line of a consumer order. The unit price is a placement-time snapshot.
+model CustomerOrderLine {
+  id             String   @id @default(cuid())
+  orderId        String
+  productId      String
+  /** Snapshot of the catalogue identity, so a renamed product does not rewrite history. */
+  sku            String
+  nameEn         String
+  nameAr         String
+  quantity       Int
+  unitPriceMinor Int
+  /** Basis points, copied from the product at placement. 1500 = 15%. */
+  taxRateBp      Int      @default(0)
+  lineSubtotalMinor Int
+  lineTaxMinor   Int      @default(0)
+  lineTotalMinor Int
+  createdAt      DateTime @default(now())
+
+  order   CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+/// The append-only status trail for a consumer order.
+///
+/// A status is never edited in place; a transition writes a row. That keeps the
+/// order's history readable and makes an accidental double transition visible
+/// rather than silent.
+model CustomerOrderEvent {
+  id        String   @id @default(cuid())
+  orderId   String
+  status    CustomerOrderStatus
+  note      String?
+  /** Who caused it: the customer, the merchant, or the system. */
+  actor     String   @default("SYSTEM")
+  createdAt DateTime @default(now())
+
+  order CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+enum CustomerOrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  OUT_FOR_DELIVERY
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+/// How a consumer chose to pay. This records the choice, not a settlement.
+enum CustomerOrderPaymentMethod {
+  CASH
+  CARD_TERMINAL
+  BANK_TRANSFER
+  BENEFITPAY
+  CARD_ONLINE
+}
+
 /// A catalogue image for a product.
 ///
 /// `isPrimary` marks the one image a listing shows. Exactly one image per product
@@ -274,6 +405,8 @@ model Company {
   id              String        @id @default(cuid())
   /// Carts opened against this tenant's catalogue.
   carts           Cart[]
+  /** Consumer orders placed against this tenant's catalogue. */
+  orders          CustomerOrder[]
   code            String        @unique
   nameEn          String
   nameAr          String
@@ -982,6 +1115,10 @@ enum StockMovementSource {
   TRANSFER
   ADJUSTMENT
   POS_SALE
+  /// A consumer marketplace order placed from the mobile app.
+  MARKETPLACE_ORDER
+  /// The reversal of a cancelled marketplace order.
+  MARKETPLACE_ORDER_CANCEL
 }
 
 enum TransferStatus {
@@ -1363,6 +1500,9 @@ model Product {
   partReferences   PartReference[]
   partCompatibilities PartCompatibility[]
   reservationLines PartsReservationLine[]
+
+  /** Consumer order lines that reference this product. */
+  orderLines CustomerOrderLine[]
 
   @@unique([companyId, sku])
   @@index([companyId, isActive])
@@ -4030,6 +4170,8 @@ model CustomerAccount {
   favorites       Favorite[]
   /** SENSAGE inspection photographs this consumer uploaded. */
   inspectionPhotos CustomerInspectionPhoto[]
+  /** Marketplace orders this consumer placed. */
+  orders          CustomerOrder[]
 
   @@index([status])
   @@index([defaultCompanyId])
@@ -4521,6 +4663,8 @@ model PaymentIntent {
 
   transactions PaymentTransaction[]
   refunds      Refund[]
+  /** Consumer orders settled through this intent. */
+  orders       CustomerOrder[]
 
   @@unique([companyId, intentNumber])
   @@unique([companyId, idempotencyKey])

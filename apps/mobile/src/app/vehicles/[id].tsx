@@ -6,8 +6,11 @@ import { useApp } from '../../lib/app-context';
 import { photo } from '../../lib/assets';
 import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
+import { useLiveSession } from '../../lib/live-session';
+import { vehiclesApi, type CustomerVehicleHistory } from '../../lib/api';
+import { customerVehicleToDemo } from '../../lib/api-adapters';
 import { ScreenHeader } from '../../components/brand';
-import { BookingCard, ReportCard } from '../../components/cards';
+import { ReportCard } from '../../components/cards';
 import {
   Body,
   Button,
@@ -20,31 +23,48 @@ import {
   StateView,
 } from '../../components/ui';
 import { radius, space, typography } from '../../lib/theme';
-import { localizeDigits } from '../../lib/format';
+import { formatDate, localizeDigits } from '../../lib/format';
 
 /**
  * A vehicle.
  *
- * The car's details plus everything that has happened to it: its reports and its
- * bookings. This is the screen that makes the demo feel connected — the same
- * vehicle appears in the garage, in the SENSAGE report and in the booking.
+ * Inside a live session the car and its history are the server's: the vehicle is
+ * read from the customer's own garage and the history comes from
+ * `GET /customer/vehicles/:id/history`, which assembles the real inspections,
+ * maintenance bookings, workshop job cards and warranties. Offline, the same
+ * screen reads the local demo records.
  */
 export default function VehicleDetail() {
   const { t, theme, locale, account, direction, dataVersion } = useApp();
+  const { isLive } = useLiveSession();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
-  const vehicle = useAsync(async () => repository.vehicle(id), [id, dataVersion]);
-  const reports = useAsync(
-    async () => (account ? repository.sensageReports(account.id) : []),
-    [account?.id, dataVersion],
+  const demoVehicle = useAsync(
+    async () => (isLive ? null : repository.vehicle(id)),
+    [id, dataVersion, isLive],
   );
-  const bookings = useAsync(
-    async () => (account ? repository.bookings(account.id) : []),
-    [account?.id, dataVersion],
+  const liveVehicle = useAsync(
+    async () => (isLive ? (await vehiclesApi.list()).find((v) => v.id === id) ?? null : null),
+    [id, dataVersion, isLive],
+  );
+  const history = useAsync(
+    async (): Promise<CustomerVehicleHistory | null> => (isLive ? vehiclesApi.history(id) : null),
+    [id, dataVersion, isLive],
+  );
+  const reports = useAsync(
+    async () => (account && !isLive ? repository.sensageReports(account.id) : []),
+    [account?.id, dataVersion, isLive],
   );
 
-  if (vehicle.loading) {
+  const vehicleLoading = isLive ? liveVehicle.loading : demoVehicle.loading;
+  const vehicleData = isLive
+    ? liveVehicle.data
+      ? customerVehicleToDemo(liveVehicle.data)
+      : null
+    : demoVehicle.data;
+
+  if (vehicleLoading) {
     return (
       <Screen>
         <ScreenHeader title={t('myVehicles')} />
@@ -52,7 +72,7 @@ export default function VehicleDetail() {
       </Screen>
     );
   }
-  if (!vehicle.data) {
+  if (!vehicleData) {
     return (
       <Screen>
         <ScreenHeader title={t('myVehicles')} />
@@ -61,9 +81,8 @@ export default function VehicleDetail() {
     );
   }
 
-  const car = vehicle.data;
+  const car = vehicleData;
   const carReports = (reports.data ?? []).filter((r) => r.vehicleId === car.id);
-  const carBookings = (bookings.data ?? []).filter((b) => b.vehicleId === car.id);
 
   return (
     <Screen>
@@ -102,20 +121,70 @@ export default function VehicleDetail() {
         carReports.map((report) => <ReportCard key={report.id} report={report} vehicle={car} />)
       )}
 
-      <SectionLabel>{t('myBookings')}</SectionLabel>
-      {carBookings.length === 0 ? (
-        <Body size="label" muted>
-          {t('noBookings')}
-        </Body>
+      {isLive ? (
+        <>
+          <SectionLabel>{t('serviceHistory')}</SectionLabel>
+          {history.loading ? (
+            <StateView kind="loading" />
+          ) : (
+            (() => {
+              const h = history.data;
+              const rows = h
+                ? [
+                    ...h.inspections.map((r) => ({
+                      id: r.id,
+                      title: `${t('inspection')} · ${r.bookingNumber}`,
+                      status: r.status,
+                      at: r.scheduledAt ?? r.createdAt,
+                    })),
+                    ...h.maintenance.map((r) => ({
+                      id: r.id,
+                      title: `${t('maintenance')} · ${r.bookingNumber}`,
+                      status: r.status,
+                      at: r.scheduledAt ?? r.createdAt,
+                    })),
+                    ...h.jobCards.map((r) => ({
+                      id: r.id,
+                      title: `${t('workOrders')} · ${r.jobNumber}`,
+                      status: r.status,
+                      at: r.completedAt ?? r.createdAt,
+                    })),
+                  ]
+                : [];
+              if (rows.length === 0) {
+                return (
+                  <Body size="label" muted>
+                    {t('noHistory')}
+                  </Body>
+                );
+              }
+              return rows.map((row) => (
+                <Card key={row.id}>
+                  <View style={styles.row}>
+                    <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.label, flex: 1 }}>
+                      {row.title}
+                    </Text>
+                    <Text style={{ color: theme.textMuted, fontSize: typography.caption }}>
+                      {formatDate(row.at)}
+                    </Text>
+                  </View>
+                </Card>
+              ));
+            })()
+          )}
+        </>
       ) : (
-        carBookings.map((booking) => (
-          <BookingCard key={booking.id} booking={booking} provider={repository.provider(booking.providerId)} />
-        ))
+        <>
+          <SectionLabel>{t('myBookings')}</SectionLabel>
+          <Body size="label" muted>
+            {t('demoNotice')}
+          </Body>
+        </>
       )}
 
       <Divider />
       <Text style={{ color: theme.textFaint, fontSize: typography.caption, textAlign: 'center' }}>
-        {t('demoData')}
+        {isLive ? t('liveData') : t('demoData')}
       </Text>
       <View style={{ height: space.xl }} />
     </Screen>

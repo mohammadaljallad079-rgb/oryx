@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useApp } from '../../lib/app-context';
 import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
+import { useLiveSession } from '../../lib/live-session';
 import { ScreenHeader } from '../../components/brand';
 import {
   Badge,
@@ -27,13 +28,38 @@ import { formatDate, formatMoney, localizeDigits } from '../../lib/format';
  * The condition score, the findings with their confidence and indicative cost,
  * and the recommendations. The disclaimer is at the top, not the bottom, because
  * a page that looks like a diagnosis must say it is not one before it is read.
+ *
+ * This is the **demo** report. There is no analysis result in the backend — only
+ * the uploaded photograph — so a live session must not reach a page that presents
+ * a generated score as a real finding. The live SENSAGE hub shows the uploaded
+ * photos instead and never links here; this guard makes that explicit rather than
+ * relying on the absence of a link.
  */
 export default function SensageReport() {
   const { t, theme, locale, direction, dataVersion } = useApp();
+  const { isLive } = useLiveSession();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
-  const report = useAsync(async () => repository.sensageReport(id), [id, dataVersion]);
+  const report = useAsync(
+    async () => (isLive ? null : repository.sensageReport(id)),
+    [id, dataVersion, isLive],
+  );
+
+  if (isLive) {
+    return (
+      <Screen>
+        <ScreenHeader title={t('reportDetails')} />
+        <Card>
+          <Body size="caption" muted>
+            {t('sensageDisclaimer')}
+          </Body>
+        </Card>
+        <Button title={t('sensageTitle')} onPress={() => router.replace('/sensage')} />
+        <View style={{ height: space.xl }} />
+      </Screen>
+    );
+  }
 
   if (report.loading) {
     return (

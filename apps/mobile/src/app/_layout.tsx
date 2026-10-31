@@ -7,6 +7,8 @@ import { LiveCartProvider } from '../lib/live-cart';
 import { LiveFavoritesProvider } from '../lib/live-favorites';
 import { LiveSessionProvider } from '../lib/live-session';
 import { LiveBookingsProvider } from '../lib/live-bookings';
+import { LiveOrdersProvider } from '../lib/live-orders';
+import { LiveRequestsProvider } from '../lib/live-requests';
 import { MerchantSessionProvider } from '../lib/merchant-session';
 import { LaunchScreen } from '../components/launch';
 
@@ -75,9 +77,13 @@ export default function RootLayout() {
           <LiveCartProvider>
             <LiveFavoritesProvider>
               <LiveBookingsProvider>
-                <MerchantSessionProvider>
-                  <RootNavigator />
-                </MerchantSessionProvider>
+                <LiveOrdersProvider>
+                  <LiveRequestsProvider>
+                    <MerchantSessionProvider>
+                      <RootNavigator />
+                    </MerchantSessionProvider>
+                  </LiveRequestsProvider>
+                </LiveOrdersProvider>
               </LiveBookingsProvider>
             </LiveFavoritesProvider>
           </LiveCartProvider>

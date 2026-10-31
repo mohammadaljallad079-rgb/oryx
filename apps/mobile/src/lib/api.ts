@@ -348,6 +348,455 @@ export const api = {
   },
 };
 
+// ----------------------------------------------------- consumer catalogue
+
+/** A product as the public consumer catalogue returns it. */
+export interface CatalogProduct {
+  id: string;
+  storeId: string;
+  sku: string;
+  /** Localised name, chosen by the `locale` the request carried. */
+  name: string;
+  nameEn: string;
+  nameAr: string;
+  type: string;
+  unit: string;
+  priceMinor: number;
+  taxRateBp: number;
+  /** A boolean, never a quantity: the catalogue does not expose stock depth. */
+  available: boolean;
+  imageUrl: string | null;
+  store: { id: string; code: string; name: string };
+}
+
+/** A marketplace store, which is a tenant company with a published catalogue. */
+export interface CatalogStore {
+  id: string;
+  code: string;
+  name: string;
+  nameEn: string;
+  nameAr: string;
+  countryCode: string | null;
+  productCount: number;
+  providerId: string | null;
+  categoryKey: string | null;
+}
+
+export interface CatalogCategory {
+  key: string;
+  name: string;
+  icon: string | null;
+  domain: string;
+  imageUrl: string | null;
+}
+
+/**
+ * The public consumer catalogue.
+ *
+ * Public by design: a guest browses parts and stores before signing in. Nothing
+ * here returns a cost price or a stock quantity — the API selects the public
+ * projection only, and the client has no field to display one.
+ */
+export const catalogApi = {
+  products: (
+    params: { locale: 'ar' | 'en'; companyId?: string; query?: string; sort?: string; page?: number; pageSize?: number } ,
+    signal?: AbortSignal,
+  ) => {
+    const q = new URLSearchParams({ locale: params.locale });
+    if (params.companyId) q.set('companyId', params.companyId);
+    if (params.query) q.set('query', params.query);
+    if (params.sort) q.set('sort', params.sort);
+    q.set('page', String(params.page ?? 1));
+    q.set('pageSize', String(params.pageSize ?? 20));
+    return requestWithRetry<{ items: CatalogProduct[]; total: number; page: number; pageSize: number }>(
+      `/customer/catalog/products?${q}`,
+      { auth: false, signal },
+    );
+  },
+
+  product: (id: string, locale: 'ar' | 'en', signal?: AbortSignal) =>
+    requestWithRetry<CatalogProduct & { images: Array<{ url: string | null }>; related: CatalogProduct[] }>(
+      `/customer/catalog/products/${encodeURIComponent(id)}?locale=${locale}`,
+      { auth: false, signal },
+    ),
+
+  stores: (params: { locale: 'ar' | 'en'; query?: string; sort?: 'name' | 'products' }, signal?: AbortSignal) => {
+    const q = new URLSearchParams({ locale: params.locale });
+    if (params.query) q.set('query', params.query);
+    if (params.sort) q.set('sort', params.sort);
+    return requestWithRetry<{ items: CatalogStore[]; total: number }>(`/customer/catalog/stores?${q}`, {
+      auth: false,
+      signal,
+    });
+  },
+
+  store: (id: string, locale: 'ar' | 'en', signal?: AbortSignal) =>
+    requestWithRetry<CatalogStore & { products: CatalogProduct[]; productTotal: number }>(
+      `/customer/catalog/stores/${encodeURIComponent(id)}?locale=${locale}`,
+      { auth: false, signal },
+    ),
+
+  categories: (locale: 'ar' | 'en', signal?: AbortSignal) =>
+    requestWithRetry<{ items: CatalogCategory[]; total: number }>(
+      `/customer/catalog/categories?locale=${locale}`,
+      { auth: false, signal },
+    ),
+};
+
+// -------------------------------------------------------- consumer orders
+
+/** One line of a consumer order, as the API returns it. */
+export interface OrderLine {
+  id: string;
+  sku: string;
+  nameEn: string;
+  nameAr: string;
+  quantity: number;
+  unitPriceMinor: number;
+  lineTotalMinor: number;
+}
+
+/** The consumer order status machine, matching `CustomerOrderStatus`. */
+export type OrderStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'PREPARING'
+  | 'READY'
+  | 'OUT_FOR_DELIVERY'
+  | 'DELIVERED'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export interface OrderSummary {
+  id: string;
+  reference: string;
+  status: OrderStatus;
+  paymentMethod: string;
+  subtotalMinor: number;
+  taxMinor: number;
+  deliveryMinor: number;
+  totalMinor: number;
+  currency: string;
+  placedAt: string;
+  itemCount: number;
+  lines: OrderLine[];
+}
+
+export interface OrderDetail extends OrderSummary {
+  address: {
+    label: string | null;
+    line1: string;
+    line2: string | null;
+    city: string | null;
+    countryCode: string | null;
+  } | null;
+  notes: string | null;
+  cancellationReason: string | null;
+  confirmedAt: string | null;
+  cancelledAt: string | null;
+  completedAt: string | null;
+  /** True while the server would still accept a cancellation. */
+  cancellable: boolean;
+  payment: { intentId: string; status: string; amountMinor: number; currency: string } | null;
+  events: Array<{ status: OrderStatus; note: string | null; actor: string; createdAt: string }>;
+}
+
+/**
+ * The consumer order surface.
+ *
+ * Every route resolves the account from the bearer token, so the client sends no
+ * customer id and cannot address another account's order. The server computes
+ * every total from the catalogue — the client only sends an address, a payment
+ * method and an idempotency key.
+ */
+export const ordersApi = {
+  list: (params: { page?: number; pageSize?: number; status?: string } = {}, signal?: AbortSignal) => {
+    const q = new URLSearchParams();
+    q.set('page', String(params.page ?? 1));
+    q.set('pageSize', String(params.pageSize ?? 20));
+    if (params.status) q.set('status', params.status);
+    return requestWithRetry<{ items: OrderSummary[]; total: number; page: number; pageSize: number }>(
+      `/customer/orders?${q}`,
+      { signal },
+    );
+  },
+
+  get: (id: string, signal?: AbortSignal) =>
+    requestWithRetry<OrderDetail>(`/customer/orders/${encodeURIComponent(id)}`, { signal }),
+
+  /**
+   * Place an order from the server cart.
+   *
+   * `idempotencyKey` is what makes a retried checkout safe: the same key returns
+   * the order that was already placed rather than placing a second one. The
+   * client generates it once per checkout attempt and reuses it on retry.
+   */
+  place: (input: { addressId?: string; paymentMethod?: string; notes?: string; idempotencyKey?: string }) =>
+    request<OrderDetail>('/customer/orders', { method: 'POST', body: input }),
+
+  cancel: (id: string, reason?: string) =>
+    request<OrderDetail>(`/customer/orders/${encodeURIComponent(id)}/cancel`, {
+      method: 'POST',
+      body: reason ? { reason } : {},
+    }),
+};
+
+// ---------------------------------------------------- customer addresses
+
+/** A delivery address, as `GET /customer/addresses` returns it. */
+export interface CustomerAddress {
+  id: string;
+  accountId: string;
+  label: string | null;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  area: string | null;
+  countryCode: string | null;
+  postalCode: string | null;
+  isDefault: boolean;
+}
+
+/**
+ * The customer's own delivery addresses.
+ *
+ * Every route resolves the account from the bearer token, so no account id is
+ * ever sent and one customer cannot read or edit another's addresses.
+ */
+export const addressesApi = {
+  list: (signal?: AbortSignal) =>
+    requestWithRetry<CustomerAddress[]>('/customer/addresses', { signal }),
+
+  create: (input: {
+    label?: string;
+    addressLine1: string;
+    addressLine2?: string;
+    city: string;
+    area?: string;
+    countryCode?: string;
+    postalCode?: string;
+    isDefault?: boolean;
+  }) => request<CustomerAddress>('/customer/addresses', { method: 'POST', body: input }),
+
+  update: (id: string, patch: Partial<Omit<CustomerAddress, 'id' | 'accountId'>>) =>
+    request<CustomerAddress>(`/customer/addresses/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: patch,
+    }),
+
+  remove: (id: string) =>
+    request<void>(`/customer/addresses/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+};
+
+// ------------------------------------------------------ customer payments
+
+/** One payment intent in the customer's own history. */
+export interface CustomerPayment {
+  id: string;
+  intentNumber: string;
+  targetType: string;
+  targetId: string;
+  amountMinor: number;
+  currency: string;
+  currencyScale: number;
+  status: string;
+  provider: string;
+  description: string | null;
+  succeededAt: string | null;
+  createdAt: string;
+  refunds: Array<{ id: string; refundNumber: string; amountMinor: number; status: string }>;
+}
+
+/**
+ * The customer's payment history.
+ *
+ * Read-only by design: money is never created from this screen, so there is no
+ * top-up route. An intent is raised by the obligation being paid (an invoice or a
+ * booking), which keeps every amount tied to a real document.
+ */
+export const paymentsApi = {
+  history: (params: { page?: number; pageSize?: number } = {}, signal?: AbortSignal) => {
+    const q = new URLSearchParams();
+    q.set('page', String(params.page ?? 1));
+    q.set('pageSize', String(params.pageSize ?? 20));
+    return requestWithRetry<{ items: CustomerPayment[]; total: number }>(
+      `/customer/payments?${q}`,
+      { signal },
+    );
+  },
+};
+
+// -------------------------------------------------- customer notifications
+
+/** One in-app notification, as `GET /customer/notifications` returns it. */
+export interface CustomerNotification {
+  id: string;
+  category: string;
+  subject: string;
+  body: string;
+  entityType: string | null;
+  entityId: string | null;
+  deliveredAt: string | null;
+  createdAt: string;
+}
+
+/**
+ * The customer's own in-app notifications.
+ *
+ * Every route resolves the account from the bearer token, so a customer cannot
+ * read or mark read another account's notifications. Delivery diagnostics for
+ * operators live on the staff plane and are not reachable from here.
+ */
+export const notificationsApi = {
+  list: (params: { page?: number; pageSize?: number; unreadOnly?: boolean } = {}, signal?: AbortSignal) => {
+    const q = new URLSearchParams();
+    q.set('page', String(params.page ?? 1));
+    q.set('pageSize', String(params.pageSize ?? 50));
+    if (params.unreadOnly) q.set('unreadOnly', 'true');
+    return requestWithRetry<{ items: CustomerNotification[]; total: number; unread: number }>(
+      `/customer/notifications?${q}`,
+      { signal },
+    );
+  },
+
+  markRead: (ids: string[]) =>
+    request<{ updated: number }>('/customer/notifications/read', { method: 'POST', body: { ids } }),
+
+  markAllRead: () => request<{ updated: number }>('/customer/notifications/read-all', { method: 'POST' }),
+};
+
+// -------------------------------------------------- public marketplace
+
+/** An active listing on a provider, as the public marketplace returns it. */
+export interface PublicProviderListing {
+  id: string;
+  categoryKey: string;
+  nameEn: string;
+  nameAr: string;
+  priceMinor: number;
+  currency: string;
+}
+
+/**
+ * An approved service provider, as `GET /marketplace/providers` returns it.
+ *
+ * The directory aggregates the rating server-side from published reviews only,
+ * so `averageRating` is null until a review has been moderated in — the card
+ * draws no pill in that case rather than a zero.
+ */
+export interface PublicProvider {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  categoryKey: string | null;
+  phone: string | null;
+  email: string | null;
+  listings: PublicProviderListing[];
+  reviewCount: number;
+  averageRating: number | null;
+}
+
+/** One published review on a provider profile. */
+export interface PublicProviderReview {
+  id: string;
+  rating: number;
+  title: string | null;
+  comment: string | null;
+  providerReply: string | null;
+  createdAt: string;
+}
+
+/** A provider profile with its listings, working hours and published reviews. */
+export interface PublicProviderDetail extends Omit<PublicProvider, 'listings'> {
+  listings: PublicProviderListing[];
+  availability: Array<{
+    id: string;
+    dayOfWeek: number;
+    opensAt: string;
+    closesAt: string;
+    isClosed: boolean;
+  }>;
+  reviews: PublicProviderReview[];
+}
+
+/**
+ * The public service marketplace.
+ *
+ * No token: a guest browses providers and their published prices before signing
+ * in. Only `APPROVED` providers with `isActive` listings are returned, so a
+ * pending or suspended provider cannot appear in the app.
+ */
+export const marketplaceApi = {
+  providers: (
+    params: { categoryKey?: string; page?: number; pageSize?: number } = {},
+    signal?: AbortSignal,
+  ) => {
+    const q = new URLSearchParams();
+    if (params.categoryKey) q.set('categoryKey', params.categoryKey);
+    q.set('page', String(params.page ?? 1));
+    q.set('pageSize', String(params.pageSize ?? 20));
+    return requestWithRetry<{ items: PublicProvider[]; total: number }>(`/marketplace/providers?${q}`, {
+      auth: false,
+      signal,
+    });
+  },
+
+  provider: (id: string, signal?: AbortSignal) =>
+    requestWithRetry<PublicProviderDetail>(`/marketplace/providers/${encodeURIComponent(id)}`, {
+      auth: false,
+      signal,
+    }),
+};
+
+/**
+ * One service request as the customer's own list returns it.
+ *
+ * The record carries the provider once one has accepted it, so the app can show
+ * who is coming without a second call. `reviews` is the moderation state of the
+ * customer's own review, used to decide whether the "leave a review" action is
+ * still offered.
+ */
+export interface CustomerServiceRequest {
+  id: string;
+  requestNumber: string;
+  categoryKey: string;
+  description: string | null;
+  status: string;
+  createdAt: string;
+  providerId: string | null;
+  provider: { id: string; nameEn: string; nameAr: string; phone: string | null } | null;
+  reviews: Array<{ id: string; rating: number; status: string }>;
+}
+
+/**
+ * The customer's own service requests.
+ *
+ * A service request is how a recovery, a wash or a repair is raised when it is
+ * not tied to a bookable slot. The account is resolved from the bearer token, so
+ * the client sends no account id and cannot read another customer's requests.
+ */
+export const serviceRequestsApi = {
+  list: (params: { page?: number; pageSize?: number } = {}, signal?: AbortSignal) => {
+    const q = new URLSearchParams();
+    q.set('page', String(params.page ?? 1));
+    q.set('pageSize', String(params.pageSize ?? 50));
+    return requestWithRetry<{ items: CustomerServiceRequest[]; total: number }>(
+      `/customer/marketplace/requests?${q}`,
+      { signal },
+    );
+  },
+
+  create: (input: { categoryKey: string; description?: string; vehicleId?: string; companyId?: string }) =>
+    request<CustomerServiceRequest>('/customer/marketplace/requests', { method: 'POST', body: input }),
+
+  cancel: (id: string, reason: string) =>
+    request<CustomerServiceRequest>(`/customer/marketplace/requests/${id}/cancel`, {
+      method: 'POST',
+      body: { reason },
+    }),
+};
+
 // ------------------------------------------------------- auth and bookings
 
 export interface CustomerSession {
@@ -779,7 +1228,56 @@ export const vehiclesApi = {
 
   remove: (id: string) =>
     request<{ removed: boolean }>(`/customer/vehicles/${id}`, { method: 'DELETE' }),
+
+  history: (id: string, signal?: AbortSignal) =>
+    requestWithRetry<CustomerVehicleHistory>(
+      `/customer/vehicles/${encodeURIComponent(id)}/history`,
+      { signal },
+    ),
 };
+
+/**
+ * One vehicle's full service history, assembled server-side from the ERP.
+ *
+ * Inspections, maintenance bookings, workshop job cards and warranties are
+ * separate record types in the platform, so they arrive as four lists rather than
+ * one invented timeline. The screen shows each under its own heading, which keeps
+ * a real inspection distinct from a real job card.
+ */
+export interface CustomerVehicleHistory {
+  vehicle: { id: string; vin: string; make: string; model: string; modelYear: number };
+  inspections: Array<{
+    id: string;
+    bookingNumber: string;
+    status: string;
+    scheduledAt: string | null;
+    createdAt: string;
+  }>;
+  maintenance: Array<{
+    id: string;
+    bookingNumber: string;
+    status: string;
+    scheduledAt: string | null;
+    complaint: string | null;
+    createdAt: string;
+  }>;
+  jobCards: Array<{
+    id: string;
+    jobNumber: string;
+    status: string;
+    complaint: string | null;
+    odometer: number | null;
+    completedAt: string | null;
+    createdAt: string;
+  }>;
+  warranties: Array<{
+    id: string;
+    description: string;
+    isActive: boolean;
+    startsAt: string;
+    expiresAt: string;
+  }>;
+}
 
 /**
  * Turns a media reference from the API into an absolute URL the `<Image>` can load.
@@ -912,4 +1410,36 @@ export const providerApi = {
   settlements: (signal?: AbortSignal) =>
     requestWithRetry<unknown[]>('/provider/settlements', { signal, plane: 'staff' }),
   reviews: (signal?: AbortSignal) => requestWithRetry<unknown[]>('/provider/reviews', { signal, plane: 'staff' }),
+
+  /**
+   * Consumer orders placed against the provider's own company.
+   *
+   * The API resolves the provider — and therefore the company — from the
+   * authenticated user's `ProviderUser` membership, never from the URL. The
+   * client sends no company id, so a merchant cannot read another tenant's
+   * orders even by editing the request.
+   */
+  orders: (params: { status?: string; page?: number; pageSize?: number } = {}, signal?: AbortSignal) => {
+    const q = new URLSearchParams();
+    if (params.status) q.set('status', params.status);
+    q.set('page', String(params.page ?? 1));
+    q.set('pageSize', String(params.pageSize ?? 20));
+    return requestWithRetry<{ items: Array<OrderSummary & { customerAccountId: string }>; total: number }>(
+      `/provider/orders?${q}`,
+      { signal, plane: 'staff' },
+    );
+  },
+
+  order: (id: string, signal?: AbortSignal) =>
+    requestWithRetry<OrderDetail & { customerAccountId: string }>(
+      `/provider/orders/${encodeURIComponent(id)}`,
+      { signal, plane: 'staff' },
+    ),
+
+  setOrderStatus: (id: string, status: OrderStatus, note?: string) =>
+    request<OrderDetail>(`/provider/orders/${encodeURIComponent(id)}/status`, {
+      method: 'POST',
+      body: note ? { status, note } : { status },
+      plane: 'staff',
+    }),
 };

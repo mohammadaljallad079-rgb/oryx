@@ -1,67 +1,165 @@
-import React, { useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { useApp } from '../lib/app-context';
-import { repository } from '../lib/repository';
+import { useLiveCart } from '../lib/live-cart';
+import { useLiveSession } from '../lib/live-session';
+import { addressesApi, ApiError, ordersApi, type CustomerAddress, type OrderDetail } from '../lib/api';
 import { useAsync } from '../lib/use-async';
 import { ScreenHeader } from '../components/brand';
-import { Body, Button, Card, Chip, Divider, Heading, ListRow, Screen, SectionLabel } from '../components/ui';
+import {
+  Body,
+  Button,
+  Card,
+  Chip,
+  Divider,
+  Heading,
+  ListRow,
+  Screen,
+  SectionLabel,
+  StateView,
+} from '../components/ui';
 import { space, typography } from '../lib/theme';
-import { formatMoney } from '../lib/format';
+import { formatMoney, localizeDigits } from '../lib/format';
+import { isOffline } from '../lib/api';
 
 /**
  * Checkout.
  *
- * A four-step demo checkout: address, payment method, a review of the order and
- * a confirmation. Nothing is charged — the demo says so on the button — but the
- * totals are computed from the real cart, so the arithmetic is honest.
+ * A four-step checkout — address, payment method, review, confirmation — that
+ * places a **real** order through `POST /customer/orders`.
+ *
+ * ## What the client does not send
+ *
+ * No price, no subtotal, no total and no company. The server computes every
+ * figure from the catalogue inside the placement transaction, so a modified
+ * request cannot change what the customer is charged. This screen shows the
+ * server's cart totals and, after placement, the server's own order.
+ *
+ * ## Idempotency
+ *
+ * The key is generated once, when placement is first attempted, and reused for
+ * every retry of that attempt. A checkout that times out after the request left
+ * the device therefore resolves to the order already placed rather than placing
+ * a second one — the failure mode a flaky mobile network produces most.
+ *
+ * ## Guests
+ *
+ * Placing an order needs an identity. A guest who reaches checkout is told to
+ * sign in rather than shown a button that would fail.
  */
 export default function Checkout() {
-  const { t, theme, locale, direction, cart, clearCart, dataVersion } = useApp();
+  const { t, theme, locale, direction, dataVersion } = useApp();
+  const live = useLiveCart();
+  const session = useLiveSession();
   const router = useRouter();
+
+  const isLive = live.mode === 'live';
+
   const [step, setStep] = useState(0);
   const [addressId, setAddressId] = useState<string | null>(null);
   const [payment, setPayment] = useState('CASH');
+  const [placing, setPlacing] = useState(false);
+  const [placed, setPlaced] = useState<OrderDetail | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
 
-  const products = useAsync(async () => repository.products(), [dataVersion]);
-  const addresses = useAsync(
-    async () => (account() ? repository.addresses(account() as string) : []),
-    [dataVersion],
-  );
+  // Generated once per checkout attempt and reused across retries, so a retried
+  // placement resolves to the order that was already created.
+  const idempotencyKey = useRef<string | null>(null);
 
-  const lines = cart.flatMap((line) => {
-    const product = (products.data ?? []).find((p) => p.id === line.productId);
-    return product ? [{ line, product }] : [];
-  });
-  const subtotalMinor = lines.reduce((sum, { line, product }) => sum + product.priceMinor * line.quantity, 0);
-  const deliveryMinor = [...new Set(lines.map(({ product }) => product.storeId))].reduce(
-    (max, storeId) => Math.max(max, repository.store(storeId)?.deliveryMinor ?? 0),
-    0,
-  );
-  const totalMinor = subtotalMinor + (lines.length ? deliveryMinor : 0);
+  const addresses = useAsync(async () => {
+    if (!session.isLive) return [] as CustomerAddress[];
+    return addressesApi.list();
+  }, [session.isLive, dataVersion]);
+
+  // Pre-select the customer's default address so the common case is one tap.
+  const selectedAddress = useMemo(() => {
+    const list = addresses.data ?? [];
+    return list.find((a) => a.id === addressId) ?? list.find((a) => a.isDefault) ?? list[0] ?? null;
+  }, [addresses.data, addressId]);
+
+  // Every figure on this screen is the server's, never a local multiplication.
+  const subtotalMinor = live.totalMinor;
+  const totalMinor = subtotalMinor;
 
   const steps = [t('deliveryAddress'), t('paymentMethod'), t('orderSummary'), t('orderPlaced')];
   const methods = [
     { key: 'CASH', label: t('payCash') },
-    { key: 'BENEFITPAY', label: t('payBenefitPay') },
-    { key: 'CARD', label: t('payCard') },
-    { key: 'WALLET', label: t('payWallet') },
+    { key: 'CARD_TERMINAL', label: t('payCard') },
+    { key: 'BANK_TRANSFER', label: t('payTransfer') },
   ];
+
+  const placeOrder = async () => {
+    if (placing) return;
+    if (!idempotencyKey.current) {
+      idempotencyKey.current = `co-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+    setPlacing(true);
+    setFailure(null);
+    try {
+      const order = await ordersApi.place({
+        addressId: selectedAddress?.id,
+        paymentMethod: payment,
+        idempotencyKey: idempotencyKey.current,
+      });
+      setPlaced(order);
+      // The server emptied the cart inside the placement transaction; this
+      // refreshes the local view so the badge follows immediately.
+      await live.refresh();
+      setStep(3);
+    } catch (err) {
+      const apiError = err as ApiError;
+      setFailure(
+        apiError instanceof ApiError && apiError.kind === 'offline' ? t('offlineBody') : t('orderFailed'),
+      );
+    } finally {
+      setPlacing(false);
+    }
+  };
+
+  // A guest cannot place an order. Saying so is honest; a button that fails is not.
+  if (!session.isLive && step < 3) {
+    return (
+      <Screen>
+        <ScreenHeader title={t('checkout')} subtitle={t('signInRequired')} />
+        <Card>
+          <Heading size="heading">{t('signInRequired')}</Heading>
+          <Body muted size="label" style={{ marginTop: space.sm }}>
+            {t('checkoutSignInBody')}
+          </Body>
+          <View style={{ marginTop: space.md, gap: space.sm }}>
+            <Button title={t('signIn')} onPress={() => router.push('/login')} />
+            <Button title={t('signUp')} variant="secondary" onPress={() => router.push('/register')} />
+          </View>
+        </Card>
+      </Screen>
+    );
+  }
+
+  // A live cart that failed to load must not be presented as empty.
+  if (isLive && live.error && live.items.length === 0 && step < 3) {
+    return (
+      <Screen>
+        <ScreenHeader title={t('checkout')} />
+        <Card>
+          <StateView kind="error" message={isOffline() ? t('offlineBody') : t('loadFailed')} />
+          <Button title={t('retry')} onPress={() => void live.refresh()} />
+        </Card>
+      </Screen>
+    );
+  }
+
+  const rowDirection = direction === 'rtl' ? 'row-reverse' : 'row';
 
   return (
     <Screen>
       <ScreenHeader title={t('checkout')} subtitle={steps[step]} />
 
-      <View style={[styles.steps, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
+      <View style={[styles.steps, { flexDirection: rowDirection }]}>
         {steps.map((label, i) => (
           <View key={label} style={{ flex: 1, gap: space.xs }}>
-            <View
-              style={[
-                styles.stepBar,
-                { backgroundColor: i <= step ? theme.gold : theme.surfaceRaised },
-              ]}
-            />
+            <View style={[styles.stepBar, { backgroundColor: i <= step ? theme.gold : theme.surfaceRaised }]} />
             <Text
               style={{
                 color: i <= step ? theme.gold : theme.textFaint,
@@ -78,18 +176,29 @@ export default function Checkout() {
       {step === 0 ? (
         <Card>
           <SectionLabel>{t('deliveryAddress')}</SectionLabel>
-          {addresses.loading ? null : (addresses.data ?? []).length === 0 ? (
-            <Body muted size="label" style={{ marginTop: space.sm }}>
-              {t('addresses')}
-            </Body>
+          {addresses.loading ? (
+            <StateView kind="loading" />
+          ) : (addresses.data ?? []).length === 0 ? (
+            <>
+              <Body muted size="label" style={{ marginTop: space.sm }}>
+                {t('noAddresses')}
+              </Body>
+              <View style={{ marginTop: space.md }}>
+                <Button title={t('addAddress')} variant="secondary" onPress={() => router.push('/addresses')} />
+              </View>
+            </>
           ) : (
             (addresses.data ?? []).map((address) => (
               <ListRow
                 key={address.id}
                 testID={`checkout-address-${address.id}`}
-                title={locale === 'ar' ? address.labelAr : address.labelEn}
-                subtitle={locale === 'ar' ? address.lineAr : address.lineEn}
-                trailing={address.isDefault ? <Chip label={t('defaultAddress')} active /> : undefined}
+                title={address.label ?? address.city}
+                subtitle={`${address.addressLine1}${address.addressLine2 ? `, ${address.addressLine2}` : ''}, ${address.city}`}
+                trailing={
+                  address.id === selectedAddress?.id ? (
+                    <Chip label={address.isDefault ? t('defaultAddress') : t('selected')} active />
+                  ) : undefined
+                }
                 onPress={() => setAddressId(address.id)}
               />
             ))
@@ -100,7 +209,7 @@ export default function Checkout() {
       {step === 1 ? (
         <Card>
           <SectionLabel>{t('paymentMethod')}</SectionLabel>
-          <View style={[styles.row, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
+          <View style={[styles.row, { flexDirection: rowDirection }]}>
             {methods.map((method) => (
               <Chip
                 key={method.key}
@@ -112,7 +221,7 @@ export default function Checkout() {
             ))}
           </View>
           <Body size="caption" muted style={{ marginTop: space.md }}>
-            {t('demoNotice')}
+            {t('paymentNotice')}
           </Body>
         </Card>
       ) : null}
@@ -120,40 +229,58 @@ export default function Checkout() {
       {step === 2 ? (
         <Card>
           <SectionLabel>{t('orderSummary')}</SectionLabel>
-          {lines.map(({ line, product }) => (
+          {live.items.map((item) => (
             <ListRow
-              key={product.id}
-              title={locale === 'ar' ? product.nameAr : product.nameEn}
-              subtitle={`${line.quantity} × ${formatMoney(product.priceMinor)}`}
+              key={item.id}
+              title={locale === 'ar' ? item.nameAr : item.nameEn}
+              subtitle={`${localizeDigits(item.quantity, locale)} × ${formatMoney(item.unitPriceMinor)}`}
               trailing={
-                <Text style={{ color: theme.text, fontWeight: '600' }}>
-                  {formatMoney(product.priceMinor * line.quantity)}
-                </Text>
+                <Text style={{ color: theme.text, fontWeight: '600' }}>{formatMoney(item.lineTotalMinor)}</Text>
               }
             />
           ))}
           <Divider />
-          <ListRow title={t('subtotal')} trailing={<Text style={{ color: theme.text }}>{formatMoney(subtotalMinor)}</Text>} />
           <ListRow
-            title={t('delivery')}
-            trailing={<Text style={{ color: theme.text }}>{formatMoney(deliveryMinor)}</Text>}
+            title={t('subtotal')}
+            trailing={<Text style={{ color: theme.text }}>{formatMoney(subtotalMinor)}</Text>}
           />
           <ListRow
             title={t('total')}
             trailing={<Text style={{ color: theme.gold, fontWeight: '700' }}>{formatMoney(totalMinor)}</Text>}
           />
+          {selectedAddress ? (
+            <Body size="caption" muted style={{ marginTop: space.sm }}>
+              {t('deliverTo')}: {selectedAddress.addressLine1}, {selectedAddress.city}
+            </Body>
+          ) : null}
         </Card>
       ) : null}
 
-      {step === 3 ? (
+      {step === 3 && placed ? (
         <Card>
           <Heading size="heading">{t('orderPlaced')}</Heading>
-          <Body muted size="label" style={{ marginTop: space.sm }}>
-            {t('demoNotice')}
+          <Body size="label" style={{ marginTop: space.sm }}>
+            {placed.reference}
           </Body>
-          <View style={{ marginTop: space.md }}>
-            <Button title={t('trackOrder')} onPress={() => router.replace('/orders')} />
+          <Body muted size="label" style={{ marginTop: space.xs }}>
+            {t('orderPlacedBody')}
+          </Body>
+          <View style={{ marginTop: space.md, gap: space.sm }}>
+            <Button title={t('trackOrder')} onPress={() => router.replace(`/orders/${placed.id}`)} />
+            <Button
+              title={t('continueShopping')}
+              variant="secondary"
+              onPress={() => router.replace('/(tabs)/home')}
+            />
           </View>
+        </Card>
+      ) : null}
+
+      {failure && step === 2 ? (
+        <Card>
+          <Body size="label" style={{ color: theme.danger }}>
+            {failure}
+          </Body>
         </Card>
       ) : null}
 
@@ -162,22 +289,19 @@ export default function Checkout() {
           <Button
             testID="checkout-next"
             title={step === 2 ? t('placeOrder') : t('continue')}
-            disabled={lines.length === 0 || (step === 0 && !addressId)}
+            disabled={placing || live.items.length === 0 || (step === 0 && !selectedAddress)}
             onPress={() => {
-              if (step === 2) clearCart();
-              setStep(step + 1);
+              if (step === 2) void placeOrder();
+              else setStep(step + 1);
             }}
           />
-          {step > 0 ? <Button title={t('back')} variant="secondary" onPress={() => setStep(step - 1)} /> : null}
+          {step > 0 ? (
+            <Button title={t('back')} variant="secondary" disabled={placing} onPress={() => setStep(step - 1)} />
+          ) : null}
         </View>
       ) : null}
     </Screen>
   );
-}
-
-/** The signed-in customer id, read from the same demo store the app context uses. */
-function account(): string | null {
-  return null;
 }
 
 const styles = StyleSheet.create({

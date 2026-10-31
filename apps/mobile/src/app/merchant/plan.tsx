@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useApp } from '../../lib/app-context';
 import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
+import { useMerchantSession } from '../../lib/merchant-session';
 import { ScreenHeader } from '../../components/brand';
 import { Body, Button, Card, Chip, Divider, Heading, Screen, SectionLabel, StateView } from '../../components/ui';
 import { space, typography } from '../../lib/theme';
@@ -16,18 +17,29 @@ import { formatMoney, localizeDigits } from '../../lib/format';
  * The three marketplace plans, with the commission and the ERP tools each one
  * unlocks. The current plan is marked, and the comparison is a real read of the
  * plan records rather than hard-coded copy.
+ *
+ * A **live merchant** cannot read the plan catalogue from the provider portal:
+ * subscription management is a company-administrator action on the staff plane,
+ * and the portal exposes no plan route. Rather than show the demo catalogue as if
+ * it were the tenant's subscription, the live session says where the real
+ * setting lives. The demo merchant keeps the local catalogue.
  */
 export default function MerchantPlan() {
   const { t, theme, locale, account, direction, dataVersion } = useApp();
+  const { isSignedIn } = useMerchantSession();
   const router = useRouter();
 
-  const plans = useAsync(async () => repository.plans(), [dataVersion]);
+  const plans = useAsync(async () => (isSignedIn ? [] : repository.plans()), [dataVersion, isSignedIn]);
 
   return (
     <Screen>
       <ScreenHeader title={t('subscription')} subtitle={t('choosePlan')} />
 
-      {plans.loading ? (
+      {isSignedIn ? (
+        <Card>
+          <StateView kind="empty" message={t('planManagedByAdmin')} />
+        </Card>
+      ) : plans.loading ? (
         <StateView kind="loading" />
       ) : (
         (plans.data ?? []).map((plan) => {
@@ -75,9 +87,11 @@ export default function MerchantPlan() {
           );
         })
       )}
-      <Body size="caption" muted align="center" style={{ marginTop: space.md }}>
-        {t('demoNotice')} · {localizeDigits(3, locale)} {t('choosePlan')}
-      </Body>
+      {isSignedIn ? null : (
+        <Body size="caption" muted align="center" style={{ marginTop: space.md }}>
+          {t('demoNotice')} · {localizeDigits(3, locale)} {t('choosePlan')}
+        </Body>
+      )}
       <View style={{ height: space.xl }} />
     </Screen>
   );
