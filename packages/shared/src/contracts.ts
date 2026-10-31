@@ -343,6 +343,12 @@ export interface CmsBannerDto {
   actionUrl: string | null;
   sortOrder: number;
   isActive: boolean;
+  /**
+   * Editorial approval. Distinct from `isActive`: the customer homepage serves
+   * only `PUBLISHED` + `isActive` banners, so an operator switching a draft on
+   * does not expose unapproved content.
+   */
+  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 }
 
 export interface FeatureFlagDto {
@@ -665,6 +671,24 @@ export interface ProductDto {
   inventoryAccountId: string | null;
   cogsAccountId: string | null;
   isActive: boolean;
+}
+
+/**
+ * A photograph attached to a catalogue product.
+ *
+ * `url` is already resolved by the API to a served media route (or, for a legacy
+ * row, an external absolute URL), so the client renders it directly and never
+ * builds a storage path of its own.
+ */
+export interface ProductImageDto {
+  id: string;
+  productId: string;
+  url: string | null;
+  altEn: string | null;
+  altAr: string | null;
+  sortOrder: number;
+  isPrimary: boolean;
+  createdAt: string;
 }
 
 export interface StockMovementDto {

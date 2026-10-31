@@ -600,6 +600,33 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   suite fails instantly, read one error in isolation (`-g "<name>"`) before
   suspecting the code.
 
+### Execution 13 gotchas
+
+- **A banner has two independent states, and only the pair reaches customers.**
+  `isActive` is an operator toggling a slide on; `status` (DRAFT/PUBLISHED) is a
+  reviewer approving what it says. The customer homepage serves only `PUBLISHED`
+  **and** `isActive`, so `PUT /cms/banners` must keep writing `status` only when it
+  is supplied — otherwise toggling activation would silently publish a draft.
+- **A catalogue item is never hard-deleted.** There is no `DELETE /inventory/products/:id`;
+  invoices, movements and images reference the row. A test that creates one cleans up
+  by deactivating it (`PATCH { isActive: false }`) and removing its images, not by
+  deleting it.
+- **A catalogue item belongs to a tenant.** The platform Super Admin has no tenant
+  scope, so creating a product as the Super Admin is a `403`. Product fixtures in the
+  UI suite sign in as a tenant administrator (`ENTERPRISE_ADMIN`).
+- **The media pipeline rejects anything under 64×64.** A hand-written PNG fixture must
+  be at least 64px on each side or the upload fails `400 media.dimensions_invalid`.
+  Build one with `zlib.deflateSync` + a CRC32 (see the UI spec's `pngBuffer`), or use
+  `sharp` as the API suites do.
+- **The inventory page opens on the Valuation tab.** A UI test that wants the product
+  table must click `inventory-tab-products` first, and the catalogue is paginated, so
+  locate a fixture through `product-search` rather than assuming page 1.
+- **Announcements address two id spaces.** A staff `userId` is not a
+  `CustomerAccount.id`, and the consumer inbox reads only rows carrying
+  `customerAccountId`. `POST /notifications/announcements` takes `userIds` and
+  `customerAccountIds` / `allCustomers` separately; a broadcast is capped at
+  `MAX_ANNOUNCEMENT_RECIPIENTS` (5,000) so one call cannot queue unbounded rows.
+
 ### Mobile gotchas
 
 - **Every file under `(app)` becomes a tab.** Expo Router registers the whole

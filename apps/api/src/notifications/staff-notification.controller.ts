@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsArray, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import {
   CurrentPrincipal,
@@ -10,6 +10,16 @@ import {
   type RequestPrincipal,
 } from '../auth/auth.decorators';
 import { NotificationService } from './notification.service';
+import { PrismaService } from '../common/prisma.service';
+
+/**
+ * Ceiling on a customer broadcast.
+ *
+ * A single request must not be able to queue an unbounded number of delivery
+ * rows, so `allCustomers` is capped. The response reports how many were queued,
+ * which is what tells an operator the cap was reached.
+ */
+const MAX_ANNOUNCEMENT_RECIPIENTS = 5_000;
 
 class SendAnnouncementDto {
   @IsString()
@@ -34,6 +44,23 @@ class SendAnnouncementDto {
   @IsArray()
   @IsString({ each: true })
   userIds?: string[];
+
+  /**
+   * Customer account ids to notify on the consumer plane.
+   *
+   * Separate from `userIds`: a customer account is not a staff user, and the
+   * consumer inbox reads only rows carrying `customerAccountId`. An operator can
+   * address both audiences in one call by supplying both lists.
+   */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  customerAccountIds?: string[];
+
+  /** Address every active customer account. Bounded by `announceMaxRecipients`. */
+  @IsOptional()
+  @IsBoolean()
+  allCustomers?: boolean;
 }
 
 /**
@@ -49,7 +76,10 @@ class SendAnnouncementDto {
 @ApiBearerAuth()
 @Controller('notifications')
 export class StaffNotificationController {
-  constructor(private readonly notifications: NotificationService) {}
+  constructor(
+    private readonly notifications: NotificationService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Get('deliveries')
   @PlatformOnly()
@@ -91,13 +121,32 @@ export class StaffNotificationController {
   @Post('announcements')
   @PlatformOnly()
   @RequirePermissions('platform.notification.manage')
-  @ApiOperation({ summary: 'Send an in-app announcement to staff' })
+  @ApiOperation({ summary: 'Send an in-app announcement to staff and/or customers' })
   async announce(@Body() dto: SendAnnouncementDto, @CurrentPrincipal() principal: RequestPrincipal) {
-    // An announcement is delivered as an in-app message to each named staff
-    // user. The delivery row is written by NotificationService before any
-    // transmit, so the log is the source of truth about what was queued.
+    // An announcement is delivered as an in-app message to each named recipient.
+    // The delivery row is written by NotificationService before any transmit, so
+    // the log is the source of truth about what was queued.
+    //
+    // Staff and customers are addressed through separate id spaces: a staff
+    // `userId` is not a `CustomerAccount.id`, and the consumer inbox reads only
+    // rows carrying `customerAccountId`. Keeping the two lists apart is what
+    // stops a staff announcement from silently reaching no customer at all.
     const userIds = dto.userIds ?? [];
-    const created: string[] = [];
+
+    let customerAccountIds = dto.customerAccountIds ?? [];
+    if (dto.allCustomers) {
+      const accounts = await this.prisma.customerAccount.findMany({
+        where: { status: 'ACTIVE' },
+        select: { id: true },
+        orderBy: { createdAt: 'asc' },
+        take: MAX_ANNOUNCEMENT_RECIPIENTS,
+      });
+      // The explicit list is additive, so an operator may address a broadcast
+      // plus a few accounts that are not active yet.
+      customerAccountIds = [...new Set([...customerAccountIds, ...accounts.map((a) => a.id)])];
+    }
+
+    const staffRecipients: string[] = [];
     for (const userId of userIds) {
       await this.notifications.notify({
         companyId: dto.companyId ?? null,
@@ -109,9 +158,29 @@ export class StaffNotificationController {
         entityType: 'ANNOUNCEMENT',
         entityId: principal.userId,
       });
-      created.push(userId);
+      staffRecipients.push(userId);
     }
-    return { queued: created.length, recipients: created };
+
+    const customerRecipients: string[] = [];
+    for (const accountId of customerAccountIds) {
+      await this.notifications.notify({
+        companyId: dto.companyId ?? null,
+        customerAccountId: accountId,
+        channel: 'IN_APP',
+        category: dto.severity ?? 'INFO',
+        fallbackSubject: dto.title,
+        fallbackBody: dto.body,
+        entityType: 'ANNOUNCEMENT',
+        entityId: principal.userId,
+      });
+      customerRecipients.push(accountId);
+    }
+
+    return {
+      queued: staffRecipients.length + customerRecipients.length,
+      recipients: staffRecipients,
+      customerRecipients,
+    };
   }
 
   @Post('templates/:id/toggle')

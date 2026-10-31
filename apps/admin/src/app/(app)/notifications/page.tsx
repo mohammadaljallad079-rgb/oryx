@@ -58,6 +58,9 @@ function NotificationsPageInner() {
   const [announceBody, setAnnounceBody] = useState('');
   const [announceSeverity, setAnnounceSeverity] = useState('INFO');
   const [announceUsers, setAnnounceUsers] = useState('');
+  const [announceAudience, setAnnounceAudience] = useState<'staff' | 'customers'>('staff');
+  const [announceAllCustomers, setAnnounceAllCustomers] = useState(false);
+  const [announceCustomers, setAnnounceCustomers] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -66,15 +69,35 @@ function NotificationsPageInner() {
   const pageSize = deliveries.data?.pageSize ?? 25;
   const pages = Math.max(1, Math.ceil(total / pageSize));
 
+  function resetComposer() {
+    setAnnounceTitle('');
+    setAnnounceBody('');
+    setAnnounceUsers('');
+    setAnnounceCustomers('');
+    setAnnounceAllCustomers(false);
+  }
+
   async function sendAnnouncement() {
-    const userIds = announceUsers
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (userIds.length === 0) {
+    const split = (value: string) =>
+      value
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+    const userIds = announceAudience === 'staff' ? split(announceUsers) : [];
+    const customerAccountIds = announceAudience === 'customers' && !announceAllCustomers ? split(announceCustomers) : [];
+
+    // An announcement with no audience reaches nobody; refuse it here rather
+    // than writing a success notice for a no-op.
+    if (announceAudience === 'staff' && userIds.length === 0) {
       setError(t('notif.announceUsersHint'));
       return;
     }
+    if (announceAudience === 'customers' && !announceAllCustomers && customerAccountIds.length === 0) {
+      setError(t('notif.announceCustomersHint'));
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
@@ -83,12 +106,12 @@ function NotificationsPageInner() {
         body: announceBody,
         severity: announceSeverity,
         userIds,
+        customerAccountIds,
+        allCustomers: announceAudience === 'customers' && announceAllCustomers ? true : undefined,
       });
       setNotice(t('notif.announceQueued').replace('{count}', String(result.queued)));
       setAnnounceOpen(false);
-      setAnnounceTitle('');
-      setAnnounceBody('');
-      setAnnounceUsers('');
+      resetComposer();
       await Promise.all([deliveries.reload(), summary.reload()]);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('common.error'));
@@ -116,7 +139,7 @@ function NotificationsPageInner() {
         title={t('notif.title')}
         subtitle={t('notif.subtitle')}
         actions={
-          <Button variant="primary" onClick={() => setAnnounceOpen(true)}>
+          <Button variant="primary" onClick={() => setAnnounceOpen(true)} data-testid="open-announce">
             <Icon name="bell" size={16} />
             {t('notif.announce')}
           </Button>
@@ -345,9 +368,45 @@ function NotificationsPageInner() {
               <option value="CRITICAL">CRITICAL</option>
             </select>
           </Field>
-          <Field label={t('notif.announceUsers')} hint={t('notif.announceUsersHint')}>
-            <input className="oryx-input" value={announceUsers} onChange={(e) => setAnnounceUsers(e.target.value)} />
+          <Field label={t('notif.announceAudience')}>
+            <select
+              className="oryx-input"
+              value={announceAudience}
+              onChange={(e) => setAnnounceAudience(e.target.value as 'staff' | 'customers')}
+              data-testid="announce-audience"
+            >
+              <option value="staff">{t('notif.announceAudienceStaff')}</option>
+              <option value="customers">{t('notif.announceAudienceCustomers')}</option>
+            </select>
           </Field>
+          {announceAudience === 'staff' ? (
+            <Field label={t('notif.announceUsers')} hint={t('notif.announceUsersHint')}>
+              <input className="oryx-input" value={announceUsers} onChange={(e) => setAnnounceUsers(e.target.value)} />
+            </Field>
+          ) : (
+            <>
+              <label className="flex items-center gap-2 text-[12.5px] font-semibold">
+                <input
+                  type="checkbox"
+                  className="oryx-checkbox"
+                  checked={announceAllCustomers}
+                  onChange={(e) => setAnnounceAllCustomers(e.target.checked)}
+                  data-testid="announce-all-customers"
+                />
+                {t('notif.announceAllCustomers')}
+              </label>
+              {!announceAllCustomers ? (
+                <Field label={t('notif.announceCustomers')} hint={t('notif.announceCustomersHint')}>
+                  <input
+                    className="oryx-input"
+                    value={announceCustomers}
+                    onChange={(e) => setAnnounceCustomers(e.target.value)}
+                    data-testid="announce-customers"
+                  />
+                </Field>
+              ) : null}
+            </>
+          )}
         </div>
       </Modal>
     </div>

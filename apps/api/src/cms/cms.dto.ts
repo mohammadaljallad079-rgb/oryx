@@ -74,6 +74,14 @@ export class UpsertBannerDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  /**
+   * Editorial approval. Defaults to DRAFT on create and is left untouched on
+   * update when omitted, so toggling a slide's activation never publishes it.
+   */
+  @IsOptional()
+  @IsIn(['DRAFT', 'PUBLISHED', 'ARCHIVED'])
+  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 }
 
 export class UpsertFeatureFlagDto {

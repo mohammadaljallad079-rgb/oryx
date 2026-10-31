@@ -185,7 +185,7 @@ function WebsiteCmsPageInner() {
               </thead>
               <tbody>
                 {banners.data!.map((b) => (
-                  <tr key={b.id}>
+                  <tr key={b.id} data-testid={`banner-row-${b.id}`}>
                     <td className="font-mono text-[12px]">{b.placement}</td>
                     <td>
                       <span className="block font-semibold">{b.title}</span>
@@ -195,9 +195,20 @@ function WebsiteCmsPageInner() {
                       <Badge tone="neutral">{b.locale.toUpperCase()}</Badge>
                     </td>
                     <td>
-                      <Badge tone={b.isActive ? 'success' : 'neutral'}>
-                        {b.isActive ? t('common.active') : t('common.inactive')}
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Badge
+                          tone={b.status === 'PUBLISHED' ? 'success' : b.status === 'ARCHIVED' ? 'danger' : 'warning'}
+                        >
+                          {b.status === 'PUBLISHED'
+                            ? t('cms.published')
+                            : b.status === 'ARCHIVED'
+                              ? t('cms.archived')
+                              : t('cms.draft')}
+                        </Badge>
+                        <Badge tone={b.isActive ? 'success' : 'neutral'}>
+                          {b.isActive ? t('common.active') : t('common.inactive')}
+                        </Badge>
+                      </div>
                     </td>
                     <td>
                       <Button size="sm" onClick={() => setEditingBanner(b)}>
@@ -745,6 +756,7 @@ function BannerEditor({
     actionUrl: '',
     sortOrder: 0,
     isActive: true,
+    status: 'DRAFT',
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -763,6 +775,7 @@ function BannerEditor({
             actionUrl: banner.actionUrl ?? '',
             sortOrder: banner.sortOrder,
             isActive: banner.isActive,
+            status: banner.status ?? 'DRAFT',
           }
         : {
             placement: 'app_home',
@@ -773,6 +786,7 @@ function BannerEditor({
             actionUrl: '',
             sortOrder: 0,
             isActive: true,
+            status: 'DRAFT',
           },
     );
   }, [open, banner]);
@@ -854,6 +868,18 @@ function BannerEditor({
             value={form.actionUrl}
             onChange={(e) => setForm({ ...form, actionUrl: e.target.value })}
           />
+        </Field>
+        <Field label={t('common.status')} hint={t('cms.bannerStatusHint')}>
+          <select
+            className="oryx-select"
+            value={form.status}
+            onChange={(e) => setForm({ ...form, status: e.target.value })}
+            data-testid="banner-status"
+          >
+            <option value="DRAFT">{t('cms.draft')}</option>
+            <option value="PUBLISHED">{t('cms.published')}</option>
+            <option value="ARCHIVED">{t('cms.archived')}</option>
+          </select>
         </Field>
       </div>
       <label className="mt-4 flex items-center gap-2 text-[12.5px] font-semibold">

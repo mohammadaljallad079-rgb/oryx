@@ -37,6 +37,7 @@ import type {
   PlanDto,
   PosSaleDto,
   ProductDto,
+  ProductImageDto,
   PurchaseDocumentDto,
   PurchasingReportDto,
   ReorderAlertDto,
@@ -707,6 +708,21 @@ export const api = {
     request<ProductDto>('/inventory/products', { method: 'POST', body }),
   updateProduct: (id: string, body: Record<string, unknown>) =>
     request<ProductDto>(`/inventory/products/${id}`, { method: 'PATCH', body }),
+  /**
+   * A product's photographs, primary first.
+   *
+   * The API resolves each `url` to a served media route; the client renders that
+   * value directly rather than composing a storage path.
+   */
+  productImages: (productId: string) =>
+    request<ProductImageDto[]>(`/inventory/products/${productId}/images`),
+  /** Upload a photograph. Multipart, so no JSON content type may be set. */
+  uploadProductImage: (productId: string, form: FormData) =>
+    request<ProductImageDto>(`/inventory/products/${productId}/images`, { method: 'POST', body: form, raw: true }),
+  updateProductImage: (productId: string, imageId: string, body: Record<string, unknown>) =>
+    request<ProductImageDto>(`/inventory/products/${productId}/images/${imageId}`, { method: 'PATCH', body }),
+  deleteProductImage: (productId: string, imageId: string) =>
+    request<{ removed: boolean }>(`/inventory/products/${productId}/images/${imageId}`, { method: 'DELETE' }),
   stockMovements: (params: { companyId?: string; page?: number } = {}) =>
     request<Paginated<StockMovementDto>>(`/inventory/movements?${toQuery(params)}`),
   recordStockMovement: (body: Record<string, unknown>) =>
@@ -1126,8 +1142,19 @@ export const api = {
       byStatus: Array<{ key: string; count: number }>;
       templates: Array<{ id: string; key: string; channel: string; locale: string; subject: string | null; body: string; isActive: boolean }>;
     }>(`/notifications/summary?${toQuery({ companyId })}`),
-  sendAnnouncement: (body: { title: string; body: string; companyId?: string; severity?: string; userIds?: string[] }) =>
-    request<{ queued: number; recipients: string[] }>('/notifications/announcements', { method: 'POST', body }),
+  sendAnnouncement: (body: {
+    title: string;
+    body: string;
+    companyId?: string;
+    severity?: string;
+    userIds?: string[];
+    customerAccountIds?: string[];
+    allCustomers?: boolean;
+  }) =>
+    request<{ queued: number; recipients: string[]; customerRecipients: string[] }>(
+      '/notifications/announcements',
+      { method: 'POST', body },
+    ),
   toggleNotificationTemplate: (id: string, active: boolean) =>
     request<{ id: string; key: string; isActive: boolean }>(`/notifications/templates/${id}/toggle?active=${active}`, {
       method: 'POST',
