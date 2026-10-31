@@ -253,8 +253,9 @@ claimed as done here:
 
 ## 8. Final commit
 
-Implementation commit on `feature/execution-07-premium-web` — the commit that
-accompanies this report. PR #7 remains **open and draft**; nothing was merged or
-deployed.
+Implementation commit `eb9a040` on `feature/execution-07-premium-web` — the commit
+that accompanies this report. PR #7 remains **open and draft** (verified after the
+push: `state=open`, `draft=true`, `head=eb9a040`); nothing was merged or deployed, and
+no APK was published.
 
 Baseline before this execution: `ab0e6fee9441dbaf76754422786b65f81f2b8fad`.
