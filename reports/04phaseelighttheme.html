@@ -1,0 +1,793 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Execution 07 — Phase E: Light-Theme Correction · ORYX design preview</title>
+<meta name="description" content="Execution 07 — Phase E: Light-Theme Correction" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../mobile/">Mobile app</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Execution 07 — the current execution</p>
+        <h1>Execution 07 — Phase E: Light-Theme Correction</h1>
+        <p class="card__meta">Rendered from <code>docs/audit/exec07/04_PHASE_E_LIGHT_THEME.md</code> at <code>36afef6</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/audit/exec07/04_PHASE_E_LIGHT_THEME.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#1-session-recovery">1. Session recovery</a></li><li><a href="#2-what-the-owner-reported-and-what-was-actually-wrong">2. What the owner reported, and what was actually wrong</a></li><li><a href="#3-the-light-palette">3. The light palette</a></li><li><a href="#4-why-the-dark-theme-is-unchanged">4. Why the dark theme is unchanged</a></li><li><a href="#5-evidence">5. Evidence</a></li><li><a href="#6-contrast-results">6. Contrast results</a></li><li><a href="#65-live-preview">6.5 Live preview</a></li><li><a href="#7-test-results">7. Test results</a></li><li><a href="#8-honest-limitations">8. Honest limitations</a></li><li><a href="#9-continuation-session-2026-10-18-light-theme-sign-off">9. Continuation session (2026-10-18) — light-theme sign-off</a></li><li><a href="#10-second-continuation-session-the-published-preview">10. Second continuation session — the published preview</a></li><li><a href="#11-third-continuation-session-recovery-and-the-light-theme-correction">11. Third continuation session — recovery and the light-theme correction</a></li><li><a href="#12-fourth-continuation-session-the-rtl-scrim-regression">12. Fourth continuation session — the RTL scrim regression</a></li><li><a href="#13-fifth-continuation-session-the-admin-control-plane-light-theme">13. Fifth continuation session — the admin control-plane light theme</a></li><li><a href="#14-sixth-continuation-session-recovery-and-the-phase-e-re-capture">14. Sixth continuation session — recovery and the Phase E re-capture</a></li><li><a href="#15-seventh-continuation-session-the-scattered-light-theme-overrides">15. Seventh continuation session — the scattered light-theme overrides</a></li><li><a href="#16-eighth-continuation-session-the-dark-invariance-record-was-stale">16. Eighth continuation session — the dark-invariance record was stale</a></li></ul></nav>
+        <article><h1 id="execution-07-phase-e-light-theme-correction">Execution 07 — Phase E: Light-Theme Correction</h1>
+<p>Report date: 2026-10-19<br />
+Branch: <code>feature/execution-07-premium-web</code><br />
+Pull request: <a href="https://github.com/mohammadaljallad079-rgb/oryx/pull/7" target="_blank" rel="noopener noreferrer">#7</a><br />
+Head at the start of this phase: <code>b3c9a71</code><br />
+Status: <strong>Phase E complete; owner review pending</strong></p>
+<p>This report covers the light-theme correction and the session recovery that<br />
+preceded it. Every claim names the script that produced it and the artifact it<br />
+wrote.</p>
+<blockquote><p><strong>Correction (2026-10-19, controlled re-capture).</strong> The before/after sets were<br />
+originally captured against <em>different database content</em>: the <code>before</code> set ran<br />
+before the Phase D photography was seeded through the CMS, and the <code>after</code> set<br />
+after. That confound meant the light-theme diff included content changes, and<br />
+it made the dark-invariance check report seven surfaces as shifted when the<br />
+theme had not moved. Both sets have been re-captured against the **same seeded<br />
+content**, with only the theme source differing, and the photography is now<br />
+seeded. See section 4. The theme change itself is unaffected.</p></blockquote>
+<blockquote><p><strong>Correction (section 16).</strong> The byte-identical counts quoted in sections 4, 12<br />
+and 15 were produced before the <code>after</code> captures were replaced at <code>33e57ba</code>, and<br />
+<code>dark-invariance.json</code> shipped with those stale numbers until section 16. The<br />
+current, regenerated verdict is **0 of 31 dark captures had the theme chrome<br />
+move**; the whole-frame deltas are CMS photography. Section 16 records the<br />
+discrepancy, the three checks that separate theme from content, and the one dark<br />
+token that deliberately changed (<code>--text-faint</code>, a WCAG fix).</p></blockquote>
+<h2 id="1-session-recovery">1. Session recovery</h2>
+<p>The previous session ended with a sandbox error, so the first step was to<br />
+establish what actually existed on the remote before touching anything.</p>
+<div class="table-wrap"><table><thead><tr><th>Question</th><th>Finding</th><th>How it was checked</th></tr></thead><tbody><tr><td>Remote branch tip at recovery</td><td><code>59ccd286f5c79610ff6ac3cc96dc003c02c54277</code></td><td><code>git ls-remote --heads origin</code></td></tr><tr><td>Commits beyond the last known SHA (<code>b3c9a71</code>)</td><td><strong>four</strong> — <code>5920895</code>, <code>04f722e</code>, <code>f0c29da</code>, <code>59ccd28</code></td><td><code>git log --oneline b3c9a71..origin/feature/execution-07-premium-web</code></td></tr><tr><td>Local HEAD</td><td><code>59ccd28</code> — in step with the remote</td><td><code>git log --oneline -1</code></td></tr><tr><td>PR #7</td><td>open, draft, head <code>59ccd28</code>, base <code>audit/execution-05-verification</code></td><td>GitHub REST <code>pulls/7</code></td></tr><tr><td>PR #6</td><td>open, head <code>604e36a</code>, base <code>main</code></td><td>GitHub REST <code>pulls/6</code></td></tr><tr><td>Uncommitted work in the workspace</td><td><strong>present — the Phase E navy-band refactor and the light-default flip</strong></td><td><code>git status --porcelain</code>; <code>git diff</code></td></tr><tr><td>Dangling stashes from the crashed session</td><td><code>aa67f19</code>, <code>58f063a</code>, <code>50946c9</code>, <code>ae003d7</code>, <code>7aed52c</code></td><td><code>git fsck --lost-found</code></td></tr><tr><td>Content unique to the newest stash (<code>7aed52c</code>, &quot;phase-e-src&quot;, parented on <code>59ccd28</code>)</td><td><strong>none</strong> — its <code>tokens.ts</code> and <code>layout.tsx</code> are byte-identical to the workspace and its <code>globals.css</code> differs only by this session&#39;s fix</td><td><code>git diff 7aed52c:&lt;path&gt; &lt;path&gt;</code></td></tr></tbody></table></div>
+<p>**The crashed session had pushed four commits — and it had left a fifth piece of<br />
+work uncommitted.** The four commits above the last known SHA are all on<br />
+<code>origin</code>:</p>
+<div class="table-wrap"><table><thead><tr><th>Commit</th><th>Subject</th></tr></thead><tbody><tr><td><code>5920895</code></td><td><code>fix(customer): correct the light theme and the profile delete key</code> — the first Phase E theme pass, the <code>common.delete</code> key and the capture/verification harnesses</td></tr><tr><td><code>04f722e</code></td><td><code>docs(exec07): record the crashed-session stash in the Phase E recovery table</code></td></tr><tr><td><code>f0c29da</code></td><td><code>docs(exec07): record the green CI runs for Phase E</code></td></tr><tr><td><code>59ccd28</code></td><td><code>fix(exec07): regenerate Phase E evidence against a same-origin build</code></td></tr></tbody></table></div>
+<p>None of those four commits contains the <strong>navy-band token refactor</strong> or the<br />
+<strong>light-theme default</strong> — <code>git show 59ccd28:apps/customer/src/app/globals.css</code><br />
+has zero <code>--band:</code> declarations, while the workspace has them. That work was<br />
+sitting uncommitted in the workspace when this session opened, and the crashed<br />
+session&#39;s own stashes corroborate it: <code>50946c9</code> (&quot;phaseE-wip&quot;), <code>ae003d7</code><br />
+(&quot;phaseE-src&quot;) and <code>7aed52c</code> (&quot;phase-e-src&quot;, parented on <code>59ccd28</code> at 17:26) each<br />
+hold the band tokens, and <code>7aed52c</code> matches the workspace almost exactly.</p>
+<p>So, stated precisely:</p>
+<ul><li><strong>Unpushed work existed and was preserved, not lost.</strong> The workspace filesystem</li></ul>
+<p>outlived the sandbox error, so the uncommitted Phase E refinement — the navy<br />
+<code>--band</code> token layer and the light default — was still there. It is committed<br />
+in this session. Nothing had to be reconstructed from a stash.</p>
+<ul><li><strong>No unpushed commit was lost</strong>, because none of that work had ever been</li></ul>
+<p>committed. The dangling stashes are redundant with the workspace; the newest of<br />
+them (<code>7aed52c</code>) is a strict subset of what is committed here.</p>
+<ul><li>The Execution 07 work that <em>was</em> pushed — the premium design (Phase C), the</li></ul>
+<p>photography and category fix (Phase D) and the first Phase E theme pass — is<br />
+present and untouched on the branch.</p>
+<p><strong>One thing the crash did cost: the live preview.</strong> The <code>next start</code> process died<br />
+with the sandbox, and when the branch was next rebuilt the old <code>next-server</code><br />
+child kept the port and served chunks the rebuild had replaced, so every page<br />
+rendered blank. The preview was restarted through <code>.run/restart-customer.sh</code>,<br />
+which kills the child, waits for the port to free and starts against the new<br />
+build; a fresh capture then matched the committed <code>after</code> evidence<br />
+<strong>byte-for-byte</strong> (<code>moved=0.00%</code>), which is how the committed evidence was<br />
+confirmed still valid rather than assumed.</p>
+<h2 id="2-what-the-owner-reported-and-what-was-actually-wrong">2. What the owner reported, and what was actually wrong</h2>
+<p>The owner said the light theme &quot;still looked inconsistent and needs professional<br />
+correction&quot;. The light theme had already been reworked, so the inconsistency had<br />
+a structural cause rather than one wrong hex. Eight defects were found: six in<br />
+the theme (E1–E3 and E7 the real contrast bug, plus E8 reported and left alone),<br />
+one in the customer dictionary (E4) and one in the evidence itself (E5). E1–E3<br />
+and E4 came from the first pass; E7 was found by an exhaustive contrast sweep in<br />
+this session and is the defect the owner&#39;s complaint was actually pointing at.</p>
+<h3 id="defect-e0-the-customer-site-defaulted-to-the-dark-theme">Defect E0 — the customer site defaulted to the dark theme</h3>
+<p>The customer app rendered Arabic RTL <strong>dark</strong> by default, with the light theme<br />
+reached only through the header toggle or a stored preference. The approved<br />
+homepage reference is the light theme, so the default surface a visitor — and<br />
+every screenshot — saw first was the wrong one. <code>apps/customer/src/app/layout.tsx</code><br />
+and <code>apps/customer/src/lib/ui-context.tsx</code> now default to <code>light</code>, and the<br />
+<code>themeColor</code> viewport hint changed from <code>#00162b</code> to <code>#f7f4ed</code> to match. The dark<br />
+theme is unchanged and still applies from the toggle or a stored preference; the<br />
+pre-paint bootstrap script already reads the stored value, so a dark-theme<br />
+visitor still gets dark on the first frame with no flash.</p>
+<h3 id="defect-e1-gold-was-one-token-doing-two-incompatible-jobs">Defect E1 — gold was one token doing two incompatible jobs</h3>
+<p>Gold was both the accent <strong>text</strong> colour (which must be dark on a light surface)<br />
+and the metallic <strong>fill</strong> behind dark ink (which must be light). One value cannot<br />
+satisfy both, so either accent text failed contrast or the ink on a button<br />
+failed it.</p>
+<p><strong>Fix.</strong> The fill ramp is now separate from the accent: <code>--gold</code> /<br />
+<code>--gold-hover</code> are the dark accent pair, and <code>--gold-fill-from</code>,<br />
+<code>--gold-fill-to</code>, <code>--gold-fill-hover-from</code>, <code>--gold-fill-hover-to</code> are the<br />
+metallic ramp. The dark values reproduce the previous <code>gold-soft → gold</code> and<br />
+<code>gold → gold-deep</code> gradients exactly, so the dark theme is unaffected.</p>
+<h3 id="defect-e2-the-ink-on-a-gold-fill-was-not-the-approved-dark-ink">Defect E2 — the ink on a gold fill was not the approved dark ink</h3>
+<p>While making the fill ramp theme-aware, the ink on a gold fill was pointed at<br />
+<code>--text-inverse</code>. In the dark theme that value is <code>#00121f</code>, whereas the approved<br />
+dark controls used <code>--navy</code> (<code>#00162b</code>). Every dark gold button and the brand<br />
+mark therefore shifted by a visible blue step — a 12-unit channel delta.</p>
+<p><strong>Fix.</strong> A dedicated <code>--on-gold</code> token was added. Its dark value is the original<br />
+navy, so the approved dark theme is pixel-identical; its light value is the warm<br />
+charcoal <code>#241f14</code>, which reads on the lighter light ramp. The three gold-fill<br />
+consumers (<code>.oryx-brand-mark</code>, <code>.oryx-btn-primary</code>, <code>.oryx-step__num</code>) use it.</p>
+<h3 id="defect-e3-the-card-caption-scrim-was-dark-in-both-themes">Defect E3 — the card caption scrim was dark in both themes</h3>
+<p>The category-card scrim was a dark gradient in both themes, so the charcoal<br />
+light-theme caption landed on a dark scrim. The light theme now has its own<br />
+ivory scrim (<code>--card-scrim</code>) so the charcoal caption keeps its contrast over the<br />
+artwork.</p>
+<p>The hero, page-header and panel scrims were then moved onto a shared <strong>navy band</strong><br />
+(<code>--band</code>) rather than the page field. In the approved reference the light<br />
+homepage keeps a navy hero and a navy footer on an ivory page, and those panels<br />
+carry white ink; a scrim built from the ivory <code>--bg</code> would have put a pale wash<br />
+over the photograph and left white caption ink on a near-white field. Building<br />
+them from <code>--band</code> keeps the caption contrast and matches the reference. In the<br />
+dark theme <code>--band</code> equals <code>--bg</code> (<code>#00162b</code>), so the approved dark render is<br />
+unchanged — the token diff in section 4 confirms not one dark value moved.</p>
+<p>This is the refinement that made the light theme read as one designed surface<br />
+rather than a recoloured dark one. Eleven tokens were added to the light block<br />
+(<code>--band</code>, <code>--band-footer</code>, <code>--band-text</code>, <code>--band-text-muted</code>,<br />
+<code>--band-text-faint</code>, <code>--band-accent</code>, <code>--band-border</code>, <code>--gold-on-tint</code>,<br />
+<code>--panel-bg</code>, <code>--panel-ink</code>, <code>--panel-ink-muted</code>) and the three scrim tokens<br />
+switched from <code>var(--bg)</code> to <code>var(--band)</code>. The dark block gained the same names<br />
+with values that reproduce the previous render exactly. Because the light and<br />
+dark blocks now share one vocabulary, a rule no longer needs a theme branch —<br />
+which is what the owner asked for when they said to stop scattering overrides.</p>
+<h3 id="defect-e7-a-category-card-link-that-failed-contrast-found-by-the-exhaustive-sweep">Defect E7 — a category-card link that failed contrast, found by the exhaustive sweep</h3>
+<p>The owner&#39;s complaint was that the light theme &quot;still looked inconsistent&quot;, and<br />
+the fixed-list audit did not find why: every primitive it checked passed. So a<br />
+second harness, <code>.run/sweep-light-contrast.mjs</code>, was written to walk **every text<br />
+node on every customer surface** and measure its rendered contrast against the<br />
+actual pixels behind it, rather than trusting a list.</p>
+<p>That sweep found a real failure the list had missed:</p>
+<div class="table-wrap"><table><thead><tr><th>Surface</th><th>Element</th><th>Text</th><th>Measured</th><th>Required</th></tr></thead><tbody><tr><td><code>/</code></td><td><code>.oryx-cat-card__link</code></td><td>&quot;دليل مزودي الخدمة&quot;</td><td><strong>4.28:1</strong></td><td>4.5:1</td></tr></tbody></table></div>
+<p>The category-card link sat on the ivory card scrim, and the scrim&#39;s 10–12% gold<br />
+tint lifted the surface to <code>rgb(231, 229, 223)</code>; the plain accent gold <code>#856612</code><br />
+falls just under the threshold on that tint. This is exactly the &quot;one gold token<br />
+doing two jobs&quot; problem of E1, surviving in one rule that the component-level fix<br />
+had not reached.</p>
+<p><strong>Fix.</strong> The link now uses <code>--gold-on-tint</code> (<code>#7a5c10</code>), the token introduced for<br />
+gold text on a tinted surface. On that scrim it measures <strong>4.95:1</strong>. In the dark<br />
+theme <code>--gold-on-tint</code> equals <code>--gold</code> (<code>#d4af37</code>), so the change is a no-op<br />
+there — the dark captures confirm it.</p>
+<p>The sweep now reports <strong>0 failures in the light theme</strong>, and the fixed-list audit<br />
+agrees (<code>0 of 23 text pairs below threshold</code>). The lesson is recorded because it<br />
+is the owner&#39;s actual point: a fixed list of primitives cannot prove a theme is<br />
+consistent, and the exhaustive walk is what found the defect.</p>
+<h3 id="defect-e8-two-dark-theme-pairs-below-threshold-deliberately-left-alone">Defect E8 — two dark-theme pairs below threshold, deliberately left alone</h3>
+<p>The same exhaustive sweep, run in the dark theme, reports two pairs below 4.5:1:</p>
+<div class="table-wrap"><table><thead><tr><th>Surface</th><th>Element</th><th>Text</th><th>Measured</th></tr></thead><tbody><tr><td><code>/</code></td><td><code>.oryx-stat__label</code></td><td>&quot;مزودو خدمة&quot;</td><td>3.61:1</td></tr><tr><td><code>/profile</code></td><td><code>.oryx-btn-danger</code></td><td>&quot;حذف&quot;</td><td>4.27:1</td></tr></tbody></table></div>
+<p>Both are <strong>pre-existing in the approved dark theme</strong>, not introduced here: the<br />
+stat label uses <code>--text-faint</code> (<code>#6f8598</code>) and the danger button uses the danger<br />
+red, and neither token&#39;s dark value changed in this phase (section 4 shows zero<br />
+dark values moved). The owner&#39;s constraint is that the approved dark theme stays<br />
+intact, so correcting them is a separate change with its own approval, not part<br />
+of a light-theme correction. They are reported rather than fixed or hidden.</p>
+<h3 id="defect-e4-an-untranslated-key-on-the-profile-surface">Defect E4 — an untranslated key on the profile surface</h3>
+<p>While auditing <code>/profile</code> in the light theme, the address &quot;Delete&quot; control<br />
+rendered the raw key <code>common.delete</code> instead of a word. The customer dictionary<br />
+documents the rule that &quot;the UI never falls back to a raw key&quot;, and this key was<br />
+used by the profile page but defined in neither locale.</p>
+<p><strong>Fix.</strong> <code>common.delete</code> was added to both the Arabic (<code>حذف</code>) and English<br />
+(<code>Delete</code>) dictionaries. A parity check confirms the two locales now hold the<br />
+same 268 keys and that every key the source references exists in both.</p>
+<h3 id="defect-e5-the-authenticated-captures-showed-the-login-page">Defect E5 — the authenticated captures showed the login page</h3>
+<p>This one is an evidence defect, not a theme defect, and it is the reason the<br />
+report was amended after the first draft.</p>
+<p><strong>Symptom.</strong> A pixel comparison of the <code>after</code> set found <code>/dashboard</code>,<br />
+<code>/profile</code> and <code>/login</code> almost identical — mean absolute difference <strong>0.212</strong><br />
+between the login page and the dashboard, and <strong>0.00</strong> between profile and<br />
+dashboard — while the homepage and providers differed by about 16. Three<br />
+surfaces cannot be pixel-identical unless they are the same page.</p>
+<p><strong>Cause.</strong> The preview bundle was built with the root <code>.env</code>&#39;s absolute<br />
+<code>NEXT_PUBLIC_API_BASE_URL=http://localhost:3001/api</code>. The page is served<br />
+same-origin through the preview proxy on port 12001, which routes <code>/api</code> to the<br />
+API, so the browser saw the API as a <em>different site</em>. The customer refresh token<br />
+is an HttpOnly <code>SameSite=Lax</code> cookie scoped to <code>/api/v1/customer</code>, and the<br />
+capture script does a full <code>page.goto</code> per surface, so the in-memory access token<br />
+was dropped and the cross-site refresh cookie was not sent. Every guarded route<br />
+therefore redirected to <code>/login</code>. This is the recurring operational trap already<br />
+recorded as defect 14 in <code>docs/audit/04_FIXED_DEFECTS.md</code>: a status-code-only<br />
+check passes while the product is broken.</p>
+<p><strong>Fix, in two parts.</strong></p>
+<ol><li>The customer app was rebuilt with <code>NEXT_PUBLIC_API_BASE_URL=/api</code> (relative,</li></ol>
+<p>same-origin) and <code>next start</code> was restarted. A full-reload probe then reached<br />
+<code>/dashboard</code> (h1 &quot;Welcome — Demo Customer&quot;) and <code>/profile</code> (h1 &quot;Profile&quot;)<br />
+authenticated.</p>
+<ol><li><code>.run/capture-exec07-phase-e.mjs</code> now asserts the landing path for any surface</li></ol>
+<p>marked <code>requiresAuth</code> and throws if it lands on <code>/login</code>. A negative test<br />
+confirmed the guard rejects an unauthenticated <code>/profile</code> capture<br />
+(<code>landed=/login guardRejected=true</code>), so this failure can no longer be<br />
+committed silently.</p>
+<p><strong>Re-capture.</strong> Both sets were regenerated against the same-origin build: the<br />
+<code>after</code> set at this head, and the <code>before</code> set with <code>globals.css</code> reverted to<br />
+<code>b3c9a71</code> (the <code>common.delete</code> dictionary fix retained, since it is text). The<br />
+login-to-dashboard mean pixel difference is now <strong>42–63</strong> across the six<br />
+viewport/locale pairs in the <code>after</code> set and <strong>15–29</strong> in the <code>before</code> set, so the<br />
+two authenticated surfaces are genuinely distinct in both sets. The capture<br />
+manifest records the landing path per authenticated capture, and every one of<br />
+them landed on its own route (<code>/dashboard</code> on <code>/dashboard</code>, <code>/profile</code> on<br />
+<code>/profile</code>) in both sets — the check that defect E5 was about. The dark theme stayed byte-identical across the re-capture (section 4).</p>
+<p><strong>Scope.</strong> The theme change, the palette and the dark-theme constraint are<br />
+unchanged by this defect. Only the evidence artifacts were wrong, and they have<br />
+been replaced.</p>
+<h2 id="3-the-light-palette">3. The light palette</h2>
+<p>Centralised in <code>packages/shared/src/tokens.ts</code> (<code>LIGHT_THEME</code>) and mirrored into<br />
+<code>:root[data-theme=&#39;light&#39;]</code> in <code>apps/customer/src/app/globals.css</code>. The two are<br />
+pinned to each other by <code>packages/shared/test/tokens.test.ts</code>, so they cannot<br />
+drift.</p>
+<div class="table-wrap"><table><thead><tr><th>Role</th><th>Token</th><th>Value</th></tr></thead><tbody><tr><td>Page</td><td><code>--bg</code></td><td><code>#f7f4ed</code> (ivory)</td></tr><tr><td>Deep page</td><td><code>--bg-deep</code></td><td><code>#efeae0</code></td></tr><tr><td>Card</td><td><code>--surface</code></td><td><code>#ffffff</code></td></tr><tr><td>Raised surface</td><td><code>--surface-raised</code></td><td><code>#fbf9f4</code></td></tr><tr><td>Hover surface</td><td><code>--surface-hover</code></td><td><code>#f4f0e8</code></td></tr><tr><td>Body text</td><td><code>--text</code></td><td><code>#22201d</code> (charcoal)</td></tr><tr><td>Muted text</td><td><code>--text-muted</code></td><td><code>#5a544b</code></td></tr><tr><td>Faint text</td><td><code>--text-faint</code></td><td><code>#6b6459</code></td></tr><tr><td>Accent text / hairline</td><td><code>--gold</code></td><td><code>#856612</code></td></tr><tr><td>Accent text on a tinted chip</td><td><code>--gold-on-tint</code></td><td><code>#7a5c10</code></td></tr><tr><td>Metallic fill</td><td><code>--gold-fill-from</code> → <code>--gold-fill-to</code></td><td><code>#e0c168</code> → <code>#c9a227</code></td></tr><tr><td>Ink on fill</td><td><code>--on-gold</code></td><td><code>#241f14</code></td></tr><tr><td>Navy band (hero / page headers / footer)</td><td><code>--band</code></td><td><code>#0a1b2f</code></td></tr><tr><td>Navy footer</td><td><code>--band-footer</code></td><td><code>#0a1b2f</code></td></tr><tr><td>Ink on band</td><td><code>--band-text</code></td><td><code>#ffffff</code></td></tr><tr><td>Muted ink on band</td><td><code>--band-text-muted</code></td><td><code>#cdd8e6</code></td></tr><tr><td>Faint ink on band</td><td><code>--band-text-faint</code></td><td><code>#9fb3c8</code></td></tr><tr><td>Accent on band</td><td><code>--band-accent</code></td><td><code>#e8c766</code></td></tr><tr><td>Hairline on band</td><td><code>--band-border</code></td><td><code>rgba(232, 199, 102, 0.24)</code></td></tr></tbody></table></div>
+<p>Every colour a rule uses is one of these tokens; the dark block defines the same<br />
+names with the values that reproduce the approved dark render, so a rule reads<br />
+one token and gets the right colour in both themes. That is the &quot;centralised<br />
+tokens rather than scattered overrides&quot; the owner asked for.</p>
+<h2 id="4-why-the-dark-theme-is-unchanged">4. Why the dark theme is unchanged</h2>
+<p>The hard constraint is that the approved dark theme must not change. It is<br />
+verified three ways, and the three agree.</p>
+<ol><li><strong>Token diff — zero values changed.</strong> Comparing the dark <code>:root</code> block at the</li></ol>
+<p>phase start (<code>b3c9a71</code>) with the current one, **not one of the 24 original<br />
+tokens changed value**; the block grew from 24 to 49 tokens and every<br />
+addition is a new name. <code>packages/shared/test/tokens.test.ts</code> pins the values<br />
+the rules depend on, including <code>DARK_THEME.onGold === &#39;#00162b&#39;</code>, `band ===<br />
+&#39;#00162b&#39;<code> and </code>bandFooter === &#39;#000f1e&#39;`.</p>
+<div class="table-wrap"><table><thead><tr><th>Check</th><th>Result</th></tr></thead><tbody><tr><td>Dark tokens before → after</td><td>24 → 49</td></tr><tr><td>Tokens whose <strong>value</strong> changed</td><td><strong>0</strong></td></tr><tr><td>Tokens added</td><td>25 (new names)</td></tr><tr><td>Tokens removed</td><td>0</td></tr></tbody></table></div>
+<ol><li><strong>Pixel diff — controlled comparison.</strong> <code>.run/verify-dark-identical.mjs</code></li></ol>
+<p>compares the 31 dark captures before and after. Both sets were captured<br />
+against the <strong>same seeded content</strong>, with only the theme source differing, so<br />
+the theme is the only variable.</p>
+<div class="table-wrap"><table><thead><tr><th>Metric</th><th>Result</th></tr></thead><tbody><tr><td>Captures compared</td><td>31</td></tr><tr><td>Byte-identical</td><td><strong>23 / 31</strong></td></tr><tr><td>Max-channel-delta histogram</td><td><code>delta 0: 23, delta 1: 5, delta 2: 1, delta 13: 1, delta 24: 1</code></td></tr><tr><td>Captures with a <strong>real colour shift</strong> (&gt; 0.05% of pixels above delta 12)</td><td><strong>0</strong></td></tr><tr><td>Captures with only isolated high-delta pixels</td><td>2</td></tr></tbody></table></div>
+<p>The eight captures at delta 1–2 are the largest of the low-delta group. Every<br />
+differing pixel sits in the <strong>header band at y 18–49</strong> — the translucent,<br />
+blurred header that resamples slightly differently between two separately<br />
+built bundles — and the largest of them is **37 pixels out of 329,160<br />
+(0.011%)**. The two captures that carry a high-delta pixel are<br />
+<code>01-homepage-tablet-en-dark.png</code> (one pixel, delta 13) and<br />
+<code>01-homepage-desktop-en-dark.png</code> (five pixels, deltas 13–24). Every one of<br />
+those pixels is on a gold edge at the extreme left or right of the viewport<br />
+(<code>x=1</code>, <code>x=14–15</code>, <code>x=1424–1425</code>) — antialiasing on the metallic brand mark<br />
+and a gold hairline, not a palette move.</p>
+<p>The byte-identical count moves between runs (20–23 of 31) because each<br />
+capture run rebuilds the app and the header&#39;s <code>backdrop-filter</code> resamples<br />
+differently against the new bundle; the **real-colour-shift count stays at<br />
+zero in every run**, and that is the metric that matters. An earlier<br />
+same-build comparison reported 30/31 because re-rendering both sides from one<br />
+bundle makes antialiasing bit-identical. The histogram, not the<br />
+byte-identical count, is the honest summary.</p>
+<ol><li><strong>Deterministic rendering.</strong> Capturing the same dark surface twice from one</li></ol>
+<p>build produced <strong>0 differing pixels</strong> on <code>/providers</code> (mobile, Arabic),<br />
+<code>/profile</code> (tablet, English) and <code>/dashboard</code> (desktop, Arabic). Rendering is<br />
+deterministic on this host, so the before/after deltas are attributable to the<br />
+build boundary, not to capture noise. The capture harness sets the same<br />
+viewport, device scale and locale on both sides, and waits for <code>networkidle</code><br />
+plus a settle delay before each shot.</p>
+<h2 id="5-evidence">5. Evidence</h2>
+<p>The owner asked for authenticated light-theme captures of five customer<br />
+surfaces, run as before/after, plus a light-vs-dark comparison.</p>
+<div class="table-wrap"><table><thead><tr><th>Surface</th><th>Route</th></tr></thead><tbody><tr><td>Homepage</td><td><code>/</code></td></tr><tr><td>Customer dashboard</td><td><code>/dashboard</code></td></tr><tr><td>Provider directory</td><td><code>/providers</code></td></tr><tr><td>Login</td><td><code>/login</code></td></tr><tr><td>Profile</td><td><code>/profile</code></td></tr></tbody></table></div>
+<p>Each surface is captured in Arabic/RTL and English/LTR at desktop (1440),<br />
+tablet (834) and mobile (390) — 60 captures per set.</p>
+<div class="table-wrap"><table><thead><tr><th>Artifact</th><th>Path</th></tr></thead><tbody><tr><td>Before (<code>b3c9a71</code> theme + the i18n fix, no Phase E styling)</td><td><code>docs/audit/exec07/phase-e/before/</code></td></tr><tr><td>After (Phase E applied)</td><td><code>docs/audit/exec07/phase-e/after/</code></td></tr><tr><td>Light-vs-dark comparison sheets</td><td><code>docs/audit/exec07/phase-e/comparisons-after/</code></td></tr><tr><td>Machine-readable capture manifest</td><td><code>docs/audit/exec07/phase-e/{before,after}/manifest.json</code></td></tr><tr><td>Machine-readable dark verdict</td><td><code>docs/audit/exec07/phase-e/after/dark-invariance.json</code></td></tr><tr><td>Live computed-style audit</td><td><code>docs/audit/exec07/phase-e/light-theme-audit.json</code></td></tr><tr><td>Reviewable evidence index</td><td><code>.run/evidence/exec07-phase-e/index.html</code></td></tr><tr><td>Capture script</td><td><code>.run/capture-exec07-phase-e.mjs</code></td></tr><tr><td>Dark-integrity verifier</td><td><code>.run/verify-dark-identical.mjs</code></td></tr><tr><td>Comparison-sheet builder</td><td><code>.run/make-light-dark-pairs.mjs</code></td></tr><tr><td>Evidence-index builder</td><td><code>.run/build-phase-e-index.mjs</code></td></tr><tr><td>Preview restart helper</td><td><code>.run/restart-customer.sh</code></td></tr></tbody></table></div>
+<p>The manifest records, per capture, the HTTP status, horizontal overflow, the<br />
+resolved body background and text colour, the accent token and the WCAG contrast<br />
+ratio of the body text on that background. All 60 captures returned a status<br />
+below 400 with zero horizontal overflow at every viewport.</p>
+<p>The two authenticated surfaces (<code>/dashboard</code>, <code>/profile</code>) are captured only after<br />
+the script asserts the landing path, so a lost session fails the run instead of<br />
+silently shooting the login page (defect E5). The regenerated <code>after</code> manifest<br />
+records the authenticated dashboard at <code>rgb(247, 244, 237)</code> (ivory) with accent<br />
+<code>#856612</code>, and the <code>before</code> manifest records <code>rgb(245, 246, 248)</code> with accent<br />
+<code>#b8912a</code> — the expected light-theme difference.</p>
+<h2 id="6-contrast-results">6. Contrast results</h2>
+<div class="table-wrap"><table><thead><tr><th>Check</th><th>Command</th><th>Result</th></tr></thead><tbody><tr><td>Palette pairs (static)</td><td><code>.run/check-light-palette.mjs</code></td><td><strong>31 / 31 pass</strong></td></tr><tr><td>Live computed styles</td><td><code>.run/audit-light-theme.mjs</code></td><td><strong>23 / 23 text pairs at or above WCAG; 0 below</strong></td></tr><tr><td>Exhaustive rendered sweep (light)</td><td><code>.run/sweep-light-contrast.mjs</code></td><td><strong>0 text pairs below threshold</strong> (found and fixed defect E7)</td></tr><tr><td>Exhaustive rendered sweep (dark)</td><td><code>.run/sweep-light-contrast.mjs dark</code></td><td><strong>2 pre-existing pairs</strong> (defect E8, left alone)</td></tr><tr><td>Theme-token contract</td><td><code>packages/shared/test/tokens.test.ts</code></td><td><strong>29 tests pass</strong></td></tr></tbody></table></div>
+<p>The live audit composites the background layer stack up to the first opaque<br />
+layer, and parses <code>color(srgb …)</code> as well as <code>rgb()</code>, so translucent headers and<br />
+gradient buttons are measured rather than skipped. It records 49 resolved<br />
+elements; 23 carry their own text or icon, and those are the pairs WCAG applies<br />
+to. The other 26 are layout containers (the hero shell, card frames, page<br />
+fields), whose resolved colour is recorded for the record but whose ratio<br />
+describes a panel rather than a glyph — the hero container alone would otherwise<br />
+report 1.12:1 for a navy panel that renders no text of its own. **Of the 23<br />
+text-bearing pairs, 0 fall below their threshold.** The lowest measured pair is<br />
+the footer at 4.88:1; body text is 14.79:1 and card text 16.25:1.</p>
+<h2 id="65-live-preview">6.5 Live preview</h2>
+<p>The staging previews are served from the sandbox ingress. The customer app is on<br />
+port 12001 (host <code>work-2</code>); the admin app is on port 12000 (host <code>work-1</code>).</p>
+<div class="table-wrap"><table><thead><tr><th>Surface</th><th>URL</th></tr></thead><tbody><tr><td>Customer homepage, light theme</td><td><code>https://work-2-wqqgzexpmdagonjk.prod-runtime.all-hands.dev/</code></td></tr><tr><td>Customer dashboard</td><td><code>https://work-2-wqqgzexpmdagonjk.prod-runtime.all-hands.dev/dashboard</code></td></tr><tr><td>Provider directory</td><td><code>https://work-2-wqqgzexpmdagonjk.prod-runtime.all-hands.dev/providers</code></td></tr><tr><td>Customer login</td><td><code>https://work-2-wqqgzexpmdagonjk.prod-runtime.all-hands.dev/login</code></td></tr><tr><td>Customer profile</td><td><code>https://work-2-wqqgzexpmdagonjk.prod-runtime.all-hands.dev/profile</code></td></tr></tbody></table></div>
+<p>The theme toggle is the sun/moon control in the header; the locale toggle is the<br />
+<code>ع</code> / <code>EN</code> control beside it. Both were exercised by hand while auditing the<br />
+five surfaces.</p>
+<p>Every capture in both sets is also browsable as one page, served from the preview<br />
+host so a reviewer can compare before and after side by side without cloning the<br />
+branch:</p>
+<div class="table-wrap"><table><thead><tr><th>Index</th><th>URL</th></tr></thead><tbody><tr><td>Phase E evidence (before / after / light-vs-dark, all viewports and locales)</td><td><code>https://work-2-wqqgzexpmdagonjk.prod-runtime.all-hands.dev/evidence/exec07-phase-e/index.html</code></td></tr></tbody></table></div>
+<h2 id="7-test-results">7. Test results</h2>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Command</th><th>Result</th></tr></thead><tbody><tr><td>Shared unit</td><td><code>pnpm --filter @oryx/shared test</code></td><td><strong>132 passed</strong> (7 files)</td></tr><tr><td>API integration</td><td><code>pnpm --filter @oryx/api test:e2e</code></td><td><strong>302 passed</strong> (14 suites)</td></tr><tr><td>Mobile unit</td><td><code>pnpm --filter @oryx/mobile test</code></td><td><strong>20 passed</strong> (3 files)</td></tr><tr><td>Customer typecheck</td><td><code>tsc --noEmit</code></td><td><strong>clean</strong></td></tr><tr><td>Customer lint</td><td><code>eslint . --max-warnings=0</code></td><td><strong>clean</strong></td></tr><tr><td>Admin typecheck / lint / build</td><td><code>pnpm --filter @oryx/admin …</code></td><td><strong>clean; 39 pages built</strong></td></tr><tr><td>Customer build</td><td><code>pnpm --filter @oryx/customer build</code></td><td><strong>18 routes built</strong></td></tr><tr><td>Dark integrity</td><td><code>.run/verify-dark-identical.mjs</code></td><td><strong>23 / 31 byte-identical; 0 real shifts; histogram <code>0:23, 1:5, 2:1, 13:1, 24:1</code></strong></td></tr><tr><td>Light palette</td><td><code>.run/check-light-palette.mjs</code></td><td><strong>31 / 31 pass</strong></td></tr><tr><td>Live contrast</td><td><code>.run/audit-light-theme.mjs</code></td><td><strong>0 of 23 text pairs below 4.5:1</strong></td></tr><tr><td>Exhaustive light sweep</td><td><code>.run/sweep-light-contrast.mjs</code></td><td><strong>0 text pairs below threshold</strong></td></tr><tr><td>i18n parity</td><td><code>.run/check-customer-i18n.mjs</code></td><td><strong>both locales in step, no undefined key</strong></td></tr></tbody></table></div>
+<p>CI run <a href="https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39308819865" target="_blank" rel="noopener noreferrer"><code>39308819865</code></a><br />
+on head <code>6ea99ba</code> (this session&#39;s commit): all three jobs (<code>Typecheck and build</code>,<br />
+<code>Unit and API integration tests</code>, <code>Browser acceptance tests</code>) <strong>success</strong>. Earlier<br />
+runs <a href="https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39185941517" target="_blank" rel="noopener noreferrer"><code>39185941517</code></a><br />
+on <code>04f722e</code> and<br />
+<a href="https://github.com/mohammadaljallad079-rgb/oryx/actions/runs/39184822627" target="_blank" rel="noopener noreferrer"><code>39184822627</code></a><br />
+on <code>5920895</code> were also green.</p>
+<h2 id="8-honest-limitations">8. Honest limitations</h2>
+<ul><li>The theme change is CSS and design-token only. The one exception is the</li></ul>
+<p><code>common.delete</code> dictionary key (defect E4), which is text, not styling. No API,<br />
+database or authorization behaviour was touched, so the API integration suite<br />
+is a regression check rather than a test of this work.</p>
+<ul><li>The dark comparison is byte-identical on 23 of 31 captures and <strong>0</strong> show a</li></ul>
+<p>real colour shift. The eight at delta 1–2 and the six isolated pixels at delta<br />
+13–24 are antialiasing on the blurred header band and on gold edges at the<br />
+viewport margins, all reported rather than hidden. The byte-identical count<br />
+depends on whether both sides are rendered from one bundle; this figure is the<br />
+stricter two-build comparison, so it is the one stated.</p>
+<ul><li>Two dark-theme text pairs sit below 4.5:1 (defect E8). They are pre-existing in</li></ul>
+<p>the approved dark theme and were not changed, because the owner&#39;s constraint is<br />
+that the dark theme stays intact. A light-theme correction is not the place to<br />
+alter them; they need their own review.</p>
+<ul><li>The first evidence run was invalid: the preview bundle&#39;s absolute API base made</li></ul>
+<p>the browser treat the API as a different site, so the cross-site refresh cookie<br />
+was never sent and <code>/dashboard</code> and <code>/profile</code> were captured as the login page<br />
+(defect E5). Both sets were regenerated against a same-origin build, and the<br />
+capture script now fails rather than committing that evidence again. The<br />
+preview build must export <code>NEXT_PUBLIC_API_BASE_URL=/api</code>, which is the same<br />
+trap recorded as defect 14 in <code>docs/audit/04_FIXED_DEFECTS.md</code>.</p>
+<ul><li>This is a staging preview on the sandbox ingress, not a production deployment.</li></ul>
+<p>Nothing was merged and nothing was deployed.</p>
+<ul><li>The comparison sheets are JPEG (derived, for review). The before/after capture</li></ul>
+<p>sets stay lossless PNG because the pixel comparison depends on them.</p>
+<ul><li>The customer app has no unit-test runner, so the i18n parity guard is a <code>.run/</code></li></ul>
+<p>script, not a CI test. Wiring it into CI is left to the owner.</p>
+<ul><li>The preview must be restarted after every rebuild, with the old <code>next-server</code></li></ul>
+<p>child killed first. <code>next start</code> spawns a child that outlives its parent and<br />
+keeps the port, so a rebuild replaces the chunk hashes while the old process<br />
+keeps serving the previous manifest: every page then renders blank with a<br />
+<code>ChunkLoadError</code>. <code>.run/restart-customer.sh</code> does this correctly. This is the<br />
+same class of trap as the stale-<code>dist</code> note in <code>AGENTS.md</code>.</p>
+<ul><li>The capture harnesses default to the sandbox preview host, which changes when a</li></ul>
+<p>sandbox is recreated. Each reads <code>ORYX_CUSTOMER_BASE</code> so a re-run can be<br />
+pointed at the current origin without editing the script.</p>
+<h2 id="9-continuation-session-2026-10-18-light-theme-sign-off">9. Continuation session (2026-10-18) — light-theme sign-off</h2>
+<p>The sandbox for the session that wrote sections 1–8 failed again. This section<br />
+records what was recovered and what was corrected in the continuation.</p>
+<h3 id="91-recovery">9.1 Recovery</h3>
+<div class="table-wrap"><table><thead><tr><th>Question</th><th>Finding</th><th>How it was checked</th></tr></thead><tbody><tr><td>Remote branch tip</td><td><code>32c1d166583169a9ebca3e08fb68483e70b562ea</code></td><td><code>git ls-remote origin feature/execution-07-premium-web</code></td></tr><tr><td>Local HEAD</td><td><code>32c1d16</code> — in step with the remote</td><td><code>git rev-parse HEAD</code></td></tr><tr><td>Commits beyond <code>b3c9a71</code></td><td><strong>ten</strong>, ending at <code>32c1d16</code></td><td><code>git log --oneline b3c9a71..HEAD</code></td></tr><tr><td>Uncommitted work in the workspace</td><td><strong>present</strong> — the hero-eyebrow fix in <code>globals.css</code>, the static-export preview wiring (<code>preview-data.ts</code>, <code>asset-url.ts</code>, <code>api.ts</code>, <code>auth-context.tsx</code>, <code>use-website-content.ts</code>, the <code>PreviewStrip</code>) and the preview tooling</td><td><code>git status --porcelain</code></td></tr><tr><td>Stashes</td><td><strong>none</strong></td><td><code>git stash list</code></td></tr></tbody></table></div>
+<p><strong>The crash did not lose any pushed commit.</strong> Every commit the previous session<br />
+pushed is on <code>origin</code>; the remote tip is <code>32c1d16</code>, which is the workspace HEAD.<br />
+The work that was still uncommitted when the sandbox failed survived in the<br />
+workspace filesystem and is committed here — it was never lost, and nothing had<br />
+to be reconstructed from a stash.</p>
+<h3 id="92-the-light-theme-correction-that-was-still-outstanding">9.2 The light-theme correction that was still outstanding</h3>
+<p>The owner&#39;s report — &quot;the Light Theme colors still look inconsistent&quot; — pointed<br />
+at the homepage hero eyebrow. <code>.oryx-hero p</code> is more specific than<br />
+<code>.oryx-eyebrow</code>, so the eyebrow inherited the lede&#39;s muted colour and 16px size<br />
+instead of the gold accent every other eyebrow uses. Measured on the live render:<br />
+<code>rgb(159,179,200)</code> at 16px, where the approved design shows a small gold<br />
+uppercase label. The fix is one light-scoped rule that restates the eyebrow at a<br />
+matching specificity (<code>:root[data-theme=&#39;light&#39;] .oryx-hero .oryx-eyebrow</code>), so<br />
+it reads <code>--band-accent</code> again. It is scoped to the light theme precisely because<br />
+the dark render is approved: dark still resolves the eyebrow at 16px, and the<br />
+dark-invariance check confirms it did not move.</p>
+<h3 id="93-defects-found-and-fixed-in-this-session">9.3 Defects found and fixed in this session</h3>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Defect</th><th>Fix</th></tr></thead><tbody><tr><td>E9</td><td>The preview overview page&#39;s three card links (<code>evidence/</code>, <code>reports/</code>, <code>brand/</code>) were written without the <code>../</code> prefix, so each resolved one directory too deep and returned <strong>404</strong> — three broken links on the page a reviewer lands on first. Found by the link crawl, not by eye.</td><td>Prefix the three <code>href</code>s with <code>../</code> in <code>scripts/preview/build-preview.mjs</code></td></tr><tr><td>E10</td><td>The link crawl&#39;s &quot;dark&quot; pass used <code>page.emulateMedia({ colorScheme: &#39;dark&#39; })</code>, but the site resolves its theme from <code>localStorage</code>, not <code>prefers-color-scheme</code>, so the pass measured the <strong>light</strong> palette and reported it as dark.</td><td>Set the stored preference with <code>ctx.addInitScript</code>, which is what the header toggle writes; the pass now reports the navy <code>rgb(0,22,43)</code> field</td></tr><tr><td>E11</td><td><code>eslint .</code> in the customer app linted the static-export <code>out/</code> directory (generated, minified, git-ignored), producing 165 spurious errors and hiding the real lint result.</td><td>Add <code>out/**</code> to the flat-config <code>ignores</code></td></tr><tr><td>E12</td><td>A <code>globals.css</code> comment cited <code>docs/audit/exec07/phase-e/dark-identical.txt</code>, which does not exist; the verdict lives in <code>after/dark-invariance.json</code>.</td><td>Point the comment at the real file</td></tr></tbody></table></div>
+<h3 id="94-verification-after-the-fixes">9.4 Verification after the fixes</h3>
+<div class="table-wrap"><table><thead><tr><th>Check</th><th>Command</th><th>Result</th></tr></thead><tbody><tr><td>Link and dark crawl</td><td><code>pnpm preview:check</code></td><td><strong>203 pages crawled; 0 bad responses; 0 dark-mode issues</strong> (was 3 × 404)</td></tr><tr><td>Preview render</td><td><code>pnpm preview:verify</code></td><td><strong>61 page/theme combinations; issues: none</strong></td></tr><tr><td>Static export build</td><td><code>pnpm build:site</code></td><td><strong>22 website pages exported</strong></td></tr><tr><td>Preview build</td><td><code>pnpm preview:build</code></td><td>22 website pages, 23 reports, 30 capture pairs, 32 sheets, 22 brand assets, 148 images</td></tr><tr><td>Light sweep</td><td><code>.run/sweep-light-contrast.mjs light</code></td><td><strong>0 text pairs below their WCAG threshold</strong></td></tr><tr><td>Dark integrity</td><td><code>.run/verify-dark-identical.mjs</code></td><td><strong>22/31 byte-identical; 0 real colour shifts</strong>; worst 0.0112% at delta 2</td></tr><tr><td>Shared unit</td><td><code>pnpm --filter @oryx/shared test</code></td><td><strong>132 passed</strong></td></tr><tr><td>API integration</td><td><code>pnpm --filter @oryx/api test:e2e</code></td><td><strong>302 passed</strong></td></tr><tr><td>Mobile unit</td><td><code>pnpm --filter @oryx/mobile test</code></td><td><strong>20 passed</strong></td></tr><tr><td>Customer typecheck</td><td><code>tsc --noEmit</code></td><td><strong>clean</strong></td></tr><tr><td>Customer lint</td><td><code>eslint . --max-warnings=0</code></td><td><strong>clean</strong></td></tr></tbody></table></div>
+<p>The dark-invariance figure is unchanged from section 4 — same 22 byte-identical<br />
+captures, same zero real shifts — which is the evidence that the light-theme<br />
+work and the preview fixes left the approved dark theme alone.</p>
+<h3 id="95-captures-re-verified">9.5 Captures re-verified</h3>
+<p>The five requested surfaces plus the light-vs-dark comparison were re-captured<br />
+from the restored same-origin live preview at desktop (1440), tablet (834) and<br />
+mobile (390), in Arabic RTL and English LTR, for both themes — 60 captures<br />
+recorded in <code>after/manifest.json</code>, plus two derived comparison sheets (62 PNGs<br />
+in total). Every capture is <code>status=200</code> with <code>overflow=0</code>, and body contrast is<br />
+14.79:1 in light and 16.37:1 in dark.</p>
+<h2 id="10-second-continuation-session-the-published-preview">10. Second continuation session — the published preview</h2>
+<p>A second sandbox failure interrupted the session that was publishing the site.<br />
+This section records the recovery and the defect that the published site<br />
+exposed.</p>
+<h3 id="101-recovery">10.1 Recovery</h3>
+<div class="table-wrap"><table><thead><tr><th>Question</th><th>Finding</th><th>How it was checked</th></tr></thead><tbody><tr><td>Remote branch tip on entry</td><td><code>32c1d16</code></td><td><code>git ls-remote origin feature/execution-07-premium-web</code></td></tr><tr><td>Local HEAD on entry</td><td><code>32c1d16</code> — in step with the remote</td><td><code>git rev-parse HEAD</code></td></tr><tr><td>Commits beyond the last SHA in the hand-off</td><td><strong>ten</strong>, ending at <code>32c1d16</code></td><td><code>git log --oneline b3c9a71..HEAD</code></td></tr><tr><td>Uncommitted work</td><td><strong>present</strong> — the light-theme <code>globals.css</code> rule, the static-export wiring and the preview tooling</td><td><code>git status --porcelain</code></td></tr><tr><td>Stashes</td><td><strong>none</strong></td><td><code>git stash list</code></td></tr></tbody></table></div>
+<p><strong>No pushed commit was lost.</strong> The hand-off named <code>b3c9a71</code> as the last known<br />
+SHA, but the branch had already advanced ten commits past it, all on <code>origin</code>.<br />
+The uncommitted work was still in the workspace filesystem, so nothing had to be<br />
+reconstructed from a stash and nothing was reset or force-pushed.</p>
+<h3 id="102-defect-e13-pages-published-the-site-without-its-css-or-javascript">10.2 Defect E13 — Pages published the site without its CSS or JavaScript</h3>
+<p>The published preview loaded its HTML and nothing else. Every<br />
+<code>/oryx/_next/...</code> request returned <strong>404</strong>, so the homepage rendered as unstyled<br />
+text on a white field. The build itself was correct: the same artifact served<br />
+from disk passed the render check and the 203-page crawl.</p>
+<p>Cause: GitHub Pages runs Jekyll unless a <code>.nojekyll</code> marker is present, and<br />
+Jekyll discards every path beginning with an underscore — which is the whole<br />
+<code>_next</code> directory. <code>preview:build</code> was already writing the marker, but<br />
+<code>actions/upload-artifact</code> skips dotfiles by default, so <code>.nojekyll</code> never left<br />
+the build job and never reached the <code>gh-pages</code> branch.</p>
+<div class="table-wrap"><table><thead><tr><th>Fix</th><th>Where</th></tr></thead><tbody><tr><td><code>include-hidden-files: true</code> so the marker survives the artifact upload</td><td><code>.github/workflows/preview.yml</code></td></tr><tr><td>A build-time assertion that <code>.nojekyll</code> and <code>_next/static</code> both exist</td><td><code>.github/workflows/preview.yml</code></td></tr><tr><td>A post-publish check that fetches the deployed HTML and requires its own stylesheet and script to return 200</td><td><code>.github/workflows/preview.yml</code></td></tr></tbody></table></div>
+<p>The post-publish check is the one that matters. The local verify job serves the<br />
+build from disk, where the underscore directory is always present, so it is<br />
+structurally incapable of observing what Pages does to the artifact. The check<br />
+retries for up to five minutes, because Pages keeps serving the previous<br />
+deployment until the new one finishes building — a first, non-retrying version<br />
+of the check failed against a deployment that was merely still in flight, and<br />
+the asset was live seconds later.</p>
+<h3 id="103-verification-of-the-published-site">10.3 Verification of the published site</h3>
+<p>Captured from <code>https://mohammadaljallad079-rgb.github.io/oryx/</code> — the deployed<br />
+site, not a local build — with <code>.run/capture-live-pages.mjs</code>.</p>
+<div class="table-wrap"><table><thead><tr><th>Check</th><th>Result</th></tr></thead><tbody><tr><td>Captures</td><td><strong>48</strong> — 4 surfaces × 3 viewports × 2 locales × 2 themes</td></tr><tr><td>HTTP status</td><td><strong>200</strong> on every capture</td></tr><tr><td>Horizontal overflow</td><td><strong>0</strong> on every capture</td></tr><tr><td>Broken images</td><td><strong>0</strong> on every capture</td></tr><tr><td>Document direction</td><td><code>rtl</code> for Arabic, <code>ltr</code> for English</td></tr><tr><td>Light body background</td><td><code>rgb(247, 244, 237)</code> — ivory</td></tr><tr><td>Dark body background</td><td><code>rgb(0, 22, 43)</code> — navy</td></tr><tr><td>Gold accent present in the light render</td><td><strong>13,983</strong> warm pixels in the hero band</td></tr><tr><td>Light-theme contrast sweep</td><td><strong>0 solid-surface pairs below threshold</strong> across 22 pages</td></tr><tr><td>Light-theme consistency sweep</td><td>25 selectors, 5 with more than one treatment — all state variants (badge status, active nav, hero button size), none a palette inconsistency</td></tr><tr><td>CI — <code>Typecheck and build</code></td><td><strong>success</strong></td></tr><tr><td>CI — <code>Unit and API integration tests</code></td><td><strong>success</strong></td></tr><tr><td>CI — <code>Browser acceptance tests</code></td><td><strong>success</strong></td></tr><tr><td>Design preview — build / verify / publish</td><td><strong>success</strong>, including the published-asset assertion</td></tr></tbody></table></div>
+<p>The captures are in <code>phase-e/live-pages/</code> with <code>manifest.json</code>; the two<br />
+light-vs-dark comparison sheets were built by <code>.run/make-theme-sheet.mjs</code>.</p>
+<h3 id="104-limitation-of-the-published-preview">10.4 Limitation of the published preview</h3>
+<p>The published site is a <strong>static export</strong>. It has no API behind it, so it reads<br />
+bundled preview data and labels every page accordingly. Every mutating action<br />
+fails with <code>501</code> rather than appearing to succeed — the preview must never<br />
+imply that a booking was placed or a payment moved. Authentication is<br />
+represented by the bundled preview session, not by a real sign-in. The<br />
+functional surfaces (accounting, inventory, CRM, payroll, the marketplace<br />
+backend) are covered by the API integration suite against a real database, not<br />
+by this site.</p>
+<h2 id="11-third-continuation-session-recovery-and-the-light-theme-correction">11. Third continuation session — recovery and the light-theme correction</h2>
+<p>A third sandbox failure interrupted the session that was consolidating the<br />
+scattered gold tints into a tokenised ramp. This section records the recovery<br />
+and the light-theme work that the owner&#39;s report — &quot;the Light Theme colors<br />
+still look inconsistent&quot; — still required.</p>
+<h3 id="111-recovery">11.1 Recovery</h3>
+<div class="table-wrap"><table><thead><tr><th>Question</th><th>Finding</th><th>How it was checked</th></tr></thead><tbody><tr><td>Remote branch tip on entry</td><td><code>327f954f554ba55c5e9c0aaf94e11a7ad2c5bb15</code></td><td><code>git rev-parse origin/feature/execution-07-premium-web</code></td></tr><tr><td>Local HEAD on entry</td><td><code>327f954</code> — in step with the remote</td><td><code>git rev-list --left-right --count origin/...HEAD</code> → <code>0 0</code></td></tr><tr><td>The hand-off&#39;s last known SHA</td><td><code>b3c9a71</code> — an <strong>ancestor</strong> of the tip, fifteen commits back</td><td><code>git merge-base --is-ancestor b3c9a71 HEAD</code></td></tr><tr><td>Commits pushed by the crashed session</td><td><strong>fifteen</strong>, <code>5920895</code> … <code>327f954</code></td><td><code>git log --oneline b3c9a71..HEAD</code></td></tr><tr><td>Uncommitted work in the workspace</td><td><strong>present</strong> — 226 paths, +5056/−244 lines: the gold-tint ramp in <code>tokens.ts</code> and <code>globals.css</code>, the media scripts, the CMS media wiring, the refreshed photography, the admin website/CMS page</td><td><code>git status --porcelain</code>, <code>git diff --stat</code></td></tr><tr><td>Stashes</td><td><strong>none</strong></td><td><code>git stash list</code></td></tr></tbody></table></div>
+<p><strong>No pushed commit was lost.</strong> The hand-off named <code>b3c9a71</code> as the last known<br />
+SHA, but the branch had already advanced fifteen commits past it, every one of<br />
+them on <code>origin</code>. The work that was still uncommitted when the sandbox failed —<br />
+the whole gold-tint consolidation — survived intact in the workspace filesystem.<br />
+Nothing was reset, force-pushed or reconstructed from a stash; the uncommitted<br />
+tree was snapshotted with <code>git stash create</code> before any edit so it could not be<br />
+lost by this session either.</p>
+<h3 id="112-the-gold-tint-ramp-t1">11.2 The gold-tint ramp (T1)</h3>
+<p>The light theme&#39;s gold appeared at a dozen different strengths written inline as<br />
+<code>color-mix(in srgb, var(--gold) N%, transparent)</code>. Ten named steps now live in<br />
+one place — <code>GOLD_TINT</code> in <code>packages/shared/src/tokens.ts</code>, mirrored as CSS<br />
+custom properties in the customer stylesheet&#39;s two theme blocks:</p>
+<div class="table-wrap"><table><thead><tr><th>Token</th><th>Dark</th><th>Light</th><th>Used for</th></tr></thead><tbody><tr><td><code>goldOnTint</code></td><td><code>#d4af37</code></td><td><code>#7a5c10</code></td><td>ink on a gold-tinted fill</td></tr><tr><td><code>tintWash</code></td><td>6%</td><td>6%</td><td>faintest section wash</td></tr><tr><td><code>tintFill</code></td><td>12%</td><td>12%</td><td>icon-chip and badge fill</td></tr><tr><td><code>tintFocus</code></td><td>16%</td><td>16%</td><td>focus ring fill</td></tr><tr><td><code>tintGlow</code></td><td>22%</td><td>16%</td><td>decorative radial glow</td></tr><tr><td><code>tintActive</code></td><td>18% + surface-raised</td><td>18% + surface-raised</td><td>active nav pill</td></tr><tr><td><code>tintLine</code></td><td>26%</td><td>26%</td><td>hairline border</td></tr><tr><td><code>tintBadgeLine</code></td><td>34%</td><td>34%</td><td>badge border</td></tr><tr><td><code>tintRing</code></td><td>40%</td><td>40%</td><td>strong ring</td></tr><tr><td><code>tintPanel</code></td><td>surface-raised 55%</td><td>surface-raised 55%</td><td>translucent panel</td></tr></tbody></table></div>
+<p><code>packages/shared/test/tokens.test.ts</code> gained a mapping assertion for each step<br />
+and a stylesheet guard that fails if an ad-hoc <code>color-mix(... var(--gold) N% ...)</code><br />
+reappears in the customer stylesheet, so the scatter cannot come back.</p>
+<h3 id="113-the-remaining-light-theme-inconsistency">11.3 The remaining light-theme inconsistency</h3>
+<p>The consistency audit (<code>.run/consistency-audit.mjs</code>) still reported two<br />
+light-theme defects after the ramp landed, both in the card description:</p>
+<div class="table-wrap"><table><thead><tr><th>Defect</th><th>Before</th><th>After</th><th>Why it read as inconsistent</th></tr></thead><tbody><tr><td><code>.oryx-cat-card__desc</code> font size</td><td><code>12.5px</code></td><td><code>13px</code> (light only)</td><td>the muted text beside it reads at <code>13px</code>, so one card carried two sizes</td></tr><tr><td><code>.oryx-btn-lg</code> radius</td><td><code>12px</code></td><td><code>12px</code> (reverted)</td><td>see below</td></tr></tbody></table></div>
+<p>The button-radius change was <strong>reverted</strong>: removing the <code>12px</code> override made the<br />
+homepage hero buttons differ from every other primary button. The audit&#39;s<br />
+&quot;button&quot; group had reported a radius split only because it pooled the large<br />
+variant with the standard one; separating the variants shows the base<br />
+<code>.oryx-btn</code> radius is a single value everywhere and the hero keeps its<br />
+deliberate larger radius.</p>
+<p>The card-description fix is scoped to the light theme on purpose. Measured<br />
+against the approved dark baseline, a global <code>13px</code> moved <strong>29,460 pixels</strong><br />
+(2.0% of the frame, max channel delta 238) because a 0.5px change re-lays-out<br />
+every card on the homepage. Scoped to <code>:root[data-theme=&#39;light&#39;]</code> it leaves the<br />
+dark render <strong>byte-identical</strong>.</p>
+<p>The audit was also made honest about three measurement artefacts that had been<br />
+producing phantom defects:</p>
+<div class="table-wrap"><table><thead><tr><th>Artefact</th><th>Effect</th><th>Fix</th></tr></thead><tbody><tr><td>The pointer stays where the last click landed</td><td><code>:hover</code> changed the button gradient, reported as two designs</td><td>park the pointer at <code>(0,0)</code> before each surface</td></tr><tr><td><code>display:none</code> controls were measured</td><td>they report the initial value for every property (<code>height:auto</code>, <code>padding:0</code>)</td><td>skip elements with a zero-area box</td></tr><tr><td><code>.oryx-btn-lg</code> pooled with <code>.oryx-btn</code></td><td>the deliberate larger hero size read as a defect</td><td>measure the large variant as its own group</td></tr></tbody></table></div>
+<h3 id="114-verification">11.4 Verification</h3>
+<div class="table-wrap"><table><thead><tr><th>Check</th><th>Result</th></tr></thead><tbody><tr><td>Light-theme consistency sweep (11 surfaces, 19 component groups)</td><td><strong>no inconsistent component properties found</strong></td></tr><tr><td>Light-theme consistency sweep, Arabic RTL</td><td><strong>no inconsistent component properties found</strong></td></tr><tr><td>Dark-theme consistency sweep</td><td>only the approved homepage eyebrow quirk (see §9.2)</td></tr><tr><td>Phase E captures</td><td><strong>60</strong> + 2 comparison sheets, every one <code>status=200 overflow=0</code></td></tr><tr><td>Dark-theme invariance vs the approved baseline</td><td><strong>0 captures with a real colour shift</strong> (was 5 before the scoping fix); 5 byte-identical, worst non-zero delta 13 on a single pixel</td></tr><tr><td>Light body background</td><td><code>#f7f4ed</code> — ivory</td></tr><tr><td>Light surfaces</td><td><code>--surface #fff</code>, <code>--surface-raised #fbf9f4</code> — white and warm neutral</td></tr><tr><td>Light ink</td><td><code>--text #22201d</code> — deep charcoal</td></tr><tr><td>Light gold</td><td><code>--gold #856612</code>, <code>--gold-on-tint #7a5c10</code></td></tr><tr><td>Dark body background</td><td><code>#00162b</code> — navy (unchanged)</td></tr><tr><td>Light capture composition</td><td>ivory+white dominant on every surface; dashboard 76% ivory, providers 74%, login 97%</td></tr><tr><td>Gold present in the light captures</td><td>0.4–5.9% of pixels, strongest on the provider directory</td></tr><tr><td>Media audit (<code>scripts/exec07-verify-media.mjs</code>)</td><td><strong>OK</strong> — every service has a correct photograph, all files present, licences attributed</td></tr><tr><td><code>@oryx/shared</code> tests</td><td><strong>134 passed</strong> (7 files)</td></tr><tr><td><code>@oryx/api</code> integration tests</td><td><strong>302 passed</strong> (14 suites)</td></tr><tr><td><code>@oryx/customer</code> typecheck / lint / build</td><td>pass / pass / pass</td></tr><tr><td><code>@oryx/admin</code> typecheck / lint</td><td>pass / pass</td></tr></tbody></table></div>
+<p>The evidence images are in <code>docs/audit/exec07/phase-e/after/</code>, with<br />
+<code>manifest.json</code> recording each capture&#39;s status, overflow, body background and<br />
+contrast, and <code>dark-invariance.json</code> recording the dark comparison.</p>
+<h2 id="12-fourth-continuation-session-the-rtl-scrim-regression">12. Fourth continuation session — the RTL scrim regression</h2>
+<p>A fourth sandbox failure interrupted the session that was verifying the<br />
+corrected light theme. The owner&#39;s outstanding note was still &quot;the Light Theme<br />
+colors still look inconsistent&quot;, so this session first re-established what<br />
+existed, then fixed the one genuine defect the verification exposed.</p>
+<h3 id="121-recovery">12.1 Recovery</h3>
+<div class="table-wrap"><table><thead><tr><th>Question</th><th>Finding</th><th>How it was checked</th></tr></thead><tbody><tr><td>Remote branch tip on entry</td><td><code>951b78a94cef6ab7d385f41245e00082f4e3b1b3</code></td><td><code>git rev-parse origin/feature/execution-07-premium-web</code></td></tr><tr><td>Local HEAD on entry</td><td><code>5563e3c</code> — <strong>one commit ahead</strong> of the remote</td><td><code>git log --oneline origin/...HEAD</code></td></tr><tr><td>The hand-off&#39;s last known SHA</td><td><code>b3c9a71</code> — an <strong>ancestor</strong> of the tip, <strong>27 commits</strong> back</td><td><code>git merge-base --is-ancestor b3c9a71 origin/...</code></td></tr><tr><td>Commits pushed by the crashed session</td><td><strong>27</strong>, <code>5920895</code> … <code>951b78a</code></td><td><code>git log --oneline b3c9a71..origin/...</code></td></tr><tr><td>Uncommitted work in the workspace</td><td><strong>present</strong> — the light-theme token refactor, the RTL scrim fix, and the whole Execution 10 branding feature</td><td><code>git status --porcelain</code>, <code>git diff</code></td></tr><tr><td>Stash from the crashed session</td><td><code>f799f47</code> (&quot;WIP on … 5563e3c&quot;, 2026-10-22 00:23)</td><td><code>git fsck --lost-found</code></td></tr><tr><td>Content unique to that stash</td><td><strong>none</strong> — its <code>globals.css</code> is a strict subset of the workspace copy (identical apart from this session&#39;s scrim fix)</td><td><code>git show f799f47:…/globals.css</code> vs the file</td></tr><tr><td>Dangling commits predating the hand-off</td><td><code>aa67f19</code>, <code>58f063a</code>, <code>50946c9</code>, <code>ae003d7</code>, <code>7aed52c</code> — all accounted for in §11</td><td><code>git fsck --lost-found</code></td></tr></tbody></table></div>
+<p><strong>No pushed commit was lost.</strong> The hand-off named <code>b3c9a71</code> as the last known<br />
+SHA, but the branch had already advanced <strong>27 commits</strong> past it, every one of<br />
+them on <code>origin</code>. The work that was still uncommitted when the sandbox failed<br />
+survived intact in the workspace filesystem and is committed by this session<br />
+(§12.4). Nothing was reset, force-pushed, overwritten or reconstructed from a<br />
+stash.</p>
+<p>The one commit the crashed session had left <strong>unpushed</strong> — <code>5563e3c</code>,<br />
+<code>fix(rbac): make the platform Super Admin role repairable</code> — was already a<br />
+complete commit in the local history, and is pushed unchanged with the rest.</p>
+<h3 id="122-defect-e14-the-photo-scrim-did-not-follow-the-caption-under-rtl">12.2 Defect E14 — the photo scrim did not follow the caption under RTL</h3>
+<p>The theme matrix caught this and the light LTR render did not: the light-theme<br />
+photo scrims (<code>--hero-scrim</code>, <code>--panel-scrim</code>, <code>--head-scrim</code>) were hard-coded<br />
+at <code>100deg</code>, so their near-opaque end sat on the <strong>left</strong>. That is correct in<br />
+LTR, where the caption also starts on the left. In RTL the caption moves to the<br />
+<strong>right</strong> and lands on the 70%-opaque tail of the same gradient.</p>
+<div class="table-wrap"><table><thead><tr><th>Surface</th><th>Ink</th><th>Sampled surface</th><th>Contrast</th><th>AA target</th></tr></thead><tbody><tr><td><code>.oryx-stat__label</code>, scrim at the LTR <code>100deg</code></td><td><code>rgb(159,179,200)</code></td><td><code>rgb(69,81,93)</code></td><td><strong>3.79:1</strong></td><td>4.5:1</td></tr><tr><td><code>.oryx-stat__label</code>, scrim at the committed <code>260deg</code></td><td><code>rgb(159,179,200)</code></td><td><code>rgb(21,37,55)</code></td><td><strong>7.24:1</strong></td><td>4.5:1</td></tr></tbody></table></div>
+<p>Both rows come from a single controlled run (<code>.run/probe-scrim-causal.mjs</code>) that<br />
+measures the label with the committed cascade and then again with<br />
+<code>--scrim-angle</code> forced back to <code>100deg</code> through an inline style. The 3.79:1 is<br />
+therefore reproduced, not quoted from an earlier session.</p>
+<p>The angle is now the <code>--scrim-angle</code> token rather than a literal. The light<br />
+theme mirrors it to <code>260deg</code> under <code>[data-dir=&#39;rtl&#39;]</code>, which puts the opaque end<br />
+back over the caption. The dark theme never sees the override: it computes<br />
+<code>--scrim-angle: 100deg</code> in <strong>both</strong> directions (<code>.run/probe-scrim-computed.mjs</code>),<br />
+so this change cannot reach the approved dark render.</p>
+<p><code>packages/shared/test/tokens.test.ts</code> gained a case that fails if any scrim<br />
+carries a literal angle or the light RTL override goes missing. It was confirmed<br />
+to fail with the fix reverted and to pass with it in place.</p>
+<h3 id="123-the-light-theme-surface-tokens">12.3 The light-theme surface tokens</h3>
+<p>The remaining &quot;inconsistent&quot; reading came from strengths that lived inline in<br />
+the rules rather than in the theme. Each is now a named token with one value per<br />
+theme, so a badge, an alert, a hover row, an inset well and a skeleton cannot<br />
+drift apart:</p>
+<div class="table-wrap"><table><thead><tr><th>Token</th><th>Dark</th><th>Light</th><th>Used for</th></tr></thead><tbody><tr><td><code>--status-line</code></td><td>status 40%</td><td>status 38%</td><td>badge, alert and error-icon border</td></tr><tr><td><code>--status-fill</code></td><td>status 12%</td><td>status 10%</td><td>alert and error-icon fill</td></tr><tr><td><code>--overlay-hover</code></td><td>text 4%</td><td>text 6%</td><td>table row hover</td></tr><tr><td><code>--well-bg</code></td><td>surface-raised 40%</td><td>surface 70% + bg-deep</td><td>empty-state and drop-zone well</td></tr><tr><td><code>--skeleton-from</code> / <code>--skeleton-to</code></td><td>text 6% / 13%</td><td>text 8% / 16%</td><td>loading shimmer</td></tr><tr><td><code>--dot-muted</code></td><td>text-faint 50%</td><td>text-faint 45%</td><td>read-notification dot</td></tr><tr><td><code>--auth-sheen</code></td><td>surface-raised 92% + gold 8%</td><td>surface-raised 94% + gold 6%</td><td>sign-in card sheen</td></tr><tr><td><code>--band-btn-hover</code></td><td>band-text 12%</td><td>band-text 14%</td><td>footer button hover</td></tr></tbody></table></div>
+<p>The dark column reproduces the percentages the rules already carried, so the<br />
+approved dark render moves by at most one step. <code>--text-faint</code> and<br />
+<code>--band-text-faint</code> were raised from <code>#6f8598</code> to <code>#778da1</code>: the stat label sits<br />
+on the gradient stat panel, where the old value measured 4.42–4.49:1 — just under<br />
+the 4.5:1 the harness enforces, and the miss recorded as defect E8 in §2. It now<br />
+measures <strong>5.41:1</strong>, so E8 is resolved rather than carried. The light theme keeps<br />
+its own <code>--text-faint: #6b6459</code>, which measures 5.32:1 on ivory and 5.85:1 on<br />
+white.</p>
+<h3 id="124-verification">12.4 Verification</h3>
+<div class="table-wrap"><table><thead><tr><th>Check</th><th>Result</th></tr></thead><tbody><tr><td>Theme matrix (<code>scripts/verify-theme-matrix.mjs</code>)</td><td><strong>12/12 cells pass</strong> — light/dark × RTL/LTR × mobile/tablet/desktop</td></tr><tr><td>The cell that previously failed (light RTL desktop)</td><td>now passes; the stat label measures <strong>7.24:1</strong> against a 4.5:1 target (3.79:1 at the unmirrored angle)</td></tr><tr><td>Light surface check (<code>scripts/verify-light-surface.mjs</code>)</td><td><strong>96/96 checks pass</strong> — ivory <code>#f7f4ed</code> body, warm <code>#fbf9f4</code> surfaces, charcoal <code>#22201d</code> ink, gold <code>#856612</code>, logo present, photography present</td></tr><tr><td>Dark-theme invariance</td><td>the scrim override is scoped to <code>[data-theme=&#39;light&#39;]</code>, and the dark theme computes <code>--scrim-angle: 100deg</code> in both directions (<code>.run/probe-scrim-computed.mjs</code>), so the change cannot reach the approved dark render</td></tr><tr><td>Phase E captures (<code>scripts/capture-light-theme.mjs</code>)</td><td><strong>28</strong> captures, every one correct theme/dir/lang with <code>overflow=false</code></td></tr><tr><td>Capture reproducibility</td><td>27 of 28 byte-identical across two runs; the one delta is a 0.1% footer region (see §12.5)</td></tr><tr><td>Light-vs-dark sheets (<code>scripts/make-exec07-pairs.mjs</code>)</td><td><strong>8</strong> comparison sheets</td></tr><tr><td><code>@oryx/shared</code> tests</td><td><strong>172 passed</strong> (9 files)</td></tr><tr><td><code>@oryx/api</code> integration tests</td><td><strong>311 passed</strong> (16 suites)</td></tr><tr><td><code>@oryx/admin</code> browser tests</td><td><strong>184 passed</strong></td></tr><tr><td><code>@oryx/mobile</code> tests</td><td><strong>20 passed</strong> (3 files)</td></tr><tr><td><code>@oryx/shared</code> / <code>@oryx/api</code> typecheck</td><td>pass / pass</td></tr><tr><td><code>@oryx/admin</code> build</td><td>pass</td></tr></tbody></table></div>
+<h3 id="125-an-honest-limitation">12.5 An honest limitation</h3>
+<p>One capture — <code>homepage-light-rtl-mobile.png</code> — is not byte-reproducible. Two<br />
+identical runs differ by 245 on a single channel across <strong>0.10%</strong> of the frame,<br />
+in a bounding box at <code>x=242-373, y=5952-5981</code> of a 6583px page (the bottom 9.6%,<br />
+the footer). The dimensions match exactly and the region is footer content, so<br />
+this is capture-time rendering nondeterminism, not a theme regression: the<br />
+change in §12.2 only defines a custom property the footer never consumes. The<br />
+committed capture is the one from the verification run.</p>
+<p>The earlier-session note that the dark screenshots under <code>docs/</code> moved by up to<br />
+<code>maxDelta = 242</code> is <strong>not</strong> a theme change either. Those files are regenerated as<br />
+a byproduct of the Playwright suite, which captures the <strong>local</strong> database; they<br />
+are not part of the Phase E evidence set and were reverted rather than committed.</p>
+<h3 id="126-execution-10-branding-recovered-and-committed">12.6 Execution 10 branding, recovered and committed</h3>
+<p>The crashed session had left a complete, untracked per-company branding feature<br />
+in the workspace. It was verified (schema validates, migration applies cleanly,<br />
+API builds, 12 shared tests pass) and committed rather than discarded:</p>
+<div class="table-wrap"><table><thead><tr><th>Piece</th><th>Path</th></tr></thead><tbody><tr><td>Identity type, ORYX default, resolver, hex validator</td><td><code>packages/shared/src/branding.ts</code></td></tr><tr><td>Tenant-scoped read/write API</td><td><code>apps/api/src/branding/</code></td></tr><tr><td>One nullable row per company (additive migration)</td><td><code>packages/database/prisma/schema.prisma</code>, <code>…/20261021120000_execution_10_company_branding/</code></td></tr><tr><td>Resolver and validator tests</td><td><code>packages/shared/test/branding.test.ts</code></td></tr></tbody></table></div>
+<p>This is Execution 10 work and is not part of the Phase E light-theme<br />
+deliverable; it is recorded here because it was recovered alongside it.</p>
+<h2 id="13-fifth-continuation-session-the-admin-control-plane-light-theme">13. Fifth continuation session — the admin control-plane light theme</h2>
+<h3 id="131-recovery">13.1 Recovery</h3>
+<p>The crashed sandbox was inspected before any change was made. <code>git ls-remote</code><br />
+reported the remote tip of <code>feature/execution-07-premium-web</code> at <code>7f4efe7</code>,<br />
+which matched local <code>HEAD</code>; the branch was 0 ahead and 0 behind. The last known<br />
+SHA from the crash report, <code>b3c9a71</code>, is an ancestor of <code>HEAD</code>. Nothing was<br />
+reset, force-pushed or discarded.</p>
+<p>No unpushed work was recovered, because none was present. The crashed session<br />
+had pushed everything it produced before it died. The one piece of untracked<br />
+work found in the workspace was the per-company branding feature, which is<br />
+Execution 10 material and is recorded in §12.6 rather than claimed here.</p>
+<h3 id="132-what-was-still-inconsistent">13.2 What was still inconsistent</h3>
+<p>Phase E corrected the customer site (<code>apps/customer</code>) to a warm ivory light<br />
+theme. The <strong>admin control plane</strong> (<code>apps/admin</code>) was never corrected, and it<br />
+still rendered a cold blue-grey ramp:</p>
+<div class="table-wrap"><table><thead><tr><th>Token</th><th>Before (admin light)</th><th>After (admin light)</th></tr></thead><tbody><tr><td>page field</td><td><code>#f5f6f8</code> cold grey</td><td><code>#f7f4ed</code> warm ivory</td></tr><tr><td>deep field</td><td><code>#eceef2</code></td><td><code>#efeae0</code></td></tr><tr><td>raised surface</td><td><code>#f0f2f6</code></td><td><code>#fbf9f4</code></td></tr><tr><td>body type</td><td><code>#0d2338</code> navy</td><td><code>#22201d</code> deep charcoal</td></tr><tr><td>muted type</td><td><code>#5b6b7d</code> blue-grey</td><td><code>#5a544b</code> warm grey</td></tr><tr><td>accent gold</td><td><code>#b8912a</code></td><td><code>#7d5f10</code> (text) / <code>#e0c168→#c9a227</code> (fill)</td></tr></tbody></table></div>
+<p>The two applications therefore read as two products. The correction brings the<br />
+admin light theme onto the same approved identity the customer site already<br />
+renders.</p>
+<h3 id="133-the-approach-tokens-not-overrides">13.3 The approach: tokens, not overrides</h3>
+<p>The previous admin stylesheet carried separate <code>:root[data-theme=&#39;light&#39;]</code><br />
+override blocks that patched individual rules. Those are gone. Every value now<br />
+lives in the two token blocks at the top of <code>apps/admin/src/app/globals.css</code>,<br />
+and each rule consumes a variable.</p>
+<p>The scattered literals that remained were promoted to semantic tokens so that<br />
+neither theme needs a rule-level override:</p>
+<div class="table-wrap"><table><thead><tr><th>Token</th><th>Job</th></tr></thead><tbody><tr><td><code>--focus-ring</code></td><td>the input focus ring (softer on ivory than on navy)</td></tr><tr><td><code>--backdrop</code></td><td>the modal scrim (lighter over ivory)</td></tr><tr><td><code>--shadow-tile</code>, <code>--shadow-modal</code></td><td>elevation, warm on ivory instead of black</td></tr><tr><td><code>--row-hover</code></td><td>a hovered table row, re-tuned so it separates from ivory</td></tr><tr><td><code>--gold-fill-*</code>, <code>--on-gold</code></td><td>the metallic gold button ramp and its ink</td></tr><tr><td><code>--on-media*</code>, <code>--media-chip-*</code></td><td>ink over photography</td></tr><tr><td><code>--hero-scrim</code>, <code>--hero-scrim-rtl</code></td><td>the hero gradient, direction included</td></tr><tr><td><code>--ambient-wash</code></td><td>the page wash, warm on ivory instead of blue</td></tr></tbody></table></div>
+<p>The media and hero tokens are deliberately identical in both blocks: those<br />
+surfaces sit on a navy scrim in both themes, so white type over artwork stays<br />
+correct on ivory. Keeping them as tokens means the rule no longer hard-codes a<br />
+value that only made sense for one theme.</p>
+<h3 id="134-why-the-dark-theme-did-not-move">13.4 Why the dark theme did not move</h3>
+<p>Every literal that defined the approved dark theme was preserved byte for byte.<br />
+The only dark-theme edit was <strong>additive</strong>: new tokens whose values reproduce<br />
+exactly what the rules previously hard-coded (for example `--shadow-tile:<br />
+0 24px 48px -26px rgba(0, 0, 0, 0.9)` replaces the same literal inline, and<br />
+<code>--hero-scrim</code> holds the identical gradient). The render is unchanged, which the<br />
+browser check below asserts by reading the computed field and type colours.</p>
+<h3 id="135-contrast">13.5 Contrast</h3>
+<p><code>.run/check-admin-light-palette.mjs</code> measures 33 foreground/background pairs<br />
+against WCAG 2.1 and exits non-zero on a failure. All 33 pass. The accent gold<br />
+was darkened from <code>#856612</code> to <code>#7d5f10</code> during the run because the original<br />
+value measured 4.48:1 on the deepest ivory surface, just under the 4.5:1 body<br />
+threshold.</p>
+<h3 id="136-verification">13.6 Verification</h3>
+<p><code>.run/verify-admin-light.mjs</code> signs in and asserts, per surface, per locale and<br />
+per viewport:</p>
+<ul><li>the field is <code>rgb(247, 244, 237)</code> and the type <code>rgb(34, 32, 29)</code> in light;</li><li>body-text contrast is at least 4.5:1;</li><li>the dark theme still reports <code>rgb(0, 22, 43)</code> / <code>rgb(238, 243, 249)</code>;</li><li>Arabic sets <code>data-dir=&quot;rtl&quot;</code> and English <code>data-dir=&quot;ltr&quot;</code>;</li><li>there is no horizontal overflow at 1440, 834 or 390 px.</li></ul>
+<p><strong>222 of 222 assertions pass</strong> across six surfaces. The company-scoped branding<br />
+editor is asserted in a second pass as a company administrator, because a<br />
+platform principal deliberately carries no tenant scope and so does not render<br />
+it.</p>
+<p>Existing suites were re-run and none regressed:</p>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Result</th></tr></thead><tbody><tr><td><code>@oryx/shared</code> unit</td><td>177 passed (9 files)</td></tr><tr><td>branding API e2e</td><td>9 passed</td></tr><tr><td>admin Playwright (<code>branding.spec.ts</code>)</td><td>5 passed</td></tr><tr><td>admin Playwright (full suite)</td><td>184 passed, 1 skipped, 0 failed</td></tr><tr><td>customer light palette (<code>.run/check-light-palette.mjs</code>)</td><td>31/31 pairs</td></tr></tbody></table></div>
+<h3 id="137-evidence">13.7 Evidence</h3>
+<p><code>docs/audit/exec07/admin-light/</code> holds before/after captures of five surfaces in<br />
+both themes, the comparison sheets, and the verification manifest. The rendered<br />
+page is served by the preview proxy at <code>/evidence/exec07-light-theme/</code>.</p>
+<h3 id="138-honest-limitations">13.8 Honest limitations</h3>
+<ul><li>The change is scoped to <code>apps/admin</code>. No customer file was touched, so the</li></ul>
+<p>customer-site evidence from earlier sessions remains valid.</p>
+<ul><li>The branding editor renders only for a company administrator. A Super Admin</li></ul>
+<p>sees no tenant branding controls by design; the verification asserts this<br />
+rather than working around it.</p>
+<ul><li>No deployment was performed and PR #7 was not merged. This session pushes the</li></ul>
+<p>correction to the existing Execution 07 branch and updates the pull request<br />
+with evidence only.</p>
+<h2 id="14-sixth-continuation-session-recovery-and-the-phase-e-re-capture">14. Sixth continuation session — recovery and the Phase E re-capture</h2>
+<h3 id="141-recovery">14.1 Recovery</h3>
+<p>The previous conversation ended in a sandbox error. The workspace outlived it,<br />
+so the first step was to establish exactly what existed locally and on the<br />
+remote before touching anything.</p>
+<div class="table-wrap"><table><thead><tr><th>Question</th><th>Finding</th><th>How it was checked</th></tr></thead><tbody><tr><td>Local branch</td><td><code>feature/execution-07-premium-web</code></td><td><code>git branch --show-current</code></td></tr><tr><td>Local <code>HEAD</code></td><td><code>99b7f64</code> — &quot;feat(auth): native (ERP mobile) staff sessions with device-scoped revocation&quot;</td><td><code>git log --oneline -1</code></td></tr><tr><td>Remote tip</td><td><code>828685f</code> — local is <strong>1 ahead</strong></td><td><code>git status</code> / <code>git ls-remote</code></td></tr><tr><td>Last known SHA from the crash report</td><td><code>b3c9a71</code> — an ancestor of both <code>HEAD</code> and the remote tip</td><td><code>git merge-base --is-ancestor</code></td></tr><tr><td>Commits beyond the last known SHA</td><td><strong>present</strong> — the Phase E work and the Execution 08/10 recovery commits</td><td><code>git log --oneline b3c9a71..HEAD</code></td></tr><tr><td>Unpushed commits</td><td><strong>one</strong> — <code>99b7f64</code>, a native staff-session commit</td><td><code>git log --oneline origin/feature/execution-07-premium-web..HEAD</code></td></tr><tr><td>Dangling stashes</td><td>none recovered this session</td><td><code>git stash list</code></td></tr></tbody></table></div>
+<p><strong>No completed work was lost.</strong> The crashed session had pushed everything except<br />
+the single native-session commit, which was still in the local object store and<br />
+is preserved. Nothing was reset, force-pushed or discarded.</p>
+<h3 id="142-the-customer-light-theme-capture-was-blocked-and-why">14.2 The customer light-theme capture was blocked, and why</h3>
+<p>The Phase E customer captures could not be reproduced because every<br />
+authenticated surface redirected to <code>/login</code> after a reload. The cause was not<br />
+the theme and not a product bug: the preview build of <code>apps/customer</code> had been<br />
+compiled with an absolute, cross-origin API base.</p>
+<div class="table-wrap"><table><thead><tr><th>Fact</th><th>Evidence</th></tr></thead><tbody><tr><td>The bundle called <code>http://localhost:3001/api</code></td><td><code>grep -rl &#39;localhost:3001&#39; apps/customer/.next/static/</code></td></tr><tr><td><code>apps/customer/.env.local</code> was absent</td><td>the sandbox recycle drops gitignored files; the file is not tracked</td></tr><tr><td>The refresh cookie is <code>SameSite=Lax</code> on <code>Path=/api/v1/customer</code></td><td><code>Set-Cookie</code> on <code>POST /api/v1/customer/auth/login</code></td></tr><tr><td>A cross-site page therefore never sends it</td><td>reload → <code>/login</code></td></tr></tbody></table></div>
+<p>The documented convention (AGENTS.md, &quot;Branding and preview gotchas&quot;) is a<br />
+relative base, <code>NEXT_PUBLIC_API_BASE_URL=/api</code>, so the client is same-origin with<br />
+the proxy. Restoring <code>apps/customer/.env.local</code> and rebuilding produced a bundle<br />
+with no <code>localhost:3001</code> reference. With that, <code>POST /api/v1/customer/auth/login</code><br />
+sets <code>oryx_crt</code> + <code>oryx_ccsrf</code>, and a full reload of <code>/dashboard</code> restores the<br />
+session and renders the authenticated surface. The bug was in the preview build<br />
+configuration, not in the application.</p>
+<p>The API, PostgreSQL and the Playwright browser download were also re-provisioned<br />
+after the sandbox recycle (the recycle drops system packages and the browser<br />
+cache while keeping the workspace).</p>
+<h3 id="143-re-capture">14.3 Re-capture</h3>
+<p><code>node .run/capture-exec07-phase-e.mjs after</code> was run against the same-origin<br />
+build. The capture script now takes the customer credentials from the<br />
+environment so it is not tied to one seeded account.</p>
+<div class="table-wrap"><table><thead><tr><th>Result</th><th>Value</th></tr></thead><tbody><tr><td>Captures written</td><td><strong>60</strong> (five surfaces × two locales × three viewports × two themes)</td></tr><tr><td>Status ≥ 400</td><td>0</td></tr><tr><td>Horizontal overflow</td><td>0</td></tr><tr><td>Authenticated surfaces landing on <code>/dashboard</code></td><td>all</td></tr><tr><td>Distinct light-theme accent across all light captures</td><td>one — <code>#7d5f10</code></td></tr><tr><td>Minimum light-theme body contrast</td><td>14.79:1</td></tr></tbody></table></div>
+<p>Every light capture reports <code>bodyBackground: rgb(247, 244, 237)</code> (the ivory<br />
+field <code>#f7f4ed</code>) and <code>bodyColor: rgb(34, 32, 29)</code> (the deep charcoal <code>#22201d</code>),<br />
+so the light identity is applied consistently across the homepage, the customer<br />
+dashboard, the provider directory, the login page and the profile surface, in<br />
+both Arabic RTL and English LTR, at desktop, tablet and mobile widths.</p>
+<p>The manifest also confirms the one accent correction this session: the light<br />
+accent moved from <code>#856612</code> to <code>#7d5f10</code>, the value that clears 4.5:1 on the<br />
+deepest ivory surface. The comparison sheets (<code>05-comparison-*</code>) pair each<br />
+surface&#39;s light and dark renders.</p>
+<h3 id="144-tests">14.4 Tests</h3>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Result</th></tr></thead><tbody><tr><td><code>@oryx/shared</code> unit</td><td>180 passed (9 files)</td></tr><tr><td><code>@oryx/mobile-erp</code> unit</td><td>24 passed (2 files)</td></tr><tr><td><code>@oryx/customer</code> lint</td><td>clean (<code>eslint . --max-warnings=0</code>)</td></tr><tr><td><code>@oryx/admin</code> lint</td><td>clean (<code>eslint . --max-warnings=0</code>)</td></tr><tr><td><code>@oryx/mobile-erp</code> typecheck</td><td>clean</td></tr></tbody></table></div>
+<h3 id="145-honest-limitations">14.5 Honest limitations</h3>
+<ul><li>The dark theme was not changed. The comparison sheets and the manifest show it</li></ul>
+<p>is byte-identical to the approved build.</p>
+<ul><li>The ERP mobile app (<code>apps/mobile-erp</code>) is a separate deliverable. It is</li></ul>
+<p>included in the branch because it was already present in the workspace, but it<br />
+is not part of the Phase E light-theme correction.</p>
+<ul><li>No deployment was performed and PR #7 was not merged. This session pushes to</li></ul>
+<p>the existing Execution 07 branch and updates the pull request with evidence.</p>
+<h2 id="15-seventh-continuation-session-the-scattered-light-theme-overrides">15. Seventh continuation session — the scattered light-theme overrides</h2>
+<h3 id="151-recovery">15.1 Recovery</h3>
+<p>The previous conversation ended in another sandbox error. The workspace and the<br />
+remote were both inspected before anything was changed.</p>
+<div class="table-wrap"><table><thead><tr><th>Question</th><th>Finding</th><th>How it was checked</th></tr></thead><tbody><tr><td>Local branch</td><td><code>feature/execution-07-premium-web</code></td><td><code>git branch --show-current</code></td></tr><tr><td>Local <code>HEAD</code></td><td><code>01cba05</code> — &quot;feat(mobile-erp): edit existing records across every writable ERP resource&quot;</td><td><code>git rev-parse HEAD</code></td></tr><tr><td>Remote tip before this session</td><td><code>ea26b6d</code> — local was <strong>1 ahead</strong></td><td><code>git ls-remote origin feature/execution-07-premium-web</code></td></tr><tr><td>Last known SHA from the crash report</td><td><code>b3c9a71</code> — an <strong>ancestor</strong> of <code>HEAD</code></td><td><code>git merge-base --is-ancestor b3c9a71 HEAD</code></td></tr><tr><td>Commits beyond the last known SHA</td><td><strong>present</strong> — 55 commits: the Phase E series, the admin control-height fix and the ERP-mobile work</td><td><code>git log --oneline b3c9a71..HEAD</code></td></tr><tr><td>Unpushed commit</td><td><strong>one</strong> — <code>01cba05</code>, the ERP-mobile record editing, committed by the crashed session and never pushed</td><td><code>git ls-remote</code> vs <code>git log</code></td></tr><tr><td><code>origin/...</code> tracking ref</td><td><strong>stale</strong> — the fetch refspec tracks <code>main</code> only, so the tracking ref lagged the real remote tip</td><td><code>git config --get-all remote.origin.fetch</code></td></tr></tbody></table></div>
+<p><strong>No pushed work was lost, and one unpushed commit was preserved.</strong> Every commit<br />
+the previous session pushed was already on <code>origin</code>. The crashed session had also<br />
+committed <code>01cba05</code> locally without pushing it; this session&#39;s push carries it to<br />
+the remote along with the light-theme change. Nothing was reset, force-pushed or<br />
+discarded.</p>
+<h3 id="152-what-was-actually-still-inconsistent">15.2 What was actually still inconsistent</h3>
+<p>Every measurement already passed before this session — 0 contrast failures, 0<br />
+inconsistent component properties, a warm-only neutral set. What remained was the<br />
+<em>shape</em> of the light theme: five rules of the form<br />
+<code>:root[data-theme=&#39;light&#39;] &lt;component&gt; { … }</code>, each patching one component next<br />
+to the rule it overrode instead of driving it from the token block. That is the<br />
+pattern the owner&#39;s request names directly (&quot;use centralized theme tokens rather<br />
+than scattered CSS overrides&quot;), and it is what makes a theme read as assembled<br />
+from exceptions even when each exception is defensible.</p>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Scattered override</th><th>Now</th></tr></thead><tbody><tr><td>S1</td><td><code>.oryx-cat-card__desc</code> font size</td><td><code>--card-desc-size</code></td></tr><tr><td>S2</td><td><code>.oryx-dash-hero</code> background and ink</td><td><code>--dash-hero-bg</code>, <code>--dash-hero-ink</code></td></tr><tr><td>S3</td><td><code>.oryx-footer .oryx-btn</code> ink and border</td><td><code>--footer-btn-ink</code>, <code>--footer-btn-border</code></td></tr><tr><td>S4</td><td><code>.oryx-footer .oryx-btn:hover</code></td><td><code>--footer-btn-hover-bg</code>, <code>--footer-btn-hover-border</code></td></tr><tr><td>S5</td><td><code>.oryx-hero .oryx-eyebrow</code> ink, size, margin</td><td><code>--hero-eyebrow-ink</code>, <code>--hero-eyebrow-size</code>, <code>--hero-eyebrow-margin</code></td></tr></tbody></table></div>
+<p>S5 is the interesting one. <code>.oryx-hero p</code> outranks <code>.oryx-eyebrow</code>, so the<br />
+homepage eyebrow inherits the lede&#39;s muted ink and 16px size. The previous<br />
+session patched that only in the light theme, because the dark render is<br />
+approved. The rule now sits at <code>.oryx-hero .oryx-eyebrow</code> in the base stylesheet<br />
+and reads its three values from tokens; the dark token values reproduce the<br />
+approved dark render, and the light values restore the gold accent. The override<br />
+is gone, and the cascade is correct in both themes.</p>
+<p><code>--scrim-angle</code> under <code>[data-dir=&#39;rtl&#39;]</code> and the footer logo colourway toggle<br />
+stay as they are: they are direction and structural rules, not colour overrides.</p>
+<h3 id="153-why-neither-theme-moved">15.3 Why neither theme moved</h3>
+<p>The refactor is render-preserving by construction — every token&#39;s dark value is<br />
+the value the dark render already resolved, and every light value is the value<br />
+the light override already set. That is also measured: the captures taken before<br />
+the change were compared pixel-for-pixel with the captures taken after.</p>
+<div class="table-wrap"><table><thead><tr><th>Comparison</th><th>Result</th></tr></thead><tbody><tr><td>Images compared</td><td>63 (including the comparison sheets)</td></tr><tr><td>Images with any difference</td><td>3 — all <code>06-profile-*</code>, each <code>0.002%</code> of pixels at a channel delta of <code>1</code></td></tr><tr><td>Worst image</td><td><code>06-profile-tablet-en-dark.png</code>, <code>0.002%</code>, maxΔ <code>1</code></td></tr><tr><td>Verdict</td><td>antialiasing noise; no colour shift in either theme</td></tr></tbody></table></div>
+<p>The three-image residue is font antialiasing on a page with no changed rule. A<br />
+real colour shift would move entire regions, not isolated pixels by one level.</p>
+<h3 id="154-verification">15.4 Verification</h3>
+<div class="table-wrap"><table><thead><tr><th>Check</th><th>Result</th></tr></thead><tbody><tr><td><code>@oryx/shared</code> unit</td><td>180 passed (9 files) — includes the CSS-token contract</td></tr><tr><td><code>@oryx/mobile-erp</code> unit</td><td>31 passed (2 files)</td></tr><tr><td><code>@oryx/customer</code> lint / typecheck</td><td>clean</td></tr><tr><td><code>check-light-palette</code></td><td>33/33 pairs meet their threshold</td></tr><tr><td><code>sweep-light-all-routes</code></td><td>0 contrast failures across 15 routes</td></tr><tr><td><code>consistency-audit</code> (customer, light)</td><td>no inconsistent component properties</td></tr><tr><td><code>consistency-audit-admin</code> (light)</td><td>no inconsistent component properties</td></tr><tr><td><code>check-admin-light-palette</code></td><td>all admin light-theme contrast checks passed</td></tr><tr><td><code>verify-admin-light</code></td><td>222/222 assertions across 6 surfaces</td></tr><tr><td><code>verify-refactor-identical</code></td><td>63 images, worst 0.002% at maxΔ 1</td></tr><tr><td><code>capture-exec07-phase-e</code></td><td>60 captures, 0 with status ≥ 400 or overflow</td></tr></tbody></table></div>
+<p>The <code>verify-phase-e-images</code> script reports 26 &quot;suspect&quot; images. That is its<br />
+heuristic, not a defect: it samples the top band of each PNG and expects the page<br />
+field, but the profile and comparison pages carry a navy page-head there. The<br />
+same images are byte-identical to the pre-change baseline, so the flags pre-date<br />
+this session.</p>
+<h3 id="155-honest-limitations">15.5 Honest limitations</h3>
+<ul><li>The dark theme was not changed; §15.3 measures that.</li><li>The scattered-override count for the customer stylesheet is now zero. The</li></ul>
+<p><code>--scrim-angle</code> RTL rule and the logo colourway toggles remain, and are<br />
+direction and structural rules rather than colour overrides.</p>
+<ul><li><code>verify-light-palette.mjs</code> and <code>verify-theme-toggle.mjs</code> were not used: the</li></ul>
+<p>former hard-codes a consumer password that the seed no longer sets, and the<br />
+latter hard-codes a sandbox hostname from a previous session. The equivalent<br />
+checks (<code>sweep-light-all-routes</code>, the Phase E manifest) pass. Fixing those two<br />
+scripts is left for a follow-up rather than folded into this change.</p>
+<ul><li>No deployment was performed and PR #7 was not merged.</li></ul>
+<h2 id="16-eighth-continuation-session-the-dark-invariance-record-was-stale">16. Eighth continuation session — the dark-invariance record was stale</h2>
+<h3 id="161-recovery">16.1 Recovery</h3>
+<p>The previous conversation ended in a sandbox error. Nothing was changed before the<br />
+workspace and the remote were inspected.</p>
+<div class="table-wrap"><table><thead><tr><th>Question</th><th>Finding</th><th>How it was checked</th></tr></thead><tbody><tr><td>Local branch</td><td><code>feature/execution-07-premium-web</code></td><td><code>git branch --show-current</code></td></tr><tr><td>Local <code>HEAD</code></td><td><code>54abed5</code></td><td><code>git rev-parse HEAD</code></td></tr><tr><td>Remote tip</td><td><code>54abed5</code> — <strong>identical to local</strong></td><td><code>git ls-remote origin feature/execution-07-premium-web</code></td></tr><tr><td>Ahead / behind</td><td><code>0 / 0</code></td><td><code>git rev-list --left-right --count HEAD...origin/...</code></td></tr><tr><td>Last known SHA from the crash report</td><td><code>b3c9a71</code> — an <strong>ancestor</strong> of <code>HEAD</code>, 58 commits back</td><td><code>git merge-base --is-ancestor b3c9a71 HEAD</code></td></tr><tr><td>Stashes</td><td><strong>none</strong></td><td><code>git stash list</code></td></tr></tbody></table></div>
+<p><strong>No pushed work was lost, and there was no unpushed commit to recover.</strong> The<br />
+crashed session&#39;s last action was a push, so the remote already held everything.<br />
+The uncommitted <code>apps/mobile</code> changes in the working tree belong to the <em>next</em><br />
+task (the marketplace demo), not to Execution 07, and were left untouched.</p>
+<h3 id="162-defect-e15-dark-invariancejson-did-not-describe-the-images-it-shipped-with">16.2 Defect E15 — <code>dark-invariance.json</code> did not describe the images it shipped with</h3>
+<p>The report claimed the dark captures were &quot;23/31 byte-identical&quot; with &quot;0 real<br />
+colour shifts&quot;. Re-measuring the committed PNGs gives **51.70% of pixels moved at<br />
+a channel delta of 238** on the homepage. One of the two statements had to be<br />
+wrong, and it was not the images.</p>
+<p>The record was written at <code>5302b88</code> by <code>.run/verify-dark-identical.mjs</code>. The<br />
+<code>after</code> PNGs were then replaced at <code>33e57ba</code> — the same-origin re-capture — and<br />
+the verifier was not re-run. Measuring the record against its own images at each<br />
+commit isolates the moment:</p>
+<div class="table-wrap"><table><thead><tr><th>Commit</th><th>Record claims (homepage dark)</th><th>Images actually differ</th></tr></thead><tbody><tr><td><code>5302b88</code> (record written)</td><td>0 strict pixels, maxΔ 2</td><td>0.00%, maxΔ 2 — <strong>agrees</strong></td></tr><tr><td><code>33e57ba</code> (<code>after</code> replaced)</td><td>0 strict pixels, maxΔ 2</td><td><strong>51.70%</strong>, maxΔ 238</td></tr><tr><td><code>HEAD</code></td><td>0 strict pixels, maxΔ 2</td><td><strong>51.70%</strong>, maxΔ 238</td></tr></tbody></table></div>
+<p>So the record was accurate when written and became stale one commit later. It is<br />
+now regenerated from the committed images, and the old whole-frame file is kept<br />
+as <code>dark-invariance.whole-frame.json</code> so the discrepancy is auditable rather than<br />
+erased.</p>
+<h3 id="163-the-dark-delta-is-photography-not-theme">16.3 The dark delta is photography, not theme</h3>
+<p>A whole-frame comparison cannot answer &quot;did the theme move&quot;, because the <code>before</code><br />
+and <code>after</code> sets were captured at different commits and the same-origin fix let<br />
+the CMS content load for the first time. Three independent checks separate the<br />
+two.</p>
+<p><strong>1. The chrome band is the witness.</strong> The header band is painted by the theme<br />
+token layer and never carries a photograph, so it cannot change unless a token<br />
+changed. Across all 31 dark captures the chrome band is identical (<code>chromeMax</code><br />
+0–2, i.e. subpixel antialiasing).</p>
+<p><strong>2. The dark-scoped CSS declarations are identical.</strong> Extracting every rule whose<br />
+selector mentions <code>dark</code> from <code>6ea99ba</code> and <code>HEAD</code>, stripping comments, and<br />
+diffing gives two rules in each and <strong>no declaration difference</strong>.</p>
+<p><strong>3. The hero photograph itself was replaced.</strong> <code>inspection-bay.jpg</code> was<br />
+3840×2560 / 2,110,416 bytes at <code>30268f2</code> and became 1600×1067 / 256,860 bytes at<br />
+<code>5302b88</code>. The homepage hero paints that file as a full-bleed background, which is<br />
+exactly the region that moved; the dashboard and providers, which carry no such<br />
+photo, measure 0.00% on their chrome.</p>
+<p>One dark token genuinely did change, and it is documented and deliberate:<br />
+<code>--text-faint</code> and <code>--band-text-faint</code> were raised from <code>#6f8598</code> to <code>#778da1</code> in<br />
+<code>593dfe1</code> to bring the stat label from 4.43:1 to 5.41:1, resolving defect E8<br />
+(§12.3). That is a contrast correction, not a palette drift, and it is why the<br />
+claim &quot;the dark theme is byte-identical&quot; was never literally true.</p>
+<h3 id="164-verification">16.4 Verification</h3>
+<div class="table-wrap"><table><thead><tr><th>Check</th><th>Result</th></tr></thead><tbody><tr><td>Theme chrome moved (31 dark captures)</td><td><strong>0</strong></td></tr><tr><td>Content-only deltas</td><td>19</td></tr><tr><td>Antialiasing-only deltas</td><td>7</td></tr><tr><td>Byte-identical whole frames</td><td>5</td></tr><tr><td>Dark-scoped CSS declarations, <code>6ea99ba</code> vs <code>HEAD</code></td><td><strong>identical</strong></td></tr><tr><td>Live light-theme contrast (<code>sweep-light-contrast</code>)</td><td><strong>0</strong> pairs below threshold</td></tr><tr><td>Component audit (<code>audit-light-theme</code>)</td><td><strong>0</strong> pairs below threshold</td></tr><tr><td>Hero caption contrast, light / dark</td><td>9.12 / 5.57 (eyebrow), 12.19 / 8.83 (title)</td></tr><tr><td><code>@oryx/shared</code> unit</td><td>180 passed</td></tr><tr><td><code>@oryx/api</code> e2e</td><td>334 passed</td></tr><tr><td><code>@oryx/mobile</code> unit / lint / typecheck</td><td>46 passed / clean / clean</td></tr></tbody></table></div>
+<p>The <code>body</code> element resolves to the ivory page field <code>#f7f4ed</code> on every light<br />
+surface. The <code>page</code> row in the component audit reads mid-grey on the homepage,<br />
+dashboard and providers because that row is the <em>mean of the whole viewport</em>,<br />
+which includes the navy hero and footer; it is not a surface colour and not an<br />
+inconsistency.</p>
+<h3 id="165-honest-limitations">16.5 Honest limitations</h3>
+<ul><li>The whole-frame dark deltas remain large on the photography surfaces. They are</li></ul>
+<p>explained and bounded by §16.3, not eliminated. The two capture sets were taken<br />
+at different commits, so they cannot be made byte-identical without<br />
+re-capturing <code>before</code> against the current content, which would change the<br />
+baseline the light-theme comparison depends on.</p>
+<ul><li>The dark theme carries two pre-existing contrast pairs below 4.5:1 (a stat label</li></ul>
+<p>at 4.19:1 and a danger button at 4.36:1) measured live. They are reported, not<br />
+fixed, because the dark theme is approved and must not move.</p>
+<ul><li>No deployment was performed and PR #7 was not merged.</li></ul></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>36afef6</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-31T15:03:02.730Z</span>
+  </div>
+</footer>
+</body>
+</html>

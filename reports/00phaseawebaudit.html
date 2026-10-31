@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Execution 07 — Phase A: Existing Web Product Audit · ORYX design preview</title>
+<meta name="description" content="Execution 07 — Phase A: Existing Web Product Audit" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../mobile/">Mobile app</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Execution 07 — the current execution</p>
+        <h1>Execution 07 — Phase A: Existing Web Product Audit</h1>
+        <p class="card__meta">Rendered from <code>docs/audit/exec07/00_PHASE_A_WEB_AUDIT.md</code> at <code>36afef6</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/audit/exec07/00_PHASE_A_WEB_AUDIT.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#scope-inspected">Scope inspected</a></li><li><a href="#what-is-already-strong">What is already strong</a></li><li><a href="#confirmed-gaps-and-defects">Confirmed gaps and defects</a></li><li><a href="#non-goals-explicitly-excluded">Non-goals (explicitly excluded)</a></li><li><a href="#plan">Plan</a></li></ul></nav>
+        <article><h1 id="execution-07-phase-a-existing-web-product-audit">Execution 07 — Phase A: Existing Web Product Audit</h1>
+<p>Audit date: 2026-10-18<br />
+Branch: <code>feature/execution-07-premium-web</code> (created from <code>604e36a</code>, the verified<br />
+Execution 06 head on <code>audit/execution-05-verification</code>, so every Execution 06<br />
+fix is preserved).</p>
+<h2 id="scope-inspected">Scope inspected</h2>
+<div class="table-wrap"><table><thead><tr><th>Surface</th><th>Entry point</th><th>Route count</th></tr></thead><tbody><tr><td>Platform Super Admin + Tenant ERP (one Next.js app)</td><td><code>apps/admin</code></td><td>35 pages</td></tr><tr><td>Public website + Customer portal (one Next.js app)</td><td><code>apps/customer</code></td><td>16 pages</td></tr><tr><td>REST API (unchanged in this execution)</td><td><code>apps/api</code></td><td>—</td></tr></tbody></table></div>
+<h2 id="what-is-already-strong">What is already strong</h2>
+<ul><li><strong>Token system.</strong> Both apps define the same approved palette (deep navy</li></ul>
+<p><code>#00162b</code> family, gold <code>#d4af37</code>, hairline borders) in <code>globals.css</code>, with a<br />
+full <code>data-theme=&quot;dark|light&quot;</code> light override and <code>data-dir=&quot;rtl|ltr&quot;</code><br />
+direction handling. 110 classes in the admin sheet, 59 in the customer sheet.</p>
+<ul><li><strong>Official logo.</strong> <code>BrandLogo</code> ships the owner&#39;s real lockup as two</li></ul>
+<p>colourways (<code>oryx-logo-on-dark.png</code>, <code>oryx-logo-on-light.png</code>), swapped by CSS<br />
+on <code>data-theme</code> so there is no first-paint flash. Used in the admin sidebar,<br />
+admin login, admin dashboard hero and the customer header.</p>
+<ul><li><strong>Bilingual by construction.</strong> Arabic is the default and the source language;</li></ul>
+<p>every key exists in both dictionaries (admin 1824 lines, customer 323 lines).</p>
+<ul><li><strong>Admin module art.</strong> 28 distinct generated SVGs in <code>apps/admin/public/tiles/</code></li></ul>
+<p>from <code>scripts/generate-tile-art.py</code>, plus a dashboard hero banner.</p>
+<h2 id="confirmed-gaps-and-defects">Confirmed gaps and defects</h2>
+<h3 id="g1-the-customer-website-has-no-imagery-at-all-highest-impact">G1 — The customer website has no imagery at all (highest impact)</h3>
+<p><code>apps/customer/public/</code> contains only <code>brand/</code>. Fourteen of sixteen customer<br />
+pages reference no image asset. The service-category tiles on the homepage and<br />
+<code>/services</code> render a <strong>single generic gradient</strong> (<code>--tile-overlay</code> +<br />
+<code>radial-gradient</code>), so all five categories look identical — violating the<br />
+Execution 07 rule &quot;use distinct visuals for distinct service categories&quot;.</p>
+<h3 id="g2-the-homepage-is-a-thin-prototype-not-a-premium-site">G2 — The homepage is a thin prototype, not a premium site</h3>
+<p><code>apps/customer/src/app/page.tsx</code> is 128 lines and renders only: a text hero, a<br />
+category grid, three provider cards and a three-step strip. The task requires a<br />
+homepage with value proposition, service categories, how-it-works, customer<br />
+benefits, provider/partner opportunities, trust and safety, FAQ, contact and a<br />
+professional footer. Everything from &quot;benefits&quot; onward is <strong>absent</strong>.</p>
+<h3 id="g3-the-footer-is-a-single-line">G3 — The footer is a single line</h3>
+<p><code>SiteFooter</code> renders one copyright span and two links. A premium public site<br />
+needs a multi-column footer (services, company, support, legal, language).</p>
+<h3 id="g4-no-service-discovery-journey-beyond-a-filter-link">G4 — No service discovery journey beyond a filter link</h3>
+<p><code>/services</code> renders five cards that each link to <code>/providers?category=…</code>. There<br />
+is no explanatory copy, no price/expectation guidance, no distinct art.</p>
+<h3 id="g5-customer-dashboard-is-a-bare-kpi-row">G5 — Customer dashboard is a bare KPI row</h3>
+<p><code>/dashboard</code> renders four plain count cards and two lists. It has no welcome<br />
+banner, no next-action guidance, no vehicle/service status summary.</p>
+<h3 id="g6-admin-dashboard-home-is-a-module-grid-only">G6 — Admin dashboard home is a module grid only</h3>
+<p><code>/dashboard</code> deliberately holds no KPIs (they live at <code>/dashboard/overview</code>).<br />
+That split is intentional and is preserved, but the module grid and hero need<br />
+final polish for a premium feel.</p>
+<h3 id="g7-no-documented-design-system">G7 — No documented design system</h3>
+<p>Tokens and components exist in code but there is no single document describing<br />
+the colour tokens, type scale, spacing, component inventory and breakpoints.<br />
+Execution 07 requires a reusable, documented system.</p>
+<h2 id="non-goals-explicitly-excluded">Non-goals (explicitly excluded)</h2>
+<ul><li>No change to authentication, sessions, CSRF, MFA, permissions or API logic.</li><li>No change to the native mobile app (<code>apps/mobile</code>).</li><li>No new business claims, partner logos, certifications or testimonials — the</li></ul>
+<p>site only states capabilities the code actually implements.</p>
+<h2 id="plan">Plan</h2>
+<p>Phase B builds the design-system documentation and the four representative<br />
+previews (public homepage, customer dashboard, Super Admin dashboard, tenant ERP<br />
+dashboard) for owner approval. Phase C applies the system across all web pages.<br />
+Phase D runs functional, responsive, accessibility and regression tests.</p></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>36afef6</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-31T15:03:02.730Z</span>
+  </div>
+</footer>
+</body>
+</html>

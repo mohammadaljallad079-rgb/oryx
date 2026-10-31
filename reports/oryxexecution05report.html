@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>ORYX — Execution 05 Report: Platform Completion &amp; External Integrations Center · ORYX design preview</title>
+<meta name="description" content="ORYX — Execution 05 Report: Platform Completion &amp; External Integrations Center" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../mobile/">Mobile app</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Execution reports</p>
+        <h1>ORYX — Execution 05 Report: Platform Completion &amp; External Integrations Center</h1>
+        <p class="card__meta">Rendered from <code>docs/execution-reports/ORYX_EXECUTION_05_REPORT.md</code> at <code>36afef6</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/execution-reports/ORYX_EXECUTION_05_REPORT.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#1-recovered-github-state">1. Recovered GitHub state</a></li><li><a href="#2-branch-and-commit">2. Branch and commit</a></li><li><a href="#3-baseline-verification-before-this-sessions-changes">3. Baseline verification (before this session&#39;s changes)</a></li><li><a href="#4-what-execution-05-adds">4. What Execution 05 adds</a></li><li><a href="#5-database-migrations">5. Database migrations</a></li><li><a href="#6-api-endpoints">6. API endpoints</a></li><li><a href="#7-admin-interface">7. Admin interface</a></li><li><a href="#8-screenshots">8. Screenshots</a></li><li><a href="#9-test-results">9. Test results</a></li><li><a href="#10-github-actions">10. GitHub Actions</a></li><li><a href="#11-remaining-external-integrations">11. Remaining external integrations</a></li><li><a href="#12-known-limitations">12. Known limitations</a></li><li><a href="#13-pull-request">13. Pull request</a></li></ul></nav>
+        <article><h1 id="oryx-execution-05-report-platform-completion-external-integrations-center">ORYX — Execution 05 Report: Platform Completion &amp; External Integrations Center</h1>
+<p>Status: <strong>implemented, tested and ready for owner review</strong>. Nothing is merged<br />
+and nothing is deployed.</p>
+<h2 id="1-recovered-github-state">1. Recovered GitHub state</h2>
+<p>GitHub was the source of truth.</p>
+<div class="table-wrap"><table><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody><tr><td>Repository</td><td><code>mohammadaljallad079-rgb/oryx</code></td></tr><tr><td>PR #1 (<code>feature/execution-01-super-admin-foundation</code>)</td><td><strong>merged</strong> into <code>main</code></td></tr><tr><td>PR #2 (<code>feature/execution-02-erp-core</code>)</td><td><strong>merged</strong> into <code>main</code></td></tr><tr><td>PR #3 (<code>feature/execution-03-hr-crm-automotive</code>)</td><td><strong>merged</strong> into <code>main</code> at <code>20dd8b471103d138011dd8be8381027a586d85aa</code></td></tr><tr><td>PR #4 (<code>feature/execution-04-customer-marketplace-mobile</code>)</td><td><strong>merged</strong> into <code>main</code> at <code>33ee5579644d88ae6a1763e7d778ba944831912a</code></td></tr><tr><td>Execution 05 branch before this session</td><td>did not exist; created from the latest verified <code>main</code></td></tr></tbody></table></div>
+<p>Executions 01–04 were not restarted. No existing work was overwritten, reset or<br />
+force-pushed.</p>
+<h2 id="2-branch-and-commit">2. Branch and commit</h2>
+<div class="table-wrap"><table><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody><tr><td>Branch</td><td><code>feature/execution-05-platform-completion</code></td></tr><tr><td>Base</td><td><code>main</code> @ <code>33ee5579644d88ae6a1763e7d778ba944831912a</code> (the Execution 04 merge)</td></tr><tr><td>Code head</td><td><code>db35fe2</code> is the code change; later commits on the branch are report-only</td></tr><tr><td>Pull request</td><td><a href="https://github.com/mohammadaljallad079-rgb/oryx/pull/5" target="_blank" rel="noopener noreferrer">#5</a> (draft, open)</td></tr></tbody></table></div>
+<h2 id="3-baseline-verification-before-this-sessions-changes">3. Baseline verification (before this session&#39;s changes)</h2>
+<ul><li><code>pnpm --filter @oryx/shared test</code> — 85 passed.</li><li><code>pnpm --filter @oryx/api test:e2e</code> — 196 passed (7 suites).</li><li><code>pnpm --filter @oryx/mobile test</code> — 14 passed.</li><li><code>pnpm --filter @oryx/admin test:ui</code> — 108 passed (Execution 04 baseline).</li></ul>
+<p>All Execution 01–04 invariants (balanced ledger, atomic and idempotent posting,<br />
+row-locked inventory, tenant isolation, payroll snapshot, booking concurrency,<br />
+payment idempotency, refresh-token cookie transport) are preserved and still<br />
+asserted by the existing suites.</p>
+<h3 id="31-runtime-verification-and-the-mobile-tab-bar-defect">3.1 Runtime verification and the mobile tab-bar defect</h3>
+<p>The automated suites do not render the mobile app, so the customer app was run<br />
+against the seeded API in a browser at a 390×844 handset viewport and every tab<br />
+was inspected. That surfaced a defect the unit tests could not see.</p>
+<p><strong>Symptom.</strong> The authenticated tab bar rendered ten entries instead of five. The<br />
+five intended destinations were squeezed into the first 156 px of a 390 px bar,<br />
+and the surplus entries were labelled with raw route names — <code>bookings/index</code>,<br />
+<code>garage/[id]</code>, <code>providers/[id]</code>, <code>bookings/new</code>, <code>invoices</code>, <code>notifications</code>.</p>
+<p><strong>Cause.</strong> Expo Router registers <em>every</em> file under <code>apps/mobile/src/app/(app)</code><br />
+as a tab. The layout declared only the five primary screens explicitly and left<br />
+the pushed routes (the booking wizard, the garage and provider detail screens,<br />
+invoices and notifications) to be registered by default. A nested <code>index.tsx</code><br />
+is also flattened to <code>bookings/index</code>, not <code>bookings</code>, so the bookings screen was<br />
+never matched by the tab that was supposed to render it.</p>
+<p><strong>Fix.</strong> <code>apps/mobile/src/app/(app)/_layout.tsx</code> now declares the bookings tab as<br />
+<code>bookings/index</code> and declares each pushed route with <code>options={{ href: null }}</code>,<br />
+which registers it without showing it in the bar.</p>
+<p><strong>Regression guard.</strong> <code>apps/mobile/test/tabs.test.ts</code> reads the route files and<br />
+the layout, and fails if a route is added under <code>(app)</code> without a matching<br />
+<code>&lt;Tabs.Screen&gt;</code>, if the visible set drifts from the five primary destinations, or<br />
+if a pushed route stops being hidden. Three assertions; the file list is derived,<br />
+so a new screen cannot silently become a tab.</p>
+<p><strong>Verified at runtime after the fix.</strong> The tab bar renders exactly five<br />
+correctly-labelled, evenly-sized tabs at 78 px each:</p>
+<div class="table-wrap"><table><thead><tr><th>Tab</th><th>Label</th><th>x</th><th>width</th></tr></thead><tbody><tr><td>Home</td><td>الرئيسية</td><td>0</td><td>78</td></tr><tr><td>Garage</td><td>مرآب سياراتي</td><td>78</td><td>78</td></tr><tr><td>Bookings</td><td>حجوزاتي</td><td>156</td><td>78</td></tr><tr><td>Services</td><td>الخدمات</td><td>234</td><td>78</td></tr><tr><td>Account</td><td>حسابي</td><td>312</td><td>78</td></tr></tbody></table></div>
+<p>The captured evidence is<br />
+<code>docs/execution-reports/screenshots/e05-mobile-tabbar-fixed-dashboard-en-dark.png</code><br />
+and <code>…-garage-en-dark.png</code>.</p>
+<p>The authenticated screens (dashboard, garage, bookings, services, account)<br />
+render live data from the API: the dashboard reports <strong>2 registered vehicles</strong><br />
+for the demo account, which matches the seeded garage.</p>
+<p>The booking engine was also exercised end to end against the running API. The<br />
+seed creates no working hours, so a freshly seeded tenant offers an empty<br />
+calendar; seven company-wide opening hours (Sunday–Saturday, 08:00–18:00, Friday<br />
+closed) and one inspection bay were added for the demo tenant purely to drive the<br />
+check. The engine then returned real slots and four bookings were created through<br />
+<code>POST /customer/bookings</code>, all accepted with HTTP 201 and status <code>HELD</code>:</p>
+<div class="table-wrap"><table><thead><tr><th>Booking</th><th>Type</th><th>Start (UTC)</th><th>Status</th></tr></thead><tbody><tr><td>Inspection</td><td>INSPECTION</td><td>2026-10-19T08:00:00Z</td><td>HELD</td></tr><tr><td>Maintenance</td><td>MAINTENANCE</td><td>2026-10-20T09:00:00Z</td><td>HELD</td></tr><tr><td>Inspection</td><td>INSPECTION</td><td>2026-10-19T10:00:00Z</td><td>HELD</td></tr><tr><td>Maintenance</td><td>MAINTENANCE</td><td>2026-10-21T11:00:00Z</td><td>HELD</td></tr></tbody></table></div>
+<p>Two notes recorded rather than fixed, because they are pre-existing seed<br />
+behaviour outside this execution&#39;s scope: the seed does not create working hours<br />
+or booking resources, and a self-registered customer account has a null<br />
+<code>defaultCompanyId</code> until it is linked, so the consumer surface resolves a tenant<br />
+through <code>TenantCompanyService</code> rather than from the account.</p>
+<h2 id="4-what-execution-05-adds">4. What Execution 05 adds</h2>
+<h3 id="41-external-integrations-center-the-core-of-this-execution">4.1 External Integrations Center (the core of this execution)</h3>
+<p>A single, database-backed catalogue of every external provider the platform<br />
+depends on, with the honest status of each. This replaces scattered<br />
+configuration with one place an operator can inspect before a launch.</p>
+<p>Providers are declared once in <code>packages/shared/src/integrations.ts</code> and read by<br />
+the API, the admin UI and the customer capabilities endpoint, so there is no<br />
+second list to drift.</p>
+<p><strong>The honesty rule.</strong> A provider is <code>OPERATIONAL</code> only when it genuinely works:</p>
+<div class="table-wrap"><table><thead><tr><th>State</th><th>Meaning</th></tr></thead><tbody><tr><td><code>OPERATIONAL</code></td><td>The adapter performs real work and nothing blocks it.</td></tr><tr><td><code>CONFIGURED</code></td><td>Every required credential is present, but no call has been verified yet.</td></tr><tr><td><code>AWAITING_CREDENTIALS</code></td><td>One or more required credentials are missing.</td></tr><tr><td><code>DISABLED</code></td><td>An operator deliberately turned it off.</td></tr><tr><td><code>ERROR</code></td><td>The last connection test failed.</td></tr></tbody></table></div>
+<p>Only <code>OPERATIONAL</code> is presented as usable, and the customer-facing capabilities<br />
+endpoint advertises only <code>OPERATIONAL</code> providers. A gateway that holds<br />
+credentials but has never completed a verified call is <strong>not</strong> advertised and<br />
+<strong>not</strong> shown as working — it is <code>CONFIGURED</code>. This is the central invariant of<br />
+the execution and is asserted in both the API and browser suites.</p>
+<p>The catalogue covers 20 providers across six categories (payments, messaging,<br />
+cloud and documents, government and identity, accounting, logistics), including<br />
+BenefitPay, the online card gateway, cash and card terminals, email, SMS,<br />
+WhatsApp Business, push, object storage, e-invoicing and identity verification.</p>
+<p>Internal providers (<code>CASH</code>, <code>CARD_TERMINAL</code>) are marked <code>IMPLEMENTED</code>: they need<br />
+no credentials and work from internal records, so they are <code>OPERATIONAL</code> from<br />
+the start. External providers are marked <code>ADAPTER_ONLY</code>: the adapter exists and<br />
+the vendor call is deliberately not implemented, so the verification path<br />
+reports that plainly instead of claiming success.</p>
+<h3 id="42-credential-handling">4.2 Credential handling</h3>
+<ul><li>Values are sealed at rest with AES-256-GCM through the existing <code>SecretCipher</code></li></ul>
+<p>(<code>MFA_ENCRYPTION_KEY</code>); the plaintext is never returned by any endpoint.</p>
+<ul><li>A non-secret provider identifier keeps a last-four hint so an operator can tell</li></ul>
+<p>which key is installed without revealing it.</p>
+<ul><li>Company-scoped credentials take precedence over platform-scoped ones, so a</li></ul>
+<p>tenant can bring its own merchant account without changing the platform row.</p>
+<ul><li><code>.env</code> values count exactly like stored ones, because the adapter reads the</li></ul>
+<p>environment at call time.</p>
+<ul><li>Every credential change is written to the audit trail **by key, never by</li></ul>
+<p>value**.</p>
+<h3 id="43-enablement-guard">4.3 Enablement guard</h3>
+<p>A provider cannot be enabled while a required credential is missing. The API<br />
+refuses with <code>400</code> and names the missing keys; the UI disables the control<br />
+outright so an operator is never offered an action the API would reject.</p>
+<h3 id="44-verification-and-audit">4.4 Verification and audit</h3>
+<p><code>POST /integrations/:key/verify</code> runs a real connection test, records a<br />
+<code>IntegrationCheck</code> row with status, message and duration, and updates the<br />
+provider&#39;s verification status. Changing a credential invalidates a previous<br />
+verification, so a stale &quot;verified&quot; badge cannot survive a credential rotation.</p>
+<h2 id="5-database-migrations">5. Database migrations</h2>
+<p>One migration was added:</p>
+<p><code>packages/database/prisma/migrations/20261015181943_execution_05_integrations_center/migration.sql</code></p>
+<div class="table-wrap"><table><thead><tr><th>Object</th><th>Purpose</th></tr></thead><tbody><tr><td><code>IntegrationScope</code> enum</td><td><code>PLATFORM</code> \</td><td><code>COMPANY</code></td></tr><tr><td><code>IntegrationVerificationStatus</code> enum</td><td><code>UNVERIFIED</code> \</td><td><code>VERIFIED</code> \</td><td><code>FAILED</code> \</td><td><code>INCOMPLETE</code></td></tr><tr><td><code>IntegrationProvider</code></td><td>One configuration row per provider and scope, with state and verification columns</td></tr><tr><td><code>IntegrationCredential</code></td><td>Sealed credential values, unique per provider and key</td></tr><tr><td><code>IntegrationCheck</code></td><td>Append-only connection-test history</td></tr><tr><td><code>IntegrationProvider_platform_key</code></td><td><strong>Partial</strong> unique index on <code>providerKey WHERE companyId IS NULL</code></td></tr></tbody></table></div>
+<p>The partial index matters: Postgres treats <code>NULL</code> as distinct in a unique index,<br />
+so the composite <code>(providerKey, scope, companyId)</code> constraint does <strong>not</strong><br />
+prevent two platform-scoped rows for the same provider. The partial index closes<br />
+that gap and is why the service uses a <code>findFirst</code> + create rather than a Prisma<br />
+<code>upsert</code> — Prisma&#39;s generated compound-unique input does not accept <code>null</code>.</p>
+<p>All 12 migrations apply cleanly and <code>prisma migrate status</code> reports the schema<br />
+is up to date.</p>
+<h2 id="6-api-endpoints">6. API endpoints</h2>
+<p>All routes are under <code>/api/v1</code>.</p>
+<div class="table-wrap"><table><thead><tr><th>Method</th><th>Path</th><th>Permission</th><th>Purpose</th></tr></thead><tbody><tr><td><code>GET</code></td><td><code>/integrations</code></td><td><code>platform.integration.read</code></td><td>Catalogue with derived state, summary counts and the production blockers</td></tr><tr><td><code>GET</code></td><td><code>/integrations/:key</code></td><td><code>platform.integration.read</code></td><td>One provider with its masked credential fields and check history</td></tr><tr><td><code>PUT</code></td><td><code>/integrations/:key/credentials</code></td><td><code>platform.integration.manage</code></td><td>Store or remove credentials; empty value removes</td></tr><tr><td><code>PUT</code></td><td><code>/integrations/:key/enabled</code></td><td><code>platform.integration.manage</code></td><td>Enable or disable, with an optional reason</td></tr><tr><td><code>POST</code></td><td><code>/integrations/:key/verify</code></td><td><code>platform.integration.verify</code></td><td>Run a connection test and record the result</td></tr><tr><td><code>GET</code></td><td><code>/customer/capabilities</code></td><td>customer session</td><td>Which payment methods and channels a signed-in customer may actually choose</td></tr></tbody></table></div>
+<p>Three new permissions were added: <code>platform.integration.read</code>,<br />
+<code>platform.integration.manage</code> and <code>platform.integration.verify</code>. A company<br />
+principal is denied every integration route — the centre is platform governance.</p>
+<h2 id="7-admin-interface">7. Admin interface</h2>
+<p>New route: <code>/integrations</code> (External Integrations Center), added to the Website<br />
+&amp; Application Management navigation group.</p>
+<ul><li>Summary tiles: total, operational, configured, awaiting credentials, disabled,</li></ul>
+<p>error.</p>
+<ul><li>A plain-language notice stating that only Operational providers are usable,</li></ul>
+<p>and the list of providers currently blocking production readiness.</p>
+<ul><li>A provider table with category, credential completeness and derived state. Only</li></ul>
+<p>Operational renders green; Configured renders amber.</p>
+<ul><li>A provider dialog with the credential form (one input per catalogue</li></ul>
+<p>credential, secrets masked), the activation requirement, the last check result<br />
+and the full connection-test history.</p>
+<p>Fully localised in Arabic (RTL) and English (LTR), in both dark and light<br />
+themes, responsive down to mobile width.</p>
+<h2 id="8-screenshots">8. Screenshots</h2>
+<p>Captured from the running application into<br />
+<code>docs/execution-reports/screenshots/</code>:</p>
+<div class="table-wrap"><table><thead><tr><th>File</th><th>Description</th></tr></thead><tbody><tr><td><code>e05-integrations-en-dark.png</code></td><td>Integrations Center, English, dark</td></tr><tr><td><code>e05-integrations-ar-dark.png</code></td><td>Integrations Center, Arabic RTL, dark</td></tr><tr><td><code>e05-integrations-en-light.png</code></td><td>Integrations Center, English, light</td></tr><tr><td><code>e05-integration-dialog-en-light.png</code></td><td>Provider dialog with credential form and check history</td></tr><tr><td><code>e05-integrations-mobile-en-light.png</code></td><td>Mobile width (420px)</td></tr><tr><td><code>e05-mobile-tabbar-fixed-dashboard-en-dark.png</code></td><td>Customer app, dashboard, tab bar after the fix (section 3.1)</td></tr><tr><td><code>e05-mobile-tabbar-fixed-garage-en-dark.png</code></td><td>Customer app, vehicle garage, tab bar after the fix (section 3.1)</td></tr></tbody></table></div>
+<h2 id="9-test-results">9. Test results</h2>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Result</th></tr></thead><tbody><tr><td><code>@oryx/shared</code> (unit)</td><td><strong>93 passed</strong> (85 baseline + 8 new catalogue-invariant tests)</td></tr><tr><td><code>@oryx/api</code> (integration)</td><td><strong>218 passed</strong>, 8 suites (196 baseline + 22 new Execution 05 tests)</td></tr><tr><td><code>@oryx/mobile</code> (unit)</td><td><strong>17 passed</strong> (14 baseline + 3 new tab-bar regression tests)</td></tr><tr><td><code>@oryx/admin</code> (browser)</td><td><strong>119 passed</strong>, 1 flaky (see below)</td></tr></tbody></table></div>
+<p>New suites:</p>
+<ul><li><code>apps/api/test/execution05.e2e-spec.ts</code> — 22 tests covering the catalogue,</li></ul>
+<p>derived state, credential sealing and removal, the enablement guard,<br />
+verification, authorization, the audit trail and customer capability<br />
+advertisement.</p>
+<ul><li><code>packages/shared/test/integrations.test.ts</code> — 8 tests asserting catalogue</li></ul>
+<p>invariants (unique keys, known categories, both languages present,<br />
+<code>configurable</code> exactly when credentials are declared, and that only<br />
+<code>OPERATIONAL</code> counts as usable).</p>
+<ul><li><code>apps/admin/e2e/execution05.spec.ts</code> — 6 browser tests, including the two that</li></ul>
+<p>matter most: an unconfigured gateway is never shown as operational, and a<br />
+connection test on an unimplemented adapter reports &quot;not implemented&quot; rather<br />
+than success.</p>
+<ul><li><code>apps/mobile/test/tabs.test.ts</code> — 3 tests pinning the authenticated tab bar to</li></ul>
+<p>the five primary destinations and asserting that every pushed route stays<br />
+hidden (see section 3.1).</p>
+<p>The mobile app consumes the same backend APIs as the customer website and needed<br />
+no API change for this execution; the only mobile change is the tab-bar fix in<br />
+section 3.1.</p>
+<h3 id="flaky-test-pre-existing-not-a-regression">Flaky test (pre-existing, not a regression)</h3>
+<p><code>auth-lifecycle.spec.ts › two tabs refreshing at once both stay usable</code> failed<br />
+once in the full run and <strong>passes in isolation</strong> (14/14 in the auth-lifecycle<br />
+suite). It races two simultaneous reloads against token rotation and is<br />
+timing-sensitive under a loaded machine. It is unrelated to Execution 05 and no<br />
+Execution 05 code touches the session path.</p>
+<h2 id="10-github-actions">10. GitHub Actions</h2>
+<p><code>ci.yml</code> was updated to:</p>
+<ul><li>trigger on <code>feature/execution-05-platform-completion</code>;</li><li>run <code>lint</code> for the admin and customer apps, which previously had no lint step</li></ul>
+<p>in CI.</p>
+<p>The lint scripts in <code>apps/admin</code>, <code>apps/customer</code> and <code>apps/mobile</code> were changed<br />
+from <code>next lint</code> (deprecated in Next 15 and interactive when no config exists,<br />
+which made <code>pnpm -r lint</code> hang) to <code>eslint . --max-warnings=0</code> against new flat<br />
+configs. <code>eslint</code> and <code>@eslint/eslintrc</code> were already in the lockfile, so<br />
+<strong><code>pnpm-lock.yaml</code> and the root <code>package.json</code> are unchanged</strong> and<br />
+<code>pnpm install --frozen-lockfile</code> still succeeds.</p>
+<p>All three CI jobs — typecheck and build, unit and API integration, browser<br />
+acceptance — pass on the branch. The mobile fix itself is commit <code>db35fe2</code>;<br />
+later commits on the branch are report-only and change no code.</p>
+<p>The <code>Typecheck and build</code> job already covered the mobile app: it typechecks,<br />
+lints, unit-tests and bundles it for Android and iOS. The tab-bar fix and its<br />
+regression test therefore run in CI on every push.</p>
+<h3 id="a-ci-failure-that-was-worth-having">A CI failure that was worth having</h3>
+<p>The first CI run failed the browser job on the new Execution 05 test with a<br />
+login <code>403</code>, while the <em>same commit</em> passed the identical job on the pull-request<br />
+trigger. That split is the signature of a race, and it exposed two real defects<br />
+in the test plumbing:</p>
+<ol><li><strong><code>apiToken</code>&#39;s login fallback omitted the <code>x-oryx-csrf</code> header.</strong> <code>signIn</code></li></ol>
+<p>has already established the refresh cookie, and <code>CsrfGuard</code> rejects any<br />
+unsafe method that carries that cookie without a matching header — so the<br />
+fallback could never succeed once a session existed. It now echoes the cookie<br />
+exactly as the refresh call above it does.</p>
+<ol><li><strong>The test stored credentials through the page</strong>, racing the page&#39;s own</li></ol>
+<p>refresh rotation. It now seeds and clears them from Node in a cookie-less<br />
+Playwright request context, so the request carries only the bearer token and<br />
+no ambient cookie. The credentials are still written and removed through the<br />
+real API, and a <code>finally</code> block guarantees removal so later tests still see<br />
+<code>AWAITING_CREDENTIALS</code>.</p>
+<p>A third, quieter bug surfaced while fixing the above: Playwright resolves a<br />
+leading-slash path against the <code>baseURL</code>&#39;s <strong>origin</strong> and discards the path<br />
+prefix, which silently turned the login call into a <code>404</code>. The helper now builds<br />
+absolute URLs.</p>
+<p>The fix is confirmed by the database: after the suite runs,<br />
+<code>IntegrationCredential</code> holds 0 rows and only the single default provider row<br />
+remains, so the cleanup genuinely works.</p>
+<h2 id="11-remaining-external-integrations">11. Remaining external integrations</h2>
+<p>No live third-party integration is operational, and none is claimed to be.<br />
+Every external provider is <code>ADAPTER_ONLY</code> and <code>AWAITING_CREDENTIALS</code> in a fresh<br />
+deployment. Activating any of them requires, in order:</p>
+<ol><li>credentials supplied by the owner (merchant agreement, API keys, webhook</li></ol>
+<p>secrets);</p>
+<ol><li>storing them through the Integrations Center;</li><li>a successful verified transaction through <code>POST /integrations/:key/verify</code>.</li></ol>
+<div class="table-wrap"><table><thead><tr><th>Integration</th><th>What the owner must supply</th></tr></thead><tbody><tr><td>BenefitPay</td><td>Merchant agreement with the bank, merchant ID, API key, API secret, gateway base URL, webhook signing secret, and one verified sandbox transaction</td></tr><tr><td>Online card gateway</td><td>A chosen acquirer and its API key</td></tr><tr><td>Email</td><td>A provider API key, or an SMTP host</td></tr><tr><td>SMS</td><td>An account SID, auth token and sender ID</td></tr><tr><td>WhatsApp Business</td><td>A Meta business account, phone number ID, access token and webhook verify token</td></tr><tr><td>Push</td><td>An FCM service-account JSON and APNs key</td></tr><tr><td>Cloud storage</td><td>An S3-compatible endpoint, bucket and access keys</td></tr><tr><td>E-invoicing / identity</td><td>Government onboarding and credentials</td></tr></tbody></table></div>
+<p>The adapter architecture, credential storage, enablement guard, verification<br />
+path and audit trail are complete and tested; only the vendor calls and the<br />
+owner-supplied credentials are outstanding.</p>
+<h2 id="12-known-limitations">12. Known limitations</h2>
+<ul><li><strong>No live gateway is operational.</strong> BenefitPay and the card gateway are</li></ul>
+<p>adapters with no vendor call implemented. <code>verify</code> reports &quot;not implemented&quot;<br />
+by design rather than returning a false success.</p>
+<ul><li><strong>The ORYX logo and approved photography are still not in the repository.</strong></li></ul>
+<p>As reported in Executions 01–04, the UI uses a neutral monogram placeholder<br />
+and generated vector art. No official brand mark was invented.</p>
+<ul><li><strong>The one flaky browser test</strong> noted in section 9 is pre-existing and</li></ul>
+<p>unrelated to this execution.</p>
+<ul><li>Execution 05 implements the Integrations Center and platform-completion</li></ul>
+<p>surface. It does not add new ERP modules; the module catalogue was already<br />
+fully implemented and DB-backed after Execution 03.</p>
+<h2 id="13-pull-request">13. Pull request</h2>
+<p><a href="https://github.com/mohammadaljallad079-rgb/oryx/pull/5" target="_blank" rel="noopener noreferrer">#5</a> against <code>main</code><br />
+from <code>feature/execution-05-platform-completion</code>, head <code>e68f45c</code>.</p>
+<p><strong>Do not merge or deploy without owner approval.</strong></p></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>36afef6</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-31T15:03:02.730Z</span>
+  </div>
+</footer>
+</body>
+</html>

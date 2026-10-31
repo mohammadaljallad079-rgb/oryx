@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>ORYX — Execution 03 Report: HR, CRM, Operations &amp; Automotive Services · ORYX design preview</title>
+<meta name="description" content="ORYX — Execution 03 Report: HR, CRM, Operations &amp; Automotive Services" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../mobile/">Mobile app</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Execution reports</p>
+        <h1>ORYX — Execution 03 Report: HR, CRM, Operations &amp; Automotive Services</h1>
+        <p class="card__meta">Rendered from <code>docs/execution-reports/ORYX_EXECUTION_03_REPORT.md</code> at <code>36afef6</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/execution-reports/ORYX_EXECUTION_03_REPORT.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#1-recovered-github-state">1. Recovered GitHub state</a></li><li><a href="#2-branch-and-commit">2. Branch and commit</a></li><li><a href="#3-baseline-verification-before-any-change">3. Baseline verification (before any change)</a></li><li><a href="#4-what-execution-03-delivers">4. What Execution 03 delivers</a></li><li><a href="#5-database-migrations">5. Database migrations</a></li><li><a href="#6-api-endpoints">6. API endpoints</a></li><li><a href="#7-functional-cross-module-workflows-verified">7. Functional cross-module workflows verified</a></li><li><a href="#8-test-results">8. Test results</a></li><li><a href="#9-github-actions-ci">9. GitHub Actions CI</a></li><li><a href="#10-screenshots">10. Screenshots</a></li><li><a href="#11-migration-and-rollback-notes">11. Migration and rollback notes</a></li><li><a href="#12-known-limitations-and-deferred-integrations">12. Known limitations and deferred integrations</a></li><li><a href="#13-pull-request">13. Pull request</a></li></ul></nav>
+        <article><h1 id="oryx-execution-03-report-hr-crm-operations-automotive-services">ORYX — Execution 03 Report: HR, CRM, Operations &amp; Automotive Services</h1>
+<p>Status: <strong>implemented, tested and ready for owner review</strong>. Nothing is merged<br />
+and nothing is deployed.</p>
+<h2 id="1-recovered-github-state">1. Recovered GitHub state</h2>
+<p>GitHub was the source of truth.</p>
+<div class="table-wrap"><table><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody><tr><td>Repository</td><td><code>mohammadaljallad079-rgb/oryx</code></td></tr><tr><td>PR #1 (<code>feature/execution-01-super-admin-foundation</code>)</td><td><strong>merged</strong> into <code>main</code></td></tr><tr><td>PR #2 (<code>feature/execution-02-erp-core</code>)</td><td><strong>merged</strong> into <code>main</code> at 2026-10-14T20:14:18Z</td></tr><tr><td>PR #2 head</td><td><code>09b85f07632d6229751937b1e23d61f82ef539c7</code></td></tr><tr><td>Current <code>main</code> / Execution 02 merge commit</td><td><code>0173fc96653496b349451246c479a7a8cb69f703</code></td></tr><tr><td>Execution 03 branch before this session</td><td>none existed</td></tr></tbody></table></div>
+<p>Because both prior PRs are merged, Execution 03 was based on the latest <code>main</code><br />
+(<code>0173fc9</code>). No prior work was overwritten, reset or duplicated, and Executions<br />
+01–02 were not restarted.</p>
+<h2 id="2-branch-and-commit">2. Branch and commit</h2>
+<div class="table-wrap"><table><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody><tr><td>Branch</td><td><code>feature/execution-03-hr-crm-automotive</code></td></tr><tr><td>Base</td><td><code>main</code> @ <code>0173fc96653496b349451246c479a7a8cb69f703</code></td></tr><tr><td>Head at time of writing</td><td>see the PR; the branch is not force-pushed</td></tr></tbody></table></div>
+<h2 id="3-baseline-verification-before-any-change">3. Baseline verification (before any change)</h2>
+<ul><li><code>pnpm --filter @oryx/shared test</code> — 30 passed.</li><li><code>pnpm --filter @oryx/api test:e2e</code> — 109 passed.</li><li>All Execution 01 and 02 correctness invariants (balanced ledger, atomic and</li></ul>
+<p>idempotent posting, row-locked inventory, tenant isolation) were preserved and<br />
+are still asserted by the existing suites, which continue to pass.</p>
+<h2 id="4-what-execution-03-delivers">4. What Execution 03 delivers</h2>
+<p>Six modules, all DB-backed, permission-protected, entitlement-gated and covered<br />
+by tests. They reuse the Execution 01 authorization/tenancy architecture and the<br />
+Execution 02 accounting and inventory engines — there is one ledger and one stock<br />
+ledger across the platform.</p>
+<h3 id="a-human-resources-payroll-humanresources">A. Human Resources &amp; Payroll (<code>human_resources</code>)</h3>
+<ul><li>Departments (with a tree), job titles and reporting lines.</li><li>Employee profiles and employment records, with an onboarding checklist created</li></ul>
+<p>automatically and an offboarding checklist on demand.</p>
+<ul><li>Employment contracts; employee documents with a <strong>confidential</strong> flag that is</li></ul>
+<p>only readable by a principal holding <code>erp.hr.document.confidential</code>.</p>
+<ul><li>Leave types, balances, requests and approvals. A request checks</li></ul>
+<p><code>entitled + accrued − used − pending</code>, reserves the days as pending, and<br />
+approval moves them to used — so two requests cannot consume the same days.</p>
+<ul><li>Shifts, attendance and overtime.</li><li><strong>Effective-dated salary structures</strong> with fixed or percentage allowances and</li></ul>
+<p>deductions.</p>
+<ul><li>Payroll periods and runs. A run <strong>snapshots</strong> each employee&#39;s structure into</li></ul>
+<p>the payslip, so editing a salary later never changes a historical result.</p>
+<ul><li>Payroll approval posts to the ledger through the Execution 02 engine:</li></ul>
+<p>Dr Salaries expense, Cr Salaries payable (net), Cr Deductions payable,<br />
+Cr Employee advances receivable. Posting is <strong>atomic</strong> (status change, payslips<br />
+and the journal commit together) and <strong>idempotent</strong> (<code>payroll:&lt;runId&gt;</code> source<br />
+key), so a retried approval cannot double-post. Run locking closes the period<br />
+and refuses a new run against it.</p>
+<ul><li>Employee advances with settlement (in full or per payroll instalment).</li><li>A workforce dashboard.</li></ul>
+<h3 id="b-crm-customer-service-crm">B. CRM &amp; Customer Service (<code>crm</code>)</h3>
+<ul><li>Lead sources, leads, pipelines and pipeline stages.</li><li>Opportunities with stage moves; a <strong>won</strong> opportunity converts into a real</li></ul>
+<p>sales quotation, created in the shared sales table so both modules see one<br />
+quotation. Conversion happens once.</p>
+<ul><li>Customer contacts and a <strong>duplicate-protected</strong> customer master (matches on tax</li></ul>
+<p>number, email or phone within the company).</p>
+<ul><li>Activities, follow-ups and reminders.</li><li>Support tickets whose SLA response and resolution targets are derived from the</li></ul>
+<p>matching SLA policy at creation, with first-response tracking and a<br />
+satisfaction score.</p>
+<ul><li>Customer segments.</li><li>A CRM dashboard.</li></ul>
+<h3 id="c-operations-work-management-operations">C. Operations &amp; Work Management (<code>operations</code>)</h3>
+<ul><li>Projects; tasks and subtasks; assignments, priorities and due dates.</li><li>Work orders with an <strong>enforced state machine</strong></li></ul>
+<p>(<code>DRAFT → OPEN → ASSIGNED/IN_PROGRESS → ON_HOLD → COMPLETED</code>, terminal<br />
+<code>CANCELLED</code>), checklists, a department work queue and branch scoping.</p>
+<ul><li>Approval workflows, internal comments, document attachments.</li><li>An operational calendar and <strong>database-persisted internal notifications</strong> (no</li></ul>
+<p>external delivery is claimed; no provider is connected).</p>
+<ul><li>An operations dashboard.</li></ul>
+<h3 id="d-vehicle-management-automotiveinspections">D. Vehicle Management (<code>automotive_inspections</code>)</h3>
+<ul><li>Vehicle registry with <strong>VIN validation</strong> (11–17 characters, uppercase letters</li></ul>
+<p>and digits, and none of I, O or Q) and per-company uniqueness.</p>
+<ul><li>Customer-owned vehicles, make/model/year, registration and plate, and a</li></ul>
+<p>mileage history that never decreases.</p>
+<ul><li>Vehicle documents and full service history.</li></ul>
+<h3 id="e-vehicle-inspection-automotiveinspections">E. Vehicle Inspection (<code>automotive_inspections</code>)</h3>
+<ul><li>Inspection service catalog with checklists.</li><li>Bookings with inspector assignment and odometer capture.</li><li>Findings with defect classification (INFO/MINOR/MAJOR/CRITICAL).</li><li>A <strong>PDF-ready report payload</strong> (vehicle, service, findings, defects, critical</li></ul>
+<p>count, attachments) and an approval workflow.</p>
+<ul><li>Invoicing of an approved inspection through the shared sales path.</li></ul>
+<h3 id="f-maintenance-workshop-automotivemaintenance">F. Maintenance &amp; Workshop (<code>automotive_maintenance</code>)</h3>
+<ul><li>Workshop bays, maintenance bookings and job cards.</li><li>A job-card state machine; <strong>completion requires an approved estimate</strong>, so work</li></ul>
+<p>is never billed unapproved.</p>
+<ul><li>Labour operations, repair estimates with customer approval.</li><li>Parts reservation and issuance, warranty tracking.</li><li>Workshop invoicing through the shared sales path, so revenue, VAT and the</li></ul>
+<p>receivable post to the one ledger.</p>
+<h3 id="g-spare-parts-spareparts">G. Spare Parts (<code>spare_parts</code>)</h3>
+<ul><li>Part numbers (OEM / aftermarket / cross-reference) and vehicle compatibility</li></ul>
+<p>mapping, with a findByVehicle lookup.</p>
+<ul><li>Reservation of stock for a job card and issuance through the **shared stock</li></ul>
+<p>ledger** (<code>InventoryService.recordMovement</code>) — there is no second inventory<br />
+ledger and no second accounting system.</p>
+<ul><li>Stock availability and low-stock suggestions come from the existing inventory</li></ul>
+<p>module.</p>
+<h3 id="h-automotive-marketplace-foundation">H. Automotive Marketplace Foundation</h3>
+<ul><li>Service providers with an approval workflow (only an <strong>approved</strong> provider can</li></ul>
+<p>be assigned), provider company profiles, service listings and service<br />
+categories.</p>
+<ul><li>Service requests with provider assignment and status tracking.</li><li>Commission configuration (basis points per provider) and commission recording.</li><li>Provider settlement foundations for a period (aggregates pending commissions;</li></ul>
+<p>no payment is executed).</p>
+<ul><li>Versioned APIs under <code>/api/v1</code> that the future application can consume. The</li></ul>
+<p>consumer mobile application is <strong>not</strong> built in Execution 03.</p>
+<h2 id="5-database-migrations">5. Database migrations</h2>
+<p>Three additive migrations:</p>
+<div class="table-wrap"><table><thead><tr><th>Migration</th><th>Contents</th></tr></thead><tbody><tr><td><code>20261014202428_execution_03_hr_crm_automotive</code></td><td>HR, payroll, CRM, operations, automotive, parts and marketplace tables and enums</td></tr><tr><td><code>20261014203945_execution_03_journal_sources</code></td><td><code>WORKSHOP_INVOICE</code> and <code>INSPECTION_INVOICE</code> journal source types</td></tr><tr><td><code>20261014205408_execution_03_work_order_project</code></td><td><code>WorkOrder.projectId</code> and its relation</td></tr></tbody></table></div>
+<p>Every tenant-owned table carries <code>companyId</code>; branch-scoped rows carry<br />
+<code>branchId</code>. Money is integer minor units; hours and leave days are hundredths of<br />
+a unit; percentages are basis points. No Execution 01 or 02 table was altered<br />
+destructively; only new relations were added to <code>Company</code>, <code>Branch</code>, <code>Customer</code><br />
+and <code>Product</code>.</p>
+<h2 id="6-api-endpoints">6. API endpoints</h2>
+<p>144 new routes under <code>/api/v1</code> (<code>/hr</code>, <code>/crm</code>, <code>/operations</code>, <code>/automotive</code>). The<br />
+full per-route permission table is in <code>docs/api/API_REFERENCE.md</code>. Every route<br />
+uses the existing <code>@RequireModule</code> + permission guards and is company-scoped<br />
+server-side.</p>
+<h2 id="7-functional-cross-module-workflows-verified">7. Functional cross-module workflows verified</h2>
+<p>Each is asserted by the integration suite against the real HTTP surface and the<br />
+seeded database:</p>
+<ol><li><strong>HR:</strong> employee → leave (balance enforced) → payroll run → approval posts a</li></ol>
+<p>balanced journal → lock closes the period.</p>
+<ol><li><strong>CRM:</strong> lead → opportunity → stage &quot;won&quot; → convert → a real sales quotation.</li><li><strong>Operations:</strong> create work order with a checklist → start → complete, with an</li></ol>
+<p>illegal transition refused.</p>
+<ol><li><strong>Inspection:</strong> vehicle → booking → findings → report → approve → invoice.</li><li><strong>Maintenance:</strong> vehicle → job card → estimate → customer approval → parts</li></ol>
+<p>reserve and issue (stock ledger moves once) → complete → invoice.</p>
+<ol><li><strong>Parts:</strong> reserve → issue consumes the shared stock ledger; concurrent</li></ol>
+<p>issuance is guarded so stock never goes negative.</p>
+<h2 id="8-test-results">8. Test results</h2>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Command</th><th>Result</th></tr></thead><tbody><tr><td>Shared unit tests</td><td><code>pnpm --filter @oryx/shared test</code></td><td><strong>30 passed</strong></td></tr><tr><td>API integration (e2e)</td><td><code>pnpm --filter @oryx/api test:e2e</code></td><td><strong>132 passed</strong> (79 E01 + 30 E02 + 23 E03)</td></tr><tr><td>Browser acceptance (Playwright)</td><td><code>pnpm --filter @oryx/admin test:ui</code></td><td><strong>108 passed</strong> (incl. 9 new E03 UI tests)</td></tr></tbody></table></div>
+<p>Total: <strong>270 automated tests passing.</strong></p>
+<p>The mandatory Execution 03 tests are all present and passing:</p>
+<ul><li>payroll calculation and accounting posting, payroll idempotency, payroll period</li></ul>
+<p>locking;</p>
+<ul><li>leave balance enforcement; employee data isolation;</li><li>CRM pipeline conversion; duplicate customer prevention;</li><li>support-ticket permissions;</li><li>work-order state transitions;</li><li>inspection approval and report integrity;</li><li>vehicle data isolation and VIN validation;</li><li>parts reservation and stock consumption; concurrent inventory consumption;</li><li>workshop invoice posting;</li><li>marketplace provider approval;</li><li>tenant isolation, branch permissions, subscription entitlement restrictions;</li><li>Arabic/English interfaces, dark/light themes and mobile responsiveness.</li></ul>
+<p>No existing test was removed or weakened; the E01/E02 suites still pass unchanged.</p>
+<h2 id="9-github-actions-ci">9. GitHub Actions CI</h2>
+<p>The existing CI workflow runs the shared unit tests, the API integration suite<br />
+and the full Playwright suite against a PostgreSQL 17 service. Execution 03 adds<br />
+no new workflow: the new suites are picked up automatically, and the Execution 03<br />
+branch was added to the <code>push</code> trigger. CI status will be shown on the PR; all<br />
+three jobs must pass on the final commit.</p>
+<h2 id="10-screenshots">10. Screenshots</h2>
+<p>Captured by the Playwright screenshot suite into<br />
+<code>docs/execution-reports/screenshots/</code>:</p>
+<ul><li><code>e03-hr-dark.png</code></li><li><code>e03-crm-dark.png</code></li><li><code>e03-operations-dark.png</code></li><li><code>e03-inspections-dark.png</code></li><li><code>e03-maintenance-dark.png</code></li><li><code>e03-spare-parts-dark.png</code></li></ul>
+<p>The approved navy/gold design, right-side Arabic navigation, image-led module<br />
+cards, responsive layout and both themes are preserved and extended to the new<br />
+screens. The official logo is still absent from the repository; the neutral<br />
+monogram placeholder remains and no brand mark was invented.</p>
+<h2 id="11-migration-and-rollback-notes">11. Migration and rollback notes</h2>
+<ul><li><strong>Apply:</strong> <code>pnpm db:migrate</code> (runs <code>prisma migrate deploy</code>). The migrations are</li></ul>
+<p>additive and safe to apply to a database that already has Executions 01–02.</p>
+<ul><li><strong>Seed:</strong> <code>pnpm db:seed</code> is idempotent and adds departments, job titles,</li></ul>
+<p>employees with salary structures, leave types, shifts, lead sources, a default<br />
+pipeline, inspection services with checklists, bays and an approved provider for<br />
+every active company.</p>
+<ul><li><strong>Rollback:</strong> dropping Execution 03 objects restores the Execution 02 schema.</li></ul>
+<p>The three migrations can be reverted by dropping the tables and enums they<br />
+create; no Execution 01 or 02 column or row is modified, so a rollback cannot<br />
+lose prior data.</p>
+<h2 id="12-known-limitations-and-deferred-integrations">12. Known limitations and deferred integrations</h2>
+<ul><li><strong>No jurisdiction compliance.</strong> Payroll calculates from configured salary</li></ul>
+<p>structures and posts to the ledger. It does <strong>not</strong> implement Bahrain labour<br />
+law, social insurance, WPS or any other jurisdiction&#39;s rules. Those must be<br />
+configured and verified before any compliance claim.</p>
+<ul><li><strong>Inspection is not accreditation.</strong> The inspection workflow is an internal ORYX</li></ul>
+<p>process. It is <strong>not</strong> government certification or an officially accredited<br />
+inspection.</p>
+<ul><li><strong>Notifications are internal only.</strong> They are persisted in the database; no</li></ul>
+<p>email, SMS or push provider is connected, so no external delivery is claimed.</p>
+<ul><li><strong>Marketplace is a foundation.</strong> Provider onboarding, listings, requests,</li></ul>
+<p>commissions and settlements are implemented administratively; the consumer<br />
+mobile application and payment execution are deferred.</p>
+<ul><li><strong>No payment gateway.</strong> Nothing charges a card or moves money.</li><li><strong>Valuation is moving-average only.</strong> FIFO/LIFO remain out of scope.</li><li><strong>Deferred to a later execution:</strong> the consumer mobile application and the</li></ul>
+<p>automotive consumer-facing experiences (My Garage, Auto Map, SOS dispatch,<br />
+marketplace checkout).</p>
+<h2 id="13-pull-request">13. Pull request</h2>
+<div class="table-wrap"><table><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody><tr><td>PR</td><td><a href="https://github.com/mohammadaljallad079-rgb/oryx/pull/3" target="_blank" rel="noopener noreferrer">https://github.com/mohammadaljallad079-rgb/oryx/pull/3</a></td></tr><tr><td>Base</td><td><code>main</code></td></tr><tr><td>Head</td><td><code>feature/execution-03-hr-crm-automotive</code></td></tr><tr><td>CI</td><td>GitHub Actions run on the branch (<code>ci.yml</code>)</td></tr></tbody></table></div>
+<p>It is <strong>not</strong> to be merged or deployed without owner approval. Execution 04 must<br />
+not start without explicit owner approval.</p></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>36afef6</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-31T15:03:02.730Z</span>
+  </div>
+</footer>
+</body>
+</html>

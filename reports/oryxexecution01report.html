@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>ORYX — Execution 01 Report · ORYX design preview</title>
+<meta name="description" content="ORYX — Execution 01 Report" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../mobile/">Mobile app</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Execution reports</p>
+        <h1>ORYX — Execution 01 Report</h1>
+        <p class="card__meta">Rendered from <code>docs/execution-reports/ORYX_EXECUTION_01_REPORT.md</code> at <code>36afef6</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/execution-reports/ORYX_EXECUTION_01_REPORT.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#1-executive-summary">1. Executive summary</a></li><li><a href="#2-verification-summary">2. Verification summary</a></li><li><a href="#3-what-is-implemented-and-tested">3. What is implemented and tested</a></li><li><a href="#4-implemented-but-not-fully-tested">4. Implemented but not fully tested</a></li><li><a href="#5-scaffolded-or-planned">5. Scaffolded or planned</a></li><li><a href="#6-blocked-by-missing-assets-or-external-credentials">6. Blocked by missing assets or external credentials</a></li><li><a href="#7-visual-comparison-against-the-approved-reference">7. Visual comparison against the approved reference</a></li><li><a href="#8-screenshots-delivered">8. Screenshots delivered</a></li><li><a href="#9-deliverables-checklist">9. Deliverables checklist</a></li><li><a href="#10-reproducing-this-report">10. Reproducing this report</a></li><li><a href="#11-recommended-next-steps">11. Recommended next steps</a></li></ul></nav>
+        <article><h1 id="oryx-execution-01-report">ORYX — Execution 01 Report</h1>
+<p><strong>Execution:</strong> 01 — Enterprise Foundation, Super Admin &amp; Approved UI<br />
+<strong>Repository:</strong> <code>mohammadaljallad079-rgb/oryx</code><br />
+<strong>Branch:</strong> <code>feature/execution-01-super-admin-foundation</code><br />
+<strong>Base branch:</strong> <code>main</code><br />
+<strong>Date:</strong> 2026-10-14<br />
+<strong>Status:</strong> Implemented and tested. Not deployed.</p>
+<hr />
+<h2 id="1-executive-summary">1. Executive summary</h2>
+<p>Execution 01 delivers a running, database-backed foundation for the ORYX<br />
+platform: a NestJS/PostgreSQL API, a Next.js admin application, persistent<br />
+authentication, the platform/company/branch hierarchy, RBAC with a permission<br />
+catalog, a configurable ERP module catalog, configurable SaaS plans with<br />
+snapshot entitlements, company provisioning, functional Super Admin screens, a<br />
+DB-backed dashboard with the approved navy/gold image-tile design, dark and light<br />
+themes, Arabic RTL and English LTR, and a persistent Website &amp; Application<br />
+Management section.</p>
+<p>Everything reported as <strong>implemented</strong> is backed by real database CRUD and<br />
+covered by automated tests. Nothing is claimed as deployed. No payment gateway<br />
+and no notification provider are integrated, and this is stated plainly rather<br />
+than simulated.</p>
+<h3 id="repository-audit-result">Repository audit result</h3>
+<p>Before writing code the repository was audited. It contained <strong>only</strong><br />
+documentation and one asset:</p>
+<pre><code>AGENTS.md
+README.md
+docs/ORYX_MASTER_REFERENCE.md
+docs/ORYX_VISUAL_REFERENCE.md
+docs/assets/ORYX Auto Services Dashboard.png   (1536 × 1024)
+docs/assets/README.md</code></pre>
+<p>There was <strong>no application code, no build tooling and no framework choice</strong>, so<br />
+the stack was selected from scratch (Next.js + NestJS + PostgreSQL + Prisma, as<br />
+the master reference prefers). Nothing pre-existing was modified or deleted.</p>
+<h3 id="missing-asset">Missing asset</h3>
+<p><strong>The official ORYX logo is not present in the repository.</strong><br />
+<code>docs/ORYX_VISUAL_REFERENCE.md</code> names<br />
+<code>WhatsApp Image 2026-10-06 at 1.25.18 PM(3).jpeg</code> as the authoritative brand<br />
+asset and expects it at <code>docs/assets/oryx-logo-original.jpg</code>. It is absent. Per<br />
+the reference&#39;s own instruction (&quot;Do not substitute guessed logo artwork&quot;), no<br />
+logo was invented: the UI uses a neutral geometric monogram placeholder, clearly<br />
+marked in code as such.</p>
+<hr />
+<h2 id="2-verification-summary">2. Verification summary</h2>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Command</th><th>Result</th></tr></thead><tbody><tr><td>Authorization invariants (unit)</td><td><code>pnpm --filter @oryx/shared test</code></td><td><strong>22 passed</strong></td></tr><tr><td>API integration (real HTTP + guards + Prisma)</td><td><code>pnpm --filter @oryx/api test:e2e</code></td><td><strong>45 passed</strong></td></tr><tr><td>UI acceptance + screenshots (Playwright)</td><td><code>pnpm --filter @oryx/admin test:ui</code></td><td><strong>29 passed</strong> (18 acceptance, 11 screenshot)</td></tr><tr><td>API typecheck</td><td><code>pnpm --filter @oryx/api typecheck</code></td><td>clean</td></tr><tr><td>Admin typecheck</td><td><code>pnpm --filter @oryx/admin typecheck</code></td><td>clean</td></tr><tr><td>Admin production build</td><td><code>pnpm --filter @oryx/admin build</code></td><td>27 routes built</td></tr></tbody></table></div>
+<h3 id="bugs-found-and-fixed-during-verification">Bugs found and fixed during verification</h3>
+<p>The test suites caught five genuine defects, all fixed:</p>
+<ol><li><strong>Privilege escalation on first invitation.</strong> A newly provisioned company&#39;s</li></ol>
+<p>default <code>company_admin</code> role references ERP permissions the plan does not<br />
+license; the delegation validator treated <code>module_not_licensed</code> as a hard<br />
+rejection, so the first invitation always failed. Fixed: unlicensed-module<br />
+permissions are now <em>accepted but inert</em> — <code>resolveEffectivePermissions</code><br />
+strips them at request time, so no privilege is conferred and the role widens<br />
+automatically on a plan upgrade.</p>
+<ol><li><strong>Plan edits retroactively changed live tenants.</strong> <code>EntitlementService</code></li></ol>
+<p>read <code>planModule</code> rows live instead of the subscription&#39;s snapshot, directly<br />
+violating the master reference. Fixed: entitlements now come from<br />
+<code>Subscription.licensedModules</code>.</p>
+<ol><li><strong><code>company_admin</code> could not delegate branch-scoped roles.</strong> The template only</li></ol>
+<p>included <code>COMPANY</code>-scope permissions, omitting <code>BRANCH</code>-scope codes such as<br />
+<code>branch.read</code>, so the seeded <code>staff_viewer</code>/<code>branch_manager</code> roles were<br />
+unassignable. Fixed: the template now includes every non-platform delegable<br />
+permission.</p>
+<ol><li><strong>The Super Admin could not create branches.</strong> The route required</li></ol>
+<p><code>company.branch.create</code>, which a platform principal does not hold. Fixed:<br />
+<code>platform.branch.manage</code> is accepted as an alternative.</p>
+<ol><li><strong>Plan creation from the UI could never succeed.</strong> The form omitted the</li></ol>
+<p>bilingual descriptions the API required, so every submit returned HTTP 400.<br />
+Fixed: descriptions are optional metadata with an empty default, and the form<br />
+now exposes the fields.</p>
+<p>Two further UI defects were found and fixed: platform-only screens rendered<br />
+active buttons for principals who could not use them (now an explicit denial<br />
+state), and branch creation errors leaked the raw English API message instead of<br />
+the localized one.</p>
+<hr />
+<h2 id="3-what-is-implemented-and-tested">3. What is implemented and tested</h2>
+<h3 id="31-authentication-and-sessions">3.1 Authentication and sessions</h3>
+<ul><li>Argon2id password hashing.</li><li>Short-lived access tokens (15 min default) plus rotating refresh tokens (30 days).</li><li>Refresh-token <strong>reuse detection</strong>: replaying a rotated token revokes every</li></ul>
+<p>session for that user.</p>
+<ul><li>Account lockout after 8 failed attempts for 15 minutes.</li><li>Invitation flow: SHA-256-hashed single-use tokens with a 7-day expiry,</li></ul>
+<p>accepted through a public endpoint that activates the account and membership.</p>
+<ul><li>Persisted per-user theme and locale preference.</li><li>Audit rows for login, logout, logout-all, password change and invitation</li></ul>
+<p>acceptance.</p>
+<ul><li>Login and refresh endpoints are rate limited independently of the global limit.</li></ul>
+<p><strong>Tests:</strong> 6 authentication integration tests + 3 UI tests.</p>
+<h3 id="32-organization-hierarchy-and-tenant-isolation">3.2 Organization hierarchy and tenant isolation</h3>
+<ul><li>Company CRUD with <code>INTERNAL</code> / <code>SAAS_TENANT</code> discrimination, status lifecycle</li></ul>
+<p>(<code>ACTIVE</code>, <code>SUSPENDED</code>, <code>PROVISIONING</code>, <code>ARCHIVED</code>), parent/subsidiary links<br />
+with server-side cycle rejection, and industry/currency/country metadata.</p>
+<ul><li>Branch CRUD with per-company unique codes and soft deletion.</li><li>Company provisioning optionally creates a subscription and invites the first</li></ul>
+<p>administrator in one call.</p>
+<ul><li><strong>Isolation is enforced in the API, not only the UI:</strong> a company principal</li></ul>
+<p>cannot read another tenant, list its users, read its audit log, or attach its<br />
+branches. A platform principal carries no tenant scope until a support session<br />
+is opened.</p>
+<p><strong>Tests:</strong> 4 company, 3 branch, 5 cross-tenant integration tests + 4 UI tests.</p>
+<h3 id="33-rbac-and-delegated-administration">3.3 RBAC and delegated administration</h3>
+<ul><li>62-entry permission catalog with scope (<code>PLATFORM</code> / <code>COMPANY</code> / <code>BRANCH</code>),</li></ul>
+<p>delegability, bilingual labels and module linkage.</p>
+<ul><li>Three seeded company roles (<code>company_admin</code>, <code>branch_manager</code>,</li></ul>
+<p><code>staff_viewer</code>) plus a platform <code>platform_super_admin</code> role.</p>
+<ul><li>Custom role creation and editing, with the permission picker offering only</li></ul>
+<p>permissions the actor holds <em>and</em> the plan licenses.</p>
+<ul><li>System roles are protected from modification.</li><li>Effective-permission view per user, showing granted vs effective vs</li></ul>
+<p>entitlement-suppressed permissions.</p>
+<ul><li>Membership role/branch-scope changes revoke live sessions when access is</li></ul>
+<p>removed.</p>
+<p><strong>Tests:</strong> 5 role/delegation integration tests, 5 authorization unit tests,<br />
+2 UI tests.</p>
+<h3 id="34-module-catalog-plans-and-subscriptions">3.4 Module catalog, plans and subscriptions</h3>
+<ul><li>17-module ERP catalog with delivery phase and availability status, shared by</li></ul>
+<p>API authorization and UI navigation.</p>
+<ul><li>Admin-defined plans: pricing, currency, trial days, limits, included modules,</li></ul>
+<p>public/active flags.</p>
+<ul><li>Subscription assignment with an immutable event history; plan changes and</li></ul>
+<p>status changes each write an event.</p>
+<ul><li><strong>Entitlement snapshot</strong> semantics: plan edits never alter live tenants.</li><li>Suspending a subscription revokes entitlements immediately.</li><li>Plan limits enforced server-side: <code>maxBranches</code> and <code>maxUsers</code> return</li></ul>
+<p><code>plan.limit_exceeded</code>.</p>
+<p><strong>Tests:</strong> 4 entitlement, 4 plan, 3 limit integration tests + 3 UI tests.</p>
+<h3 id="35-dashboard">3.5 Dashboard</h3>
+<ul><li>Every figure is a database aggregate constrained to the authorized</li></ul>
+<p>company/branch scope: companies, active companies, branches, users, active<br />
+subscriptions, monthly recurring revenue, licensed modules, seat utilisation,<br />
+open support sessions.</p>
+<ul><li>Branch staffing chart and module-entitlement donut are drawn from real rows.</li><li>Recent activity is read from the audit trail.</li><li><code>isDemoData</code> is <code>true</code> only when every company in scope is a seeded synthetic</li></ul>
+<p>record; the UI then shows a labelled demo notice.</p>
+<ul><li>Empty states are shown rather than invented numbers.</li></ul>
+<p><strong>Tests:</strong> 4 dashboard integration tests + 2 UI tests.</p>
+<h3 id="36-website-application-management">3.6 Website &amp; Application Management</h3>
+<p>Persistent, admin-editable: CMS pages (bilingual, draft/published/archived),<br />
+home-screen and web banners, feature flags, application version records, service<br />
+categories, notification templates, and API client registration (secret returned<br />
+once, stored as a SHA-256 hash). A public endpoint serves published content to<br />
+the future website and app shells.</p>
+<p><strong>Tests:</strong> 2 UI tests plus public-content integration tests.</p>
+<h3 id="37-audit-and-support-access">3.7 Audit and support access</h3>
+<ul><li>Append-only audit trail across every security-relevant mutation.</li><li>Super Admin support sessions are explicit, reason-gated (≥10 characters),</li></ul>
+<p>time-bounded (5–240 minutes, default 60) and audited on open and end. An<br />
+expired or non-owned session is rejected.</p>
+<p><strong>Tests:</strong> 2 support integration tests.</p>
+<h3 id="38-ui-themes-and-localization">3.8 UI, themes and localization</h3>
+<ul><li>27 routes built; the authenticated shell provides company and branch context</li></ul>
+<p>selection, theme and language toggles, and a user menu.</p>
+<ul><li>Dark theme reproduces the approved navy (<code>#00162b</code>) and gold (<code>#d4af37</code>)</li></ul>
+<p>identity; light theme keeps the same layout with navy typography and<br />
+restrained gold.</p>
+<ul><li>Theme and locale persist per user (localStorage plus the user profile).</li><li>Arabic RTL is the default; English LTR is natural, not mirrored.</li><li>Planned modules render an explicit &quot;not implemented in Execution 01&quot; state</li></ul>
+<p>with no fabricated data.</p>
+<ul><li>Responsive: the sidebar collapses to an overlay drawer below 860 px.</li></ul>
+<p><strong>Tests:</strong> 2 theme/locale UI tests, 2 responsive/mobile screenshot captures.</p>
+<hr />
+<h2 id="4-implemented-but-not-fully-tested">4. Implemented but not fully tested</h2>
+<div class="table-wrap"><table><thead><tr><th>Area</th><th>Coverage</th><th>Gap</th></tr></thead><tbody><tr><td><code>storageMb</code> and <code>apiRequestsPerMonth</code> limits</td><td>Stored, returned, displayed</td><td>No storage meter or request metering job, so no enforcement test</td></tr><tr><td><code>maxCompanies</code> limit</td><td>Stored and displayed</td><td>Not enforced; the Super Admin provisions companies</td></tr><tr><td>CMS <code>PUT</code> upsert paths</td><td>Pages and banners exercised through the UI</td><td>Feature-flag and app-version writes are covered by UI tests only, not by an API-level assertion</td></tr><tr><td>API client secret lifecycle</td><td>Creation returns the secret; revocation path implemented</td><td>No test asserting that a revoked client is refused at the gateway (no gateway exists yet)</td></tr><tr><td>Password change flow</td><td>Implemented with session revocation</td><td>No integration test</td></tr><tr><td>Logout / logout-all</td><td>Implemented and audited</td><td>Covered indirectly; no dedicated integration test</td></tr><tr><td>Mobile viewports</td><td>Screenshot-verified at 390 × 844</td><td>No interaction tests at mobile width</td></tr><tr><td>Tablet viewports</td><td>Responsive CSS present</td><td>Not screenshot-verified</td></tr></tbody></table></div>
+<hr />
+<h2 id="5-scaffolded-or-planned">5. Scaffolded or planned</h2>
+<p>Routed, permission-protected, and <strong>explicitly labelled as not implemented</strong> in<br />
+the UI. No fabricated data is shown on these screens.</p>
+<div class="table-wrap"><table><thead><tr><th>Module</th><th>Route</th><th>Planned phase</th></tr></thead><tbody><tr><td>Financial Accounting</td><td><code>/accounting</code></td><td>execution-02</td></tr><tr><td>Sales &amp; POS</td><td><code>/sales</code></td><td>execution-02</td></tr><tr><td>Purchasing &amp; Procurement</td><td><code>/purchasing</code></td><td>execution-02</td></tr><tr><td>Reports &amp; Analytics</td><td><code>/reports</code></td><td>execution-02</td></tr><tr><td>Warehouses &amp; Inventory</td><td><code>/inventory</code></td><td>execution-03</td></tr><tr><td>Human Resources</td><td><code>/hr</code></td><td>execution-03</td></tr><tr><td>CRM</td><td><code>/crm</code></td><td>execution-03</td></tr><tr><td>Operations</td><td><code>/operations</code></td><td>execution-03</td></tr><tr><td>Automotive Inspections</td><td><code>/automotive/inspections</code></td><td>execution-04</td></tr><tr><td>Automotive Maintenance</td><td><code>/automotive/maintenance</code></td><td>execution-04</td></tr><tr><td>Spare Parts</td><td><code>/automotive/spare-parts</code></td><td>execution-04</td></tr></tbody></table></div>
+<p>Also scaffolded but not implemented: the consumer mobile application, marketplace<br />
+moderation queues, inspection/maintenance configuration engines, partner<br />
+administration, payments, and email/SMS/push delivery.</p>
+<hr />
+<h2 id="6-blocked-by-missing-assets-or-external-credentials">6. Blocked by missing assets or external credentials</h2>
+<div class="table-wrap"><table><thead><tr><th>Item</th><th>Blocker</th><th>Effect</th></tr></thead><tbody><tr><td>Official ORYX logo</td><td>The original image file is not in the repository</td><td>A neutral geometric monogram placeholder is used; no mark was invented</td></tr><tr><td>Approved dashboard photography</td><td>Only the flat screenshot exists; the underlying imagery is not available</td><td>Tile and hero artwork is generated abstract vector art (<code>scripts/generate-tile-art.py</code>). Replacing it needs only new files in <code>apps/admin/public/tiles/</code></td></tr><tr><td>Payment gateway</td><td>No provider credentials</td><td>Subscriptions record price, period and immutable history; no charge is attempted and no integration is claimed</td></tr><tr><td>Email/SMS/push delivery</td><td>No provider credentials</td><td>Invitation tokens are returned by the API exactly once and must be delivered out of band</td></tr><tr><td>MFA</td><td>Not implemented in this execution</td><td>Privileged accounts rely on password + lockout only</td></tr><tr><td>Deployment</td><td>No target environment provided</td><td>Nothing is deployed; no deployment is claimed</td></tr></tbody></table></div>
+<hr />
+<h2 id="7-visual-comparison-against-the-approved-reference">7. Visual comparison against the approved reference</h2>
+<p><strong>Reference:</strong> <code>docs/assets/ORYX Auto Services Dashboard.png</code> (1536 × 1024),<br />
+the authoritative owner-approved layout.</p>
+<p><strong>Implementation:</strong> <code>docs/execution-reports/screenshots/desktop-dark-dashboard-full.png</code><br />
+(1440 × 1000 viewport, full page).</p>
+<h3 id="what-matches">What matches</h3>
+<div class="table-wrap"><table><thead><tr><th>Reference element</th><th>Implementation</th></tr></thead><tbody><tr><td>Deep navy field with layered panels</td><td><code>--bg: #00162b</code>, <code>--surface: #021f3a</code>, <code>--surface-raised: #072a4a</code></td></tr><tr><td>Restrained gold accent</td><td><code>--gold: #d4af37</code>, with soft/deep variants for gradients</td></tr><tr><td>Premium top navigation bar</td><td>Sticky translucent header with blurred backdrop, scope selector, theme/language toggles, user menu</td></tr><tr><td>Right-side navigation in Arabic</td><td>Sidebar switches to the inline-start (right) edge under RTL, grouped and gold-highlighted on the active route</td></tr><tr><td>Automotive hero section</td><td>Full-width image-led hero with a navy gradient scrim, headline, supporting copy and a primary CTA</td></tr><tr><td>Large image-led rectangular module cards</td><td><code>.oryx-tile</code> grid with SVG artwork behind a navy gradient, icon chip, availability badge, title and description</td></tr><tr><td>Card overlays, typography, icons, borders</td><td>Hairline gold-tinted borders, text shadows over imagery, gold-bordered icon chips</td></tr><tr><td>KPI cards</td><td>Eight KPI cards with icon chip, label, tabular value and sub-label</td></tr><tr><td>Analytics charts</td><td>Branch staffing bar chart, module-entitlement donut, entitlement trend line — all theme-aware inline SVG</td></tr><tr><td>Overall proportions and density</td><td>3-column tile grid, 4-column KPI row, 3-column analytics row at 1440 px</td></tr></tbody></table></div>
+<h3 id="deliberate-differences">Deliberate differences</h3>
+<ol><li><strong>Photography replaced by generated vector art.</strong> The reference uses</li></ol>
+<p>photographic tiles; the repository contains no licensed imagery, so<br />
+<code>scripts/generate-tile-art.py</code> produces abstract automotive/enterprise vector<br />
+artwork. The visual role — image-led rectangles with a navy scrim and legible<br />
+captions — is preserved. Dropping real photography into<br />
+<code>apps/admin/public/tiles/</code> with the same filenames completes the match without<br />
+a code change.</p>
+<ol><li><strong>No ORYX logo.</strong> A neutral geometric monogram occupies the brand slot. This</li></ol>
+<p>follows the visual reference&#39;s explicit instruction not to invent the mark.</p>
+<ol><li><strong>Illustrative metrics are replaced by real data.</strong> The reference shows</li></ol>
+<p>fixed sample figures. The implementation queries the database for the<br />
+authorized scope; with only seeded data present it displays a labelled demo<br />
+notice, and with real data the notice disappears. This is required by the<br />
+execution rules and is the most important intentional difference.</p>
+<ol><li><strong>Module tiles carry an availability badge.</strong> Tiles for modules that are not</li></ol>
+<p>implemented in Execution 01 are desaturated and labelled &quot;Planned&quot;, and the<br />
+destination page states plainly that the workflow is absent. The reference<br />
+shows all tiles as equal.</p>
+<ol><li><strong>Extra operational chrome.</strong> The reference is a single static view; the</li></ol>
+<p>implementation adds a company/branch scope selector, because the dashboard<br />
+must respect permitted scope.</p>
+<ol><li><strong>Additional dashboard panels.</strong> Branch staffing, module entitlement and</li></ol>
+<p>recent activity replace decorative panels so that every element carries<br />
+meaning.</p>
+<h3 id="themes-and-directions">Themes and directions</h3>
+<div class="table-wrap"><table><thead><tr><th>Variant</th><th>File</th></tr></thead><tbody><tr><td>Desktop dark (English LTR)</td><td><code>desktop-dark-dashboard.png</code>, <code>desktop-dark-dashboard-full.png</code></td></tr><tr><td>Desktop light (English LTR)</td><td><code>desktop-light-dashboard.png</code>, <code>desktop-light-dashboard-full.png</code></td></tr><tr><td>Desktop dark (Arabic RTL)</td><td><code>desktop-dark-ar-dashboard.png</code></td></tr><tr><td>Mobile dark</td><td><code>mobile-dark-dashboard.png</code></td></tr><tr><td>Mobile light</td><td><code>mobile-light-dashboard.png</code></td></tr></tbody></table></div>
+<p>The light theme keeps the identical layout, swapping to a warm off-white field<br />
+with navy headings and restrained gold. Arabic RTL mirrors the shell, the hero<br />
+scrim gradient and the active-route highlight.</p>
+<hr />
+<h2 id="8-screenshots-delivered">8. Screenshots delivered</h2>
+<p>All in <code>docs/execution-reports/screenshots/</code>, captured from the running<br />
+application at 1440 px (desktop) and 390 × 844 (mobile).</p>
+<div class="table-wrap"><table><thead><tr><th>File</th><th>Shows</th></tr></thead><tbody><tr><td><code>desktop-dark-dashboard.png</code></td><td>Dashboard, dark, English, viewport</td></tr><tr><td><code>desktop-dark-dashboard-full.png</code></td><td>Dashboard, dark, English, full page</td></tr><tr><td><code>desktop-light-dashboard.png</code> / <code>-full.png</code></td><td>Dashboard, light, English</td></tr><tr><td><code>desktop-dark-ar-dashboard.png</code></td><td>Dashboard, dark, Arabic RTL</td></tr><tr><td><code>mobile-dark-dashboard.png</code></td><td>Dashboard, dark, mobile</td></tr><tr><td><code>mobile-light-dashboard.png</code></td><td>Dashboard, light, mobile</td></tr><tr><td><code>desktop-dark-companies.png</code></td><td>Company &amp; tenant management</td></tr><tr><td><code>desktop-light-companies.png</code></td><td>Company management, light theme</td></tr><tr><td><code>desktop-dark-plans.png</code></td><td>Subscription packages</td></tr><tr><td><code>desktop-dark-roles.png</code></td><td>Roles &amp; permissions</td></tr><tr><td><code>desktop-dark-company-admin.png</code></td><td>Restricted company-administrator view</td></tr><tr><td><code>desktop-dark-planned-module.png</code></td><td>Explicit not-implemented module state</td></tr><tr><td><code>desktop-dark-login.png</code> / <code>desktop-light-login.png</code></td><td>Sign-in screen, both themes</td></tr></tbody></table></div>
+<hr />
+<h2 id="9-deliverables-checklist">9. Deliverables checklist</h2>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Deliverable</th><th>Status</th></tr></thead><tbody><tr><td>1</td><td>Source committed to a dedicated feature branch</td><td>Done</td></tr><tr><td>2</td><td>Branch pushed to GitHub</td><td>Done — <code>feature/execution-01-super-admin-foundation</code></td></tr><tr><td>3</td><td>Pull request against <code>main</code></td><td>Opened — <a href="https://github.com/mohammadaljallad079-rgb/oryx/pull/1" target="_blank" rel="noopener noreferrer">https://github.com/mohammadaljallad079-rgb/oryx/pull/1</a></td></tr><tr><td>4</td><td>Database migrations and seed scripts</td><td>Done — 2 migrations, idempotent seed</td></tr><tr><td>5</td><td><code>.env.example</code> without secrets</td><td>Done</td></tr><tr><td>6</td><td>Local development runbook</td><td><code>docs/LOCAL_DEVELOPMENT.md</code></td></tr><tr><td>7</td><td>Architecture document</td><td><code>docs/architecture/ARCHITECTURE.md</code></td></tr><tr><td>8</td><td>Permission matrix</td><td><code>docs/architecture/PERMISSION_MATRIX.md</code></td></tr><tr><td>9</td><td>Module/plan entitlement specification</td><td><code>docs/architecture/MODULE_PLAN_ENTITLEMENTS.md</code></td></tr><tr><td>10</td><td>Screenshots and visual comparison report</td><td>Section 7 + <code>screenshots/</code></td></tr><tr><td>11</td><td>Automated test results</td><td>Section 2</td></tr><tr><td>12</td><td>This execution report</td><td><code>docs/execution-reports/ORYX_EXECUTION_01_REPORT.md</code></td></tr></tbody></table></div>
+<p>Additional: <code>docs/api/API_REFERENCE.md</code>, Swagger UI at <code>/api/docs</code>,<br />
+<code>scripts/smoke.sh</code>, <code>scripts/generate-tile-art.py</code>.</p>
+<hr />
+<h2 id="10-reproducing-this-report">10. Reproducing this report</h2>
+<pre><code class="language-bash"># Prerequisites: Node ≥ 20, pnpm 9.15.9, PostgreSQL 17
+pnpm install
+cp .env.example .env                     # then set the two JWT secrets
+pnpm db:generate &amp;&amp; pnpm db:migrate &amp;&amp; pnpm db:seed
+
+pnpm --filter @oryx/shared test           # 22 passed
+pnpm --filter @oryx/api test:e2e          # 45 passed
+
+# UI suites need both services running:
+AUTH_THROTTLE_LIMIT=500 pnpm dev:api &amp;
+pnpm dev:admin &amp;
+pnpm --filter @oryx/admin test:ui         # 29 passed</code></pre>
+<hr />
+<h2 id="11-recommended-next-steps">11. Recommended next steps</h2>
+<ol><li>Upload the official ORYX logo and the approved dashboard photography, then</li></ol>
+<p>drop the imagery into <code>apps/admin/public/tiles/</code>.</p>
+<ol><li>Implement Execution 02 (Financial Accounting, Sales &amp; POS, Purchasing,</li></ol>
+<p>Reports) as real DB-backed workflows, promoting each module from <code>PLANNED</code> to<br />
+<code>AVAILABLE</code> in the shared catalog.</p>
+<ol><li>Add MFA for privileged accounts and move refresh tokens to httpOnly cookies.</li><li>Add a storage meter and an API request metering job so <code>storageMb</code> and</li></ol>
+<p><code>apiRequestsPerMonth</code> are enforced, then extend the limit tests to cover them.</p>
+<ol><li>Integrate a payment provider and an email/SMS provider behind explicit,</li></ol>
+<p>auditable adapters.</p></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>36afef6</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-31T15:03:02.730Z</span>
+  </div>
+</footer>
+</body>
+</html>

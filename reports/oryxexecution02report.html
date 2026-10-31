@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>ORYX — Execution 02 Report: Enterprise ERP Core · ORYX design preview</title>
+<meta name="description" content="ORYX — Execution 02 Report: Enterprise ERP Core" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../mobile/">Mobile app</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Execution reports</p>
+        <h1>ORYX — Execution 02 Report: Enterprise ERP Core</h1>
+        <p class="card__meta">Rendered from <code>docs/execution-reports/ORYX_EXECUTION_02_REPORT.md</code> at <code>36afef6</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/execution-reports/ORYX_EXECUTION_02_REPORT.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#1-recovered-github-state">1. Recovered GitHub state</a></li><li><a href="#2-branch-and-commit">2. Branch and commit</a></li><li><a href="#3-what-execution-02-delivers">3. What Execution 02 delivers</a></li><li><a href="#4-database-migrations">4. Database migrations</a></li><li><a href="#5-api-endpoints">5. API endpoints</a></li><li><a href="#6-functional-workflows-verified">6. Functional workflows verified</a></li><li><a href="#7-test-results">7. Test results</a></li><li><a href="#8-github-actions-ci">8. GitHub Actions CI</a></li><li><a href="#9-screenshots">9. Screenshots</a></li><li><a href="#10-known-limitations">10. Known limitations</a></li><li><a href="#11-pull-request">11. Pull request</a></li></ul></nav>
+        <article><h1 id="oryx-execution-02-report-enterprise-erp-core">ORYX — Execution 02 Report: Enterprise ERP Core</h1>
+<p>Status: <strong>implemented, tested and ready for owner review</strong>. Nothing is merged<br />
+and nothing is deployed.</p>
+<h2 id="1-recovered-github-state">1. Recovered GitHub state</h2>
+<p>GitHub was the source of truth for this session; the previous conversation was<br />
+unavailable.</p>
+<div class="table-wrap"><table><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody><tr><td>Repository</td><td><code>mohammadaljallad079-rgb/oryx</code></td></tr><tr><td>PR #1 (<code>feature/execution-01-super-admin-foundation</code>)</td><td><strong>merged</strong> into <code>main</code> at 2026-10-14T13:28:02Z</td></tr><tr><td>PR #1 head commit (last verified Execution 01 commit)</td><td><code>efed3488c803a4bb834860be97f4e03edf2c1a7e</code></td></tr><tr><td>PR #1 merge commit / current <code>main</code></td><td><code>77c19252ac1768c89099835b5d68215d7fa14d24</code></td></tr><tr><td>Other branches</td><td>only <code>feature/execution-01-super-admin-foundation</code> (merged)</td></tr><tr><td>Other pull requests</td><td>none</td></tr><tr><td>Execution 02 branch before this session</td><td>none existed</td></tr></tbody></table></div>
+<p>Because PR #1 <strong>is</strong> merged, Execution 02 was based on the latest <code>main</code><br />
+(<code>77c1925</code>) and the new branch was created from it. No existing work was<br />
+overwritten, reset or duplicated, and Execution 01 was not restarted.</p>
+<h2 id="2-branch-and-commit">2. Branch and commit</h2>
+<div class="table-wrap"><table><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody><tr><td>Branch</td><td><code>feature/execution-02-erp-core</code></td></tr><tr><td>Base</td><td><code>main</code> @ <code>77c19252ac1768c89099835b5d68215d7fa14d24</code></td></tr><tr><td>Head at time of writing</td><td>see the PR; the branch is not force-pushed</td></tr></tbody></table></div>
+<h2 id="3-what-execution-02-delivers">3. What Execution 02 delivers</h2>
+<p>Five operational modules, all DB-backed, permission-protected, entitlement-gated<br />
+and covered by tests. They reuse the Execution 01 authorization, tenancy and<br />
+subscription architecture — no separate or disconnected system was introduced.</p>
+<h3 id="a-accounting-financialaccounting">A. Accounting (<code>financial_accounting</code>)</h3>
+<ul><li>Chart of accounts with a seeded standard chart (14 system accounts) and</li></ul>
+<p>system roles (AR/AP control, cash, bank, revenue, VAT output/input, inventory,<br />
+COGS, discount, over/short, adjustment, purchase price variance).</p>
+<ul><li>Fiscal years with monthly periods; periods are <code>OPEN</code>, <code>CLOSED</code> or <code>LOCKED</code>.</li><li>Balanced double-entry journals. Every posted entry is <strong>balanced</strong> (asserted</li></ul>
+<p>before insert), <strong>atomic</strong> (header, lines and account balances in one<br />
+transaction), <strong>auditable</strong> (source document, never edited after posting) and<br />
+<strong>idempotent</strong> (a unique key on <code>(companyId, sourceType, sourceId)</code> makes a<br />
+retried posting a no-op).</p>
+<ul><li>General ledger with running balances, trial balance, income statement and</li></ul>
+<p>balance sheet.</p>
+<ul><li>Reversals post a mirror entry; the original is marked <code>REVERSED</code> and both</li></ul>
+<p>remain in the ledger so the two net to zero.</p>
+<ul><li>Period locking refuses a posting into a closed or locked period</li></ul>
+<p>(<code>accounting.period_not_open</code>).</p>
+<ul><li>AR/AP aging, receipts and payments with allocations against invoices, over-</li></ul>
+<p>allocation protection, and customer credit-limit enforcement.</p>
+<h3 id="b-sales-and-pos-salespos">B. Sales and POS (<code>sales_pos</code>)</h3>
+<ul><li>Customers, quotations, orders, invoices, credit notes and customer payments.</li><li>The full chain works end to end: quotation → convert → order → invoice →</li></ul>
+<p>receipt → credit note.</p>
+<ul><li>Invoice posting draws down stock at moving-average cost and posts revenue,</li></ul>
+<p>discount, VAT and COGS in one transaction.</p>
+<ul><li>Cashier sessions with an opening float, expected-cash derivation from cash POS</li></ul>
+<p>sales, and a close step that posts any over/short difference.</p>
+<ul><li>POS sales create a settled invoice, issue stock and settle the receivable.</li></ul>
+<h3 id="c-procurement-purchasingprocurement">C. Procurement (<code>purchasing_procurement</code>)</h3>
+<ul><li>Suppliers, purchase requisitions (approve → convert), purchase orders,</li></ul>
+<p>goods receipts, supplier invoices, purchase returns and supplier payments.</p>
+<ul><li>Goods receipt increases stock at the ordered cost and accrues the payable; the</li></ul>
+<p>supplier invoice only accrues the unaccrued net plus VAT, so a payable is never<br />
+double-counted.</p>
+<ul><li>Purchase returns issue stock, reverse the payable and post any difference</li></ul>
+<p>between the invoiced cost and the inventory valuation to a price-variance<br />
+account so the entry balances.</p>
+<h3 id="d-inventory-warehousesinventory">D. Inventory (<code>warehouses_inventory</code>)</h3>
+<ul><li>Warehouses, SKUs/products, stock receipts and issues, transfers, adjustments,</li></ul>
+<p>an append-only stock movement ledger, reorder alerts and valuation.</p>
+<ul><li><strong>Moving-average valuation.</strong> Inbound movements blend their cost into the</li></ul>
+<p>average; outbound movements are valued at the current average.</p>
+<ul><li><strong>Concurrency safety.</strong> The level row is locked with <code>SELECT … FOR UPDATE</code></li></ul>
+<p>before it is read, so concurrent issues of the same SKU cannot drive stock<br />
+negative. This is verified by a test that fires ten parallel issues.</p>
+<h3 id="e-reports-reportsanalytics">E. Reports (<code>reports_analytics</code>)</h3>
+<ul><li>Accounting, sales, purchasing and inventory summaries with company and branch</li></ul>
+<p>filters, date ranges and a balance indicator.</p>
+<ul><li>Permission-aware: each report route requires the relevant read permission and</li></ul>
+<p>is scoped to the caller&#39;s company server-side.</p>
+<h2 id="4-database-migrations">4. Database migrations</h2>
+<p>One additive migration: <code>20261014175813_execution_02_erp_core</code>.</p>
+<ul><li>40 new tenant-scoped tables and 22 new enums.</li><li>Every operational table carries <code>companyId</code>; branch-scoped rows carry</li></ul>
+<p><code>branchId</code>.</p>
+<ul><li>Money is stored as integer minor units; quantities are scaled by 10^4;</li></ul>
+<p>percentages are basis units (basis points).</p>
+<ul><li>No Execution 01 table was altered destructively; only new relations were added</li></ul>
+<p>to <code>Company</code> and <code>Branch</code>.</p>
+<p>Tables (grouped): document numbering; chart of accounts, fiscal years/periods,<br />
+journals, journal lines, account balances, payments, payment allocations;<br />
+warehouses, products, stock levels, stock movements, transfers, adjustments;<br />
+customers, quotations, sales orders, sales invoices, credit notes, cashier<br />
+sessions, POS sales; suppliers, requisitions, purchase orders, goods receipts,<br />
+supplier invoices, purchase returns — with their line tables.</p>
+<h2 id="5-api-endpoints">5. API endpoints</h2>
+<p>72 new routes under <code>/api/v1</code>, grouped by module:</p>
+<div class="table-wrap"><table><thead><tr><th>Module</th><th>Base</th><th>Examples</th></tr></thead><tbody><tr><td>Accounting</td><td><code>/accounting</code></td><td><code>GET/POST accounts</code>, <code>POST accounts/seed-standard-chart</code>, <code>GET/POST fiscal-years</code>, <code>PATCH fiscal-periods/:id/status</code>, <code>GET/POST journals</code>, <code>POST journals/:id/reverse</code>, <code>GET general-ledger</code>, <code>GET trial-balance</code>, <code>GET income-statement</code>, <code>GET balance-sheet</code>, <code>GET receivables-aging</code>, <code>GET payables-aging</code>, <code>GET/POST payments</code></td></tr><tr><td>Inventory</td><td><code>/inventory</code></td><td><code>GET/POST warehouses</code>, <code>GET/POST products</code>, <code>GET/POST movements</code>, <code>GET/POST transfers</code>, <code>POST transfers/:id/post</code>, <code>GET/POST adjustments</code>, <code>POST adjustments/:id/post</code>, <code>GET valuation</code>, <code>GET reorder-alerts</code></td></tr><tr><td>Sales</td><td><code>/sales</code></td><td><code>GET/POST customers</code>, <code>GET/POST quotations</code>, <code>POST quotations/:id/convert</code>, <code>GET/POST orders</code>, <code>GET/POST invoices</code>, <code>GET/POST credit-notes</code>, <code>GET/POST cashier-sessions</code>, <code>POST cashier-sessions/:id/close</code>, <code>GET/POST pos-sales</code></td></tr><tr><td>Purchasing</td><td><code>/purchasing</code></td><td><code>GET/POST suppliers</code>, <code>GET/POST requisitions</code>, <code>POST requisitions/:id/approve</code>, <code>POST requisitions/:id/convert</code>, <code>GET/POST orders</code>, <code>POST orders/:id/approve</code>, <code>GET/POST receipts</code>, <code>GET/POST supplier-invoices</code>, <code>GET/POST returns</code></td></tr><tr><td>Reports</td><td><code>/reports</code></td><td><code>GET accounting</code>, <code>GET sales</code>, <code>GET purchasing</code>, <code>GET inventory</code></td></tr></tbody></table></div>
+<p>All routes carry <code>@RequireModule</code> (plan licensing) plus the relevant permission<br />
+codes, and are tenant-scoped by the existing guards.</p>
+<h2 id="6-functional-workflows-verified">6. Functional workflows verified</h2>
+<p>Each is asserted by the integration suite against the real HTTP surface and the<br />
+seeded database:</p>
+<ol><li>Seed the standard chart; create a fiscal year; list accounts.</li><li>Post a balanced journal; reject an unbalanced one.</li><li>Reverse a posted journal; confirm the ledger nets to zero.</li><li>Lock a period; confirm posting into it is refused with</li></ol>
+<p><code>accounting.period_not_open</code>; reopen it.</p>
+<ol><li>Produce a balanced trial balance, income statement and balance sheet.</li><li>Receive stock; value it at the received cost.</li><li>Refuse to issue more stock than is on hand.</li><li>Fire ten concurrent issues; confirm the balance never goes negative.</li><li>Transfer stock between warehouses; post and confirm the destination level.</li><li>Post a stock adjustment and reflect it in valuation.</li><li>Raise a quotation; convert it to an order.</li><li>Issue a sales invoice; confirm stock drops and VAT is posted.</li><li>Record a customer receipt; confirm the invoice is <code>PAID</code>.</li><li>Reject an over-allocation against a settled invoice.</li><li>Issue a credit note; confirm revenue reverses and goods restock.</li><li>Enforce a customer credit limit.</li><li>Open a cashier session; record a POS sale; reject a second open session;</li></ol>
+<p>close and record the cash variance.</p>
+<ol><li>Run a requisition through approval and conversion; receive goods.</li><li>Record and pay a supplier invoice.</li><li>Return goods to a supplier; confirm stock and the payable reverse.</li><li>Read all four reports; filter sales by branch.</li></ol>
+<h2 id="7-test-results">7. Test results</h2>
+<div class="table-wrap"><table><thead><tr><th>Suite</th><th>Command</th><th>Result</th></tr></thead><tbody><tr><td>Shared unit tests</td><td><code>pnpm --filter @oryx/shared test</code></td><td><strong>30 passed</strong> (22 authorization + 8 money)</td></tr><tr><td>API integration (e2e)</td><td><code>pnpm --filter @oryx/api test:e2e</code></td><td><strong>109 passed</strong> (79 Execution 01 + 30 ERP)</td></tr><tr><td>Browser acceptance (Playwright)</td><td><code>pnpm --filter @oryx/admin test:ui</code></td><td><strong>99 passed</strong> (incl. 8 new ERP UI tests)</td></tr></tbody></table></div>
+<p>Total: <strong>238 automated tests passing.</strong></p>
+<p>The ERP API suite (<code>apps/api/test/erp.e2e-spec.ts</code>) covers financial<br />
+correctness (balance, reversal, VAT, COGS), concurrent inventory operations,<br />
+permissions and cross-tenant access. The ERP UI suite<br />
+(<code>apps/admin/e2e/erp.spec.ts</code>) drives the real screens and asserts against the<br />
+API, not only the DOM.</p>
+<h2 id="8-github-actions-ci">8. GitHub Actions CI</h2>
+<p>The existing CI workflow runs the shared unit tests, the API integration suite<br />
+and the full Playwright suite against a PostgreSQL 17 service. Execution 02 adds<br />
+no new workflow: the ERP suites are picked up automatically, and the Execution 02<br />
+branch was added to the <code>push</code> trigger. CI status will be shown on the PR.</p>
+<h2 id="9-screenshots">9. Screenshots</h2>
+<p>Captured by the Playwright screenshot suite into<br />
+<code>docs/execution-reports/screenshots/</code>:</p>
+<ul><li><code>erp-accounting-dark.png</code></li><li><code>erp-inventory-dark.png</code></li><li><code>erp-sales-dark.png</code></li><li><code>erp-purchasing-dark.png</code></li><li><code>erp-reports-dark.png</code></li></ul>
+<p>The approved navy/gold design, right-side Arabic navigation, image-led module<br />
+cards, responsive layout and both themes are preserved. The official logo is<br />
+still absent from the repository; the neutral monogram placeholder remains and<br />
+no brand mark was invented.</p>
+<h2 id="10-known-limitations">10. Known limitations</h2>
+<ul><li>Reports are operational summaries, not a full BI engine; there is no</li></ul>
+<p>custom-report builder and no pivot export.</p>
+<ul><li>Inventory valuation is moving-average only; FIFO and LIFO are not offered.</li><li>Journal approval workflows and budget control are not implemented; posting is</li></ul>
+<p>direct once the caller holds the posting permission.</p>
+<ul><li>Multi-currency is recorded on documents but the ledger does not revalue</li></ul>
+<p>foreign-currency balances.</p>
+<ul><li>The consumer mobile application and the remaining ERP modules (HR, CRM,</li></ul>
+<p>operations, automotive) belong to later executions.</p>
+<ul><li>No payment gateway, email or SMS provider is integrated.</li><li>Nothing is deployed.</li></ul>
+<h2 id="11-pull-request">11. Pull request</h2>
+<div class="table-wrap"><table><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody><tr><td>PR</td><td><a href="https://github.com/mohammadaljallad079-rgb/oryx/pull/2" target="_blank" rel="noopener noreferrer">https://github.com/mohammadaljallad079-rgb/oryx/pull/2</a></td></tr><tr><td>Base</td><td><code>main</code></td></tr><tr><td>Head</td><td><code>feature/execution-02-erp-core</code></td></tr><tr><td>CI</td><td>GitHub Actions run on the branch (<code>ci.yml</code>)</td></tr></tbody></table></div>
+<p>It is <strong>not</strong> to be merged or deployed without owner approval.</p></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>36afef6</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-31T15:03:02.730Z</span>
+  </div>
+</footer>
+</body>
+</html>

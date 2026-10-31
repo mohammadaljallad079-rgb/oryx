@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>ORYX — Frontend / Backend Functional Audit · ORYX design preview</title>
+<meta name="description" content="ORYX — Frontend / Backend Functional Audit" />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/">Overview</a><a href="../mobile/">Mobile app</a><a href="../evidence/">Design evidence</a><a href="../reports/" aria-current="page">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+        <p class="eyebrow">Audit</p>
+        <h1>ORYX — Frontend / Backend Functional Audit</h1>
+        <p class="card__meta">Rendered from <code>docs/audit/02_FUNCTIONAL_AUDIT.md</code> at <code>36afef6</code>. <a href="https://github.com/mohammadaljallad079-rgb/oryx/blob/feature%2Fexecution-07-premium-web/docs/audit/02_FUNCTIONAL_AUDIT.md">View the source on GitHub</a>.</p>
+        <nav class="card"><strong>Contents</strong><ul class="toc"><li><a href="#stack-under-audit">Stack under audit</a></li><li><a href="#connection-inventory">Connection inventory</a></li><li><a href="#per-module-verification">Per-module verification</a></li><li><a href="#frontendbackend-connection-audit">Frontend/backend connection audit</a></li><li><a href="#database-operation-audit">Database operation audit</a></li><li><a href="#permission-and-navigation-audit">Permission and navigation audit</a></li><li><a href="#form-and-workflow-audit">Form and workflow audit</a></li><li><a href="#localization-theme-and-responsiveness-audit">Localization, theme and responsiveness audit</a></li><li><a href="#conclusion">Conclusion</a></li></ul></nav>
+        <article><h1 id="oryx-frontend-backend-functional-audit">ORYX — Frontend / Backend Functional Audit</h1>
+<p>Audit date: 2026-10-16. Re-verified 2026-10-17 (crash recovery) and<br />
+2026-10-18 (Execution 06 follow-up, module-by-module live probe).<br />
+Audited revision: <code>fc2ab20</code> plus the working-tree fixes in <code>04_FIXED_DEFECTS.md</code>.</p>
+<p>Every surface below was exercised against the running staging stack: a real<br />
+NestJS API, a real Next.js admin app, a real Next.js customer app, the Expo web<br />
+export of the mobile app and a real PostgreSQL database. Nothing was mocked.</p>
+<h2 id="stack-under-audit">Stack under audit</h2>
+<div class="table-wrap"><table><thead><tr><th>Surface</th><th>Port</th><th>Public host</th><th>Check</th></tr></thead><tbody><tr><td>API (NestJS)</td><td>3001</td><td><code>/api/*</code> via nginx</td><td><code>/api/health</code></td></tr><tr><td>Admin (Next.js)</td><td>3000</td><td>work-1</td><td><code>/login</code></td></tr><tr><td>Customer (Next.js)</td><td>3002</td><td>work-2</td><td><code>/</code></td></tr><tr><td>Mobile web (Expo export)</td><td>8081</td><td>work-2 <code>/mobile/</code></td><td><code>/mobile/login</code></td></tr><tr><td>Reverse proxy (nginx)</td><td>12000 / 12001</td><td>ingress target</td><td>—</td></tr><tr><td>PostgreSQL 17</td><td>5432</td><td>local only</td><td><code>oryx_staging</code></td></tr></tbody></table></div>
+<h2 id="connection-inventory">Connection inventory</h2>
+<div class="table-wrap"><table><thead><tr><th>Layer</th><th>Count</th><th>Notes</th></tr></thead><tbody><tr><td>API controllers</td><td>32</td><td>all under <code>/api/v1</code>, health at <code>/api/health</code></td></tr><tr><td>Admin routed pages</td><td>35</td><td>every <code>MODULES</code> route resolves</td></tr><tr><td>Customer routed pages</td><td>16</td><td>website + dashboard</td></tr><tr><td>Mobile screens</td><td>17</td><td>Expo Router; each declared with <code>href: null</code> unless a tab</td></tr><tr><td>Module catalog entries</td><td>21</td><td>all <code>AVAILABLE</code></td></tr><tr><td>Permission catalog entries</td><td>153</td><td></td></tr><tr><td>API e2e specs</td><td>13</td><td>277 tests</td></tr><tr><td>Browser specs</td><td>16</td><td>189 tests</td></tr><tr><td>Mobile unit specs</td><td>3</td><td>20 tests</td></tr><tr><td>Shared unit specs</td><td>5</td><td>96 tests</td></tr></tbody></table></div>
+<h2 id="per-module-verification">Per-module verification</h2>
+<h3 id="super-admin-execution-01">Super Admin (Execution 01)</h3>
+<ul><li>Login, logout, session rotation, MFA enrollment and challenge all exercised in</li></ul>
+<p><code>auth-lifecycle.spec.ts</code> and <code>mfa.spec.ts</code>.</p>
+<ul><li>Company provisioning creates a company, a subscription and an admin invitation</li></ul>
+<p>in one flow (<code>admin.spec.ts</code>). Verified against the database: the seeded state<br />
+returns to 6 companies after a reset, and the UI count matched the DB count<br />
+exactly (6 companies, 10 branches).</p>
+<ul><li>Plan editing is snapshot-based: editing a plan does not change an existing</li></ul>
+<p>tenant&#39;s <code>Subscription.licensedModules</code> (<code>authorization.test.ts</code>).</p>
+<ul><li>Delegation limits are enforced server-side: a company admin cannot grant a</li></ul>
+<p>permission it does not hold, a non-delegable permission, or one the plan does<br />
+not license (<code>admin.spec.ts</code>).</p>
+<h3 id="erp-core-execution-02">ERP core (Execution 02)</h3>
+<ul><li>The accounting posting service asserts balance, resolves the open period and</li></ul>
+<p>allocates the entry number in one transaction. A reversed entry stays in the<br />
+ledger as a new POSTED entry, so the trial balance still balances<br />
+(<code>erp.e2e-spec.ts</code>).</p>
+<ul><li>Inventory moves through <code>InventoryService.recordMovement</code>, which locks the</li></ul>
+<p>level row with <code>SELECT … FOR UPDATE</code>. <code>StockLevel.averageCostMinor</code> is scaled<br />
+by 100 and read back with <code>wholeAverageCost</code>.</p>
+<ul><li>Idempotency is a unique key: <code>JournalEntry(companyId, sourceType, sourceId)</code></li></ul>
+<p>makes a retried posting a no-op.</p>
+<h3 id="hr-payroll-crm-operations-automotive-execution-03">HR / payroll, CRM, operations, automotive (Execution 03)</h3>
+<ul><li>A payroll run copies each employee&#39;s active salary structure into the payslip,</li></ul>
+<p>so editing a salary later never changes a historical run<br />
+(<code>execution03.e2e-spec.ts</code>).</p>
+<ul><li>Payroll posting is idempotent through <code>sourceId: payroll:&lt;runId&gt;</code>.</li><li>Work orders and job cards enforce an explicit transition graph server-side; a</li></ul>
+<p>job card cannot be completed without an approved estimate.</p>
+<ul><li>Workshop and inspection parts move the shared stock ledger and invoices go</li></ul>
+<p>through <code>SalesService.issueInvoice</code> — no second ledger.</p>
+<h3 id="customer-platform-marketplace-booking-payments-notifications-execution-04">Customer platform, marketplace, booking, payments, notifications (Execution 04)</h3>
+<ul><li>The consumer identity plane is separate: a consumer token carries</li></ul>
+<p><code>audience: customer</code>, a staff token is refused on a consumer route and a<br />
+consumer token is refused on a staff route.</p>
+<ul><li>Booking concurrency is enforced by a unique constraint plus a transactional row</li></ul>
+<p>lock; a cancelled booking releases its slot.</p>
+<ul><li>Payments never claim money moved: <code>CASH</code> and <code>CARD_TERMINAL</code> are always</li></ul>
+<p>configured; <code>BANK_TRANSFER</code> awaits operator confirmation; <code>BENEFITPAY</code> and<br />
+<code>CARD_ONLINE</code> report themselves unconfigured without credentials.</p>
+<ul><li>Webhooks are idempotent and signature-verified.</li></ul>
+<h3 id="external-integrations-center-execution-05">External Integrations Center (Execution 05)</h3>
+<ul><li>The catalogue lives once in <code>packages/shared/src/integrations.ts</code> and feeds the</li></ul>
+<p>API, the admin page and the customer capabilities endpoint. 20 providers.</p>
+<ul><li>Credential reads return a <code>hint</code> only; an empty value deletes the row; changing</li></ul>
+<p>a credential clears the verification.</p>
+<ul><li><code>deriveState</code> is the single place that decides a provider&#39;s state, and</li></ul>
+<p><code>AWAITING_CREDENTIALS</code> is checked before a stored <code>verificationStatus</code>. Only<br />
+<code>OPERATIONAL</code> is advertised through <code>GET /customer/capabilities</code>.</p>
+<ul><li>Live check: 8 providers render, 2 <code>OPERATIONAL</code> (cash, card terminal — the</li></ul>
+<p>internal, no-credential providers), 6 <code>AWAITING_CREDENTIALS</code>.</p>
+<h2 id="frontendbackend-connection-audit">Frontend/backend connection audit</h2>
+<div class="table-wrap"><table><thead><tr><th>Check</th><th>Method</th><th>Result</th></tr></thead><tbody><tr><td>Every catalog route resolves</td><td><code>audit.spec.ts</code> route sweep</td><td>21/21 modules return 200 with no error boundary</td></tr><tr><td>Platform governance surfaces</td><td><code>audit.spec.ts</code></td><td>11/11 return 200</td></tr><tr><td>Enterprise ERP modules render their interface</td><td><code>audit.spec.ts</code></td><td>10/10 render the module test-id</td></tr><tr><td>Admin public routes</td><td><code>curl</code> through nginx</td><td>17/17 return 200</td></tr><tr><td>Customer and mobile public routes</td><td><code>curl</code> through nginx</td><td>16/16 return 200</td></tr><tr><td>API health</td><td><code>GET /api/health</code></td><td>200</td></tr><tr><td>Login through the public host</td><td>browser</td><td>reaches <code>/dashboard</code> with live data</td></tr><tr><td>Customer login through the public host</td><td>browser</td><td>reaches <code>/dashboard</code> with live data</td></tr><tr><td>Mobile login</td><td>browser</td><td>reaches <code>/mobile/</code> then <code>/mobile/garage</code></td></tr><tr><td>Module surfaces, live API probe</td><td><code>.run/probe-modules.mjs</code></td><td><strong>96/96 return 200</strong> with real rows</td></tr><tr><td>Public preview routes, external</td><td><code>.run/sweep-preview.mjs</code></td><td><strong>39/39 success, 0 failed requests</strong></td></tr></tbody></table></div>
+<h3 id="module-by-module-live-probe-2026-10-18">Module-by-module live probe (2026-10-18)</h3>
+<p><code>.run/probe-modules.mjs</code> signs in as the platform principal and as the Enterprise<br />
+tenant admin, then issues a real authenticated <code>GET</code> against every module&#39;s list<br />
+endpoint and records the status plus a summary of the returned shape. It is the<br />
+only check that proves each controller reads the database rather than merely<br />
+routing. Result: <strong>96 of 96 surfaces returned 200</strong>, each with a non-empty row<br />
+set, e.g. <code>Super Admin — companies items(5) total=60</code>, `audit trail<br />
+items(5) total=3717<code>, </code>modules items(21)<code>, </code>plans array(20)<code>, </code>subscriptions<br />
+array(51)<code>. Evidence: </code>docs/audit/evidence/exec06-module-probe.json`.</p>
+<p>Two false positives were removed from the probe during this pass: it had guessed<br />
+<code>GET /hr/salary-structures</code> (salary structures are created with <code>POST</code>, so a<br />
+<code>GET</code> correctly 404s) and <code>GET /crm/customers</code> (customers live under<br />
+<code>/sales/customers</code>; CRM exposes <code>customers/:id/contacts</code>). The probe now calls<br />
+the real routes.</p>
+<h2 id="database-operation-audit">Database operation audit</h2>
+<ul><li>All 20+ migrations applied cleanly with <code>prisma migrate deploy</code>.</li><li>The seed is idempotent: <code>pnpm db:reset</code> produced 6 companies (2 marked</li></ul>
+<p><code>SEED_DEMO_DATA</code>), 6 subscriptions, 2 company admins, 126 accounts, 6 fiscal<br />
+years, 6 warehouses, 24 products, 12 customers, 12 suppliers, and the<br />
+Execution 03 baseline.</p>
+<ul><li>Every tenant-owned table carries <code>companyId</code>; cross-tenant reads are refused</li></ul>
+<p>(<code>authorization.e2e-spec.ts</code>).</p>
+<h2 id="permission-and-navigation-audit">Permission and navigation audit</h2>
+<ul><li>Navigation is derived from the same catalog as the guards, so a hidden control</li></ul>
+<p>and a rejected request agree. The UI only hides what the API would reject.</p>
+<ul><li>A company administrator sees only licensed modules</li></ul>
+<p>(<code>admin.spec.ts</code> &quot;company admin sees only licensed modules&quot;).</p>
+<ul><li>A platform principal carries no tenant scope until it opens a reasoned,</li></ul>
+<p>time-bounded support session (<code>admin.spec.ts</code> &quot;company admin cannot reach<br />
+platform-only governance screens&quot;).</p>
+<h2 id="form-and-workflow-audit">Form and workflow audit</h2>
+<ul><li>Provisioning, branch creation with plan limits, plan creation with a module</li></ul>
+<p>selection, role editing with delegable scope, MFA enrollment and challenge,<br />
+and the integrations credential dialog were all driven through the browser in<br />
+the Playwright suites.</p>
+<ul><li>Modals stay in the DOM; the suites wait for <code>.oryx-modal</code> to reach count 0 as</li></ul>
+<p>the completion signal, which is why the modal-driven tests are reliable.</p>
+<h2 id="localization-theme-and-responsiveness-audit">Localization, theme and responsiveness audit</h2>
+<div class="table-wrap"><table><thead><tr><th>Check</th><th>Result</th></tr></thead><tbody><tr><td>Arabic RTL (<code>data-dir=rtl</code>)</td><td>pass, <code>dashboard-ar-*.png</code></td></tr><tr><td>English LTR (<code>data-dir=ltr</code>)</td><td>pass, <code>dashboard-en-*.png</code></td></tr><tr><td>Dark theme</td><td>pass</td></tr><tr><td>Light theme</td><td>pass</td></tr><tr><td>Tablet 834×1112, no horizontal overflow</td><td>pass (overflow ≤ 2 px)</td></tr><tr><td>Mobile 390×844, no horizontal overflow</td><td>pass (overflow ≤ 2 px)</td></tr></tbody></table></div>
+<h2 id="conclusion">Conclusion</h2>
+<p>Every declared Phase-1 surface is connected end to end: the UI calls the API, the<br />
+API reads and writes PostgreSQL, permissions are enforced server-side, and the<br />
+same catalog drives navigation, guards and dashboard tiles. The one defect found<br />
+during this audit is recorded in <code>04_FIXED_DEFECTS.md</code>.</p></article>
+      
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>36afef6</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-31T15:03:02.730Z</span>
+  </div>
+</footer>
+</body>
+</html>

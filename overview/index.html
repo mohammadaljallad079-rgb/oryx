@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Overview · ORYX design preview</title>
+<meta name="description" content="Permanent GitHub-hosted ORYX design preview." />
+<link rel="icon" href="../assets/logo.png" />
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="../">
+      <img src="../assets/logo.png" alt="ORYX" />
+      <span>ORYX<span class="brand__sub">Design preview · not production</span></span>
+    </a>
+    <nav class="site-nav"><a href="../">The website</a><a href="../overview/" aria-current="page">Overview</a><a href="../mobile/">Mobile app</a><a href="../evidence/">Design evidence</a><a href="../reports/">Reports</a><a href="../brand/">Brand</a></nav>
+  </div>
+</header>
+<main class="wrap">
+
+    <p class="eyebrow">Permanent preview</p>
+    <h1>ORYX website and design preview</h1>
+    <p class="lede">The published ORYX customer website, built from this branch and served at the root of this URL, with the Execution 07 design evidence, audit reports and approved brand assets alongside it.</p>
+
+    <div class="cta">
+      <a class="cta__button" href="../">Open the website &rarr;</a>
+      <span class="cta__hint">The real Next.js site, statically exported. Every page below the root is that site.</span>
+    </div>
+
+    <div class="notice">
+      <strong>The website is a static export, so it is read-only.</strong>
+      It renders the real pages, themes, photography and layout, but GitHub Pages serves files only: it cannot run the NestJS API or PostgreSQL, so signing in and booking cannot succeed here. The export says so on every page and never reports a write as successful. The interactive application runs from the branch on a host that meets the requirements below.
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><div class="kpi__value">23</div><div class="kpi__label">website pages</div></div>
+      <div class="kpi"><div class="kpi__value">25</div><div class="kpi__label">reports rendered</div></div>
+      <div class="kpi"><div class="kpi__value">30</div><div class="kpi__label">capture pairs</div></div>
+      <div class="kpi"><div class="kpi__value">33</div><div class="kpi__label">light-vs-dark sheets</div></div>
+      <div class="kpi"><div class="kpi__value">22</div><div class="kpi__label">brand assets</div></div>
+      <div class="kpi"><div class="kpi__value">67</div><div class="kpi__label">mobile screens</div></div>
+    </div>
+
+    <div class="grid">
+      <a class="card card--link" href="../evidence/"><h3>Design evidence</h3><p class="card__meta">Homepage, dashboard, provider directory, sign-in and profile — before/after with the dark render beside each, in Arabic RTL and English LTR at three viewports.</p></a>
+      <a class="card card--link" href="../reports/"><h3>Reports</h3><p class="card__meta">Every audit and execution report, rendered from the committed Markdown.</p></a>
+      <a class="card card--link" href="../mobile/"><h3>Mobile app</h3><p class="card__meta">The approved Splash and Homepage against their references, plus every customer and merchant screen — and the APK built from this branch.</p></a>
+      <a class="card card--link" href="../brand/"><h3>Brand</h3><p class="card__meta">The official logo and the approved design references.</p></a>
+    </div>
+
+    <h2>What this preview covers</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Area</th><th>State</th><th>Where</th></tr></thead>
+      <tbody>
+        <tr><td>Premium homepage and service pages</td><td><span class="badge badge--ok">committed</span></td><td>Phase C report, evidence</td></tr>
+        <tr><td>Real automotive photography and category fixes</td><td><span class="badge badge--ok">committed</span></td><td>Phase D report</td></tr>
+        <tr><td>Light theme (ivory, charcoal, metallic gold)</td><td><span class="badge badge--ok">committed</span></td><td>Phase E report, evidence</td></tr>
+        <tr><td>Dark theme (approved identity)</td><td><span class="badge badge--ok">unchanged</span></td><td>Dark-invariance verdict</td></tr>
+        <tr><td>Interactive customer app + API</td><td><span class="badge">not hosted here</span></td><td>Hosting requirements below</td></tr>
+      </tbody>
+    </table></div>
+
+    <h2>How this is published</h2>
+    <p>GitHub Actions builds this site on every push to <code>feature/execution-07-premium-web</code> and publishes it with GitHub Pages. The URL is stable and outlives any editor session. The build reads only files already committed to the branch, so the preview can never show something the repository does not contain.</p>
+
+    <h2>Hosting requirements for a full-stack preview</h2>
+    <p>A full-stack preview needs a host that can run a long-lived Node process and a PostgreSQL database. GitHub Pages serves static files only and cannot run either. The exact requirements are:</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Component</th><th>Requirement</th></tr></thead>
+      <tbody>
+        <tr><td>API</td><td>Node 22, a long-lived process, health-checked; secrets for <code>JWT_ACCESS_SECRET</code>, <code>JWT_REFRESH_SECRET</code> and <code>MFA_ENCRYPTION_KEY</code></td></tr>
+        <tr><td>Database</td><td>PostgreSQL 17 with <code>prisma migrate deploy</code> and a seed run; isolated from production</td></tr>
+        <tr><td>Customer and admin apps</td><td>Node 22 build of two Next.js apps, each on its own origin</td></tr>
+        <tr><td>Networking</td><td>HTTPS on both origins; <code>CORS_ORIGINS</code> set to them; the refresh cookie scoped to <code>/api/v1</code></td></tr>
+        <tr><td>Isolation</td><td>Separate database, separate secrets, no production credentials or services</td></tr>
+      </tbody>
+    </table></div>
+    <p>Candidate hosts that meet this: a container host (Fly.io, Render, Railway), a small VM, or a Kubernetes namespace. Each needs an account and, for private previews, a token. Until one is configured, this static preview is the permanent, verifiable artifact.</p>
+
+    <h2>Source of truth</h2>
+    <p>The pull request is <a href="https://github.com/mohammadaljallad079-rgb/oryx/pull/7">#7</a>, still open and unmerged. The branch is <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web"><code>feature/execution-07-premium-web</code></a>. Nothing here is deployed to production.</p>
+  
+</main>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Static design preview generated from the <code>feature/execution-07-premium-web</code> branch at <code>36afef6</code>.</span>
+    <span>Source of truth: <a href="https://github.com/mohammadaljallad079-rgb/oryx/tree/feature%2Fexecution-07-premium-web">the repository</a> · built 2026-10-31T15:03:02.730Z</span>
+  </div>
+</footer>
+</body>
+</html>
