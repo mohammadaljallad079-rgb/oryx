@@ -98,6 +98,18 @@ const AUTOMOTIVE = MODULES.filter((m) => m.group === 'automotive');
 const ANALYTICS = MODULES.filter((m) => m.group === 'analytics');
 const ADMIN = MODULES.filter((m) => m.group === 'administration');
 
+/** Centralized ecosystem management — Super Admin control panel. */
+export const CONTROL_PANEL_NAV: NavGroup = {
+  key: 'control',
+  labelKey: 'nav.group.control',
+  platformOnly: true,
+  items: [
+    { key: 'ecosystem', labelKey: 'nav.ecosystem', href: '/ecosystem', icon: 'globe', permission: 'platform.ecosystem.read', platformOnly: true },
+    { key: 'coupons', labelKey: 'nav.coupons', href: '/coupons', icon: 'tag', permission: 'platform.coupon.read', platformOnly: true },
+    { key: 'notifications', labelKey: 'nav.notifications', href: '/notifications', icon: 'bell', permission: 'platform.notification.read', platformOnly: true },
+  ],
+};
+
 /** Platform governance group — visible only to Super Admin principals. */
 export const PLATFORM_NAV: NavGroup = {
   key: 'platform',
@@ -164,7 +176,7 @@ export const ERP_NAV: NavGroup[] = [
   { key: 'administration', labelKey: 'nav.group.administration', items: ADMIN.map(erpItem) },
 ];
 
-export const ALL_NAV_GROUPS: NavGroup[] = [PLATFORM_NAV, WEBSITE_APP_NAV, ...ERP_NAV];
+export const ALL_NAV_GROUPS: NavGroup[] = [CONTROL_PANEL_NAV, PLATFORM_NAV, WEBSITE_APP_NAV, ...ERP_NAV];
 
 /** Resolve the module that owns a route, used by the planned-module page. */
 export function moduleForRoute(route: string): ModuleDefinition | undefined {

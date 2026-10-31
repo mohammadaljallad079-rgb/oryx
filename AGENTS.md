@@ -575,6 +575,31 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   a file that was never copied looks plausible and serves the wrong thing. Check
   `content-type` before publishing a link.
 
+### Execution 12 gotchas
+
+- **A test must never clean up by company when it borrows a seeded tenant.**
+  `execution10-mobile-integration.e2e-spec.ts` used `DEMO-ALNOOR` as its fixture
+  and then deleted products with `where: { companyId }`, which also removed the
+  seeded catalog and opening stock. The Execution 02 inventory UI test then failed
+  on the *next* run, looking like a code regression. Clean up by the ids you
+  created (`where: { id: { in: [...] } }`), never by the tenant you borrowed.
+- **The API e2e suites run against `oryx_dev`, the same database as the UI suite.**
+  They are not isolated. A destructive `afterAll` corrupts the fixtures the
+  Playwright suite reads, and the symptom appears in a later, unrelated test.
+- **`.env` ships production-ish throttle limits; the UI suite needs the overrides.**
+  `AUTH_THROTTLE_LIMIT=10` in `.env` makes the Playwright suite fail with 30s
+  `waitForURL` timeouts after roughly ten logins. `scripts/dev-up.sh` sources
+  `.env`, so a stack it started is *not* ready for `test:ui`. Start the API with
+  `AUTH_THROTTLE_LIMIT=100000 THROTTLE_LIMIT=1000000 REFRESH_THROTTLE_LIMIT=100000`.
+- **A sandbox restart removes Postgres, pnpm and the Playwright browsers.**
+  `bash scripts/dev-up.sh` restores Postgres, the built API and pnpm. It does
+  *not* restore the browsers: run
+  `pnpm --filter @oryx/admin exec playwright install chromium` afterwards, or every
+  UI test fails in ~3ms with `Executable doesn't exist`.
+- **A 2–3ms failure is a launch failure, not a test failure.** When every test in a
+  suite fails instantly, read one error in isolation (`-g "<name>"`) before
+  suspecting the code.
+
 ### Mobile gotchas
 
 - **Every file under `(app)` becomes a tab.** Expo Router registers the whole

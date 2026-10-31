@@ -174,7 +174,11 @@ describe('Execution 10 — product images & inspection uploads (e2e)', () => {
     await prisma.cmsMediaAsset.deleteMany({ where: { originalName: { startsWith: 'e10-' } } });
     await prisma.vehicle.deleteMany({ where: { id: { in: [vehicleA, vehicleB] } } });
     await prisma.customer.deleteMany({ where: { code: { startsWith: PREFIX } } });
-    await prisma.product.deleteMany({ where: { companyId: { in: [companyId, otherCompanyId] } } });
+    // This suite borrows the seeded DEMO-ALNOOR tenant as its fixture, so it must
+    // delete only the products it created. A company-scoped delete also removed
+    // the seeded catalog and opening stock, which broke the Execution 02
+    // inventory UI test on the next run.
+    await prisma.product.deleteMany({ where: { id: { in: [productId, otherProductId] } } });
     await prisma.company.deleteMany({ where: { id: otherCompanyId } });
     await prisma.customerAccount.deleteMany({ where: { id: { in: [accountA, accountB] } } });
     await ctx.app.close();

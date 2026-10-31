@@ -1334,6 +1334,71 @@ async function seedPlatformSettings(): Promise<void> {
   }
 }
 
+async function seedCoupons(actorId: string): Promise<number> {
+  // A small, honest set of launch coupons. Idempotent by `code`, and
+  // `redemptionCount` is left untouched on an existing row so a re-seed never
+  // rewrites real redemption history.
+  const now = new Date();
+  const inThirtyDays = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const coupons = [
+    {
+      code: 'WELCOME15',
+      descriptionEn: '15% off your first order.',
+      descriptionAr: 'خصم ١٥٪ على طلبك الأول.',
+      discountType: 'PERCENT' as const,
+      percentOffBp: 1500,
+      amountOffMinor: 0,
+      minOrderMinor: 0,
+      maxRedemptions: null as number | null,
+    },
+    {
+      code: 'SAVE5',
+      descriptionEn: 'BHD 5 off orders over BHD 50.',
+      descriptionAr: 'خصم ٥ د.ب على الطلبات فوق ٥٠ د.ب.',
+      discountType: 'FIXED' as const,
+      percentOffBp: 0,
+      amountOffMinor: 5000,
+      minOrderMinor: 50000,
+      maxRedemptions: 500 as number | null,
+    },
+    {
+      code: 'SERVICE10',
+      descriptionEn: '10% off service bookings.',
+      descriptionAr: 'خصم ١٠٪ على حجوزات الخدمة.',
+      discountType: 'PERCENT' as const,
+      percentOffBp: 1000,
+      amountOffMinor: 0,
+      minOrderMinor: 0,
+      maxRedemptions: 1000 as number | null,
+    },
+  ];
+
+  let created = 0;
+  for (const c of coupons) {
+    const existing = await prisma.coupon.findUnique({ where: { code: c.code } });
+    if (existing) continue;
+    await prisma.coupon.create({
+      data: {
+        code: c.code,
+        descriptionEn: c.descriptionEn,
+        descriptionAr: c.descriptionAr,
+        discountType: c.discountType,
+        percentOffBp: c.percentOffBp,
+        amountOffMinor: c.amountOffMinor,
+        currency: DEFAULT_CURRENCY,
+        minOrderMinor: c.minOrderMinor,
+        maxRedemptions: c.maxRedemptions,
+        isActive: true,
+        startsAt: now,
+        endsAt: inThirtyDays,
+        createdById: actorId,
+      },
+    });
+    created += 1;
+  }
+  return created;
+}
+
 async function main() {
   assertSeedIsAllowed();
   console.log('ORYX seed — start');
@@ -1350,7 +1415,9 @@ async function main() {
   await seedAuditBaseline(superAdmin.id, idByCode);
   const areas = await seedServiceAreas();
   await seedPlatformSettings();
+  const coupons = await seedCoupons(superAdmin.id);
   console.log(`  e08 baseline: ${areas} new service area(s), platform settings written`);
+  console.log(`  e12 baseline: ${coupons} new coupon(s)`);
   console.log('ORYX seed — done');
 }
 

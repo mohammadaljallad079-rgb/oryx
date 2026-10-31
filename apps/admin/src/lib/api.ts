@@ -13,8 +13,11 @@ import type {
   CompanyDto,
   CompanyBrandingDto,
   ContextResponse,
+  CouponDto,
+  CouponValidationResponse,
   CustomerDto,
   DashboardResponse,
+  EcosystemOverviewResponse,
   ErpAccountDto,
   FeatureFlagDto,
   FiscalYearDto,
@@ -28,6 +31,7 @@ import type {
   LoginResponse,
   LoginResult,
   ModuleDto,
+  NotificationDeliveryDto,
   Paginated,
   PaymentDto,
   PlanDto,
@@ -1101,6 +1105,47 @@ export const api = {
     }),
   verifyIntegration: (key: string) =>
     request<IntegrationDetailResponse>(`/integrations/${key}/verify`, { method: 'POST', body: {} }),
+
+  // ------------------------------------- Execution 12: platform control panel
+  ecosystem: () => request<EcosystemOverviewResponse>('/platform/ecosystem'),
+  coupons: (params: { includeInactive?: boolean; companyId?: string } = {}) =>
+    request<{ items: CouponDto[] }>(`/coupons?${toQuery(params)}`),
+  coupon: (id: string) => request<CouponDto>(`/coupons/${id}`),
+  createCoupon: (body: Record<string, unknown>) =>
+    request<CouponDto>('/coupons', { method: 'POST', body }),
+  updateCoupon: (id: string, body: Record<string, unknown>) =>
+    request<CouponDto>(`/coupons/${id}`, { method: 'PATCH', body }),
+  deleteCoupon: (id: string) => request<{ deleted: boolean }>(`/coupons/${id}`, { method: 'DELETE' }),
+  validateCoupon: (body: { code: string; subtotalMinor: number; companyId?: string }) =>
+    request<CouponValidationResponse>('/coupons/validate', { method: 'POST', body }),
+  notificationDeliveries: (params: { companyId?: string; channel?: string; status?: string; page?: number; pageSize?: number } = {}) =>
+    request<Paginated<NotificationDeliveryDto>>(`/notifications/deliveries?${toQuery(params)}`),
+  notificationSummary: (companyId?: string) =>
+    request<{
+      byChannel: Array<{ key: string; count: number }>;
+      byStatus: Array<{ key: string; count: number }>;
+      templates: Array<{ id: string; key: string; channel: string; locale: string; subject: string | null; body: string; isActive: boolean }>;
+    }>(`/notifications/summary?${toQuery({ companyId })}`),
+  sendAnnouncement: (body: { title: string; body: string; companyId?: string; severity?: string; userIds?: string[] }) =>
+    request<{ queued: number; recipients: string[] }>('/notifications/announcements', { method: 'POST', body }),
+  toggleNotificationTemplate: (id: string, active: boolean) =>
+    request<{ id: string; key: string; isActive: boolean }>(`/notifications/templates/${id}/toggle?active=${active}`, {
+      method: 'POST',
+      body: {},
+    }),
+  roleTemplates: (companyId?: string) =>
+    request<{
+      companyId: string;
+      templates: Array<{
+        code: string;
+        nameEn: string;
+        nameAr: string;
+        descriptionEn: string;
+        permissions: string[];
+        totalPermissions: number;
+        withheldPermissions: number;
+      }>;
+    }>(`/permissions/role-templates?${toQuery({ companyId })}`),
 };
 
 function toQuery(params: Record<string, unknown>): string {

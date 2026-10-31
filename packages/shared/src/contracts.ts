@@ -1478,3 +1478,136 @@ export interface CustomerCapabilitiesResponse {
     push: boolean;
   };
 }
+
+// ============================================================================
+// EXECUTION 12 — SUPER ADMIN ECOSYSTEM OVERVIEW, COUPONS & NOTIFICATION CENTRE
+//
+// These contracts describe the platform-wide operational control panel. Every
+// figure is a real aggregate over the database; nothing here is a design
+// placeholder.
+// ============================================================================
+
+/** One labelled figure on an ecosystem card. */
+export interface EcosystemMetric {
+  key: string;
+  labelEn: string;
+  labelAr: string;
+  value: number;
+  /** Minor units when the metric is money; null otherwise. */
+  amountMinor: number | null;
+  currency: string | null;
+}
+
+/** A breakdown row (status, channel, category) with a count. */
+export interface EcosystemBreakdown {
+  key: string;
+  count: number;
+}
+
+/**
+ * The platform ecosystem overview.
+ *
+ * Deliberately platform-scoped: it counts across every tenant, which is exactly
+ * the capability a Super Admin holds and a company administrator does not.
+ */
+export interface EcosystemOverviewResponse {
+  generatedAt: string;
+  currency: string;
+  metrics: {
+    customers: EcosystemMetric;
+    providers: EcosystemMetric;
+    pendingProviders: EcosystemMetric;
+    products: EcosystemMetric;
+    services: EcosystemMetric;
+    orders: EcosystemMetric;
+    bookings: EcosystemMetric;
+    revenueMinor: EcosystemMetric;
+    paymentsSucceeded: EcosystemMetric;
+    refunds: EcosystemMetric;
+    activePromotions: EcosystemMetric;
+    pendingApprovals: EcosystemMetric;
+    inspections: EcosystemMetric;
+    notifications: EcosystemMetric;
+  };
+  providerStatus: EcosystemBreakdown[];
+  orderStatus: EcosystemBreakdown[];
+  bookingStatus: EcosystemBreakdown[];
+  revenueTrend: Array<{ period: string; amountMinor: number }>;
+  /** Plain-language statement of what the figures include. */
+  noticeEn: string;
+  noticeAr: string;
+}
+
+/** A discount coupon redeemable by a customer at checkout. */
+export interface CouponDto {
+  id: string;
+  code: string;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
+  /** PERCENT uses `percentOffBp`; FIXED uses `amountOffMinor`. */
+  discountType: 'PERCENT' | 'FIXED';
+  percentOffBp: number;
+  amountOffMinor: number;
+  currency: string;
+  /** Null means unlimited. */
+  maxRedemptions: number | null;
+  redemptionCount: number;
+  /** Null means every company; set to narrow to one tenant. */
+  companyId: string | null;
+  minOrderMinor: number;
+  isActive: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** The result of validating a coupon code against an order subtotal. */
+export interface CouponValidationResponse {
+  valid: boolean;
+  code: string;
+  discountMinor: number;
+  /** Machine-readable reason when `valid` is false. */
+  reason: string | null;
+  messageEn: string;
+  messageAr: string;
+}
+
+/** One notification delivery row in the operator's delivery log. */
+export interface NotificationDeliveryDto {
+  id: string;
+  channel: string;
+  category: string;
+  templateKey: string | null;
+  locale: string;
+  recipient: string | null;
+  subject: string | null;
+  body: string;
+  status: string;
+  providerState: string;
+  provider: string | null;
+  attempts: number;
+  error: string | null;
+  sentAt: string | null;
+  deliveredAt: string | null;
+  createdAt: string;
+}
+
+/** The staff notification centre payload. */
+export interface NotificationCentreResponse {
+  items: NotificationDeliveryDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+  byChannel: EcosystemBreakdown[];
+  byStatus: EcosystemBreakdown[];
+  templates: Array<{
+    id: string;
+    key: string;
+    channel: string;
+    locale: string;
+    subject: string | null;
+    body: string;
+    isActive: boolean;
+  }>;
+}

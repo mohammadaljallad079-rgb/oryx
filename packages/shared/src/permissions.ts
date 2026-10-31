@@ -70,6 +70,11 @@ export const PERMISSIONS: PermissionDefinition[] = [
   P('platform.support.access', 'Platform', 'Support access to a tenant', 'الدخول الدعم لشركة', 'PLATFORM', false, 'Open an explicit, audited, time-bounded support session into a tenant.'),
   P('platform.settings.read', 'Platform', 'View platform settings', 'عرض إعدادات المنصة', 'PLATFORM', false, 'Read market configuration and the service-area catalogue.'),
   P('platform.settings.manage', 'Platform', 'Manage platform settings', 'إدارة إعدادات المنصة', 'PLATFORM', false, 'Change market configuration and manage service areas.'),
+  P('platform.ecosystem.read', 'Platform', 'View ecosystem overview', 'عرض نظرة عامة على المنظومة', 'PLATFORM', false, 'Read platform-wide operational KPIs across every tenant.'),
+  P('platform.coupon.read', 'Platform', 'View coupons', 'عرض القسائم', 'PLATFORM', false, 'Read platform discount coupons.'),
+  P('platform.coupon.manage', 'Platform', 'Manage coupons', 'إدارة القسائم', 'PLATFORM', false, 'Create, edit and withdraw platform discount coupons.'),
+  P('platform.notification.read', 'Platform', 'View notification centre', 'عرض مركز الإشعارات', 'PLATFORM', false, 'Read the delivery log and notification templates.'),
+  P('platform.notification.manage', 'Platform', 'Manage notifications', 'إدارة الإشعارات', 'PLATFORM', false, 'Send announcements and manage notification templates.'),
 
   // ----------------------------------------------------------------- company
   P('company.read', 'Company', 'View company', 'عرض الشركة', 'COMPANY', true, 'Read own company profile.'),

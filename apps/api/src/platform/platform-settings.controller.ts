@@ -12,6 +12,7 @@ import {
 import { AuditService } from '../common/audit.service';
 import { badRequest, ERROR_CODES, notFound } from '../common/errors';
 import { PlatformSettingsService, PLATFORM_SETTING_KEYS } from './platform-settings.service';
+import { EcosystemService } from './ecosystem.service';
 
 interface RequestLike {
   ip?: string;
@@ -92,8 +93,17 @@ export class UpdateServiceAreaDto {
 export class PlatformSettingsController {
   constructor(
     private readonly settings: PlatformSettingsService,
+    private readonly ecosystem: EcosystemService,
     private readonly audit: AuditService,
   ) {}
+
+  @Get('ecosystem')
+  @PlatformOnly()
+  @RequirePermissions('platform.ecosystem.read')
+  @ApiOperation({ summary: 'Platform-wide ecosystem KPIs' })
+  async readEcosystem() {
+    return this.ecosystem.build();
+  }
 
   @Get('settings')
   @PlatformOnly()

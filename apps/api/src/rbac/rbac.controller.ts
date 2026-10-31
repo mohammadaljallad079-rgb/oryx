@@ -29,6 +29,7 @@ import {
   UpdateUserStatusDto,
 } from './rbac.dto';
 import { PrismaService } from '../common/prisma.service';
+import { DEFAULT_COMPANY_ROLE_TEMPLATES } from '../common/role-templates';
 
 interface RequestLike {
   ip?: string;
@@ -95,6 +96,43 @@ export class PermissionsController {
     const scope = resolveCompanyId(p, companyId);
     const codes = await this.rbac.delegablePermissions(scope, actorFrom(p, req));
     return { companyId: scope, permissions: codes };
+  }
+
+  /**
+   * Named role templates.
+   *
+   * These are the same templates seeded into every new company. Exposing them
+   * lets the admin UI offer "start from a role" instead of an empty permission
+   * grid, and each template is returned with the permission codes it grants so
+   * the screen can preview them. A caller with a company scope receives only
+   * the codes it may actually delegate, so a template can never be used to
+   * escalate.
+   */
+  @Get('role-templates')
+  @RequireAnyPermission('platform.company.read', 'company.role.read', 'platform.role.manage')
+  @ApiOperation({ summary: 'Named role templates with their permission sets' })
+  async roleTemplates(
+    @Query('companyId') companyId: string | undefined,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    const scope = resolveCompanyId(p, companyId);
+    const delegable = new Set(await this.rbac.delegablePermissions(scope, actorFrom(p, req)));
+    return {
+      companyId: scope,
+      templates: DEFAULT_COMPANY_ROLE_TEMPLATES.map((t) => {
+        const allowed = t.permissions.filter((code) => delegable.has(code));
+        return {
+          code: t.code,
+          nameEn: t.nameEn,
+          nameAr: t.nameAr,
+          descriptionEn: t.descriptionEn,
+          permissions: allowed,
+          totalPermissions: t.permissions.length,
+          withheldPermissions: t.permissions.length - allowed.length,
+        };
+      }),
+    };
   }
 
   constructor(private readonly rbac: RbacService) {}

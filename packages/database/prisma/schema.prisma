@@ -43,14 +43,14 @@ model Cart {
 /// later catalogue price change cannot silently alter what the customer was
 /// shown — the same snapshot principle the payroll run uses.
 model CartItem {
-  id            String   @id @default(cuid())
-  cartId        String
-  productId     String
-  quantity      Int      @default(1)
+  id             String   @id @default(cuid())
+  cartId         String
+  productId      String
+  quantity       Int      @default(1)
   /// Unit price captured when the line was added, in minor units.
   unitPriceMinor Int
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -98,37 +98,45 @@ model Favorite {
 /// placement, so a later catalogue price change cannot rewrite a historical
 /// order — the same principle the payroll run uses.
 model CustomerOrder {
-  id                String   @id @default(cuid())
+  id                 String                     @id @default(cuid())
   /// Human-facing reference, e.g. ORD-2026-000123. Unique per company.
-  reference         String
-  customerAccountId String
+  reference          String
+  customerAccountId  String
   /// The catalogue tenant the order was placed against.
-  companyId         String
-  status            CustomerOrderStatus @default(PENDING)
-  /** Payment intent, when the order was paid through a gateway. Null for cash/terminal. */
-  paymentIntentId   String?
-  /** How the customer chose to pay. Never a claim that money moved. */
-  paymentMethod     CustomerOrderPaymentMethod @default(CASH)
-  /** Denormalised address text, so a later address edit cannot rewrite history. */
-  addressLabel      String?
-  addressLine1      String?
-  addressLine2      String?
-  addressCity       String?
+  companyId          String
+  status             CustomerOrderStatus        @default(PENDING)
+  /**
+   * Payment intent, when the order was paid through a gateway. Null for cash/terminal.
+   */
+  paymentIntentId    String?
+  /**
+   * How the customer chose to pay. Never a claim that money moved.
+   */
+  paymentMethod      CustomerOrderPaymentMethod @default(CASH)
+  /**
+   * Denormalised address text, so a later address edit cannot rewrite history.
+   */
+  addressLabel       String?
+  addressLine1       String?
+  addressLine2       String?
+  addressCity        String?
   addressCountryCode String?
-  subtotalMinor     Int
-  taxMinor          Int      @default(0)
-  deliveryMinor     Int      @default(0)
-  totalMinor        Int
-  currency          String   @default("BHD")
-  notes             String?
-  /** Set when the customer cancels; a reason the operator can act on. */
+  subtotalMinor      Int
+  taxMinor           Int                        @default(0)
+  deliveryMinor      Int                        @default(0)
+  totalMinor         Int
+  currency           String                     @default("BHD")
+  notes              String?
+  /**
+   * Set when the customer cancels; a reason the operator can act on.
+   */
   cancellationReason String?
-  placedAt          DateTime @default(now())
-  confirmedAt       DateTime?
-  cancelledAt       DateTime?
-  completedAt       DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  placedAt           DateTime                   @default(now())
+  confirmedAt        DateTime?
+  cancelledAt        DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
 
   customerAccount CustomerAccount      @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
   company         Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -139,6 +147,7 @@ model CustomerOrder {
   /// A retried checkout with the same key returns the original order rather than
   /// placing a second one. Null for orders created before the key was supplied.
   idempotencyKey String?
+
   @@unique([companyId, reference])
   @@unique([customerAccountId, idempotencyKey])
   @@index([customerAccountId, placedAt])
@@ -148,21 +157,25 @@ model CustomerOrder {
 
 /// One line of a consumer order. The unit price is a placement-time snapshot.
 model CustomerOrderLine {
-  id             String   @id @default(cuid())
-  orderId        String
-  productId      String
-  /** Snapshot of the catalogue identity, so a renamed product does not rewrite history. */
-  sku            String
-  nameEn         String
-  nameAr         String
-  quantity       Int
-  unitPriceMinor Int
-  /** Basis points, copied from the product at placement. 1500 = 15%. */
-  taxRateBp      Int      @default(0)
+  id                String   @id @default(cuid())
+  orderId           String
+  productId         String
+  /**
+   * Snapshot of the catalogue identity, so a renamed product does not rewrite history.
+   */
+  sku               String
+  nameEn            String
+  nameAr            String
+  quantity          Int
+  unitPriceMinor    Int
+  /**
+   * Basis points, copied from the product at placement. 1500 = 15%.
+   */
+  taxRateBp         Int      @default(0)
   lineSubtotalMinor Int
-  lineTaxMinor   Int      @default(0)
-  lineTotalMinor Int
-  createdAt      DateTime @default(now())
+  lineTaxMinor      Int      @default(0)
+  lineTotalMinor    Int
+  createdAt         DateTime @default(now())
 
   order   CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
@@ -177,13 +190,15 @@ model CustomerOrderLine {
 /// order's history readable and makes an accidental double transition visible
 /// rather than silent.
 model CustomerOrderEvent {
-  id        String   @id @default(cuid())
+  id        String              @id @default(cuid())
   orderId   String
   status    CustomerOrderStatus
   note      String?
-  /** Who caused it: the customer, the merchant, or the system. */
-  actor     String   @default("SYSTEM")
-  createdAt DateTime @default(now())
+  /**
+   * Who caused it: the customer, the merchant, or the system.
+   */
+  actor     String              @default("SYSTEM")
+  createdAt DateTime            @default(now())
 
   order CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
@@ -228,7 +243,7 @@ model ProductImage {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  product    Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product    Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
   mediaAsset CmsMediaAsset? @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
 
   @@index([productId, sortOrder])
@@ -310,38 +325,44 @@ enum SupportSessionStatus {
 // ---------------------------------------------------------------- identity
 
 model User {
-  id             String     @id @default(cuid())
-  email          String     @unique
-  passwordHash   String
-  fullNameEn     String
-  fullNameAr     String
-  status         UserStatus @default(INVITED)
-  isSuperAdmin   Boolean    @default(false)
-  preferredLocale Locale    @default(ar)
-  preferredTheme Theme      @default(dark)
-  lastLoginAt    DateTime?
-  failedLoginCount Int      @default(0)
-  lockedUntil    DateTime?
-  /** TOTP MFA: secret is stored encrypted at rest, never in plaintext. */
-  mfaEnabled     Boolean    @default(false)
-  mfaSecretEncrypted String?
-  /** Short-lived, single-use enrollment secret pending verification. */
+  id                        String     @id @default(cuid())
+  email                     String     @unique
+  passwordHash              String
+  fullNameEn                String
+  fullNameAr                String
+  status                    UserStatus @default(INVITED)
+  isSuperAdmin              Boolean    @default(false)
+  preferredLocale           Locale     @default(ar)
+  preferredTheme            Theme      @default(dark)
+  lastLoginAt               DateTime?
+  failedLoginCount          Int        @default(0)
+  lockedUntil               DateTime?
+  /**
+   * TOTP MFA: secret is stored encrypted at rest, never in plaintext.
+   */
+  mfaEnabled                Boolean    @default(false)
+  mfaSecretEncrypted        String?
+  /**
+   * Short-lived, single-use enrollment secret pending verification.
+   */
   mfaPendingSecretEncrypted String?
-  mfaPendingExpiresAt DateTime?
-  /** Monotonic counter that rejects replay of an already-accepted TOTP step. */
-  mfaLastUsedStep BigInt?
-  mfaEnrolledAt  DateTime?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  mfaPendingExpiresAt       DateTime?
+  /**
+   * Monotonic counter that rejects replay of an already-accepted TOTP step.
+   */
+  mfaLastUsedStep           BigInt?
+  mfaEnrolledAt             DateTime?
+  createdAt                 DateTime   @default(now())
+  updatedAt                 DateTime   @updatedAt
 
-  memberships       Membership[]
-  refreshTokens     RefreshToken[]
-  invitationsSent   Invitation[]     @relation("InvitationInviter")
-  auditLogs         AuditLog[]
-  supportSessions   SupportSession[] @relation("SupportSessionActor")
-  mfaRecoveryCodes  MfaRecoveryCode[]
+  memberships        Membership[]
+  refreshTokens      RefreshToken[]
+  invitationsSent    Invitation[]      @relation("InvitationInviter")
+  auditLogs          AuditLog[]
+  supportSessions    SupportSession[]  @relation("SupportSessionActor")
+  mfaRecoveryCodes   MfaRecoveryCode[]
   mediaAssetsCreated CmsMediaAsset[]
-  contentUpdated    CmsContentBlock[]
+  contentUpdated     CmsContentBlock[]
 
   @@index([status])
 }
@@ -351,11 +372,11 @@ model User {
  * code is marked used the first time it is redeemed.
  */
 model MfaRecoveryCode {
-  id         String    @id @default(cuid())
-  userId     String
-  codeHash   String
-  usedAt     DateTime?
-  createdAt  DateTime  @default(now())
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -402,67 +423,69 @@ model RefreshToken {
 // ---------------------------------------------------------------- organization
 
 model Company {
-  id              String        @id @default(cuid())
+  id              String          @id @default(cuid())
   /// Carts opened against this tenant's catalogue.
   carts           Cart[]
-  /** Consumer orders placed against this tenant's catalogue. */
+  /**
+   * Consumer orders placed against this tenant's catalogue.
+   */
   orders          CustomerOrder[]
-  code            String        @unique
+  code            String          @unique
   nameEn          String
   nameAr          String
   legalNameEn     String?
   type            CompanyType
-  status          CompanyStatus @default(PROVISIONING)
+  status          CompanyStatus   @default(PROVISIONING)
   industry        String?
   countryCode     String?
-  currency        String        @default("BHD")
-  timezone        String        @default("Asia/Bahrain")
+  currency        String          @default("BHD")
+  timezone        String          @default("Asia/Bahrain")
   taxNumber       String?
   parentCompanyId String?
   notes           String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
-  parent       Company?  @relation("CompanyHierarchy", fields: [parentCompanyId], references: [id], onDelete: SetNull)
-  children     Company[] @relation("CompanyHierarchy")
-  branches     Branch[]
-  memberships  Membership[]
-  roles        Role[]
-  subscriptions Subscription[]
-  invitations  Invitation[]
-  auditLogs    AuditLog[]
+  parent          Company?         @relation("CompanyHierarchy", fields: [parentCompanyId], references: [id], onDelete: SetNull)
+  children        Company[]        @relation("CompanyHierarchy")
+  branches        Branch[]
+  memberships     Membership[]
+  roles           Role[]
+  subscriptions   Subscription[]
+  invitations     Invitation[]
+  auditLogs       AuditLog[]
   supportSessions SupportSession[]
   branding        CompanyBranding?
 
   // Execution 02 — ERP core (all tenant-owned rows carry companyId).
-  documentSequences   DocumentSequence[]
-  accounts            Account[]
-  fiscalYears         FiscalYear[]
-  fiscalPeriods       FiscalPeriod[]
-  accountBalances     AccountBalance[]
-  journalEntries      JournalEntry[]
-  journalLines        JournalLine[]
-  payments            Payment[]
-  paymentAllocations  PaymentAllocation[]
-  customers           Customer[]
-  products            Product[]
-  warehouses          Warehouse[]
-  stockLevels         StockLevel[]
-  stockMovements      StockMovement[]
-  stockTransfers      StockTransfer[]
-  stockAdjustments    StockAdjustment[]
-  quotations          Quotation[]
-  salesOrders         SalesOrder[]
-  salesInvoices       SalesInvoice[]
-  creditNotes         CreditNote[]
-  cashierSessions     CashierSession[]
-  posSales            PosSale[]
-  suppliers           Supplier[]
+  documentSequences    DocumentSequence[]
+  accounts             Account[]
+  fiscalYears          FiscalYear[]
+  fiscalPeriods        FiscalPeriod[]
+  accountBalances      AccountBalance[]
+  journalEntries       JournalEntry[]
+  journalLines         JournalLine[]
+  payments             Payment[]
+  paymentAllocations   PaymentAllocation[]
+  customers            Customer[]
+  products             Product[]
+  warehouses           Warehouse[]
+  stockLevels          StockLevel[]
+  stockMovements       StockMovement[]
+  stockTransfers       StockTransfer[]
+  stockAdjustments     StockAdjustment[]
+  quotations           Quotation[]
+  salesOrders          SalesOrder[]
+  salesInvoices        SalesInvoice[]
+  creditNotes          CreditNote[]
+  cashierSessions      CashierSession[]
+  posSales             PosSale[]
+  suppliers            Supplier[]
   purchaseRequisitions PurchaseRequisition[]
-  purchaseOrders      PurchaseOrder[]
-  goodsReceipts       GoodsReceipt[]
-  supplierInvoices    SupplierInvoice[]
-  purchaseReturns     PurchaseReturn[]
+  purchaseOrders       PurchaseOrder[]
+  goodsReceipts        GoodsReceipt[]
+  supplierInvoices     SupplierInvoice[]
+  purchaseReturns      PurchaseReturn[]
 
   // Execution 03 — HR, CRM, operations and automotive services.
   departments         Department[]
@@ -485,50 +508,50 @@ model Company {
   employeeAdvances    EmployeeAdvance[]
   advanceSettlements  AdvanceSettlement[]
 
-  leadSources         LeadSource[]
-  leads               Lead[]
-  pipelines           Pipeline[]
-  pipelineStages      PipelineStage[]
-  opportunities       Opportunity[]
-  customerContacts    CustomerContact[]
-  crmActivities       CrmActivity[]
-  slaPolicies         SlaPolicy[]
-  supportTickets      SupportTicket[]
-  ticketMessages      TicketMessage[]
-  customerSegments    CustomerSegment[]
+  leadSources            LeadSource[]
+  leads                  Lead[]
+  pipelines              Pipeline[]
+  pipelineStages         PipelineStage[]
+  opportunities          Opportunity[]
+  customerContacts       CustomerContact[]
+  crmActivities          CrmActivity[]
+  slaPolicies            SlaPolicy[]
+  supportTickets         SupportTicket[]
+  ticketMessages         TicketMessage[]
+  customerSegments       CustomerSegment[]
   customerSegmentMembers CustomerSegmentMember[]
 
-  projects            Project[]
-  projectTasks        ProjectTask[]
-  workOrders          WorkOrder[]
+  projects                Project[]
+  projectTasks            ProjectTask[]
+  workOrders              WorkOrder[]
   workOrderChecklistItems WorkOrderChecklistItem[]
-  approvalRequests    ApprovalRequest[]
-  entityComments      EntityComment[]
-  entityAttachments   EntityAttachment[]
-  notifications       Notification[]
-  calendarEvents      OperationalCalendarEvent[]
+  approvalRequests        ApprovalRequest[]
+  entityComments          EntityComment[]
+  entityAttachments       EntityAttachment[]
+  notifications           Notification[]
+  calendarEvents          OperationalCalendarEvent[]
 
-  vehicles            Vehicle[]
-  vehicleMileageRecords VehicleMileageRecord[]
-  vehicleDocuments    VehicleDocument[]
-  inspectionServices  InspectionService[]
+  vehicles                 Vehicle[]
+  vehicleMileageRecords    VehicleMileageRecord[]
+  vehicleDocuments         VehicleDocument[]
+  inspectionServices       InspectionService[]
   inspectionChecklistItems InspectionChecklistItem[]
-  inspectionBookings  InspectionBooking[]
-  inspectionFindings  InspectionFinding[]
-  inspectionReports   InspectionReport[]
-  workshopBays        WorkshopBay[]
-  maintenanceBookings MaintenanceBooking[]
-  jobCards            JobCard[]
-  labourOperations    LabourOperation[]
-  repairEstimates     RepairEstimate[]
-  repairEstimateLines RepairEstimateLine[]
-  partsReservations   PartsReservation[]
-  partsReservationLines PartsReservationLine[]
-  partReferences      PartReference[]
-  partCompatibilities PartCompatibility[]
-  warrantyRecords     WarrantyRecord[]
-  serviceRequests     ServiceRequest[]
-  marketplaceCommissions MarketplaceCommission[]
+  inspectionBookings       InspectionBooking[]
+  inspectionFindings       InspectionFinding[]
+  inspectionReports        InspectionReport[]
+  workshopBays             WorkshopBay[]
+  maintenanceBookings      MaintenanceBooking[]
+  jobCards                 JobCard[]
+  labourOperations         LabourOperation[]
+  repairEstimates          RepairEstimate[]
+  repairEstimateLines      RepairEstimateLine[]
+  partsReservations        PartsReservation[]
+  partsReservationLines    PartsReservationLine[]
+  partReferences           PartReference[]
+  partCompatibilities      PartCompatibility[]
+  warrantyRecords          WarrantyRecord[]
+  serviceRequests          ServiceRequest[]
+  marketplaceCommissions   MarketplaceCommission[]
 
   // Execution 04 — customer platform, marketplace and mobile applications.
   customerAccounts          CustomerAccount[]
@@ -544,7 +567,10 @@ model Company {
   notificationDeliveries    NotificationDelivery[]
 
   // Execution 05 — per-tenant integration configuration.
-  integrationProviders      IntegrationProvider[]
+  integrationProviders IntegrationProvider[]
+
+  // Execution 12 — platform discount coupons.
+  coupons Coupon[]
 
   @@index([type])
   @@index([status])
@@ -570,33 +596,33 @@ model Branch {
   memberships MembershipBranch[]
 
   // Execution 02 — branch-level operational scope.
-  warehouses        Warehouse[]
-  cashierSessions   CashierSession[]
-  posSales          PosSale[]
-  salesInvoices     SalesInvoice[]
-  purchaseOrders    PurchaseOrder[]
-  goodsReceipts     GoodsReceipt[]
-  supplierInvoices  SupplierInvoice[]
-  payments          Payment[]
-  journalEntries    JournalEntry[]
+  warehouses       Warehouse[]
+  cashierSessions  CashierSession[]
+  posSales         PosSale[]
+  salesInvoices    SalesInvoice[]
+  purchaseOrders   PurchaseOrder[]
+  goodsReceipts    GoodsReceipt[]
+  supplierInvoices SupplierInvoice[]
+  payments         Payment[]
+  journalEntries   JournalEntry[]
 
   // Execution 03 — branch scope for HR, operations and automotive.
-  departments       Department[]
-  employees         Employee[]
-  projects          Project[]
-  projectTasks      ProjectTask[]
-  workOrders        WorkOrder[]
-  calendarEvents    OperationalCalendarEvent[]
-  inspectionBookings InspectionBooking[]
+  departments         Department[]
+  employees           Employee[]
+  projects            Project[]
+  projectTasks        ProjectTask[]
+  workOrders          WorkOrder[]
+  calendarEvents      OperationalCalendarEvent[]
+  inspectionBookings  InspectionBooking[]
   maintenanceBookings MaintenanceBooking[]
-  jobCards          JobCard[]
-  workshopBays      WorkshopBay[]
+  jobCards            JobCard[]
+  workshopBays        WorkshopBay[]
 
   // Execution 04 — branch scope for the booking engine.
-  bookingResources  BookingResource[]
-  workingHours      WorkingHours[]
-  bookingSlots      BookingSlot[]
-  paymentIntents    PaymentIntent[]
+  bookingResources BookingResource[]
+  workingHours     WorkingHours[]
+  bookingSlots     BookingSlot[]
+  paymentIntents   PaymentIntent[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -612,12 +638,14 @@ model Role {
   nameAr        String
   descriptionEn String?
   isSystem      Boolean  @default(false)
-  /** Platform roles are not editable by company admins. */
+  /**
+   * Platform roles are not editable by company admins.
+   */
   isPlatform    Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  company     Company?           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company     Company?         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   permissions RolePermission[]
   memberships Membership[]
   invitations Invitation[]
@@ -638,18 +666,18 @@ model RolePermission {
 }
 
 model Membership {
-  id         String   @id @default(cuid())
-  userId     String
-  companyId  String
-  roleId     String
-  isActive   Boolean  @default(true)
+  id          String   @id @default(cuid())
+  userId      String
+  companyId   String
+  roleId      String
+  isActive    Boolean  @default(true)
   invitedById String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  company Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  role    Role             @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company  Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role     Role               @relation(fields: [roleId], references: [id], onDelete: Restrict)
   branches MembershipBranch[]
 
   @@unique([userId, companyId])
@@ -681,9 +709,9 @@ model Invitation {
   acceptedAt  DateTime?
   createdAt   DateTime         @default(now())
 
-  company   Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  role      Role             @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  invitedBy User?            @relation("InvitationInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+  company   Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role      Role               @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  invitedBy User?              @relation("InvitationInviter", fields: [invitedById], references: [id], onDelete: SetNull)
   branches  InvitationBranch[]
 
   @@index([companyId])
@@ -703,22 +731,22 @@ model InvitationBranch {
 // ---------------------------------------------------------------- modules / plans
 
 model Module {
-  id             String       @id @default(cuid())
-  key            String       @unique
-  nameEn         String
-  nameAr         String
-  descriptionEn  String
-  descriptionAr  String
-  group          String
-  icon           String
-  route          String
-  status         ModuleStatus @default(PLANNED)
-  deliveryPhase  String
-  readPermission String
+  id              String       @id @default(cuid())
+  key             String       @unique
+  nameEn          String
+  nameAr          String
+  descriptionEn   String
+  descriptionAr   String
+  group           String
+  icon            String
+  route           String
+  status          ModuleStatus @default(PLANNED)
+  deliveryPhase   String
+  readPermission  String
   writePermission String?
-  sortOrder      Int          @default(0)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  sortOrder       Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   planModules PlanModule[]
 
@@ -726,26 +754,28 @@ model Module {
 }
 
 model Plan {
-  id                 String   @id @default(cuid())
-  code               String   @unique
-  nameEn             String
-  nameAr             String
-  descriptionEn      String
-  descriptionAr      String
-  monthlyPrice       Decimal  @db.Decimal(12, 2)
-  annualPrice        Decimal  @db.Decimal(12, 2)
-  currency           String   @default("BHD")
-  isPublic           Boolean  @default(true)
-  isActive           Boolean  @default(true)
-  trialDays          Int      @default(14)
-  /** -1 means unlimited. */
-  maxCompanies       Int      @default(1)
-  maxBranches        Int      @default(1)
-  maxUsers           Int      @default(5)
-  storageMb          Int      @default(1024)
-  apiRequestsPerMonth Int     @default(10000)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  code                String   @unique
+  nameEn              String
+  nameAr              String
+  descriptionEn       String
+  descriptionAr       String
+  monthlyPrice        Decimal  @db.Decimal(12, 2)
+  annualPrice         Decimal  @db.Decimal(12, 2)
+  currency            String   @default("BHD")
+  isPublic            Boolean  @default(true)
+  isActive            Boolean  @default(true)
+  trialDays           Int      @default(14)
+  /**
+   * -1 means unlimited.
+   */
+  maxCompanies        Int      @default(1)
+  maxBranches         Int      @default(1)
+  maxUsers            Int      @default(5)
+  storageMb           Int      @default(1024)
+  apiRequestsPerMonth Int      @default(10000)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   modules       PlanModule[]
   subscriptions Subscription[]
@@ -775,13 +805,15 @@ model Subscription {
   startedAt        DateTime           @default(now())
   currentPeriodEnd DateTime?
   cancelledAt      DateTime?
-  /** Denormalised snapshot of the licensed module keys at activation. */
+  /**
+   * Denormalised snapshot of the licensed module keys at activation.
+   */
   licensedModules  String[]           @default([])
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 
-  company Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  plan    Plan                 @relation(fields: [planId], references: [id], onDelete: Restrict)
+  company Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan    Plan                @relation(fields: [planId], references: [id], onDelete: Restrict)
   events  SubscriptionEvent[]
 
   @@index([companyId])
@@ -810,14 +842,14 @@ model SubscriptionEvent {
 // ---------------------------------------------------------------- governance
 
 model SupportSession {
-  id        String               @id @default(cuid())
+  id          String               @id @default(cuid())
   actorUserId String
-  companyId String
-  reason    String
-  status    SupportSessionStatus @default(ACTIVE)
-  expiresAt DateTime
-  endedAt   DateTime?
-  createdAt DateTime             @default(now())
+  companyId   String
+  reason      String
+  status      SupportSessionStatus @default(ACTIVE)
+  expiresAt   DateTime
+  endedAt     DateTime?
+  createdAt   DateTime             @default(now())
 
   actor   User    @relation("SupportSessionActor", fields: [actorUserId], references: [id], onDelete: Cascade)
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -866,16 +898,16 @@ model CmsPage {
 }
 
 model CmsBanner {
-  id        String  @id @default(cuid())
-  placement String
-  locale    Locale
-  title     String
-  subtitle  String?
-  imageUrl  String?
-  actionUrl String?
-  sortOrder Int     @default(0)
+  id           String    @id @default(cuid())
+  placement    String
+  locale       Locale
+  title        String
+  subtitle     String?
+  imageUrl     String?
+  actionUrl    String?
+  sortOrder    Int       @default(0)
   /// Activation: whether this slide is switched on at all.
-  isActive  Boolean @default(true)
+  isActive     Boolean   @default(true)
   /// Editorial approval: whether the content itself has been signed off.
   ///
   /// Distinct from `isActive` on purpose, and the distinction matters for the
@@ -886,11 +918,13 @@ model CmsBanner {
   ///
   /// The default is DRAFT, so a newly created banner is never customer-visible
   /// until someone publishes it explicitly.
-  status    CmsStatus @default(DRAFT)
-  publishedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  /** Preferred reference; `imageUrl` is kept for external absolute URLs. */
+  status       CmsStatus @default(DRAFT)
+  publishedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  /**
+   * Preferred reference; `imageUrl` is kept for external absolute URLs.
+   */
   mediaAssetId String?
 
   mediaAsset CmsMediaAsset? @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
@@ -928,32 +962,36 @@ model AppVersion {
 }
 
 model ApiClient {
-  id                String    @id @default(cuid())
-  name              String
-  clientId          String    @unique
-  secretHash        String
-  scopes            String[]  @default([])
-  isActive          Boolean   @default(true)
-  rateLimitPerMinute Int      @default(60)
-  lastUsedAt        DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  name               String
+  clientId           String    @unique
+  secretHash         String
+  scopes             String[]  @default([])
+  isActive           Boolean   @default(true)
+  rateLimitPerMinute Int       @default(60)
+  lastUsedAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 }
 
 model ServiceCategory {
-  id         String   @id @default(cuid())
-  key        String   @unique
-  nameEn     String
-  nameAr     String
-  domain     String
-  icon       String?
-  sortOrder  Int      @default(0)
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  /** Photography for the category card; replaces the generated vector art. */
-  imageAssetId String?
-  /** Short marketing copy per locale, editable from the admin CMS. */
+  id            String   @id @default(cuid())
+  key           String   @unique
+  nameEn        String
+  nameAr        String
+  domain        String
+  icon          String?
+  sortOrder     Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  /**
+   * Photography for the category card; replaces the generated vector art.
+   */
+  imageAssetId  String?
+  /**
+   * Short marketing copy per locale, editable from the admin CMS.
+   */
   descriptionEn String?
   descriptionAr String?
 
@@ -986,12 +1024,10 @@ model PlatformSetting {
 
 /**
  * Platform-level service-area catalogue.
- *
  * Seeded from `BAHRAIN_SERVICE_AREAS` in `@oryx/shared` so a fresh deployment
  * is usable, but stored in the database so an administrator can rename,
  * deactivate or add an area without a code change. The `code` is the stable
  * identifier; the names are display values.
- *
  * This is a platform catalogue, not a tenant table: it carries no `companyId`,
  * because every tenant in the launch market shares the same administrative
  * areas. A tenant narrows coverage through its own branches.
@@ -1201,7 +1237,9 @@ enum PosSaleStatus {
 
 // ----------------------------------------------------------- document numbering
 
-/** Monotonic per-company, per-document-type sequence. Never reused. */
+/**
+ * Monotonic per-company, per-document-type sequence. Never reused.
+ */
 model DocumentSequence {
   id         String   @id @default(cuid())
   companyId  String
@@ -1218,7 +1256,9 @@ model DocumentSequence {
 
 // ------------------------------------------------------------------- accounting
 
-/** Chart-of-accounts node. `code` orders the tree; `parentId` nests it. */
+/**
+ * Chart-of-accounts node. `code` orders the tree; `parentId` nests it.
+ */
 model Account {
   id            String               @id @default(cuid())
   companyId     String
@@ -1231,24 +1271,26 @@ model Account {
   level         Int                  @default(1)
   isPostable    Boolean              @default(true)
   isSystem      Boolean              @default(false)
-  /** System role tag (e.g. AR_CONTROL, AP_CONTROL, CASH, SALES_REVENUE, VAT_OUTPUT). */
+  /**
+   * System role tag (e.g. AR_CONTROL, AP_CONTROL, CASH, SALES_REVENUE, VAT_OUTPUT).
+   */
   systemRole    String?
   currency      String               @default("BHD")
   isActive      Boolean              @default(true)
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
 
-  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  parent   Account? @relation("AccountTree", fields: [parentId], references: [id], onDelete: SetNull)
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  parent   Account?  @relation("AccountTree", fields: [parentId], references: [id], onDelete: SetNull)
   children Account[] @relation("AccountTree")
 
   journalLines      JournalLine[]
   balances          AccountBalance[]
   customers         Customer[]
   suppliers         Supplier[]
-  productsSales     Product[]  @relation("ProductSalesAccount")
-  productsInventory Product[]  @relation("ProductInventoryAccount")
-  productsCogs      Product[]  @relation("ProductCogsAccount")
+  productsSales     Product[]        @relation("ProductSalesAccount")
+  productsInventory Product[]        @relation("ProductInventoryAccount")
+  productsCogs      Product[]        @relation("ProductCogsAccount")
   warehouses        Warehouse[]
 
   @@unique([companyId, code])
@@ -1257,7 +1299,9 @@ model Account {
   @@index([parentId])
 }
 
-/** Fiscal year. Only one year per company may be open at a time. */
+/**
+ * Fiscal year. Only one year per company may be open at a time.
+ */
 model FiscalYear {
   id             String    @id @default(cuid())
   companyId      String
@@ -1277,7 +1321,9 @@ model FiscalYear {
   @@index([companyId, isClosed])
 }
 
-/** Accounting period inside a fiscal year. Posting is refused when not OPEN. */
+/**
+ * Accounting period inside a fiscal year. Posting is refused when not OPEN.
+ */
 model FiscalPeriod {
   id             String             @id @default(cuid())
   companyId      String
@@ -1293,8 +1339,8 @@ model FiscalPeriod {
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
-  company    Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  fiscalYear FiscalYear        @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
+  company    Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear FiscalYear       @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
   balances   AccountBalance[]
   entries    JournalEntry[]
 
@@ -1302,7 +1348,9 @@ model FiscalPeriod {
   @@index([companyId, status])
 }
 
-/** Balanced double-entry journal header. */
+/**
+ * Balanced double-entry journal header.
+ */
 model JournalEntry {
   id               String            @id @default(cuid())
   companyId        String
@@ -1312,7 +1360,9 @@ model JournalEntry {
   entryDate        DateTime
   status           JournalStatus     @default(DRAFT)
   sourceType       JournalSourceType @default(MANUAL)
-  /** Source document id, used to make posting idempotent. */
+  /**
+   * Source document id, used to make posting idempotent.
+   */
   sourceId         String?
   memo             String?
   currency         String            @default("BHD")
@@ -1330,8 +1380,8 @@ model JournalEntry {
   fiscalPeriod FiscalPeriod? @relation(fields: [fiscalPeriodId], references: [id], onDelete: SetNull)
 
   lines      JournalLine[]
-  reversal   JournalEntry?   @relation("JournalReversal", fields: [reversalOfId], references: [id], onDelete: SetNull)
-  reversedBy JournalEntry[]  @relation("JournalReversal")
+  reversal   JournalEntry?  @relation("JournalReversal", fields: [reversalOfId], references: [id], onDelete: SetNull)
+  reversedBy JournalEntry[] @relation("JournalReversal")
 
   @@unique([companyId, entryNumber])
   // Idempotency: one journal per source document. Manual entries have a null
@@ -1361,7 +1411,9 @@ model JournalLine {
   @@index([companyId, accountId])
 }
 
-/** Per-account, per-period aggregate kept in step with posted entries. */
+/**
+ * Per-account, per-period aggregate kept in step with posted entries.
+ */
 model AccountBalance {
   id             String   @id @default(cuid())
   companyId      String
@@ -1379,7 +1431,9 @@ model AccountBalance {
   @@index([companyId])
 }
 
-/** Payment or receipt against a customer or supplier. */
+/**
+ * Payment or receipt against a customer or supplier.
+ */
 model Payment {
   id             String           @id @default(cuid())
   companyId      String
@@ -1415,7 +1469,7 @@ model Payment {
 }
 
 model PaymentAllocation {
-  id                String          @id @default(cuid())
+  id                String           @id @default(cuid())
   companyId         String
   paymentId         String
   target            AllocationTarget
@@ -1423,7 +1477,7 @@ model PaymentAllocation {
   supplierInvoiceId String?
   creditNoteId      String?
   amountMinor       Int
-  createdAt         DateTime        @default(now())
+  createdAt         DateTime         @default(now())
 
   company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   payment         Payment          @relation(fields: [paymentId], references: [id], onDelete: Cascade)
@@ -1460,7 +1514,9 @@ model Warehouse {
   @@index([companyId])
 }
 
-/** Sellable / stockable item. Serves both the sales catalog and inventory. */
+/**
+ * Sellable / stockable item. Serves both the sales catalog and inventory.
+ */
 model Product {
   id                 String      @id @default(cuid())
   companyId          String
@@ -1472,9 +1528,13 @@ model Product {
   barcode            String?
   salesPriceMinor    Int         @default(0)
   costPriceMinor     Int         @default(0)
-  /** Default VAT rate in basis points (1500 = 15.00%). */
+  /**
+   * Default VAT rate in basis points (1500 = 15.00%).
+   */
   taxRateBp          Int         @default(0)
-  /** Reorder threshold, scaled by 10^4. */
+  /**
+   * Reorder threshold, scaled by 10^4.
+   */
   reorderLevel       Int         @default(0)
   reorderQuantity    Int         @default(0)
   trackStock         Boolean     @default(true)
@@ -1497,26 +1557,34 @@ model Product {
   movements StockMovement[]
 
   // Execution 03
-  partReferences   PartReference[]
+  partReferences      PartReference[]
   partCompatibilities PartCompatibility[]
-  reservationLines PartsReservationLine[]
+  reservationLines    PartsReservationLine[]
 
-  /** Consumer order lines that reference this product. */
+  /**
+   * Consumer order lines that reference this product.
+   */
   orderLines CustomerOrderLine[]
 
   @@unique([companyId, sku])
   @@index([companyId, isActive])
 }
 
-/** Current on-hand quantity and moving-average cost for a product in a warehouse. */
+/**
+ * Current on-hand quantity and moving-average cost for a product in a warehouse.
+ */
 model StockLevel {
   id               String   @id @default(cuid())
   companyId        String
   warehouseId      String
   productId        String
-  /** On-hand quantity, scaled by 10^4. */
+  /**
+   * On-hand quantity, scaled by 10^4.
+   */
   quantity         Int      @default(0)
-  /** Moving-average unit cost in minor units. */
+  /**
+   * Moving-average unit cost in minor units.
+   */
   averageCostMinor Int      @default(0)
   updatedAt        DateTime @updatedAt
 
@@ -1529,7 +1597,9 @@ model StockLevel {
   @@index([companyId, productId])
 }
 
-/** Append-only stock ledger. `balanceAfter` is the on-hand after this movement. */
+/**
+ * Append-only stock ledger. `balanceAfter` is the on-hand after this movement.
+ */
 model StockMovement {
   id             String              @id @default(cuid())
   companyId      String
@@ -1537,7 +1607,9 @@ model StockMovement {
   warehouseId    String
   productId      String
   movementType   StockMovementType
-  /** Signed quantity, scaled by 10^4. */
+  /**
+   * Signed quantity, scaled by 10^4.
+   */
   quantity       Int
   unitCostMinor  Int                 @default(0)
   totalCostMinor Int                 @default(0)
@@ -1583,7 +1655,9 @@ model StockTransferLine {
   id         String @id @default(cuid())
   transferId String
   productId  String
-  /** Quantity to move, scaled by 10^4. */
+  /**
+   * Quantity to move, scaled by 10^4.
+   */
   quantity   Int
 
   transfer StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
@@ -1615,7 +1689,9 @@ model StockAdjustmentLine {
   id            String @id @default(cuid())
   adjustmentId  String
   productId     String
-  /** Signed delta, scaled by 10^4 (positive increases stock). */
+  /**
+   * Signed delta, scaled by 10^4 (positive increases stock).
+   */
   quantityDelta Int
   unitCostMinor Int    @default(0)
 
@@ -1640,7 +1716,9 @@ model Customer {
   countryCode         String?
   creditLimitMinor    Int      @default(0)
   paymentTermsDays    Int      @default(0)
-  /** Control account for this customer's receivable. */
+  /**
+   * Control account for this customer's receivable.
+   */
   receivableAccountId String?
   currency            String   @default("BHD")
   isActive            Boolean  @default(true)
@@ -1659,14 +1737,14 @@ model Customer {
   payments    Payment[]
 
   // Execution 03
-  contacts          CustomerContact[]
-  vehicles          Vehicle[]
+  contacts           CustomerContact[]
+  vehicles           Vehicle[]
   segmentMemberships CustomerSegmentMember[]
 
   // Execution 04 — the same tenant customer record is reachable from a
   // consumer account through the vehicle and booking relations.
-  bookingSlots      BookingSlot[]
-  paymentIntents    PaymentIntent[]
+  bookingSlots   BookingSlot[]
+  paymentIntents PaymentIntent[]
 
   @@unique([companyId, code])
   @@index([companyId, isActive])
@@ -1701,16 +1779,16 @@ model Quotation {
 }
 
 model QuotationLine {
-  id                String @id @default(cuid())
+  id                String  @id @default(cuid())
   quotationId       String
   productId         String?
   description       String
   quantity          Int
   unitPriceMinor    Int
-  discountPercentBp Int    @default(0)
-  taxPercentBp      Int    @default(0)
+  discountPercentBp Int     @default(0)
+  taxPercentBp      Int     @default(0)
   lineTotalMinor    Int
-  sortOrder         Int    @default(0)
+  sortOrder         Int     @default(0)
 
   quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
 
@@ -1747,17 +1825,17 @@ model SalesOrder {
 }
 
 model SalesOrderLine {
-  id                String @id @default(cuid())
+  id                String  @id @default(cuid())
   orderId           String
   productId         String?
   description       String
   quantity          Int
-  quantityInvoiced  Int    @default(0)
+  quantityInvoiced  Int     @default(0)
   unitPriceMinor    Int
-  discountPercentBp Int    @default(0)
-  taxPercentBp      Int    @default(0)
+  discountPercentBp Int     @default(0)
+  taxPercentBp      Int     @default(0)
   lineTotalMinor    Int
-  sortOrder         Int    @default(0)
+  sortOrder         Int     @default(0)
 
   order SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
@@ -1788,10 +1866,10 @@ model SalesInvoice {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
-  company     Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  branch      Branch?              @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  customer    Customer             @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  order       SalesOrder?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  company     Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch      Branch?             @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  customer    Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  order       SalesOrder?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
   lines       SalesInvoiceLine[]
   allocations PaymentAllocation[]
   creditNotes CreditNote[]
@@ -1804,19 +1882,19 @@ model SalesInvoice {
 }
 
 model SalesInvoiceLine {
-  id                String @id @default(cuid())
+  id                String  @id @default(cuid())
   invoiceId         String
   productId         String?
   description       String
   quantity          Int
   unitPriceMinor    Int
-  discountPercentBp Int    @default(0)
-  taxPercentBp      Int    @default(0)
+  discountPercentBp Int     @default(0)
+  taxPercentBp      Int     @default(0)
   lineSubtotalMinor Int
-  discountMinor     Int    @default(0)
-  taxMinor          Int    @default(0)
+  discountMinor     Int     @default(0)
+  taxMinor          Int     @default(0)
   lineTotalMinor    Int
-  sortOrder         Int    @default(0)
+  sortOrder         Int     @default(0)
 
   invoice SalesInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
@@ -1856,22 +1934,24 @@ model CreditNote {
 }
 
 model CreditNoteLine {
-  id             String @id @default(cuid())
+  id             String  @id @default(cuid())
   creditNoteId   String
   productId      String?
   description    String
   quantity       Int
   unitPriceMinor Int
-  taxPercentBp   Int    @default(0)
+  taxPercentBp   Int     @default(0)
   lineTotalMinor Int
-  sortOrder      Int    @default(0)
+  sortOrder      Int     @default(0)
 
   creditNote CreditNote @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
 
   @@index([creditNoteId])
 }
 
-/** Cashier shift for a POS terminal. Expected cash is derived from POS sales. */
+/**
+ * Cashier shift for a POS terminal. Expected cash is derived from POS sales.
+ */
 model CashierSession {
   id                String               @id @default(cuid())
   companyId         String
@@ -1934,15 +2014,15 @@ model PosSale {
 }
 
 model PosSaleLine {
-  id             String @id @default(cuid())
+  id             String  @id @default(cuid())
   posSaleId      String
   productId      String?
   description    String
   quantity       Int
   unitPriceMinor Int
-  discountMinor  Int    @default(0)
-  taxPercentBp   Int    @default(0)
-  taxMinor       Int    @default(0)
+  discountMinor  Int     @default(0)
+  taxPercentBp   Int     @default(0)
+  taxMinor       Int     @default(0)
   lineTotalMinor Int
 
   posSale PosSale @relation(fields: [posSaleId], references: [id], onDelete: Cascade)
@@ -1965,7 +2045,9 @@ model Supplier {
   city             String?
   countryCode      String?
   paymentTermsDays Int      @default(0)
-  /** Control account for this supplier's payable. */
+  /**
+   * Control account for this supplier's payable.
+   */
   payableAccountId String?
   currency         String   @default("BHD")
   isActive         Boolean  @default(true)
@@ -2012,13 +2094,13 @@ model PurchaseRequisition {
 }
 
 model PurchaseRequisitionLine {
-  id                     String @id @default(cuid())
+  id                     String  @id @default(cuid())
   requisitionId          String
   productId              String?
   description            String
   quantity               Int
-  estimatedUnitCostMinor Int    @default(0)
-  sortOrder              Int    @default(0)
+  estimatedUnitCostMinor Int     @default(0)
+  sortOrder              Int     @default(0)
 
   requisition PurchaseRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
 
@@ -2047,9 +2129,9 @@ model PurchaseOrder {
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
 
-  company  Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  branch   Branch?              @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  supplier Supplier             @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  company  Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch   Branch?             @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  supplier Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   lines    PurchaseOrderLine[]
   receipts GoodsReceipt[]
   invoices SupplierInvoice[]
@@ -2060,16 +2142,16 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderLine {
-  id               String @id @default(cuid())
+  id               String  @id @default(cuid())
   orderId          String
   productId        String?
   description      String
   quantity         Int
-  quantityReceived Int    @default(0)
+  quantityReceived Int     @default(0)
   unitCostMinor    Int
-  taxPercentBp     Int    @default(0)
+  taxPercentBp     Int     @default(0)
   lineTotalMinor   Int
-  sortOrder        Int    @default(0)
+  sortOrder        Int     @default(0)
 
   order PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
@@ -2139,10 +2221,10 @@ model SupplierInvoice {
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
 
-  company       Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  branch        Branch?            @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  supplier      Supplier           @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  purchaseOrder PurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  company       Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch        Branch?               @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  supplier      Supplier              @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  purchaseOrder PurchaseOrder?        @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
   lines         SupplierInvoiceLine[]
   allocations   PaymentAllocation[]
 
@@ -2152,17 +2234,17 @@ model SupplierInvoice {
 }
 
 model SupplierInvoiceLine {
-  id                String @id @default(cuid())
+  id                String  @id @default(cuid())
   invoiceId         String
   productId         String?
   description       String
   quantity          Int
   unitCostMinor     Int
-  taxPercentBp      Int    @default(0)
+  taxPercentBp      Int     @default(0)
   lineSubtotalMinor Int
-  taxMinor          Int    @default(0)
+  taxMinor          Int     @default(0)
   lineTotalMinor    Int
-  sortOrder         Int    @default(0)
+  sortOrder         Int     @default(0)
 
   invoice SupplierInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
@@ -2513,29 +2595,29 @@ enum SettlementStatus {
 // ============================================================================
 
 model Department {
-  id         String   @id @default(cuid())
-  companyId  String
-  code       String
-  nameEn     String
-  nameAr     String
-  parentId   String?
-  branchId   String?
+  id                String   @id @default(cuid())
+  companyId         String
+  code              String
+  nameEn            String
+  nameAr            String
+  parentId          String?
+  branchId          String?
   managerEmployeeId String?
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  company  Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  parent   Department? @relation("DepartmentTree", fields: [parentId], references: [id], onDelete: SetNull)
+  company  Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  parent   Department?  @relation("DepartmentTree", fields: [parentId], references: [id], onDelete: SetNull)
   children Department[] @relation("DepartmentTree")
 
-  jobTitles JobTitle[]
-  employees Employee[]
+  jobTitles  JobTitle[]
+  employees  Employee[]
   workOrders WorkOrder[]
+  branch     Branch?     @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   @@unique([companyId, code])
   @@index([companyId, isActive])
-  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
 }
 
 model JobTitle {
@@ -2558,30 +2640,34 @@ model JobTitle {
 }
 
 model Employee {
-  id             String         @id @default(cuid())
-  companyId      String
-  code           String
-  fullNameEn     String
-  fullNameAr     String
-  email          String?
-  phone          String?
-  nationalId     String?
-  /** Optional link to a platform user account. */
-  userId         String?
-  departmentId   String?
-  jobTitleId     String?
-  branchId       String?
-  /** Reporting line. */
-  managerId      String?
-  status         EmployeeStatus @default(ACTIVE)
-  hireDate       DateTime
+  id              String         @id @default(cuid())
+  companyId       String
+  code            String
+  fullNameEn      String
+  fullNameAr      String
+  email           String?
+  phone           String?
+  nationalId      String?
+  /**
+   * Optional link to a platform user account.
+   */
+  userId          String?
+  departmentId    String?
+  jobTitleId      String?
+  branchId        String?
+  /**
+   * Reporting line.
+   */
+  managerId       String?
+  status          EmployeeStatus @default(ACTIVE)
+  hireDate        DateTime
   terminationDate DateTime?
-  dateOfBirth    DateTime?
-  gender         String?
-  addressLine    String?
-  notes          String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  dateOfBirth     DateTime?
+  gender          String?
+  addressLine     String?
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
@@ -2590,16 +2676,16 @@ model Employee {
   manager    Employee?   @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
   reports    Employee[]  @relation("EmployeeManager")
 
-  contracts      EmploymentContract[]
-  documents      EmployeeDocument[]
-  lifecycle      EmployeeLifecycle[]
-  leaveBalances  LeaveBalance[]
-  leaveRequests  LeaveRequest[]
-  attendance     AttendanceRecord[]
+  contracts        EmploymentContract[]
+  documents        EmployeeDocument[]
+  lifecycle        EmployeeLifecycle[]
+  leaveBalances    LeaveBalance[]
+  leaveRequests    LeaveRequest[]
+  attendance       AttendanceRecord[]
   shiftAssignments EmployeeShift[]
   salaryStructures SalaryStructure[]
-  payslips       Payslip[]
-  advances       EmployeeAdvance[]
+  payslips         Payslip[]
+  advances         EmployeeAdvance[]
 
   @@unique([companyId, code])
   @@index([companyId, status])
@@ -2608,21 +2694,23 @@ model Employee {
 }
 
 model EmploymentContract {
-  id            String         @id @default(cuid())
-  companyId     String
-  employeeId    String
-  contractNumber String
-  type          ContractType   @default(PERMANENT)
-  status        ContractStatus @default(DRAFT)
-  startDate     DateTime
-  endDate       DateTime?
-  /** Contracted base salary at signing, in minor units. */
+  id              String         @id @default(cuid())
+  companyId       String
+  employeeId      String
+  contractNumber  String
+  type            ContractType   @default(PERMANENT)
+  status          ContractStatus @default(DRAFT)
+  startDate       DateTime
+  endDate         DateTime?
+  /**
+   * Contracted base salary at signing, in minor units.
+   */
   baseSalaryMinor Int
-  currency      String         @default("BHD")
-  probationDays Int            @default(0)
-  notes         String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  currency        String         @default("BHD")
+  probationDays   Int            @default(0)
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -2632,19 +2720,21 @@ model EmploymentContract {
 }
 
 model EmployeeDocument {
-  id         String                  @id @default(cuid())
-  companyId  String
-  employeeId String
-  category   EmployeeDocumentCategory @default(OTHER)
-  title      String
-  fileRef    String?
-  issuedAt   DateTime?
-  expiresAt  DateTime?
-  /** When true only a principal holding the confidential-documents permission may read it. */
-  isConfidential Boolean            @default(false)
-  notes      String?
-  createdAt  DateTime                @default(now())
-  updatedAt  DateTime                @updatedAt
+  id             String                   @id @default(cuid())
+  companyId      String
+  employeeId     String
+  category       EmployeeDocumentCategory @default(OTHER)
+  title          String
+  fileRef        String?
+  issuedAt       DateTime?
+  expiresAt      DateTime?
+  /**
+   * When true only a principal holding the confidential-documents permission may read it.
+   */
+  isConfidential Boolean                  @default(false)
+  notes          String?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
 
   company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -2652,33 +2742,35 @@ model EmployeeDocument {
   @@index([companyId, employeeId])
 }
 
-/** Onboarding or offboarding checklist for an employee. */
+/**
+ * Onboarding or offboarding checklist for an employee.
+ */
 model EmployeeLifecycle {
-  id         String          @id @default(cuid())
-  companyId  String
-  employeeId String
-  type       LifecycleType
-  status     LifecycleStatus @default(OPEN)
-  startedAt  DateTime        @default(now())
+  id          String          @id @default(cuid())
+  companyId   String
+  employeeId  String
+  type        LifecycleType
+  status      LifecycleStatus @default(OPEN)
+  startedAt   DateTime        @default(now())
   completedAt DateTime?
-  notes      String?
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  notes       String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
-  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  company  Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee                @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   items    EmployeeLifecycleItem[]
 
   @@index([companyId, employeeId])
 }
 
 model EmployeeLifecycleItem {
-  id          String  @id @default(cuid())
+  id          String    @id @default(cuid())
   lifecycleId String
   label       String
-  isDone      Boolean @default(false)
+  isDone      Boolean   @default(false)
   doneAt      DateTime?
-  sortOrder   Int     @default(0)
+  sortOrder   Int       @default(0)
 
   lifecycle EmployeeLifecycle @relation(fields: [lifecycleId], references: [id], onDelete: Cascade)
 
@@ -2686,20 +2778,22 @@ model EmployeeLifecycleItem {
 }
 
 model LeaveType {
-  id        String   @id @default(cuid())
-  companyId String
-  code      String
-  nameEn    String
-  nameAr    String
-  /** Annual entitlement in hundredths of a day (2500 = 25 days). */
-  annualEntitlementDays Int @default(0)
-  isPaid    Boolean  @default(true)
-  requiresApproval Boolean @default(true)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  companyId             String
+  code                  String
+  nameEn                String
+  nameAr                String
+  /**
+   * Annual entitlement in hundredths of a day (2500 = 25 days).
+   */
+  annualEntitlementDays Int      @default(0)
+  isPaid                Boolean  @default(true)
+  requiresApproval      Boolean  @default(true)
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
-  company  Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company  Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   balances LeaveBalance[]
   requests LeaveRequest[]
 
@@ -2707,17 +2801,19 @@ model LeaveType {
 }
 
 model LeaveBalance {
-  id          String   @id @default(cuid())
-  companyId   String
-  employeeId  String
-  leaveTypeId String
-  year        Int
-  /** All in hundredths of a day. */
-  entitledDays Int     @default(0)
-  accruedDays  Int     @default(0)
-  usedDays     Int     @default(0)
-  pendingDays  Int     @default(0)
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  companyId    String
+  employeeId   String
+  leaveTypeId  String
+  year         Int
+  /**
+   * All in hundredths of a day.
+   */
+  entitledDays Int      @default(0)
+  accruedDays  Int      @default(0)
+  usedDays     Int      @default(0)
+  pendingDays  Int      @default(0)
+  updatedAt    DateTime @updatedAt
 
   company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employee  Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -2728,21 +2824,23 @@ model LeaveBalance {
 }
 
 model LeaveRequest {
-  id          String            @id @default(cuid())
-  companyId   String
-  employeeId  String
-  leaveTypeId String
-  startDate   DateTime
-  endDate     DateTime
-  /** Total days requested in hundredths of a day. */
-  days        Int
-  status      LeaveRequestStatus @default(DRAFT)
-  reason      String?
+  id           String             @id @default(cuid())
+  companyId    String
+  employeeId   String
+  leaveTypeId  String
+  startDate    DateTime
+  endDate      DateTime
+  /**
+   * Total days requested in hundredths of a day.
+   */
+  days         Int
+  status       LeaveRequestStatus @default(DRAFT)
+  reason       String?
   approvedById String?
-  decidedAt   DateTime?
+  decidedAt    DateTime?
   decisionNote String?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
   company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employee  Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -2753,19 +2851,19 @@ model LeaveRequest {
 }
 
 model Shift {
-  id          String   @id @default(cuid())
-  companyId   String
-  code        String
-  nameEn      String
-  nameAr      String
-  startTime   String
-  endTime     String
-  breakMinutes Int     @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  companyId    String
+  code         String
+  nameEn       String
+  nameAr       String
+  startTime    String
+  endTime      String
+  breakMinutes Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  company     Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company     Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   assignments EmployeeShift[]
   attendance  AttendanceRecord[]
 
@@ -2773,13 +2871,13 @@ model Shift {
 }
 
 model EmployeeShift {
-  id         String   @id @default(cuid())
-  companyId  String
-  employeeId String
-  shiftId    String
+  id            String    @id @default(cuid())
+  companyId     String
+  employeeId    String
+  shiftId       String
   effectiveFrom DateTime
   effectiveTo   DateTime?
-  createdAt  DateTime @default(now())
+  createdAt     DateTime  @default(now())
 
   company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -2789,19 +2887,19 @@ model EmployeeShift {
 }
 
 model AttendanceRecord {
-  id             String           @id @default(cuid())
-  companyId      String
-  employeeId     String
-  shiftId        String?
-  workDate       DateTime
-  checkInAt      DateTime?
-  checkOutAt     DateTime?
-  workedMinutes  Int              @default(0)
-  overtimeMinutes Int             @default(0)
-  status         AttendanceStatus @default(PRESENT)
-  notes          String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  id              String           @id @default(cuid())
+  companyId       String
+  employeeId      String
+  shiftId         String?
+  workDate        DateTime
+  checkInAt       DateTime?
+  checkOutAt      DateTime?
+  workedMinutes   Int              @default(0)
+  overtimeMinutes Int              @default(0)
+  status          AttendanceStatus @default(PRESENT)
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -2811,13 +2909,17 @@ model AttendanceRecord {
   @@index([companyId, workDate])
 }
 
-/** Effective-dated salary structure. A payroll run snapshots it. */
+/**
+ * Effective-dated salary structure. A payroll run snapshots it.
+ */
 model SalaryStructure {
   id            String   @id @default(cuid())
   companyId     String
   employeeId    String
   effectiveFrom DateTime
-  /** Base monthly salary in minor units. */
+  /**
+   * Base monthly salary in minor units.
+   */
   basicMinor    Int
   currency      String   @default("BHD")
   isActive      Boolean  @default(true)
@@ -2825,27 +2927,31 @@ model SalaryStructure {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  company    Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee   Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   components SalaryComponent[]
 
   @@index([companyId, employeeId, effectiveFrom])
 }
 
 model SalaryComponent {
-  id                String             @id @default(cuid())
+  id                String              @id @default(cuid())
   companyId         String
   salaryStructureId String
   type              SalaryComponentType
   code              String
   nameEn            String
   nameAr            String
-  /** Fixed amount in minor units when isPercentage is false. */
-  amountMinor       Int                @default(0)
-  isPercentage      Boolean            @default(false)
-  /** Percentage of basic in basis points when isPercentage is true. */
-  percentBp         Int                @default(0)
-  sortOrder         Int                @default(0)
+  /**
+   * Fixed amount in minor units when isPercentage is false.
+   */
+  amountMinor       Int                 @default(0)
+  isPercentage      Boolean             @default(false)
+  /**
+   * Percentage of basic in basis points when isPercentage is true.
+   */
+  percentBp         Int                 @default(0)
+  sortOrder         Int                 @default(0)
 
   company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   salaryStructure SalaryStructure @relation(fields: [salaryStructureId], references: [id], onDelete: Cascade)
@@ -2855,18 +2961,18 @@ model SalaryComponent {
 }
 
 model PayrollPeriod {
-  id        String              @id @default(cuid())
-  companyId String
-  code      String
-  nameEn    String
-  nameAr    String
-  startDate DateTime
-  endDate   DateTime
-  status    PayrollPeriodStatus @default(OPEN)
-  closedAt  DateTime?
+  id             String              @id @default(cuid())
+  companyId      String
+  code           String
+  nameEn         String
+  nameAr         String
+  startDate      DateTime
+  endDate        DateTime
+  status         PayrollPeriodStatus @default(OPEN)
+  closedAt       DateTime?
   closedByUserId String?
-  createdAt DateTime            @default(now())
-  updatedAt DateTime            @updatedAt
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 
   company Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   runs    PayrollRun[]
@@ -2876,28 +2982,28 @@ model PayrollPeriod {
 }
 
 model PayrollRun {
-  id             String           @id @default(cuid())
-  companyId      String
-  periodId       String
-  runNumber      String
-  status         PayrollRunStatus @default(DRAFT)
-  employeeCount  Int              @default(0)
-  grossMinor     Int              @default(0)
-  allowancesMinor Int             @default(0)
-  deductionsMinor Int             @default(0)
-  netMinor       Int              @default(0)
-  currency       String           @default("BHD")
-  journalEntryId String?
-  approvedById   String?
-  approvedAt     DateTime?
-  postedAt       DateTime?
-  createdById    String
-  notes          String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  id              String           @id @default(cuid())
+  companyId       String
+  periodId        String
+  runNumber       String
+  status          PayrollRunStatus @default(DRAFT)
+  employeeCount   Int              @default(0)
+  grossMinor      Int              @default(0)
+  allowancesMinor Int              @default(0)
+  deductionsMinor Int              @default(0)
+  netMinor        Int              @default(0)
+  currency        String           @default("BHD")
+  journalEntryId  String?
+  approvedById    String?
+  approvedAt      DateTime?
+  postedAt        DateTime?
+  createdById     String
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-  company Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  period  PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  company  Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  period   PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
   payslips Payslip[]
 
   @@unique([companyId, runNumber])
@@ -2905,29 +3011,33 @@ model PayrollRun {
   @@index([companyId, periodId])
 }
 
-/** Immutable result of one employee in one run. Snapshots the structure. */
+/**
+ * Immutable result of one employee in one run. Snapshots the structure.
+ */
 model Payslip {
-  id            String   @id @default(cuid())
-  companyId     String
-  payrollRunId  String
-  employeeId    String
-  employeeCode  String
-  employeeNameEn String
-  employeeNameAr String
-  basicMinor    Int
-  allowancesMinor Int    @default(0)
-  deductionsMinor Int    @default(0)
-  grossMinor    Int      @default(0)
-  netMinor      Int      @default(0)
-  currency      String   @default("BHD")
-  advanceDeductionMinor Int @default(0)
-  /** Full snapshot of the salary structure and computed components at run time. */
-  snapshot      Json?
-  createdAt     DateTime @default(now())
+  id                    String   @id @default(cuid())
+  companyId             String
+  payrollRunId          String
+  employeeId            String
+  employeeCode          String
+  employeeNameEn        String
+  employeeNameAr        String
+  basicMinor            Int
+  allowancesMinor       Int      @default(0)
+  deductionsMinor       Int      @default(0)
+  grossMinor            Int      @default(0)
+  netMinor              Int      @default(0)
+  currency              String   @default("BHD")
+  advanceDeductionMinor Int      @default(0)
+  /**
+   * Full snapshot of the salary structure and computed components at run time.
+   */
+  snapshot              Json?
+  createdAt             DateTime @default(now())
 
-  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  payrollRun PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
-  employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  company    Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  payrollRun PayrollRun    @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employee   Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   lines      PayslipLine[]
 
   @@unique([payrollRunId, employeeId])
@@ -2935,14 +3045,14 @@ model Payslip {
 }
 
 model PayslipLine {
-  id           String             @id @default(cuid())
-  payslipId    String
-  type         SalaryComponentType
-  code         String
-  nameEn       String
-  nameAr       String
-  amountMinor  Int
-  sortOrder    Int                @default(0)
+  id          String              @id @default(cuid())
+  payslipId   String
+  type        SalaryComponentType
+  code        String
+  nameEn      String
+  nameAr      String
+  amountMinor Int
+  sortOrder   Int                 @default(0)
 
   payslip Payslip @relation(fields: [payslipId], references: [id], onDelete: Cascade)
 
@@ -2965,8 +3075,8 @@ model EmployeeAdvance {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  employee  Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  company     Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee    Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   settlements AdvanceSettlement[]
 
   @@unique([companyId, advanceNumber])
@@ -2974,15 +3084,15 @@ model EmployeeAdvance {
 }
 
 model AdvanceSettlement {
-  id            String   @id @default(cuid())
-  companyId     String
-  advanceId     String
-  payrollRunId  String?
-  amountMinor   Int
-  settledAt     DateTime @default(now())
-  note          String?
+  id           String   @id @default(cuid())
+  companyId    String
+  advanceId    String
+  payrollRunId String?
+  amountMinor  Int
+  settledAt    DateTime @default(now())
+  note         String?
 
-  company Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   advance EmployeeAdvance @relation(fields: [advanceId], references: [id], onDelete: Cascade)
 
   @@index([companyId, advanceId])
@@ -3009,28 +3119,30 @@ model LeadSource {
 }
 
 model Lead {
-  id            String     @id @default(cuid())
-  companyId     String
-  code          String
-  nameEn        String
-  nameAr        String
-  contactName   String?
-  email         String?
-  phone         String?
-  sourceId      String?
-  status        LeadStatus @default(NEW)
-  ownerUserId   String?
-  estimatedValueMinor Int  @default(0)
-  currency      String     @default("BHD")
-  notes         String?
-  /** Set when the lead is converted to a customer. */
-  customerId    String?
+  id                     String     @id @default(cuid())
+  companyId              String
+  code                   String
+  nameEn                 String
+  nameAr                 String
+  contactName            String?
+  email                  String?
+  phone                  String?
+  sourceId               String?
+  status                 LeadStatus @default(NEW)
+  ownerUserId            String?
+  estimatedValueMinor    Int        @default(0)
+  currency               String     @default("BHD")
+  notes                  String?
+  /**
+   * Set when the lead is converted to a customer.
+   */
+  customerId             String?
   convertedOpportunityId String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
 
-  company  Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  source   LeadSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  company Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  source  LeadSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
 
   opportunities Opportunity[]
 
@@ -3049,28 +3161,30 @@ model Pipeline {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  stages  PipelineStage[]
+  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  stages        PipelineStage[]
   opportunities Opportunity[]
 
   @@unique([companyId, code])
 }
 
 model PipelineStage {
-  id           String   @id @default(cuid())
-  companyId    String
-  pipelineId   String
-  code         String
-  nameEn       String
-  nameAr       String
-  sortOrder    Int      @default(0)
-  /** Win probability in basis points. */
+  id            String  @id @default(cuid())
+  companyId     String
+  pipelineId    String
+  code          String
+  nameEn        String
+  nameAr        String
+  sortOrder     Int     @default(0)
+  /**
+   * Win probability in basis points.
+   */
   probabilityBp Int     @default(0)
-  isWon        Boolean  @default(false)
-  isLost       Boolean  @default(false)
+  isWon         Boolean @default(false)
+  isLost        Boolean @default(false)
 
-  company      Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  pipeline     Pipeline        @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  company       Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  pipeline      Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   opportunities Opportunity[]
 
   @@unique([pipelineId, code])
@@ -3078,25 +3192,27 @@ model PipelineStage {
 }
 
 model Opportunity {
-  id            String            @id @default(cuid())
-  companyId     String
-  code          String
-  title         String
-  pipelineId    String
-  stageId       String
-  customerId    String?
-  leadId        String?
-  ownerUserId   String?
-  amountMinor   Int               @default(0)
-  currency      String            @default("BHD")
+  id                String            @id @default(cuid())
+  companyId         String
+  code              String
+  title             String
+  pipelineId        String
+  stageId           String
+  customerId        String?
+  leadId            String?
+  ownerUserId       String?
+  amountMinor       Int               @default(0)
+  currency          String            @default("BHD")
   expectedCloseDate DateTime?
-  status        OpportunityStatus @default(OPEN)
-  /** Set when converted into a quotation. */
-  quotationId   String?
-  notes         String?
-  closedAt      DateTime?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  status            OpportunityStatus @default(OPEN)
+  /**
+   * Set when converted into a quotation.
+   */
+  quotationId       String?
+  notes             String?
+  closedAt          DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
   company  Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   pipeline Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Restrict)
@@ -3153,15 +3269,15 @@ model CrmActivity {
 }
 
 model SlaPolicy {
-  id                String          @id @default(cuid())
+  id                String         @id @default(cuid())
   companyId         String
   name              String
   priority          TicketPriority
   responseMinutes   Int
   resolutionMinutes Int
-  isActive          Boolean         @default(true)
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  isActive          Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -3169,33 +3285,37 @@ model SlaPolicy {
 }
 
 model SupportTicket {
-  id             String         @id @default(cuid())
-  companyId      String
-  ticketNumber   String
-  subject        String
-  description    String?
-  customerId     String?
-  contactId      String?
-  /** The consumer account that raised this ticket from the website or app. */
+  id                String         @id @default(cuid())
+  companyId         String
+  ticketNumber      String
+  subject           String
+  description       String?
+  customerId        String?
+  contactId         String?
+  /**
+   * The consumer account that raised this ticket from the website or app.
+   */
   customerAccountId String?
-  category       String?
-  priority       TicketPriority @default(NORMAL)
-  status         TicketStatus   @default(NEW)
-  assignedToUserId String?
-  /** Response/resolution targets derived from the SLA policy at creation. */
-  responseDueAt  DateTime?
-  resolutionDueAt DateTime?
-  firstResponseAt DateTime?
-  resolvedAt     DateTime?
-  closedAt       DateTime?
+  category          String?
+  priority          TicketPriority @default(NORMAL)
+  status            TicketStatus   @default(NEW)
+  assignedToUserId  String?
+  /**
+   * Response/resolution targets derived from the SLA policy at creation.
+   */
+  responseDueAt     DateTime?
+  resolutionDueAt   DateTime?
+  firstResponseAt   DateTime?
+  resolvedAt        DateTime?
+  closedAt          DateTime?
   satisfactionScore Int?
-  createdById    String
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  createdById       String
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
-  company Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   customerAccount CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
-  messages TicketMessage[]
+  messages        TicketMessage[]
 
   @@unique([companyId, ticketNumber])
   @@index([companyId, status])
@@ -3219,17 +3339,17 @@ model TicketMessage {
 }
 
 model CustomerSegment {
-  id        String   @id @default(cuid())
-  companyId String
-  code      String
-  nameEn    String
-  nameAr    String
+  id          String   @id @default(cuid())
+  companyId   String
+  code        String
+  nameEn      String
+  nameAr      String
   description String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  company Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
   members CustomerSegmentMember[]
 
   @@unique([companyId, code])
@@ -3255,25 +3375,25 @@ model CustomerSegmentMember {
 // ============================================================================
 
 model Project {
-  id          String        @id @default(cuid())
-  companyId   String
-  code        String
-  nameEn      String
-  nameAr      String
-  branchId    String?
+  id           String        @id @default(cuid())
+  companyId    String
+  code         String
+  nameEn       String
+  nameAr       String
+  branchId     String?
   departmentId String?
-  status      ProjectStatus @default(PLANNED)
-  ownerUserId String?
-  startDate   DateTime?
-  endDate     DateTime?
-  description String?
-  createdById String
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  status       ProjectStatus @default(PLANNED)
+  ownerUserId  String?
+  startDate    DateTime?
+  endDate      DateTime?
+  description  String?
+  createdById  String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
-  company Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  tasks   ProjectTask[]
+  company    Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch     Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  tasks      ProjectTask[]
   workOrders WorkOrder[]
 
   @@unique([companyId, code])
@@ -3281,21 +3401,21 @@ model Project {
 }
 
 model ProjectTask {
-  id           String       @id @default(cuid())
-  companyId    String
-  projectId    String?
-  parentTaskId String?
-  title        String
-  description  String?
-  status       TaskStatus   @default(TODO)
-  priority     TaskPriority @default(NORMAL)
+  id             String       @id @default(cuid())
+  companyId      String
+  projectId      String?
+  parentTaskId   String?
+  title          String
+  description    String?
+  status         TaskStatus   @default(TODO)
+  priority       TaskPriority @default(NORMAL)
   assigneeUserId String?
-  branchId     String?
-  dueDate      DateTime?
-  completedAt  DateTime?
-  createdById  String
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  branchId       String?
+  dueDate        DateTime?
+  completedAt    DateTime?
+  createdById    String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   company  Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   branch   Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
@@ -3308,48 +3428,50 @@ model ProjectTask {
 }
 
 model WorkOrder {
-  id            String          @id @default(cuid())
-  companyId     String
-  orderNumber   String
-  title         String
-  description   String?
-  type          String          @default("GENERAL")
-  branchId      String?
-  departmentId  String?
-  projectId     String?
-  status        WorkOrderStatus @default(DRAFT)
-  priority      TaskPriority    @default(NORMAL)
-  requestedById String?
+  id             String          @id @default(cuid())
+  companyId      String
+  orderNumber    String
+  title          String
+  description    String?
+  type           String          @default("GENERAL")
+  branchId       String?
+  departmentId   String?
+  projectId      String?
+  status         WorkOrderStatus @default(DRAFT)
+  priority       TaskPriority    @default(NORMAL)
+  requestedById  String?
   assigneeUserId String?
-  dueDate       DateTime?
-  startedAt     DateTime?
-  completedAt   DateTime?
-  /** Optional link to a CRM service request or an automotive job card. */
-  sourceType    String?
-  sourceId      String?
-  createdById   String
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  dueDate        DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  /**
+   * Optional link to a CRM service request or an automotive job card.
+   */
+  sourceType     String?
+  sourceId       String?
+  createdById    String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
-  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  project    Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  company    Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  department Department?              @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  project    Project?                 @relation(fields: [projectId], references: [id], onDelete: SetNull)
   checklist  WorkOrderChecklistItem[]
+  branch     Branch?                  @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   @@unique([companyId, orderNumber])
   @@index([companyId, status])
   @@index([companyId, assigneeUserId])
-  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
 }
 
 model WorkOrderChecklistItem {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   companyId   String
   workOrderId String
   label       String
-  isDone      Boolean  @default(false)
+  isDone      Boolean   @default(false)
   doneAt      DateTime?
-  sortOrder   Int      @default(0)
+  sortOrder   Int       @default(0)
 
   company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
@@ -3358,17 +3480,17 @@ model WorkOrderChecklistItem {
 }
 
 model ApprovalRequest {
-  id            String         @id @default(cuid())
-  companyId     String
-  entityType    String
-  entityId      String
-  status        ApprovalStatus @default(PENDING)
-  requestedById String
+  id             String         @id @default(cuid())
+  companyId      String
+  entityType     String
+  entityId       String
+  status         ApprovalStatus @default(PENDING)
+  requestedById  String
   approverUserId String?
-  decidedAt     DateTime?
-  note          String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  decidedAt      DateTime?
+  note           String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -3376,7 +3498,9 @@ model ApprovalRequest {
   @@index([companyId, status])
 }
 
-/** A comment on any operational entity, addressed by type + id. */
+/**
+ * A comment on any operational entity, addressed by type + id.
+ */
 model EntityComment {
   id           String   @id @default(cuid())
   companyId    String
@@ -3392,24 +3516,28 @@ model EntityComment {
 }
 
 model EntityAttachment {
-  id         String   @id @default(cuid())
-  companyId  String
-  entityType String
-  entityId   String
-  fileName   String
-  mimeType   String?
-  sizeBytes  Int      @default(0)
-  /** Opaque storage reference; no binary is stored in the database. */
-  storageRef String?
+  id           String   @id @default(cuid())
+  companyId    String
+  entityType   String
+  entityId     String
+  fileName     String
+  mimeType     String?
+  sizeBytes    Int      @default(0)
+  /**
+   * Opaque storage reference; no binary is stored in the database.
+   */
+  storageRef   String?
   uploadedById String?
-  createdAt  DateTime @default(now())
+  createdAt    DateTime @default(now())
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId, entityType, entityId])
 }
 
-/** Internal, database-persisted notification. No external provider is claimed. */
+/**
+ * Internal, database-persisted notification. No external provider is claimed.
+ */
 model Notification {
   id         String           @id @default(cuid())
   companyId  String
@@ -3428,24 +3556,24 @@ model Notification {
 }
 
 model OperationalCalendarEvent {
-  id         String   @id @default(cuid())
-  companyId  String
-  branchId   String?
-  title      String
+  id          String   @id @default(cuid())
+  companyId   String
+  branchId    String?
+  title       String
   description String?
-  startAt    DateTime
-  endAt      DateTime
-  allDay     Boolean  @default(false)
-  entityType String?
-  entityId   String?
+  startAt     DateTime
+  endAt       DateTime
+  allDay      Boolean  @default(false)
+  entityType  String?
+  entityId    String?
   createdById String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch  Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   @@index([companyId, startAt])
-  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
 }
 
 // ============================================================================
@@ -3453,38 +3581,44 @@ model OperationalCalendarEvent {
 // ============================================================================
 
 model Vehicle {
-  id           String        @id @default(cuid())
-  companyId    String
-  customerId   String
-  /** The consumer account that owns this vehicle, when registered from the app. */
-  customerAccountId String?
-  /** VIN/chassis number, unique per company. */
-  vin          String
-  plateNumber  String?
-  make         String
-  model        String
-  modelYear    Int
-  color        String?
-  mileage      Int           @default(0)
-  status       VehicleStatus @default(ACTIVE)
+  id                    String        @id @default(cuid())
+  companyId             String
+  customerId            String
+  /**
+   * The consumer account that owns this vehicle, when registered from the app.
+   */
+  customerAccountId     String?
+  /**
+   * VIN/chassis number, unique per company.
+   */
+  vin                   String
+  plateNumber           String?
+  make                  String
+  model                 String
+  modelYear             Int
+  color                 String?
+  mileage               Int           @default(0)
+  status                VehicleStatus @default(ACTIVE)
   registrationExpiresAt DateTime?
-  notes        String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  notes                 String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
-  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  /** Ownership link for the customer website and mobile garage. */
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer        Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  /**
+   * Ownership link for the customer website and mobile garage.
+   */
   customerAccount CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
 
-  mileageRecords VehicleMileageRecord[]
-  documents      VehicleDocument[]
-  inspections    InspectionBooking[]
-  maintenance    MaintenanceBooking[]
-  jobCards       JobCard[]
-  warranties     WarrantyRecord[]
+  mileageRecords   VehicleMileageRecord[]
+  documents        VehicleDocument[]
+  inspections      InspectionBooking[]
+  maintenance      MaintenanceBooking[]
+  jobCards         JobCard[]
+  warranties       WarrantyRecord[]
   inspectionPhotos CustomerInspectionPhoto[]
-  bookingSlots   BookingSlot[]
+  bookingSlots     BookingSlot[]
 
   @@unique([companyId, vin])
   @@index([companyId, customerId])
@@ -3507,14 +3641,14 @@ model VehicleMileageRecord {
 }
 
 model VehicleDocument {
-  id         String   @id @default(cuid())
-  companyId  String
-  vehicleId  String
-  category   String
-  number     String?
-  expiresAt  DateTime?
-  fileRef    String?
-  createdAt  DateTime @default(now())
+  id        String    @id @default(cuid())
+  companyId String
+  vehicleId String
+  category  String
+  number    String?
+  expiresAt DateTime?
+  fileRef   String?
+  createdAt DateTime  @default(now())
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
@@ -3536,7 +3670,7 @@ model InspectionService {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  company  Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company  Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   items    InspectionChecklistItem[]
   bookings InspectionBooking[]
 
@@ -3544,85 +3678,87 @@ model InspectionService {
 }
 
 model InspectionChecklistItem {
-  id         String   @id @default(cuid())
-  companyId  String
-  serviceId  String?
-  code       String
-  labelEn    String
-  labelAr    String
-  category   String
-  sortOrder  Int      @default(0)
-  isActive   Boolean  @default(true)
+  id        String  @id @default(cuid())
+  companyId String
+  serviceId String?
+  code      String
+  labelEn   String
+  labelAr   String
+  category  String
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
 
-  company  Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  service  InspectionService? @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  company  Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  service  InspectionService?  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   findings InspectionFinding[]
 
   @@index([companyId, serviceId])
 }
 
 model InspectionBooking {
-  id            String                  @id @default(cuid())
-  companyId     String
-  bookingNumber String
-  vehicleId     String
-  customerId    String
-  serviceId     String
-  branchId      String?
-  scheduledAt   DateTime
-  status        InspectionBookingStatus @default(REQUESTED)
+  id              String                  @id @default(cuid())
+  companyId       String
+  bookingNumber   String
+  vehicleId       String
+  customerId      String
+  serviceId       String
+  branchId        String?
+  scheduledAt     DateTime
+  status          InspectionBookingStatus @default(REQUESTED)
   inspectorUserId String?
-  odometer      Int?
-  notes         String?
-  createdById   String
-  createdAt     DateTime                @default(now())
-  updatedAt     DateTime                @updatedAt
+  odometer        Int?
+  notes           String?
+  createdById     String
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
 
-  company  Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  vehicle  Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
-  service  InspectionService @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  company Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicle Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  service InspectionService @relation(fields: [serviceId], references: [id], onDelete: Restrict)
 
   findings InspectionFinding[]
   report   InspectionReport?
+  branch   Branch?             @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   @@unique([companyId, bookingNumber])
   @@index([companyId, status])
   @@index([companyId, vehicleId])
-  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
 }
 
 model InspectionFinding {
-  id           String          @id @default(cuid())
-  companyId    String
-  bookingId    String
+  id              String          @id @default(cuid())
+  companyId       String
+  bookingId       String
   checklistItemId String?
-  category     String
-  severity     FindingSeverity @default(INFO)
-  description  String
-  isDefect     Boolean         @default(false)
-  recommendation String?
-  createdAt    DateTime        @default(now())
+  category        String
+  severity        FindingSeverity @default(INFO)
+  description     String
+  isDefect        Boolean         @default(false)
+  recommendation  String?
+  createdAt       DateTime        @default(now())
 
-  company  Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  booking  InspectionBooking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  company       Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  booking       InspectionBooking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   checklistItem InspectionChecklistItem? @relation(fields: [checklistItemId], references: [id], onDelete: SetNull)
 
   @@index([bookingId])
 }
 
 model InspectionReport {
-  id            String                 @id @default(cuid())
-  companyId     String
-  bookingId     String                 @unique
-  summary       String?
+  id               String                 @id @default(cuid())
+  companyId        String
+  bookingId        String                 @unique
+  summary          String?
   overallCondition String?
-  status        InspectionReportStatus @default(DRAFT)
-  approvedById  String?
-  approvedAt    DateTime?
-  /** Sales invoice created from the inspection, when invoiced. */
-  invoiceId     String?
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
+  status           InspectionReportStatus @default(DRAFT)
+  approvedById     String?
+  approvedAt       DateTime?
+  /**
+   * Sales invoice created from the inspection, when invoiced.
+   */
+  invoiceId        String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
 
   company Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   booking InspectionBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
@@ -3642,9 +3778,9 @@ model WorkshopBay {
   updatedAt DateTime @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch  Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   @@unique([companyId, code])
-  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
 }
 
 model MaintenanceBooking {
@@ -3667,59 +3803,63 @@ model MaintenanceBooking {
   vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
 
   jobCards JobCard[]
+  branch   Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   @@unique([companyId, bookingNumber])
   @@index([companyId, status])
-  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
 }
 
 model JobCard {
-  id            String        @id @default(cuid())
-  companyId     String
-  jobNumber     String
-  vehicleId     String
-  bookingId     String?
-  customerId    String
-  branchId      String?
-  bayId         String?
+  id               String        @id @default(cuid())
+  companyId        String
+  jobNumber        String
+  vehicleId        String
+  bookingId        String?
+  customerId       String
+  branchId         String?
+  bayId            String?
   technicianUserId String?
-  status        JobCardStatus @default(DRAFT)
-  odometer      Int?
-  complaint     String?
-  diagnosis     String?
-  startedAt     DateTime?
-  completedAt   DateTime?
-  /** Sales invoice raised for the completed job. */
-  invoiceId     String?
-  createdById   String
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  status           JobCardStatus @default(DRAFT)
+  odometer         Int?
+  complaint        String?
+  diagnosis        String?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  /**
+   * Sales invoice raised for the completed job.
+   */
+  invoiceId        String?
+  createdById      String
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
-  company   Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  vehicle   Vehicle             @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
-  booking   MaintenanceBooking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  company Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicle Vehicle             @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  booking MaintenanceBooking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
 
-  labour        LabourOperation[]
-  estimates     RepairEstimate[]
-  reservations  PartsReservation[]
-  warranties    WarrantyRecord[]
+  labour       LabourOperation[]
+  estimates    RepairEstimate[]
+  reservations PartsReservation[]
+  warranties   WarrantyRecord[]
+  branch       Branch?            @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   @@unique([companyId, jobNumber])
   @@index([companyId, status])
   @@index([companyId, vehicleId])
-  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
 }
 
 model LabourOperation {
-  id           String   @id @default(cuid())
-  companyId    String
-  jobCardId    String
-  description  String
-  /** Hours in hundredths of an hour (250 = 2.5 h). */
-  hours        Int
-  rateMinor    Int      @default(0)
-  amountMinor  Int      @default(0)
-  sortOrder    Int      @default(0)
+  id          String @id @default(cuid())
+  companyId   String
+  jobCardId   String
+  description String
+  /**
+   * Hours in hundredths of an hour (250 = 2.5 h).
+   */
+  hours       Int
+  rateMinor   Int    @default(0)
+  amountMinor Int    @default(0)
+  sortOrder   Int    @default(0)
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   jobCard JobCard @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
@@ -3728,25 +3868,25 @@ model LabourOperation {
 }
 
 model RepairEstimate {
-  id            String        @id @default(cuid())
-  companyId     String
-  jobCardId     String
-  estimateNumber String
-  status        EstimateStatus @default(DRAFT)
-  subtotalMinor Int           @default(0)
-  taxMinor      Int           @default(0)
-  totalMinor    Int           @default(0)
-  currency      String        @default("BHD")
+  id                   String         @id @default(cuid())
+  companyId            String
+  jobCardId            String
+  estimateNumber       String
+  status               EstimateStatus @default(DRAFT)
+  subtotalMinor        Int            @default(0)
+  taxMinor             Int            @default(0)
+  totalMinor           Int            @default(0)
+  currency             String         @default("BHD")
   customerApprovedById String?
-  approvedAt    DateTime?
-  expiresAt     DateTime?
-  notes         String?
-  createdById   String
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  approvedAt           DateTime?
+  expiresAt            DateTime?
+  notes                String?
+  createdById          String
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
 
-  company Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  jobCard JobCard         @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  company Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobCard JobCard              @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
   lines   RepairEstimateLine[]
 
   @@unique([companyId, estimateNumber])
@@ -3772,7 +3912,9 @@ model RepairEstimateLine {
   @@index([estimateId])
 }
 
-/** Reservation of stock for a job card. Issuing it moves the shared stock ledger. */
+/**
+ * Reservation of stock for a job card. Issuing it moves the shared stock ledger.
+ */
 model PartsReservation {
   id          String            @id @default(cuid())
   companyId   String
@@ -3783,8 +3925,8 @@ model PartsReservation {
   issuedAt    DateTime?
   createdById String
 
-  company Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  jobCard JobCard               @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  company Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobCard JobCard                @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
   lines   PartsReservationLine[]
 
   @@index([companyId, status])
@@ -3792,13 +3934,15 @@ model PartsReservation {
 }
 
 model PartsReservationLine {
-  id           String @id @default(cuid())
-  companyId    String
-  reservationId String
-  productId    String
-  /** Reserved quantity, scaled by 10^4. */
-  quantity     Int
-  issuedQuantity Int  @default(0)
+  id             String @id @default(cuid())
+  companyId      String
+  reservationId  String
+  productId      String
+  /**
+   * Reserved quantity, scaled by 10^4.
+   */
+  quantity       Int
+  issuedQuantity Int    @default(0)
 
   company     Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   reservation PartsReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
@@ -3808,16 +3952,18 @@ model PartsReservationLine {
   @@index([companyId])
 }
 
-/** OEM / aftermarket / cross-reference part numbers for a product. */
+/**
+ * OEM / aftermarket / cross-reference part numbers for a product.
+ */
 model PartReference {
-  id         String        @id @default(cuid())
+  id         String         @id @default(cuid())
   companyId  String
   productId  String
   partNumber String
   type       PartNumberType @default(OEM)
   brand      String?
-  isActive   Boolean       @default(true)
-  createdAt  DateTime      @default(now())
+  isActive   Boolean        @default(true)
+  createdAt  DateTime       @default(now())
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -3826,7 +3972,9 @@ model PartReference {
   @@index([companyId, productId])
 }
 
-/** Vehicle compatibility mapping for a product. */
+/**
+ * Vehicle compatibility mapping for a product.
+ */
 model PartCompatibility {
   id        String   @id @default(cuid())
   companyId String
@@ -3846,19 +3994,19 @@ model PartCompatibility {
 }
 
 model WarrantyRecord {
-  id         String   @id @default(cuid())
-  companyId  String
-  vehicleId  String
-  jobCardId  String?
+  id          String    @id @default(cuid())
+  companyId   String
+  vehicleId   String
+  jobCardId   String?
   description String
-  terms      String?
-  startsAt   DateTime @default(now())
-  expiresAt  DateTime?
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
+  terms       String?
+  startsAt    DateTime  @default(now())
+  expiresAt   DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  company Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicle Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   jobCard JobCard? @relation(fields: [jobCardId], references: [id], onDelete: SetNull)
 
   @@index([companyId, vehicleId])
@@ -3867,36 +4015,40 @@ model WarrantyRecord {
 // ------------------------------------------------- marketplace foundations
 
 model MarketplaceProvider {
-  id                String         @id @default(cuid())
-  code              String         @unique
-  nameEn            String
-  nameAr            String
-  /** Set when the provider is itself an ORYX tenant company. */
-  providerCompanyId String?
-  categoryKey       String?
-  email             String?
-  phone             String?
-  status            ProviderStatus @default(PENDING)
-  /** Platform commission in basis points. */
-  commissionPercentBp Int          @default(0)
-  approvedAt        DateTime?
-  notes             String?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  id                  String         @id @default(cuid())
+  code                String         @unique
+  nameEn              String
+  nameAr              String
+  /**
+   * Set when the provider is itself an ORYX tenant company.
+   */
+  providerCompanyId   String?
+  categoryKey         String?
+  email               String?
+  phone               String?
+  status              ProviderStatus @default(PENDING)
+  /**
+   * Platform commission in basis points.
+   */
+  commissionPercentBp Int            @default(0)
+  approvedAt          DateTime?
+  notes               String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 
-  listings     ProviderServiceListing[]
-  requests     ServiceRequest[]
-  commissions  MarketplaceCommission[]
-  settlements  ProviderSettlement[]
+  listings    ProviderServiceListing[]
+  requests    ServiceRequest[]
+  commissions MarketplaceCommission[]
+  settlements ProviderSettlement[]
 
   // Execution 04 — onboarding, portal, availability, reviews and disputes.
-  applications    MarketplaceApplication[]
-  providerUsers   ProviderUser[]
-  availability    ProviderAvailability[]
-  reviews         ProviderReview[]
-  disputes        MarketplaceDispute[]
+  applications     MarketplaceApplication[]
+  providerUsers    ProviderUser[]
+  availability     ProviderAvailability[]
+  reviews          ProviderReview[]
+  disputes         MarketplaceDispute[]
   bookingResources BookingResource[]
-  offers          ProviderOffer[]
+  offers           ProviderOffer[]
 
   @@index([status])
 }
@@ -3922,31 +4074,29 @@ model ProviderServiceListing {
 
 /**
  * A promotional offer published by a marketplace provider.
- *
  * Scoped to the provider, not the tenant, because an offer is a marketplace
  * artifact: the customer app reads the active ones to show a "special offer"
  * rail. `percentOffBp` is basis points for the same reason every other
  * percentage in this schema is (1500 = 15%); `categoryKey` narrows the offer to
  * one catalogue category and is optional, so an empty value means the whole
  * catalogue.
- *
  * `startsAt`/`endsAt` bound the offer. A null bound is open-ended, and the
  * customer query filters on `isActive` plus the window, so an expired offer is
  * never advertised.
  */
 model ProviderOffer {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   providerId   String
   titleEn      String
   titleAr      String
   description  String?
   categoryKey  String?
-  percentOffBp Int      @default(0)
-  isActive     Boolean  @default(true)
+  percentOffBp Int       @default(0)
+  isActive     Boolean   @default(true)
   startsAt     DateTime?
   endsAt       DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   provider MarketplaceProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
@@ -3955,26 +4105,28 @@ model ProviderOffer {
 }
 
 model ServiceRequest {
-  id            String               @id @default(cuid())
-  companyId     String
-  requestNumber String
-  customerId    String?
-  vehicleId     String?
-  /** The consumer account that raised this request from the website or app. */
+  id                String               @id @default(cuid())
+  companyId         String
+  requestNumber     String
+  customerId        String?
+  vehicleId         String?
+  /**
+   * The consumer account that raised this request from the website or app.
+   */
   customerAccountId String?
-  categoryKey   String
-  description   String?
-  status        ServiceRequestStatus @default(NEW)
-  providerId    String?
-  assignedAt    DateTime?
-  completedAt   DateTime?
-  createdById   String
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  categoryKey       String
+  description       String?
+  status            ServiceRequestStatus @default(NEW)
+  providerId        String?
+  assignedAt        DateTime?
+  completedAt       DateTime?
+  createdById       String
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
-  company  Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  provider MarketplaceProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
-  customerAccount CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
+  company         Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  provider        MarketplaceProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  customerAccount CustomerAccount?     @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
 
   commissions MarketplaceCommission[]
   reviews     ProviderReview[]
@@ -3997,7 +4149,7 @@ model MarketplaceCommission {
   status           CommissionStatus @default(PENDING)
   createdAt        DateTime         @default(now())
 
-  company        Company?           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company        Company?            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   provider       MarketplaceProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
   serviceRequest ServiceRequest?     @relation(fields: [serviceRequestId], references: [id], onDelete: SetNull)
 
@@ -4048,7 +4200,9 @@ enum CustomerAccountStatus {
   CLOSED
 }
 
-/** Which automotive workflow a booking slot belongs to. */
+/**
+ * Which automotive workflow a booking slot belongs to.
+ */
 enum BookingType {
   INSPECTION
   MAINTENANCE
@@ -4056,7 +4210,9 @@ enum BookingType {
 }
 
 enum BookingStatus {
-  /** Held while the customer completes checkout; released when it expires. */
+  /**
+   * Held while the customer completes checkout; released when it expires.
+   */
   HELD
   CONFIRMED
   RESCHEDULED
@@ -4145,15 +4301,25 @@ enum NotificationDeliveryStatus {
   SKIPPED
 }
 
-/** Whether a delivery channel has working credentials or only an adapter. */
+/**
+ * Whether a delivery channel has working credentials or only an adapter.
+ */
 enum NotificationProviderState {
-  /** Adapter implemented; no credentials configured. Nothing is transmitted. */
+  /**
+   * Adapter implemented; no credentials configured. Nothing is transmitted.
+   */
   NOT_CONFIGURED
-  /** Credentials present; deliveries are attempted. */
+  /**
+   * Credentials present; deliveries are attempted.
+   */
   CONFIGURED
-  /** Queued but not yet attempted. */
+  /**
+   * Queued but not yet attempted.
+   */
   PENDING
-  /** The provider returned an error; retried until attempts are exhausted. */
+  /**
+   * The provider returned an error; retried until attempts are exhausted.
+   */
   ERROR
   DISABLED
 }
@@ -4169,14 +4335,18 @@ model CustomerAccount {
   status             CustomerAccountStatus @default(PENDING)
   preferredLocale    Locale                @default(ar)
   preferredTheme     Theme                 @default(dark)
-  /** Set when the account is linked to a tenant customer record. */
+  /**
+   * Set when the account is linked to a tenant customer record.
+   */
   defaultCompanyId   String?
   emailVerifiedAt    DateTime?
   phoneVerifiedAt    DateTime?
   lastLoginAt        DateTime?
   failedLoginCount   Int                   @default(0)
   lockedUntil        DateTime?
-  /** Base32 TOTP secret, encrypted at rest; customers may opt in to MFA. */
+  /**
+   * Base32 TOTP secret, encrypted at rest; customers may opt in to MFA.
+   */
   mfaEnabled         Boolean               @default(false)
   mfaSecretEncrypted String?
   mfaLastUsedStep    BigInt?
@@ -4186,27 +4356,33 @@ model CustomerAccount {
 
   defaultCompany Company? @relation(fields: [defaultCompanyId], references: [id], onDelete: SetNull)
 
-  addresses       CustomerAddress[]
-  privacy         CustomerPrivacySetting?
-  preferences     CustomerNotificationPreference[]
-  refreshTokens   CustomerRefreshToken[]
-  resetTokens     CustomerPasswordResetToken[]
-  /** Vehicles this consumer owns. Ownership is enforced server-side. */
-  vehicles        Vehicle[]
-  bookings        BookingSlot[]
-  paymentIntents  PaymentIntent[]
-  refunds         Refund[]
-  reviews         ProviderReview[]
-  disputes        MarketplaceDispute[]
-  supportTickets  SupportTicket[]
-  serviceRequests ServiceRequest[]
+  addresses              CustomerAddress[]
+  privacy                CustomerPrivacySetting?
+  preferences            CustomerNotificationPreference[]
+  refreshTokens          CustomerRefreshToken[]
+  resetTokens            CustomerPasswordResetToken[]
+  /**
+   * Vehicles this consumer owns. Ownership is enforced server-side.
+   */
+  vehicles               Vehicle[]
+  bookings               BookingSlot[]
+  paymentIntents         PaymentIntent[]
+  refunds                Refund[]
+  reviews                ProviderReview[]
+  disputes               MarketplaceDispute[]
+  supportTickets         SupportTicket[]
+  serviceRequests        ServiceRequest[]
   notificationDeliveries NotificationDelivery[]
-  cart            Cart?
-  favorites       Favorite[]
-  /** SENSAGE inspection photographs this consumer uploaded. */
-  inspectionPhotos CustomerInspectionPhoto[]
-  /** Marketplace orders this consumer placed. */
-  orders          CustomerOrder[]
+  cart                   Cart?
+  favorites              Favorite[]
+  /**
+   * SENSAGE inspection photographs this consumer uploaded.
+   */
+  inspectionPhotos       CustomerInspectionPhoto[]
+  /**
+   * Marketplace orders this consumer placed.
+   */
+  orders                 CustomerOrder[]
 
   @@index([status])
   @@index([defaultCompanyId])
@@ -4214,7 +4390,6 @@ model CustomerAccount {
 
 /**
  * A photograph a customer uploaded for a SENSAGE inspection.
- *
  * Ownership is the `customerAccountId` from the verified token, never a request
  * field. The bytes live in the shared media library (`CmsMediaAsset`) and are
  * re-encoded on the way in by `MediaStorageService`, so this row only records
@@ -4271,19 +4446,31 @@ model CustomerAddress {
 model CustomerPrivacySetting {
   id                       String    @id @default(cuid())
   accountId                String    @unique
-  /** Allow providers to contact the customer directly about a booking. */
+  /**
+   * Allow providers to contact the customer directly about a booking.
+   */
   shareContactWithProvider Boolean   @default(true)
-  /** Include the vehicle in marketplace discovery / quote requests. */
+  /**
+   * Include the vehicle in marketplace discovery / quote requests.
+   */
   allowVehicleDiscovery    Boolean   @default(false)
-  /** Marketing messages, separate from transactional messages. */
+  /**
+   * Marketing messages, separate from transactional messages.
+   */
   allowMarketingEmails     Boolean   @default(false)
   allowMarketingSms        Boolean   @default(false)
   allowMarketingWhatsapp   Boolean   @default(false)
-  /** Permit push notifications to this device set. */
+  /**
+   * Permit push notifications to this device set.
+   */
   allowPushNotifications   Boolean   @default(false)
-  /** Analytics/usage profiling. */
+  /**
+   * Analytics/usage profiling.
+   */
   allowAnalytics           Boolean   @default(false)
-  /** Third-party data sharing beyond booking fulfilment. */
+  /**
+   * Third-party data sharing beyond booking fulfilment.
+   */
   allowThirdPartySharing   Boolean   @default(false)
   dataExportRequestedAt    DateTime?
   deletionRequestedAt      DateTime?
@@ -4297,7 +4484,9 @@ model CustomerNotificationPreference {
   id        String              @id @default(cuid())
   accountId String
   channel   NotificationChannel
-  /** Category key, e.g. "booking", "invoice", "marketing", "support". */
+  /**
+   * Category key, e.g. "booking", "invoice", "marketing", "support".
+   */
   category  String
   enabled   Boolean             @default(true)
   updatedAt DateTime            @updatedAt
@@ -4317,7 +4506,9 @@ model CustomerRefreshToken {
   revokedAt  DateTime?
   replacedBy String?
   familyId   String    @default(cuid())
-  /** Distinguishes the web session from a mobile device session. */
+  /**
+   * Distinguishes the web session from a mobile device session.
+   */
   deviceKind String    @default("WEB")
   deviceName String?
   userAgent  String?
@@ -4365,9 +4556,13 @@ model BookingResource {
   code         String
   nameEn       String
   nameAr       String
-  /** Optional link to the staff user who operates the resource. */
+  /**
+   * Optional link to the staff user who operates the resource.
+   */
   userId       String?
-  /** Optional link when the resource is a marketplace provider. */
+  /**
+   * Optional link when the resource is a marketplace provider.
+   */
   providerId   String?
   capacity     Int                 @default(1)
   isActive     Boolean             @default(true)
@@ -4387,15 +4582,21 @@ model BookingResource {
   @@index([companyId, branchId])
 }
 
-/** Recurring weekly opening hours for a resource (or a branch when resourceId is null). */
+/**
+ * Recurring weekly opening hours for a resource (or a branch when resourceId is null).
+ */
 model WorkingHours {
   id           String   @id @default(cuid())
   companyId    String
   branchId     String?
   resourceId   String?
-  /** 0 = Sunday … 6 = Saturday, matching the Gulf working week. */
+  /**
+   * 0 = Sunday … 6 = Saturday, matching the Gulf working week.
+   */
   dayOfWeek    Int
-  /** Minutes from midnight, local to the branch timezone. */
+  /**
+   * Minutes from midnight, local to the branch timezone.
+   */
   opensMinute  Int
   closesMinute Int
   isClosed     Boolean  @default(false)
@@ -4410,7 +4611,9 @@ model WorkingHours {
   @@index([resourceId])
 }
 
-/** A dated exception: a holiday, a training day or an extended shift. */
+/**
+ * A dated exception: a holiday, a training day or an extended shift.
+ */
 model BookingResourceException {
   id           String   @id @default(cuid())
   companyId    String
@@ -4431,14 +4634,12 @@ model BookingResourceException {
 
 /**
  * The central scheduling reservation.
- *
  * Double-booking is prevented by a **partial unique index** on
  * `(resourceKey, startsAt)` restricted to rows whose status is not CANCELLED
  * (see the migration). That constraint lives in PostgreSQL, so two concurrent
  * requests that both pass the availability pre-check still cannot both commit —
  * the loser receives a unique violation and the API answers HTTP 409. The
  * pre-check alone would be a race and is deliberately not relied upon.
- *
  * `resourceKey` is derived by the service: the resource id when one is chosen,
  * otherwise a deterministic key (`branch:<id>|service:<ref>`) so resource-less
  * bookings are serialised against each other too.
@@ -4448,23 +4649,33 @@ model BookingSlot {
   companyId          String
   branchId           String?
   resourceId         String?
-  /** Non-null. See the model comment: this is the concurrency key. */
+  /**
+   * Non-null. See the model comment: this is the concurrency key.
+   */
   resourceKey        String
   bookingType        BookingType
   status             BookingStatus @default(HELD)
-  /** Service catalog id (inspection service, provider listing, …). */
+  /**
+   * Service catalog id (inspection service, provider listing, …).
+   */
   serviceRef         String?
   startsAt           DateTime
   endsAt             DateTime
-  /** Whole minutes; a snapshot so later catalog edits do not move history. */
+  /**
+   * Whole minutes; a snapshot so later catalog edits do not move history.
+   */
   durationMinutes    Int
   customerAccountId  String?
   customerId         String?
   vehicleId          String?
-  /** The module document this slot schedules (InspectionBooking, JobCard, …). */
+  /**
+   * The module document this slot schedules (InspectionBooking, JobCard, …).
+   */
   entityType         String?
   entityId           String?
-  /** Populated while status is HELD; an expired hold is released and reusable. */
+  /**
+   * Populated while status is HELD; an expired hold is released and reusable.
+   */
   holdExpiresAt      DateTime?
   reference          String
   notes              String?
@@ -4490,7 +4701,9 @@ model BookingSlot {
   @@index([entityType, entityId])
 }
 
-/** Append-only booking lifecycle log; also drives reminders and delivery. */
+/**
+ * Append-only booking lifecycle log; also drives reminders and delivery.
+ */
 model BookingEvent {
   id         String         @id @default(cuid())
   companyId  String
@@ -4512,7 +4725,9 @@ model BookingEvent {
 
 // ------------------------------------------------- E04 marketplace lifecycle
 
-/** A provider's onboarding application, reviewed before any listing is live. */
+/**
+ * A provider's onboarding application, reviewed before any listing is live.
+ */
 model MarketplaceApplication {
   id                 String                    @id @default(cuid())
   code               String                    @unique
@@ -4520,7 +4735,9 @@ model MarketplaceApplication {
   legalNameAr        String
   contactEmail       String
   contactPhone       String
-  /** Commercial registration / CR number supplied by the applicant. */
+  /**
+   * Commercial registration / CR number supplied by the applicant.
+   */
   registrationNumber String?
   taxNumber          String?
   countryCode        String                    @default("BH")
@@ -4532,7 +4749,9 @@ model MarketplaceApplication {
   reviewedAt         DateTime?
   reviewedById       String?
   reviewNote         String?
-  /** Set when the application is approved and a provider record is created. */
+  /**
+   * Set when the application is approved and a provider record is created.
+   */
   providerId         String?                   @unique
   createdAt          DateTime                  @default(now())
   updatedAt          DateTime                  @updatedAt
@@ -4543,7 +4762,9 @@ model MarketplaceApplication {
   @@index([contactEmail])
 }
 
-/** Links a platform user to the provider it may administer. */
+/**
+ * Links a platform user to the provider it may administer.
+ */
 model ProviderUser {
   id         String   @id @default(cuid())
   providerId String
@@ -4559,7 +4780,9 @@ model ProviderUser {
   @@index([userId])
 }
 
-/** Provider-declared availability, merged with the shared booking engine. */
+/**
+ * Provider-declared availability, merged with the shared booking engine.
+ */
 model ProviderAvailability {
   id                   String   @id @default(cuid())
   providerId           String
@@ -4567,7 +4790,9 @@ model ProviderAvailability {
   opensMinute          Int
   closesMinute         Int
   isClosed             Boolean  @default(false)
-  /** Lead time before a slot may be booked, in minutes. */
+  /**
+   * Lead time before a slot may be booked, in minutes.
+   */
   minimumNoticeMinutes Int      @default(60)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
@@ -4578,19 +4803,25 @@ model ProviderAvailability {
   @@index([providerId])
 }
 
-/** A customer review of a completed provider service. */
+/**
+ * A customer review of a completed provider service.
+ */
 model ProviderReview {
   id                String       @id @default(cuid())
   providerId        String
   serviceRequestId  String?
   bookingSlotId     String?
   customerAccountId String
-  /** 1–5. Enforced in the service layer as well as the database. */
+  /**
+   * 1–5. Enforced in the service layer as well as the database.
+   */
   rating            Int
   title             String?
   comment           String?
   status            ReviewStatus @default(PENDING)
-  /** Set when a provider replies to the review. */
+  /**
+   * Set when a provider replies to the review.
+   */
   providerReply     String?
   providerRepliedAt DateTime?
   publishedAt       DateTime?
@@ -4607,24 +4838,28 @@ model ProviderReview {
   @@index([providerId, status])
 }
 
-/** A customer complaint against a provider, with a resolution trail. */
+/**
+ * A customer complaint against a provider, with a resolution trail.
+ */
 model MarketplaceDispute {
-  id                String          @id @default(cuid())
-  code              String          @unique
+  id                String        @id @default(cuid())
+  code              String        @unique
   providerId        String
   serviceRequestId  String?
   bookingSlotId     String?
   customerAccountId String
   subject           String
   description       String
-  status            DisputeStatus   @default(OPEN)
+  status            DisputeStatus @default(OPEN)
   resolution        String?
-  /** Amount refunded or credited as a result of the dispute, in minor units. */
-  compensationMinor Int             @default(0)
+  /**
+   * Amount refunded or credited as a result of the dispute, in minor units.
+   */
+  compensationMinor Int           @default(0)
   resolvedAt        DateTime?
   resolvedById      String?
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
   provider        MarketplaceProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
   serviceRequest  ServiceRequest?     @relation(fields: [serviceRequestId], references: [id], onDelete: SetNull)
@@ -4640,11 +4875,15 @@ model MarketplaceDispute {
 model DisputeMessage {
   id         String   @id @default(cuid())
   disputeId  String
-  /** CUSTOMER | PROVIDER | PLATFORM */
+  /**
+   * CUSTOMER | PROVIDER | PLATFORM
+   */
   authorKind String
   authorId   String?
   body       String
-  /** Internal notes are never shown to the customer. */
+  /**
+   * Internal notes are never shown to the customer.
+   */
   isInternal Boolean  @default(false)
   createdAt  DateTime @default(now())
 
@@ -4657,7 +4896,6 @@ model DisputeMessage {
 
 /**
  * A payment attempt against a document (invoice, booking, settlement).
- *
  * The intent records what the customer is trying to pay; `PaymentTransaction`
  * records what the provider actually reported. Nothing is ever marked paid from
  * a client response: only a verified transaction or webhook may settle a
@@ -4665,22 +4903,28 @@ model DisputeMessage {
  * returns the original intent rather than charging twice.
  */
 model PaymentIntent {
-  id                String             @id @default(cuid())
+  id                String              @id @default(cuid())
   companyId         String
   branchId          String?
   intentNumber      String
   customerId        String?
   customerAccountId String?
-  /** What is being paid: SALES_INVOICE | BOOKING | SERVICE_REQUEST | SETTLEMENT. */
+  /**
+   * What is being paid: SALES_INVOICE | BOOKING | SERVICE_REQUEST | SETTLEMENT.
+   */
   targetType        String
   targetId          String
   amountMinor       Int
-  currency          String             @default("BHD")
-  /** 3 for BHD/KWD/OMR, 2 for most others. Stored so totals are unambiguous. */
-  currencyScale     Int                @default(3)
+  currency          String              @default("BHD")
+  /**
+   * 3 for BHD/KWD/OMR, 2 for most others. Stored so totals are unambiguous.
+   */
+  currencyScale     Int                 @default(3)
   status            PaymentIntentStatus @default(REQUIRES_METHOD)
-  /** Adapter key: CASH | CARD_TERMINAL | BANK_TRANSFER | BENEFITPAY | MANUAL. */
-  provider          String             @default("MANUAL")
+  /**
+   * Adapter key: CASH | CARD_TERMINAL | BANK_TRANSFER | BENEFITPAY | MANUAL.
+   */
+  provider          String              @default("MANUAL")
   providerReference String?
   idempotencyKey    String
   description       String?
@@ -4688,8 +4932,8 @@ model PaymentIntent {
   succeededAt       DateTime?
   failedReason      String?
   createdById       String?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 
   company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   branch          Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
@@ -4698,7 +4942,9 @@ model PaymentIntent {
 
   transactions PaymentTransaction[]
   refunds      Refund[]
-  /** Consumer orders settled through this intent. */
+  /**
+   * Consumer orders settled through this intent.
+   */
   orders       CustomerOrder[]
 
   @@unique([companyId, intentNumber])
@@ -4718,9 +4964,13 @@ model PaymentTransaction {
   currency          String                   @default("BHD")
   currencyScale     Int                      @default(3)
   provider          String
-  /** The provider's own transaction id. Unique per provider when present. */
+  /**
+   * The provider's own transaction id. Unique per provider when present.
+   */
   providerReference String?
-  /** Opaque gateway payload retained for reconciliation and dispute evidence. */
+  /**
+   * Opaque gateway payload retained for reconciliation and dispute evidence.
+   */
   rawPayload        Json?
   failureReason     String?
   processedAt       DateTime?
@@ -4746,9 +4996,13 @@ model Refund {
   currencyScale     Int          @default(3)
   reason            String
   status            RefundStatus @default(REQUESTED)
-  /** Set when the reversal is written to the ledger. */
+  /**
+   * Set when the reversal is written to the ledger.
+   */
   journalEntryId    String?
-  /** The gateway refund reference once the provider confirms it. */
+  /**
+   * The gateway refund reference once the provider confirms it.
+   */
   providerReference String?
   requestedById     String?
   approvedById      String?
@@ -4768,7 +5022,6 @@ model Refund {
 
 /**
  * Inbound webhook ledger.
- *
  * `(provider, eventId)` is unique, which is what makes webhook handling
  * idempotent: a redelivered event is recognised and acknowledged without being
  * applied a second time. The signature is verified before the row is written.
@@ -4779,7 +5032,9 @@ model PaymentWebhookEvent {
   eventId        String
   eventType      String
   signatureValid Boolean   @default(false)
-  /** Raw body hash, retained so a payload cannot be silently swapped. */
+  /**
+   * Raw body hash, retained so a payload cannot be silently swapped.
+   */
   payloadHash    String
   payload        Json?
   processedAt    DateTime?
@@ -4793,19 +5048,27 @@ model PaymentWebhookEvent {
   @@index([processedAt])
 }
 
-/** A daily reconciliation run against a provider's settlement report. */
+/**
+ * A daily reconciliation run against a provider's settlement report.
+ */
 model PaymentReconciliation {
   id            String   @id @default(cuid())
   companyId     String
   provider      String
   businessDate  DateTime
-  /** Totals computed from our own transaction table. */
+  /**
+   * Totals computed from our own transaction table.
+   */
   internalCount Int      @default(0)
   internalMinor Int      @default(0)
-  /** Totals reported by the provider. */
+  /**
+   * Totals reported by the provider.
+   */
   externalCount Int      @default(0)
   externalMinor Int      @default(0)
-  /** internalMinor − externalMinor. Non-zero means a break to investigate. */
+  /**
+   * internalMinor − externalMinor. Non-zero means a break to investigate.
+   */
   varianceMinor Int      @default(0)
   matched       Boolean  @default(false)
   notes         String?
@@ -4823,7 +5086,6 @@ model PaymentReconciliation {
 
 /**
  * One delivery attempt per channel for one logical notification.
- *
  * The in-app channel is genuinely functional (the row is the message). Email,
  * SMS, WhatsApp and push rows record what an adapter did: when a channel has no
  * credentials the row is SKIPPED with `providerState = NOT_CONFIGURED`, so the
@@ -4851,7 +5113,9 @@ model NotificationDelivery {
   sentAt            DateTime?
   deliveredAt       DateTime?
   error             String?
-  /** Correlates a delivery with the document that produced it. */
+  /**
+   * Correlates a delivery with the document that produced it.
+   */
   entityType        String?
   entityId          String?
   createdAt         DateTime                   @default(now())
@@ -4878,43 +5142,63 @@ model NotificationDelivery {
 // it. The audit trail records that a credential changed, never its contents.
 // ============================================================================
 
-/** Whether a provider is switched on for the deployment or for one tenant. */
+/**
+ * Whether a provider is switched on for the deployment or for one tenant.
+ */
 enum IntegrationScope {
   PLATFORM
   COMPANY
 }
 
-/** The last known verification outcome. Only VERIFIED means "working". */
+/**
+ * The last known verification outcome. Only VERIFIED means "working".
+ */
 enum IntegrationVerificationStatus {
-  /** Never tested since the credentials were last changed. */
+  /**
+   * Never tested since the credentials were last changed.
+   */
   UNVERIFIED
-  /** A real call reached the provider and it answered successfully. */
+  /**
+   * A real call reached the provider and it answered successfully.
+   */
   VERIFIED
-  /** A real call was attempted and the provider rejected or failed it. */
+  /**
+   * A real call was attempted and the provider rejected or failed it.
+   */
   FAILED
-  /** Credentials are incomplete; no call could be made. */
+  /**
+   * Credentials are incomplete; no call could be made.
+   */
   INCOMPLETE
 }
 
 model IntegrationProvider {
-  id               String           @id @default(cuid())
-  /** Provider key from @oryx/shared, e.g. BENEFITPAY. */
-  providerKey      String
-  scope            IntegrationScope @default(PLATFORM)
-  /** Set only when scope is COMPANY. */
-  companyId        String?
-  enabled          Boolean          @default(false)
-  /** Operator note explaining why it is disabled, if it is. */
-  disabledReason   String?
+  id                 String                        @id @default(cuid())
+  /**
+   * Provider key from @oryx/shared, e.g. BENEFITPAY.
+   */
+  providerKey        String
+  scope              IntegrationScope              @default(PLATFORM)
+  /**
+   * Set only when scope is COMPANY.
+   */
+  companyId          String?
+  enabled            Boolean                       @default(false)
+  /**
+   * Operator note explaining why it is disabled, if it is.
+   */
+  disabledReason     String?
   verificationStatus IntegrationVerificationStatus @default(UNVERIFIED)
-  lastCheckedAt    DateTime?
-  lastCheckMessage String?
-  /** Who last changed the configuration, for accountability. */
-  updatedById      String?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  lastCheckedAt      DateTime?
+  lastCheckMessage   String?
+  /**
+   * Who last changed the configuration, for accountability.
+   */
+  updatedById        String?
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
 
-  company     Company?                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company     Company?                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   credentials IntegrationCredential[]
   checks      IntegrationCheck[]
 
@@ -4925,11 +5209,17 @@ model IntegrationProvider {
 model IntegrationCredential {
   id            String   @id @default(cuid())
   providerId    String
-  /** Credential key from the provider definition, e.g. BENEFITPAY_API_KEY. */
+  /**
+   * Credential key from the provider definition, e.g. BENEFITPAY_API_KEY.
+   */
   credentialKey String
-  /** AES-256-GCM sealed value. Never returned to a client unmasked. */
+  /**
+   * AES-256-GCM sealed value. Never returned to a client unmasked.
+   */
   value         String
-  /** Last four characters, kept so an operator can tell two keys apart. */
+  /**
+   * Last four characters, kept so an operator can tell two keys apart.
+   */
   hint          String?
   updatedById   String?
   createdAt     DateTime @default(now())
@@ -4941,14 +5231,20 @@ model IntegrationCredential {
   @@index([providerId])
 }
 
-/** Append-only record of every connection test, successful or not. */
+/**
+ * Append-only record of every connection test, successful or not.
+ */
 model IntegrationCheck {
   id          String                        @id @default(cuid())
   providerId  String
   status      IntegrationVerificationStatus
-  /** Human-readable outcome, safe to display. Never contains a secret. */
+  /**
+   * Human-readable outcome, safe to display. Never contains a secret.
+   */
   message     String
-  /** How long the probe took, so a hanging provider is visible. */
+  /**
+   * How long the probe took, so a hanging provider is visible.
+   */
   durationMs  Int?
   actorUserId String?
   createdAt   DateTime                      @default(now())
@@ -4969,13 +5265,11 @@ model IntegrationCheck {
 
 /**
  * Per-company visual identity.
- *
  * One row per company. A company that has never set branding has no row at all,
  * and the API resolves it to the ORYX default; a partial row inherits the
  * remaining fields. Every `*AssetId` is a `CmsMediaAsset` id, so a logo is
  * uploaded, validated and optimised through the existing media pipeline rather
  * than being pasted in as a base64 blob on the company row.
- *
  * A platform-level ORYX logo is not stored here: it is the platform default and
  * lives in the `branding` platform setting, so a tenant can never overwrite it.
  */
@@ -4985,11 +5279,13 @@ model CompanyBranding {
   nameEn String?
   nameAr String?
 
-  logoAssetId      String?
-  logoDarkAssetId  String?
-  faviconAssetId   String?
+  logoAssetId     String?
+  logoDarkAssetId String?
+  faviconAssetId  String?
 
-  /** 6-digit hex (`#rrggbb`). Validated in the API; never interpolated unvalidated. */
+  /**
+   * 6-digit hex (`#rrggbb`). Validated in the API; never interpolated unvalidated.
+   */
   primaryColor String?
   accentColor  String?
 
@@ -5020,48 +5316,62 @@ model CmsMediaFolder {
 
 model CmsMediaAsset {
   /// Catalogue images that reference this asset.
-  productImages   ProductImage[]
+  productImages    ProductImage[]
   /// SENSAGE inspection photographs stored against this asset.
   inspectionPhotos CustomerInspectionPhoto[]
-  id           String   @id @default(cuid())
-  folderId     String?
-  /** Original filename as uploaded, kept for display. Never used as a path. */
-  originalName String
-  /** Content-addressed storage key, e.g. `2026/02/ab12….webp`. */
-  storageKey   String   @unique
-  mimeType     String
-  byteSize     Int
-  width        Int
-  height       Int
-  /** Dominant colour, used as a placeholder background while loading. */
-  dominantColor String?
-  /** Blurred inline placeholder (tiny base64 webp) for progressive loading. */
-  blurDataUrl  String?
-  /** Cropped variants keyed by name (`thumb`, `card`, `hero`). */
-  variants     Json     @default("{}")
-  /** Focal point as a percentage of the source, so cropping stays intentional. */
-  focalX       Float    @default(50)
-  focalY       Float    @default(50)
-  altAr        String?
-  altEn        String?
-  caption      String?
-  credit       String?
-  /** Source/licence note for third-party photography. */
-  licenseNote  String?
-  tags         String[] @default([])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  createdByUserId String?
+  id               String                    @id @default(cuid())
+  folderId         String?
+  /**
+   * Original filename as uploaded, kept for display. Never used as a path.
+   */
+  originalName     String
+  /**
+   * Content-addressed storage key, e.g. `2026/02/ab12….webp`.
+   */
+  storageKey       String                    @unique
+  mimeType         String
+  byteSize         Int
+  width            Int
+  height           Int
+  /**
+   * Dominant colour, used as a placeholder background while loading.
+   */
+  dominantColor    String?
+  /**
+   * Blurred inline placeholder (tiny base64 webp) for progressive loading.
+   */
+  blurDataUrl      String?
+  /**
+   * Cropped variants keyed by name (`thumb`, `card`, `hero`).
+   */
+  variants         Json                      @default("{}")
+  /**
+   * Focal point as a percentage of the source, so cropping stays intentional.
+   */
+  focalX           Float                     @default(50)
+  focalY           Float                     @default(50)
+  altAr            String?
+  altEn            String?
+  caption          String?
+  credit           String?
+  /**
+   * Source/licence note for third-party photography.
+   */
+  licenseNote      String?
+  tags             String[]                  @default([])
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  createdByUserId  String?
 
-  folder       CmsMediaFolder?       @relation(fields: [folderId], references: [id], onDelete: SetNull)
-  createdBy    User?                 @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
-  versions     CmsMediaAssetVersion[]
-  blocks       CmsContentBlock[]
-  banners      CmsBanner[]
-  categories   ServiceCategory[]
-  companyLogos     CompanyBranding[] @relation("CompanyLogo")
-  companyLogosDark CompanyBranding[] @relation("CompanyLogoDark")
-  companyFavicons  CompanyBranding[] @relation("CompanyFavicon")
+  folder           CmsMediaFolder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  createdBy        User?                  @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  versions         CmsMediaAssetVersion[]
+  blocks           CmsContentBlock[]
+  banners          CmsBanner[]
+  categories       ServiceCategory[]
+  companyLogos     CompanyBranding[]      @relation("CompanyLogo")
+  companyLogosDark CompanyBranding[]      @relation("CompanyLogoDark")
+  companyFavicons  CompanyBranding[]      @relation("CompanyFavicon")
 
   @@index([folderId])
   @@index([createdAt])
@@ -5074,13 +5384,15 @@ model CmsMediaAsset {
  * does not duplicate bytes.
  */
 model CmsMediaAssetVersion {
-  id        String   @id @default(cuid())
-  assetId   String
-  /** Monotonic per asset; 1 is the upload. */
-  revision  Int
-  snapshot  Json
+  id          String   @id @default(cuid())
+  assetId     String
+  /**
+   * Monotonic per asset; 1 is the upload.
+   */
+  revision    Int
+  snapshot    Json
   actorUserId String?
-  createdAt DateTime @default(now())
+  createdAt   DateTime @default(now())
 
   asset CmsMediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
@@ -5094,22 +5406,28 @@ model CmsMediaAssetVersion {
  * `isPublished`, so a draft never reaches the public endpoint.
  */
 model CmsContentBlock {
-  id          String   @id @default(cuid())
-  /** Stable key the frontend reads, e.g. `home.hero.title`. */
-  key         String
-  locale      Locale
-  /** Plain text for titles and labels. */
-  value       String
-  /** Optional longer rich copy; rendered as text, never as raw HTML. */
-  body        String?
-  mediaAssetId String?
-  linkUrl     String?
-  linkLabel   String?
-  sortOrder   Int      @default(0)
-  isPublished Boolean  @default(false)
-  publishedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String    @id @default(cuid())
+  /**
+   * Stable key the frontend reads, e.g. `home.hero.title`.
+   */
+  key             String
+  locale          Locale
+  /**
+   * Plain text for titles and labels.
+   */
+  value           String
+  /**
+   * Optional longer rich copy; rendered as text, never as raw HTML.
+   */
+  body            String?
+  mediaAssetId    String?
+  linkUrl         String?
+  linkLabel       String?
+  sortOrder       Int       @default(0)
+  isPublished     Boolean   @default(false)
+  publishedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   updatedByUserId String?
 
   mediaAsset CmsMediaAsset? @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
@@ -5119,15 +5437,72 @@ model CmsContentBlock {
   @@index([isPublished])
 }
 
-/** Ordered, publishable record of every content change for revert. */
+/**
+ * Ordered, publishable record of every content change for revert.
+ */
 model CmsContentRevision {
-  id        String   @id @default(cuid())
-  blockId   String
-  revision  Int
-  snapshot  Json
+  id          String   @id @default(cuid())
+  blockId     String
+  revision    Int
+  snapshot    Json
   actorUserId String?
-  createdAt DateTime @default(now())
+  createdAt   DateTime @default(now())
 
   @@unique([blockId, revision])
   @@index([blockId, createdAt])
+}
+
+// ============================================================================
+// EXECUTION 12 — SUPER ADMIN CONTROL PANEL
+//
+// Platform discount coupons. A coupon is a platform artefact that a Super Admin
+// authors; `companyId` narrows it to one tenant's catalogue and a null value
+// means it applies across the platform. Redemption is counted, not enforced by
+// the coupon row itself, so the checkout path stays the single writer.
+// ============================================================================
+
+enum CouponDiscountType {
+  PERCENT
+  FIXED
+}
+
+model Coupon {
+  id              String             @id @default(cuid())
+  code            String             @unique
+  descriptionEn   String?
+  descriptionAr   String?
+  discountType    CouponDiscountType @default(PERCENT)
+  /**
+   * Basis points when PERCENT (1500 = 15%). Zero when FIXED.
+   */
+  percentOffBp    Int                @default(0)
+  /**
+   * Minor units when FIXED. Zero when PERCENT.
+   */
+  amountOffMinor  Int                @default(0)
+  currency        String             @default("BHD")
+  /**
+   * Null means unlimited redemptions.
+   */
+  maxRedemptions  Int?
+  redemptionCount Int                @default(0)
+  /**
+   * Null means the coupon is platform-wide.
+   */
+  companyId       String?
+  /**
+   * Minimum order subtotal in minor units for the coupon to apply.
+   */
+  minOrderMinor   Int                @default(0)
+  isActive        Boolean            @default(true)
+  startsAt        DateTime?
+  endsAt          DateTime?
+  createdById     String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([isActive, startsAt, endsAt])
+  @@index([companyId])
 }

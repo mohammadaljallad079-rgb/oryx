@@ -32,6 +32,7 @@ import { MarketplaceModule } from './marketplace/marketplace.module';
 import { PaymentsModule } from './payments/payments.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { PlatformModule } from './platform/platform.module';
+import { CouponsModule } from './coupons/coupons.module';
 import { BrandingModule } from './branding/branding.module';
 
 @Module({
@@ -73,6 +74,7 @@ import { BrandingModule } from './branding/branding.module';
     PaymentsModule,
     IntegrationsModule,
     PlatformModule,
+    CouponsModule,
     BrandingModule,
   ],
   providers: [
