@@ -225,6 +225,17 @@ Reported honestly:
 
 ## 8. Final commit hash
 
-`be4eb4d` — `feat(execution-15): provider photography, vehicle catalogue and home-rail dedupe`
+Commits on `feature/execution-07-premium-web`:
 
-Pushed to `feature/execution-07-premium-web`. PR #7 stays open and in draft.
+| Commit | Subject |
+| --- | --- |
+| `be4eb4d` | `feat(execution-15): provider photography, vehicle catalogue and home-rail dedupe` |
+| `7710108` | `docs(execution-15): record the implementation commit hash` |
+| `747fb8d` | `docs(agents): record the home-rail dedupe and database-target gotchas` |
+
+**Push blocked.** The `GITHUB_TOKEN` available in this session is rejected by
+GitHub (`gh auth status` reports "The token in GITHUB_TOKEN is invalid"; the REST
+API answers `401 Bad credentials` and the git transport answers "Invalid username
+or token"). The work is committed locally and the working tree is clean; the
+three commits need to be pushed from a session holding a valid token. PR #7
+remains open and in draft, and no merge, deploy or force-push was performed.
