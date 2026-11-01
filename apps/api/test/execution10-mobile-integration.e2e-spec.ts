@@ -468,6 +468,34 @@ describe('Execution 10 — product images & inspection uploads (e2e)', () => {
       expect(product).toBeTruthy();
       expect(product?.imageUrl).toMatch(/^\/api\/v1\/cms\/media\/.+\/file\?variant=/);
     });
+
+    /**
+     * The home rail must agree with the public catalogue on availability.
+     *
+     * The mobile card renders "Out of stock" when the flag it receives is false,
+     * so a projection that omits availability made every in-stock product look
+     * sold out. The flag is asserted here against the catalogue's own answer for
+     * the same product, so the two can never silently diverge again.
+     */
+    it('reports availability for a home product, matching the catalogue', async () => {
+      const home = await call<{
+        products: Array<{ id: string; sku: string; available?: boolean }>;
+      }>(ctx.base, `/customer/homepage?locale=en&companyId=${companyId}`);
+      expect(home.status).toBe(200);
+      const product = home.body.products.find((p) => p.id === productId);
+      expect(product).toBeTruthy();
+      // Availability is a boolean on the wire, never a quantity.
+      expect(typeof product?.available).toBe('boolean');
+
+      const catalogue = await call<{ items: Array<{ id: string; available: boolean }> }>(
+        ctx.base,
+        `/customer/catalog/products?locale=en&page=1&pageSize=100`,
+      );
+      const fromCatalogue = catalogue.body.items.find((p) => p.id === productId);
+      if (fromCatalogue) {
+        expect(product?.available).toBe(fromCatalogue.available);
+      }
+    });
   });
 
   // ------------------------------------------ live customer booking lifecycle

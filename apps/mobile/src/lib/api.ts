@@ -116,6 +116,32 @@ export function getAccessToken(): string | null {
 }
 
 /**
+ * The customer double-submit token, held in memory beside the access token.
+ *
+ * The API issues the customer refresh token in an HttpOnly cookie scoped to
+ * `/api/v1/customer`, so React Native's cookie jar presents it on every customer
+ * request whether the app wants it to or not. `CsrfGuard` then requires the
+ * matching `x-oryx-csrf` header on every unsafe method, and a native client has
+ * no `document.cookie` to read the readable pair from — so without this the
+ * cookie becomes a trap that 403s every POST the app makes (cancelling a
+ * booking, saving a vehicle, uploading a photo).
+ *
+ * The API returns the same value in the body for `x-oryx-client: mobile`, so the
+ * app stores it here and echoes it. In-memory, like the access token: it is not
+ * a credential on its own and a restart re-obtains it during session restore.
+ */
+let csrfToken: string | null =
+  (globalThis as { __oryxCsrfToken?: string }).__oryxCsrfToken ?? null;
+
+export function setCsrfToken(token: string | null): void {
+  csrfToken = token;
+}
+
+export function getCsrfToken(): string | null {
+  return csrfToken;
+}
+
+/**
  * The staff (merchant) access token, kept apart from the consumer token.
  *
  * The API enforces two identity planes — a consumer token is refused on a staff
@@ -133,6 +159,25 @@ export function setStaffAccessToken(token: string | null): void {
 
 export function getStaffAccessToken(): string | null {
   return staffAccessToken;
+}
+
+/**
+ * The staff double-submit token, kept apart from the consumer one.
+ *
+ * The merchant app shares a cookie jar with the customer app on the same
+ * device, so the staff plane needs its own token exactly as the customer plane
+ * does — see `setCsrfToken`. `GET /auth/login` with `x-oryx-client: mobile`
+ * returns it in the body.
+ */
+let staffCsrfToken: string | null =
+  (globalThis as { __oryxStaffCsrfToken?: string }).__oryxStaffCsrfToken ?? null;
+
+export function setStaffCsrfToken(token: string | null): void {
+  staffCsrfToken = token;
+}
+
+export function getStaffCsrfToken(): string | null {
+  return staffCsrfToken;
 }
 
 /**
@@ -192,6 +237,14 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   const token = plane === 'staff' ? staffAccessToken : accessToken;
   if (auth && token) headers.Authorization = `Bearer ${token}`;
+  // The refresh cookie rides along in the platform cookie jar, so the API's
+  // `CsrfGuard` demands the matching header on every unsafe method. Only unsafe
+  // methods need it: a GET carries no double submit, and echoing the token on
+  // reads would leak it into every request log.
+  if (method !== 'GET') {
+    const csrf = plane === 'staff' ? staffCsrfToken : csrfToken;
+    if (csrf) headers['x-oryx-csrf'] = csrf;
+  }
 
   try {
     const response = await fetch(`${V1}${path}`, {
@@ -278,6 +331,8 @@ export interface HomepageResponse {
     sku: string;
     name: string;
     priceMinor: number;
+    /** A boolean, never a quantity: the catalogue does not expose stock depth. */
+    available: boolean;
     imageUrl: string | null;
   }>;
   /** True when the CMS has nothing published and the app should use its bundled Hero. */
@@ -831,6 +886,14 @@ export const serviceRequestsApi = {
 export interface CustomerSession {
   accessToken: string;
   refreshToken?: string;
+  /**
+   * The double-submit token, present only for `x-oryx-client: mobile`.
+   *
+   * The API pairs the HttpOnly refresh cookie with this value so a native
+   * client — which cannot read the readable cookie pair — can still satisfy
+   * `CsrfGuard` on unsafe methods.
+   */
+  csrfToken?: string;
   expiresIn: number;
   account: {
     id: string;
@@ -966,6 +1029,8 @@ export const authApi = {
 export interface StaffSession {
   accessToken: string;
   refreshToken?: string;
+  /** Present only for `x-oryx-client: mobile`; see `CustomerSession.csrfToken`. */
+  csrfToken?: string;
   expiresIn: number;
   user: {
     id: string;
@@ -1113,6 +1178,10 @@ export async function uploadFile<T>(
   const headers: Record<string, string> = { Accept: 'application/json', 'x-oryx-client': 'mobile' };
   const token = options.plane === 'staff' ? staffAccessToken : accessToken;
   if (token) headers.Authorization = `Bearer ${token}`;
+  // An upload is a POST, so it needs the same double-submit header as any other
+  // unsafe method — the refresh cookie is in the jar either way.
+  const csrf = options.plane === 'staff' ? staffCsrfToken : csrfToken;
+  if (csrf) headers['x-oryx-csrf'] = csrf;
 
   try {
     const response = await fetch(`${V1}${path}`, {

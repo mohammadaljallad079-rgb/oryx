@@ -54,6 +54,10 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-secure-store',
     'expo-localization',
+    // Android blocks plain HTTP from targetSdk 28 on, so the release build
+    // cannot reach the local API without this exemption. It is scoped to the
+    // loopback hosts only; see plugins/with-cleartext-local-api.js.
+    './plugins/with-cleartext-local-api',
     [
       'expo-notifications',
       {

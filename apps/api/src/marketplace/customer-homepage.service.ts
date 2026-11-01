@@ -238,6 +238,11 @@ export class CustomerHomepageService {
    * tenant the caller asked for when one is given. The price returned is the
    * catalogue price from the database — a client-submitted price is never read
    * anywhere in this service.
+   *
+   * `available` is projected with the same rule the public catalogue uses
+   * (`trackStock ? onHand > 0 : true`), so the home rail and the catalogue agree
+   * on whether a product can be bought. It is a boolean, never the quantity: a
+   * public projection must not expose a tenant's inventory depth.
    */
   private async getPopularProducts(locale: 'ar' | 'en', companyId?: string) {
     const rows = await this.prisma.product.findMany({
@@ -254,6 +259,8 @@ export class CustomerHomepageService {
         nameEn: true,
         nameAr: true,
         salesPriceMinor: true,
+        trackStock: true,
+        levels: { select: { quantity: true } },
         images: {
           orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }],
           take: 1,
@@ -267,6 +274,9 @@ export class CustomerHomepageService {
       sku: row.sku,
       name: locale === 'ar' ? row.nameAr : row.nameEn,
       priceMinor: row.salesPriceMinor,
+      available: row.trackStock
+        ? row.levels.reduce((sum, level) => sum + level.quantity, 0) > 0
+        : true,
       imageUrl:
         this.assetUrl(row.images[0]?.mediaAsset, 'card') ??
         this.safeUrl(row.images[0]?.url, 'image'),

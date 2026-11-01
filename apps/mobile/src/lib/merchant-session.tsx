@@ -16,10 +16,24 @@
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ApiError, providerApi, setStaffAccessToken, staffAuthApi, type ProviderProfile } from './api';
+import {
+  ApiError,
+  providerApi,
+  setStaffAccessToken,
+  setStaffCsrfToken,
+  staffAuthApi,
+  type ProviderProfile,
+} from './api';
 import { deleteSecret, getSecret, setSecret } from './session-storage';
 
 const REFRESH_KEY = 'oryx.merchant.refresh';
+/**
+ * Where the staff double-submit token is sealed. It must survive a restart for
+ * the same reason as the customer one: the cookie jar keeps the HttpOnly staff
+ * refresh cookie, so the restore refresh already presents it and needs the
+ * matching header.
+ */
+const CSRF_KEY = 'oryx.merchant.csrf';
 
 export interface MerchantAccount {
   userId: string;
@@ -64,8 +78,15 @@ export function MerchantSessionProvider({ children }: { children: React.ReactNod
   const bootstrapped = useRef(false);
 
   const adopt = useCallback(
-    async (input: { accessToken: string; refreshToken?: string; user: { id: string; email: string; fullNameEn: string; fullNameAr: string } }) => {
+    async (input: {
+      accessToken: string;
+      refreshToken?: string;
+      csrfToken?: string;
+      user: { id: string; email: string; fullNameEn: string; fullNameAr: string };
+    }) => {
       setStaffAccessToken(input.accessToken);
+      setStaffCsrfToken(input.csrfToken ?? null);
+      if (input.csrfToken) await setSecret(CSRF_KEY, input.csrfToken);
       if (input.refreshToken) await setSecret(REFRESH_KEY, input.refreshToken);
       // Resolve the provider membership. A staff account that is not linked to a
       // provider is not a merchant and is refused here rather than on every later
@@ -76,6 +97,8 @@ export function MerchantSessionProvider({ children }: { children: React.ReactNod
       } catch (err) {
         if (err instanceof ApiError && err.kind === 'forbidden') {
           setStaffAccessToken(null);
+          setStaffCsrfToken(null);
+          await deleteSecret(CSRF_KEY);
           await deleteSecret(REFRESH_KEY);
           setAccount(null);
           setStatus('signed-out');
@@ -96,6 +119,8 @@ export function MerchantSessionProvider({ children }: { children: React.ReactNod
 
   const clear = useCallback(async () => {
     setStaffAccessToken(null);
+    setStaffCsrfToken(null);
+    await deleteSecret(CSRF_KEY);
     await deleteSecret(REFRESH_KEY);
     setAccount(null);
     setStatus('signed-out');
@@ -108,6 +133,9 @@ export function MerchantSessionProvider({ children }: { children: React.ReactNod
       return;
     }
     setStatus('restoring');
+    // See the customer restore: the refresh POST carries the staff cookie, so
+    // the matching header has to be in place before it is sent.
+    setStaffCsrfToken(await getSecret(CSRF_KEY));
     try {
       const session = await staffAuthApi.refresh(stored);
       await adopt(session);
@@ -117,6 +145,7 @@ export function MerchantSessionProvider({ children }: { children: React.ReactNod
         return;
       }
       setStaffAccessToken(null);
+      setStaffCsrfToken(null);
       setAccount(null);
       setStatus('signed-out');
     }

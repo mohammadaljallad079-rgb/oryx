@@ -7,6 +7,7 @@ import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
 import { useLiveSession } from '../../lib/live-session';
 import { useLiveBookings } from '../../lib/live-bookings';
+import { useReloadOnFocus } from '../../lib/use-reload-on-focus';
 import { ScreenHeader } from '../../components/brand';
 import { BookingCard, LiveBookingCard } from '../../components/cards';
 import { Body, Button, Card, Screen, SectionLabel, StateView } from '../../components/ui';
@@ -39,6 +40,14 @@ export default function Bookings() {
 
   const count = isLive ? live.items.length : (demoBookings.data ?? []).length;
   const loading = isLive ? live.loading : demoBookings.loading;
+
+  // A booking created on the wizard, or cancelled on a detail screen, changes
+  // server state this mounted tab cannot see. Re-read the list when the tab
+  // regains focus so a new appointment appears without a manual pull.
+  // `live.refresh` is stable (`useCallback` keyed on the session), so it is
+  // passed directly: an inline arrow would change identity every render and
+  // re-subscribe the focus effect in a loop.
+  useReloadOnFocus(live.refresh, isLive);
 
   return (
     <Screen>

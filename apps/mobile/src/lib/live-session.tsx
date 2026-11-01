@@ -25,11 +25,21 @@
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ApiError, authApi, setAccessToken, type CustomerSession } from './api';
+import { ApiError, authApi, setAccessToken, setCsrfToken, type CustomerSession } from './api';
 import { deleteSecret, getSecret, setSecret } from './session-storage';
 
 /** Where the refresh token is sealed. Distinct from the demo session key. */
 const REFRESH_KEY = 'oryx.customer.refresh';
+/**
+ * Where the double-submit token is sealed.
+ *
+ * It has to survive a restart: the platform cookie jar keeps the HttpOnly
+ * refresh cookie across launches, so the very first request after a cold start
+ * (the restore refresh) already presents that cookie and `CsrfGuard` demands the
+ * matching header. An in-memory-only token made every restore 403 and dropped
+ * the customer into demo mode until they signed in again by hand.
+ */
+const CSRF_KEY = 'oryx.customer.csrf';
 
 export interface CustomerAccount {
   id: string;
@@ -105,6 +115,10 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
 
   const adopt = useCallback(async (session: CustomerSession) => {
     setAccessToken(session.accessToken);
+    // Echoed on every unsafe request so `CsrfGuard` accepts the refresh cookie
+    // the platform jar sends automatically.
+    setCsrfToken(session.csrfToken ?? null);
+    if (session.csrfToken) await setSecret(CSRF_KEY, session.csrfToken);
     // The native client asks for the refresh token in the body; the API only
     // returns it when `x-oryx-client: mobile` is present.
     if (session.refreshToken) await setSecret(REFRESH_KEY, session.refreshToken);
@@ -114,6 +128,8 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
 
   const clear = useCallback(async () => {
     setAccessToken(null);
+    setCsrfToken(null);
+    await deleteSecret(CSRF_KEY);
     await deleteSecret(REFRESH_KEY);
     setAccount(null);
     setStatus('guest');
@@ -134,6 +150,10 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
       setStatus('guest');
       return;
     }
+    // Load the double-submit token *before* the refresh call: the refresh is a
+    // POST, the cookie jar replays the HttpOnly refresh cookie, and the guard
+    // rejects the pair unless the matching header is present.
+    setCsrfToken(await getSecret(CSRF_KEY));
     try {
       const session = await authApi.refresh(stored);
       await adopt(session);

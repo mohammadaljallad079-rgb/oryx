@@ -89,7 +89,10 @@ export function toDemoProduct(product: ApiProduct): DemoProduct {
     compareAtMinor: null,
     rating: 0,
     reviewCount: 0,
-    stock: 0,
+    // The homepage projection reports availability as a boolean, so a real
+    // in-stock product is not shown as "Out of stock". It carries no depth, so
+    // the card's stock count stays at its neutral value.
+    stock: product.available ? 1 : 0,
     photo: fallbackPhoto(product.id),
     // A real uploaded photograph wins over the bundled fallback art. `mediaUrl`
     // resolves the API's relative path against the API origin.

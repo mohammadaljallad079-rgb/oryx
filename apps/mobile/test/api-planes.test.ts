@@ -15,6 +15,7 @@ import {
   staffAuthApi,
   uploadFile,
 } from '../src/lib/api';
+import { toDemoProduct } from '../src/lib/api-adapters';
 
 /**
  * The API client's identity-plane separation.
@@ -227,5 +228,53 @@ describe('mediaUrl', () => {
     expect(mediaUrl(null)).toBeNull();
     expect(mediaUrl(undefined)).toBeNull();
     expect(mediaUrl('')).toBeNull();
+  });
+});
+
+/**
+ * The homepage product adapter and the availability flag.
+ *
+ * The card shows "Out of stock" whenever `stock <= 0`. The homepage projection
+ * carries availability as a boolean, so the adapter must read it — defaulting to
+ * zero made every real, in-stock product render as sold out on the Android
+ * build. These tests pin the mapping so that regression cannot come back.
+ */
+describe('toDemoProduct availability', () => {
+  it('marks an available product as in stock', () => {
+    const demo = toDemoProduct({
+      id: 'p1',
+      sku: 'SKU-1',
+      name: 'Front brake pad set',
+      priceMinor: 28000,
+      available: true,
+      imageUrl: null,
+    });
+    expect(demo.stock).toBe(1);
+  });
+
+  it('marks an unavailable product as out of stock', () => {
+    const demo = toDemoProduct({
+      id: 'p2',
+      sku: 'SKU-2',
+      name: 'Rear shock absorber',
+      priceMinor: 41000,
+      available: false,
+      imageUrl: null,
+    });
+    expect(demo.stock).toBe(0);
+  });
+
+  it('never invents a stock depth from the boolean', () => {
+    const demo = toDemoProduct({
+      id: 'p3',
+      sku: 'SKU-3',
+      name: 'Oil filter',
+      priceMinor: 3000,
+      available: true,
+      imageUrl: null,
+    });
+    // A boolean cannot carry a count, so the depth stays neutral rather than
+    // being fabricated as an arbitrary number.
+    expect(demo.stock).toBeLessThanOrEqual(1);
   });
 });
