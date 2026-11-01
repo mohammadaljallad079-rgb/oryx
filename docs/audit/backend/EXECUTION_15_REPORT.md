@@ -225,5 +225,6 @@ Reported honestly:
 
 ## 8. Final commit hash
 
-See the commit that carries this report on
-`feature/execution-07-premium-web`. PR #7 stays open and in draft.
+`be4eb4d` — `feat(execution-15): provider photography, vehicle catalogue and home-rail dedupe`
+
+Pushed to `feature/execution-07-premium-web`. PR #7 stays open and in draft.
