@@ -496,6 +496,57 @@ describe('Execution 10 — product images & inspection uploads (e2e)', () => {
         expect(product?.available).toBe(fromCatalogue.available);
       }
     });
+
+    /**
+     * The rails must not repeat a record once per tenant.
+     *
+     * Every tenant seeds its own copy of the demo catalogue, so an unscoped
+     * query returned "Front brake pad set" ten times and "Al Noor Parts" ten
+     * times — the home screen showed the same card over and over. The rail is
+     * now de-duplicated by SKU (products) and display name (providers), and the
+     * copy that carries a photograph is the one kept so a photographed twin is
+     * not discarded in favour of a blank one.
+     */
+    it('returns each product once, keeping the photographed copy', async () => {
+      // A second tenant copy of the same SKU, deliberately with no image.
+      const twin = await prisma.product.create({
+        data: {
+          companyId: otherCompanyId,
+          sku: `${PREFIX}-P1`,
+          nameEn: 'E10 Brake Disc',
+          nameAr: 'قرص فرامل',
+          salesPriceMinor: 4200,
+          isActive: true,
+        },
+      });
+      try {
+        const res = await call<{ products: Array<{ id: string; sku: string; imageUrl: string | null }> }>(
+          ctx.base,
+          '/customer/homepage?locale=en',
+        );
+        expect(res.status).toBe(200);
+
+        const skus = res.body.products.map((p) => p.sku);
+        expect(skus.length).toBe(new Set(skus).size);
+        expect(skus.filter((s) => s === `${PREFIX}-P1`).length).toBeLessThanOrEqual(1);
+
+        // When the rail does carry this SKU, it is the photographed row.
+        const kept = res.body.products.find((p) => p.sku === `${PREFIX}-P1`);
+        if (kept) expect(kept.id).toBe(productId);
+      } finally {
+        await prisma.product.delete({ where: { id: twin.id } });
+      }
+    });
+
+    it('returns each provider once', async () => {
+      const res = await call<{ providers: Array<{ id: string; name: string }> }>(
+        ctx.base,
+        '/customer/homepage?locale=en',
+      );
+      expect(res.status).toBe(200);
+      const names = res.body.providers.map((p) => p.name);
+      expect(names.length).toBe(new Set(names).size);
+    });
   });
 
   // ------------------------------------------ live customer booking lifecycle

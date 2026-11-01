@@ -82,6 +82,20 @@ export class CustomerCatalogController {
   }
 
   /**
+   * The vehicle reference catalogue.
+   *
+   * Public, so the garage form can offer the real make/model lists before a
+   * customer signs in. The server validates a registration against the same
+   * list, so the picker cannot offer a combination the API would reject.
+   */
+  @Public()
+  @Get('vehicle-catalog')
+  @ApiOperation({ summary: 'The vehicle makes and models the platform services' })
+  vehicleCatalog() {
+    return this.catalog.vehicleCatalog();
+  }
+
+  /**
    * The live promotional offers.
    *
    * Public, like the rest of the catalogue: an offer is advertising, and the

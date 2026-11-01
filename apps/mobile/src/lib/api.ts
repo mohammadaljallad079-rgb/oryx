@@ -21,6 +21,7 @@
  * the platform keychain, handled by `session-storage.ts`.
  */
 import { getSecret } from './session-storage';
+import type { VehicleCatalogResponse } from '@oryx/shared';
 
 /** Where the API lives. Set by `EXPO_PUBLIC_API_BASE_URL` at build time. */
 const BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api').replace(
@@ -325,6 +326,7 @@ export interface HomepageResponse {
     categoryKey: string | null;
     fromPriceMinor: number | null;
     currency: string | null;
+    imageUrl: string | null;
   }>;
   products: Array<{
     id: string;
@@ -496,6 +498,19 @@ export const catalogApi = {
       `/customer/catalog/categories?locale=${locale}`,
       { auth: false, signal },
     ),
+
+  /**
+   * The vehicle makes and models the platform services.
+   *
+   * Public, so the garage form can offer real lists before a customer signs in.
+   * The server validates a registration against the same catalogue, so a model
+   * the form hides is a model the API refuses.
+   */
+  vehicleCatalog: (signal?: AbortSignal) =>
+    requestWithRetry<VehicleCatalogResponse>(`/customer/catalog/vehicle-catalog`, {
+      auth: false,
+      signal,
+    }),
 
   /**
    * The live promotional offers published by approved providers.
@@ -776,6 +791,8 @@ export interface PublicProvider {
   categoryKey: string | null;
   phone: string | null;
   email: string | null;
+  /** A served storefront photograph, or null when the provider has none. */
+  imageUrl: string | null;
   listings: PublicProviderListing[];
   reviewCount: number;
   averageRating: number | null;

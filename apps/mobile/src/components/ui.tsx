@@ -9,7 +9,9 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -386,6 +388,137 @@ export function Field({
   );
 }
 
+/**
+ * A labelled picker.
+ *
+ * The vehicle form needs a make chosen from a fixed list and a model limited to
+ * what that make sells, so a dependent pair is a select whose option list the
+ * caller swaps. It is a modal rather than a platform picker so the dark/light
+ * treatment and the RTL direction stay under the kit's control.
+ */
+export function Select({
+  label,
+  value,
+  placeholder,
+  options,
+  onSelect,
+  disabled = false,
+  hint,
+  testID,
+}: {
+  label: string;
+  value: string;
+  placeholder?: string;
+  options: Array<{ value: string; label: string; sublabel?: string }>;
+  onSelect: (value: string) => void;
+  disabled?: boolean;
+  hint?: string;
+  testID?: string;
+}) {
+  const { theme, direction } = useApp();
+  const [open, setOpen] = React.useState(false);
+  const selected = options.find((option) => option.value === value);
+
+  return (
+    <View style={{ marginBottom: space.md }}>
+      <Body size="label" muted style={{ fontWeight: '600', marginBottom: space.xs }}>
+        {label}
+      </Body>
+      <Pressable
+        testID={testID}
+        accessibilityRole="button"
+        accessibilityState={{ disabled, expanded: open }}
+        disabled={disabled}
+        onPress={() => setOpen(true)}
+        style={({ pressed }) => [
+          styles.input,
+          {
+            backgroundColor: theme.surfaceRaised,
+            borderColor: theme.border,
+            opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
+            flexDirection: direction === 'rtl' ? 'row-reverse' : 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          },
+        ]}
+      >
+        <Text
+          style={{
+            color: selected ? theme.text : theme.textFaint,
+            fontSize: typography.body,
+            textAlign: direction === 'rtl' ? 'right' : 'left',
+            flex: 1,
+          }}
+        >
+          {selected ? selected.label : (placeholder ?? '')}
+        </Text>
+        <Text style={{ color: theme.gold, fontSize: typography.body }}>▾</Text>
+      </Pressable>
+      {hint ? (
+        <Body size="caption" muted style={{ marginTop: space.xs }}>
+          {hint}
+        </Body>
+      ) : null}
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={styles.selectBackdrop} onPress={() => setOpen(false)}>
+          <View
+            testID={testID ? `${testID}-options` : undefined}
+            style={[
+              styles.selectSheet,
+              { backgroundColor: theme.surface, borderColor: theme.border, ...elevation(theme, 3) },
+            ]}
+          >
+            <View style={{ paddingHorizontal: space.lg, paddingVertical: space.md }}>
+              <Heading size="subheading">{label}</Heading>
+            </View>
+            <FlatList
+              data={options}
+              keyExtractor={(item) => item.value}
+              style={{ maxHeight: 380 }}
+              renderItem={({ item }) => {
+                const active = item.value === value;
+                return (
+                  <Pressable
+                    testID={testID ? `${testID}-option-${item.value}` : undefined}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    onPress={() => {
+                      onSelect(item.value);
+                      setOpen(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.selectOption,
+                      {
+                        borderColor: theme.borderSoft,
+                        backgroundColor: active ? theme.surfaceHover : 'transparent',
+                        flexDirection: direction === 'rtl' ? 'row-reverse' : 'row',
+                      },
+                      pressed && { opacity: 0.8 },
+                    ]}
+                  >
+                    <View style={{ flex: 1, alignItems: direction === 'rtl' ? 'flex-end' : 'flex-start' }}>
+                      <Text style={{ color: theme.text, fontSize: typography.body, fontWeight: active ? '700' : '500' }}>
+                        {item.label}
+                      </Text>
+                      {item.sublabel ? (
+                        <Text style={{ color: theme.textMuted, fontSize: typography.label, marginTop: 2 }}>
+                          {item.sublabel}
+                        </Text>
+                      ) : null}
+                    </View>
+                    {active ? <Text style={{ color: theme.gold, fontSize: typography.body }}>✓</Text> : null}
+                  </Pressable>
+                );
+              }}
+            />
+          </View>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+}
+
 /** A labelled key/value row used by detail screens. */
 export function DetailRow({ label, value }: { label: string; value: string }) {
   const { theme, direction } = useApp();
@@ -729,6 +862,23 @@ const styles = StyleSheet.create({
     paddingVertical: space.md,
     fontSize: typography.body,
     minHeight: 48,
+  },
+  selectBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 16, 31, 0.62)',
+    justifyContent: 'center',
+    paddingHorizontal: space.lg,
+  },
+  selectSheet: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  selectOption: {
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: space.sm,
   },
   state: { alignItems: 'center', justifyContent: 'center', paddingVertical: space.xxl },
   detailRow: {

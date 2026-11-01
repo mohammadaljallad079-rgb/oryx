@@ -294,6 +294,23 @@ export class UpdateProviderProfileDto {
   @IsString()
   @MaxLength(60)
   categoryKey?: string;
+
+  /**
+   * A `CmsMediaAsset` id from the media library, or null to clear the storefront
+   * photograph. Validated against the library so a stale id cannot be stored.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  imageAssetId?: string | null;
+}
+
+/** An administrator's choice of storefront photograph for a provider. */
+export class SetProviderImageDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  imageAssetId?: string | null;
 }
 
 // ---------------------------------------------------------- service requests

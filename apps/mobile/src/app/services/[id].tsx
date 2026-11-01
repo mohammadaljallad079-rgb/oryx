@@ -23,8 +23,8 @@ import {
 } from '../../components/ui';
 import { space, typography } from '../../lib/theme';
 import { formatMoney } from '../../lib/format';
-import { isOffline, marketplaceApi } from '../../lib/api';
-import { fallbackPhoto } from '../../lib/api-adapters';
+import { isOffline, marketplaceApi, mediaUrl } from '../../lib/api';
+import { categoryPhoto } from '../../lib/api-adapters';
 
 /** The days the API numbers, in the order it stores them. */
 const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
@@ -71,7 +71,13 @@ export default function ProviderDetail() {
 
   return (
     <Screen padded={false}>
-      <Photo source={photo(fallbackPhoto(shop.id))} height={220} width="100%" radiusValue={0} />
+      <Photo
+        source={photo(categoryPhoto(shop.categoryKey, shop.id))}
+        uri={mediaUrl(shop.imageUrl)}
+        height={220}
+        width="100%"
+        radiusValue={0}
+      />
       <View style={{ padding: space.lg, gap: space.md }}>
         <ScreenHeader title={name} />
 

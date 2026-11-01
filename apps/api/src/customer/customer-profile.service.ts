@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DEFAULT_COUNTRY_CODE } from '@oryx/shared';
+import { DEFAULT_COUNTRY_CODE, canonicalMake, canonicalModel, isKnownModel, vehicleMake } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { TenantCompanyService } from '../common/tenant-company.service';
@@ -302,6 +302,20 @@ export class CustomerProfileService {
 
     const companyId = await this.resolveCompanyForAccount(account.defaultCompanyId);
 
+    // A make the app offers must pair with a model that make actually sells.
+    // Canonicalising first means "toyota"/"camry" is stored as the catalogue
+    // spelling, so the garage groups correctly; an unknown make (a legacy value
+    // or a make outside the Bahrain catalogue) is accepted and preserved rather
+    // than silently rewritten.
+    const make = canonicalMake(input.make);
+    const model = canonicalModel(make, input.model);
+    if (vehicleMake(make) && !isKnownModel(make, model)) {
+      throw badRequest(
+        ERROR_CODES.VALIDATION_FAILED,
+        `${model} is not a model offered by ${make} in the vehicle catalogue.`,
+      );
+    }
+
     const vin = input.vin.trim().toUpperCase();
     const duplicate = await this.prisma.vehicle.findFirst({
       where: { companyId, vin, customerAccountId: accountId },
@@ -322,8 +336,8 @@ export class CustomerProfileService {
           customerAccountId: accountId,
           vin,
           plateNumber: input.plateNumber?.trim() ?? null,
-          make: input.make.trim(),
-          model: input.model.trim(),
+          make,
+          model,
           modelYear: input.modelYear,
           color: input.color?.trim() ?? null,
           mileage: input.mileage ?? 0,

@@ -40,6 +40,17 @@ export class CustomerHomepageService {
   /** How many of each rail the homepage shows. */
   private static readonly RAIL_LIMIT = 12;
 
+  /**
+   * How many rows are read before de-duplication.
+   *
+   * The demo seed gives every tenant its own copy of the catalogue, so a window
+   * of `RAIL_LIMIT` rows can be ten copies of one product and de-duplicate down
+   * to a single tile. Reading a multiple of the rail size leaves room for the
+   * distinct records to survive, while keeping the query bounded on a large
+   * install.
+   */
+  private static readonly RAIL_SCAN_LIMIT = CustomerHomepageService.RAIL_LIMIT * 4;
+
   constructor(private readonly prisma: PrismaService) {}
 
   /**
@@ -202,17 +213,24 @@ export class CustomerHomepageService {
    *
    * Only providers in an approved state are returned: a provider that is pending,
    * suspended or rejected must not appear in a customer rail.
+   *
+   * Every tenant seeds its own copy of the demo providers, so an unscoped query
+   * returned "Al Noor Parts" ten times — once per company that carries the demo
+   * catalogue. The rail is de-duplicated by display name, keeping the row that
+   * actually has a storefront photograph so the card is not blank when a
+   * photographed twin exists.
    */
   private async getFeaturedProviders(locale: 'ar' | 'en') {
     const rows = await this.prisma.marketplaceProvider.findMany({
       where: { status: 'APPROVED' },
       orderBy: [{ nameEn: 'asc' }, { id: 'asc' }],
-      take: CustomerHomepageService.RAIL_LIMIT,
+      take: CustomerHomepageService.RAIL_SCAN_LIMIT,
       select: {
         id: true,
         nameEn: true,
         nameAr: true,
         categoryKey: true,
+        imageAsset: { select: { id: true, variants: true } },
         listings: {
           where: { isActive: true },
           orderBy: { priceMinor: 'asc' },
@@ -222,13 +240,43 @@ export class CustomerHomepageService {
       },
     });
 
-    return rows.map((row) => ({
+    const projected = rows.map((row) => ({
       id: row.id,
       name: locale === 'ar' ? row.nameAr : row.nameEn,
       categoryKey: row.categoryKey,
       fromPriceMinor: row.listings[0]?.priceMinor ?? null,
       currency: row.listings[0]?.currency ?? null,
+      imageUrl: this.assetUrl(row.imageAsset, 'card'),
     }));
+
+    return this.dedupeBy(
+      projected,
+      (row) => row.name,
+      (row) => row.imageUrl !== null,
+    ).slice(0, CustomerHomepageService.RAIL_LIMIT);
+  }
+
+  /**
+   * Collapses repeated rows, preferring the copy that carries a photograph.
+   *
+   * Every tenant seeds the same demo catalogue, so a query that spans tenants
+   * returns one row per company for the same logical record. Showing the same
+   * storefront ten times is not a rail, it is a bug a customer sees on the home
+   * screen. The first occurrence wins unless a later twin has an image the
+   * incumbent lacks, which is the only case where the later row is better.
+   */
+  private dedupeBy<T>(rows: T[], keyOf: (row: T) => string, prefer?: (row: T) => boolean): T[] {
+    const chosen = new Map<string, T>();
+    for (const row of rows) {
+      const key = keyOf(row);
+      const incumbent = chosen.get(key);
+      if (!incumbent) {
+        chosen.set(key, row);
+        continue;
+      }
+      if (prefer && !prefer(incumbent) && prefer(row)) chosen.set(key, row);
+    }
+    return [...chosen.values()];
   }
 
   /**
@@ -252,7 +300,7 @@ export class CustomerHomepageService {
         ...(companyId ? { companyId } : {}),
       },
       orderBy: [{ sku: 'asc' }, { id: 'asc' }],
-      take: CustomerHomepageService.RAIL_LIMIT,
+      take: CustomerHomepageService.RAIL_SCAN_LIMIT,
       select: {
         id: true,
         sku: true,
@@ -269,7 +317,7 @@ export class CustomerHomepageService {
       },
     });
 
-    return rows.map((row) => ({
+    const projected = rows.map((row) => ({
       id: row.id,
       sku: row.sku,
       name: locale === 'ar' ? row.nameAr : row.nameEn,
@@ -281,5 +329,13 @@ export class CustomerHomepageService {
         this.assetUrl(row.images[0]?.mediaAsset, 'card') ??
         this.safeUrl(row.images[0]?.url, 'image'),
     }));
+
+    // See `getFeaturedProviders`: an unscoped rail would show the same seed SKU
+    // once per tenant. The photographed twin wins so the tile is not blank.
+    return this.dedupeBy(
+      projected,
+      (row) => row.sku,
+      (row) => row.imageUrl !== null,
+    ).slice(0, CustomerHomepageService.RAIL_LIMIT);
   }
 }

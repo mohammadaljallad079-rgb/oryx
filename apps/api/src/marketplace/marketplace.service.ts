@@ -233,6 +233,7 @@ export class MarketplaceService {
           categoryKey: true,
           phone: true,
           email: true,
+          imageAsset: { select: { id: true, variants: true } },
           listings: {
             where: { isActive: true },
             select: {
@@ -253,10 +254,11 @@ export class MarketplaceService {
     // Aggregate the rating here so the directory shows a real average rather
     // than exposing individual reviews.
     return {
-      items: items.map(({ reviews, ...provider }) => {
+      items: items.map(({ reviews, imageAsset, ...provider }) => {
         const ratings = reviews.map((r) => r.rating);
         return {
           ...provider,
+          imageUrl: this.assetUrl(imageAsset, 'card'),
           reviewCount: ratings.length,
           averageRating:
             ratings.length > 0
@@ -272,6 +274,7 @@ export class MarketplaceService {
     const provider = await this.prisma.marketplaceProvider.findFirst({
       where: { id: providerId, status: 'APPROVED' },
       include: {
+        imageAsset: { select: { id: true, variants: true } },
         listings: { where: { isActive: true }, orderBy: { nameEn: 'asc' } },
         availability: { orderBy: { dayOfWeek: 'asc' } },
         reviews: {
@@ -293,14 +296,34 @@ export class MarketplaceService {
     if (!provider) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Provider not found.');
 
     const ratings = provider.reviews.map((r) => r.rating);
+    const { imageAsset, ...rest } = provider;
     return {
-      ...provider,
+      ...rest,
+      imageUrl: this.assetUrl(imageAsset, 'card'),
       reviewCount: ratings.length,
       averageRating:
         ratings.length > 0
           ? Number((ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(2))
           : null,
     };
+  }
+
+  /**
+   * Builds a served URL for a media asset variant.
+   *
+   * The file route picks the variant from the query, so the URL is stable even
+   * if the stored object key changes. Mirrors the homepage service's helper so
+   * the directory and the rails agree on the shape.
+   */
+  private assetUrl(
+    asset: { id: string; variants: unknown } | null | undefined,
+    variant: string,
+  ): string | null {
+    if (!asset) return null;
+    const variants = (asset.variants ?? {}) as Record<string, unknown>;
+    const chosen = variants[variant] ?? variants.card ?? variants.hero ?? variants.wide;
+    if (!chosen) return null;
+    return `/api/v1/cms/media/${asset.id}/file?variant=${encodeURIComponent(variant)}`;
   }
 
   /**
@@ -346,17 +369,36 @@ export class MarketplaceService {
 
   async updateProviderProfile(
     providerId: string,
-    input: { nameEn?: string; nameAr?: string; phone?: string; email?: string; categoryKey?: string },
+    input: {
+      nameEn?: string;
+      nameAr?: string;
+      phone?: string;
+      email?: string;
+      categoryKey?: string;
+      imageAssetId?: string | null;
+    },
   ) {
     const provider = await this.prisma.marketplaceProvider.findUnique({
       where: { id: providerId },
     });
     if (!provider) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Provider not found.');
 
+    // A storefront photograph must name a real library asset; a cleared value is
+    // stored as null so the client falls back to the category art rather than a
+    // broken image.
+    if (input.imageAssetId) {
+      const asset = await this.prisma.cmsMediaAsset.findUnique({
+        where: { id: input.imageAssetId },
+        select: { id: true },
+      });
+      if (!asset) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Media asset not found.');
+    }
+
     const data: Record<string, unknown> = {};
     for (const key of ['nameEn', 'nameAr', 'phone', 'email', 'categoryKey'] as const) {
       if (input[key] !== undefined) data[key] = input[key];
     }
+    if (input.imageAssetId !== undefined) data.imageAssetId = input.imageAssetId || null;
     if (Object.keys(data).length === 0) return provider;
     return this.prisma.marketplaceProvider.update({ where: { id: providerId }, data });
   }
@@ -379,6 +421,46 @@ export class MarketplaceService {
       targetType: 'MARKETPLACE_PROVIDER',
       targetId: providerId,
       summary: `Provider ${provider.code} set to ${status}.`,
+    });
+
+    return updated;
+  }
+
+  /**
+   * Set (or clear) a provider's storefront photograph from the media library.
+   *
+   * The asset must exist, so a stale id cannot be stored and leave a broken
+   * image in the customer directory. Clearing is explicit (`null`), which the
+   * client renders as the bundled category art rather than as nothing.
+   */
+  async setProviderImage(providerId: string, imageAssetId: string | null, actorId: string) {
+    const provider = await this.prisma.marketplaceProvider.findUnique({
+      where: { id: providerId },
+      select: { id: true, code: true },
+    });
+    if (!provider) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Provider not found.');
+
+    if (imageAssetId) {
+      const asset = await this.prisma.cmsMediaAsset.findUnique({
+        where: { id: imageAssetId },
+        select: { id: true },
+      });
+      if (!asset) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Media asset not found.');
+    }
+
+    const updated = await this.prisma.marketplaceProvider.update({
+      where: { id: providerId },
+      data: { imageAssetId: imageAssetId || null },
+    });
+
+    await this.audit.record({
+      actorUserId: actorId,
+      action: 'marketplace.provider_image_changed',
+      targetType: 'MARKETPLACE_PROVIDER',
+      targetId: providerId,
+      summary: imageAssetId
+        ? `Provider ${provider.code} storefront photograph set.`
+        : `Provider ${provider.code} storefront photograph cleared.`,
     });
 
     return updated;

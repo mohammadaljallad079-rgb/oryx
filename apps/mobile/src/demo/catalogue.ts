@@ -160,6 +160,14 @@ export interface DemoProvider {
   reviewCount: number;
   verified: boolean;
   photo: PhotoKey;
+  /**
+   * A real storefront photograph from the API's media library, when one exists.
+   *
+   * `photo` is the bundled category art; when `imageUrl` is set the card renders
+   * the uploaded photograph instead. Kept separate so a provider with no upload
+   * is visibly using placeholder art rather than silently substituting it.
+   */
+  imageUrl?: string | null;
   /** Straight-line distance used by the "nearby" sort. */
   distanceKm: number;
   services: DemoService[];

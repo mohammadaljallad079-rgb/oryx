@@ -53,12 +53,46 @@ const FALLBACK_PHOTOS: PhotoKey[] = [
  * Picks a stable fallback photograph for a record.
  *
  * Deterministic on the id, so a product keeps the same placeholder across
- * renders and screens instead of shuffling.
+ * renders and screens instead of shuffling. Used only when nothing better is
+ * known about the record — prefer `categoryPhoto` or `productPhoto`, which pick
+ * art that actually matches what is being shown.
  */
 export function fallbackPhoto(id: string): PhotoKey {
   let sum = 0;
   for (let i = 0; i < id.length; i += 1) sum += id.charCodeAt(i);
   return FALLBACK_PHOTOS[sum % FALLBACK_PHOTOS.length] as PhotoKey;
+}
+
+/**
+ * The photograph for a service category.
+ *
+ * A provider or an offer carries the category it belongs to, so the card shows
+ * the workshop it actually is rather than a picture of an unrelated business.
+ * The id-based fallback is used only for a record with no category at all.
+ */
+export function categoryPhoto(categoryKey: string | null | undefined, id: string): PhotoKey {
+  if (categoryKey && CATEGORY_PHOTO[categoryKey]) return CATEGORY_PHOTO[categoryKey];
+  return fallbackPhoto(id);
+}
+
+/**
+ * The photograph for a part, matched on its name.
+ *
+ * The public catalogue does not return a part's free-text group, so the name is
+ * the only signal available. These are the same rules the seeder uses when it
+ * attaches a real photograph, so a part that has no upload yet still shows art
+ * of its own kind — a brake pad does not fall back to a car-wash bay.
+ */
+const PART_PHOTO_RULES: Array<{ photo: PhotoKey; match: RegExp }> = [
+  { photo: 'mechanicEngine', match: /oil|filter|engine|belt|gasket|spark|fluid|coolant|زيت|محرك|فلتر/i },
+  { photo: 'autoService', match: /tyre|tire|wheel|rim|brake|disc|pad|suspension|shock|strut|إطار|فرامل/i },
+  { photo: 'evCharging', match: /battery|electric|alternator|starter|charging|ev\b|بطارية/i },
+  { photo: 'inspectionBay', match: /sensor|diagnostic|ecu|computer|scan|probe|حساس/i },
+  { photo: 'partsStore', match: /.*/ },
+];
+
+export function productPhoto(name: string, id: string): PhotoKey {
+  return PART_PHOTO_RULES.find((rule) => rule.match.test(name))?.photo ?? fallbackPhoto(id);
 }
 
 /** The API's product, as the homepage returns it. */
@@ -93,7 +127,7 @@ export function toDemoProduct(product: ApiProduct): DemoProduct {
     // in-stock product is not shown as "Out of stock". It carries no depth, so
     // the card's stock count stays at its neutral value.
     stock: product.available ? 1 : 0,
-    photo: fallbackPhoto(product.id),
+    photo: productPhoto(product.name, product.id),
     // A real uploaded photograph wins over the bundled fallback art. `mediaUrl`
     // resolves the API's relative path against the API origin.
     imageUrl: mediaUrl(product.imageUrl),
@@ -123,7 +157,8 @@ export function toDemoProvider(provider: ApiProvider): DemoProvider {
     rating: 0,
     reviewCount: 0,
     verified: true,
-    photo: fallbackPhoto(provider.id),
+    photo: categoryPhoto(provider.categoryKey, provider.id),
+    imageUrl: mediaUrl(provider.imageUrl),
     distanceKm: 0,
     services:
       provider.fromPriceMinor === null
@@ -165,7 +200,7 @@ export function favoriteToDemoProduct(favorite: FavoriteResponse): DemoProduct {
     rating: 0,
     reviewCount: 0,
     stock: favorite.available ? 1 : 0,
-    photo: fallbackPhoto(favorite.productId),
+    photo: productPhoto(favorite.nameEn, favorite.productId),
     fits: [],
     warrantyMonths: 0,
   };
@@ -197,7 +232,7 @@ export function catalogProductToDemo(product: CatalogProduct): DemoProduct {
     rating: 0,
     reviewCount: 0,
     stock: product.available ? 1 : 0,
-    photo: fallbackPhoto(product.id),
+    photo: productPhoto(product.nameEn, product.id),
     imageUrl: mediaUrl(product.imageUrl),
     fits: [],
     warrantyMonths: 0,
@@ -310,7 +345,8 @@ export function publicProviderToDemo(provider: PublicProvider): DemoProvider {
     rating: provider.averageRating ?? 0,
     reviewCount: provider.reviewCount,
     verified: true,
-    photo: fallbackPhoto(provider.id),
+    photo: categoryPhoto(provider.categoryKey, provider.id),
+    imageUrl: mediaUrl(provider.imageUrl),
     distanceKm: 0,
     services,
     opensAt: '',

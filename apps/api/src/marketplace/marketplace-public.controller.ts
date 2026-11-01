@@ -22,6 +22,7 @@ import {
   ModerateReviewDto,
   ProviderApplicationDto,
   RejectApplicationDto,
+  SetProviderImageDto,
 } from './marketplace.dto';
 
 interface RequestLike {
@@ -134,6 +135,18 @@ export class MarketplaceAdminController {
   @ApiOperation({ summary: 'Reinstate a suspended provider' })
   async reinstateProvider(@Param('id') id: string, @CurrentPrincipal() principal: RequestPrincipal) {
     return this.marketplace.setProviderStatus(id, 'APPROVED', principal.userId);
+  }
+
+  @Post('providers/:id/image')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('erp.marketplace.provider.manage')
+  @ApiOperation({ summary: 'Set or clear a provider storefront photograph' })
+  async setProviderImage(
+    @Param('id') id: string,
+    @Body() dto: SetProviderImageDto,
+    @CurrentPrincipal() principal: RequestPrincipal,
+  ) {
+    return this.marketplace.setProviderImage(id, dto.imageAssetId ?? null, principal.userId);
   }
 
   @Post('reviews/:id/moderate')

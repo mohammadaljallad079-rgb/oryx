@@ -6,6 +6,7 @@ export * from './currency';
 export * from './bahrain';
 export * from './scheduling';
 export * from './service-categories';
+export * from './vehicle-catalog';
 export * from './tokens';
 export * from './authorization';
 export * from './integrations';

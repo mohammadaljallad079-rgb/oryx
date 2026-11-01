@@ -156,7 +156,7 @@ export function ProviderCard({ provider, onPress }: { provider: DemoProvider; on
 
   return (
     <Card onPress={open} testID={`provider-card-${provider.id}`} style={{ padding: 0, overflow: 'hidden' }}>
-      <Photo source={photoSmall(provider.photo)} height={120} width="100%" radiusValue={0} />
+      <Photo source={photoSmall(provider.photo)} uri={provider.imageUrl ?? null} height={120} width="100%" radiusValue={0} />
       <View style={{ padding: space.md, gap: space.xs }}>
         <View style={styles.titleRow}>
           <Text style={{ color: theme.text, fontSize: typography.subheading, fontWeight: '700', flexShrink: 1 }}>

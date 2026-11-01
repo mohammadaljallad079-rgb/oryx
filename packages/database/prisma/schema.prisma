@@ -4033,8 +4033,16 @@ model MarketplaceProvider {
   commissionPercentBp Int            @default(0)
   approvedAt          DateTime?
   notes               String?
+  /**
+   * Storefront photograph, chosen by an administrator from the media library.
+   * Null means no photograph has been approved, and the client falls back to the
+   * bundled category art rather than showing an unrelated image.
+   */
+  imageAssetId        String?
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
+
+  imageAsset  CmsMediaAsset? @relation("ProviderImage", fields: [imageAssetId], references: [id], onDelete: SetNull)
 
   listings    ProviderServiceListing[]
   requests    ServiceRequest[]
@@ -5319,6 +5327,8 @@ model CmsMediaAsset {
   productImages    ProductImage[]
   /// SENSAGE inspection photographs stored against this asset.
   inspectionPhotos CustomerInspectionPhoto[]
+  /// Provider storefront photographs that reference this asset.
+  providerImages   MarketplaceProvider[] @relation("ProviderImage")
   id               String                    @id @default(cuid())
   folderId         String?
   /**

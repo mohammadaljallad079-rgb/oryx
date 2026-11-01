@@ -1,4 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import {
+  VEHICLE_MAKES,
+  currentModelYear,
+  type VehicleCatalogResponse,
+} from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { ERROR_CODES, notFound } from '../common/errors';
 
@@ -301,6 +306,28 @@ export class CustomerCatalogService {
         imageUrl: this.assetUrl(row.imageAssetId ? { id: row.imageAssetId } : null),
       })),
       total: rows.length,
+    };
+  }
+
+  /**
+   * The vehicle reference catalogue.
+   *
+   * Served from `@oryx/shared` so the mobile pickers and the server validation
+   * read one list: a make the picker offers is a make `createVehicle` accepts,
+   * and a model the picker hides is a model the server refuses. It is public —
+   * a guest registering a vehicle has not signed in yet.
+   */
+  vehicleCatalog(): VehicleCatalogResponse {
+    const now = new Date();
+    return {
+      makes: VEHICLE_MAKES.map((m) => ({
+        make: m.make,
+        makeAr: m.makeAr,
+        models: [...m.models],
+        fromYear: m.fromYear,
+      })),
+      maxYear: currentModelYear(now),
+      minYear: 1950,
     };
   }
 
