@@ -654,6 +654,23 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   true`). The card treats `stock <= 0` as sold out, so the client adapter must map
   the flag rather than default the count to zero, or every in-stock product renders
   as out of stock.
+- **Every tenant seeds its own copy of the demo catalogue, so an unscoped home
+  query repeats itself.** The demo seed gives ORYX-HOLDING, ORYX-AUTO, the demo
+  tenants and each E2E fixture its own copy of the same five providers and six
+  products. A homepage rail that queried across tenants returned "Front brake pad
+  set" and "Al Noor Parts" about ten times each. `getFeaturedProviders` and
+  `getPopularProducts` in `customer-homepage.service.ts` now de-duplicate — by SKU
+  for products, by display name for providers — and keep the photographed copy so a
+  blank twin cannot displace a photographed one. Read a window of
+  `RAIL_SCAN_LIMIT` (4× the rail) rows before de-duplicating, not `RAIL_LIMIT`, or
+  ten copies of one SKU collapse the rail to a single tile. Pinned by
+  `apps/api/test/execution10-mobile-integration.e2e-spec.ts`.
+- **A local API can be reading `oryx_test`, not `oryx_dev`.** `DATABASE_URL` in the
+  ambient shell wins over `.env`, so a restarted `node dist/main.js` may serve the
+  e2e database — which is empty until the suites seed it. A homepage probe then
+  returns rows whose ids do not exist in `oryx_dev`, which looks like a projection
+  bug. Check `tr '\0' '\n' < /proc/$(pgrep -f "node dist/main.js")/environ | grep
+  DATABASE_URL` before trusting a manual probe, or pass the URL explicitly.
 - **Every file under `(app)` becomes a tab.** Expo Router registers the whole
   directory, so a screen that is only pushed onto the stack (a detail screen, the
   booking wizard, invoices, notifications) renders as an extra tab whose label is
