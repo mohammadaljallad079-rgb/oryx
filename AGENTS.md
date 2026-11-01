@@ -629,6 +629,31 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 
 ### Mobile gotchas
 
+- **The double-submit token must be adopted from the login/refresh body.** A native
+  client has no `document.cookie`, but React Native's cookie jar still replays the
+  HttpOnly `oryx_crt` / `oryx_rt` cookie on every request to its scope, so
+  `CsrfGuard` demands a matching `x-oryx-csrf` header on every unsafe method. The
+  API returns `csrfToken` in the body for `x-oryx-client: mobile`; the app must
+  store it (`setCsrfToken` / `setStaffCsrfToken`) and echo it. Omitting it is not a
+  harmless no-op: the restore is answered `403 auth.csrf_token_invalid` and the
+  customer is silently dropped into offline demo mode. The token is kept **stable**
+  across a refresh — only the refresh token rotates — so the app may echo the same
+  value again. Pinned by `apps/mobile/test/csrf-double-submit.test.ts` and
+  `apps/api/test/execution14-mobile-restore.e2e-spec.ts`.
+- **Android blocks cleartext HTTP from targetSdk 28 on.** A release build cannot
+  reach `http://localhost:3001` without an explicit exemption, and the failure is
+  silent: OkHttp throws `UnknownServiceException`, the app maps it to an offline
+  error, and every live rail renders empty. `plugins/with-cleartext-local-api.js`
+  declares a `network_security_config.xml` scoped to the loopback hosts and the
+  emulator alias only (`localhost`, `127.0.0.1`, `10.0.2.2`, `10.0.3.2`); every
+  other destination stays HTTPS-only. `apps/mobile/android` is generated, so the
+  policy lives in the plugin and is applied by `expo prebuild`.
+- **The home rail reports availability as a boolean, not a count.** A public
+  projection must not expose a tenant's inventory depth, so
+  `GET /customer/homepage` returns `available: boolean` (`trackStock ? onHand > 0 :
+  true`). The card treats `stock <= 0` as sold out, so the client adapter must map
+  the flag rather than default the count to zero, or every in-stock product renders
+  as out of stock.
 - **Every file under `(app)` becomes a tab.** Expo Router registers the whole
   directory, so a screen that is only pushed onto the stack (a detail screen, the
   booking wizard, invoices, notifications) renders as an extra tab whose label is
