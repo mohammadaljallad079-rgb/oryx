@@ -377,6 +377,27 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   cookie without a matching `x-oryx-csrf` header. The refresh branch above it
   echoes the cookie; the login branch must too.
 
+### Malformed-input gotchas (Execution 16)
+
+- **An unvalidated `?status=` string is a 400, not a 500.** Most list routes pass
+  the query straight into a Prisma filter (`status: query.status as never`).
+  A value that is not a member of the enum makes Prisma throw
+  `PrismaClientValidationError`, and a non-UUID `?companyId=` makes it throw
+  P2023. Both are the caller's mistake. `PrismaExceptionFilter`
+  (`apps/api/src/common/prisma-exception.filter.ts`, registered globally in
+  `createApp`) maps the validation error to 400 and P2025/P2002/P2003/P2023 to
+  404/409/400. A genuine bug stays a 500 and is logged, never returned. Do not
+  re-derive this per call site.
+- **Never `throw new Error(...)` from a request path.** Nest reports a plain
+  `Error` as a 500. `resolveCompanyId` in `rbac.controller.ts` did this for a
+  cross-tenant or missing company scope; use `forbidden()` / `badRequest()` from
+  `common/errors.ts` so the status is honest.
+- **Sweep before claiming "no 5xx".** A GET fuzz over every path in
+  `GET /api/docs-json` with junk query values (non-enum `status`, non-UUID
+  `companyId`, `page=abc`, negative `pageSize`) caught 36 failing routes that a
+  happy-path suite never touches. `apps/api/test/execution16-malformed-input.e2e-spec.ts`
+  pins representative cases.
+
 ### Production-readiness gotchas (Execution 09)
 
 - **`MFA_REQUIRE_SUPER_ADMIN=true` must not lock the owner out.** The guard
