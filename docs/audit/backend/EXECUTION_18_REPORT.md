@@ -221,7 +221,10 @@ bundles) — passing.
 
 ## 10. Delivery
 
-- Commit **`38cbc88`** pushed to `feature/execution-07-premium-web`.
-- **PR #7 stays open and Draft** (head `38cbc88`, state `open`, `draft: true`,
-  `merged: false`). Not merged, not deployed.
+- Pushed to `feature/execution-07-premium-web`:
+  - `38cbc88` — the Execution 18 fix, tests and this report;
+  - `63c0e77` — records the final commit hash here;
+  - `95445bf` — the labour-hours rule added to `AGENTS.md`.
+- **PR #7 stays open and Draft** (`state: open`, `draft: true`, `merged: false`).
+  Not merged, not deployed.
 - No APK was built.
