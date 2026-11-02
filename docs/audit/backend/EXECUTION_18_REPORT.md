@@ -221,5 +221,7 @@ bundles) — passing.
 
 ## 10. Delivery
 
-- Commit and push to `feature/execution-07-premium-web`.
-- **PR #7 stays open and Draft.** Not merged, not deployed.
+- Commit **`38cbc88`** pushed to `feature/execution-07-premium-web`.
+- **PR #7 stays open and Draft** (head `38cbc88`, state `open`, `draft: true`,
+  `merged: false`). Not merged, not deployed.
+- No APK was built.
