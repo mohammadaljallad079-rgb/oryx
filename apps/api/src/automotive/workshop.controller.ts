@@ -28,6 +28,7 @@ import {
   CreateWorkshopBayDto,
   InvoiceJobCardDto,
   IssueReservationDto,
+  CompatiblePartsQueryDto,
   ListQueryDto,
   UpdateJobCardDto,
   UpdateMaintenanceBookingDto,
@@ -239,14 +240,8 @@ export class WorkshopController {
   @RequireModule('spare_parts')
   @RequireAnyPermission('erp.spare_parts.read', 'erp.parts.compatibility.manage')
   @ApiOperation({ summary: 'Parts compatible with a given make/model/year' })
-  compatibleParts(
-    @Query('make') make: string,
-    @Query('model') model: string,
-    @Query('year') year: string,
-    @Query('companyId') companyId: string | undefined,
-    @CurrentPrincipal() p: RequestPrincipal,
-  ) {
-    return this.workshop.compatibleParts(make, model, Number(year), p, companyId);
+  compatibleParts(@Query() query: CompatiblePartsQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.workshop.compatibleParts(query.make, query.model, query.year, p, query.companyId);
   }
 
   // ------------------------------------------------------------- marketplace

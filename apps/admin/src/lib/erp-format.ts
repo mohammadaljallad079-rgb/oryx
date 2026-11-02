@@ -51,6 +51,18 @@ export function toBasisPoints(value: string): number {
   return Math.round(Number(trimmed) * 100);
 }
 
+/**
+ * Render integer minor units as a decimal string for a money input field.
+ *
+ * `minor / 100` is wrong outside two-decimal currencies: BHD is 1000 fils, so
+ * dividing by 100 turns 19.000 BD into 190.00 and a saved cost becomes a
+ * tenfold error. Always derive the decimal places from the currency.
+ */
+export function minorToInput(minor: number | null | undefined, currency = DEFAULT_CURRENCY): string {
+  if (minor === null || minor === undefined) return '';
+  return fromMinor(minor, currencyScale(currency));
+}
+
 export function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }

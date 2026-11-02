@@ -532,6 +532,11 @@ export class WorkshopService {
 
   /** Parts compatible with a given vehicle, resolved through the shared catalog. */
   async compatibleParts(make: string, model: string, year: number, principal: RequestPrincipal, companyIdInput?: string) {
+    // Guard the numeric filter even though the controller validates: a NaN
+    // reaching Prisma raises a 500, and this method is callable from elsewhere.
+    if (!Number.isInteger(year)) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'A model year is required.');
+    }
     const { companyId } = await this.context.resolveCompanyScope(principal, companyIdInput);
     const rows = await this.prisma.partCompatibility.findMany({
       where: { companyId, make: { equals: make, mode: 'insensitive' }, model: { equals: model, mode: 'insensitive' }, yearFrom: { lte: year }, OR: [{ yearTo: null }, { yearTo: { gte: year } }] },

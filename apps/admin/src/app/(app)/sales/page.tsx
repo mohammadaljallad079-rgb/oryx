@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
-import { money, qty, toMinorInput, toQuantityInput } from '@/lib/erp-format';
+import { minorToInput, money, qty, toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -272,6 +272,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
         showWarehouse
+        dateField="invoiceDate"
         testIdPrefix="invoice"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
@@ -338,6 +339,7 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
         showWarehouse
+        dateField="orderDate"
         testIdPrefix="order"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
@@ -418,6 +420,7 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
         customers={customers.data?.items ?? []}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
+        dateField="issueDate"
         testIdPrefix="quotation"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
@@ -487,6 +490,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
         warehouses={warehouses.data?.items ?? []}
         showWarehouse
         showRestock
+        dateField="issueDate"
         testIdPrefix="credit-note"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
@@ -809,7 +813,7 @@ function LineEditor({
               update(i, {
                 productId: e.target.value,
                 description: product ? product.nameEn : line.description,
-                unitPrice: product ? (product.salesPriceMinor / 100).toFixed(2) : line.unitPrice,
+                unitPrice: product ? minorToInput(product.salesPriceMinor) : line.unitPrice,
                 taxPercent: product ? String(product.taxRateBp / 100) : line.taxPercent,
               });
             }}
@@ -871,6 +875,7 @@ function DocumentModal({
   warehouses,
   showWarehouse,
   showRestock,
+  dateField,
   testIdPrefix,
   onClose,
   onSubmit,
@@ -882,6 +887,8 @@ function DocumentModal({
   warehouses: WarehouseDto[];
   showWarehouse?: boolean;
   showRestock?: boolean;
+  /** The date property this document's API DTO accepts. */
+  dateField: 'invoiceDate' | 'orderDate' | 'issueDate';
   testIdPrefix: string;
   onClose: () => void;
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
@@ -901,9 +908,7 @@ function DocumentModal({
       await onSubmit({
         customerId,
         warehouseId: warehouseId || undefined,
-        issueDate: new Date().toISOString(),
-        invoiceDate: new Date().toISOString(),
-        orderDate: new Date().toISOString(),
+        [dateField]: new Date().toISOString(),
         restockInventory: showRestock ? restock : undefined,
         lines: lines.map((l) => ({
           productId: l.productId || undefined,

@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
-import { money, qty, toMinorInput, toQuantityInput } from '@/lib/erp-format';
+import { minorToInput, money, qty, toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -270,8 +270,8 @@ function EditProductModal({
       nameEn: product.nameEn,
       nameAr: product.nameAr,
       unit: product.unit,
-      salesPrice: (product.salesPriceMinor / 100).toFixed(2),
-      costPrice: (product.costPriceMinor / 100).toFixed(2),
+      salesPrice: minorToInput(product.salesPriceMinor),
+      costPrice: minorToInput(product.costPriceMinor),
       taxRate: (product.taxRateBp / 100).toString(),
       isActive: product.isActive,
     });

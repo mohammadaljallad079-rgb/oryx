@@ -8,6 +8,7 @@ import {
   IsISO8601,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -23,6 +24,19 @@ export class ListQueryDto {
   @IsOptional() @IsString() branchId?: string;
   @IsOptional() @IsString() customerId?: string;
   @IsOptional() @IsString() vehicleId?: string;
+}
+
+/**
+ * Parts-compatibility lookup. The make, model and year all come from the query
+ * string, so each needs a validator: without one the handler coerced a missing
+ * or non-numeric `year` into `NaN` and handed it to a Prisma numeric filter,
+ * which raised a 500 instead of a 400.
+ */
+export class CompatiblePartsQueryDto {
+  @IsString() @MinLength(1) @MaxLength(80) make!: string;
+  @IsString() @MinLength(1) @MaxLength(80) model!: string;
+  @Type(() => Number) @IsInt() @Min(1900) @Max(2100) year!: number;
+  @IsOptional() @IsString() companyId?: string;
 }
 
 // ------------------------------------------------------------------ vehicles

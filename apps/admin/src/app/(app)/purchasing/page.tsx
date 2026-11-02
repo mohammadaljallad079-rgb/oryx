@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
-import { money, toMinorInput, toQuantityInput } from '@/lib/erp-format';
+import { minorToInput, money, toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -806,7 +806,7 @@ function CostLineEditor({
               update(i, {
                 productId: e.target.value,
                 description: product ? product.nameEn : line.description,
-                unitCost: product ? (product.costPriceMinor / 100).toFixed(2) : line.unitCost,
+                unitCost: product ? minorToInput(product.costPriceMinor) : line.unitCost,
               });
             }}
             data-testid={`${testIdPrefix}-product-${i}`}

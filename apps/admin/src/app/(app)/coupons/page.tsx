@@ -19,6 +19,7 @@ import { api, ApiError } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 import { useUi } from '@/lib/ui-context';
 import { money, toMinorInput } from '@/lib/erp-format';
+import { currencyScale, fromMinor } from '@oryx/shared';
 import type { CouponDto, CouponValidationResponse } from '@oryx/shared';
 
 interface CouponForm {
@@ -77,8 +78,8 @@ function CouponsPageInner() {
       descriptionEn: coupon.descriptionEn ?? '',
       discountType: coupon.discountType,
       percent: coupon.percentOffBp ? String(coupon.percentOffBp / 100) : '',
-      amount: coupon.amountOffMinor ? String(coupon.amountOffMinor / 1000) : '',
-      minOrder: coupon.minOrderMinor ? String(coupon.minOrderMinor / 1000) : '',
+      amount: coupon.amountOffMinor ? fromMinor(coupon.amountOffMinor, currencyScale(currency)) : '',
+      minOrder: coupon.minOrderMinor ? fromMinor(coupon.minOrderMinor, currencyScale(currency)) : '',
       maxRedemptions: coupon.maxRedemptions ? String(coupon.maxRedemptions) : '',
       isActive: coupon.isActive,
     });

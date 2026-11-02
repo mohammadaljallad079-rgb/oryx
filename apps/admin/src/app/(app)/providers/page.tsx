@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { api } from '@/lib/api';
+import { money } from '@/lib/erp-format';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
@@ -410,9 +411,9 @@ function SettlementsTab({ canSettle }: { canSettle: boolean }) {
                 <td className="text-[12px]">
                   {new Date(s.periodStart).toLocaleDateString()} – {new Date(s.periodEnd).toLocaleDateString()}
                 </td>
-                <td className="tabular-nums text-[12.5px]">{(s.grossMinor / 1000).toFixed(3)} {s.currency}</td>
-                <td className="tabular-nums text-[12.5px]">{(s.commissionMinor / 1000).toFixed(3)}</td>
-                <td className="tabular-nums text-[12.5px] font-semibold">{(s.netMinor / 1000).toFixed(3)}</td>
+                <td className="tabular-nums text-[12.5px]">{money(s.grossMinor, s.currency)}</td>
+                <td className="tabular-nums text-[12.5px]">{money(s.commissionMinor, s.currency)}</td>
+                <td className="tabular-nums text-[12.5px] font-semibold">{money(s.netMinor, s.currency)}</td>
                 <td><StatusBadge status={s.status} label={s.status} /></td>
               </tr>
             ))}

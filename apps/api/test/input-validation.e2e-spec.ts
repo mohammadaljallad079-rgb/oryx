@@ -67,4 +67,34 @@ describe('input validation hardening (Execution 06)', () => {
       expect(Array.isArray(res.body)).toBe(true);
     });
   });
+
+  describe('the parts-compatibility lookup validates its numeric filter', () => {
+    // `Number(undefined)` is NaN, and a NaN in a Prisma numeric filter raised a
+    // 500 for a request that simply omitted a parameter.
+    it('rejects a missing year', async () => {
+      const res = await call(ctx.base, '/automotive/compatible-parts?make=Toyota&model=Camry', { token });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects a non-numeric year', async () => {
+      const res = await call(ctx.base, '/automotive/compatible-parts?make=Toyota&model=Camry&year=abc', {
+        token,
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects an out-of-range year', async () => {
+      const res = await call(ctx.base, '/automotive/compatible-parts?make=Toyota&model=Camry&year=1800', {
+        token,
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('accepts a well-formed lookup', async () => {
+      const res = await call(ctx.base, '/automotive/compatible-parts?make=Toyota&model=Camry&year=2020', {
+        token,
+      });
+      expect(res.status).toBe(200);
+    });
+  });
 });
