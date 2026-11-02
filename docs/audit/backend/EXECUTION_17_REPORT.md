@@ -304,5 +304,9 @@ Nothing above is claimed that is not verified in this session.
 
 ## 10. Final commit
 
-See the branch head after this commit. PR #7 remains **Draft**; nothing was
-merged, deployed or released.
+- Implementation commit: **`3bb0bc4`** — `feat(execution-17): dashboard density,
+  sales date contract fix and production acceptance`.
+- The branch head after this document-only revision is on
+  `feature/execution-07-premium-web`.
+
+PR #7 remains **Draft**; nothing was merged, deployed or released.
