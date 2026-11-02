@@ -311,7 +311,7 @@ Typecheck, lint and build pass for the API and the mobile app. The Android expor
 
 | Item | State |
 | --- | --- |
-| **Android visual acceptance** | **Not verified.** `screencap` returns black frames on the emulator available here; the swiftshader compositor does not paint without KVM. Layout is verified structurally and by the Android export, **not** visually. The Splash and the design are **not** marked approved. |
+| **Device visual acceptance** | **Verified in a browser at an Android viewport, not on a device.** This container has no `/dev/kvm`, so no emulator can run; the app was instead rendered by its real Expo web export — the same component tree, theme, API client and live backend — in Chromium at 411×914 @2.6×. Sixteen screens were captured and machine-checked for image decode, RTL and overflow (section 15). The Splash and the design are **not** marked approved on a physical device. |
 | SENSAGE AI analysis | No provider is configured, so analysis stays labelled as demo. |
 | Merchant promotions screen | The portal exposes no promotions route; the screen states the limitation rather than showing demo offers. |
 | Merchant subscription plan screen | Managed by a company administrator on the staff plane; the live screen says so. |
@@ -406,6 +406,154 @@ none of the first account's bookings.
   catalogue; a tenant created afterwards falls back to bundled category art until
   an administrator uploads an asset.
 - **Merchant mobile parity on a device** has not been re-run.
+
+---
+
+## 15. Continuation session — visual acceptance, uploads and a full re-verification
+
+The environment was reset between sessions, so every result below was produced
+again from scratch: PostgreSQL 17 installed and seeded, the API built and run,
+the mobile web export rebuilt against the live API, and Chromium driven at an
+Android phone viewport.
+
+### 15.1 Why a browser and not an emulator
+
+`/dev/kvm` is absent and the CPU exposes neither `vmx` nor `svm`, so the
+x86_64 system image cannot boot and an arm64 image cannot run on an x86_64 host
+(`Avd's CPU Architecture 'arm64' is not supported by QEMU2`). The next-best
+evidence is the real application: `expo export --platform web` compiles the same
+React Native component tree, the same theme and the same API client, and
+`scripts/capture-exec10-visual.mjs` renders it at 411×914 @2.6× — the Pixel-class
+viewport in CSS pixels. This is a browser rendering of the app, **not** a device
+capture, and the report says so.
+
+### 15.2 Sixteen screens, machine-checked
+
+`node scripts/capture-exec10-visual.mjs` — result: **16 screens captured, 0
+problems**. The script fails on a horizontal overflow, a missing bottom tab bar,
+Arabic text that did not resolve to RTL, or an image that decoded to nothing.
+
+| Screen | File | Check |
+| --- | --- | --- |
+| Splash (AR) | `01-splash.png` | photographic scene painted |
+| Homepage (AR) | `02-homepage-ar.png` | 54 images, all decoded; RTL; tabs |
+| Homepage (EN) | `02-homepage-en.png` | 54 images, all decoded; tabs |
+| Parts catalogue (AR) | `03-catalog.png` | 50 images, all decoded; RTL |
+| Services (EN) | `04-services.png` | rendered |
+| Customer sign-in | `05-login.png` | live form present |
+| After live sign-in | `06-after-login.png` | refresh token stored |
+| Booking wizard | `07-booking-new.png` | real slots |
+| Booking history | `08-bookings.png` | the seeded booking is listed, live mode |
+| Booking detail | `08b-booking-detail.png` | owner's booking |
+| Merchant sign-in | `09-merchant-login.png` | staff plane |
+| Merchant dashboard | `10-merchant-dashboard.png` | provider name from the session |
+| Merchant services | `11-merchant-services.png` | provider's own listings |
+| Merchant products | `12-merchant-products.png` | 606-colour render, real data |
+| Merchant orders | `13-merchant-orders.png` | provider's own requests |
+| Merchant profile | `14-merchant-profile.png` | membership-resolved profile |
+
+Two defects were found and fixed while doing this, both in the harness rather
+than the product:
+
+1. **The web export was built against the wrong API base.** `api.ts` reads
+   `EXPO_PUBLIC_API_BASE_URL`; the export had been given `EXPO_PUBLIC_API_URL`,
+   so the app fell back to `http://localhost:3001/api` and every request was
+   blocked as a cross-origin call from `127.0.0.1:8091`. Rebuilding with the
+   correct variable made the live sign-in succeed.
+2. **The preview origin was not in the CORS allowlist.** The API allowed
+   `http://localhost:3000,http://localhost:3002` only, so the preflight for the
+   preview host returned no `Access-Control-Allow-Origin`. Running the API with
+   the preview origin appended made the preflight a `204`.
+
+Neither is a product defect — a native build calls the API directly and never
+issues a preflight — but both would have made the acceptance run look like a
+failure.
+
+### 15.3 The locale toggle is not a defect
+
+An earlier session saw an Arabic capture that differed from the English one only
+in the status-bar band, which looked like a broken RTL switch. Driving the real
+toggle shows the opposite:
+
+```
+before:      chip "ع"  arabicTexts 1   rtlTexts 1   stored "en"
+after tap 1: chip "EN" arabicTexts 94  rtlTexts 89  stored "ar"
+after tap 2: chip "ع"  arabicTexts 1   rtlTexts 1   stored "en"
+```
+
+One tap switches to Arabic and 89 of 94 Arabic text nodes compute to
+`direction: rtl`; the second tap returns to English. The earlier capture was a
+double-tap artefact in the harness, not an app fault.
+
+### 15.4 Real HTTP re-verification
+
+Run against the live API and the migrated, seeded database.
+
+```
+Customer journey (scripts + curl)
+  register                                  201
+  login                                     200  accessToken + refresh + csrf
+  me                                        200
+  availability (9 days out)                 200  23 real slots
+  create booking                            201
+  confirm                                   200  CONFIRMED
+  history                                   200  1 row
+  cancel                                    200  CANCELLED
+  bookings without a token                  401
+
+SENSAGE upload (/customer/inspection-photos)
+  128×128 PNG, valid                        201  stored as image/webp 128×128 4360 B
+  text file declared text/plain             400  media.type_not_allowed
+  tiny 1×1 PNG                              400  media.dimensions_invalid
+  no bearer token                           401
+  history lists it, delete removes it       200 → 0
+
+Ownership isolation
+  account B lists account A's photos         0 rows
+  account B deletes account A's photo        404
+  account A still has its own photo          1 row
+
+Product media (/cms/media, staff plane)
+  200×200 PNG as super admin                201  stored as image/webp 200×200
+```
+
+### 15.5 Suites, typecheck, lint, build
+
+```
+API e2e:     25 suites, 482 tests   all passing   (real test DB, migrated + seeded)
+Shared:       9 files,  180 tests   all passing
+Mobile:       8 files,  117 tests   all passing
+Typecheck:   all packages clean
+Lint:        all packages clean
+Build:       shared, database, api, admin and customer all clean
+React:       19.1.0 / react-dom 19.1.0, aligned across admin, customer,
+             mobile and mobile-erp (the hoisted-copy regression stays fixed)
+```
+
+### 15.6 Photography audit
+
+`docs/audit/execution-07-media-licenses.json` is the registry. Checked against
+the tree:
+
+- 12 entries: 10 shipping photographs and 2 explicitly withdrawn (a branded
+  Bentley showroom and a Jaguar showroom, both removed for showing marques ORYX
+  does not sell).
+- Licences: CC0 ×2, CC BY 4.0 ×2, CC BY-SA 4.0 ×5, CC BY-SA 3.0 ×3. All are
+  real, licensed photographs from Wikimedia Commons with a recorded source page,
+  licence URL and artist.
+- All 13 `PhotoKey` union values resolve to a real bundled image.
+- `assets.ts` requires 26 files, all 26 exist, and no file on disk is
+  unreferenced — there are no placeholder or orphan images.
+
+### 15.7 Still open
+
+- **Device visual acceptance is not claimed.** The evidence is a browser render
+  of the real app; a screenshot from a physical Android device is still needed
+  before the Splash and the Homepage are marked approved.
+- **Product photography is not universal.** The seed links the ORYX-AUTO
+  catalogue; a tenant created afterwards falls back to bundled category art
+  until an administrator uploads an asset.
+- **Merchant parity on a device** has not been re-run.
 
 ---
 

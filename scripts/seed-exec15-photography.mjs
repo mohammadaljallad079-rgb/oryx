@@ -189,6 +189,47 @@ async function linkProducts(assetCache, companyId) {
   return { linked, total: products.length };
 }
 
+/**
+ * Attaches a photograph to every catalogue product that still has none, across
+ * every tenant.
+ *
+ * The product-image route needs `erp.inventory.item.manage`, which a company
+ * administrator holds for its own company and a platform principal holds for
+ * none. Only ORYX-AUTO has a company administrator in the base seed, so the
+ * other tenants' catalogue rows cannot go through that route. As with the
+ * provider storefronts above, the bytes still come from the media library
+ * endpoint and only the link row is written directly, so the asset is
+ * pipeline-produced and the same library backs the catalogue and the website.
+ */
+async function linkProductsDirect(assetCache) {
+  const products = await prisma.product.findMany({
+    where: { isActive: true, salesPriceMinor: { gt: 0 }, images: { none: {} } },
+    select: { id: true, sku: true, nameEn: true, companyId: true },
+    orderBy: { sku: 'asc' },
+  });
+  let linked = 0;
+  for (const product of products) {
+    const photoKey = photoForProduct(`${product.nameEn ?? ''} ${product.sku ?? ''}`);
+    const assetId = DRY ? 'dry' : await assetFor(photoKey, assetCache);
+    if (DRY) {
+      linked += 1;
+      continue;
+    }
+    await prisma.productImage.create({
+      data: {
+        productId: product.id,
+        mediaAssetId: assetId,
+        altEn: `Catalogue photograph for ${product.nameEn ?? product.sku}`,
+        isPrimary: true,
+        sortOrder: 0,
+      },
+    });
+    linked += 1;
+  }
+  console.log(`  products: ${linked} linked directly, ${products.length} without an image`);
+  return { linked, total: products.length };
+}
+
 async function main() {
   console.log(`ORYX Execution 15 photography seed -> ${BASE}${DRY ? '  (dry run)' : ''}`);
   const assetCache = {};
@@ -224,7 +265,13 @@ async function main() {
   await login('admin@oryx-auto.local');
   const products = await linkProducts(assetCache, companyId);
 
-  console.log('\nSummary:', { providers, products });
+  // The remaining tenants have no company administrator to authenticate as, so
+  // their catalogue rows are linked directly. This still runs after the media
+  // pass, so every asset it references already exists in the library.
+  console.log('\nProducts (other tenants):');
+  const otherProducts = await linkProductsDirect(assetCache);
+
+  console.log('\nSummary:', { providers, products, otherProducts });
 }
 
 main()

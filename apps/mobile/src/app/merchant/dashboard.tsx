@@ -39,7 +39,7 @@ import { compactMoney, formatMoney, localizeDigits } from '../../lib/format';
  */
 export default function MerchantDashboard() {
   const { t, locale, account, direction, dataVersion } = useApp();
-  const { isSignedIn } = useMerchantSession();
+  const { isSignedIn, account: merchant } = useMerchantSession();
   const router = useRouter();
   const storeId = account?.storeId ?? 'store-01';
 
@@ -99,7 +99,20 @@ export default function MerchantDashboard() {
 
         <View>
           <Heading size="title">
-            {store.data ? (locale === 'ar' ? store.data.nameAr : store.data.nameEn) : t('merchantDashboard')}
+            {/*
+              A live session's heading is the authenticated provider's own name.
+              The demo store record belongs to the offline demo, so falling back
+              to it would label a real merchant with a demo name.
+            */}
+            {isSignedIn && merchant?.provider
+              ? locale === 'ar'
+                ? merchant.provider.nameAr
+                : merchant.provider.nameEn
+              : store.data
+                ? locale === 'ar'
+                  ? store.data.nameAr
+                  : store.data.nameEn
+                : t('merchantDashboard')}
           </Heading>
           <Body size="label" muted style={{ marginTop: space.xs }}>
             {t('merchantDashboard')}

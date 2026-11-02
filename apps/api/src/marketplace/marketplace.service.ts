@@ -45,6 +45,16 @@ export interface ProviderApplicationInput {
 export class MarketplaceService {
   private readonly logger = new Logger(MarketplaceService.name);
 
+  /**
+   * How many provider rows the public directory scans before de-duplicating.
+   *
+   * Every tenant carries a copy of the demo catalogue, so the raw row count is
+   * many times the number of distinct providers. The scan is bounded so a large
+   * platform does not read the whole table, and generous enough that the distinct
+   * providers in it comfortably exceed one page.
+   */
+  private static readonly DIRECTORY_SCAN_LIMIT = 500;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -219,42 +229,54 @@ export class MarketplaceService {
       status: 'APPROVED' as never,
       ...(params.categoryKey ? { categoryKey: params.categoryKey } : {}),
     };
-    const [items, total] = await Promise.all([
-      this.prisma.marketplaceProvider.findMany({
-        where,
-        orderBy: { nameEn: 'asc' },
-        skip: (params.page - 1) * params.pageSize,
-        take: params.pageSize,
-        select: {
-          id: true,
-          code: true,
-          nameEn: true,
-          nameAr: true,
-          categoryKey: true,
-          phone: true,
-          email: true,
-          imageAsset: { select: { id: true, variants: true } },
-          listings: {
-            where: { isActive: true },
-            select: {
-              id: true,
-              categoryKey: true,
-              nameEn: true,
-              nameAr: true,
-              priceMinor: true,
-              currency: true,
-            },
+
+    // Every tenant seeds its own copy of the demo providers, so an unscoped
+    // query returns "Al Noor Parts" once per company — six identical cards in
+    // the customer directory. The rows are de-duplicated by display name before
+    // pagination, keeping the copy that carries a storefront photograph, so the
+    // page and its total describe distinct providers rather than tenant copies.
+    const rows = await this.prisma.marketplaceProvider.findMany({
+      where,
+      orderBy: [{ nameEn: 'asc' }, { id: 'asc' }],
+      take: MarketplaceService.DIRECTORY_SCAN_LIMIT,
+      select: {
+        id: true,
+        code: true,
+        nameEn: true,
+        nameAr: true,
+        categoryKey: true,
+        phone: true,
+        email: true,
+        imageAsset: { select: { id: true, variants: true } },
+        listings: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            categoryKey: true,
+            nameEn: true,
+            nameAr: true,
+            priceMinor: true,
+            currency: true,
           },
-          reviews: { where: { status: 'PUBLISHED' }, select: { rating: true } },
         },
-      }),
-      this.prisma.marketplaceProvider.count({ where }),
-    ]);
+        reviews: { where: { status: 'PUBLISHED' }, select: { rating: true } },
+      },
+    });
+
+    const unique = new Map<string, (typeof rows)[number]>();
+    for (const row of rows) {
+      const key = row.nameEn;
+      const incumbent = unique.get(key);
+      if (!incumbent || (!incumbent.imageAsset && row.imageAsset)) unique.set(key, row);
+    }
+    const deduped = [...unique.values()];
+    const start = (params.page - 1) * params.pageSize;
+    const page = deduped.slice(start, start + params.pageSize);
 
     // Aggregate the rating here so the directory shows a real average rather
     // than exposing individual reviews.
     return {
-      items: items.map(({ reviews, imageAsset, ...provider }) => {
+      items: page.map(({ reviews, imageAsset, ...provider }) => {
         const ratings = reviews.map((r) => r.rating);
         return {
           ...provider,
@@ -266,7 +288,7 @@ export class MarketplaceService {
               : null,
         };
       }),
-      total,
+      total: deduped.length,
     };
   }
 

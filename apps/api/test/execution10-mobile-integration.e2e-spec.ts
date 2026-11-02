@@ -547,6 +547,26 @@ describe('Execution 10 — product images & inspection uploads (e2e)', () => {
       const names = res.body.providers.map((p) => p.name);
       expect(names.length).toBe(new Set(names).size);
     });
+
+    /**
+     * The public directory the mobile wizard reads must de-duplicate too.
+     *
+     * The homepage rail was de-duplicated but `GET /marketplace/providers` was
+     * not, so the booking wizard's provider picker listed "Al Noor Parts" six
+     * times — once per tenant that carries the demo catalogue. The directory now
+     * collapses the tenant copies before it paginates, so `total` and the page
+     * describe distinct providers.
+     */
+    it('lists each provider once in the public directory', async () => {
+      const res = await call<{ items: Array<{ id: string; nameEn: string }>; total: number }>(
+        ctx.base,
+        '/marketplace/providers?pageSize=50',
+      );
+      expect(res.status).toBe(200);
+      const names = res.body.items.map((p) => p.nameEn);
+      expect(names.length).toBe(new Set(names).size);
+      expect(res.body.total).toBe(names.length);
+    });
   });
 
   // ------------------------------------------ live customer booking lifecycle
