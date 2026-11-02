@@ -26,6 +26,7 @@ import {
 } from 'react-native';
 
 import { useApp } from '../lib/app-context';
+import { filterOptions, type SelectOption } from '../lib/options';
 import { brand, elevation, radius, space, statusColor, typography } from '../lib/theme';
 
 /** The page shell: themed background, correct direction, optional scroll. */
@@ -395,6 +396,13 @@ export function Field({
  * what that make sells, so a dependent pair is a select whose option list the
  * caller swaps. It is a modal rather than a platform picker so the dark/light
  * treatment and the RTL direction stay under the kit's control.
+ *
+ * A list long enough that scrolling is a chore — the 29 makes, the ~189 models,
+ * the model years — passes `searchable`, which adds a filter field inside the
+ * sheet. The match is case-insensitive and also looks at the option's
+ * `keywords`, so "merc" finds "Mercedes-Benz" and a search in Arabic finds the
+ * Arabic label. A search that matches nothing says so rather than showing an
+ * empty sheet.
  */
 export function Select({
   label,
@@ -405,19 +413,38 @@ export function Select({
   disabled = false,
   hint,
   testID,
+  searchable = false,
+  searchPlaceholder,
+  emptyMessage,
 }: {
   label: string;
   value: string;
   placeholder?: string;
-  options: Array<{ value: string; label: string; sublabel?: string }>;
+  options: SelectOption[];
   onSelect: (value: string) => void;
   disabled?: boolean;
   hint?: string;
   testID?: string;
+  searchable?: boolean;
+  searchPlaceholder?: string;
+  emptyMessage?: string;
 }) {
-  const { theme, direction } = useApp();
+  const { theme, direction, t } = useApp();
   const [open, setOpen] = React.useState(false);
+  const [query, setQuery] = React.useState('');
   const selected = options.find((option) => option.value === value);
+
+  const visible = React.useMemo(
+    () => (searchable ? filterOptions(options, query) : options),
+    [options, query, searchable],
+  );
+
+  // A fresh sheet opens on the full list; a stale term would hide the very
+  // option the user came back to change.
+  const openSheet = () => {
+    setQuery('');
+    setOpen(true);
+  };
 
   return (
     <View style={{ marginBottom: space.md }}>
@@ -429,7 +456,7 @@ export function Select({
         accessibilityRole="button"
         accessibilityState={{ disabled, expanded: open }}
         disabled={disabled}
-        onPress={() => setOpen(true)}
+        onPress={openSheet}
         style={({ pressed }) => [
           styles.input,
           {
@@ -472,10 +499,41 @@ export function Select({
             <View style={{ paddingHorizontal: space.lg, paddingVertical: space.md }}>
               <Heading size="subheading">{label}</Heading>
             </View>
+            {searchable ? (
+              <View style={{ paddingHorizontal: space.lg, paddingBottom: space.sm }}>
+                <TextInput
+                  testID={testID ? `${testID}-search` : undefined}
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder={searchPlaceholder ?? t('search')}
+                  placeholderTextColor={theme.textFaint}
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.surfaceRaised,
+                      borderColor: theme.border,
+                      color: theme.text,
+                      textAlign: direction === 'rtl' ? 'right' : 'left',
+                      writingDirection: direction,
+                    },
+                  ]}
+                />
+              </View>
+            ) : null}
             <FlatList
-              data={options}
+              data={visible}
               keyExtractor={(item) => item.value}
               style={{ maxHeight: 380 }}
+              keyboardShouldPersistTaps="handled"
+              ListEmptyComponent={
+                <View style={{ paddingHorizontal: space.lg, paddingVertical: space.lg }}>
+                  <Body size="label" muted align="center">
+                    {emptyMessage ?? t('noResults')}
+                  </Body>
+                </View>
+              }
               renderItem={({ item }) => {
                 const active = item.value === value;
                 return (

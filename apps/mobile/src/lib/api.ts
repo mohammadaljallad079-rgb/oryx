@@ -1132,6 +1132,19 @@ export const bookingsApi = {
       method: 'POST',
     }),
 
+  /**
+   * Move a held or confirmed booking the caller owns to a new time.
+   *
+   * The API re-checks the new time against working hours and every other booking
+   * on the resource, so a slot that filled while the screen was open is refused
+   * rather than double-booked.
+   */
+  reschedule: (id: string, startsAt: string, durationMinutes: number) =>
+    request<BookingSummary>(`/customer/bookings/${encodeURIComponent(id)}/reschedule`, {
+      method: 'POST',
+      body: { startsAt, durationMinutes },
+    }),
+
   cancel: (id: string, reason?: string) =>
     request<BookingSummary>(`/customer/bookings/${encodeURIComponent(id)}/cancel`, {
       method: 'POST',

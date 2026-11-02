@@ -331,4 +331,82 @@ merged or deployed.
 
 ---
 
+## 14. Continuation session — reschedule, searchable selectors, upload retry
+
+This section records the work completed in a later session on the same branch,
+which closed the last gaps Execution 10 left open. It is additive; nothing above
+was reverted.
+
+### Customer reschedule (was missing end to end)
+
+A customer could create, confirm and cancel a booking but could not move one.
+
+- **`apps/api/src/customer/booking.service.ts`** — `rescheduleCustomerBooking`.
+  It loads the slot scoped to `customerAccountId` (a foreign id is a 404, not a
+  leak), refuses a `CANCELLED`/`COMPLETED`/`NO_SHOW` booking with `BOOKING_STATE`,
+  re-runs `assertSlotBookable` with `excludeSlotId` so the booking does not
+  collide with itself, moves the row to `RESCHEDULED`, clears the hold, appends a
+  `RESCHEDULED` event and audits `booking.rescheduled_by_customer`. A unique
+  violation on the new time surfaces as `BOOKING_SLOT_UNAVAILABLE` (409).
+- **`apps/api/src/customer/booking.controller.ts`** — `POST /customer/bookings/:id/reschedule`
+  (and the `/api/bookings/:id/reschedule` alias), reading the account from the
+  verified token.
+- **`apps/mobile/src/lib/api.ts`** — `bookingsApi.reschedule(id, startsAt, durationMinutes)`.
+- **`apps/mobile/src/lib/live-bookings.tsx`** — `reschedule` in the live state.
+- **`apps/mobile/src/app/bookings/[id].tsx`** — a reschedule sheet that loads real
+  availability for the chosen day and posts the selected engine slot. A 409 is
+  shown as `slotUnavailable`, never as a generic failure.
+
+### Searchable selectors and a shared slot label
+
+- **`apps/mobile/src/lib/options.ts`** (new) — `filterOptions`, the pure matcher
+  behind a searchable select. It matches case-insensitively on the label, the
+  sublabel and the option's `keywords`, so an Arabic term finds an English label
+  without switching the app locale. It is unit-tested directly.
+- **`apps/mobile/src/components/ui.tsx`** — `Select` gained `searchable`,
+  `searchPlaceholder` and `emptyMessage`; the sheet filters as you type and says
+  "no results" rather than showing an empty list.
+- **`apps/mobile/src/app/vehicles/new.tsx`** and
+  **`apps/mobile/src/app/bookings/new.tsx`** — the make, model and year pickers
+  and the provider picker are searchable; the wizard also offers a change-provider
+  step and a provider directory search.
+- **`apps/mobile/src/lib/format.ts`** — `slotLabel(startsAt)`, the UTC `HH:MM`
+  label. Four copies of this formatting were collapsed into one, so the wizard,
+  the detail screen and the booking card cannot drift apart. It is unit-tested.
+
+### SENSAGE upload failure and retry
+
+- **`apps/mobile/src/app/sensage/new.tsx`** — a shot carries its own
+  `uploadState` (`pending` / `failed`). A failed upload no longer reads
+  "uploading" forever; it is marked failed and offers a retry that re-sends the
+  same photograph. `uploadFailedShort` was added in both locales.
+
+### Evidence in this session
+
+```
+API e2e:    25 suites, 481 tests   all passing   (real test DB, migrated + seeded)
+Shared:      9 files,  180 tests   all passing
+Mobile:      8 files,  117 tests   all passing
+Typecheck:   all packages clean
+Lint:        all packages clean
+Build:       shared, database and api clean; android export completes
+```
+
+The reschedule path was also exercised over real HTTP by
+`scripts/probe-customer-journey.mjs`, which registers a consumer, books, confirms,
+reschedules to a real engine slot and cancels — and shows a second account sees
+none of the first account's bookings.
+
+### Still open
+
+- **Android visual acceptance of the Splash and the Homepage is not claimed.** It
+  needs a device or emulator screenshot; neither the DOM nor the UI hierarchy is
+  evidence.
+- **Product photography is not universal.** The seed links the ORYX-AUTO
+  catalogue; a tenant created afterwards falls back to bundled category art until
+  an administrator uploads an asset.
+- **Merchant mobile parity on a device** has not been re-run.
+
+---
+
 *Written by an AI agent (OpenHands) on behalf of the repository owner.*

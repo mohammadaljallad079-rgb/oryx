@@ -51,6 +51,12 @@ interface LiveBookingsState {
   cancel: (id: string, reason?: string) => Promise<{ ok: boolean; error?: ApiError }>;
   /** Confirm a held booking, so it becomes a real appointment. */
   confirmBooking: (id: string) => Promise<{ ok: boolean; error?: ApiError }>;
+  /** Move a held or confirmed booking to a new time, re-checked by the engine. */
+  reschedule: (
+    id: string,
+    startsAt: string,
+    durationMinutes: number,
+  ) => Promise<{ ok: boolean; error?: ApiError }>;
 }
 
 const LiveBookingsContext = createContext<LiveBookingsState | null>(null);
@@ -178,6 +184,24 @@ export function LiveBookingsProvider({ children }: { children: React.ReactNode }
     [busy, refresh],
   );
 
+  const reschedule = useCallback(
+    async (id: string, startsAt: string, durationMinutes: number) => {
+      if (busy) return { ok: false };
+      setBusy(true);
+      try {
+        await bookingsApi.reschedule(id, startsAt, durationMinutes);
+        await refresh();
+        return { ok: true as const };
+      } catch (err) {
+        setError(err as ApiError);
+        return { ok: false as const, error: err as ApiError };
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, refresh],
+  );
+
   const value = useMemo<LiveBookingsState>(
     () => ({
       mode: isLive ? 'live' : 'demo',
@@ -194,6 +218,7 @@ export function LiveBookingsProvider({ children }: { children: React.ReactNode }
       create,
       cancel,
       confirmBooking,
+      reschedule,
     }),
     [
       isLive,
@@ -210,6 +235,7 @@ export function LiveBookingsProvider({ children }: { children: React.ReactNode }
       create,
       cancel,
       confirmBooking,
+      reschedule,
     ],
   );
 

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  bookingsApi,
   catalogApi,
   getAccessToken,
   getStaffAccessToken,
@@ -237,5 +238,30 @@ describe('plane isolation for the new calls', () => {
     expect(captured[0]?.headers.Authorization).toBeUndefined();
     expect(getAccessToken()).toBe('consumer-token');
     expect(getStaffAccessToken()).toBeNull();
+  });
+});
+
+describe('customer booking reschedule', () => {
+  it('posts the new time to the customer-owned reschedule route', async () => {
+    stubFetch(200, { id: 'b1', status: 'RESCHEDULED' });
+    setAccessToken('consumer-token');
+    setStaffAccessToken('staff-token');
+    await bookingsApi.reschedule('b1', '2026-11-03T14:00:00.000Z', 60);
+    expect(captured[0]?.url).toContain('/customer/bookings/b1/reschedule');
+    expect(captured[0]?.method).toBe('POST');
+    // The consumer plane, never the staff token: a booking belongs to the
+    // signed-in customer and the API scopes it from the bearer.
+    expect(captured[0]?.headers.Authorization).toBe('Bearer consumer-token');
+    expect(JSON.parse(captured[0]?.body as string)).toEqual({
+      startsAt: '2026-11-03T14:00:00.000Z',
+      durationMinutes: 60,
+    });
+  });
+
+  it('encodes the booking id in the path', async () => {
+    stubFetch(200, { id: 'b/2', status: 'RESCHEDULED' });
+    setAccessToken('consumer-token');
+    await bookingsApi.reschedule('b/2', '2026-11-03T14:00:00.000Z', 30);
+    expect(captured[0]?.url).toContain('/customer/bookings/b%2F2/reschedule');
   });
 });

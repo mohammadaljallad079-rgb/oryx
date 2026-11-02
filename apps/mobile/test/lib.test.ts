@@ -9,9 +9,11 @@ import {
   formatDayChip,
   formatMoney,
   localizeDigits,
+  slotLabel,
   toDateParam,
   upcomingDays,
 } from '../src/lib/format';
+import { filterOptions } from '../src/lib/options';
 import { statusColor, themes } from '../src/lib/theme';
 import { SPLASH_MIN_MS } from '../src/lib/splash-timing';
 import {
@@ -346,5 +348,49 @@ describe('React and react-dom stay on one version', () => {
   it('pins react to the version react-native bundles', () => {
     // react-native 0.81.5 bundles react-native-renderer 19.1.0.
     expect(all.react).toBe('19.1.0');
+  });
+});
+
+describe('searchable select options', () => {
+  const MAKES = [
+    { value: 'Toyota', label: 'Toyota', keywords: 'Toyota تويوتا' },
+    { value: 'Mercedes-Benz', label: 'Mercedes-Benz', keywords: 'Mercedes-Benz مرسيدس' },
+    { value: 'Nissan', label: 'Nissan', sublabel: '12', keywords: 'Nissan نيسان' },
+  ];
+
+  it('returns the whole list for an empty or blank query', () => {
+    // A fresh sheet must not hide the option the user came back to change.
+    expect(filterOptions(MAKES, '')).toHaveLength(3);
+    expect(filterOptions(MAKES, '   ')).toHaveLength(3);
+  });
+
+  it('matches case-insensitively on the visible label', () => {
+    expect(filterOptions(MAKES, 'merc').map((o) => o.value)).toEqual(['Mercedes-Benz']);
+    expect(filterOptions(MAKES, 'TOYOTA').map((o) => o.value)).toEqual(['Toyota']);
+  });
+
+  it('matches a keyword that is not in the label', () => {
+    // The Arabic name is a keyword so an Arabic typist finds the make without
+    // switching the app locale.
+    expect(filterOptions(MAKES, 'مرسيدس').map((o) => o.value)).toEqual(['Mercedes-Benz']);
+  });
+
+  it('matches the sublabel', () => {
+    expect(filterOptions(MAKES, '12').map((o) => o.value)).toEqual(['Nissan']);
+  });
+
+  it('returns nothing for a term that matches nothing', () => {
+    expect(filterOptions(MAKES, 'zzz')).toEqual([]);
+  });
+});
+
+describe('booking slot labels', () => {
+  it('labels a slot in UTC, the zone the engine planned the day in', () => {
+    expect(slotLabel('2026-11-04T08:00:00.000Z')).toBe('08:00');
+    expect(slotLabel('2026-11-04T16:30:00.000Z')).toBe('16:30');
+  });
+
+  it('returns the raw value rather than NaN:NaN when unparseable', () => {
+    expect(slotLabel('not-a-date')).toBe('not-a-date');
   });
 });

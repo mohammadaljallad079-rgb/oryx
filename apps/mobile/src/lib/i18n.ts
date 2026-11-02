@@ -197,6 +197,7 @@ const strings: Record<string, Entry> = {
     ar: 'تعذّر رفع الصورة. حاول مرة أخرى.',
     en: 'The photo could not be uploaded. Please try again.',
   },
+  uploadFailedShort: { ar: 'فشل الرفع', en: 'Upload failed' },
   uploading: { ar: 'جارٍ الرفع…', en: 'Uploading…' },
   uploaded: { ar: 'تم الرفع', en: 'Uploaded' },
   uploadHistory: { ar: 'سجل الفحوصات', en: 'Inspection history' },
@@ -408,6 +409,8 @@ const strings: Record<string, Entry> = {
 
   // ------------------------------------------------------------ services
   serviceProviders: { ar: 'مزودو الخدمة', en: 'Service providers' },
+  chooseProvider: { ar: 'اختر مزود الخدمة', en: 'Choose a service provider' },
+  changeProvider: { ar: 'تغيير مزود الخدمة', en: 'Change provider' },
   inspection: { ar: 'الفحص', en: 'Inspection' },
   maintenance: { ar: 'الصيانة', en: 'Maintenance' },
   providerDetails: { ar: 'تفاصيل المزود', en: 'Provider details' },
@@ -426,6 +429,10 @@ const strings: Record<string, Entry> = {
   noSlots: {
     ar: 'لا توجد أوقات متاحة في هذا اليوم.',
     en: 'No slots are available on that day.',
+  },
+  slotUnavailable: {
+    ar: 'هذا الوقت لم يعد متاحًا. اختر وقتًا آخر.',
+    en: 'That time is no longer available. Choose another slot.',
   },
   bookingSummary: { ar: 'ملخص الحجز', en: 'Booking summary' },
   confirmBooking: { ar: 'تأكيد الحجز', en: 'Confirm booking' },
@@ -584,6 +591,13 @@ const strings: Record<string, Entry> = {
   make: { ar: 'الشركة المصنعة', en: 'Make' },
   model: { ar: 'الطراز', en: 'Model' },
   year: { ar: 'سنة الصنع', en: 'Model year' },
+  searchMake: { ar: 'ابحث عن الشركة المصنعة', en: 'Search make' },
+  searchModel: { ar: 'ابحث عن الطراز', en: 'Search model' },
+  searchYear: { ar: 'ابحث عن السنة', en: 'Search year' },
+  rescheduleBooking: { ar: 'تغيير الموعد', en: 'Reschedule' },
+  rescheduled: { ar: 'تم تغيير موعد الحجز.', en: 'The booking was rescheduled.' },
+  newDate: { ar: 'التاريخ الجديد', en: 'New date' },
+  confirmReschedule: { ar: 'تأكيد الموعد الجديد', en: 'Confirm new time' },
   plate: { ar: 'رقم اللوحة', en: 'Plate number' },
   vin: { ar: 'رقم الهيكل (VIN)', en: 'VIN' },
   colour: { ar: 'اللون', en: 'Colour' },

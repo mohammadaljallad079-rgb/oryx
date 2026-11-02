@@ -55,12 +55,20 @@ export default function NewVehicle() {
         value: m.make,
         label: locale === 'ar' ? m.makeAr : m.make,
         sublabel: `${m.models.length}`,
+        // Both scripts are searchable, so an Arabic typist finds "تويوتا" and an
+        // English typist finds "Toyota" without switching the app locale.
+        keywords: `${m.make} ${m.makeAr}`,
       })),
     [makes, locale],
   );
 
   const modelOptions = useMemo(
-    () => (selectedMake?.models ?? []).map((name) => ({ value: name, label: name })),
+    () =>
+      (selectedMake?.models ?? []).map((name) => ({
+        value: name,
+        label: name,
+        keywords: `${selectedMake?.make ?? ''} ${selectedMake?.makeAr ?? ''}`,
+      })),
     [selectedMake],
   );
 
@@ -129,6 +137,9 @@ export default function NewVehicle() {
             onSelect={onSelectMake}
             disabled={catalogue.loading || makeOptions.length === 0}
             testID="vehicle-make"
+            searchable
+            searchPlaceholder={t('searchMake')}
+            emptyMessage={t('noResults')}
           />
           <Select
             label={t('model')}
@@ -138,6 +149,9 @@ export default function NewVehicle() {
             onSelect={setModel}
             disabled={!make || modelOptions.length === 0}
             testID="vehicle-model"
+            searchable
+            searchPlaceholder={t('searchModel')}
+            emptyMessage={t('noResults')}
           />
           <Select
             label={t('year')}
@@ -147,6 +161,9 @@ export default function NewVehicle() {
             onSelect={setYear}
             disabled={!make}
             testID="vehicle-year"
+            searchable
+            searchPlaceholder={t('searchYear')}
+            emptyMessage={t('noResults')}
           />
           <Field label={t('plate')} value={plate} onChangeText={setPlate} placeholder="1234 ABC" testID="vehicle-plate" />
           <Field label={t('vin')} value={vin} onChangeText={setVin} testID="vehicle-vin" />

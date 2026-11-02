@@ -738,7 +738,27 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   declared type alone will assert the wrong thing.
 - **A 1x1 PNG is refused by the image pipeline.** Smoke tests need a real image;
   `scripts/exec10-smoke.sh` generates an 80x80 RGB PNG for exactly this reason.
-
+- **A booking slot must be labelled in UTC, the zone the engine planned it in.**
+  `assertSlotBookable` plans a day from UTC midnight and returns each slot as an
+  instant, so `slotLabel()` in `apps/mobile/src/lib/format.ts` formats with
+  `getUTCHours()`. A local-time label shows a time the workshop never offered
+  whenever the device is off UTC. Four copies of that formatting were collapsed
+  into the one helper; use it rather than inlining the padStart pair again.
+- **Rescheduling re-checks availability with `excludeSlotId`.** Without that
+  exclusion a booking collides with its own row and every move to a slot in the
+  same window is refused. A unique violation on the new time must surface as
+  `BOOKING_SLOT_UNAVAILABLE` (409), not a generic failure.
+- **A failed upload must not keep reading "uploading".** `sensage/new.tsx` gives
+  each shot its own `uploadState` (`pending`/`failed`) so a failed send is marked
+  and offers a retry. A single screen-level `uploading` flag leaves a shot that
+  never landed looking like work in progress.
+- **A searchable `Select` filters on label, sublabel and `keywords`.** The match
+  lives in `filterOptions` (`apps/mobile/src/lib/options.ts`) so it is unit-tested
+  directly. Pass both scripts as keywords — `keywords: \`${make} ${makeAr}\`` — so
+  an Arabic term finds an English label without switching the app locale.
+- **The e2e suites need `DATABASE_URL` pointed at `oryx_test`.** The API default
+  is `oryx_dev`; running `test:e2e` against the dev database mutates seeded data.
+  Create, migrate and seed `oryx_test` first, then export the URL for the run.
 
 ### Execution 11 gotchas
 

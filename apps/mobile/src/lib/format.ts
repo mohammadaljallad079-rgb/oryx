@@ -47,6 +47,21 @@ export function formatTime(iso: string): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+/**
+ * `HH:MM` in UTC for a booking slot.
+ *
+ * The availability engine plans a day from UTC midnight and returns each slot as
+ * an instant, so a slot must be labelled in the same zone it was computed in. A
+ * local-time label would show a time the workshop never offered whenever the
+ * device is not on UTC. An unparseable value is returned unchanged rather than
+ * rendering "NaN:NaN".
+ */
+export function slotLabel(startsAt: string): string {
+  const d = new Date(startsAt);
+  if (Number.isNaN(d.getTime())) return startsAt;
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+}
+
 /** `YYYY-MM-DD` in local time, the format the availability API expects. */
 export function toDateParam(date: Date): string {
   const year = date.getFullYear();

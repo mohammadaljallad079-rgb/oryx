@@ -13,7 +13,7 @@ import { useRouter } from 'expo-router';
 import { useApp } from '../lib/app-context';
 import { photoSmall } from '../lib/assets';
 import { brand, radius, space, typography } from '../lib/theme';
-import { discountPercent, formatAmount, formatDate, formatMoney, localizeDigits } from '../lib/format';
+import { discountPercent, formatAmount, formatDate, formatMoney, localizeDigits, slotLabel } from '../lib/format';
 import type { BookingSummary as LiveBookingSummary } from '../lib/api';
 import type {
   DemoBooking,
@@ -254,9 +254,7 @@ export function LiveBookingCard({
   const { theme, locale, t } = useApp();
   const when = new Date(booking.startsAt);
   const dateLabel = Number.isNaN(when.getTime()) ? booking.startsAt : when.toISOString().slice(0, 10);
-  const timeLabel = Number.isNaN(when.getTime())
-    ? ''
-    : `${String(when.getUTCHours()).padStart(2, '0')}:${String(when.getUTCMinutes()).padStart(2, '0')}`;
+  const timeLabel = Number.isNaN(when.getTime()) ? '' : slotLabel(booking.startsAt);
   return (
     <Card onPress={onPress} testID={`live-booking-card-${booking.id}`}>
       <View style={styles.titleRow}>

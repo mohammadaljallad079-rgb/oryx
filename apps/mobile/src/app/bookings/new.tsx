@@ -22,10 +22,11 @@ import {
   Heading,
   Screen,
   SectionLabel,
+  Select,
   StateView,
 } from '../../components/ui';
 import { space, typography } from '../../lib/theme';
-import { formatDayChip, formatMoney, localizeDigits, toDateParam, upcomingDays } from '../../lib/format';
+import { formatDayChip, formatMoney, localizeDigits, slotLabel, toDateParam, upcomingDays } from '../../lib/format';
 
 /**
  * The booking wizard.
@@ -126,16 +127,7 @@ export default function NewBooking() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLive, date, serviceName]);
 
-  const liveSlotLabels = useMemo(
-    () =>
-      live.slots.map((slot) => {
-        const d = new Date(slot.startsAt);
-        return Number.isNaN(d.getTime())
-          ? slot.startsAt
-          : `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
-      }),
-    [live.slots],
-  );
+  const liveSlotLabels = useMemo(() => live.slots.map((slot) => slotLabel(slot.startsAt)), [live.slots]);
 
   const confirm = async () => {
     if (!isLive) {
@@ -211,28 +203,70 @@ export default function NewBooking() {
           <SectionLabel>{t('serviceProviders')}</SectionLabel>
           {providers.loading ? (
             <StateView kind="loading" />
+          ) : (providers.data ?? []).length === 0 ? (
+            <StateView kind="empty" message={t('noResults')} />
           ) : (
-            (providers.data ?? []).slice(0, 8).map((p) => (
-              <Card
-                key={p.id}
-                testID={`booking-provider-${p.id}`}
-                onPress={() => {
-                  setProviderId(p.id);
+            <>
+              {/* A searchable picker over the whole directory, because the card
+                  list below is deliberately bounded and a customer arriving with
+                  a workshop in mind should not have to page through it. */}
+              <Select
+                label={t('serviceProviders')}
+                testID="booking-provider-select"
+                value={providerId}
+                placeholder={t('chooseProvider')}
+                searchable
+                searchPlaceholder={t('search')}
+                emptyMessage={t('noResults')}
+                options={(providers.data ?? []).map((p) => ({
+                  value: p.id,
+                  label: locale === 'ar' ? p.nameAr : p.nameEn,
+                  sublabel: `${localizeDigits(p.services.length, locale)} ${t('servicesAndPrices')}`,
+                  keywords: `${p.nameEn} ${p.nameAr}`,
+                }))}
+                onSelect={(id) => {
+                  setProviderId(id);
                   setServiceName('');
                 }}
-              >
-                <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.body }}>
-                  {locale === 'ar' ? p.nameAr : p.nameEn}
-                </Text>
-                <Body size="caption" muted>
-                  {localizeDigits(p.services.length, locale)} {t('servicesAndPrices')}
-                </Body>
-              </Card>
-            ))
+              />
+              {(providers.data ?? []).slice(0, 8).map((p) => (
+                <Card
+                  key={p.id}
+                  testID={`booking-provider-${p.id}`}
+                  onPress={() => {
+                    setProviderId(p.id);
+                    setServiceName('');
+                  }}
+                >
+                  <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.body }}>
+                    {locale === 'ar' ? p.nameAr : p.nameEn}
+                  </Text>
+                  <Body size="caption" muted>
+                    {localizeDigits(p.services.length, locale)} {t('servicesAndPrices')}
+                  </Body>
+                </Card>
+              ))}
+            </>
           )}
         </>
       ) : (
         <>
+          <Card>
+            <SectionLabel>{t('serviceProviders')}</SectionLabel>
+            <DetailRow label={t('chooseProvider')} value={locale === 'ar' ? provider.nameAr : provider.nameEn} />
+            <View style={{ height: space.sm }} />
+            <Button
+              testID="booking-change-provider"
+              title={t('changeProvider')}
+              variant="secondary"
+              onPress={() => {
+                setProviderId('');
+                setServiceName('');
+                setTime('');
+              }}
+            />
+          </Card>
+
           <Card>
             <SectionLabel>{t('chooseService')}</SectionLabel>
             <View style={[styles.row, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>

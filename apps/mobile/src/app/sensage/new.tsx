@@ -47,6 +47,12 @@ interface Shot {
   source: 'camera' | 'gallery';
   /** Set once the shot has been uploaded to the backend, in a live session. */
   uploadedId?: string;
+  /**
+   * The upload's own outcome. `pending` while in flight, `failed` when it did
+   * not land — a failed upload must not keep reading "uploading", or the screen
+   * would claim work that is not happening.
+   */
+  uploadState?: 'pending' | 'failed';
 }
 
 /** A live vehicle row, shaped for `VehicleCard` (which is typed for a demo vehicle). */
@@ -215,6 +221,9 @@ export default function NewSensage() {
   /** Uploads one shot to the backend and records its id on the shot. */
   async function uploadShot(shot: Shot) {
     setUploading(true);
+    setShots((prev) =>
+      prev.map((s) => (s.uri === shot.uri ? { ...s, uploadState: 'pending' } : s)),
+    );
     try {
       const file: UploadFile = {
         uri: shot.uri,
@@ -225,7 +234,11 @@ export default function NewSensage() {
         vehicleId: vehicleId || undefined,
         caption: shot.source === 'camera' ? t('takePhoto') : t('chooseFromGallery'),
       });
-      setShots((prev) => prev.map((s) => (s.uri === shot.uri ? { ...s, uploadedId: uploaded.id } : s)));
+      setShots((prev) =>
+        prev.map((s) =>
+          s.uri === shot.uri ? { ...s, uploadedId: uploaded.id, uploadState: undefined } : s,
+        ),
+      );
       setUploadedCount((n) => n + 1);
     } catch (err) {
       const key =
@@ -235,6 +248,11 @@ export default function NewSensage() {
             ? 'validationFailed'
             : 'uploadFailed';
       setNotice(t(key as never));
+      // The shot stays on screen, marked failed, so the customer can retry it
+      // rather than losing the photograph or reading a false "uploading".
+      setShots((prev) =>
+        prev.map((s) => (s.uri === shot.uri ? { ...s, uploadState: 'failed' } : s)),
+      );
     } finally {
       setUploading(false);
     }
@@ -342,16 +360,32 @@ export default function NewSensage() {
                     {shot.source === 'camera' ? t('takePhoto') : t('chooseFromGallery')}
                   </Text>
                   {isLive ? (
-                    <Text
-                      testID={`sensage-upload-${shot.source}`}
-                      style={{
-                        color: shot.uploadedId ? theme.gold : theme.textFaint,
-                        fontSize: typography.caption,
-                        marginTop: 2,
-                      }}
-                    >
-                      {shot.uploadedId ? `✓ ${t('uploaded')}` : t('uploading')}
-                    </Text>
+                    shot.uploadedId ? (
+                      <Text
+                        testID={`sensage-upload-${shot.source}`}
+                        style={{ color: theme.gold, fontSize: typography.caption, marginTop: 2 }}
+                      >
+                        {`✓ ${t('uploaded')}`}
+                      </Text>
+                    ) : shot.uploadState === 'failed' ? (
+                      <Pressable
+                        testID={`sensage-retry-${shot.source}`}
+                        accessibilityRole="button"
+                        onPress={() => void uploadShot(shot)}
+                        style={{ marginTop: 2 }}
+                      >
+                        <Text style={{ color: theme.danger, fontSize: typography.caption, fontWeight: '700' }}>
+                          {`${t('uploadFailedShort')} · ${t('retry')}`}
+                        </Text>
+                      </Pressable>
+                    ) : (
+                      <Text
+                        testID={`sensage-upload-${shot.source}`}
+                        style={{ color: theme.textFaint, fontSize: typography.caption, marginTop: 2 }}
+                      >
+                        {t('uploading')}
+                      </Text>
+                    )
                   ) : null}
                   <Pressable
                     testID={`sensage-remove-${shot.source}`}

@@ -705,6 +705,59 @@ describe('Execution 10 — product images & inspection uploads (e2e)', () => {
       expect([409]).toContain(res.status);
     });
 
+    it('reschedules a confirmed booking to a new time', async () => {
+      const res = await call<{ id: string; status: string; startsAt: string }>(
+        ctx.base,
+        `/customer/bookings/${bookingId}/reschedule`,
+        { method: 'POST', token: tokenA, body: { startsAt: instant(3, 14), durationMinutes: 60 } },
+      );
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('RESCHEDULED');
+      expect(new Date(res.body.startsAt).getUTCHours()).toBe(14);
+
+      // The detail read reflects the move.
+      const detail = await call<{ startsAt: string }>(ctx.base, `/customer/bookings/${bookingId}`, {
+        token: tokenA,
+      });
+      expect(new Date(detail.body.startsAt).getUTCHours()).toBe(14);
+    });
+
+    it('refuses another customer rescheduling this booking', async () => {
+      const res = await call(ctx.base, `/customer/bookings/${bookingId}/reschedule`, {
+        method: 'POST',
+        token: tokenB,
+        body: { startsAt: instant(3, 15), durationMinutes: 60 },
+      });
+      expect(res.status).toBe(404);
+    });
+
+    it('refuses a reschedule into an occupied slot', async () => {
+      const other = await call<{ id: string }>(ctx.base, '/customer/bookings', {
+        method: 'POST',
+        token: tokenB,
+        body: {
+          bookingType: 'PROVIDER_SERVICE',
+          startsAt: instant(3, 16),
+          durationMinutes: 60,
+          resourceId,
+        },
+      });
+      expect(other.status).toBe(201);
+
+      const res = await call(ctx.base, `/customer/bookings/${bookingId}/reschedule`, {
+        method: 'POST',
+        token: tokenA,
+        body: { startsAt: instant(3, 16), durationMinutes: 60 },
+      });
+      expect(res.status).toBe(409);
+
+      await call(ctx.base, `/customer/bookings/${other.body.id}/cancel`, {
+        method: 'POST',
+        token: tokenB,
+        body: { reason: 'E10 cleanup' },
+      });
+    });
+
     it('cancels the customer booking and releases the slot', async () => {
       const res = await call<{ status: string }>(
         ctx.base,

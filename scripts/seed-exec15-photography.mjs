@@ -199,6 +199,19 @@ async function main() {
   console.log('\nProviders:');
   const providers = await linkProviders(assetCache);
 
+  // The product image route needs `inventory.product.manage`, which the company
+  // administrator holds but the super admin does not; the media upload needs
+  // `platform.cms.manage`, which only the super admin holds. The catalogue
+  // photographs are therefore uploaded to the library first, while the super
+  // admin token is still active, so the product pass can read the asset bytes
+  // without needing to upload.
+  const productPhotoKeys = new Set(Object.values(PART_PHOTO_RULES).map((rule) => rule.photo));
+  console.log('\nMedia library:');
+  for (const photoKey of productPhotoKeys) {
+    await assetFor(photoKey, assetCache);
+  }
+  console.log(`  assets ready: ${productPhotoKeys.size}`);
+
   // Product photography belongs to a tenant, so the run switches to that
   // tenant's company administrator and its own company id.
   console.log('\nProducts (ORYX-AUTO):');
