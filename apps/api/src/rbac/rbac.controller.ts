@@ -29,6 +29,7 @@ import {
   UpdateUserStatusDto,
 } from './rbac.dto';
 import { PrismaService } from '../common/prisma.service';
+import { badRequest, ERROR_CODES, forbidden } from '../common/errors';
 import { DEFAULT_COMPANY_ROLE_TEMPLATES } from '../common/role-templates';
 
 interface RequestLike {
@@ -53,13 +54,17 @@ function resolveCompanyId(principal: RequestPrincipal, routeCompanyId?: string):
   const own = principal.company?.companyId;
   if (principal.kind === 'COMPANY') {
     if (routeCompanyId && routeCompanyId !== own) {
-      // PermissionsGuard/guard already rejects, but keep a defence in depth.
-      throw new Error('cross-tenant route resolution');
+      // PermissionsGuard already rejects, but keep a defence in depth. This must
+      // be an HTTP exception: a plain Error surfaced as a 500 for what is a
+      // caller-scoping mistake.
+      throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'Cross-tenant access is not permitted.');
     }
-    if (!own) throw new Error('no company scope');
+    if (!own) throw forbidden(ERROR_CODES.FORBIDDEN_PERMISSION, 'No company scope is selected.');
     return own;
   }
-  if (!routeCompanyId) throw new Error('platform requests must specify a company');
+  if (!routeCompanyId) {
+    throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'A companyId is required for a platform request.');
+  }
   return routeCompanyId;
 }
 
