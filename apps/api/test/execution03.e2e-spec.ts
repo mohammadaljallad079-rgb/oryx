@@ -171,6 +171,16 @@ describe('ORYX Execution 03 (e2e)', () => {
       // Basic 5000.00 + 25% housing (1250.00) + overtime => gross > 6250.00
       expect(run.body.grossMinor).toBeGreaterThan(625000);
       expect(run.body.netMinor).toBeLessThanOrEqual(run.body.grossMinor);
+
+      // Overtime is priced at the hourly rate, not 1/100 of it. 120 minutes is
+      // 2.00 h (200 hundredths); basic 5000.00 gives an hourly rate of 20.83,
+      // so the line is 41.66 — not the 0.42 the quantity-scaled helper produced.
+      const slips = await erp<{ items: Array<{ employeeId: string; lines: Array<{ code: string; amountMinor: number }> }> }>(
+        `/hr/payroll-runs/${run.body.id}/payslips`,
+      );
+      const slip = slips.body.items.find((s) => s.employeeId === employeeId);
+      const overtime = slip?.lines.find((l) => l.code === 'OVERTIME');
+      expect(overtime?.amountMinor).toBe(4166);
     });
 
     it('posts payroll to the ledger exactly once (atomic and idempotent)', async () => {
@@ -524,6 +534,41 @@ describe('ORYX Execution 03 (e2e)', () => {
       const invoice = await erp<{ invoiceNumber: string; totalMinor: number }>(`/automotive/job-cards/${jobId}/invoice`, { method: 'POST', body: {} });
       expect(invoice.status).toBe(201);
       expect(invoice.body.totalMinor).toBe(46000);
+    });
+
+    it('prices labour hours at hundredths scale when invoicing a job card', async () => {
+      const job = await erp<{ id: string; jobNumber: string }>('/automotive/job-cards', {
+        method: 'POST',
+        body: { vehicleId, odometer: 52000, complaint: 'Front pads worn' },
+      });
+      expect(job.status).toBe(201);
+      const jobId = job.body.id;
+
+      // 2.5 h at 25.000 BHD/h must be 62.500 BHD (62500 fils), not the 0.625 BHD
+      // the quantity-scaled helper produced. `hours` is hundredths (250).
+      const labour = await erp<{ items: Array<{ amountMinor: number }> }>(`/automotive/job-cards/${jobId}/labour`, {
+        method: 'POST',
+        body: { operations: [{ description: 'Replace front pads', hours: 250, rateMinor: 25000 }] },
+      });
+      expect(labour.status).toBe(201);
+      expect(labour.body.items[0].amountMinor).toBe(62500);
+
+      // The estimate line carries the same 2.5 h rescaled onto quantity units
+      // (25000 in 10^4), which must also price to 62.500 BHD.
+      const estimate = await erp<{ id: string; subtotalMinor: number; totalMinor: number }>(
+        `/automotive/job-cards/${jobId}/estimates`,
+        { method: 'POST', body: { lines: [{ type: 'LABOUR', description: 'Replace front pads', quantity: 25000, unitPriceMinor: 25000, taxPercentBp: 0 }] } },
+      );
+      expect(estimate.status).toBe(201);
+      expect(estimate.body.subtotalMinor).toBe(62500);
+      expect(estimate.body.totalMinor).toBe(62500);
+      await erp(`/automotive/estimates/${estimate.body.id}/approve`, { method: 'POST', body: {} });
+
+      await erp(`/automotive/job-cards/${jobId}`, { method: 'PATCH', body: { status: 'IN_PROGRESS' } });
+      await erp(`/automotive/job-cards/${jobId}`, { method: 'PATCH', body: { status: 'COMPLETED' } });
+      const invoice = await erp<{ totalMinor: number }>(`/automotive/job-cards/${jobId}/invoice`, { method: 'POST', body: {} });
+      expect(invoice.status).toBe(201);
+      expect(invoice.body.totalMinor).toBe(62500);
     });
 
     it('keeps the shared ledger and stock balanced after the workshop flow', async () => {

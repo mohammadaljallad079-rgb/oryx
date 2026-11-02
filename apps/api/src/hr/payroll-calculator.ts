@@ -1,11 +1,11 @@
-import { basisPointsOfMinor, lineAmountMinor, sumMinor } from '@oryx/shared';
+import { basisPointsOfMinor, hoursAmountMinor, sumMinor } from '@oryx/shared';
 
 /**
  * Payroll calculation.
  *
  * A payslip is derived from the employee's effective salary structure and its
  * components, all in integer minor units. Hours and leave days are hundredths
- * of a unit, so overtime is `lineAmountMinor(hours, hourlyRateMinor)` with
+ * of a unit, so overtime is `hoursAmountMinor(hours, hourlyRateMinor)` with
  * `hours` scaled by 100 and the hourly rate derived from the monthly basic.
  *
  * The calculation is pure: the same structure and the same inputs always yield
@@ -82,7 +82,7 @@ export function computePayslip(input: {
 
   // Overtime is an earning; the multiplier is in basis points (15000 = 150%).
   if (input.overtimeHours && input.overtimeHours > 0) {
-    const base = lineAmountMinor(input.overtimeHours, hourlyRateMinor(input.basicMinor));
+    const base = hoursAmountMinor(input.overtimeHours, hourlyRateMinor(input.basicMinor));
     const multiplier = input.overtimeMultiplierBp ?? 10000;
     lines.push({
       type: 'ALLOWANCE',
@@ -102,7 +102,7 @@ export function computePayslip(input: {
       code: 'UNPAID_LEAVE',
       nameEn: 'Unpaid leave',
       nameAr: 'إجازة غير مدفوعة',
-      amountMinor: lineAmountMinor(input.unpaidLeaveDays, dailyRate),
+      amountMinor: hoursAmountMinor(input.unpaidLeaveDays, dailyRate),
       sortOrder: 9100,
     });
   }

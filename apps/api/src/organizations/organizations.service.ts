@@ -525,6 +525,8 @@ export class OrganizationsService {
     nameEn: string;
     nameAr: string;
     city: string | null;
+    addressLine: string | null;
+    phone: string | null;
     countryCode: string | null;
     timezone: string;
     isActive: boolean;
@@ -540,6 +542,8 @@ export class OrganizationsService {
       nameEn: b.nameEn,
       nameAr: b.nameAr,
       city: b.city,
+      addressLine: b.addressLine,
+      phone: b.phone,
       countryCode: b.countryCode,
       timezone: b.timezone,
       isActive: b.isActive,

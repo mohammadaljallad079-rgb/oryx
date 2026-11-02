@@ -3,12 +3,16 @@ import {
   addMinor,
   allocateMinor,
   basisPointsOfMinor,
+  fromHours,
   fromMinor,
   fromQuantity,
+  hoursAmountMinor,
+  hoursToQuantity,
   isBalanced,
   lineAmountMinor,
   subMinor,
   sumMinor,
+  toHours,
   toMinor,
   toQuantity,
 } from '../src/money';
@@ -56,6 +60,20 @@ describe('money — exact minor-unit arithmetic', () => {
     // 1.3333 units at 3.00 = 3.9999 -> 4.00 rounded half-up once
     expect(lineAmountMinor(toQuantity('1.3333'), toMinor('3.00'))).toBe(400);
     expect(fromQuantity(toQuantity('2.5'))).toBe('2.5000');
+  });
+
+  it('prices labour hours at hundredths scale, not quantity scale', () => {
+    // 2.5 h at 25.00/h = 62.50; using lineAmountMinor would yield 0.62.
+    expect(hoursAmountMinor(toHours('2.5'), toMinor('25.00'))).toBe(6250);
+    expect(lineAmountMinor(toHours('2.5'), toMinor('25.00'))).toBe(63);
+    expect(hoursAmountMinor(toHours(1), toMinor('40.00'))).toBe(4000);
+    expect(fromHours(toHours('2.5'))).toBe('2.50');
+  });
+
+  it('rescales labour hours onto quantity units for invoicing', () => {
+    // 2.5 h becomes 25000 in 10^4 quantity units, so a 25.00 rate yields 62.50.
+    expect(hoursToQuantity(toHours('2.5'))).toBe(25000);
+    expect(lineAmountMinor(hoursToQuantity(toHours('2.5')), toMinor('25.00'))).toBe(6250);
   });
 
   it('applies basis-point percentages exactly', () => {

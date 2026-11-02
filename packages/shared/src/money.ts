@@ -18,6 +18,14 @@ import { currencyScale, DEFAULT_CURRENCY } from './currency';
 export const QUANTITY_SCALE = 4;
 const QUANTITY_FACTOR = 10n ** BigInt(QUANTITY_SCALE);
 
+/**
+ * Decimal places a labour duration carries. The HR and workshop data model
+ * stores hours in hundredths (`250` = 2.50 h), which is a different scale from
+ * `QUANTITY_SCALE`, so a duration must never be priced with `lineAmountMinor`.
+ */
+export const HOURS_SCALE = 2;
+const HOURS_FACTOR = 10n ** BigInt(HOURS_SCALE);
+
 export class MoneyError extends Error {
   constructor(message: string) {
     super(message);
@@ -124,6 +132,35 @@ export function lineAmountMinor(quantity: number, unitPriceMinor: number): numbe
     throw new MoneyError('lineAmountMinor requires integer operands.');
   }
   return assertSafeInteger(divRoundHalfUp(BigInt(quantity) * BigInt(unitPriceMinor), QUANTITY_FACTOR), 'Line amount');
+}
+
+/** Parse a labour duration ("2.5") into hundredths of an hour. */
+export function toHours(value: string | number): number {
+  return toMinor(value, HOURS_SCALE);
+}
+
+/** Render hundredths of an hour back to a decimal string. */
+export function fromHours(value: number): string {
+  return fromMinor(value, HOURS_SCALE);
+}
+
+/**
+ * Labour amount = hours × hourly rate, rounded half-up exactly once.
+ * `hours` is scaled by `HOURS_SCALE` (hundredths), `rateMinor` is minor units
+ * per hour. Using `lineAmountMinor` here would divide by 10^4 and under-price
+ * the labour by a factor of 100.
+ */
+export function hoursAmountMinor(hours: number, rateMinor: number): number {
+  if (!Number.isInteger(hours) || !Number.isInteger(rateMinor)) {
+    throw new MoneyError('hoursAmountMinor requires integer operands.');
+  }
+  return assertSafeInteger(divRoundHalfUp(BigInt(hours) * BigInt(rateMinor), HOURS_FACTOR), 'Labour amount');
+}
+
+/** Rescale hundredths of an hour onto `QUANTITY_SCALE` units. */
+export function hoursToQuantity(hours: number): number {
+  if (!Number.isInteger(hours)) throw new MoneyError('hoursToQuantity requires integer operands.');
+  return assertSafeInteger(BigInt(hours) * 10n ** BigInt(QUANTITY_SCALE - HOURS_SCALE), 'Hours as quantity');
 }
 
 /**

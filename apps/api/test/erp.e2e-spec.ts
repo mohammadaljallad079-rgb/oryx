@@ -319,7 +319,7 @@ describe('ORYX ERP core (e2e)', () => {
     });
 
     it('refuses to issue more stock than is on hand', async () => {
-      const res = await erp<{ code: string }>('/inventory/movements', {
+      const res = await erp<{ code: string; message?: string; details?: { onHand: number; requested: number } }>('/inventory/movements', {
         method: 'POST',
         body: {
           warehouseId,
@@ -331,6 +331,12 @@ describe('ORYX ERP core (e2e)', () => {
       });
       expect(res.status).toBe(403);
       expect(res.body.code).toBe('inventory.insufficient_stock');
+      // `details` carries raw 10^4-scaled quantities (matching `onHand`), while
+      // the human message shows whole units. `requested` is the magnitude that
+      // was asked for, never the negative movement the ledger would apply.
+      expect(res.body.details?.requested).toBe(999_000_000);
+      expect(res.body.details?.onHand).toBeGreaterThanOrEqual(0);
+      expect(res.body.message).toContain('requested 99900');
     });
 
     it('keeps stock non-negative under concurrent issues of the same SKU', async () => {

@@ -141,7 +141,7 @@ export class InventoryService {
       throw forbidden(
         ERROR_CODES.INSUFFICIENT_STOCK,
         `Insufficient stock for ${product.sku}: on hand ${level.quantity / QTY_FACTOR}, requested ${-input.quantity / QTY_FACTOR}.`,
-        { onHand: level.quantity, requested: input.quantity },
+        { onHand: level.quantity, requested: -input.quantity },
       );
     }
 

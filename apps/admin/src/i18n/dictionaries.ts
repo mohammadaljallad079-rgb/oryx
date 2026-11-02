@@ -370,6 +370,11 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     'branches.limit': 'Plan branch limit',
     'branches.usersAssigned': 'Users assigned',
     'branches.deactivate': 'Deactivate',
+    'branches.reactivate': 'Reactivate',
+    'branches.edit': 'Edit',
+    'branches.editTitle': 'Edit branch',
+    'branches.phone': 'Phone',
+    'branches.addressLine': 'Address',
 
     'users.title': 'Users & Permissions',
     'users.subtitle': 'Company users, roles, branch scope and effective permissions.',
@@ -1438,6 +1443,11 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     'branches.limit': 'حد الفروع في الباقة',
     'branches.usersAssigned': 'المستخدمون المعيّنون',
     'branches.deactivate': 'تعطيل',
+    'branches.reactivate': 'إعادة التنشيط',
+    'branches.edit': 'تعديل',
+    'branches.editTitle': 'تعديل الفرع',
+    'branches.phone': 'الهاتف',
+    'branches.addressLine': 'العنوان',
 
     'users.title': 'المستخدمون والصلاحيات',
     'users.subtitle': 'مستخدمو الشركة والأدوار ونطاق الفروع والصلاحيات الفعلية.',

@@ -258,6 +258,8 @@ export interface BranchDto {
   nameEn: string;
   nameAr: string;
   city: string | null;
+  addressLine: string | null;
+  phone: string | null;
   countryCode: string | null;
   timezone: string;
   isActive: boolean;

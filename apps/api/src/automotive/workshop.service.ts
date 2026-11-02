@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { lineAmountMinor, sumMinor } from '@oryx/shared';
+import { hoursAmountMinor, hoursToQuantity, sumMinor } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccountingPostingService } from '../common/accounting-posting.service';
@@ -249,7 +249,7 @@ export class WorkshopService {
       for (const [i, op] of dto.operations.entries()) {
         created.push(
           await tx.labourOperation.create({
-            data: { companyId, jobCardId: id, description: op.description, hours: op.hours, rateMinor: op.rateMinor, amountMinor: lineAmountMinor(op.hours, op.rateMinor), sortOrder: count + i },
+            data: { companyId, jobCardId: id, description: op.description, hours: op.hours, rateMinor: op.rateMinor, amountMinor: hoursAmountMinor(op.hours, op.rateMinor), sortOrder: count + i },
           }),
         );
       }
@@ -443,7 +443,9 @@ export class WorkshopService {
         }
       } else {
         for (const op of job.labour) {
-          lines.push({ productId: null, description: op.description, quantity: op.hours, unitPriceMinor: op.rateMinor, taxPercentBp: 0 });
+          // `op.hours` is hundredths of an hour; invoice lines carry quantities
+          // scaled by QUANTITY_SCALE (10^4), so rescale before pricing.
+          lines.push({ productId: null, description: op.description, quantity: hoursToQuantity(op.hours), unitPriceMinor: op.rateMinor, taxPercentBp: 0 });
         }
       }
       if (lines.length === 0) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'The job card has no billable lines.');
