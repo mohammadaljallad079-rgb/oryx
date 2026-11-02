@@ -10,6 +10,7 @@ import { computeDocumentTotals, type PricedLineInput } from '../common/document-
 import { badRequest, conflict, ERROR_CODES, forbidden, notFound } from '../common/errors';
 import type { ActorContext } from '../organizations/organizations.service';
 import type { RequestPrincipal } from '../auth/auth.decorators';
+import { resolveDocumentDate } from './sales.dto';
 import type {
   ConvertQuotationDto,
   CreateCashierSessionDto,
@@ -207,7 +208,7 @@ export class SalesService {
           quoteNumber,
           customerId: dto.customerId,
           status: 'DRAFT',
-          issueDate: new Date(dto.issueDate),
+          issueDate: new Date(resolveDocumentDate(dto)!),
           validUntil: dto.validUntil ? new Date(dto.validUntil) : null,
           subtotalMinor: totals.subtotalMinor,
           discountMinor: totals.discountMinor,
@@ -325,7 +326,7 @@ export class SalesService {
           customerId: dto.customerId,
           warehouseId: dto.warehouseId ?? null,
           status: dto.confirm ? 'CONFIRMED' : 'DRAFT',
-          orderDate: new Date(dto.orderDate),
+          orderDate: new Date(resolveDocumentDate(dto)!),
           subtotalMinor: totals.subtotalMinor,
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
@@ -456,7 +457,7 @@ export class SalesService {
       }
 
       const invoiceNumber = await this.sequences.next(tx, companyId, 'salesInvoice');
-      const invoiceDate = new Date(dto.invoiceDate);
+      const invoiceDate = new Date(resolveDocumentDate(dto)!);
       const dueDate = dto.dueDate
         ? new Date(dto.dueDate)
         : await computeDueDate(tx, companyId, customerId!, invoiceDate);
@@ -700,7 +701,7 @@ export class SalesService {
 
       const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })));
       const creditNoteNumber = await this.sequences.next(tx, companyId, 'creditNote');
-      const issueDate = new Date(dto.issueDate);
+      const issueDate = new Date(resolveDocumentDate(dto)!);
 
       const note = await tx.creditNote.create({
         data: {

@@ -55,7 +55,7 @@ export default function InventoryPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="inventory-page">
+    <div className="flex flex-col gap-4" data-testid="inventory-page">
       <SectionHeader
         title={t('nav.warehouses_inventory')}
         subtitle={t('erp.inventory.subtitle')}

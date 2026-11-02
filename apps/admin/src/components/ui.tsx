@@ -195,9 +195,20 @@ export function Skeleton({ height = 16, width = '100%' }: { height?: number; wid
   return <div className="oryx-skeleton" style={{ height, width }} />;
 }
 
-export function TableShell({ children }: { children: ReactNode }) {
+export function TableShell({ children, label }: { children: ReactNode; label?: string }) {
   return (
-    <div className="overflow-x-auto">
+    // The scroll container is the shell itself rather than a bare wrapper: it
+    // keeps the horizontal scrollbar inside the card and lets a narrow viewport
+    // pan the table instead of clipping its rightmost columns. `role="region"`
+    // plus a label keeps the scrollable area reachable by keyboard and
+    // announced by a screen reader.
+    <div
+      className="oryx-table-scroll"
+      data-testid="table-scroll"
+      role="region"
+      aria-label={label}
+      tabIndex={0}
+    >
       <table className="oryx-table">{children}</table>
     </div>
   );

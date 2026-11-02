@@ -37,7 +37,7 @@ export default function SparePartsPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="spare-parts-page">
+    <div className="flex flex-col gap-4" data-testid="spare-parts-page">
       <SectionHeader
         title={t('nav.spare_parts')}
         subtitle={t('erp.parts.subtitle')}

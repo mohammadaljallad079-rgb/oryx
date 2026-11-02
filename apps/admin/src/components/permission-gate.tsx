@@ -31,7 +31,7 @@ export function PermissionGate({
   if (allowed) return <>{children}</>;
 
   return (
-    <div className="flex flex-col gap-5" data-testid="permission-denied">
+    <div className="flex flex-col gap-4" data-testid="permission-denied">
       <SectionHeader title={t('error.forbidden')} />
       <Card className="p-6">
         <div className="flex flex-col items-start gap-4 sm:flex-row">

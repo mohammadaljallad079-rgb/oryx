@@ -50,7 +50,7 @@ function UsersInner() {
 
   if (!scopeCompanyId) {
     return (
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-4">
         <SectionHeader title={t('users.title')} subtitle={t('users.subtitle')} />
         <Card>
           <EmptyState title={t('common.selectCompany')} />
@@ -62,7 +62,7 @@ function UsersInner() {
   const canInvite = can('company.user.invite') || can('platform.user.manage');
 
   return (
-    <div className="flex flex-col gap-5" data-testid="users-page">
+    <div className="flex flex-col gap-4" data-testid="users-page">
       <SectionHeader
         title={t('users.title')}
         subtitle={t('users.subtitle')}

@@ -57,7 +57,7 @@ export default function DashboardOverviewPage() {
   });
 
   return (
-    <div className="flex flex-col gap-5" data-testid="dashboard">
+    <div className="flex flex-col gap-4" data-testid="dashboard">
       <section className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="m-0 text-[22px] font-extrabold">{t('dash.title')}</h1>
@@ -134,7 +134,7 @@ export default function DashboardOverviewPage() {
 
       {/* Analytics */}
       <section className="grid gap-4 lg:grid-cols-3 [&>*]:min-w-0">
-        <Card className="p-5 lg:col-span-2" data-testid="chart-branches">
+        <Card className="p-4 lg:col-span-2" data-testid="chart-branches">
           <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
             <div>
               <p className="oryx-panel-title m-0">{t('dash.branchPerformance')}</p>
@@ -155,7 +155,7 @@ export default function DashboardOverviewPage() {
           )}
         </Card>
 
-        <Card className="p-5" data-testid="chart-modules">
+        <Card className="p-4" data-testid="chart-modules">
           <div className="mb-3">
             <p className="oryx-panel-title m-0">{t('dash.moduleAdoption')}</p>
             <p className="oryx-faint m-0 text-[11.5px]">{t('dash.moduleAdoptionHint')}</p>
@@ -174,7 +174,7 @@ export default function DashboardOverviewPage() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-3 [&>*]:min-w-0">
-        <Card className="p-5 lg:col-span-2" data-testid="module-adoption">
+        <Card className="p-4 lg:col-span-2" data-testid="module-adoption">
           <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
             <div>
               <p className="oryx-panel-title m-0">{t('dash.moduleAdoption')}</p>
@@ -217,7 +217,7 @@ export default function DashboardOverviewPage() {
           )}
         </Card>
 
-        <Card className="p-5" data-testid="recent-activity">
+        <Card className="p-4" data-testid="recent-activity">
           <p className="oryx-panel-title m-0 mb-3">{t('dash.recentActivity')}</p>
           {loading ? (
             <Skeleton height={160} />
@@ -249,17 +249,17 @@ export default function DashboardOverviewPage() {
 
 function Kpi({ icon, label, value, sub }: { icon: string; label: string; value: string; sub?: string }) {
   return (
-    <Card className="flex items-start gap-3 p-4" data-testid={`kpi-${label}`}>
+    <Card className="flex items-start gap-2 px-3 py-2.5" data-testid={`kpi-${label}`}>
       <span
-        className="grid h-10 w-10 flex-none place-items-center rounded-xl"
+        className="grid h-8 w-8 flex-none place-items-center rounded-lg"
         style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-strong)', color: 'var(--gold)' }}
       >
         <Icon name={icon} size={18} />
       </span>
       <span className="min-w-0">
-        <span className="oryx-muted oryx-kpi-label block text-[11.5px] font-semibold uppercase tracking-wide">{label}</span>
+        <span className="oryx-muted oryx-kpi-label block text-[11px] font-semibold uppercase tracking-wide">{label}</span>
         <span className="oryx-kpi-value block truncate">{value}</span>
-        {sub ? <span className="oryx-faint block text-[11.5px]">{sub}</span> : null}
+        {sub ? <span className="oryx-faint block text-[11px]">{sub}</span> : null}
       </span>
     </Card>
   );

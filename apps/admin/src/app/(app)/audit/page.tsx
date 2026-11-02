@@ -26,7 +26,7 @@ function AuditPageInner() {
   const logs = useAsync(() => api.listAuditLogs({ page, pageSize: 25, action: action || undefined }), [page, action]);
 
   return (
-    <div className="flex flex-col gap-5" data-testid="audit-page">
+    <div className="flex flex-col gap-4" data-testid="audit-page">
       <SectionHeader
         title={t('audit.title')}
         subtitle={t('audit.subtitle')}

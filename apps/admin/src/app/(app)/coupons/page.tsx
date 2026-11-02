@@ -148,7 +148,7 @@ function CouponsPageInner() {
   const coupons = list.data?.items ?? [];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="coupons-page">
+    <div className="flex flex-col gap-4" data-testid="coupons-page">
       <SectionHeader
         title={t('coupon.title')}
         subtitle={t('coupon.subtitle')}
@@ -180,7 +180,7 @@ function CouponsPageInner() {
         <p className="oryx-muted m-0 text-[12.5px]">{t('coupon.notice')}</p>
       </Card>
 
-      <Card className="p-5" data-testid="coupon-tester">
+      <Card className="p-4" data-testid="coupon-tester">
         <p className="oryx-panel-title m-0">{t('coupon.test')}</p>
         <p className="oryx-faint m-0 mb-3 text-[11.5px]">{t('coupon.testHint')}</p>
         <div className="flex flex-wrap items-end gap-3">
@@ -227,7 +227,7 @@ function CouponsPageInner() {
       </Card>
 
       {list.loading ? (
-        <Card className="p-5">
+        <Card className="p-4">
           <Skeleton height={220} />
         </Card>
       ) : coupons.length === 0 ? (

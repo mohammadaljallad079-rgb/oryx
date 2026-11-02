@@ -60,7 +60,7 @@ function BranchesInner() {
 
   if (!scopeCompanyId) {
     return (
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-4">
         <SectionHeader title={t('branches.title')} subtitle={t('branches.subtitle')} />
         <Card>
           <EmptyState title={t('common.selectCompany')} hint={t('context.company')} />
@@ -70,7 +70,7 @@ function BranchesInner() {
   }
 
   return (
-    <div className="flex flex-col gap-5" data-testid="branches-page">
+    <div className="flex flex-col gap-4" data-testid="branches-page">
       <SectionHeader
         title={t('branches.title')}
         subtitle={t('branches.subtitle')}

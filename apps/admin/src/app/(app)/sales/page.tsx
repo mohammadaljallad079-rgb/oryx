@@ -55,7 +55,7 @@ export default function SalesPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="sales-page">
+    <div className="flex flex-col gap-4" data-testid="sales-page">
       <SectionHeader
         title={t('nav.sales_pos')}
         subtitle={t('erp.sales.subtitle')}
@@ -272,7 +272,6 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
         showWarehouse
-        dateField="invoiceDate"
         testIdPrefix="invoice"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
@@ -339,7 +338,6 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
         showWarehouse
-        dateField="orderDate"
         testIdPrefix="order"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
@@ -420,7 +418,6 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
         customers={customers.data?.items ?? []}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
-        dateField="issueDate"
         testIdPrefix="quotation"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
@@ -490,7 +487,6 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
         warehouses={warehouses.data?.items ?? []}
         showWarehouse
         showRestock
-        dateField="issueDate"
         testIdPrefix="credit-note"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
@@ -875,7 +871,6 @@ function DocumentModal({
   warehouses,
   showWarehouse,
   showRestock,
-  dateField,
   testIdPrefix,
   onClose,
   onSubmit,
@@ -887,8 +882,6 @@ function DocumentModal({
   warehouses: WarehouseDto[];
   showWarehouse?: boolean;
   showRestock?: boolean;
-  /** The date property this document's API DTO accepts. */
-  dateField: 'invoiceDate' | 'orderDate' | 'issueDate';
   testIdPrefix: string;
   onClose: () => void;
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
@@ -908,7 +901,7 @@ function DocumentModal({
       await onSubmit({
         customerId,
         warehouseId: warehouseId || undefined,
-        [dateField]: new Date().toISOString(),
+        documentDate: new Date().toISOString(),
         restockInventory: showRestock ? restock : undefined,
         lines: lines.map((l) => ({
           productId: l.productId || undefined,

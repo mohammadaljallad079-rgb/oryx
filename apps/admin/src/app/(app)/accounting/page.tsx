@@ -50,7 +50,7 @@ export default function AccountingPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="accounting-page">
+    <div className="flex flex-col gap-4" data-testid="accounting-page">
       <SectionHeader
         title={t('nav.financial_accounting')}
         subtitle={t('erp.accounting.subtitle')}

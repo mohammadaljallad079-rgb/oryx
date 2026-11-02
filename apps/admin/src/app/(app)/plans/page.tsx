@@ -27,7 +27,7 @@ function PlansPageInner() {
   const [creating, setCreating] = useState(false);
 
   return (
-    <div className="flex flex-col gap-5" data-testid="plans-page">
+    <div className="flex flex-col gap-4" data-testid="plans-page">
       <SectionHeader
         title={t('plans.title')}
         subtitle={t('plans.subtitle')}

@@ -38,7 +38,7 @@ export default function MaintenancePage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="maintenance-page">
+    <div className="flex flex-col gap-4" data-testid="maintenance-page">
       <SectionHeader
         title={t('nav.automotive_maintenance')}
         subtitle={t('erp.automotive.maintenanceSubtitle')}

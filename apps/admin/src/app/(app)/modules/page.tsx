@@ -20,7 +20,7 @@ function ModulesPageInner() {
   const filtered = (modules.data?.items ?? []).filter((m) => !group || m.group === group);
 
   return (
-    <div className="flex flex-col gap-5" data-testid="modules-page">
+    <div className="flex flex-col gap-4" data-testid="modules-page">
       <SectionHeader
         title={t('modules.title')}
         subtitle={t('modules.subtitle')}
@@ -55,7 +55,7 @@ function ModulesPageInner() {
           : filtered.map((m) => {
               const licensed = isPlatform && !companyId ? true : m.licensed;
               return (
-                <Card key={m.id} className="p-5" data-testid={`module-card-${m.key}`}>
+                <Card key={m.id} className="p-4" data-testid={`module-card-${m.key}`}>
                   <div className="mb-2 flex items-start justify-between gap-2">
                     <span
                       className="grid h-10 w-10 place-items-center rounded-xl"

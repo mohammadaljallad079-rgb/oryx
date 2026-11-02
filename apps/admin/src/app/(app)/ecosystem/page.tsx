@@ -72,7 +72,7 @@ function EcosystemPageInner() {
     rows.map((r) => ({ label: r.key, value: r.count }));
 
   return (
-    <div className="flex flex-col gap-5" data-testid="ecosystem-page">
+    <div className="flex flex-col gap-4" data-testid="ecosystem-page">
       <SectionHeader
         title={t('eco.title')}
         subtitle={t('eco.subtitle')}
@@ -108,7 +108,7 @@ function EcosystemPageInner() {
           )}
           <span className="oryx-faint text-[11.5px]">{data?.currency ?? '—'}</span>
         </Card>
-        <Card className="p-5 lg:col-span-2" data-testid="eco-trend">
+        <Card className="p-4 lg:col-span-2" data-testid="eco-trend">
           <p className="oryx-panel-title m-0">{t('eco.revenueTrend')}</p>
           {overview.loading ? (
             <Skeleton height={170} />
@@ -159,7 +159,7 @@ function EcosystemPageInner() {
 
       {/* Breakdowns */}
       <section className="grid gap-4 lg:grid-cols-3 [&>*]:min-w-0">
-        <Card className="p-5" data-testid="eco-provider-status">
+        <Card className="p-4" data-testid="eco-provider-status">
           <p className="oryx-panel-title m-0">{t('eco.providerStatus')}</p>
           {overview.loading ? (
             <Skeleton height={170} />
@@ -169,7 +169,7 @@ function EcosystemPageInner() {
             <MiniBarChart data={breakdown(data!.providerStatus)} height={170} />
           )}
         </Card>
-        <Card className="p-5" data-testid="eco-order-status">
+        <Card className="p-4" data-testid="eco-order-status">
           <p className="oryx-panel-title m-0">{t('eco.orderStatus')}</p>
           {overview.loading ? (
             <Skeleton height={170} />
@@ -179,7 +179,7 @@ function EcosystemPageInner() {
             <MiniBarChart data={breakdown(data!.orderStatus)} height={170} />
           )}
         </Card>
-        <Card className="p-5" data-testid="eco-booking-status">
+        <Card className="p-4" data-testid="eco-booking-status">
           <p className="oryx-panel-title m-0">{t('eco.bookingStatus')}</p>
           {overview.loading ? (
             <Skeleton height={170} />

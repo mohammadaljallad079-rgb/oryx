@@ -38,7 +38,7 @@ export default function CrmPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="crm-page">
+    <div className="flex flex-col gap-4" data-testid="crm-page">
       <SectionHeader
         title={t('nav.crm')}
         subtitle={t('erp.crm.subtitle')}

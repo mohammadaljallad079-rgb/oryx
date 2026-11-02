@@ -32,7 +32,7 @@ export default function SubscriptionsPage() {
   const [historyOf, setHistoryOf] = useState<SubscriptionRow | null>(null);
 
   return (
-    <div className="flex flex-col gap-5" data-testid="subscriptions-page">
+    <div className="flex flex-col gap-4" data-testid="subscriptions-page">
       <SectionHeader
         title={t('subscriptions.title')}
         subtitle={t('subscriptions.subtitle')}
@@ -107,7 +107,7 @@ export default function SubscriptionsPage() {
         )}
       </Card>
 
-      <Card className="p-5">
+      <Card className="p-4">
         <p className="oryx-panel-title m-0 mb-3">{t('subscriptions.assign')}</p>
         <div className="flex flex-wrap gap-2">
           {(companies.data?.items ?? [])

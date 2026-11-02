@@ -43,7 +43,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-5" data-testid="settings-page">
+    <div className="flex flex-col gap-4" data-testid="settings-page">
       <SectionHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
 
       {saved ? (
@@ -61,7 +61,7 @@ export default function SettingsPage() {
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="p-5">
+        <Card className="p-4">
           <p className="oryx-panel-title m-0 mb-4">{t('settings.profile')}</p>
           <div className="grid gap-4">
             <Field label={t('auth.email')}>
@@ -91,7 +91,7 @@ export default function SettingsPage() {
           </div>
         </Card>
 
-        <Card className="p-5">
+        <Card className="p-4">
           <p className="oryx-panel-title m-0 mb-4">{t('settings.preferences')}</p>
 
           <div className="mb-4">
@@ -146,7 +146,7 @@ export default function SettingsPage() {
       </div>
 
       {companyId && canEditBranding ? (
-        <Card className="p-5" data-testid="settings-branding">
+        <Card className="p-4" data-testid="settings-branding">
           <p className="oryx-panel-title m-0 mb-1">{t('branding.title')}</p>
           <p className="oryx-muted m-0 mb-4 text-[12px]">{t('branding.subtitle')}</p>
           <BrandingPanel companyId={companyId} />
@@ -154,7 +154,7 @@ export default function SettingsPage() {
       ) : null}
 
       {companyId ? (
-        <Card className="p-5" data-testid="settings-entitlements">
+        <Card className="p-4" data-testid="settings-entitlements">
           <p className="oryx-panel-title m-0 mb-1">{t('subscriptions.licence')}</p>
           <p className="oryx-muted m-0 mb-4 text-[12px]">{t('dash.moduleAdoptionHint')}</p>
           {entitlements.loading ? (

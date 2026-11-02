@@ -398,6 +398,33 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   happy-path suite never touches. `apps/api/test/execution16-malformed-input.e2e-spec.ts`
   pins representative cases.
 
+### Sales date and test-isolation gotchas (Execution 17)
+
+- **`@Transform` never fires for an absent key.** `class-transformer` runs a
+  property's transform only when that property is present on the source object.
+  `SalesDocumentDateDto` used a `documentDate` transform to fold the historical
+  `issueDate`/`orderDate`/`invoiceDate` aliases onto it, so a payload carrying
+  only an alias never reached the transform and `@IsISO8601()` rejected a
+  perfectly valid date. Declare each name and read the effective value with
+  `resolveDocumentDate(dto)`; use `@ValidateIf` to require `documentDate` only
+  when no alias is supplied. Verified: `plainToInstance(D, { issueDate })` leaves
+  `documentDate` `undefined`.
+- **Keep `forbidNonWhitelisted` on.** The fix for the alias bug was to *declare*
+  the aliases, not to relax the whitelist. Every name keeps its own
+  `@IsISO8601()`, so a malformed legacy value is still a 400.
+- **A suite that does not test stock must not move stock.** The e2e specs run
+  against the dev database, so `issueStock` defaults to true and an invoice
+  create drains the seeded product. A manual curl check had already consumed the
+  stock, and the suite then failed with a 403 "Insufficient stock" that looked
+  like a date regression. Pass `issueStock: false` (and `restockInventory: false`
+  on a credit note) in specs that assert dates or totals, and re-seed
+  (`pnpm db:seed`) after manual write verification.
+- **Never run two Playwright suites at once.** Concurrent runs contend and every
+  login times out at ~30 s, which looks like a broken app. One suite at a time.
+- **`apps/api` has no unit tests.** `pnpm --filter @oryx/api test` prints
+  "No tests found" because `jest.config.js` ignores `test/`; every API test is an
+  e2e spec run by `test:e2e`. That exit code is not a regression.
+
 ### Production-readiness gotchas (Execution 09)
 
 - **`MFA_REQUIRE_SUPER_ADMIN=true` must not lock the owner out.** The guard

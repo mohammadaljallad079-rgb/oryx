@@ -35,7 +35,7 @@ function AppVersionsPageInner() {
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <div className="flex flex-col gap-5" data-testid="app-versions-page">
+    <div className="flex flex-col gap-4" data-testid="app-versions-page">
       <SectionHeader
         title={t('app.versions')}
         subtitle={t('app.subtitle')}

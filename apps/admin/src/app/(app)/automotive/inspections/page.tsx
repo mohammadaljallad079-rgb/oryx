@@ -36,7 +36,7 @@ export default function InspectionsPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="inspections-page">
+    <div className="flex flex-col gap-4" data-testid="inspections-page">
       <SectionHeader
         title={t('nav.automotive_inspections')}
         subtitle={t('erp.automotive.inspectionSubtitle')}

@@ -42,7 +42,7 @@ export default function CompaniesPage() {
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
-    <div className="flex flex-col gap-5" data-testid="companies-page">
+    <div className="flex flex-col gap-4" data-testid="companies-page">
       <SectionHeader
         title={t('companies.title')}
         subtitle={t('companies.subtitle')}

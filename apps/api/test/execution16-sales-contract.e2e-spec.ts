@@ -67,43 +67,85 @@ describe('Execution 16 — sales document date contract (e2e)', () => {
     await ctx.app.close();
   });
 
-  it('accepts the declared date property for each document type', async () => {
+  it('accepts the canonical documentDate on every document type', async () => {
     const quotation = await erp<{ id: string }>('/sales/quotations', {
       method: 'POST',
-      body: { customerId, issueDate: now, lines: [line()] },
+      body: { customerId, documentDate: now, lines: [line()] },
     });
     expect(quotation.status).toBe(201);
 
     const order = await erp<{ id: string; totalMinor: number }>('/sales/orders', {
       method: 'POST',
-      body: { customerId, warehouseId, orderDate: now, confirm: true, lines: [line()] },
+      body: { customerId, warehouseId, documentDate: now, confirm: true, lines: [line()] },
     });
     expect(order.status).toBe(201);
     expect(order.body.totalMinor).toBeGreaterThan(0);
 
     const invoice = await erp<{ id: string; totalMinor: number }>('/sales/invoices', {
       method: 'POST',
-      body: { customerId, warehouseId, invoiceDate: now, lines: [line()] },
+      body: { customerId, warehouseId, documentDate: now, issueStock: false, lines: [line()] },
     });
     expect(invoice.status).toBe(201);
     expect(invoice.body.totalMinor).toBeGreaterThan(0);
 
     const creditNote = await erp<{ id: string }>('/sales/credit-notes', {
       method: 'POST',
-      body: { customerId, invoiceId: invoice.body.id, warehouseId, issueDate: now, lines: [line()] },
+      body: { customerId, invoiceId: invoice.body.id, warehouseId, documentDate: now, restockInventory: false, lines: [line()] },
     });
     expect(creditNote.status).toBe(201);
   });
 
-  it('rejects an undeclared date property, so the guard is still on', async () => {
-    const rejected = await erp<{ message: string[] }>('/sales/invoices', {
+  it('still accepts each historical per-document date name as an alias', async () => {
+    const quotation = await erp<{ id: string }>('/sales/quotations', {
       method: 'POST',
-      body: { customerId, warehouseId, issueDate: now, orderDate: now, invoiceDate: now, lines: [line()] },
+      body: { customerId, issueDate: now, lines: [line()] },
+    });
+    expect(quotation.status).toBe(201);
+
+    const order = await erp<{ id: string }>('/sales/orders', {
+      method: 'POST',
+      body: { customerId, warehouseId, orderDate: now, confirm: true, lines: [line()] },
+    });
+    expect(order.status).toBe(201);
+
+    const invoice = await erp<{ id: string }>('/sales/invoices', {
+      method: 'POST',
+      body: { customerId, warehouseId, invoiceDate: now, issueStock: false, lines: [line()] },
+    });
+    expect(invoice.status).toBe(201);
+  });
+
+  it('accepts all four date names at once, so a shared form cannot 400', async () => {
+    const accepted = await erp<{ id: string }>('/sales/invoices', {
+      method: 'POST',
+      body: {
+        customerId,
+        warehouseId,
+        documentDate: now,
+        issueDate: now,
+        orderDate: now,
+        invoiceDate: now,
+        issueStock: false,
+        lines: [line()],
+      },
+    });
+    expect(accepted.status).toBe(201);
+  });
+
+  it('rejects a document with no date at all', async () => {
+    const rejected = await erp<{ statusCode: number }>('/sales/invoices', {
+      method: 'POST',
+      body: { customerId, warehouseId, lines: [line()] },
     });
     expect(rejected.status).toBe(400);
-    expect(rejected.body.message).toEqual(
-      expect.arrayContaining(['property issueDate should not exist', 'property orderDate should not exist']),
-    );
+  });
+
+  it('rejects a malformed date, so the validator is still on', async () => {
+    const rejected = await erp<{ statusCode: number }>('/sales/invoices', {
+      method: 'POST',
+      body: { customerId, warehouseId, documentDate: 'not-a-date', lines: [line()] },
+    });
+    expect(rejected.status).toBe(400);
   });
 
   it('totals a multi-line invoice from its own lines, in minor units', async () => {
@@ -114,6 +156,7 @@ describe('Execution 16 — sales document date contract (e2e)', () => {
         customerId,
         warehouseId,
         invoiceDate: now,
+        issueStock: false,
         lines: [line({ quantity }), line({ quantity, unitPriceMinor: salesPriceMinor * 2 })],
       },
     });

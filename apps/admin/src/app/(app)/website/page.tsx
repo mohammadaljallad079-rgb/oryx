@@ -34,7 +34,7 @@ function WebsiteCmsPageInner() {
   const media = useAsync(() => (tab === 'media' ? api.mediaAssets() : Promise.resolve(null)), [tab]);
 
   return (
-    <div className="flex flex-col gap-5" data-testid="website-page">
+    <div className="flex flex-col gap-4" data-testid="website-page">
       <SectionHeader
         title={t('cms.title')}
         subtitle={t('cms.subtitle')}

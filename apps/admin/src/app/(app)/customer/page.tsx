@@ -61,7 +61,7 @@ export default function CustomerPlatformPage() {
   );
 
   return (
-    <div className="flex flex-col gap-5" data-testid="customer-platform-page">
+    <div className="flex flex-col gap-4" data-testid="customer-platform-page">
       <SectionHeader
         title={t('nav.customer_portal')}
         subtitle={t('erp.customerPlatform.subtitle')}

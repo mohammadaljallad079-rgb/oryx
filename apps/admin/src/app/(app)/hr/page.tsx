@@ -39,7 +39,7 @@ export default function HrPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="hr-page">
+    <div className="flex flex-col gap-4" data-testid="hr-page">
       <SectionHeader
         title={t('nav.human_resources')}
         subtitle={t('erp.hr.subtitle')}

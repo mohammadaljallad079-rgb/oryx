@@ -77,7 +77,7 @@ export default function ProvidersPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="providers-page">
+    <div className="flex flex-col gap-4" data-testid="providers-page">
       <SectionHeader
         title={t('nav.provider_portal')}
         subtitle={t('erp.providers.subtitle')}

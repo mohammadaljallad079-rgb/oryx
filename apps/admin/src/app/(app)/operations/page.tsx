@@ -39,7 +39,7 @@ export default function OperationsPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="operations-page">
+    <div className="flex flex-col gap-4" data-testid="operations-page">
       <SectionHeader
         title={t('nav.operations')}
         subtitle={t('erp.operations.subtitle')}

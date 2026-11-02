@@ -49,7 +49,7 @@ export default function PurchasingPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="purchasing-page">
+    <div className="flex flex-col gap-4" data-testid="purchasing-page">
       <SectionHeader
         title={t('nav.purchasing_procurement')}
         subtitle={t('erp.purchasing.subtitle')}

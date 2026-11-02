@@ -134,7 +134,7 @@ function NotificationsPageInner() {
   const statusData = (summary.data?.byStatus ?? []).map((r) => ({ label: r.key, value: r.count }));
 
   return (
-    <div className="flex flex-col gap-5" data-testid="notifications-page">
+    <div className="flex flex-col gap-4" data-testid="notifications-page">
       <SectionHeader
         title={t('notif.title')}
         subtitle={t('notif.subtitle')}
@@ -158,7 +158,7 @@ function NotificationsPageInner() {
 
       {/* Breakdown */}
       <section className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
-        <Card className="p-5" data-testid="notif-by-channel">
+        <Card className="p-4" data-testid="notif-by-channel">
           <p className="oryx-panel-title m-0">{t('notif.byChannel')}</p>
           {summary.loading ? (
             <Skeleton height={160} />
@@ -168,7 +168,7 @@ function NotificationsPageInner() {
             <MiniBarChart data={channelData} height={160} />
           )}
         </Card>
-        <Card className="p-5" data-testid="notif-by-status">
+        <Card className="p-4" data-testid="notif-by-status">
           <p className="oryx-panel-title m-0">{t('notif.byStatus')}</p>
           {summary.loading ? (
             <Skeleton height={160} />
@@ -225,7 +225,7 @@ function NotificationsPageInner() {
         </div>
 
         {deliveries.loading ? (
-          <Card className="p-5">
+          <Card className="p-4">
             <Skeleton height={240} />
           </Card>
         ) : rows.length === 0 ? (
@@ -286,7 +286,7 @@ function NotificationsPageInner() {
       </section>
 
       {/* Templates */}
-      <Card className="p-5" data-testid="notif-templates">
+      <Card className="p-4" data-testid="notif-templates">
         <p className="oryx-panel-title m-0 mb-3">{t('notif.templates')}</p>
         {summary.loading ? (
           <Skeleton height={140} />
