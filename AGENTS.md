@@ -165,6 +165,12 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   (`toMinor`, `lineAmountMinor`, `basisPointsOfMinor`, `allocateMinor`). Percentages
   in the data model are **basis points** (1500 = 15%); `percentOfMinor`'s scale
   argument is easy to get wrong, so prefer `basisPointsOfMinor`.
+- **Labour hours are hundredths, not `QUANTITY_SCALE` units.** A duration such as
+  2.5 h is stored as `250`, while an inventory quantity of 2.5 is `25000`. Price a
+  labour line with `hoursAmountMinor(hours, rateMinor)`, never `lineAmountMinor` —
+  the latter divides by `10^4` and under-prices the work by 100×. Convert hours
+  onto an invoice line's quantity with `hoursToQuantity`. The same rule covers
+  payroll overtime and unpaid leave.
 - **Every posting goes through `AccountingPostingService.postJournal`.** It asserts
   balance, resolves the open period, allocates the entry number and updates
   account balances in one transaction. Never write journal rows directly.
