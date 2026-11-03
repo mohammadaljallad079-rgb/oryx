@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useUi } from '@/lib/ui-context';
 import { customerApi, type CustomerReturnRecord } from '@/lib/api';
 import { messageOf, useAsync } from '@/lib/hooks';
-import { RequireCustomer } from '@/components/require-customer';
 import { Alert, Button, Card, StatusBadge, formatDate } from '@/components/ui';
 import { LoadingPanel, PageHeader, StatePanel, TableWrap } from '@/components/premium';
 
@@ -18,9 +17,7 @@ import { LoadingPanel, PageHeader, StatePanel, TableWrap } from '@/components/pr
  */
 export default function ReturnsPage() {
   return (
-    <RequireCustomer>
-      <ReturnsContent />
-    </RequireCustomer>
+    <ReturnsContent />
   );
 }
 
@@ -42,7 +39,7 @@ function ReturnsContent() {
   }
 
   return (
-    <div className="oryx-container">
+    <div className="oryx-account-page">
       <PageHeader eyebrow={t('brand.tagline')} title={t('returns.title')} subtitle={t('returns.subtitle')} />
 
       {failure ? (

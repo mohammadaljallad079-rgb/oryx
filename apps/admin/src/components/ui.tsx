@@ -257,3 +257,66 @@ export function StatusBadge({ status, label }: { status: string; label: string }
           : 'neutral';
   return <Badge tone={tone}>{label}</Badge>;
 }
+
+/**
+ * The one KPI tile the admin uses.
+ *
+ * A KPI row previously had three separate markups — a padded `Card`, a raw
+ * flex row and an inline grid — with different paddings, icon sizes and label
+ * sizes, so the same metric looked different on every screen. This is the only
+ * tile now: one density, one label treatment, one value size.
+ *
+ * The tile is deliberately compact. The label sits above the value and the
+ * whole tile stays under a fixed minimum height, so a row of eight reads as one
+ * band rather than eight tall panels. `compact` drops the icon for dense grids.
+ */
+export function StatCard({
+  icon,
+  label,
+  value,
+  sub,
+  tone = 'default',
+  compact = false,
+  ...rest
+}: {
+  icon?: string;
+  label: string;
+  value: ReactNode;
+  sub?: ReactNode;
+  tone?: 'default' | 'gold' | 'success' | 'danger';
+  compact?: boolean;
+} & React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={`oryx-stat-card oryx-stat-card--${tone}`} {...rest}>
+      {icon && (
+        <span className="oryx-stat-card__icon" aria-hidden>
+          <Icon name={icon} size={compact ? 15 : 16} />
+        </span>
+      )}
+      <span className="oryx-stat-card__body">
+        <span className="oryx-stat-card__label">{label}</span>
+        <span className="oryx-stat-card__value">{value}</span>
+        {sub ? <span className="oryx-stat-card__sub">{sub}</span> : null}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * The KPI row.
+ *
+ * Columns are driven by a minimum tile width, not a fixed count, so a row of
+ * four on a wide screen becomes two on a tablet and one on a phone without a
+ * breakpoint per screen.
+ */
+export function StatGrid({
+  children,
+  className = '',
+  ...rest
+}: { children: ReactNode; className?: string } & React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={`oryx-stat-grid ${className}`} {...rest}>
+      {children}
+    </div>
+  );
+}

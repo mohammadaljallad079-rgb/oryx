@@ -17,6 +17,8 @@ import {
   Modal,
   SectionHeader,
   Skeleton,
+  StatCard,
+  StatGrid,
   StatusBadge,
   TableShell,
 } from '@/components/ui';
@@ -80,13 +82,13 @@ function DashboardTab() {
   const d = data.data!;
   return (
     <Card className="p-4" data-testid="hr-dashboard">
-      <div className="grid gap-4 sm:grid-cols-4">
-        <Kpi label={t('erp.hr.totalEmployees')} value={String(d.totalEmployees)} />
-        <Kpi label={t('erp.hr.active')} value={String(d.activeEmployees)} />
-        <Kpi label={t('erp.hr.onLeave')} value={String(d.onLeaveEmployees)} />
-        <Kpi label={t('erp.hr.pendingLeave')} value={String(d.pendingLeaveRequests)} />
-        <Kpi label={t('erp.hr.departments')} value={String(d.departmentCount)} />
-      </div>
+      <StatGrid>
+        <StatCard icon="users" label={t('erp.hr.totalEmployees')} value={String(d.totalEmployees)} />
+        <StatCard icon="check" label={t('erp.hr.active')} value={String(d.activeEmployees)} />
+        <StatCard icon="calendar" label={t('erp.hr.onLeave')} value={String(d.onLeaveEmployees)} />
+        <StatCard icon="clock" label={t('erp.hr.pendingLeave')} value={String(d.pendingLeaveRequests)} />
+        <StatCard icon="building" label={t('erp.hr.departments')} value={String(d.departmentCount)} />
+      </StatGrid>
       {d.latestPayroll ? (
         <div className="mt-4 border-t border-[var(--border)] pt-3 text-[13px]">
           <span className="oryx-muted">{t('erp.hr.latestPayroll')}: </span>
@@ -621,11 +623,3 @@ function AdvancesTab({ canManage }: { canManage: boolean }) {
   );
 }
 
-function Kpi({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="oryx-label">{label}</p>
-      <p className="m-0 text-[22px] font-extrabold tabular-nums">{value}</p>
-    </div>
-  );
-}

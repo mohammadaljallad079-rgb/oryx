@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
+import { statusLabel } from '../../lib/i18n';
 import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
 import { useMerchantSession } from '../../lib/merchant-session';
@@ -245,7 +246,7 @@ export default function MerchantDashboard() {
               <Card key={request.id}>
                 <View style={styles.headRow}>
                   <Body size="label">{request.requestNumber}</Body>
-                  <Badge text={request.status} status={request.status} />
+                  <Badge text={statusLabel(locale, request.status)} status={request.status} />
                 </View>
                 {request.description ? (
                   <Body size="caption" muted style={{ marginTop: space.xs }}>

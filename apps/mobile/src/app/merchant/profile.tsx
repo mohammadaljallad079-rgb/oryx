@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
+import { statusLabel } from '../../lib/i18n';
 import { photo } from '../../lib/assets';
 import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
@@ -119,7 +120,7 @@ export default function MerchantProfile() {
           <Card style={{ padding: space.lg }}>
             <Heading size="subheading">{locale === 'ar' ? merchant.provider.nameAr : merchant.provider.nameEn}</Heading>
             <View style={[styles.row, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>
-              <Chip label={merchant.provider.status} active />
+              <Chip label={statusLabel(locale, merchant.provider.status)} active />
               <Chip label={merchant.provider.categoryKey} />
             </View>
             <Divider />

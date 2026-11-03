@@ -3,7 +3,6 @@
 import { useUi } from '@/lib/ui-context';
 import { customerApi } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
-import { RequireCustomer } from '@/components/require-customer';
 import { Button, Card, formatDate } from '@/components/ui';
 import { LoadingPanel, PageHeader, StatePanel } from '@/components/premium';
 import { Icon } from '@/components/icons';
@@ -11,9 +10,7 @@ import { Icon } from '@/components/icons';
 /** In-app notifications with read state. */
 export default function NotificationsPage() {
   return (
-    <RequireCustomer>
-      <NotificationsContent />
-    </RequireCustomer>
+    <NotificationsContent />
   );
 }
 
@@ -35,7 +32,7 @@ function NotificationsContent() {
   const unread = items.filter((item) => !item.readAt).length;
 
   return (
-    <div className="oryx-container">
+    <div className="oryx-account-page">
       <PageHeader
         eyebrow={t('brand.tagline')}
         title={t('notifications.title')}

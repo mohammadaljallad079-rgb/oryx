@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useUi } from '@/lib/ui-context';
 import { customerApi } from '@/lib/api';
 import { messageOf, useAsync } from '@/lib/hooks';
-import { RequireCustomer } from '@/components/require-customer';
 import { Alert, Button, Card, Field, StatusBadge, formatDate } from '@/components/ui';
 import { LoadingPanel, PageHeader, StatePanel, TableWrap } from '@/components/premium';
 import { Icon } from '@/components/icons';
@@ -12,9 +11,7 @@ import { Icon } from '@/components/icons';
 /** Vehicle garage: list, add and remove the customer's own vehicles. */
 export default function GaragePage() {
   return (
-    <RequireCustomer>
-      <GarageContent />
-    </RequireCustomer>
+    <GarageContent />
   );
 }
 
@@ -87,7 +84,7 @@ function GarageContent() {
   }
 
   return (
-    <div className="oryx-container">
+    <div className="oryx-account-page">
       <PageHeader
         eyebrow={t('brand.tagline')}
         title={t('garage.title')}

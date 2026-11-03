@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
+import { statusLabel } from '../../lib/i18n';
 import { useLiveSession } from '../../lib/live-session';
 import { useLiveBookings } from '../../lib/live-bookings';
 import { ApiError, bookingsApi, type BookingSummary } from '../../lib/api';
@@ -197,10 +198,10 @@ export default function LiveBookingDetail() {
           <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.heading, flexShrink: 1 }}>
             {booking.reference ?? booking.bookingType}
           </Text>
-          <Badge text={booking.status} status={booking.status} />
+          <Badge text={statusLabel(locale, booking.status)} status={booking.status} />
         </View>
         <Divider />
-        <DetailRow label={t('status')} value={booking.status} />
+        <DetailRow label={t('status')} value={statusLabel(locale, booking.status)} />
         <DetailRow
           label={t('chooseDate')}
           value={Number.isNaN(when.getTime()) ? booking.startsAt : when.toISOString().slice(0, 10)}

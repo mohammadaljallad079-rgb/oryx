@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
+import { statusLabel } from '../../lib/i18n';
 import { useLiveOrders } from '../../lib/live-orders';
 import { ApiError, type OrderDetail as OrderDetailType } from '../../lib/api';
 import { repository } from '../../lib/repository';
@@ -116,7 +117,7 @@ export default function OrderDetail() {
 
         <Card>
           <View style={styles.headRow}>
-            <Badge text={record.status} status={record.status} />
+            <Badge text={statusLabel(locale, record.status)} status={record.status} />
             <Text style={{ color: theme.gold, fontWeight: '700', fontSize: typography.subheading }}>
               {formatMoney(record.totalMinor)}
             </Text>
@@ -244,7 +245,7 @@ export default function OrderDetail() {
 
       <Card>
         <View style={styles.headRow}>
-          <Badge text={record.status} status={record.status} />
+          <Badge text={statusLabel(locale, record.status)} status={record.status} />
           <Text style={{ color: theme.gold, fontWeight: '700', fontSize: typography.subheading }}>
             {formatMoney(record.totalMinor)}
           </Text>

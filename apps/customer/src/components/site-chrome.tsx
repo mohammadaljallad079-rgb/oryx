@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
 import { IS_STATIC_PREVIEW, previewNotice } from '@/lib/preview-data';
@@ -30,35 +30,92 @@ function PreviewStrip() {
 }
 
 /**
+ * The public navigation.
+ *
+ * These are the browsing destinations a visitor — signed in or not — can use.
+ * The private account functions (bookings, orders, invoices, quotations,
+ * returns, the garage, notifications and the profile) deliberately do not
+ * appear here; they live in the account menu so a visitor is never offered a
+ * link the API would refuse. See `ACCOUNT_LINKS` below.
+ */
+const PUBLIC_LINKS = [
+  { href: '/', key: 'nav.home' },
+  { href: '/categories', key: 'nav.categories' },
+  { href: '/products', key: 'nav.products' },
+  { href: '/services', key: 'nav.services' },
+  { href: '/providers', key: 'nav.providers' },
+  { href: '/about', key: 'nav.about' },
+  { href: '/contact', key: 'nav.contact' },
+];
+
+/** Account destinations, in the order the menu presents them. */
+const ACCOUNT_LINKS = [
+  { href: '/dashboard', key: 'account.nav.overview', icon: 'grid' as const },
+  { href: '/bookings', key: 'account.nav.bookings', icon: 'calendar' as const },
+  { href: '/orders', key: 'account.nav.orders', icon: 'cart' as const },
+  { href: '/rfqs', key: 'account.nav.rfqs', icon: 'clipboard' as const },
+  { href: '/invoices', key: 'account.nav.invoices', icon: 'wallet' as const },
+  { href: '/returns', key: 'account.nav.returns', icon: 'file' as const },
+  { href: '/garage', key: 'account.nav.garage', icon: 'car' as const },
+  { href: '/notifications', key: 'account.nav.notifications', icon: 'bell' as const },
+  { href: '/profile', key: 'account.nav.profile', icon: 'user' as const },
+  { href: '/support', key: 'account.nav.support', icon: 'headset' as const },
+];
+
+/**
  * Public site header.
  *
- * Navigation is identical in both directions: the markup order is fixed and the
- * document direction flips it, so nothing is duplicated for RTL.
+ * Two rows: a brand/search/actions row and a browsing row. Navigation is
+ * identical in both directions — the markup order is fixed and the document
+ * direction flips it, so nothing is duplicated for RTL.
  *
- * Below 900px the desktop nav is replaced by a disclosure panel. Without it the
- * primary navigation was simply unreachable on a phone.
+ * Below 900px the browsing row is replaced by a disclosure panel and the
+ * account menu becomes a section of that panel, so no destination is
+ * unreachable on a phone.
  */
 export function SiteHeader() {
   const { t, locale, toggleLocale, theme, toggleTheme } = useUi();
   const { isAuthenticated, profile, signOut } = useCustomerAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const accountRef = useRef<HTMLDivElement | null>(null);
 
-  const links = [
-    { href: '/', key: 'nav.home' },
-    { href: '/services', key: 'nav.services' },
-    { href: '/providers', key: 'nav.providers' },
-    { href: '/bookings', key: 'nav.bookings' },
-    { href: '/invoices', key: 'nav.invoices' },
-    { href: '/rfqs', key: 'nav.rfqs' },
-    { href: '/returns', key: 'nav.returns' },
-    { href: '/support', key: 'nav.support' },
-  ];
-
-  // A navigation always closes the panel, so the next page is not covered.
+  // A navigation always closes every panel, so the next page is not covered.
   useEffect(() => {
     setMenuOpen(false);
+    setAccountOpen(false);
   }, [pathname]);
+
+  // Close the account menu on an outside click or Escape, so it cannot be left
+  // floating over the page.
+  useEffect(() => {
+    if (!accountOpen) return;
+    function onPointer(event: MouseEvent) {
+      if (accountRef.current && !accountRef.current.contains(event.target as Node)) {
+        setAccountOpen(false);
+      }
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') setAccountOpen(false);
+    }
+    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [accountOpen]);
+
+  function submitSearch(event: React.FormEvent) {
+    event.preventDefault();
+    const trimmed = query.trim();
+    router.push(trimmed ? `/products?query=${encodeURIComponent(trimmed)}` : '/products');
+  }
+
+  const firstName = profile?.fullName?.split(' ')[0];
 
   return (
     <header className="oryx-header">
@@ -69,17 +126,20 @@ export function SiteHeader() {
           <span className="oryx-brand__tagline oryx-muted">{t('brand.tagline')}</span>
         </Link>
 
-        <nav className="oryx-nav" aria-label={t('nav.home')}>
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              aria-current={pathname === link.href ? 'page' : undefined}
-            >
-              {t(link.key)}
-            </Link>
-          ))}
-        </nav>
+        <form className="oryx-search" role="search" onSubmit={submitSearch}>
+          <Icon name="search" size={16} />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t('nav.search')}
+            aria-label={t('nav.search')}
+            data-testid="site-search"
+          />
+          <button type="submit" className="oryx-search__submit">
+            {t('nav.searchAction')}
+          </button>
+        </form>
 
         <div className="oryx-header-actions">
           <button
@@ -103,16 +163,58 @@ export function SiteHeader() {
 
           {isAuthenticated ? (
             <>
-              <Link href="/dashboard" className="oryx-btn oryx-header-auth">
-                {profile?.fullName?.split(' ')[0] ?? t('nav.dashboard')}
-              </Link>
-              <button
-                type="button"
-                className="oryx-btn oryx-btn-ghost oryx-header-auth"
-                onClick={() => void signOut()}
+              <Link
+                href="/cart"
+                className="oryx-btn oryx-btn-ghost oryx-header-icon"
+                aria-label={t('nav.cart')}
+                data-testid="header-cart"
               >
-                {t('nav.logout')}
-              </button>
+                <Icon name="cart" size={18} />
+              </Link>
+              <div className="oryx-account" ref={accountRef}>
+                <button
+                  type="button"
+                  className="oryx-btn oryx-header-auth oryx-account__trigger"
+                  onClick={() => setAccountOpen((v) => !v)}
+                  aria-expanded={accountOpen}
+                  aria-haspopup="menu"
+                  aria-label={t('nav.accountMenu')}
+                  data-testid="account-menu-trigger"
+                >
+                  <Icon name="user" size={16} />
+                  <span className="oryx-account__name">{firstName ?? t('nav.account')}</span>
+                  <Icon name="chevron" size={14} />
+                </button>
+                {accountOpen && (
+                  <div className="oryx-account__menu" role="menu" data-testid="account-menu">
+                    <p className="oryx-account__header">
+                      <strong>{profile?.fullName}</strong>
+                      <span className="oryx-muted">{profile?.email}</span>
+                    </p>
+                    {ACCOUNT_LINKS.map((link) => (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        role="menuitem"
+                        className="oryx-account__item"
+                        aria-current={pathname === link.href ? 'page' : undefined}
+                      >
+                        <Icon name={link.icon} size={16} />
+                        {t(link.key)}
+                      </Link>
+                    ))}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="oryx-account__item oryx-account__item--danger"
+                      onClick={() => void signOut()}
+                    >
+                      <Icon name="logout" size={16} />
+                      {t('nav.logout')}
+                    </button>
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <>
@@ -139,9 +241,9 @@ export function SiteHeader() {
         </div>
       </div>
 
-      {menuOpen && (
-        <nav id="oryx-mobile-nav" className="oryx-mobile-nav" aria-label={t('nav.home')}>
-          {links.map((link) => (
+      <nav className="oryx-navbar" aria-label={t('nav.home')}>
+        <div className="oryx-container oryx-navbar__inner">
+          {PUBLIC_LINKS.map((link) => (
             <Link
               key={link.href}
               href={link.href}
@@ -150,27 +252,57 @@ export function SiteHeader() {
               {t(link.key)}
             </Link>
           ))}
-          <div className="oryx-mobile-nav__auth">
-            {isAuthenticated ? (
-              <>
-                <Link href="/dashboard" className="oryx-btn">
-                  {t('nav.dashboard')}
+        </div>
+      </nav>
+
+      {menuOpen && (
+        <nav id="oryx-mobile-nav" className="oryx-mobile-nav" aria-label={t('nav.home')}>
+          <form className="oryx-search oryx-search--mobile" role="search" onSubmit={submitSearch}>
+            <Icon name="search" size={16} />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t('nav.search')}
+              aria-label={t('nav.search')}
+            />
+            <button type="submit" className="oryx-search__submit">
+              {t('nav.searchAction')}
+            </button>
+          </form>
+          {PUBLIC_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              aria-current={pathname === link.href ? 'page' : undefined}
+            >
+              {t(link.key)}
+            </Link>
+          ))}
+
+          {isAuthenticated ? (
+            <div className="oryx-mobile-nav__section">
+              <p className="oryx-mobile-nav__title">{t('account.nav.title')}</p>
+              {ACCOUNT_LINKS.map((link) => (
+                <Link key={link.href} href={link.href} className="oryx-mobile-nav__account">
+                  <Icon name={link.icon} size={16} />
+                  {t(link.key)}
                 </Link>
-                <button type="button" className="oryx-btn" onClick={() => void signOut()}>
-                  {t('nav.logout')}
-                </button>
-              </>
-            ) : (
-              <>
-                <Link href="/login" className="oryx-btn">
-                  {t('nav.login')}
-                </Link>
-                <Link href="/register" className="oryx-btn oryx-btn-primary">
-                  {t('nav.register')}
-                </Link>
-              </>
-            )}
-          </div>
+              ))}
+              <button type="button" className="oryx-btn" onClick={() => void signOut()}>
+                {t('nav.logout')}
+              </button>
+            </div>
+          ) : (
+            <div className="oryx-mobile-nav__auth">
+              <Link href="/login" className="oryx-btn">
+                {t('nav.login')}
+              </Link>
+              <Link href="/register" className="oryx-btn oryx-btn-primary">
+                {t('nav.register')}
+              </Link>
+            </div>
+          )}
         </nav>
       )}
     </header>
@@ -184,15 +316,16 @@ export function SiteFooter() {
     {
       title: t('footer.services'),
       links: [
+        { href: '/categories', label: t('nav.categories') },
+        { href: '/products', label: t('nav.products') },
         { href: '/services', label: t('nav.services') },
         { href: '/providers', label: t('nav.providers') },
-        { href: '/bookings', label: t('nav.bookings') },
       ],
     },
     {
       title: t('footer.company'),
       links: [
-        { href: '/', label: t('footer.about') },
+        { href: '/about', label: t('footer.about') },
         { href: '/#how', label: t('footer.howItWorks') },
         { href: '/providers/apply', label: t('footer.becomeProvider') },
         { href: '/credits', label: t('footer.credits') },
@@ -201,8 +334,8 @@ export function SiteFooter() {
     {
       title: t('footer.support'),
       links: [
-        { href: '/support', label: t('footer.contact') },
-        { href: '/invoices', label: t('nav.invoices') },
+        { href: '/contact', label: t('footer.contact') },
+        { href: '/support', label: t('nav.support') },
       ],
     },
   ];

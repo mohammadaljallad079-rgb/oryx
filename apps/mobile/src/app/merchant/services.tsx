@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useApp } from '../../lib/app-context';
+import { statusLabel } from '../../lib/i18n';
 import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
 import { useMerchantSession } from '../../lib/merchant-session';
@@ -124,7 +125,7 @@ export default function MerchantServices() {
                     <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.body }}>
                       {request.requestNumber}
                     </Text>
-                    <Chip label={request.status} />
+                    <Chip label={statusLabel(locale, request.status)} />
                   </View>
                   {request.description ? (
                     <Body size="caption" muted style={{ marginTop: space.xs }}>
@@ -209,7 +210,7 @@ export default function MerchantServices() {
                     <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.body }}>
                       {request.requestNumber}
                     </Text>
-                    <Chip label={request.status} />
+                    <Chip label={statusLabel(locale, request.status)} />
                   </View>
                   {request.description ? (
                     <Body size="caption" muted style={{ marginTop: space.xs }}>

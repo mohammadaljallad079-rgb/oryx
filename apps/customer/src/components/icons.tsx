@@ -184,6 +184,43 @@ export const Icons = {
       <circle cx="12" cy="10.5" r="2.6" />
     </Base>
   ),
+  cart: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M3 4h2l2.2 10.4a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 2-1.55L21 8H6" />
+      <circle cx="9.5" cy="20" r="1.3" />
+      <circle cx="17.5" cy="20" r="1.3" />
+    </Base>
+  ),
+  heart: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 7.7a4.2 4.2 0 0 1 7 3c0 4.9-7 9.3-7 9.3Z" />
+    </Base>
+  ),
+  grid: (p: IconProps) => (
+    <Base {...p}>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.6" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1.6" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.6" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1.6" />
+    </Base>
+  ),
+  info: (p: IconProps) => (
+    <Base {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5.5M12 7.8v.4" />
+    </Base>
+  ),
+  phone: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M5 3.8h3.3l1.6 4-2 1.4a12 12 0 0 0 5.9 5.9l1.4-2 4 1.6V18a2.2 2.2 0 0 1-2.4 2.2A15.5 15.5 0 0 1 2.8 6.2 2.2 2.2 0 0 1 5 3.8Z" />
+    </Base>
+  ),
+  mail: (p: IconProps) => (
+    <Base {...p}>
+      <rect x="3" y="5" width="18" height="14" rx="2.2" />
+      <path d="m3.6 6.5 8.4 6 8.4-6" />
+    </Base>
+  ),
 } as const;
 
 export type IconName = keyof typeof Icons;

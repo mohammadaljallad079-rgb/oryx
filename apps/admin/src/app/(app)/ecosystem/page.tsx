@@ -2,7 +2,7 @@
 
 import { PermissionGate } from '@/components/permission-gate';
 import { Icon } from '@/components/icons';
-import { Badge, Card, EmptyState, ErrorBanner, SectionHeader, Skeleton } from '@/components/ui';
+import { Badge, Card, EmptyState, ErrorBanner, SectionHeader, Skeleton, StatCard, StatGrid } from '@/components/ui';
 import { MiniBarChart, MiniLineChart } from '@/components/charts';
 import { api } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
@@ -99,15 +99,13 @@ function EcosystemPageInner() {
 
       {/* Headline revenue */}
       <section className="grid gap-4 lg:grid-cols-3 [&>*]:min-w-0" data-testid="eco-headline">
-        <Card className="flex flex-col justify-between p-5">
-          <span className="oryx-kpi-label">{t('eco.metric.revenueMinor')}</span>
-          {overview.loading ? (
-            <Skeleton height={34} width="70%" />
-          ) : (
-            <span className="oryx-kpi-value">{metricValue('revenueMinor')}</span>
-          )}
-          <span className="oryx-faint text-[11.5px]">{data?.currency ?? '—'}</span>
-        </Card>
+        <StatCard
+          icon="wallet"
+          tone="gold"
+          label={t('eco.metric.revenueMinor')}
+          value={overview.loading ? <Skeleton height={18} width="70%" /> : metricValue('revenueMinor')}
+          sub={data?.currency ?? '—'}
+        />
         <Card className="p-4 lg:col-span-2" data-testid="eco-trend">
           <p className="oryx-panel-title m-0">{t('eco.revenueTrend')}</p>
           {overview.loading ? (
@@ -121,13 +119,13 @@ function EcosystemPageInner() {
       </section>
 
       {/* Metric grid */}
-      <section className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 [&>*]:min-w-0" data-testid="eco-metrics">
+      <StatGrid data-testid="eco-metrics">
         {overview.loading
           ? Array.from({ length: 12 }).map((_, i) => (
-              <Card key={i} className="p-4">
-                <Skeleton height={12} width="55%" />
-                <div className="mt-3">
-                  <Skeleton height={26} width="40%" />
+              <Card key={i} className="p-3">
+                <Skeleton height={11} width="55%" />
+                <div className="mt-2">
+                  <Skeleton height={18} width="40%" />
                 </div>
               </Card>
             ))
@@ -135,27 +133,16 @@ function EcosystemPageInner() {
               const metric = data?.metrics[key];
               if (!metric) return null;
               return (
-                <Card key={key} className="flex items-start gap-3 p-4" data-testid={`eco-metric-${key}`}>
-                  <span
-                    className="grid h-10 w-10 flex-none place-items-center rounded-xl"
-                    style={{
-                      background: 'var(--surface-raised)',
-                      border: '1px solid var(--border-strong)',
-                      color: 'var(--gold)',
-                    }}
-                  >
-                    <Icon name={metricIcon[key] ?? 'gauge'} size={18} />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="oryx-muted oryx-kpi-label block text-[11.5px] font-semibold uppercase tracking-wide">
-                      {label(metric)}
-                    </span>
-                    <span className="oryx-kpi-value block truncate">{metricValue(key)}</span>
-                  </span>
-                </Card>
+                <StatCard
+                  key={key}
+                  icon={metricIcon[key] ?? 'gauge'}
+                  label={label(metric)}
+                  value={metricValue(key)}
+                  data-testid={`eco-metric-${key}`}
+                />
               );
             })}
-      </section>
+      </StatGrid>
 
       {/* Breakdowns */}
       <section className="grid gap-4 lg:grid-cols-3 [&>*]:min-w-0">

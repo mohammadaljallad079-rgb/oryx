@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
+import { statusLabel } from '../../lib/i18n';
 import { useLiveSession } from '../../lib/live-session';
 import { ApiError, rfqsApi } from '../../lib/api';
 import { useAsync } from '../../lib/use-async';
@@ -156,7 +157,7 @@ function RfqCard({ rfq, onOpen }: { rfq: RfqDto; onOpen: () => void }) {
     <Card onPress={onOpen} testID={`rfq-card-${rfq.reference}`}>
       <View style={styles.head}>
         <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.body }}>{rfq.reference}</Text>
-        <Badge text={rfq.status} status={rfq.status} />
+        <Badge text={statusLabel(locale, rfq.status)} status={rfq.status} />
       </View>
       <Text style={{ color: theme.textMuted, fontSize: typography.label, marginTop: space.xs }} numberOfLines={2}>
         {rfq.description}

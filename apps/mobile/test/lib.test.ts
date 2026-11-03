@@ -1,9 +1,9 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { directionFor, translate, localized, type Locale } from '../src/lib/i18n';
+import { directionFor, translate, localized, statusLabel, bookingTypeLabel, type Locale } from '../src/lib/i18n';
 import {
   formatDate,
   formatDayChip,
@@ -174,6 +174,124 @@ describe('status colours', () => {
     expect(themes.dark.search).toBe('#1b3047');
   });
 });
+
+describe('status localisation', () => {
+  // The defect: a screen printed `booking.status` straight into a `<Badge>`, so
+  // an Arabic RTL build showed `HELD` and `NO_SHOW` in English. Every status a
+  // screen can render must resolve to a real word in both locales.
+  const statuses = [
+    'HELD',
+    'CONFIRMED',
+    'RESCHEDULED',
+    'IN_PROGRESS',
+    'COMPLETED',
+    'CANCELLED',
+    'NO_SHOW',
+    'PENDING',
+    'PREPARING',
+    'READY',
+    'OUT_FOR_DELIVERY',
+    'DELIVERED',
+    'SHIPPED',
+    'REQUIRES_METHOD',
+    'REQUIRES_ACTION',
+    'PROCESSING',
+    'SUCCEEDED',
+    'FAILED',
+    'EXPIRED',
+    'VOIDED',
+    'REQUESTED',
+    'APPROVED',
+    'PROCESSED',
+    'REJECTED',
+    'OPEN',
+    'QUOTED',
+    'ACCEPTED',
+    'WITHDRAWN',
+    'NEW',
+    'RESOLVED',
+    'CLOSED',
+    'UNDER_REVIEW',
+    'AWAITING_PROVIDER',
+    'ESCALATED',
+    'ACTIVE',
+    'INACTIVE',
+    'SOLD',
+    'RECEIVED',
+    'REFUNDED',
+    'ASSIGNED',
+    'EN_ROUTE',
+    'ON_SITE',
+    'ARRIVED',
+    'SEARCHING',
+    'ANALYSING',
+    'PUBLISHED',
+    'HIDDEN',
+    'DRAFT',
+    'SUBMITTED',
+    'SCHEDULED',
+    'ON_HOLD',
+  ];
+
+  it.each(statuses)('localises %s into Arabic and English', (status) => {
+    expect(statusLabel('ar', status)).toBeTruthy();
+    expect(statusLabel('en', status)).toBeTruthy();
+    expect(statusLabel('ar', status)).not.toBe(status);
+    expect(statusLabel('en', status)).not.toBe(status);
+  });
+
+  it('keeps the Arabic and English labels different', () => {
+    for (const status of statuses) {
+      expect(statusLabel('ar', status)).not.toBe(statusLabel('en', status));
+    }
+  });
+
+  it('degrades an unknown status to a readable word rather than an empty string', () => {
+    expect(statusLabel('en', 'BRAND_NEW_STATE')).toBe('brand new state');
+    expect(statusLabel('en', null)).toBe('');
+    expect(statusLabel('en', undefined)).toBe('');
+  });
+
+  it('localises every booking type', () => {
+    for (const type of ['INSPECTION', 'MAINTENANCE', 'PROVIDER_SERVICE']) {
+      expect(bookingTypeLabel('ar', type)).not.toBe(type);
+      expect(bookingTypeLabel('en', type)).toBeTruthy();
+    }
+  });
+
+  it('does not print a raw status enum on a live screen', () => {
+    // The exact shapes the defect took before the fix.
+    const offenders = [
+      'text={order.status}',
+      'text={booking.status}',
+      'text={rfq.status}',
+      'text={job.status}',
+      'text={record.status}',
+      'label={request.status}',
+      'label={merchant.provider.status}',
+    ];
+    for (const file of appSources()) {
+      const source = readFileSync(file, 'utf8');
+      for (const offender of offenders) {
+        expect(source.includes(offender), `${file} still renders ${offender}`).toBe(false);
+      }
+    }
+  });
+});
+
+/** Every `.tsx` file under the mobile `src` tree. */
+function appSources(dir = join(__dirname, '..', 'src')): string[] {
+  const files: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      files.push(...appSources(full));
+      continue;
+    }
+    if (entry.endsWith('.tsx')) files.push(full);
+  }
+  return files;
+}
 
 describe('demo catalogue', () => {
   it('carries at least fifty products', () => {

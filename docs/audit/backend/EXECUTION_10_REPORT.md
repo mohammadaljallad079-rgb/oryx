@@ -557,4 +557,109 @@ the tree:
 
 ---
 
+## 16. Continuation session — raw enum labels in the Arabic RTL UI
+
+### 16.1 The defect
+
+`StatusBadge` printed its `status` prop verbatim. Every caller passed the raw
+database enum, so an Arabic-first screen showed `HELD`, `NO_SHOW`, `IN_PROGRESS`
+and `INSPECTION` in English. The same class of defect existed in the mobile app:
+a screen rendered `{booking.status}` straight into a `<Badge>`.
+
+This is a presentation defect, not a data defect. The API contract is correct and
+was not changed.
+
+### 16.2 The customer fix
+
+- `apps/customer/src/i18n/dictionaries.ts` — added a `status.*` block for both
+  locales (52 statuses) and the booking-type labels. Both dictionaries now hold
+  **486 keys** and stay in step.
+- `apps/customer/src/components/ui.tsx` — `StatusBadge` resolves its label
+  through the dictionary via `useUi()`, and falls back to the raw status only
+  when no key exists. Exported `bookingTypeLabel`.
+- `apps/customer/src/app/(account)/bookings/page.tsx` and
+  `.../dashboard/page.tsx` — render `bookingTypeLabel(booking.bookingType)`
+  instead of the enum.
+- `apps/customer/src/app/(account)/rfqs/page.tsx` — the category field asked for
+  `services.category`, which did not exist, so it rendered the literal key. Added
+  `rfq.category` to both locales and pointed the page at it. This was a second,
+  independent leak of the same kind.
+
+### 16.3 The mobile fix
+
+`apps/mobile/src/lib/i18n.ts` gained a `statusLabel(locale, status)` helper and a
+status dictionary. Twelve screens were repointed: `cards.tsx`,
+`app/rfqs/[id].tsx`, `app/rfqs/index.tsx`, `app/wallet.tsx`,
+`app/merchant/dashboard.tsx`, `app/merchant/services.tsx`,
+`app/merchant/profile.tsx`, `app/returns/[id].tsx`, `app/returns/index.tsx`,
+`app/bookings/[id].tsx`, `app/recovery/[id].tsx` and `app/orders/[id].tsx`.
+
+An unknown status degrades to a readable word (`BRAND_NEW_STATE` →
+`brand new state`), never to an empty string or a raw enum.
+
+### 16.4 Regression tests
+
+- `apps/customer/test/i18n-status.test.ts` — **49 tests**. Asserts that both
+  locales hold the same key set, that every `t()` key in the source tree exists,
+  and that each status resolves to a different word per locale.
+- `apps/mobile/test/lib.test.ts` — **51 new tests** (139 → 194). Asserts every
+  status localises in both locales, that the two locales differ, that an unknown
+  status degrades, and — by reading the source tree — that no live screen still
+  renders one of the raw shapes the defect took (`text={order.status}`,
+  `text={booking.status}`, and so on).
+- `apps/customer/package.json` gained `vitest` and a `test` script; the customer
+  app previously had no unit-test runner.
+
+### 16.5 Evidence re-verified in this session
+
+```
+Customer guard:  node .run/check-customer-i18n.mjs
+                 ar keys=486 en keys=486 used=376 — OK, both locales in step
+Customer:         1 file,   49 tests   all passing
+Mobile:           9 files, 194 tests   all passing
+Shared:           9 files, 182 tests   all passing
+API e2e:         28 suites, 548 tests  all passing  (real DB, seeded)
+Admin Playwright: 199 passed, 1 skipped (200 tests, real API + real admin)
+Typecheck:       customer, mobile — clean
+Lint:            customer, mobile — clean
+Build:           customer — clean
+React:           19.1.0 / react-dom 19.1.0 unchanged across all four apps
+```
+
+Browser check on `http://localhost:3002/bookings`, signed in as the Visual QA
+customer: Arabic renders `فحص` and `قيد الحجز`; switching to English renders
+`Inspection` and `Held`. `/dashboard` renders `Inspection` / `Held` and no raw
+enum. `/orders` renders its empty state with no leakage.
+
+### 16.6 Environment notes (not code regressions)
+
+The sandbox recycled mid-session and removed three runtime dependencies while
+leaving the workspace intact. All three were restored, and the results above are
+from after restoration:
+
+- PostgreSQL 17 server package was reinstalled and the seeded cluster under
+  `.run/pgdata` was restarted; the seed survived (127 companies, 32 users, 25
+  customer accounts).
+- The API was restarted with the documented relaxed throttles
+  (`AUTH_THROTTLE_LIMIT` / `THROTTLE_LIMIT` / `REFRESH_THROTTLE_LIMIT`), because
+  the Playwright suite rotates sessions heavily and the default ceilings return
+  429.
+- Playwright's chromium headless shell was reinstalled
+  (`playwright install chromium`); its absence produced 200 tests failing in
+  3 ms with `Executable doesn't exist`, which is a missing browser, not a code
+  failure.
+
+`pnpm --filter @oryx/api test` reports "No tests found": `apps/api/jest.config.js`
+ignores `/test/`, and every API test is an `.e2e-spec.ts`. That is the
+pre-existing configuration from Execution 01, not a regression.
+
+### 16.7 Still open
+
+- **Device visual acceptance is still not claimed.** A browser render is not a
+  physical Android device; the Splash and Homepage remain unapproved on device.
+- **No APK was published**, per the instruction not to ship one until the
+  integrated functionality is ready for a coherent testing release.
+
+---
+
 *Written by an AI agent (OpenHands) on behalf of the repository owner.*

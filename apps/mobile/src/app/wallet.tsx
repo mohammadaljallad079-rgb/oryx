@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useApp } from '../lib/app-context';
+import { statusLabel } from '../lib/i18n';
 import { repository } from '../lib/repository';
 import { useAsync } from '../lib/use-async';
 import { useLiveSession } from '../lib/live-session';
@@ -71,7 +72,7 @@ export default function Wallet() {
               <ListRow
                 key={payment.id}
                 title={payment.description ?? payment.intentNumber}
-                subtitle={`${payment.provider} · ${payment.status}${payment.refunds.length > 0 ? ` · ${t('refunds')}: ${localizeDigits(payment.refunds.length, locale)}` : ''}`}
+                subtitle={`${payment.provider} · ${statusLabel(locale, payment.status)}${payment.refunds.length > 0 ? ` · ${t('refunds')}: ${localizeDigits(payment.refunds.length, locale)}` : ''}`}
                 trailing={
                   <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.label }}>
                     {formatMoney(payment.amountMinor)}

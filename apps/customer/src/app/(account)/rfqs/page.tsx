@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useUi } from '@/lib/ui-context';
 import { ApiError, SERVICE_CATEGORIES, customerApi, type RfqRecord } from '@/lib/api';
 import { messageOf, useAsync } from '@/lib/hooks';
-import { RequireCustomer } from '@/components/require-customer';
 import { Alert, Button, Card, Field, Money, StatusBadge, formatDate } from '@/components/ui';
 import { LoadingPanel, PageHeader, StatePanel } from '@/components/premium';
 
@@ -19,9 +18,7 @@ import { LoadingPanel, PageHeader, StatePanel } from '@/components/premium';
  */
 export default function RfqsPage() {
   return (
-    <RequireCustomer>
-      <RfqsContent />
-    </RequireCustomer>
+    <RfqsContent />
   );
 }
 
@@ -65,7 +62,7 @@ function RfqsContent() {
   const items = list.data?.items ?? [];
 
   return (
-    <div className="oryx-container">
+    <div className="oryx-account-page">
       <PageHeader eyebrow={t('brand.tagline')} title={t('rfq.title')} subtitle={t('rfq.subtitle')} />
 
       {failure ? (
@@ -81,7 +78,7 @@ function RfqsContent() {
 
       <Card title={t('rfq.new')}>
         <form onSubmit={submit}>
-          <Field label={t('services.category')}>
+          <Field label={t('rfq.category')}>
             <select
               className="oryx-select"
               value={categoryKey}

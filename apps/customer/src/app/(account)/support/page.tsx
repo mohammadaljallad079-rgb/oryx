@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useUi } from '@/lib/ui-context';
 import { customerApi, SERVICE_CATEGORIES } from '@/lib/api';
 import { messageOf, useAsync } from '@/lib/hooks';
-import { RequireCustomer } from '@/components/require-customer';
 import { Alert, Button, Card, Field, StatusBadge, Stars } from '@/components/ui';
 import { LoadingPanel, PageHeader, StatePanel, TableWrap } from '@/components/premium';
 import { Icon } from '@/components/icons';
@@ -18,9 +17,7 @@ import { Icon } from '@/components/icons';
  */
 export default function SupportPage() {
   return (
-    <RequireCustomer>
-      <SupportContent />
-    </RequireCustomer>
+    <SupportContent />
   );
 }
 
@@ -114,7 +111,7 @@ function SupportContent() {
   }
 
   return (
-    <div className="oryx-container">
+    <div className="oryx-account-page">
       <PageHeader
         eyebrow={t('brand.tagline')}
         title={t('support.title')}

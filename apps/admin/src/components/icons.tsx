@@ -296,6 +296,48 @@ export const Icons = {
       <path d="M10 19a2 2 0 0 0 4 0" />
     </Base>
   ),
+  clock: (p: IconProps) => (
+    <Base {...p}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </Base>
+  ),
+  star: (p: IconProps) => (
+    <Base {...p}>
+      <path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1.1 5.9L12 16.9l-5.3 2.8 1.1-5.9L3.5 9.7l5.9-.8Z" />
+    </Base>
+  ),
+  target: (p: IconProps) => (
+    <Base {...p}>
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="4.5" />
+      <circle cx="12" cy="12" r="1" />
+    </Base>
+  ),
+  trend: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M3.5 16.5 9 11l3.5 3.5L20.5 6.5" />
+      <path d="M15 6.5h5.5V12" />
+    </Base>
+  ),
+  wallet: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h11a2 2 0 0 1 2 2v.5" />
+      <rect x="3.5" y="7.5" width="17" height="11" rx="2" />
+      <path d="M16 13h1.5" />
+    </Base>
+  ),
+  folder: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M3.5 6.5a1.5 1.5 0 0 1 1.5-1.5h4l2 2.5h8a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5Z" />
+    </Base>
+  ),
+  list: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M8.5 6.5h11M8.5 12h11M8.5 17.5h11" />
+      <path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01" />
+    </Base>
+  ),
 } as const;
 
 export type IconName = keyof typeof Icons;

@@ -3,7 +3,6 @@
 import { useUi } from '@/lib/ui-context';
 import { customerApi } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
-import { RequireCustomer } from '@/components/require-customer';
 import { Card, Money, StatusBadge, formatDate } from '@/components/ui';
 import { LoadingPanel, PageHeader, StatePanel, TableWrap } from '@/components/premium';
 import { Icon } from '@/components/icons';
@@ -11,9 +10,7 @@ import { Icon } from '@/components/icons';
 /** Payment history with the refunds recorded against each payment. */
 export default function InvoicesPage() {
   return (
-    <RequireCustomer>
-      <InvoicesContent />
-    </RequireCustomer>
+    <InvoicesContent />
   );
 }
 
@@ -27,7 +24,7 @@ function InvoicesContent() {
   const refunded = items.reduce((sum, p) => sum + p.refunds.length, 0);
 
   return (
-    <div className="oryx-container">
+    <div className="oryx-account-page">
       <PageHeader
         eyebrow={t('brand.tagline')}
         title={t('invoices.title')}

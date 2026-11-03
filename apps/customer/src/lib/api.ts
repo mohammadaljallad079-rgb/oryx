@@ -339,6 +339,107 @@ export interface ProviderDetail extends ProviderSummary {
   listings: Array<{ id: string; nameEn: string; nameAr: string; priceMinor: number }>;
 }
 
+/** A catalogue category as `GET /customer/catalog/categories` returns it. */
+export interface CatalogCategory {
+  key: string;
+  name: string;
+  icon: string | null;
+  domain: string | null;
+  imageUrl: string | null;
+}
+
+/** The public product projection — never a cost price or a stock quantity. */
+export interface CatalogProduct {
+  id: string;
+  storeId: string;
+  sku: string;
+  name: string;
+  nameEn: string;
+  nameAr: string;
+  type: string;
+  unit: string;
+  priceMinor: number;
+  taxRateBp: number;
+  available: boolean;
+  imageUrl: string | null;
+  store: { id: string; code: string; name: string };
+}
+
+/** A store that has at least one published product. */
+export interface CatalogStore {
+  id: string;
+  code: string;
+  name: string;
+  nameEn: string;
+  nameAr: string;
+  countryCode: string;
+  providerId: string | null;
+  categoryKey: string | null;
+  productCount: number;
+}
+
+/** A live promotional offer from an approved provider. */
+export interface ProviderOffer {
+  id: string;
+  titleEn: string;
+  titleAr: string;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
+  discountBp: number | null;
+  priceMinor: number | null;
+  categoryKey: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  provider: { id: string; code: string; nameEn: string; nameAr: string };
+}
+
+/** A line in the customer cart. */
+export interface CartItem {
+  id: string;
+  productId: string;
+  sku: string;
+  nameEn: string;
+  nameAr: string;
+  quantity: number;
+  unitPriceMinor: number;
+  lineTotalMinor: number;
+  available: boolean;
+}
+
+export interface Cart {
+  items: CartItem[];
+  totalMinor: number;
+  itemCount: number;
+}
+
+/** A placed order as the customer sees it. */
+export interface CustomerOrder {
+  id: string;
+  reference: string;
+  status: string;
+  paymentMethod: string;
+  subtotalMinor: number;
+  taxMinor: number;
+  deliveryMinor: number;
+  totalMinor: number;
+  currency: string;
+  placedAt: string;
+  itemCount: number;
+  lines: Array<{
+    id: string;
+    sku: string;
+    nameEn: string;
+    nameAr: string;
+    quantity: number;
+    unitPriceMinor: number;
+    lineTotalMinor: number;
+  }>;
+  /** Present on the detail projection only. */
+  cancellable?: boolean;
+  notes?: string | null;
+  events?: Array<{ status: string; note: string | null; actor: string; createdAt: string }>;
+}
+
 export interface ServiceRequestRecord {
   id: string;
   requestNumber: string;
@@ -656,6 +757,70 @@ export const customerApi = {
           body: { body },
         }),
 
+  // ---------------------------------------------------------- marketplace
+  /**
+   * The shopping cart.
+   *
+   * Every call is authenticated and resolved from the bearer token, so a cart
+   * can never be read or written for another account.
+   */
+  cart: () =>
+    IS_STATIC_PREVIEW
+      ? Promise.resolve({ items: [], totalMinor: 0, itemCount: 0 } as Cart)
+      : request<Cart>('/customer/cart'),
+  addCartItem: (productId: string, quantity = 1) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<Cart>('/customer/cart/items', { method: 'POST', body: { productId, quantity } }),
+  setCartQuantity: (productId: string, quantity: number) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<Cart>(`/customer/cart/items/${encodeURIComponent(productId)}`, {
+          method: 'PATCH',
+          body: { quantity },
+        }),
+  removeCartItem: (productId: string) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<Cart>(`/customer/cart/items/${encodeURIComponent(productId)}`, { method: 'DELETE' }),
+  clearCart: () =>
+    IS_STATIC_PREVIEW ? previewReadOnly() : request<Cart>('/customer/cart', { method: 'DELETE' }),
+
+  /** Saved products. */
+  favorites: () =>
+    IS_STATIC_PREVIEW
+      ? Promise.resolve({ items: [] as CatalogProduct[], total: 0 })
+      : request<{ items: CatalogProduct[]; total: number }>('/customer/favorites'),
+  addFavorite: (productId: string) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<{ id: string }>('/customer/favorites', { method: 'POST', body: { productId } }),
+  removeFavorite: (productId: string) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<void>(`/customer/favorites/${encodeURIComponent(productId)}`, { method: 'DELETE' }),
+
+  /** Order history and placement from the cart. */
+  orders: () =>
+    IS_STATIC_PREVIEW
+      ? Promise.resolve({ items: [] as CustomerOrder[], total: 0 })
+      : request<{ items: CustomerOrder[]; total: number }>('/customer/orders?pageSize=50'),
+  order: (id: string) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<CustomerOrder>(`/customer/orders/${encodeURIComponent(id)}`),
+  placeOrder: (body: { paymentMethod: string; addressId?: string; notes?: string; idempotencyKey?: string }) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<CustomerOrder>('/customer/orders', { method: 'POST', body }),
+  cancelOrder: (id: string, reason?: string) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<CustomerOrder>(`/customer/orders/${encodeURIComponent(id)}/cancel`, {
+          method: 'POST',
+          body: { reason },
+        }),
+
   // ------------------------------------------------- planned ecosystem (P4)
   /**
    * Requests for quotation (P4).
@@ -728,6 +893,80 @@ export const customerApi = {
  * limits of that data; every page that shows it also shows a preview notice.
  */
 export const publicApi = {
+  /**
+   * The catalogue categories the admin CMS maintains.
+   *
+   * Read from the same `ServiceCategory` rows the control panel edits, so a
+   * category cannot appear on the site that an operator cannot manage.
+   */
+  categories: async (locale: string) => {
+    if (IS_STATIC_PREVIEW) {
+      const items = SERVICE_CATEGORIES.map((c) => ({
+        key: c.key,
+        name: locale === 'ar' ? c.nameAr : c.nameEn,
+        icon: null as string | null,
+        domain: null as string | null,
+        imageUrl: null as string | null,
+      }));
+      return { items, total: items.length };
+    }
+    return publicGet<{ items: CatalogCategory[]; total: number }>(
+      `/customer/catalog/categories?locale=${locale}`,
+    );
+  },
+
+  /** The published product catalogue, filtered and paginated. */
+  products: async (
+    params: {
+      locale: string;
+      companyId?: string;
+      query?: string;
+      sort?: 'relevance' | 'price_asc' | 'price_desc' | 'name';
+      page?: number;
+      pageSize?: number;
+    },
+  ) => {
+    if (IS_STATIC_PREVIEW) return { items: [] as CatalogProduct[], total: 0, page: 1, pageSize: 20 };
+    const qs = new URLSearchParams({ locale: params.locale });
+    if (params.companyId) qs.set('companyId', params.companyId);
+    if (params.query) qs.set('query', params.query);
+    if (params.sort) qs.set('sort', params.sort);
+    qs.set('page', String(params.page ?? 1));
+    qs.set('pageSize', String(params.pageSize ?? 20));
+    return publicGet<{ items: CatalogProduct[]; total: number; page: number; pageSize: number }>(
+      `/customer/catalog/products?${qs.toString()}`,
+    );
+  },
+
+  /** One product with its images, store and related items. */
+  product: async (id: string, locale: string) => {
+    if (IS_STATIC_PREVIEW) throw new ApiError(404, 'not_found', 'Product not found.');
+    return publicGet<CatalogProduct & { images: Array<{ url: string | null }>; related: CatalogProduct[] }>(
+      `/customer/catalog/products/${encodeURIComponent(id)}?locale=${locale}`,
+    );
+  },
+
+  /** The marketplace stores that actually have published products. */
+  stores: async (locale: string) => {
+    if (IS_STATIC_PREVIEW) return { items: [] as CatalogStore[], total: 0 };
+    return publicGet<{ items: CatalogStore[]; total: number }>(
+      `/customer/catalog/stores?locale=${locale}`,
+    );
+  },
+
+  /**
+   * The active promotional offers.
+   *
+   * The service filters to active offers from approved providers inside their
+   * window, so an expired or unapproved offer is never advertised.
+   */
+  offers: async (categoryKey?: string, limit = 12) => {
+    if (IS_STATIC_PREVIEW) return [] as ProviderOffer[];
+    const qs = new URLSearchParams({ limit: String(limit) });
+    if (categoryKey) qs.set('categoryKey', categoryKey);
+    return publicGet<ProviderOffer[]>(`/customer/catalog/offers?${qs.toString()}`);
+  },
+
   /**
    * Approved providers, optionally filtered by category.
    *

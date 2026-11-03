@@ -17,6 +17,8 @@ import {
   Modal,
   SectionHeader,
   Skeleton,
+  StatCard,
+  StatGrid,
   StatusBadge,
   TableShell,
 } from '@/components/ui';
@@ -261,10 +263,10 @@ function BookingsTab({ canBook, canApprove, canInvoice }: { canBook: boolean; ca
             <Button size="sm" variant="ghost" onClick={() => setDetail(null)}><Icon name="close" size={14} /></Button>
           </div>
           {report.loading ? <Skeleton height={80} /> : (
-            <div className="grid gap-3 sm:grid-cols-4">
-              <Kpi label={t('erp.automotive.findings')} value={String((report.data?.findings as unknown[] | undefined)?.length ?? 0)} />
-              <Kpi label={t('erp.automotive.defects')} value={String(report.data?.defects ?? 0)} />
-              <Kpi label={t('erp.automotive.critical')} value={String(report.data?.critical ?? 0)} />
+            <StatGrid>
+              <StatCard icon="clipboardCheck" label={t('erp.automotive.findings')} value={String((report.data?.findings as unknown[] | undefined)?.length ?? 0)} />
+              <StatCard icon="alert" label={t('erp.automotive.defects')} value={String(report.data?.defects ?? 0)} />
+              <StatCard tone="danger" icon="alert" label={t('erp.automotive.critical')} value={String(report.data?.critical ?? 0)} />
               {canBook && report.data?.report ? null : (
                 <div className="flex items-end">
                   <Button size="sm" data-testid={`submit-report-${detail}`} onClick={async () => { await api.submitInspectionReport(detail); await report.reload(); }}>
@@ -272,7 +274,7 @@ function BookingsTab({ canBook, canApprove, canInvoice }: { canBook: boolean; ca
                   </Button>
                 </div>
               )}
-            </div>
+            </StatGrid>
           )}
         </div>
       ) : null}
@@ -414,11 +416,3 @@ function CreateServiceModal({ open, onClose, onCreated }: { open: boolean; onClo
   );
 }
 
-function Kpi({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="oryx-label">{label}</p>
-      <p className="m-0 text-[22px] font-extrabold tabular-nums">{value}</p>
-    </div>
-  );
-}

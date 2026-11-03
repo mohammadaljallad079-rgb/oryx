@@ -6,7 +6,6 @@ import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
 import { customerApi, type Address, type NotificationPreference, type PrivacySettings } from '@/lib/api';
 import { messageOf, useAsync } from '@/lib/hooks';
-import { RequireCustomer } from '@/components/require-customer';
 import { Alert, Button, Card, Field } from '@/components/ui';
 import { LoadingPanel, PageHeader, StatePanel } from '@/components/premium';
 import { Icon } from '@/components/icons';
@@ -14,9 +13,7 @@ import { Icon } from '@/components/icons';
 /** Profile, addresses, notification preferences and privacy controls. */
 export default function ProfilePage() {
   return (
-    <RequireCustomer>
-      <ProfileContent />
-    </RequireCustomer>
+    <ProfileContent />
   );
 }
 
@@ -152,7 +149,7 @@ function ProfileContent() {
   }
 
   return (
-    <div className="oryx-container">
+    <div className="oryx-account-page">
       <PageHeader
         eyebrow={t('brand.tagline')}
         title={t('profile.title')}

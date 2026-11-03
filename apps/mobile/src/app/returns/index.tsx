@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
+import { statusLabel } from '../../lib/i18n';
 import { useLiveSession } from '../../lib/live-session';
 import { returnsApi } from '../../lib/api';
 import { useAsync } from '../../lib/use-async';
@@ -60,7 +61,7 @@ function ReturnCard({ row, onOpen }: { row: CustomerReturnDto; onOpen: () => voi
     <Card onPress={onOpen} testID={`return-card-${row.reference}`}>
       <View style={styles.head}>
         <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.body }}>{row.reference}</Text>
-        <Badge text={row.status} status={row.status} />
+        <Badge text={statusLabel(locale, row.status)} status={row.status} />
       </View>
       <Text style={{ color: theme.textMuted, fontSize: typography.label, marginTop: space.xs }} numberOfLines={2}>
         {row.reason}

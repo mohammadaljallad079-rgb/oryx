@@ -11,6 +11,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { useApp } from '../lib/app-context';
+import { statusLabel } from '../lib/i18n';
 import { photoSmall } from '../lib/assets';
 import { brand, radius, space, typography } from '../lib/theme';
 import { discountPercent, formatAmount, formatDate, formatMoney, localizeDigits, slotLabel } from '../lib/format';
@@ -193,7 +194,7 @@ export function OrderCard({ order, store }: { order: DemoOrder; store?: DemoStor
         <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.body }}>
           {order.reference}
         </Text>
-        <Badge text={order.status} status={order.status} />
+        <Badge text={statusLabel(locale, order.status)} status={order.status} />
       </View>
       <Body size="caption" muted style={{ marginTop: space.xs }}>
         {store ? l({ en: store.nameEn, ar: store.nameAr }) : ''}
@@ -220,7 +221,7 @@ export function BookingCard({ booking, provider }: { booking: DemoBooking; provi
         <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.body, flexShrink: 1 }}>
           {l({ en: booking.serviceNameEn, ar: booking.serviceNameAr })}
         </Text>
-        <Badge text={booking.status} status={booking.status} />
+        <Badge text={statusLabel(locale, booking.status)} status={booking.status} />
       </View>
       <Body size="caption" muted style={{ marginTop: space.xs }}>
         {provider ? l({ en: provider.nameEn, ar: provider.nameAr }) : ''}
@@ -261,7 +262,7 @@ export function LiveBookingCard({
         <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.body, flexShrink: 1 }}>
           {booking.reference ?? booking.bookingType}
         </Text>
-        <Badge text={booking.status} status={booking.status} />
+        <Badge text={statusLabel(locale, booking.status)} status={booking.status} />
       </View>
       <Body size="caption" muted style={{ marginTop: space.xs }}>
         {booking.serviceRef ?? booking.bookingType}
@@ -289,7 +290,7 @@ export function RecoveryCard({ job }: { job: DemoRecoveryJob }) {
         <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.body }}>
           {job.reference}
         </Text>
-        <Badge text={job.status} status={job.status} />
+        <Badge text={statusLabel(locale, job.status)} status={job.status} />
       </View>
       <Body size="caption" muted style={{ marginTop: space.xs }}>
         {locale === 'ar' ? job.pickupAr : job.pickupEn}

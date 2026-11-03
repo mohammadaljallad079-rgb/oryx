@@ -14,6 +14,8 @@ import {
   Field,
   SectionHeader,
   Skeleton,
+  StatCard,
+  StatGrid,
   TableShell,
 } from '@/components/ui';
 import type {
@@ -99,11 +101,13 @@ export default function ReportsPage() {
             <EmptyState title={t('common.empty')} />
           ) : (
             <>
-              <div className="grid gap-4 border-b border-[var(--border)] p-4 sm:grid-cols-4">
-                <Kpi label={t('erp.reports.totalSales')} value={money(sales.data.totalSalesMinor)} testId="kpi-sales-total" />
-                <Kpi label={t('erp.reports.totalTax')} value={money(sales.data.totalTaxMinor)} />
-                <Kpi label={t('erp.reports.collected')} value={money(sales.data.totalPaidMinor)} />
-                <Kpi label={t('erp.reports.outstanding')} value={money(sales.data.totalOutstandingMinor)} />
+              <div className="border-b border-[var(--border)] p-4">
+                <StatGrid>
+                  <StatCard tone="gold" icon="cart" label={t('erp.reports.totalSales')} value={money(sales.data.totalSalesMinor)} data-testid="kpi-sales-total" />
+                  <StatCard icon="scroll" label={t('erp.reports.totalTax')} value={money(sales.data.totalTaxMinor)} />
+                  <StatCard tone="success" icon="wallet" label={t('erp.reports.collected')} value={money(sales.data.totalPaidMinor)} />
+                  <StatCard tone="danger" icon="clock" label={t('erp.reports.outstanding')} value={money(sales.data.totalOutstandingMinor)} />
+                </StatGrid>
               </div>
               <div className="border-b border-[var(--border)] p-4">
                 <p className="oryx-panel-title m-0 mb-3">{t('erp.reports.byCustomer')}</p>
@@ -173,11 +177,13 @@ export default function ReportsPage() {
             <EmptyState title={t('common.empty')} />
           ) : (
             <>
-              <div className="grid gap-4 border-b border-[var(--border)] p-4 sm:grid-cols-4">
-                <Kpi label={t('erp.reports.ordered')} value={money(purchasing.data.totalOrderedMinor)} testId="kpi-purchasing-ordered" />
-                <Kpi label={t('erp.reports.invoiced')} value={money(purchasing.data.totalInvoicedMinor)} />
-                <Kpi label={t('erp.reports.paid')} value={money(purchasing.data.totalPaidMinor)} />
-                <Kpi label={t('erp.reports.outstanding')} value={money(purchasing.data.totalOutstandingMinor)} />
+              <div className="border-b border-[var(--border)] p-4">
+                <StatGrid>
+                  <StatCard icon="truck" label={t('erp.reports.ordered')} value={money(purchasing.data.totalOrderedMinor)} data-testid="kpi-purchasing-ordered" />
+                  <StatCard icon="scroll" label={t('erp.reports.invoiced')} value={money(purchasing.data.totalInvoicedMinor)} />
+                  <StatCard tone="success" icon="wallet" label={t('erp.reports.paid')} value={money(purchasing.data.totalPaidMinor)} />
+                  <StatCard tone="danger" icon="clock" label={t('erp.reports.outstanding')} value={money(purchasing.data.totalOutstandingMinor)} />
+                </StatGrid>
               </div>
               <div className="p-4">
                 <p className="oryx-panel-title m-0 mb-3">{t('erp.reports.bySupplier')}</p>
@@ -220,10 +226,12 @@ export default function ReportsPage() {
             <EmptyState title={t('common.empty')} />
           ) : (
             <>
-              <div className="grid gap-4 border-b border-[var(--border)] p-4 sm:grid-cols-3">
-                <Kpi label={t('erp.inventory.totalValue')} value={money(inventory.data.totalValueMinor)} testId="kpi-inventory-value" />
-                <Kpi label={t('erp.inventory.totalQty')} value={qty(inventory.data.totalQuantity)} />
-                <Kpi label={t('erp.inventory.reorder')} value={String(inventory.data.reorderAlerts.length)} />
+              <div className="border-b border-[var(--border)] p-4">
+                <StatGrid>
+                  <StatCard tone="gold" icon="warehouse" label={t('erp.inventory.totalValue')} value={money(inventory.data.totalValueMinor)} data-testid="kpi-inventory-value" />
+                  <StatCard icon="package" label={t('erp.inventory.totalQty')} value={qty(inventory.data.totalQuantity)} />
+                  <StatCard tone="danger" icon="alert" label={t('erp.inventory.reorder')} value={String(inventory.data.reorderAlerts.length)} />
+                </StatGrid>
               </div>
               <div className="border-b border-[var(--border)] p-4">
                 <p className="oryx-panel-title m-0 mb-3">{t('erp.inventory.valuation')}</p>
@@ -291,16 +299,22 @@ export default function ReportsPage() {
             <EmptyState title={t('common.empty')} />
           ) : (
             <>
-              <div className="grid gap-4 border-b border-[var(--border)] p-4 sm:grid-cols-4">
-                <Kpi label={t('erp.reports.journals')} value={String(accounting.data.journalCount)} testId="kpi-journal-count" />
-                <Kpi label={t('erp.accounting.debit')} value={money(accounting.data.totalDebitMinor)} />
-                <Kpi label={t('erp.accounting.credit')} value={money(accounting.data.totalCreditMinor)} />
-                <div>
-                  <p className="oryx-label">{t('erp.accounting.balanced')}</p>
-                  <Badge tone={accounting.data.balanced ? 'success' : 'danger'} data-testid="report-accounting-balanced">
-                    {accounting.data.balanced ? t('erp.accounting.balanced') : t('erp.accounting.unbalanced')}
-                  </Badge>
-                </div>
+              <div className="border-b border-[var(--border)] p-4">
+                <StatGrid>
+                  <StatCard icon="scroll" label={t('erp.reports.journals')} value={String(accounting.data.journalCount)} data-testid="kpi-journal-count" />
+                  <StatCard icon="calculator" label={t('erp.accounting.debit')} value={money(accounting.data.totalDebitMinor)} />
+                  <StatCard icon="calculator" label={t('erp.accounting.credit')} value={money(accounting.data.totalCreditMinor)} />
+                  <StatCard
+                    icon="shield"
+                    tone={accounting.data.balanced ? 'success' : 'danger'}
+                    label={t('erp.accounting.balanced')}
+                    value={
+                      <Badge tone={accounting.data.balanced ? 'success' : 'danger'} data-testid="report-accounting-balanced">
+                        {accounting.data.balanced ? t('erp.accounting.balanced') : t('erp.accounting.unbalanced')}
+                      </Badge>
+                    }
+                  />
+                </StatGrid>
               </div>
               <div className="p-4">
                 <p className="oryx-panel-title m-0 mb-3">{t('erp.reports.bySource')}</p>
@@ -339,11 +353,3 @@ export default function ReportsPage() {
   );
 }
 
-function Kpi({ label, value, testId }: { label: string; value: string; testId?: string }) {
-  return (
-    <div data-testid={testId}>
-      <p className="oryx-label">{label}</p>
-      <p className="m-0 text-[19px] font-extrabold tabular-nums">{value}</p>
-    </div>
-  );
-}

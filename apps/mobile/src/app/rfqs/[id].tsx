@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
+import { statusLabel } from '../../lib/i18n';
 import { useLiveSession } from '../../lib/live-session';
 import { ApiError, rfqsApi } from '../../lib/api';
 import { useAsync } from '../../lib/use-async';
@@ -100,7 +101,7 @@ export default function RfqDetail() {
 
       <Card>
         <View style={styles.head}>
-          <Badge text={record.status} status={record.status} />
+          <Badge text={statusLabel(locale, record.status)} status={record.status} />
           <Text style={{ color: theme.gold, fontWeight: '700', fontSize: typography.subheading }}>
             {`${localizeDigits(record.quantity, locale)}`}
           </Text>
@@ -128,7 +129,7 @@ export default function RfqDetail() {
               {record.acceptedQuoteId === quote.id ? (
                 <Badge text={t('rfqAccepted')} tone="success" />
               ) : (
-                <Badge text={quote.status} status={quote.status} />
+                <Badge text={statusLabel(locale, quote.status)} status={quote.status} />
               )}
             </View>
             {quote.leadTimeDays !== null ? (

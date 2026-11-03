@@ -885,6 +885,92 @@ const strings: Record<string, Entry> = {
   sensageAiConfidence: { ar: 'الثقة', en: 'Confidence' },
 };
 
+/**
+ * Status words the API returns as enums.
+ *
+ * A screen that printed `booking.status` directly leaked an English enum
+ * (`HELD`, `NO_SHOW`) into the Arabic UI. Every consumer-facing status is
+ * named here and rendered through `statusLabel`.
+ */
+const statusStrings: Record<string, Entry> = {
+  HELD: { ar: 'قيد الحجز', en: 'Held' },
+  CONFIRMED: { ar: 'مؤكد', en: 'Confirmed' },
+  RESCHEDULED: { ar: 'أُعيد جدولته', en: 'Rescheduled' },
+  IN_PROGRESS: { ar: 'قيد التنفيذ', en: 'In progress' },
+  COMPLETED: { ar: 'مكتمل', en: 'Completed' },
+  CANCELLED: { ar: 'ملغى', en: 'Cancelled' },
+  NO_SHOW: { ar: 'لم يحضر', en: 'No show' },
+  PENDING: { ar: 'قيد الانتظار', en: 'Pending' },
+  PREPARING: { ar: 'قيد التجهيز', en: 'Preparing' },
+  READY: { ar: 'جاهز', en: 'Ready' },
+  OUT_FOR_DELIVERY: { ar: 'قيد التوصيل', en: 'Out for delivery' },
+  DELIVERED: { ar: 'تم التوصيل', en: 'Delivered' },
+  SHIPPED: { ar: 'تم الشحن', en: 'Shipped' },
+  REQUIRES_METHOD: { ar: 'بانتظار طريقة الدفع', en: 'Awaiting payment method' },
+  REQUIRES_ACTION: { ar: 'بانتظار إجراء', en: 'Awaiting action' },
+  PROCESSING: { ar: 'قيد المعالجة', en: 'Processing' },
+  SUCCEEDED: { ar: 'ناجح', en: 'Succeeded' },
+  FAILED: { ar: 'فشل', en: 'Failed' },
+  EXPIRED: { ar: 'منتهي', en: 'Expired' },
+  VOIDED: { ar: 'ملغى', en: 'Voided' },
+  REQUESTED: { ar: 'مطلوب', en: 'Requested' },
+  APPROVED: { ar: 'معتمد', en: 'Approved' },
+  PROCESSED: { ar: 'تمت معالجته', en: 'Processed' },
+  REJECTED: { ar: 'مرفوض', en: 'Rejected' },
+  OPEN: { ar: 'مفتوح', en: 'Open' },
+  QUOTED: { ar: 'تم التسعير', en: 'Quoted' },
+  ACCEPTED: { ar: 'مقبول', en: 'Accepted' },
+  WITHDRAWN: { ar: 'مسحوب', en: 'Withdrawn' },
+  NEW: { ar: 'جديد', en: 'New' },
+  RESOLVED: { ar: 'تم حله', en: 'Resolved' },
+  CLOSED: { ar: 'مغلق', en: 'Closed' },
+  UNDER_REVIEW: { ar: 'قيد المراجعة', en: 'Under review' },
+  AWAITING_PROVIDER: { ar: 'بانتظار المزود', en: 'Awaiting provider' },
+  ESCALATED: { ar: 'مُصعّد', en: 'Escalated' },
+  ACTIVE: { ar: 'نشط', en: 'Active' },
+  INACTIVE: { ar: 'غير نشط', en: 'Inactive' },
+  SOLD: { ar: 'مباع', en: 'Sold' },
+  RECEIVED: { ar: 'تم الاستلام', en: 'Received' },
+  REFUNDED: { ar: 'مُسترد', en: 'Refunded' },
+  ASSIGNED: { ar: 'مُكلّف', en: 'Assigned' },
+  EN_ROUTE: { ar: 'في الطريق', en: 'En route' },
+  ON_SITE: { ar: 'في الموقع', en: 'On site' },
+  ARRIVED: { ar: 'وصل', en: 'Arrived' },
+  SEARCHING: { ar: 'جارٍ البحث', en: 'Searching' },
+  ANALYSING: { ar: 'قيد التحليل', en: 'Analysing' },
+  PUBLISHED: { ar: 'منشور', en: 'Published' },
+  HIDDEN: { ar: 'مخفي', en: 'Hidden' },
+  DRAFT: { ar: 'مسودة', en: 'Draft' },
+  SUBMITTED: { ar: 'مُقدّم', en: 'Submitted' },
+  SCHEDULED: { ar: 'مجدول', en: 'Scheduled' },
+  ON_HOLD: { ar: 'معلّق', en: 'On hold' },
+};
+
+const bookingTypeStrings: Record<string, Entry> = {
+  INSPECTION: { ar: 'فحص', en: 'Inspection' },
+  MAINTENANCE: { ar: 'صيانة', en: 'Maintenance' },
+  PROVIDER_SERVICE: { ar: 'خدمة مزود', en: 'Provider service' },
+};
+
+/**
+ * Localise a status enum, degrading to a readable word for an unknown value so
+ * a new server enum never renders as an empty string.
+ */
+export function statusLabel(locale: Locale, status: string | null | undefined): string {
+  if (!status) return '';
+  const entry = statusStrings[status];
+  if (entry) return entry[locale];
+  return status.replace(/_/g, ' ').toLowerCase();
+}
+
+/** Localise a booking type enum (`INSPECTION`). */
+export function bookingTypeLabel(locale: Locale, value: string | null | undefined): string {
+  if (!value) return '';
+  const entry = bookingTypeStrings[value];
+  if (entry) return entry[locale];
+  return value.replace(/_/g, ' ').toLowerCase();
+}
+
 export function translate(locale: Locale, key: keyof typeof strings): string {
   const entry = strings[key];
   if (!entry) return String(key);

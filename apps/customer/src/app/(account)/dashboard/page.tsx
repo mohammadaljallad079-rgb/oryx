@@ -5,16 +5,13 @@ import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
 import { customerApi, assetUrl } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
-import { RequireCustomer } from '@/components/require-customer';
-import { Card, EmptyState, Loading, StatusBadge, formatDate } from '@/components/ui';
+import { Card, EmptyState, Loading, StatusBadge, bookingTypeLabel, formatDate } from '@/components/ui';
 import { Icon } from '@/components/icons';
 
 /** Customer dashboard: real counts and the latest activity from the API. */
 export default function DashboardPage() {
   return (
-    <RequireCustomer>
-      <DashboardContent />
-    </RequireCustomer>
+    <DashboardContent />
   );
 }
 
@@ -29,7 +26,7 @@ function DashboardContent() {
   const latestPayments = payments.data?.items.slice(0, 5) ?? [];
 
   return (
-    <div className="oryx-container">
+    <div className="oryx-account-page">
       {/* ------------------------------------------------ welcome banner */}
       <section className="oryx-dash-hero">
         <span
@@ -139,7 +136,7 @@ function DashboardContent() {
               <tbody>
                 {bookings.data?.items.slice(0, 5).map((booking) => (
                   <tr key={booking.id}>
-                    <td>{booking.bookingType}</td>
+                    <td>{bookingTypeLabel(t, booking.bookingType)}</td>
                     <td>{formatDate(booking.startsAt, locale)}</td>
                     <td>
                       <StatusBadge status={booking.status} />

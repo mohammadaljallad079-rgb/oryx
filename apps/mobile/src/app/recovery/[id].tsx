@@ -3,6 +3,7 @@ import { Linking, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
+import { statusLabel } from '../../lib/i18n';
 import { repository } from '../../lib/repository';
 import { useAsync } from '../../lib/use-async';
 import { useLiveSession } from '../../lib/live-session';
@@ -128,7 +129,7 @@ export default function RecoveryDetail() {
 
         <Card>
           <View style={styles.headRow}>
-            <Badge text={record.status} status={record.status} />
+            <Badge text={statusLabel(locale, record.status)} status={record.status} />
             <Text style={{ color: theme.gold, fontWeight: '700', fontSize: typography.label }}>
               {record.urgency}
             </Text>
@@ -176,7 +177,7 @@ export default function RecoveryDetail() {
           <SectionLabel>{t('recoveryTimeline')}</SectionLabel>
           {record.timeline.map((event) => (
             <View key={event.id} style={styles.event} testID={`recovery-event-${event.id}`}>
-              <Badge text={event.status} status={event.status} />
+              <Badge text={statusLabel(locale, event.status)} status={event.status} />
               <View style={{ flex: 1 }}>
                 {event.note ? (
                   <Text style={{ color: theme.textMuted, fontSize: typography.label }}>{event.note}</Text>

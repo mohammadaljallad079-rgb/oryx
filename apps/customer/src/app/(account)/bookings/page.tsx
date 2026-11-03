@@ -5,8 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useUi } from '@/lib/ui-context';
 import { customerApi, SERVICE_CATEGORIES, type AvailableSlot } from '@/lib/api';
 import { messageOf, useAsync } from '@/lib/hooks';
-import { RequireCustomer } from '@/components/require-customer';
-import { Alert, Button, Card, Field, StatusBadge, formatDate } from '@/components/ui';
+import { Alert, Button, Card, Field, StatusBadge, bookingTypeLabel, formatDate } from '@/components/ui';
 import { LoadingPanel, PageHeader, StatePanel, TableWrap } from '@/components/premium';
 import { Icon } from '@/components/icons';
 
@@ -23,17 +22,15 @@ function todayIso(): string {
 /** Booking engine: pick a service, a vehicle and a real available slot. */
 export default function BookingsPage() {
   return (
-    <RequireCustomer>
-      <Suspense
-        fallback={
-          <div className="oryx-container">
-            <LoadingPanel rows={4} />
-          </div>
-        }
-      >
-        <BookingsContent />
-      </Suspense>
-    </RequireCustomer>
+    <Suspense
+      fallback={
+        <div className="oryx-account-page">
+          <LoadingPanel rows={4} />
+        </div>
+      }
+    >
+      <BookingsContent />
+    </Suspense>
   );
 }
 
@@ -289,7 +286,7 @@ function BookingsContent() {
                 <tbody>
                   {active.map((booking) => (
                     <tr key={booking.id}>
-                      <td>{booking.bookingType}</td>
+                      <td>{bookingTypeLabel(t, booking.bookingType)}</td>
                       <td>{formatDate(booking.startsAt, locale)}</td>
                       <td>
                         <StatusBadge status={booking.status} />

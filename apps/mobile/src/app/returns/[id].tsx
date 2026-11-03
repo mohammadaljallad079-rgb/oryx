@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 
 import { useApp } from '../../lib/app-context';
+import { statusLabel } from '../../lib/i18n';
 import { useLiveSession } from '../../lib/live-session';
 import { ApiError, returnsApi } from '../../lib/api';
 import { useAsync } from '../../lib/use-async';
@@ -81,7 +82,7 @@ export default function ReturnDetail() {
           <Text style={{ color: theme.text, fontWeight: '700', fontSize: typography.subheading }}>
             {row.orderReference ?? row.orderId}
           </Text>
-          <Badge text={row.status} status={row.status} />
+          <Badge text={statusLabel(locale, row.status)} status={row.status} />
         </View>
         <Divider />
         <DetailRow label={t('returnReason')} value={row.reason} />

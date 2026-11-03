@@ -17,6 +17,8 @@ import {
   Modal,
   SectionHeader,
   Skeleton,
+  StatCard,
+  StatGrid,
   StatusBadge,
   TableShell,
 } from '@/components/ui';
@@ -78,15 +80,15 @@ function DashboardTab() {
   const d = data.data!;
   return (
     <Card className="p-4" data-testid="crm-dashboard">
-      <div className="grid gap-4 sm:grid-cols-4">
-        <Kpi label={t('erp.crm.totalLeads')} value={String(d.totalLeads)} />
-        <Kpi label={t('erp.crm.openOpportunities')} value={String(d.openOpportunities)} />
-        <Kpi label={t('erp.crm.pipelineValue')} value={money(d.pipelineValueMinor)} />
-        <Kpi label={t('erp.crm.openTickets')} value={String(d.openTickets)} />
-        <Kpi label={t('erp.crm.wonOpportunities')} value={String(d.wonOpportunities)} />
-        <Kpi label={t('erp.crm.overdueActivities')} value={String(d.overdueActivities)} />
-        <Kpi label={t('erp.crm.satisfaction')} value={d.averageSatisfaction ? d.averageSatisfaction.toFixed(1) : '—'} />
-      </div>
+      <StatGrid>
+        <StatCard icon="target" label={t('erp.crm.totalLeads')} value={String(d.totalLeads)} />
+        <StatCard icon="trend" label={t('erp.crm.openOpportunities')} value={String(d.openOpportunities)} />
+        <StatCard tone="gold" icon="wallet" label={t('erp.crm.pipelineValue')} value={money(d.pipelineValueMinor)} />
+        <StatCard icon="lifeBuoy" label={t('erp.crm.openTickets')} value={String(d.openTickets)} />
+        <StatCard tone="success" icon="check" label={t('erp.crm.wonOpportunities')} value={String(d.wonOpportunities)} />
+        <StatCard tone="danger" icon="clock" label={t('erp.crm.overdueActivities')} value={String(d.overdueActivities)} />
+        <StatCard icon="star" label={t('erp.crm.satisfaction')} value={d.averageSatisfaction ? d.averageSatisfaction.toFixed(1) : '—'} />
+      </StatGrid>
     </Card>
   );
 }
@@ -524,11 +526,3 @@ function ActivitiesTab({ canManage }: { canManage: boolean }) {
   );
 }
 
-function Kpi({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="oryx-label">{label}</p>
-      <p className="m-0 text-[22px] font-extrabold tabular-nums">{value}</p>
-    </div>
-  );
-}
