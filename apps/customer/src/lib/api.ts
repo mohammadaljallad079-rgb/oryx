@@ -319,6 +319,11 @@ export interface ProviderSummary {
   averageRating?: number | null;
   reviewCount?: number;
   listings?: Array<{ id: string; nameEn: string; nameAr: string; priceMinor: number }>;
+  /** Auto Map coordinates (P3), present once an operator places the provider. */
+  latitude?: number | null;
+  longitude?: number | null;
+  /** Kilometres from the query origin; present only on a proximity search. */
+  distanceKm?: number | null;
 }
 
 export interface ProviderDetail extends ProviderSummary {
@@ -373,6 +378,64 @@ export interface PrivacySettings {
  */
 function previewReadOnly(): never {
   throw new ApiError(501, 'preview_read_only', PREVIEW_READ_ONLY_MESSAGE);
+}
+
+/**
+ * A provider quote on a consumer RFQ (P4).
+ *
+ * Mirrors `RfqQuoteDto` in `@oryx/shared`; declared here so the website client
+ * does not reach into the mobile contract for a field name.
+ */
+export interface RfqQuoteRecord {
+  id: string;
+  providerId: string;
+  priceMinor: number;
+  currency: string;
+  leadTimeDays: number | null;
+  note: string | null;
+  status: string;
+  createdAt: string;
+}
+
+/** A consumer request for quotation (P4). */
+export interface RfqRecord {
+  id: string;
+  reference: string;
+  categoryKey: string;
+  description: string;
+  quantity: number;
+  status: string;
+  acceptedQuoteId: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  vehicle: { id: string; label: string } | null;
+  quotes: RfqQuoteRecord[];
+}
+
+/** A consumer order return (P4). */
+export interface CustomerReturnRecord {
+  id: string;
+  reference: string;
+  orderId: string;
+  orderReference: string | null;
+  reason: string;
+  status: string;
+  reviewNote: string | null;
+  requestedAt: string;
+  reviewedAt: string | null;
+  receivedAt: string | null;
+  refundedAt: string | null;
+  cancellable: boolean;
+  lines: Array<{ id: string; orderLineId: string; productId: string; quantity: number }>;
+}
+
+/** The fitment answer for one vehicle and product (P4). */
+export interface FitmentResult {
+  vehicle: { id: string; label: string; year: number };
+  product: { id: string; sku: string; nameEn: string; nameAr: string };
+  compatible: boolean;
+  notes: string[];
+  fitmentKnown: boolean;
 }
 
 export const customerApi = {
@@ -592,6 +655,69 @@ export const customerApi = {
           method: 'POST',
           body: { body },
         }),
+
+  // ------------------------------------------------- planned ecosystem (P4)
+  /**
+   * Requests for quotation (P4).
+   *
+   * A consumer raises a request for a part that is not in the catalogue, approved
+   * providers quote, and the consumer accepts exactly one quote. The account is
+   * resolved from the bearer token, so no account id is sent.
+   */
+  rfqs: () =>
+    IS_STATIC_PREVIEW
+      ? Promise.resolve({ items: [] as RfqRecord[], total: 0 })
+      : request<{ items: RfqRecord[]; total: number }>('/customer/rfqs'),
+  rfq: (id: string) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<RfqRecord>(`/customer/rfqs/${encodeURIComponent(id)}`),
+  createRfq: (body: { categoryKey: string; description: string; quantity?: number; vehicleId?: string; validDays?: number }) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<RfqRecord>('/customer/rfqs', { method: 'POST', body }),
+  cancelRfq: (id: string) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<RfqRecord>(`/customer/rfqs/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: {} }),
+  acceptRfqQuote: (id: string, quoteId: string) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<RfqRecord>(
+          `/customer/rfqs/${encodeURIComponent(id)}/quotes/${encodeURIComponent(quoteId)}/accept`,
+          { method: 'POST', body: {} },
+        ),
+
+  /**
+   * Consumer order returns (P4).
+   *
+   * A return is only accepted inside the server's window and only for the
+   * caller's own delivered order.
+   */
+  returns: () =>
+    IS_STATIC_PREVIEW
+      ? Promise.resolve({ items: [] as CustomerReturnRecord[], total: 0 })
+      : request<{ items: CustomerReturnRecord[]; total: number }>('/customer/returns'),
+  createReturn: (orderId: string, body: { reason: string; lines: Array<{ orderLineId: string; quantity: number }> }) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<CustomerReturnRecord>(`/customer/orders/${encodeURIComponent(orderId)}/returns`, {
+          method: 'POST',
+          body,
+        }),
+  cancelReturn: (id: string) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<CustomerReturnRecord>(`/customer/returns/${encodeURIComponent(id)}/cancel`, {
+          method: 'POST',
+          body: {},
+        }),
+
+  /** Part fitment against the caller's own garage (P4). */
+  checkFitment: (vehicleId: string, productId: string) =>
+    IS_STATIC_PREVIEW
+      ? previewReadOnly()
+      : request<FitmentResult>(`/customer/fitment?vehicleId=${encodeURIComponent(vehicleId)}&productId=${encodeURIComponent(productId)}`),
 };
 
 /**
@@ -602,14 +728,29 @@ export const customerApi = {
  * limits of that data; every page that shows it also shows a preview notice.
  */
 export const publicApi = {
-  providers: async (categoryKey?: string) => {
+  /**
+   * Approved providers, optionally filtered by category.
+   *
+   * When `origin` is supplied the API returns only providers that have Auto Map
+   * coordinates inside `radiusKm`, nearest first. Without an origin the list is
+   * alphabetical and no provider is silently dropped.
+   */
+  providers: async (
+    categoryKey?: string,
+    origin?: { latitude: number; longitude: number; radiusKm?: number },
+  ) => {
     if (IS_STATIC_PREVIEW) {
       const items = previewProviders(categoryKey);
       return { items, total: items.length };
     }
-    return publicGet<{ items: ProviderSummary[]; total: number }>(
-      `/marketplace/providers?pageSize=50${categoryKey ? `&categoryKey=${encodeURIComponent(categoryKey)}` : ''}`,
-    );
+    const qs = new URLSearchParams({ pageSize: '50' });
+    if (categoryKey) qs.set('categoryKey', categoryKey);
+    if (origin) {
+      qs.set('lat', String(origin.latitude));
+      qs.set('lng', String(origin.longitude));
+      if (origin.radiusKm !== undefined) qs.set('radiusKm', String(origin.radiusKm));
+    }
+    return publicGet<{ items: ProviderSummary[]; total: number }>(`/marketplace/providers?${qs.toString()}`);
   },
   provider: async (id: string) => {
     if (IS_STATIC_PREVIEW) {

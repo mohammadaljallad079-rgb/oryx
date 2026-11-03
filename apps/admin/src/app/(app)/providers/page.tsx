@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { money } from '@/lib/erp-format';
 import { useAuth } from '@/lib/auth-context';
@@ -29,6 +29,9 @@ interface ProviderRow {
   status: string;
   commissionPercentBp: number;
   approvedAt: string | null;
+  /** Auto Map coordinates (P3); null when the provider has no known location. */
+  latitude?: number | null;
+  longitude?: number | null;
   _count?: { listings: number; requests: number };
 }
 
@@ -192,6 +195,58 @@ function ProviderModal({
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Auto Map coordinates (P3), seeded from the provider row and editable here.
+  const [lat, setLat] = useState('');
+  const [lng, setLng] = useState('');
+  const [locBusy, setLocBusy] = useState(false);
+  const [locError, setLocError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLat(provider?.latitude != null ? String(provider.latitude) : '');
+    setLng(provider?.longitude != null ? String(provider.longitude) : '');
+    setLocError(null);
+  }, [provider?.id, provider?.latitude, provider?.longitude]);
+
+  async function saveLocation(explicit?: { latitude: number | null; longitude: number | null }) {
+    if (!provider) return;
+    let latitude: number | null;
+    let longitude: number | null;
+    if (explicit) {
+      ({ latitude, longitude } = explicit);
+    } else {
+      // Clearing is an explicit action: an empty pair removes the provider from
+      // every proximity query rather than storing a half-typed point.
+      const clearing = lat.trim() === '' && lng.trim() === '';
+      if (!clearing && (lat.trim() === '' || lng.trim() === '')) {
+        setLocError(t('erp.providers.locationBothRequired'));
+        return;
+      }
+      latitude = clearing ? null : Number(lat);
+      longitude = clearing ? null : Number(lng);
+      if (!clearing && (!Number.isFinite(latitude) || !Number.isFinite(longitude))) {
+        setLocError(t('erp.providers.locationInvalid'));
+        return;
+      }
+      if (
+        !clearing &&
+        ((latitude as number) < -90 || (latitude as number) > 90 ||
+          (longitude as number) < -180 || (longitude as number) > 180)
+      ) {
+        setLocError(t('erp.providers.locationRange'));
+        return;
+      }
+    }
+    setLocBusy(true);
+    setLocError(null);
+    try {
+      await api.setProviderLocation(provider.id, { latitude, longitude });
+      onClose();
+    } catch (e) {
+      setLocError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setLocBusy(false);
+    }
+  }
 
   async function decide(decision: 'APPROVED' | 'REJECTED' | 'SUSPENDED') {
     if (!provider) return;
@@ -236,6 +291,53 @@ function ProviderModal({
                 ))}
               </ul>
             )}
+          </div>
+
+          <div className="border-t border-[var(--border)] pt-3">
+            <div className="mb-1 text-[12px] font-semibold">{t('erp.providers.autoMap')}</div>
+            <p className="mb-2 text-[11.5px] text-[var(--muted)]">{t('erp.providers.autoMapHint')}</p>
+            {locError ? <ErrorBanner message={locError} /> : null}
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Field label={t('erp.providers.latitude')}>
+                <input
+                  className="oryx-input"
+                  inputMode="decimal"
+                  value={lat}
+                  onChange={(e) => setLat(e.target.value)}
+                  placeholder="26.2285"
+                  data-testid="provider-latitude"
+                />
+              </Field>
+              <Field label={t('erp.providers.longitude')}>
+                <input
+                  className="oryx-input"
+                  inputMode="decimal"
+                  value={lng}
+                  onChange={(e) => setLng(e.target.value)}
+                  placeholder="50.5860"
+                  data-testid="provider-longitude"
+                />
+              </Field>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="primary" disabled={locBusy} onClick={() => void saveLocation()} data-testid="provider-save-location">
+                {t('common.save')}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={locBusy || (provider.latitude == null && provider.longitude == null)}
+                onClick={() => void saveLocation({ latitude: null, longitude: null })}
+                data-testid="provider-clear-location"
+              >
+                {t('erp.providers.clearLocation')}
+              </Button>
+              <Badge tone={provider.latitude != null && provider.longitude != null ? 'success' : 'neutral'}>
+                {provider.latitude != null && provider.longitude != null
+                  ? t('erp.providers.onMap')
+                  : t('erp.providers.offMap')}
+              </Badge>
+            </div>
           </div>
 
           {canDecide ? (

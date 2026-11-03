@@ -79,6 +79,26 @@ export default function SensageHome() {
           <SectionLabel>{isLive ? t('myPhotos') : t('myReports')}</SectionLabel>
         </View>
 
+        {/* The real analysis path (P7). Only a live session has server-side
+            photographs and an authenticated endpoint, so this entry is offered
+            there alone. */}
+        {isLive ? (
+          <Card>
+            <Heading size="subheading">{t('sensageAiTitle')}</Heading>
+            <Body size="caption" muted style={{ marginTop: space.xs }}>
+              {t('sensageAiPending')}
+            </Body>
+            <View style={{ marginTop: space.md }}>
+              <Button
+                testID="sensage-ai-open"
+                title={t('sensageAiTitle')}
+                variant="secondary"
+                onPress={() => router.push('/sensage/ai')}
+              />
+            </View>
+          </Card>
+        ) : null}
+
         {isLive ? (
           photos.loading ? (
             <StateView kind="loading" />

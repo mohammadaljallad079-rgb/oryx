@@ -681,6 +681,38 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `customerAccountIds` / `allCustomers` separately; a broadcast is capped at
   `MAX_ANNOUNCEMENT_RECIPIENTS` (5,000) so one call cannot queue unbounded rows.
 
+### Planned-ecosystem gotchas (Execution 20)
+
+- **The account id always comes from the token.** Every `/customer/*` route in
+  `apps/api/src/ecosystem/customer-ecosystem.controller.ts` reads the account
+  from `@CurrentCustomer()`, never from a path or body. A foreign RFQ, return,
+  recovery request, fleet, vehicle or photo must be a `404`, not a leak — the
+  suite `execution20.e2e-spec.ts` pins each one.
+- **A consumer token on a staff route is `401`, not `403`.** `CustomerAuthGuard`
+  and the staff principal guard reject the wrong plane before any permission is
+  read, so the smoke test expects `401` on `/provider/rfqs` with a consumer
+  token and `403` only for a *staff* user without provider membership.
+- **Unknown fitment is not incompatibility.** `EcosystemService.checkFitment`
+  returns `fitmentKnown: false` when the product has no fitment rows at all;
+  `compatible` is then `false` too, but the UI must show the unknown state. Never
+  collapse the two.
+- **A fitment query needs a real product id.** An unknown `productId` is a `404`;
+  use an id from `GET /customer/catalog/products` in a smoke test.
+- **The fleet driver response nests the id.** `POST /customer/fleets/:id/drivers`
+  returns `{ drivers: [...] }`, so a new driver's id is `drivers[0].id`, not the
+  top-level `id`.
+- **`OPERATIONAL` still means it works.** `SENSAGE_AI` reports `configured: false`
+  and produces no analysis until a credential is stored; the analysis path stores
+  every result as a `PENDING` suggestion and the mobile screen must never label
+  it a diagnosis. `apps/mobile/test/ecosystem-honesty.test.ts` guards this.
+- **The registration endpoint is throttled.** A smoke test that registers a
+  fresh consumer per section hits the auth limiter and sees `429` (which empties
+  the token and cascades into spurious `401`s). Run the API with
+  `AUTH_THROTTLE_LIMIT=100000 THROTTLE_LIMIT=1000000 REFRESH_THROTTLE_LIMIT=100000`.
+- **Build the API before a smoke test.** `node apps/api/dist/main.js` serves
+  compiled output; after a source change run `pnpm --filter @oryx/api build`
+  first or the server serves stale routes.
+
 ### Mobile gotchas
 
 - **The double-submit token must be adopted from the login/refresh body.** A native

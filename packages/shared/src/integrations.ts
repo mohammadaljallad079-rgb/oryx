@@ -224,6 +224,29 @@ export const INTEGRATION_PROVIDERS: readonly IntegrationProviderDefinition[] = [
     activationRequirementEn: 'None — messages are stored and read back from the database.',
     activationRequirementAr: 'لا شيء — تُخزَّن الرسائل وتُقرأ من قاعدة البيانات.',
   },
+  {
+    key: 'SENSAGE_AI',
+    nameEn: 'SENSAGE AI vision',
+    nameAr: 'رؤية SENSAGE الذكية',
+    category: 'ANALYTICS',
+    descriptionEn:
+      'Photograph analysis for the SENSAGE inspection feature. Results are suggestions that a human reviews; they are never presented as a diagnosis.',
+    descriptionAr:
+      'تحليل الصور لميزة الفحص SENSAGE. النتائج اقتراحات يراجعها إنسان، ولا تُعرض أبداً كتشخيص.',
+    implementation: 'ADAPTER_ONLY',
+    configurable: true,
+    perCompany: true,
+    credentials: [
+      C('SENSAGE_AI_API_KEY', 'API key', 'مفتاح الواجهة', true),
+      C('SENSAGE_AI_BASE_URL', 'API base URL', 'عنوان الواجهة', false, false),
+      C('SENSAGE_AI_MODEL', 'Model name', 'اسم النموذج', false, false),
+    ],
+    activationRequirementEn:
+      'A vision-model API key from the chosen vendor and one verified analysis call. Until then the feature reports itself unconfigured and produces no result.',
+    activationRequirementAr:
+      'مفتاح واجهة لنموذج رؤية من المزود المختار، ونداء تحليل موثق واحد. قبل ذلك تُبلّغ الميزة عن نفسها كغير مهيّأة ولا تنتج نتيجة.',
+    docsUrl: 'https://platform.openai.com/docs/guides/vision',
+  },
 ];
 
 export const INTEGRATION_PROVIDER_BY_KEY: ReadonlyMap<string, IntegrationProviderDefinition> =

@@ -3,11 +3,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   bookingsApi,
   catalogApi,
+  fitmentApi,
+  fleetsApi,
   getAccessToken,
   getStaffAccessToken,
   paymentsApi,
   providerApi,
+  recoveryApi,
   request,
+  returnsApi,
+  rfqsApi,
+  sensageAiApi,
   serviceRequestsApi,
   setAccessToken,
   subscriptionApi,
@@ -265,3 +271,134 @@ describe('customer booking reschedule', () => {
     expect(captured[0]?.url).toContain('/customer/bookings/b%2F2/reschedule');
   });
 });
+
+/**
+ * The planned-ecosystem endpoints (Execution 20, P4–P7).
+ *
+ * Each of these must ride the consumer plane: an RFQ, a return, a recovery job,
+ * a fleet, a fitment answer and an AI suggestion all belong to the signed-in
+ * customer, and the API resolves the account from the bearer token rather than a
+ * path or query parameter. These tests pin the plane and the exact route so a
+ * later edit cannot send a staff token or a foreign account id.
+ */
+describe('planned ecosystem endpoints', () => {
+  it('raises an RFQ on the consumer plane', async () => {
+    stubFetch(201, { id: 'rfq1', reference: 'RFQ-1' });
+    setAccessToken('consumer-token');
+    setStaffAccessToken('staff-token');
+    await rfqsApi.create({ categoryKey: 'spare_parts', description: 'Front brake pads', quantity: 2 });
+    expect(captured[0]?.url).toContain('/customer/rfqs');
+    expect(captured[0]?.method).toBe('POST');
+    expect(captured[0]?.headers.Authorization).toBe('Bearer consumer-token');
+    expect(JSON.parse(captured[0]?.body as string)).toEqual({
+      categoryKey: 'spare_parts',
+      description: 'Front brake pads',
+      quantity: 2,
+    });
+  });
+
+  it('accepts a quote through the rfq-scoped accept route', async () => {
+    stubFetch(200, { id: 'rfq1', acceptedQuoteId: 'q1' });
+    setAccessToken('consumer-token');
+    await rfqsApi.acceptQuote('rfq1', 'q1');
+    expect(captured[0]?.url).toContain('/customer/rfqs/rfq1/quotes/q1/accept');
+    expect(captured[0]?.method).toBe('POST');
+  });
+
+  it('encodes the rfq and quote ids when accepting', async () => {
+    stubFetch(200, {});
+    setAccessToken('consumer-token');
+    await rfqsApi.acceptQuote('r/1', 'q/1');
+    expect(captured[0]?.url).toContain('/customer/rfqs/r%2F1/quotes/q%2F1/accept');
+  });
+
+  it('raises a return against the caller own order', async () => {
+    stubFetch(201, { id: 'ret1', status: 'REQUESTED' });
+    setAccessToken('consumer-token');
+    await returnsApi.create('order-9', {
+      reason: 'Wrong part',
+      lines: [{ orderLineId: 'line-1', quantity: 1 }],
+    });
+    expect(captured[0]?.url).toContain('/customer/orders/order-9/returns');
+    expect(captured[0]?.method).toBe('POST');
+    expect(captured[0]?.headers.Authorization).toBe('Bearer consumer-token');
+  });
+
+  it('lists returns from the token scope with no account id', async () => {
+    stubFetch(200, []);
+    setAccessToken('consumer-token');
+    await returnsApi.list();
+    expect(captured[0]?.url).toContain('/customer/returns');
+    expect(captured[0]?.url).not.toContain('accountId');
+  });
+
+  it('raises a recovery with the pickup coordinates the server requires', async () => {
+    stubFetch(201, { id: 'rec1', reference: 'REC-1' });
+    setAccessToken('consumer-token');
+    setStaffAccessToken('staff-token');
+    await recoveryApi.create({
+      pickupLatitude: 26.2285,
+      pickupLongitude: 50.586,
+      contactPhone: '+97330000000',
+      issue: 'Flat battery',
+      urgency: 'URGENT',
+    });
+    expect(captured[0]?.url).toContain('/customer/recovery');
+    expect(captured[0]?.method).toBe('POST');
+    expect(captured[0]?.headers.Authorization).toBe('Bearer consumer-token');
+    expect(JSON.parse(captured[0]?.body as string).pickupLatitude).toBe(26.2285);
+  });
+
+  it('tracks a recovery through the recovery-specific route', async () => {
+    stubFetch(200, { id: 'rec1', timeline: [] });
+    setAccessToken('consumer-token');
+    await recoveryApi.get('rec/1');
+    expect(captured[0]?.url).toContain('/customer/recovery/rec%2F1');
+  });
+
+  it('creates a fleet and lists it from the token scope', async () => {
+    stubFetch(201, { id: 'f1', name: 'Delivery fleet' });
+    setAccessToken('consumer-token');
+    await fleetsApi.create({ name: 'Delivery fleet', contactPhone: '+97330000000' });
+    expect(captured[0]?.url).toContain('/customer/fleets');
+    expect(captured[0]?.method).toBe('POST');
+    expect(captured[0]?.headers.Authorization).toBe('Bearer consumer-token');
+  });
+
+  it('toggles a driver through the fleet-scoped route', async () => {
+    stubFetch(200, { id: 'f1', drivers: [] });
+    setAccessToken('consumer-token');
+    await fleetsApi.setDriverActive('f1', 'd1', false);
+    expect(captured[0]?.url).toContain('/customer/fleets/f1/drivers/d1/active');
+    expect(JSON.parse(captured[0]?.body as string)).toEqual({ isActive: false });
+  });
+
+  it('checks fitment for the caller own vehicle and product', async () => {
+    stubFetch(200, { compatible: true, fitmentKnown: true });
+    setAccessToken('consumer-token');
+    await fitmentApi.check('v1', 'p1');
+    expect(captured[0]?.url).toContain('/customer/fitment?vehicleId=v1&productId=p1');
+    expect(captured[0]?.headers.Authorization).toBe('Bearer consumer-token');
+  });
+
+  it('reports the SENSAGE status without claiming a model is configured', async () => {
+    stubFetch(200, { providerKey: 'SENSAGE_AI', configured: false, message: 'not configured' });
+    setAccessToken('consumer-token');
+    const status = await sensageAiApi.status();
+    expect(captured[0]?.url).toContain('/customer/sensage/status');
+    expect(status.configured).toBe(false);
+  });
+
+  it('requests an analysis and reads the suggestion back as pending', async () => {
+    stubFetch(201, { id: 's1', reviewStatus: 'PENDING', verified: false });
+    setAccessToken('consumer-token');
+    const suggestion = await sensageAiApi.analyze({ photoId: 'photo-1' });
+    expect(captured[0]?.url).toContain('/customer/sensage/analyze');
+    expect(captured[0]?.method).toBe('POST');
+    // A suggestion is never verified on creation; the screen must not present
+    // the model output as a diagnosis.
+    expect(suggestion.verified).toBe(false);
+    expect(suggestion.reviewStatus).toBe('PENDING');
+  });
+});
+

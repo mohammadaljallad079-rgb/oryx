@@ -37,12 +37,39 @@ function ProvidersDirectory() {
   const [providers, setProviders] = useState<ProviderSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Auto Map discovery (P3). The origin is only ever set from the browser's own
+  // geolocation prompt, never inferred, so a proximity result is always a real
+  // distance from a location the visitor agreed to share.
+  const [origin, setOrigin] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [radiusKm, setRadiusKm] = useState(25);
+  const [geoError, setGeoError] = useState<string | null>(null);
+  const [locating, setLocating] = useState(false);
+
+  function useMyLocation() {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setGeoError(t('providers.geoUnsupported'));
+      return;
+    }
+    setLocating(true);
+    setGeoError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setOrigin({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+        setLocating(false);
+      },
+      () => {
+        setGeoError(t('providers.geoDenied'));
+        setLocating(false);
+      },
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000 },
+    );
+  }
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     publicApi
-      .providers(category)
+      .providers(category, origin ? { ...origin, radiusKm } : undefined)
       .then((res) => {
         if (active) {
           setProviders(res.items);
@@ -58,7 +85,7 @@ function ProvidersDirectory() {
     return () => {
       active = false;
     };
-  }, [category, t]);
+  }, [category, t, origin, radiusKm]);
 
   return (
     <div className="oryx-container">
@@ -88,6 +115,45 @@ function ProvidersDirectory() {
             {locale === 'ar' ? item.nameAr : item.nameEn}
           </Link>
         ))}
+      </Toolbar>
+
+      <Toolbar>
+        <button
+          type="button"
+          className={origin ? 'oryx-btn oryx-btn-primary' : 'oryx-btn'}
+          onClick={useMyLocation}
+          disabled={locating}
+          data-testid="providers-near-me"
+        >
+          <Icon name="pin" size={15} />
+          {locating ? t('providers.locating') : t('providers.nearMe')}
+        </button>
+        {origin ? (
+          <>
+            <label className="oryx-toolbar" style={{ marginBottom: 0 }}>
+              <span className="oryx-muted">{t('providers.radius')}</span>
+              <select
+                className="oryx-input"
+                value={String(radiusKm)}
+                onChange={(e) => setRadiusKm(Number(e.target.value))}
+                data-testid="providers-radius"
+              >
+                {[5, 10, 25, 50, 100].map((km) => (
+                  <option key={km} value={km}>{t('providers.km', { count: String(km) })}</option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="oryx-btn"
+              onClick={() => { setOrigin(null); setGeoError(null); }}
+              data-testid="providers-clear-location"
+            >
+              {t('providers.clearLocation')}
+            </button>
+          </>
+        ) : null}
+        {geoError ? <span className="oryx-muted" data-testid="providers-geo-error">{geoError}</span> : null}
       </Toolbar>
 
       {loading ? (
@@ -120,6 +186,11 @@ function ProvidersDirectory() {
                   </h2>
                 </div>
                 <div className="oryx-provider-card__meta">
+                  {typeof provider.distanceKm === 'number' ? (
+                    <span className="oryx-muted" data-testid={`provider-distance-${provider.code}`}>
+                      {t('providers.distanceAway', { count: provider.distanceKm.toFixed(1) })}
+                    </span>
+                  ) : null}
                   {typeof provider.averageRating === 'number' ? (
                     <>
                       <Stars rating={provider.averageRating} />

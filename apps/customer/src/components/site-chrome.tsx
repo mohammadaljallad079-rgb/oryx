@@ -50,6 +50,8 @@ export function SiteHeader() {
     { href: '/providers', key: 'nav.providers' },
     { href: '/bookings', key: 'nav.bookings' },
     { href: '/invoices', key: 'nav.invoices' },
+    { href: '/rfqs', key: 'nav.rfqs' },
+    { href: '/returns', key: 'nav.returns' },
     { href: '/support', key: 'nav.support' },
   ];
 

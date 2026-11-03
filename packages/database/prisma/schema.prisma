@@ -143,6 +143,8 @@ model CustomerOrder {
   paymentIntent   PaymentIntent?       @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
   lines           CustomerOrderLine[]
   events          CustomerOrderEvent[]
+  /// Execution 20 — P4 consumer returns raised against this order.
+  returns         CustomerOrderReturn[]
 
   /// A retried checkout with the same key returns the original order rather than
   /// placing a second one. Null for orders created before the key was supplied.
@@ -179,6 +181,8 @@ model CustomerOrderLine {
 
   order   CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  /// Execution 20 — return lines that reference this order line.
+  returnLines CustomerOrderReturnLine[]
 
   @@index([orderId])
   @@index([productId])
@@ -571,6 +575,12 @@ model Company {
 
   // Execution 12 — platform discount coupons.
   coupons Coupon[]
+
+  // Execution 20 — P4 RFQ and returns, P5 recovery dispatch, P7 AI usage.
+  customerRfqs        CustomerRfq[]
+  customerOrderReturns CustomerOrderReturn[]
+  recoveryRequests    RecoveryRequest[]
+  aiSuggestions       AiSuggestion[]
 
   @@index([type])
   @@index([status])
@@ -1155,6 +1165,8 @@ enum StockMovementSource {
   MARKETPLACE_ORDER
   /// The reversal of a cancelled marketplace order.
   MARKETPLACE_ORDER_CANCEL
+  /// Goods received back from a consumer marketplace return (P4).
+  MARKETPLACE_RETURN
 }
 
 enum TransferStatus {
@@ -1565,6 +1577,8 @@ model Product {
    * Consumer order lines that reference this product.
    */
   orderLines CustomerOrderLine[]
+  /// Execution 20 — return lines that reference this product.
+  returnLines CustomerOrderReturnLine[]
 
   @@unique([companyId, sku])
   @@index([companyId, isActive])
@@ -3620,6 +3634,12 @@ model Vehicle {
   inspectionPhotos CustomerInspectionPhoto[]
   bookingSlots     BookingSlot[]
 
+  // Execution 20 — P4 RFQ, P5 recovery, P6 fleet membership, P7 suggestions.
+  rfqs           CustomerRfq[]
+  recoveryRequests RecoveryRequest[]
+  fleetVehicles  FleetVehicle[]
+  aiSuggestions  AiSuggestion[]
+
   @@unique([companyId, vin])
   @@index([companyId, customerId])
   @@index([companyId, status])
@@ -4039,6 +4059,14 @@ model MarketplaceProvider {
    * bundled category art rather than showing an unrelated image.
    */
   imageAssetId        String?
+  /**
+   * Discovery coordinates for the Auto Map. Nullable because a provider may be
+   * approved before its location is recorded; a provider without coordinates is
+   * never returned by a proximity query rather than being placed at a default
+   * point, which would put it on a map at a place it is not.
+   */
+  latitude            Decimal?       @db.Decimal(10, 7)
+  longitude           Decimal?       @db.Decimal(10, 7)
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 
@@ -4057,6 +4085,10 @@ model MarketplaceProvider {
   disputes         MarketplaceDispute[]
   bookingResources BookingResource[]
   offers           ProviderOffer[]
+
+  // Execution 20 — P4 RFQ quotes, P5 recovery dispatch.
+  rfqQuotes        CustomerRfqQuote[]
+  recoveryRequests RecoveryRequest[]
 
   @@index([status])
 }
@@ -4380,6 +4412,13 @@ model CustomerAccount {
   disputes               MarketplaceDispute[]
   supportTickets         SupportTicket[]
   serviceRequests        ServiceRequest[]
+
+  // Execution 20 — P4 RFQ and returns, P5 recovery, P6 fleet, P7 suggestions.
+  rfqs            CustomerRfq[]
+  orderReturns    CustomerOrderReturn[]
+  recoveryRequests RecoveryRequest[]
+  fleetAccounts   FleetAccount[]
+  aiSuggestions   AiSuggestion[]
   notificationDeliveries NotificationDelivery[]
   cart                   Cart?
   favorites              Favorite[]
@@ -4420,6 +4459,8 @@ model CustomerInspectionPhoto {
   customerAccount CustomerAccount @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
   vehicle         Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   mediaAsset      CmsMediaAsset?  @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
+  /// Execution 20 — P7 AI suggestions raised against this photograph.
+  aiSuggestions   AiSuggestion[]
 
   @@index([customerAccountId, createdAt])
   @@index([mediaAssetId])
@@ -5515,4 +5556,330 @@ model Coupon {
 
   @@index([isActive, startsAt, endsAt])
   @@index([companyId])
+}
+
+// ============================================================================
+// Execution 20 — planned automotive ecosystem (P3–P7)
+//
+// These tables back the server-side capabilities the master reference lists
+// under "Planned automotive ecosystem". Each is scoped to a customer account or
+// a company exactly like its neighbours, so tenant and account isolation are
+// enforced by the same queries that enforce them elsewhere.
+// ============================================================================
+
+/// P4 — a consumer request for quotation on a spare part.
+///
+/// Distinct from the internal `PurchaseRequisition`: this is raised by a
+/// consumer, quoted by approved marketplace providers, and accepted by the
+/// consumer. Acceptance is exclusive — the first accepted quote closes the RFQ.
+model CustomerRfq {
+  id                String        @id @default(cuid())
+  reference         String
+  customerAccountId String
+  companyId         String
+  vehicleId         String?
+  categoryKey       String
+  /// What the customer is looking for, in their own words.
+  description       String
+  quantity          Int           @default(1)
+  status            CustomerRfqStatus @default(OPEN)
+  /// The quote the customer accepted. Only one may be set.
+  acceptedQuoteId   String?
+  expiresAt         DateTime?
+  closedAt          DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  customerAccount CustomerAccount    @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+  company         Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicle         Vehicle?           @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  quotes          CustomerRfqQuote[]
+
+  @@unique([companyId, reference])
+  @@index([customerAccountId, createdAt])
+  @@index([status])
+}
+
+/// A provider's answer to an RFQ. One provider may quote an RFQ once.
+model CustomerRfqQuote {
+  id           String    @id @default(cuid())
+  rfqId        String
+  providerId   String
+  priceMinor   Int
+  currency     String    @default("BHD")
+  /// How long the part takes to arrive, in days. Informational.
+  leadTimeDays Int?
+  note         String?
+  status       CustomerRfqQuoteStatus @default(SUBMITTED)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  rfq      CustomerRfq        @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  provider MarketplaceProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([rfqId, providerId])
+  @@index([providerId])
+}
+
+enum CustomerRfqStatus {
+  OPEN
+  QUOTED
+  ACCEPTED
+  CANCELLED
+  EXPIRED
+}
+
+enum CustomerRfqQuoteStatus {
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+/// P4 — a consumer return of a placed order.
+///
+/// A return is only possible for a delivered/completed order, inside the
+/// configured window. Accepting a return moves the returned quantity back
+/// through the same inventory ledger the order used, so stock is never
+/// adjusted by a second, parallel path.
+model CustomerOrderReturn {
+  id                String              @id @default(cuid())
+  reference         String
+  orderId           String
+  customerAccountId String
+  companyId         String
+  reason            String
+  status            CustomerReturnStatus @default(REQUESTED)
+  /// When the customer asked. The window is measured from the order's completion.
+  requestedAt       DateTime            @default(now())
+  reviewedAt        DateTime?
+  receivedAt        DateTime?
+  refundedAt        DateTime?
+  reviewedById      String?
+  reviewNote        String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  order           CustomerOrder            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customerAccount CustomerAccount          @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+  company         Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lines           CustomerOrderReturnLine[]
+
+  @@unique([companyId, reference])
+  @@index([customerAccountId, createdAt])
+  @@index([orderId])
+}
+
+model CustomerOrderReturnLine {
+  id         String @id @default(cuid())
+  returnId   String
+  orderLineId String
+  productId  String
+  quantity   Int
+  createdAt  DateTime @default(now())
+
+  return    CustomerOrderReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  orderLine CustomerOrderLine   @relation(fields: [orderLineId], references: [id], onDelete: Restrict)
+  product   Product             @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([returnId])
+}
+
+enum CustomerReturnStatus {
+  REQUESTED
+  APPROVED
+  RECEIVED
+  REFUNDED
+  REJECTED
+  CANCELLED
+}
+
+/// P5 — a roadside recovery / SOS request.
+///
+/// Carries the pickup location the generic `ServiceRequest` does not, and a
+/// state machine that a client cannot skip. Every transition appends a
+/// `RecoveryTrackingEvent`, so the trail is the history rather than a guess.
+model RecoveryRequest {
+  id                String               @id @default(cuid())
+  reference         String
+  companyId         String
+  customerAccountId String?
+  vehicleId         String?
+  providerId        String?
+  /// Where the vehicle is. Required: a recovery request with no location is not
+  /// dispatchable.
+  pickupLatitude    Decimal              @db.Decimal(10, 7)
+  pickupLongitude   Decimal              @db.Decimal(10, 7)
+  pickupLabel       String?
+  contactPhone      String
+  issue             String
+  urgency           RecoveryUrgency      @default(STANDARD)
+  status            RecoveryStatus       @default(REQUESTED)
+  assignedAt        DateTime?
+  enRouteAt         DateTime?
+  onSiteAt          DateTime?
+  completedAt       DateTime?
+  cancelledAt       DateTime?
+  cancellationReason String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  company         Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customerAccount CustomerAccount?       @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
+  vehicle         Vehicle?               @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  provider        MarketplaceProvider?   @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  events          RecoveryTrackingEvent[]
+
+  @@unique([companyId, reference])
+  @@index([companyId, status])
+  @@index([customerAccountId, createdAt])
+  @@index([providerId])
+}
+
+/// The append-only dispatch trail. A transition never edits the previous row.
+model RecoveryTrackingEvent {
+  id          String         @id @default(cuid())
+  requestId   String
+  status      RecoveryStatus
+  note        String?
+  /// Who caused it: CUSTOMER, PROVIDER, DISPATCH or SYSTEM.
+  actor       String         @default("SYSTEM")
+  actorUserId String?
+  /// Optional location at the moment of the event, for a moving truck.
+  latitude    Decimal?       @db.Decimal(10, 7)
+  longitude   Decimal?       @db.Decimal(10, 7)
+  createdAt   DateTime       @default(now())
+
+  request RecoveryRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+}
+
+enum RecoveryUrgency {
+  STANDARD
+  URGENT
+  CRITICAL
+}
+
+enum RecoveryStatus {
+  REQUESTED
+  ASSIGNED
+  EN_ROUTE
+  ON_SITE
+  COMPLETED
+  CANCELLED
+}
+
+/// P6 — a fleet account.
+///
+/// Owned by a consumer account. A fleet groups vehicles and drivers so a company
+/// customer can manage many cars without sharing one consumer login.
+model FleetAccount {
+  id                String   @id @default(cuid())
+  name              String
+  customerAccountId String
+  contactName       String?
+  contactPhone      String?
+  contactEmail      String?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  customerAccount CustomerAccount @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+  vehicles        FleetVehicle[]
+  drivers         Driver[]
+
+  @@index([customerAccountId])
+}
+
+/// A vehicle belonging to a fleet. `Vehicle` stays the single vehicle record;
+/// this is the membership row, so one vehicle has one history.
+model FleetVehicle {
+  id        String   @id @default(cuid())
+  fleetId   String
+  vehicleId String
+  addedAt   DateTime @default(now())
+
+  fleet   FleetAccount @relation(fields: [fleetId], references: [id], onDelete: Cascade)
+  vehicle Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@unique([fleetId, vehicleId])
+  @@index([vehicleId])
+}
+
+/// P6 — a driver who may be assigned to a fleet vehicle's request.
+model Driver {
+  id             String    @id @default(cuid())
+  fleetId        String
+  fullName       String
+  phone          String
+  email          String?
+  licenceNumber  String?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  fleet FleetAccount @relation(fields: [fleetId], references: [id], onDelete: Cascade)
+
+  @@index([fleetId])
+}
+
+/// P7 — a SENSAGE AI suggestion awaiting human review.
+///
+/// The row is deliberately named a *suggestion*, never a finding or a diagnosis.
+/// `reviewStatus` starts PENDING and only a reviewer moves it. A suggestion is
+/// never shown to a customer as a verified condition until it is approved, which
+/// is what the master reference means by "reviewed assistance".
+model AiSuggestion {
+  id                String               @id @default(cuid())
+  customerAccountId String?
+  photoId           String?
+  vehicleId         String?
+  companyId         String?
+  providerKey       String
+  /// The model's raw, validated JSON payload. Never rendered directly.
+  payload           Json
+  /// 0-1 self-reported confidence, when the model supplies one.
+  confidence        Decimal?             @db.Decimal(4, 3)
+  summary           String
+  reviewStatus      AiSuggestionReview   @default(PENDING)
+  reviewedById      String?
+  reviewedAt        DateTime?
+  reviewNote        String?
+  /// Tokens in/out and the computed cost, for the usage ceiling.
+  inputTokens       Int                  @default(0)
+  outputTokens      Int                  @default(0)
+  costMinor         Int                  @default(0)
+  latencyMs         Int                  @default(0)
+  createdAt         DateTime             @default(now())
+
+  customerAccount CustomerAccount?        @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+  photo           CustomerInspectionPhoto? @relation(fields: [photoId], references: [id], onDelete: SetNull)
+  vehicle         Vehicle?                @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  company         Company?                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([customerAccountId, createdAt])
+  @@index([reviewStatus])
+  @@index([companyId, createdAt])
+}
+
+/// Per-company daily AI usage, so a runaway client cannot spend without bound.
+model AiUsageCounter {
+  id            String   @id @default(cuid())
+  companyId     String
+  /// The UTC day the counter covers, as YYYY-MM-DD.
+  day           String
+  requestCount  Int      @default(0)
+  inputTokens   Int      @default(0)
+  outputTokens  Int      @default(0)
+  costMinor     Int      @default(0)
+  updatedAt     DateTime @updatedAt
+
+  @@unique([companyId, day])
+}
+
+enum AiSuggestionReview {
+  PENDING
+  APPROVED
+  REJECTED
 }

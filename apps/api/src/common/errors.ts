@@ -141,4 +141,25 @@ export const ERROR_CODES = {
   CONTENT_REVISION_NOT_FOUND: 'cms.content_revision_not_found',
   MEDIA_ASSET_NOT_FOUND: 'cms.media_asset_not_found',
   SERVICE_CATEGORY_NOT_FOUND: 'cms.service_category_not_found',
+
+  // ------------------------------------------------------------ Execution 20
+  // Planned automotive ecosystem (P3–P7).
+  RFQ_STATE: 'rfq.invalid_state',
+  RFQ_ALREADY_ACCEPTED: 'rfq.already_accepted',
+  RFQ_QUOTE_DUPLICATE: 'rfq.quote_duplicate',
+  RFQ_EXPIRED: 'rfq.expired',
+  RETURN_WINDOW_CLOSED: 'return.window_closed',
+  RETURN_STATE: 'return.invalid_state',
+  RETURN_ORDER_NOT_ELIGIBLE: 'return.order_not_eligible',
+  RETURN_QUANTITY_EXCEEDS: 'return.quantity_exceeds_ordered',
+  RECOVERY_STATE: 'recovery.invalid_state',
+  RECOVERY_NOT_ASSIGNED: 'recovery.not_assigned_to_provider',
+  RECOVERY_LOCATION_REQUIRED: 'recovery.location_required',
+  FLEET_SCOPE_DENIED: 'fleet.scope_denied',
+  FLEET_DRIVER_SCOPE: 'fleet.driver_scope_denied',
+  AI_PROVIDER_NOT_CONFIGURED: 'ai.provider_not_configured',
+  AI_QUOTA_EXCEEDED: 'ai.quota_exceeded',
+  AI_INVALID_OUTPUT: 'ai.invalid_model_output',
+  AI_TIMEOUT: 'ai.timeout',
+  AI_INPUT_INVALID: 'ai.input_invalid',
 } as const;

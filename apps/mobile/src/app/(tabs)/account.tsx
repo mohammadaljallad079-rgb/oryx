@@ -328,6 +328,9 @@ export default function Account() {
           <ListRow title={t('favourites')} onPress={() => router.push('/favourites')} />
           <ListRow title={t('myBookings')} onPress={() => router.push('/bookings')} />
           <ListRow title={t('myRecoveryRequests')} onPress={() => router.push('/recovery')} />
+          <ListRow title={t('rfqsTitle')} onPress={() => router.push('/rfqs')} />
+          <ListRow title={t('returnsTitle')} onPress={() => router.push('/returns')} />
+          <ListRow title={t('fleetsTitle')} onPress={() => router.push('/fleets')} />
           <ListRow title={t('notifications')} onPress={() => router.push('/notifications')} />
           <ListRow title={t('addresses')} onPress={() => router.push('/addresses')} />
           <ListRow title={t('accountSecurity')} onPress={() => router.push('/account-security')} />

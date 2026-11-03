@@ -1,6 +1,7 @@
 import type {
   AccountingReportDto,
   AgingRowDto,
+  AiSuggestionDto,
   AppVersionDto,
   AuditLogDto,
   BalanceSheetDto,
@@ -16,6 +17,7 @@ import type {
   CouponDto,
   CouponValidationResponse,
   CustomerDto,
+  CustomerReturnDto,
   DashboardResponse,
   EcosystemOverviewResponse,
   ErpAccountDto,
@@ -40,6 +42,7 @@ import type {
   ProductImageDto,
   PurchaseDocumentDto,
   PurchasingReportDto,
+  RecoveryRequestDto,
   ReorderAlertDto,
   RequisitionDto,
   RoleDto,
@@ -1036,12 +1039,24 @@ export const api = {
     request<Paginated<Record<string, unknown>>>(
       `/automotive/compatible-parts?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year=${year}${companyId ? `&companyId=${companyId}` : ''}`,
     ),
-  marketplaceProviders: (params: { status?: string } = {}) =>
+  marketplaceProviders: (params: { status?: string; categoryKey?: string; lat?: number; lng?: number; radiusKm?: number } = {}) =>
     request<Paginated<MarketplaceProviderDto>>(`/automotive/providers?${toQuery(params)}`),
   createProvider: (body: Record<string, unknown>) =>
     request<MarketplaceProviderDto>('/automotive/providers', { method: 'POST', body }),
   decideProvider: (id: string, decision: 'APPROVED' | 'SUSPENDED' | 'REJECTED', note?: string) =>
     request<MarketplaceProviderDto>(`/automotive/providers/${id}/decide`, { method: 'POST', body: { decision, note } }),
+  /**
+   * Set or clear a provider's Auto Map coordinates (P3).
+   *
+   * Both values must be supplied together, or both omitted to clear the
+   * location. The API rejects half a coordinate rather than storing a point the
+   * map cannot place.
+   */
+  setProviderLocation: (id: string, location: { latitude: number | null; longitude: number | null }) =>
+    request<MarketplaceProviderDto>(`/marketplace/admin/providers/${id}/location`, {
+      method: 'POST',
+      body: location,
+    }),
   providerListings: (providerId: string) =>
     request<Paginated<Record<string, unknown>>>(`/automotive/providers/${providerId}/listings`),
   createProviderListing: (providerId: string, body: Record<string, unknown>) =>
@@ -1135,6 +1150,37 @@ export const api = {
 
   // ------------------------------------- Execution 12: platform control panel
   ecosystem: () => request<EcosystemOverviewResponse>('/platform/ecosystem'),
+
+  // --------------------------- Execution 20: planned ecosystem operations
+  /**
+   * Consumer order returns awaiting a staff decision (P4).
+   *
+   * The queue is scoped server-side to the active company, so an operator only
+   * ever sees their own tenant's returns.
+   */
+  ecosystemReturns: (status?: string) =>
+    request<CustomerReturnDto[]>(`/ecosystem/returns?${toQuery({ status })}`),
+  decideReturn: (id: string, decision: 'APPROVED' | 'REJECTED', note?: string) =>
+    request<CustomerReturnDto>(`/ecosystem/returns/${id}/decide`, { method: 'POST', body: { decision, note } }),
+  receiveReturn: (id: string) =>
+    request<CustomerReturnDto>(`/ecosystem/returns/${id}/receive`, { method: 'POST', body: {} }),
+  refundReturn: (id: string) =>
+    request<CustomerReturnDto>(`/ecosystem/returns/${id}/refund`, { method: 'POST', body: {} }),
+
+  /** Roadside recovery dispatch queue (P5). */
+  ecosystemRecovery: (status?: string) =>
+    request<RecoveryRequestDto[]>(`/ecosystem/recovery?${toQuery({ status })}`),
+  assignRecovery: (id: string, providerId: string) =>
+    request<RecoveryRequestDto>(`/ecosystem/recovery/${id}/assign`, { method: 'POST', body: { providerId } }),
+
+  /** SENSAGE AI suggestion review queue (P7). */
+  ecosystemSuggestions: (status?: string) =>
+    request<AiSuggestionDto[]>(`/ecosystem/sensage/suggestions?${toQuery({ status })}`),
+  reviewSuggestion: (id: string, decision: 'APPROVED' | 'REJECTED', note?: string) =>
+    request<AiSuggestionDto>(`/ecosystem/sensage/suggestions/${id}/review`, {
+      method: 'POST',
+      body: { decision, note },
+    }),
   coupons: (params: { includeInactive?: boolean; companyId?: string } = {}) =>
     request<{ items: CouponDto[] }>(`/coupons?${toQuery(params)}`),
   coupon: (id: string) => request<CouponDto>(`/coupons/${id}`),

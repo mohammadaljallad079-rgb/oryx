@@ -6,6 +6,7 @@ import {
   IsDateString,
   IsEmail,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -311,6 +312,28 @@ export class SetProviderImageDto {
   @IsString()
   @MaxLength(40)
   imageAssetId?: string | null;
+}
+
+/**
+ * Auto Map coordinates for a provider (P3).
+ *
+ * Both fields are optional so a caller can clear the location by sending them
+ * as null. They are validated as a pair in the service: a half coordinate is
+ * rejected rather than stored, because a provider with only a latitude cannot be
+ * placed on a map and would silently vanish from every proximity query.
+ */
+export class SetProviderLocationDto {
+  @IsOptional()
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  latitude?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  longitude?: number | null;
 }
 
 // ---------------------------------------------------------- service requests

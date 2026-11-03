@@ -20,8 +20,17 @@
  * is readable by anything with access to the store. The refresh token lives in
  * the platform keychain, handled by `session-storage.ts`.
  */
+import type {
+  AiSuggestionDto,
+  CustomerReturnDto,
+  FitmentResultDto,
+  FleetDto,
+  RfqDto,
+  RecoveryRequestDto,
+  SensageStatusDto,
+  VehicleCatalogResponse,
+} from '@oryx/shared';
 import { getSecret } from './session-storage';
-import type { VehicleCatalogResponse } from '@oryx/shared';
 
 /** Where the API lives. Set by `EXPO_PUBLIC_API_BASE_URL` at build time. */
 const BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api').replace(
@@ -653,6 +662,14 @@ export interface CustomerAddress {
   area: string | null;
   countryCode: string | null;
   postalCode: string | null;
+  /**
+   * The saved coordinates, when the address has them.
+   *
+   * A recovery request requires a real pickup point, so the screen offers the
+   * customer's own saved address rather than inventing a location.
+   */
+  latitude?: number | null;
+  longitude?: number | null;
   isDefault: boolean;
 }
 
@@ -674,6 +691,8 @@ export const addressesApi = {
     area?: string;
     countryCode?: string;
     postalCode?: string;
+    latitude?: number;
+    longitude?: number;
     isDefault?: boolean;
   }) => request<CustomerAddress>('/customer/addresses', { method: 'POST', body: input }),
 
@@ -896,6 +915,152 @@ export const serviceRequestsApi = {
       method: 'POST',
       body: { reason },
     }),
+};
+
+// -------------------------------------- P4–P7 planned ecosystem (Exec 20)
+
+/**
+ * The consumer request-for-quotation surface (P4).
+ *
+ * A consumer raises a request, approved providers quote, and the consumer
+ * accepts exactly one quote. The account is resolved from the bearer token, so
+ * no account id is sent and another customer's RFQ cannot be addressed.
+ */
+export const rfqsApi = {
+  list: (signal?: AbortSignal) => requestWithRetry<RfqDto[]>('/customer/rfqs', { signal }),
+
+  get: (id: string, signal?: AbortSignal) =>
+    requestWithRetry<RfqDto>(`/customer/rfqs/${encodeURIComponent(id)}`, { signal }),
+
+  create: (input: { categoryKey: string; description: string; quantity?: number; vehicleId?: string; validDays?: number }) =>
+    request<RfqDto>('/customer/rfqs', { method: 'POST', body: input }),
+
+  cancel: (id: string) =>
+    request<RfqDto>(`/customer/rfqs/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: {} }),
+
+  acceptQuote: (id: string, quoteId: string) =>
+    request<RfqDto>(`/customer/rfqs/${encodeURIComponent(id)}/quotes/${encodeURIComponent(quoteId)}/accept`, {
+      method: 'POST',
+      body: {},
+    }),
+};
+
+/**
+ * Consumer order returns (P4).
+ *
+ * A return is only accepted inside the window the server enforces, only on the
+ * caller's own delivered order, and receiving the goods is what moves stock back.
+ */
+export const returnsApi = {
+  list: (signal?: AbortSignal) => requestWithRetry<CustomerReturnDto[]>('/customer/returns', { signal }),
+
+  get: (id: string, signal?: AbortSignal) =>
+    requestWithRetry<CustomerReturnDto>(`/customer/returns/${encodeURIComponent(id)}`, { signal }),
+
+  create: (orderId: string, input: { reason: string; lines: Array<{ orderLineId: string; quantity: number }> }) =>
+    request<CustomerReturnDto>(`/customer/orders/${encodeURIComponent(orderId)}/returns`, {
+      method: 'POST',
+      body: input,
+    }),
+
+  cancel: (id: string) =>
+    request<CustomerReturnDto>(`/customer/returns/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: {} }),
+};
+
+/**
+ * Roadside recovery / SOS (P5).
+ *
+ * Distinct from the generic service request: a recovery carries a mandatory
+ * pickup point, an urgency and an append-only tracking trail the client polls.
+ */
+export const recoveryApi = {
+  list: (signal?: AbortSignal) => requestWithRetry<RecoveryRequestDto[]>('/customer/recovery', { signal }),
+
+  get: (id: string, signal?: AbortSignal) =>
+    requestWithRetry<RecoveryRequestDto>(`/customer/recovery/${encodeURIComponent(id)}`, { signal }),
+
+  create: (input: {
+    pickupLatitude: number;
+    pickupLongitude: number;
+    pickupLabel?: string;
+    contactPhone: string;
+    issue: string;
+    urgency?: 'STANDARD' | 'URGENT' | 'CRITICAL';
+    vehicleId?: string;
+  }) => request<RecoveryRequestDto>('/customer/recovery', { method: 'POST', body: input }),
+
+  cancel: (id: string, reason: string) =>
+    request<RecoveryRequestDto>(`/customer/recovery/${encodeURIComponent(id)}/cancel`, {
+      method: 'POST',
+      body: { reason },
+    }),
+};
+
+/** Fleet accounts, vehicles and drivers (P6). */
+export const fleetsApi = {
+  list: (signal?: AbortSignal) => requestWithRetry<FleetDto[]>('/customer/fleets', { signal }),
+
+  get: (id: string, signal?: AbortSignal) =>
+    requestWithRetry<FleetDto>(`/customer/fleets/${encodeURIComponent(id)}`, { signal }),
+
+  create: (input: { name: string; contactName?: string; contactPhone?: string; contactEmail?: string }) =>
+    request<FleetDto>('/customer/fleets', { method: 'POST', body: input }),
+
+  addVehicle: (id: string, vehicleId: string) =>
+    request<FleetDto>(`/customer/fleets/${encodeURIComponent(id)}/vehicles`, { method: 'POST', body: { vehicleId } }),
+
+  removeVehicle: (id: string, vehicleId: string) =>
+    request<FleetDto>(
+      `/customer/fleets/${encodeURIComponent(id)}/vehicles/${encodeURIComponent(vehicleId)}/remove`,
+      { method: 'POST', body: {} },
+    ),
+
+  addDriver: (id: string, input: { fullName: string; phone: string; email?: string; licenceNumber?: string }) =>
+    request<FleetDto>(`/customer/fleets/${encodeURIComponent(id)}/drivers`, { method: 'POST', body: input }),
+
+  setDriverActive: (id: string, driverId: string, isActive: boolean) =>
+    request<FleetDto>(
+      `/customer/fleets/${encodeURIComponent(id)}/drivers/${encodeURIComponent(driverId)}/active`,
+      { method: 'POST', body: { isActive } },
+    ),
+};
+
+/**
+ * Part fitment (P4).
+ *
+ * Reports whether a product fits one of the caller's own vehicles. `fitmentKnown`
+ * is false when the product has no fitment rows at all, so the screen can say
+ * "unknown" rather than "does not fit".
+ */
+export const fitmentApi = {
+  check: (vehicleId: string, productId: string, signal?: AbortSignal) =>
+    requestWithRetry<FitmentResultDto>(
+      `/customer/fitment?vehicleId=${encodeURIComponent(vehicleId)}&productId=${encodeURIComponent(productId)}`,
+      { signal },
+    ),
+};
+
+/**
+ * SENSAGE AI (P7).
+ *
+ * The status endpoint says whether a model is configured at all. An analysis
+ * returns a **suggestion** with `reviewStatus: PENDING`; it is never a diagnosis
+ * and never labelled verified until a human approves it.
+ */
+export const sensageAiApi = {
+  status: (signal?: AbortSignal) => requestWithRetry<SensageStatusDto>('/customer/sensage/status', { signal }),
+
+  analyze: (input: { photoId: string; focus?: string; vehicleId?: string }) =>
+    request<AiSuggestionDto>('/customer/sensage/analyze', { method: 'POST', body: input }),
+
+  suggestions: (photoId?: string, signal?: AbortSignal) =>
+    requestWithRetry<AiSuggestionDto[]>(
+      `/customer/sensage/suggestions${photoId ? `?photoId=${encodeURIComponent(photoId)}` : ''}`,
+      { signal },
+    ),
+
+  suggestion: (id: string, signal?: AbortSignal) =>
+    requestWithRetry<AiSuggestionDto>(`/customer/sensage/suggestions/${encodeURIComponent(id)}`, { signal }),
 };
 
 // ------------------------------------------------------- auth and bookings

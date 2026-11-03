@@ -9,6 +9,7 @@ import { LiveSessionProvider } from '../lib/live-session';
 import { LiveBookingsProvider } from '../lib/live-bookings';
 import { LiveOrdersProvider } from '../lib/live-orders';
 import { LiveRequestsProvider } from '../lib/live-requests';
+import { LiveRecoveryProvider } from '../lib/live-recovery';
 import { MerchantSessionProvider } from '../lib/merchant-session';
 import { LaunchScreen } from '../components/launch';
 
@@ -82,9 +83,11 @@ export default function RootLayout() {
               <LiveBookingsProvider>
                 <LiveOrdersProvider>
                   <LiveRequestsProvider>
-                    <MerchantSessionProvider>
-                      <RootNavigator />
-                    </MerchantSessionProvider>
+                    <LiveRecoveryProvider>
+                      <MerchantSessionProvider>
+                        <RootNavigator />
+                      </MerchantSessionProvider>
+                    </LiveRecoveryProvider>
                   </LiveRequestsProvider>
                 </LiveOrdersProvider>
               </LiveBookingsProvider>

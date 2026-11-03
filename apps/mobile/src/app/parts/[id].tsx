@@ -9,6 +9,7 @@ import { useLiveProduct, useLiveStore } from '../../lib/live-catalog';
 import { catalogProductToDemo, catalogStoreToDemo } from '../../lib/api-adapters';
 import { ScreenHeader } from '../../components/brand';
 import { ProductCard } from '../../components/cards';
+import { FitmentCard } from '../../components/fitment';
 import {
   Body,
   Button,
@@ -169,6 +170,10 @@ export default function ProductDetail() {
             ))}
           </Rail>
         )}
+
+        {/* Fitment is a live-only capability: it answers against the caller's own
+            server-side garage, so a guest sees nothing rather than a dead button. */}
+        {isLive ? <FitmentCard productId={item.id} /> : null}
 
         {failure ? (
           <Body size="label" style={{ color: theme.danger }}>

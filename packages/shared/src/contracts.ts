@@ -1383,6 +1383,11 @@ export interface MarketplaceProviderDto {
   status: string;
   commissionPercentBp: number;
   approvedAt: string | null;
+  /** Auto Map coordinates (P3). Null when the provider has no known location. */
+  latitude?: number | null;
+  longitude?: number | null;
+  /** Present only on a proximity query, in kilometres from the supplied origin. */
+  distanceKm?: number | null;
   _count?: { listings: number; requests: number };
 }
 
@@ -1636,4 +1641,158 @@ export interface NotificationCentreResponse {
     body: string;
     isActive: boolean;
   }>;
+}
+
+// ============================================================================
+// EXECUTION 20 — PLANNED AUTOMOTIVE ECOSYSTEM (P3–P7)
+//
+// The consumer RFQ, returns, recovery, fleet, fitment and AI-suggestion
+// contracts. Each mirrors the exact shape the API returns, so a client renders
+// what it is given instead of inventing a field.
+// ============================================================================
+
+/** A quote a provider submitted against a consumer RFQ (P4). */
+export interface RfqQuoteDto {
+  id: string;
+  providerId: string;
+  priceMinor: number;
+  currency: string;
+  leadTimeDays: number | null;
+  note: string | null;
+  status: string;
+  createdAt: string;
+}
+
+/** A consumer request for quotation (P4). */
+export interface RfqDto {
+  id: string;
+  reference: string;
+  categoryKey: string;
+  description: string;
+  quantity: number;
+  status: string;
+  acceptedQuoteId: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  vehicle: { id: string; label: string } | null;
+  quotes: RfqQuoteDto[];
+}
+
+/** A line on a consumer order return (P4). */
+export interface CustomerReturnLineDto {
+  id: string;
+  orderLineId: string;
+  productId: string;
+  quantity: number;
+}
+
+/** A consumer order return (P4). */
+export interface CustomerReturnDto {
+  id: string;
+  reference: string;
+  orderId: string;
+  orderReference: string | null;
+  reason: string;
+  status: string;
+  reviewNote: string | null;
+  requestedAt: string;
+  reviewedAt: string | null;
+  receivedAt: string | null;
+  refundedAt: string | null;
+  cancellable: boolean;
+  lines: CustomerReturnLineDto[];
+}
+
+/** One append-only tracking event on a recovery request (P5). */
+export interface RecoveryTimelineEventDto {
+  id: string;
+  status: string;
+  note: string | null;
+  actor: string;
+  latitude: number | null;
+  longitude: number | null;
+  createdAt: string;
+}
+
+/** A roadside recovery / SOS request (P5). */
+export interface RecoveryRequestDto {
+  id: string;
+  reference: string;
+  status: string;
+  urgency: string;
+  issue: string;
+  pickup: { latitude: number; longitude: number; label: string | null };
+  contactPhone: string;
+  vehicleId: string | null;
+  provider: { id: string; name: string; phone: string | null } | null;
+  assignedAt: string | null;
+  enRouteAt: string | null;
+  onSiteAt: string | null;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  cancellationReason: string | null;
+  createdAt: string;
+  cancellable: boolean;
+  timeline: RecoveryTimelineEventDto[];
+}
+
+/** A driver assigned to a fleet (P6). */
+export interface FleetDriverDto {
+  id: string;
+  fullName: string;
+  phone: string;
+  email: string | null;
+  licenceNumber: string | null;
+  isActive: boolean;
+}
+
+/** A fleet account (P6). */
+export interface FleetDto {
+  id: string;
+  name: string;
+  contactName: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
+  isActive: boolean;
+  createdAt: string;
+  vehicles: Array<{ id: string; vehicleId: string; addedAt: string }>;
+  drivers: FleetDriverDto[];
+}
+
+/**
+ * A stored AI suggestion awaiting human review (P7).
+ *
+ * `verified` is true only once a reviewer approved it; the client uses it to
+ * decide whether the result may be labelled reviewed rather than pending.
+ */
+export interface AiSuggestionDto {
+  id: string;
+  photoId: string | null;
+  vehicleId: string | null;
+  providerKey: string;
+  payload: unknown;
+  confidence: number | null;
+  summary: string;
+  reviewStatus: string;
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  verified: boolean;
+}
+
+/** The SENSAGE AI configuration state, as the customer endpoint reports it. */
+export interface SensageStatusDto {
+  providerKey: string;
+  configured: boolean;
+  message: string;
+}
+
+/** The fitment answer for one vehicle and product (P4). */
+export interface FitmentResultDto {
+  vehicle: { id: string; label: string; year: number };
+  product: { id: string; sku: string; nameEn: string; nameAr: string };
+  compatible: boolean;
+  notes: string[];
+  /** False when the product has no fitment rows at all — unknown, not incompatible. */
+  fitmentKnown: boolean;
 }

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { basisPointsOfMinor, currencyScale, DEFAULT_COUNTRY_CODE, DEFAULT_CURRENCY } from '@oryx/shared';
+import { basisPointsOfMinor, currencyScale, DEFAULT_COUNTRY_CODE, DEFAULT_CURRENCY, rankByDistance } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import {
@@ -224,10 +224,21 @@ export class MarketplaceService {
     categoryKey?: string;
     page: number;
     pageSize: number;
+    /**
+     * Auto Map discovery (P3). When supplied, providers without coordinates are
+     * dropped, the rest are ordered nearest-first and an optional radius keeps
+     * only those inside it. Pagination is applied *after* the distance sort, so
+     * page 1 is genuinely the closest providers rather than an alphabetical
+     * slice of them.
+     */
+    origin?: { latitude: number; longitude: number };
+    radiusKm?: number;
   }) {
     const where = {
       status: 'APPROVED' as never,
       ...(params.categoryKey ? { categoryKey: params.categoryKey } : {}),
+      // A proximity query must not return a provider we cannot place on a map.
+      ...(params.origin ? { latitude: { not: null }, longitude: { not: null } } : {}),
     };
 
     // Every tenant seeds its own copy of the demo providers, so an unscoped
@@ -247,6 +258,8 @@ export class MarketplaceService {
         categoryKey: true,
         phone: true,
         email: true,
+        latitude: true,
+        longitude: true,
         imageAsset: { select: { id: true, variants: true } },
         listings: {
           where: { isActive: true },
@@ -269,17 +282,38 @@ export class MarketplaceService {
       const incumbent = unique.get(key);
       if (!incumbent || (!incumbent.imageAsset && row.imageAsset)) unique.set(key, row);
     }
-    const deduped = [...unique.values()];
+    let deduped = [...unique.values()];
+
+    // Rank by distance before paging so "near me" is honoured across the whole
+    // result set, not just the current page.
+    let distances: Map<string, number> | null = null;
+    if (params.origin) {
+      const ranked = rankByDistance(
+        params.origin,
+        deduped,
+        (row) => ({
+          latitude: row.latitude === null ? null : Number(row.latitude),
+          longitude: row.longitude === null ? null : Number(row.longitude),
+        }),
+        params.radiusKm,
+      );
+      deduped = ranked.map((entry) => entry.provider);
+      distances = new Map(ranked.map((entry) => [entry.provider.id, entry.distanceKm]));
+    }
+
     const start = (params.page - 1) * params.pageSize;
     const page = deduped.slice(start, start + params.pageSize);
 
     // Aggregate the rating here so the directory shows a real average rather
     // than exposing individual reviews.
     return {
-      items: page.map(({ reviews, imageAsset, ...provider }) => {
+      items: page.map(({ reviews, imageAsset, latitude, longitude, ...provider }) => {
         const ratings = reviews.map((r) => r.rating);
         return {
           ...provider,
+          latitude: latitude === null ? null : Number(latitude),
+          longitude: longitude === null ? null : Number(longitude),
+          ...(distances ? { distanceKm: distances.get(provider.id) ?? null } : {}),
           imageUrl: this.assetUrl(imageAsset, 'card'),
           reviewCount: ratings.length,
           averageRating:
@@ -483,6 +517,46 @@ export class MarketplaceService {
       summary: imageAssetId
         ? `Provider ${provider.code} storefront photograph set.`
         : `Provider ${provider.code} storefront photograph cleared.`,
+    });
+
+    return updated;
+  }
+
+  /**
+   * Set or clear a provider's Auto Map coordinates (P3).
+   *
+   * The admin chooses the point; the API only stores it. Passing `null` clears
+   * the location, which removes the provider from every proximity query rather
+   * than leaving a stale point on the map.
+   */
+  async setProviderLocation(
+    providerId: string,
+    location: { latitude: number | null; longitude: number | null },
+    actorId: string,
+  ) {
+    const provider = await this.prisma.marketplaceProvider.findUnique({
+      where: { id: providerId },
+      select: { id: true, code: true },
+    });
+    if (!provider) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Provider not found.');
+
+    const cleared = location.latitude === null || location.longitude === null;
+    const updated = await this.prisma.marketplaceProvider.update({
+      where: { id: providerId },
+      data: {
+        latitude: cleared ? null : location.latitude,
+        longitude: cleared ? null : location.longitude,
+      },
+    });
+
+    await this.audit.record({
+      actorUserId: actorId,
+      action: 'marketplace.provider_location_changed',
+      targetType: 'MARKETPLACE_PROVIDER',
+      targetId: providerId,
+      summary: cleared
+        ? `Provider ${provider.code} map location cleared.`
+        : `Provider ${provider.code} map location set.`,
     });
 
     return updated;
