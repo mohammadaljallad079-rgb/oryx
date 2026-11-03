@@ -653,7 +653,13 @@ from after restoration:
 ignores `/test/`, and every API test is an `.e2e-spec.ts`. That is the
 pre-existing configuration from Execution 01, not a regression.
 
-### 16.7 Still open
+### 16.7 Final commit
+
+`a161a49` — *fix(i18n): localise raw enum status labels across customer and
+mobile* — is the commit that carries the code and tests in this section. The
+commit that records this report follows it and changes documentation only.
+
+### 16.8 Still open
 
 - **Device visual acceptance is still not claimed.** A browser render is not a
   physical Android device; the Splash and Homepage remain unapproved on device.
