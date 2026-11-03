@@ -890,7 +890,13 @@ Committed under `docs/audit/exec10/screenshots/`:
 Before/after pairs for the KPI density change remain in the local QA capture set
 and are described by the measurements in §17.1.
 
-### 17.8 Still open
+### 17.8 Final commit
+
+`994b9a1` — *fix(web): resolve API media on its own origin and compact the admin
+KPIs* — carries the code, the regression test and the evidence in this section.
+The commit that records this report changes documentation only.
+
+### 17.9 Still open
 
 - **Android visual acceptance of Splash and Homepage is still not claimed.** A
   browser render is not a physical device; the report does not present one as
