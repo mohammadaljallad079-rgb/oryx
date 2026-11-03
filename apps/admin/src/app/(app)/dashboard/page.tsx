@@ -80,13 +80,13 @@ export default function DashboardHomePage() {
         </div>
 
         {loading ? (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 [&>*]:min-w-0">
             {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} height={186} />
+              <Skeleton key={i} height={142} />
             ))}
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 [&>*]:min-w-0">
             {(data?.tiles ?? []).map((tile) => (
               <Link
                 key={tile.moduleKey}

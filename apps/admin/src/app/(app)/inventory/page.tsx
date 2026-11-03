@@ -460,7 +460,7 @@ function ProductImagesModal({
             <figure key={img.id} className="overflow-hidden rounded-lg border border-[var(--border)]" data-testid={`product-image-${img.id}`}>
               {img.url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={img.url} alt={locale === 'ar' ? img.altAr ?? '' : img.altEn ?? ''} className="h-28 w-full object-cover" />
+                <img src={api.resolveImage(img.url) ?? ''} alt={locale === 'ar' ? img.altAr ?? '' : img.altEn ?? ''} className="h-28 w-full object-cover" />
               ) : (
                 <div className="flex h-28 w-full items-center justify-center text-[11px] text-[var(--muted)]">{t('common.empty')}</div>
               )}

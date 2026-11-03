@@ -5,7 +5,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
-import { customerApi, publicApi, type CatalogCategory, type CatalogProduct, type CatalogStore } from '@/lib/api';
+import { customerApi, publicApi, resolveImage, type CatalogCategory, type CatalogProduct, type CatalogStore } from '@/lib/api';
 import { messageOf } from '@/lib/hooks';
 import { Card, Money, Alert } from '@/components/ui';
 import { LoadingPanel, PageHeader, StatePanel } from '@/components/premium';
@@ -228,7 +228,7 @@ function ProductsCatalog() {
                     <Link href={`/products/${product.id}`} className="oryx-product-card__media">
                       {product.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={product.imageUrl} alt={product.name} loading="lazy" decoding="async" />
+                        <img src={resolveImage(product.imageUrl) ?? ''} alt={product.name} loading="lazy" decoding="async" />
                       ) : (
                         <span className="oryx-product-card__placeholder" aria-hidden>
                           <Icon name="cart" size={26} />

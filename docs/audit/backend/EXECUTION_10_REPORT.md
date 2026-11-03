@@ -666,6 +666,239 @@ commit that records this report follows it and changes documentation only.
 - **No APK was published**, per the instruction not to ship one until the
   integrated functionality is ready for a coherent testing release.
 
+## 17. Continuation session — KPI density, admin→public data flow and a broken-image defect
+
+This session resumed the governing instruction *"Website, Admin Dashboard &
+Visual Verification"*. It implemented directly in the existing code, produced
+before/after evidence, proved the admin→public data flow with real database
+rows, and ran the full technical verification.
+
+### 17.1 Admin KPI density
+
+The platform dashboard and the ERP module headers rendered oversized KPI cards
+and module tiles: nine 193px tiles in a single row at 1920px, one full-width
+tile at 375px, and 85px-tall statistic cards.
+
+`apps/admin/src/app/globals.css`:
+
+| Rule | Before | After |
+| --- | --- | --- |
+| `.oryx-stat-card` | `min-height: 58px`, `padding: 10px 12px`, `border-radius: 12px` | `min-height: 46px`, `padding: 6px 9px`, `border-radius: 10px` |
+| `.oryx-stat-card__icon` | `28×28px` | `22×22px` |
+| `.oryx-stat-card__label` | `10.5px`, `0.06em` | `9.5px`, `0.05em` |
+| `.oryx-stat-card__value` | `17px` | `15px` |
+| `.oryx-stat-grid` | `repeat(auto-fit, minmax(168px, 1fr))` | `repeat(4, minmax(0, 1fr))` |
+| `.oryx-stat-grid--wide` | `repeat(auto-fit, minmax(210px, 1fr))` | `repeat(4, minmax(0, 1fr))` |
+| `@media (max-width: 1024px)` | — | three columns |
+| `@media (max-width: 640px)` | — | two columns |
+| `.oryx-tile` | `min-height: 178px`, `border-radius: 16px` | `min-height: 142px`, `border-radius: 14px` |
+| `.oryx-tile__body` | `min-height: 178px`, `padding: 17px` | `min-height: 142px`, `padding: 13px` |
+| `.oryx-tile__icon` | `38×38px` | `32×32px` |
+
+`apps/admin/src/app/(app)/dashboard/page.tsx`: the module tile grid became
+`grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 [&>*]:min-w-0`, and the
+loading skeleton dropped from 186px to 142px so it matches the tile it stands in
+for.
+
+Measured in the running application (Chromium, `getComputedStyle` and
+`getBoundingClientRect`):
+
+| Context | Viewport | Columns | Card width | Card height |
+| --- | --- | --- | --- | --- |
+| Overview KPIs | 1920 | 4 | 398px | 72px |
+| Overview KPIs | 1440 | 4 | 278px | 72px |
+| Overview KPIs | 1280 | 4 | 238px | 72px |
+| Overview KPIs | 1024 | 3 | 247px | 72px |
+| Overview KPIs | 768 | 3 | 240px | 72px |
+| Overview KPIs | 430 | 2 | 195px | 72px |
+| Overview KPIs | 390 | 2 | 175px | 72px |
+| Overview KPIs | 375 | 2 | 168px | 72px |
+| CRM / HR / Reports / Operations KPIs | 1440 | 4 | 270px | 54px |
+
+The count is now capped at four and reduced to three, then two, as the viewport
+narrows; the tile itself is never compressed below the width that fits an Arabic
+metric label. The tall cards (72px) are the overview tiles that carry a
+secondary line; the ERP module cards (54px) carry one metric.
+
+A page that renders no KPI grid is not a defect: `/crm`, `/hr`, `/reports` and
+`/accounting` require a tenant company, and a platform principal has **no tenant
+scope** by design (see `docs/architecture/PERMISSION_MATRIX.md`). Signed in as
+`admin@oryx-auto.local` (Enterprise company administrator) every one of those
+pages renders its grid, which is what the table above records.
+
+### 17.2 The broken-image defect — the API serves origin-relative media
+
+The defect audit found 404s on the customer catalogue:
+
+```
+/products  404 http://localhost:3002/api/v1/cms/media/<id>/file?variant=card
+/categories 404 http://localhost:3002/api/v1/cms/media/<id>/file?variant=card
+```
+
+The API returns media as `/api/v1/cms/media/<id>/file` — a path relative to the
+**API** origin. The product, category, favourite and product-detail screens put
+that string straight into `<img src>` / `background-image`. Because the customer
+site is served from its own origin (port 3002), the browser asked the *website*
+for an API route and got a 404. The page still rendered, so the regression was
+invisible to a structural check: the photograph simply disappeared.
+
+Confirmed directly:
+
+```
+$ curl -o /dev/null -w '%{http_code}' http://localhost:3001/api/v1/cms/media/<id>/file?variant=card
+200   # image/webp, 77,612 bytes
+
+$ curl -o /dev/null -w '%{http_code}' http://localhost:3002/api/v1/cms/media/<id>/file?variant=card
+404   # text/html — the Next.js 404 page
+```
+
+The same defect existed in the admin product-image modal
+(`apps/admin/src/app/(app)/inventory/page.tsx`), which also rendered the raw
+relative path.
+
+**The fix.** One resolver per app, so the rule lives in exactly one place:
+
+- `apps/customer/src/lib/api.ts` — added `resolveImage(path)`. An absolute URL is
+  returned unchanged; a path beginning `/api/` is prefixed with the API origin;
+  anything else is a bundled site asset and keeps the base-path prefix that
+  `assetUrl` applies.
+- `apps/admin/src/lib/api.ts` — added `api.resolveImage(path)` with the same rule.
+
+Applied at every render site:
+
+| File | Site |
+| --- | --- |
+| `apps/customer/src/app/products/page.tsx` | product card image |
+| `apps/customer/src/app/products/[id]/page.tsx` | gallery and related items |
+| `apps/customer/src/app/categories/page.tsx` | category tile art |
+| `apps/customer/src/app/(account)/favorites/page.tsx` | favourite card image |
+| `apps/customer/src/app/page.tsx` | homepage hero banner path |
+| `apps/admin/src/app/(app)/inventory/page.tsx` | product-image modal thumbnail |
+
+Verified after the fix, in the browser:
+
+```
+/products   img srcs: [… "http://localhost:3001/api/v1/cms/media/<id>/file?variant=card" …]
+/categories backgrounds: ["url(\"http://localhost:3001/api/v1/cms/media/<id>/file?variant=card\")" …]
+```
+
+and the defect audit reports `broken=0` on every page:
+
+| Page | Images | Broken | Horizontal overflow |
+| --- | --- | --- | --- |
+| `/` | 4 | 0 | 0 |
+| `/categories` | 4 | 0 | 0 |
+| `/products` | 8 | 0 | 0 |
+| `/services` | 4 | 0 | 0 |
+| `/providers` | 4 | 0 | 0 |
+| `/about` | 4 | 0 | 0 |
+| `/contact` | 4 | 0 | 0 |
+| `/products` (390px) | 8 | 0 | 0 |
+
+Admin product-image modal, after the fix:
+
+```
+product images: [{"src":"http://localhost:3001/api/v1/cms/media/<id>/file?variant=card","ok":true}]
+```
+
+The remaining 401 on `/customer/auth/refresh` is the guest session probe: a
+visitor with no refresh cookie is correctly refused, and the protected account
+pages redirect to `/login`. It is not an error.
+
+A regression test guards the rule —
+`apps/customer/test/media-url.test.ts` (4 tests) asserts that an API media path
+goes to the API origin, that a bundled asset stays relative, that an absolute URL
+passes through, and that an absent image returns `null`.
+
+### 17.3 Admin → public data flow, with real database rows
+
+The customer website reads the same database the admin edits. Evidence:
+
+- `GET /api/v1/customer/catalog/categories` returns real `Category` rows with
+  real `mediaAssetId` values; the resolver turns each into a live
+  `cms/media/...` URL that returns `200 image/webp`.
+- `GET /api/v1/customer/catalog/providers` returns real `MarketplaceProvider`
+  rows (for example `Al Noor Parts`, `ORYX-HOLDING-P3`).
+- A suspend mutation without a company context returns **403**, which is the
+  correct authorization result, not a defect: a platform principal cannot mutate
+  tenant data outside a support session.
+- A QA customer was created through the real endpoint
+  (`POST /api/v1/customer/auth/register`), which returned a real access token and
+  set the refresh cookie. The account then signed in and reached `/dashboard`
+  with the ten expected account routes.
+
+### 17.4 Technical verification
+
+| Check | Command | Result |
+| --- | --- | --- |
+| API integration | `pnpm --filter @oryx/api test:e2e` | **28 suites, 548 tests passed** |
+| Customer unit | `pnpm --filter @oryx/customer test` | **53 tests passed** (49 + 4 new) |
+| Mobile unit | `pnpm --filter @oryx/mobile test` | **194 tests passed** |
+| Shared unit | `pnpm --filter @oryx/shared test` | **182 tests passed** |
+| Admin browser | `pnpm --filter @oryx/admin test:ui` | **199 passed, 1 skipped** |
+| Admin typecheck | `pnpm --filter @oryx/admin typecheck` | pass |
+| Admin lint | `pnpm --filter @oryx/admin lint` | pass |
+| Customer typecheck | `pnpm --filter @oryx/customer typecheck` | pass |
+| Customer lint | `pnpm --filter @oryx/customer lint` | pass |
+| Mobile typecheck | `pnpm --filter @oryx/mobile typecheck` | pass |
+| Mobile lint | `pnpm --filter @oryx/mobile lint` | pass |
+| API build | `pnpm --filter @oryx/api build` | pass |
+| Admin build | `pnpm --filter @oryx/admin build` | pass |
+| Customer build | `pnpm --filter @oryx/customer build` | pass |
+
+The API suite ran against the seeded PostgreSQL database
+(`oryx_dev` at `127.0.0.1:5432`) with the documented relaxed throttles. A test
+database that is unseeded reports connection and fixture errors, which are not
+code regressions; none were seen here.
+
+### 17.5 React version regression
+
+`react` and `react-dom` are `19.1.0` in `apps/admin`, `apps/customer` and
+`apps/mobile`, and the hoisted root resolves to `19.1.0`. All three builds
+prerender without the `Cannot read properties of null (reading 'useRef')`
+failure the hoisting rule warns about.
+
+### 17.6 Security verification
+
+- **No new surface.** The change is presentation-only: a URL is rewritten before
+  it reaches an `<img>`. No endpoint, DTO or query was added.
+- **Media access rules unchanged.** `GET /cms/media/:id/file` still applies its
+  own access rules; the resolver only changes which origin the browser asks, not
+  what the API will serve. An unauthenticated request still returns what the
+  endpoint decides.
+- **No credential is exposed.** The resolver returns a URL; it never reads a
+  token, and the customer session cookie stays scoped to `/api/v1/customer` on
+  the API origin.
+- **Guest isolation holds.** Protected customer pages redirect to `/login` when
+  the refresh probe returns 401; no tenant data is served to a guest.
+- **No secret was committed.** The QA account password lives in an ignored
+  scratch file (`.run/qa-customer-creds.txt`); `qa/` scratch captures are now
+  ignored, and only curated evidence under `docs/audit/` is tracked.
+
+### 17.7 Evidence
+
+Committed under `docs/audit/exec10/screenshots/`:
+
+| File | What it shows |
+| --- | --- |
+| `17-customer-products-images-after.png` | catalogue with uploaded photographs, 0 broken |
+| `18-customer-categories-images-after.png` | category tiles with CMS art, 0 broken |
+| `19-admin-inventory-images-after.png` | admin product-image modal, thumbnail decoded |
+| `20-admin-crm-kpi-after.png` | compact KPI band, 4 columns |
+| `21-admin-overview-kpi-after.png` | compact module tiles and KPI band |
+
+Before/after pairs for the KPI density change remain in the local QA capture set
+and are described by the measurements in §17.1.
+
+### 17.8 Still open
+
+- **Android visual acceptance of Splash and Homepage is still not claimed.** A
+  browser render is not a physical device; the report does not present one as
+  the other.
+- **No APK was published**, per the instruction not to ship one until the
+  integrated functionality is ready for a coherent testing release.
+- **PR #7 remains open and Draft.** Nothing was merged or deployed.
+
 ---
 
 *Written by an AI agent (OpenHands) on behalf of the repository owner.*

@@ -1104,6 +1104,26 @@ export function mediaUrl(media: CmsMedia | null, variant = 'card'): string | nul
   return `${API_BASE}/v1/cms/media/${media.id}/file?variant=${chosen}`;
 }
 
+/** The API origin, without the `/api` suffix `API_BASE` carries. */
+const API_ORIGIN = API_BASE.replace(/\/api\/?$/, '');
+
+/**
+ * Resolve an image path the API returned into a URL the browser can load.
+ *
+ * The catalogue endpoints return media as `/api/v1/cms/media/<id>/file`, which
+ * is relative to the API origin. The customer site is served from its own
+ * origin, so rendering that path verbatim makes the browser request the website
+ * and 404 — the picture silently disappears. Bundled assets (`/media/...`,
+ * `/art/...`) are served by the site itself, so they keep the base-path prefix
+ * instead, and an absolute URL is returned unchanged.
+ */
+export function resolveImage(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  if (path.startsWith('/api/')) return `${API_ORIGIN}${path}`;
+  return assetUrl(path);
+}
+
 /** Looks up a published content block by key, returning null when absent. */
 export function block(content: WebsiteContent, key: string): WebsiteBlock | null {
   return content.blocks.find((b) => b.key === key) ?? null;

@@ -102,6 +102,9 @@ const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001
   .replace(/\/+$/, '')
   .replace(/\/v1$/, '');
 
+/** The API origin, without the `/api` suffix `API_BASE` carries. */
+const API_ORIGIN = API_BASE.replace(/\/api\/?$/, '');
+
 /**
  * Only non-secret UI preferences are persisted.
  *
@@ -650,6 +653,22 @@ export const api = {
   deleteMedia: (id: string) => request<{ ok: boolean }>(`/cms/media/${id}`, { method: 'DELETE' }),
   /** The servable URL of an image variant (`card` by default). */
   mediaFileUrl: (id: string, variant = 'card') => `${API_BASE}/v1/cms/media/${id}/file?variant=${variant}`,
+
+  /**
+   * Resolve an image path the API returned into a URL the browser can load.
+   *
+   * Inventory and CMS endpoints return media as `/api/v1/cms/media/<id>/file`,
+   * a path relative to the API origin. The admin app is served from its own
+   * origin, so rendering that path verbatim asks the admin host for an API
+   * route and 404s, and the thumbnail silently disappears. An absolute URL is
+   * returned unchanged.
+   */
+  resolveImage: (path: string | null | undefined): string | null => {
+    if (!path) return null;
+    if (/^https?:\/\//i.test(path)) return path;
+    if (path.startsWith('/api/')) return `${API_ORIGIN}${path}`;
+    return path;
+  },
 
   notificationTemplates: () => request<Array<Record<string, unknown>>>('/cms/notification-templates'),
   apiClients: () => request<Array<Record<string, unknown>>>('/cms/api-clients'),

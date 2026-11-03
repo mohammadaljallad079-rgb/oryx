@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
-import { customerApi, publicApi, type CatalogProduct } from '@/lib/api';
+import { customerApi, publicApi, resolveImage, type CatalogProduct } from '@/lib/api';
 import { messageOf } from '@/lib/hooks';
 import { Alert, Card, Money } from '@/components/ui';
 import { LoadingPanel, PageHeader, StatePanel } from '@/components/premium';
@@ -125,9 +125,9 @@ export default function ProductDetailPage() {
 
   const gallery =
     product.images.length > 0
-      ? product.images.map((i) => i.url).filter((u): u is string => Boolean(u))
+      ? product.images.map((i) => resolveImage(i.url)).filter((u): u is string => Boolean(u))
       : product.imageUrl
-        ? [product.imageUrl]
+        ? [resolveImage(product.imageUrl)!]
         : [];
 
   return (
@@ -205,7 +205,7 @@ export default function ProductDetailPage() {
                 <Link href={`/products/${item.id}`} className="oryx-product-card__media">
                   {item.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.imageUrl} alt={item.name} loading="lazy" decoding="async" />
+                    <img src={resolveImage(item.imageUrl) ?? ''} alt={item.name} loading="lazy" decoding="async" />
                   ) : (
                     <span className="oryx-product-card__placeholder" aria-hidden>
                       <Icon name="cart" size={26} />

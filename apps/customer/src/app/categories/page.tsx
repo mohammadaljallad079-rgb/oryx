@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useUi } from '@/lib/ui-context';
-import { categoryImage, publicApi, type CatalogCategory } from '@/lib/api';
+import { categoryImage, publicApi, resolveImage, type CatalogCategory } from '@/lib/api';
 import { Card } from '@/components/ui';
 import { LoadingPanel, PageHeader, StatePanel } from '@/components/premium';
 import { Icon } from '@/components/icons';
@@ -57,7 +57,7 @@ export default function CategoriesPage() {
               <span
                 className="oryx-category-card__art"
                 style={{
-                  backgroundImage: `url(${category.imageUrl ?? categoryImage(null, category.key, 'card')})`,
+                  backgroundImage: `url(${resolveImage(category.imageUrl) ?? categoryImage(null, category.key, 'card')})`,
                 }}
                 aria-hidden
               />

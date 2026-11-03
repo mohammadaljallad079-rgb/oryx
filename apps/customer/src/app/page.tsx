@@ -11,6 +11,7 @@ import {
   mediaAlt,
   mediaUrl,
   publicApi,
+  resolveImage,
   SERVICE_CATEGORIES,
   type ProviderSummary,
   type WebsiteCategory,
@@ -59,7 +60,7 @@ export default function HomePage() {
   const heroBanner = content.banners.find((b) => b.media || b.imageUrl) ?? null;
   // A banner image can be a CMS media id or a plain path; both are normalised
   // to a servable URL, and the bundled asset prefix is applied to the latter.
-  const bannerImage = heroBanner?.imageUrl ? assetUrl(heroBanner.imageUrl) : null;
+  const bannerImage = heroBanner?.imageUrl ? resolveImage(heroBanner.imageUrl) : null;
   const heroImage =
     mediaUrl(heroBanner?.media ?? null, 'hero') ??
     bannerImage ??

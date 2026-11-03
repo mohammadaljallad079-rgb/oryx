@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useUi } from '@/lib/ui-context';
-import { customerApi } from '@/lib/api';
+import { customerApi, resolveImage } from '@/lib/api';
 import { messageOf, useAsync } from '@/lib/hooks';
 import { Alert, Card, Money } from '@/components/ui';
 import { LoadingPanel, PageHeader, StatePanel } from '@/components/premium';
@@ -64,7 +64,7 @@ export default function FavoritesPage() {
               <Link href={`/products/${product.id}`} className="oryx-product-card__media">
                 {product.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={product.imageUrl} alt={product.name} loading="lazy" decoding="async" />
+                  <img src={resolveImage(product.imageUrl) ?? ''} alt={product.name} loading="lazy" decoding="async" />
                 ) : (
                   <span className="oryx-product-card__placeholder" aria-hidden>
                     <Icon name="cart" size={26} />

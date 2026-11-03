@@ -545,9 +545,9 @@ body::before {
   position: relative;
   display: block;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: 14px;
   border: 1px solid var(--border);
-  min-height: 178px;
+  min-height: 142px;
   text-decoration: none;
   color: var(--on-media);
   isolation: isolate;
@@ -580,18 +580,18 @@ body::before {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: 6px;
-  min-height: 178px;
-  padding: 17px;
+  gap: 5px;
+  min-height: 142px;
+  padding: 13px;
 }
 
 .oryx-tile__icon {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 32px;
   margin-bottom: auto;
-  border-radius: 11px;
+  border-radius: 9px;
   background: var(--media-chip-bg);
   border: 1px solid var(--media-chip-border);
   color: var(--on-media-accent);
@@ -959,11 +959,11 @@ body::before {
 .oryx-stat-card {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 58px;
-  padding: 10px 12px;
+  gap: 7px;
+  min-height: 46px;
+  padding: 6px 9px;
   border: 1px solid var(--border-soft);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--surface);
   box-shadow: var(--shadow-card);
   min-width: 0;
@@ -973,9 +973,9 @@ body::before {
   display: grid;
   flex: none;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
   color: var(--gold);
@@ -1004,9 +1004,9 @@ body::before {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-muted);
-  font-size: 10.5px;
+  font-size: 9.5px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
@@ -1014,7 +1014,7 @@ body::before {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 800;
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
@@ -1040,17 +1040,36 @@ body::before {
   font-size: 10.5px;
 }
 
-/* Columns follow the tile width, so a screen does not need a breakpoint per
- * count. 168px is the width at which a long Arabic metric label still fits on
- * one line beside its icon. */
+/* Columns are capped at four on a wide screen. The previous `auto-fit`
+ * minimum produced nine 193px tiles at 1920px, which read as a cramped strip
+ * rather than a KPI band, and a single full-width tile at 375px. A fixed
+ * count keeps four balanced tiles on a desktop and two on a phone, and the
+ * narrow queries below only reduce the count — never the tile. */
 .oryx-stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .oryx-stat-grid--wide {
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* Reduce the count, never the tile. Three columns while the content still fits
+ * a tablet, two on a phone. Both stay far wider than the 168px the old
+ * auto-fit floor allowed, so a label never clips. */
+@media (max-width: 1024px) {
+  .oryx-stat-grid,
+  .oryx-stat-grid--wide {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .oryx-stat-grid,
+  .oryx-stat-grid--wide {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* Legacy KPI classes are kept so a screen that has not been migrated still
