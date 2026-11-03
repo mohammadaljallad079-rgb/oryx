@@ -335,7 +335,7 @@ platform without breaking a type:
 
 ## 9. Delivery
 
-- Committed to `feature/execution-07-premium-web` and pushed.
+- Committed to `feature/execution-07-premium-web` as `a9f2ad1` and pushed.
 - **PR #7 stays open and Draft.** Not merged, not deployed.
 - No production deployment and no APK were produced.
 
