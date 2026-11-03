@@ -221,6 +221,6 @@ Unchanged from Execution 18; nothing in this execution alters these.
 
 ## 10. Delivery
 
-- Committed to `feature/execution-07-premium-web` and pushed.
+- Committed to `feature/execution-07-premium-web` and pushed as `9d456cd`.
 - **PR #7 stays open and Draft.** Not merged, not deployed.
 - No APK was built.
