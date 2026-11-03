@@ -39,8 +39,10 @@ const SECTIONS: Array<{ titleKey: string; items: NavItem[] }> = [
     items: [
       { href: '/orders', key: 'account.nav.orders', icon: 'cart' },
       { href: '/rfqs', key: 'account.nav.rfqs', icon: 'clipboard' },
+      { href: '/quotations', key: 'account.nav.quotations', icon: 'file' },
       { href: '/invoices', key: 'account.nav.invoices', icon: 'wallet' },
-      { href: '/returns', key: 'account.nav.returns', icon: 'file' },
+      { href: '/returns', key: 'account.nav.returns', icon: 'arrow' },
+      { href: '/my-credits', key: 'account.nav.credits', icon: 'wallet' },
     ],
   },
   {
