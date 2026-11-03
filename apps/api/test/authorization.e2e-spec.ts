@@ -885,6 +885,52 @@ describe('ORYX API authorization (e2e)', () => {
       );
       expect(audit.body.items.length).toBeGreaterThan(0);
 
+      // The new filters narrow the same trail: by target type, by free-text
+      // summary, and by a date window that excludes a past century. A wrong
+      // filter must return nothing, not everything.
+      const byTarget = await call<{ items: Array<{ targetType: string }>; total: number }>(
+        ctx.base,
+        '/audit-logs?targetType=COMPANY',
+        { token: superToken },
+      );
+      expect(byTarget.status).toBe(200);
+      expect(byTarget.body.items.every((i) => i.targetType === 'COMPANY')).toBe(true);
+
+      const bySearch = await call<{ items: Array<{ summary: string; action: string; targetId: string | null }> }>(
+        ctx.base,
+        '/audit-logs?search=support',
+        { token: superToken },
+      );
+      expect(bySearch.status).toBe(200);
+      expect(bySearch.body.items.length).toBeGreaterThan(0);
+      expect(
+        bySearch.body.items.every(
+          (i) =>
+            i.summary.toLowerCase().includes('support') ||
+            i.action.toLowerCase().includes('support') ||
+            (i.targetId ?? '').toLowerCase().includes('support'),
+        ),
+      ).toBe(true);
+
+      const windowed = await call<{ total: number }>(
+        ctx.base,
+        '/audit-logs?from=2020-01-01T00:00:00.000Z&to=2030-01-01T00:00:00.000Z',
+        { token: superToken },
+      );
+      expect(windowed.status).toBe(200);
+      expect(windowed.body.total).toBeGreaterThan(0);
+
+      const empty = await call<{ total: number }>(
+        ctx.base,
+        '/audit-logs?from=1999-01-01T00:00:00.000Z&to=1999-12-31T00:00:00.000Z',
+        { token: superToken },
+      );
+      expect(empty.body.total).toBe(0);
+
+      // A malformed date is the caller's mistake, not a 500.
+      const badDate = await call(ctx.base, '/audit-logs?from=not-a-date', { token: superToken });
+      expect(badDate.status).toBe(400);
+
       const ended = await call(ctx.base, `/support-sessions/${opened.body.id}/end`, {
         method: 'POST',
         token: superToken,

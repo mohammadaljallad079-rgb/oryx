@@ -75,6 +75,7 @@ export const ERROR_CODES = {
   CREDIT_LIMIT_EXCEEDED: 'sales.credit_limit_exceeded',
   DOCUMENT_ALREADY_POSTED: 'erp.document_already_posted',
   OVER_ALLOCATION: 'erp.over_allocation',
+  OVER_RECEIPT: 'purchasing.over_receipt',
 
   // ------------------------------------------------------------ Execution 03
   PAYROLL_ALREADY_POSTED: 'payroll.already_posted',

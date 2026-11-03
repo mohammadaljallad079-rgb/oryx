@@ -28,6 +28,7 @@ import {
   CreateWorkshopBayDto,
   InvoiceJobCardDto,
   IssueReservationDto,
+  ReservedStockQueryDto,
   CompatiblePartsQueryDto,
   ListQueryDto,
   UpdateJobCardDto,
@@ -184,6 +185,22 @@ export class WorkshopController {
   @ApiOperation({ summary: 'Issue reserved parts to the shared stock ledger' })
   issue(@Param('id') id: string, @Body() dto: IssueReservationDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.workshop.issueReservation(id, dto, p, actorFrom(p, req));
+  }
+
+  @Post('reservations/:id/cancel')
+  @RequireModule('spare_parts')
+  @RequirePermissions('erp.parts.reserve')
+  @ApiOperation({ summary: 'Cancel an un-issued parts reservation' })
+  cancelReservation(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.workshop.cancelReservation(id, p, actorFrom(p, req));
+  }
+
+  @Get('reservations/reserved-stock')
+  @RequireModule('spare_parts')
+  @RequireAnyPermission('erp.parts.reserve', 'erp.parts.issue', 'erp.spare_parts.read', 'erp.inventory.read')
+  @ApiOperation({ summary: 'Outstanding reserved quantity per product and warehouse' })
+  reservedStock(@Query() query: ReservedStockQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.workshop.reservedStock(query, p);
   }
 
   // ------------------------------------------------------------- warranties

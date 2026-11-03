@@ -536,6 +536,54 @@ describe('ORYX Execution 03 (e2e)', () => {
       expect(invoice.body.totalMinor).toBe(46000);
     });
 
+    it('cancels an un-issued parts reservation and releases the reserved quantity', async () => {
+      const job = await erp<{ id: string }>('/automotive/job-cards', {
+        method: 'POST',
+        body: { vehicleId, complaint: 'Reservation cancel' },
+      });
+      const jobId = job.body.id;
+
+      const reservation = await erp<{ id: string; status: string }>('/automotive/reservations', {
+        method: 'POST',
+        body: { jobCardId: jobId, warehouseId, lines: [{ productId, quantity: 10000 }] },
+      });
+      expect(reservation.status).toBe(201);
+
+      const reserved = await erp<{ items: Array<{ productId: string; warehouseId: string; reservedQuantity: number }> }>(
+        `/automotive/reservations/reserved-stock?warehouseId=${warehouseId}`,
+      );
+      expect(reserved.status).toBe(200);
+      const entry = reserved.body.items.find((i) => i.productId === productId);
+      expect(entry?.reservedQuantity).toBeGreaterThanOrEqual(10000);
+
+      const cancelled = await erp<{ status: string }>(`/automotive/reservations/${reservation.body.id}/cancel`, {
+        method: 'POST',
+        body: {},
+      });
+      expect(cancelled.status).toBe(201);
+      expect(cancelled.body.status).toBe('CANCELLED');
+
+      // A cancelled reservation no longer holds stock, so it must not be
+      // reported as outstanding.
+      const after = await erp<{ items: Array<{ productId: string }> }>(
+        `/automotive/reservations/reserved-stock?warehouseId=${warehouseId}`,
+      );
+      expect(after.body.items.filter((i) => i.productId === productId)).toHaveLength(0);
+
+      // Cancelling twice, and cancelling an issued reservation, are both refused.
+      const again = await erp<{ code: string }>(`/automotive/reservations/${reservation.body.id}/cancel`, { method: 'POST', body: {} });
+      expect(again.status).toBe(400);
+
+      const issuedJob = await erp<{ id: string }>('/automotive/job-cards', { method: 'POST', body: { vehicleId, complaint: 'Issued reservation' } });
+      const issuedRes = await erp<{ id: string }>('/automotive/reservations', {
+        method: 'POST',
+        body: { jobCardId: issuedJob.body.id, warehouseId, lines: [{ productId, quantity: 10000 }] },
+      });
+      await erp(`/automotive/reservations/${issuedRes.body.id}/issue`, { method: 'POST', body: {} });
+      const tooLate = await erp<{ code: string }>(`/automotive/reservations/${issuedRes.body.id}/cancel`, { method: 'POST', body: {} });
+      expect(tooLate.status).toBe(400);
+    });
+
     it('prices labour hours at hundredths scale when invoicing a job card', async () => {
       const job = await erp<{ id: string; jobNumber: string }>('/automotive/job-cards', {
         method: 'POST',

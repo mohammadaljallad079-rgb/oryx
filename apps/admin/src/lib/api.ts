@@ -598,8 +598,19 @@ export const api = {
     }),
 
   // ------------------------------------------------------------------- audit
-  listAuditLogs: (params: { page?: number; pageSize?: number; companyId?: string; action?: string } = {}) =>
-    request<Paginated<AuditLogDto>>(`/audit-logs?${toQuery(params)}`),
+  listAuditLogs: (
+    params: {
+      page?: number;
+      pageSize?: number;
+      companyId?: string;
+      action?: string;
+      targetType?: string;
+      actorUserId?: string;
+      search?: string;
+      from?: string;
+      to?: string;
+    } = {},
+  ) => request<Paginated<AuditLogDto>>(`/audit-logs?${toQuery(params)}`),
 
   // --------------------------------------------------------------------- cms
   cmsPages: (locale?: string) => request<CmsPageDto[]>(`/cms/pages${locale ? `?locale=${locale}` : ''}`),

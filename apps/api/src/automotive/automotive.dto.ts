@@ -24,6 +24,16 @@ export class ListQueryDto {
   @IsOptional() @IsString() branchId?: string;
   @IsOptional() @IsString() customerId?: string;
   @IsOptional() @IsString() vehicleId?: string;
+  @IsOptional() @IsString() productId?: string;
+}
+
+/**
+ * Reserved-stock lookup. The base list query carries no warehouse filter, and
+ * `forbidNonWhitelisted` rejects any property a DTO does not declare, so the
+ * warehouse filter needs an explicit optional field here.
+ */
+export class ReservedStockQueryDto extends ListQueryDto {
+  @IsOptional() @IsString() warehouseId?: string;
 }
 
 /**

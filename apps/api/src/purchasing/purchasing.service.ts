@@ -407,10 +407,21 @@ export class PurchasingService {
       const receivedAt = new Date(dto.receivedAt);
 
       // Determine received quantities: explicit lines, or the outstanding order.
+      // An explicit line is capped at what the order still owes, so a retried or
+      // duplicated receipt cannot move stock (and accrue AP) twice for the same
+      // ordered quantity.
       const receiptLines = dto.lines
         ? dto.lines.map((l) => {
             const orderLine = order.lines.find((ol) => ol.productId === l.productId);
             if (!orderLine) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Received product is not on the order.');
+            const outstanding = orderLine.quantity - orderLine.quantityReceived;
+            if (l.quantity > outstanding) {
+              throw badRequest(
+                ERROR_CODES.OVER_RECEIPT,
+                `Cannot receive ${l.quantity} of ${orderLine.description}: only ${outstanding} remains outstanding on this order.`,
+                { ordered: orderLine.quantity, received: orderLine.quantityReceived, outstanding },
+              );
+            }
             return {
               productId: l.productId,
               description: orderLine.description,

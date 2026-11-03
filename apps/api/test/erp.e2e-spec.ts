@@ -666,6 +666,39 @@ describe('ORYX ERP core (e2e)', () => {
       expect(order.body.items.length).toBeGreaterThanOrEqual(1);
     });
 
+    it('refuses to receive more than the order still owes', async () => {
+      const before = await ctx.prisma.stockLevel.findUniqueOrThrow({
+        where: { warehouseId_productId: { warehouseId, productId } },
+      });
+
+      // The order is fully received. An explicit receipt that repeats the whole
+      // ordered quantity must be rejected: without the cap it created a second
+      // receipt, moved stock twice and accrued AP twice for one order line.
+      const over = await erp<{ code: string }>('/purchasing/receipts', {
+        method: 'POST',
+        body: {
+          purchaseOrderId: orderId,
+          warehouseId,
+          receivedAt: new Date().toISOString(),
+          lines: [{ productId, quantity: 50000, unitCostMinor: 6000 }],
+        },
+      });
+      expect(over.status).toBe(400);
+      expect(over.body.code).toBe('purchasing.over_receipt');
+
+      // An automatic receipt (no explicit lines) finds nothing outstanding.
+      const auto = await erp('/purchasing/receipts', {
+        method: 'POST',
+        body: { purchaseOrderId: orderId, warehouseId, receivedAt: new Date().toISOString() },
+      });
+      expect(auto.status).toBe(400);
+
+      const after = await ctx.prisma.stockLevel.findUniqueOrThrow({
+        where: { warehouseId_productId: { warehouseId, productId } },
+      });
+      expect(after.quantity).toBe(before.quantity);
+    });
+
     it('records a supplier invoice and pays it', async () => {
       const invoice = await erp<{ id: string; invoiceNumber: string; totalMinor: number; status: string }>(
         '/purchasing/supplier-invoices',

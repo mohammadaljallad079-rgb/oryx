@@ -49,8 +49,15 @@ describe('Execution 16 — sales document date contract (e2e)', () => {
     const me = await call<{ context: { companyId: string | null } }>(ctx.base, '/auth/me', { token });
     companyId = me.body.context.companyId!;
 
-    const customers = await erp<{ items: Array<{ id: string }> }>('/sales/customers?pageSize=1');
-    customerId = customers.body.items[0].id;
+    // A dedicated customer with no credit limit. Reusing the seeded customer
+    // makes these assertions depend on every other suite's posting history:
+    // once its outstanding balance reaches its credit limit, an unrelated
+    // invoice here starts failing with `sales.credit_limit_exceeded` (403).
+    const created = await erp<{ id: string }>('/sales/customers', {
+      method: 'POST',
+      body: { code: `EX16-${Date.now()}`, nameEn: 'Contract Customer', nameAr: 'عميل العقد' },
+    });
+    customerId = created.body.id;
 
     const warehouses = await erp<{ items: Array<{ id: string }> }>('/inventory/warehouses?pageSize=1');
     warehouseId = warehouses.body.items[0].id;
@@ -64,6 +71,16 @@ describe('Execution 16 — sales document date contract (e2e)', () => {
   });
 
   afterAll(async () => {
+    // Remove the fixtures this suite created so a repeated run starts clean.
+    await ctx.prisma.creditNoteLine.deleteMany({ where: { creditNote: { customerId } } });
+    await ctx.prisma.creditNote.deleteMany({ where: { customerId } });
+    await ctx.prisma.salesInvoiceLine.deleteMany({ where: { invoice: { customerId } } });
+    await ctx.prisma.salesInvoice.deleteMany({ where: { customerId } });
+    await ctx.prisma.quotationLine.deleteMany({ where: { quotation: { customerId } } });
+    await ctx.prisma.quotation.deleteMany({ where: { customerId } });
+    await ctx.prisma.salesOrderLine.deleteMany({ where: { order: { customerId } } });
+    await ctx.prisma.salesOrder.deleteMany({ where: { customerId } });
+    await ctx.prisma.customer.deleteMany({ where: { id: customerId } });
     await ctx.app.close();
   });
 
