@@ -873,6 +873,41 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 - **`percentOffBp` is basis points.** `20000` (200%) is rejected with `400`; the
   bound is enforced in the DTO, not the screen.
 
+### Inspection engine gotchas (Execution Phase 2)
+
+- **The section catalogue lives once.** `packages/shared/src/inspection.ts`
+  declares the seven areas, their items, their result sets, the paint conditions
+  and the chassis regions. The API validates against it and the admin workspace
+  renders from it. Add an area there, not in a second list.
+- **A section's item count is asserted by a test.** Interior 12, Exterior 6,
+  Engine Compartment 13, Road Test 13. `packages/shared/test/inspection.test.ts`
+  fails if the catalogue drifts from the report it reproduces; update the test
+  deliberately, not to silence it.
+- **Writing to an area the job did not select is rejected.** This is what keeps a
+  paint-only job from asking about the engine. Do not relax it to let a screen
+  render every section.
+- **A marker outside the diagram is rejected, not clamped.** Validation bounds
+  the normalised coordinates. A clamped marker would be stored and then drawn in
+  the wrong place, which is worse than a rejected write.
+- **Submission is gated on completeness server-side.** Every item answered, and
+  every diagram/diagnostic section carrying either content or an explicit
+  `noFindings`. The disabled button is a courtesy; the API is the gate.
+- **`InspectionSectionResult.noFindings` defaults to `false`.** Migration
+  `20261104002429` adds it. A diagram or diagnostic section with neither markers
+  nor this flag cannot be submitted.
+- **Approved inspections are frozen.** Section writes and cancellation return
+  `409`. The workspace hides the controls; the service refuses regardless.
+- **`POST /:id/review` needs `erp.inspection.report.approve`, not
+  `erp.inspection.write`.** An inspector may write the report but not approve it.
+- **Job numbers come from the `JOB` document sequence.** Add a key to
+  `DOCUMENT_SEQUENCE_KEYS` rather than formatting a number in the service.
+- **The media pipeline re-encodes to WebP and strips EXIF.** An upload test must
+  assert `image/webp`, not the type it sent; asserting the sent type fails.
+- **Customer `nameEn` and `nameAr` are independently optional.** At least one is
+  required, enforced in `SalesService.createCustomer` because a class-validator
+  rule cannot express "one of these two". A missing name is stored as `''`, so
+  reads across sales, accounting and reports need no null branch.
+
 ### Adding a new ERP module
 
 1. Add a `ModuleDefinition` to `packages/shared/src/modules.ts`.
