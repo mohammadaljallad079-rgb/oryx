@@ -1164,3 +1164,211 @@ commit that records this section changes documentation only.
   reported there; this section adds the inspection engine only.
 - **No APK was published**, per the standing instruction.
 - **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.
+
+---
+
+## 19. Continuation session — official documents, PDF printing and QR verification (Execution Phase 3)
+
+This section records the work done in this session. It does not repeat the
+inspection engine of §18; it adds the document that an approved record produces,
+the register that lists it, the printed PDF and the public verification page.
+
+### 19.1 What was added
+
+An approved inspection had no output. An administrator could see that a job was
+approved, but could not hand the customer a document, and there was nothing a
+customer could scan to check that a paper report was genuine. Financial records
+had the same gap: a stored invoice could be viewed on screen but not printed as
+an official page.
+
+Execution Phase 3 closes that gap:
+
+1. **A document is issued from a source record.** The register refuses a
+   free-form document. An inspection report can only be issued for an
+   `APPROVED` session, and a financial document only from a stored invoice,
+   order or quotation — so a PDF can never carry figures that no row backs.
+2. **The PDF is really rendered.** A headless Chromium pass draws a
+   self-contained HTML template with the Noto Naskh Arabic and Noto Sans faces
+   embedded, so an Arabic report is not tofu. The bytes are re-encoded and
+   stored through the existing media pipeline.
+3. **The stored copy is served through an authorised route only**, inline with
+   `private, no-store`. A revoked document must not keep showing as valid from a
+   cache.
+4. **Every document carries a verification token.** `GET /documents/verify/:token`
+   is public and returns a projection with no amount and no contact detail; the
+   customer site renders it at `/verify`. A scan reports valid, withdrawn,
+   superseded or unknown — and a withdrawn document is reported *as withdrawn*,
+   never as absent, so a scan never accuses a genuine document of being fake.
+5. **Withdrawal is audited and terminal.** A reason is required, a withdrawn
+   document stays in the register, and the public page changes outcome
+   immediately.
+
+### 19.2 Files changed
+
+**New — shared contract**
+
+| File | Purpose |
+| --- | --- |
+| `packages/shared/src/documents.ts` | The document catalogue, the report composition planner, the stored and public status vocabularies and the helpers that keep them apart. |
+| `packages/shared/test/documents.test.ts` | 24 tests: catalogue shape, pagination over the section catalogue, the two status vocabularies, VIN masking and the absence of financial fields in the public projection. |
+
+**New — API**
+
+| File | Purpose |
+| --- | --- |
+| `apps/api/src/documents/documents.module.ts` | Registers the controller, the service, storage, fonts, renderer and QR. |
+| `apps/api/src/documents/documents.controller.ts` | 8 routes under `/api/v1/documents`. |
+| `apps/api/src/documents/documents.service.ts` | Issuing, listing, reading, downloading and withdrawing; the tenant and source checks. |
+| `apps/api/src/documents/document-payload.ts` | Builds the render payload from stored rows — the only place a figure reaches a PDF. |
+| `apps/api/src/documents/documents.dto.ts` | Validated request bodies. |
+| `apps/api/src/documents/document-storage.service.ts` | Stores and reads the rendered bytes under `DOCUMENT_STORAGE_ROOT`. |
+| `apps/api/src/documents/pdf/pdf-renderer.service.ts` | The headless-Chromium pass and the page count. |
+| `apps/api/src/documents/pdf/document-fonts.service.ts` | Embeds the four Noto faces. |
+| `apps/api/src/documents/pdf/qr.service.ts` | Renders the verification QR. |
+| `apps/api/src/documents/templates/*.ts` | The chrome, the inspection-report template and the financial-document template. |
+| `apps/api/assets/fonts/*.ttf` | The embedded Arabic and Latin faces. |
+
+**New — admin interface**
+
+| File | Purpose |
+| --- | --- |
+| `apps/admin/src/components/documents-panel.tsx` | The register: list, open, copy the verification link, withdraw with a reason. |
+| `apps/admin/src/app/(app)/documents/page.tsx` | The document register, reached from the sidebar. |
+
+**New — customer site**
+
+| File | Purpose |
+| --- | --- |
+| `apps/customer/src/app/verify/[[...token]]/page.tsx` | The public verification page. Works with no session. |
+
+**New — database**
+
+| File | Purpose |
+| --- | --- |
+| `packages/database/prisma/migrations/20261104162028_execution_phase3_official_documents/` | `OfficialDocument`, `OfficialDocumentEvent` and the `OfficialDocumentStatus` enum. |
+
+**New — tests**
+
+| File | Purpose |
+| --- | --- |
+| `apps/api/test/execution-phase3-documents.e2e-spec.ts` | 22 API integration tests over real HTTP. |
+| `apps/admin/e2e/execution-phase3-documents.spec.ts` | 6 browser tests driving the real interface against the real API. |
+
+**Modified**
+
+| File | Change |
+| --- | --- |
+| `packages/database/prisma/schema.prisma` | The document tables and the status enum. |
+| `packages/shared/src/index.ts` | Re-exports the document specification. |
+| `apps/api/src/app.module.ts` | Registers `DocumentsModule`. |
+| `apps/api/test/test-app.ts` | `cleanupFixtures` deletes document rows before their company. |
+| `apps/admin/src/lib/api.ts` | The document client methods and the `OfficialDocumentDto` type, which now uses the shared `OfficialDocumentStatus` rather than an inline union. |
+| `apps/admin/src/lib/navigation.ts` | The register route. |
+| `apps/admin/src/app/(app)/automotive/inspections/[id]/page.tsx` | The register and the issue action on an approved job; a locked notice otherwise. |
+| `apps/admin/src/i18n/dictionaries.ts` | The document keys, English and Arabic. |
+| `apps/customer/src/lib/api.ts` | `verifyDocument`, the public call. |
+| `apps/customer/src/i18n/dictionaries.ts` | The verification page keys, English and Arabic. |
+| `apps/customer/test/i18n-status.test.ts` | A guard that the four verification outcomes read distinctly in both locales. |
+| `.gitignore` | Generated PDFs and uploaded media are runtime data, not source. |
+
+### 19.3 Backend endpoints
+
+All under `/api/v1/documents`.
+
+| Method | Path | Permission | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/verify/:token` | **public** | The verification projection. No amount, no contact detail. |
+| `GET` | `/catalogue` | `erp.dashboard.read` | The issuable document types and their bilingual titles. |
+| `POST` | `/issue` | any of `erp.sales.read`, `erp.purchasing.read`, `erp.accounting.read`, `erp.inspection.read` | Issue a financial document from a source record. |
+| `POST` | `/inspections/:sessionId/issue` | `erp.inspection.read` + module `automotive_inspections` | Issue the report for an `APPROVED` inspection. |
+| `GET` | `?sourceType=&sourceId=` | any of the four read permissions | The register for one source record. |
+| `GET` | `/:id` | any of the four | One document with its append-only event trail. |
+| `GET` | `/:id/file` | any of the four | The stored PDF, inline, `private, no-store`. |
+| `POST` | `/:id/revoke` | any of the four | Withdraw a document; a reason is required. |
+
+### 19.4 Server-enforced rules
+
+Each of these is covered by an integration test, not only by the interface.
+
+- A report cannot be issued for a session that is not `APPROVED`.
+- A financial document can only be issued from a stored source record; a
+  nonexistent id is a 400, not an empty document.
+- Another tenant's document reads as 404, and another tenant's register for the
+  same source id is empty. Tenant isolation is the `companyId` on the row.
+- The public verification projection carries no amount and no contact detail —
+  asserted as an exact key set, so a field added later fails the test.
+- A withdrawn document verifies as `REVOKED`, not as "not found".
+- `GET /:id/file` sets `Cache-Control: private, no-store`.
+- The register and the public page use different status vocabularies, and the
+  types and the tests keep them apart.
+
+### 19.5 Real HTTP test results
+
+A live driver (`22/22`) exercised the running API over real HTTP against the
+seeded database: login, issue, list, read, download, verify anonymously, verify
+as withdrawn, and the cross-tenant refusals. The Playwright suite then drove the
+same paths through the browser.
+
+| Check | Result |
+| --- | --- |
+| API integration — `test/execution-phase3-documents.e2e-spec.ts` | 22 passed |
+| API integration — whole suite | 30 suites, 606 passed |
+| Browser — `e2e/execution-phase3-documents.spec.ts` | 6 passed |
+| Browser — whole suite | 213 passed, 1 skipped |
+| Shared — `vitest run` | 215 passed |
+| Customer — `vitest run` | 54 passed |
+| Mobile — `vitest run` | 194 passed |
+| Typecheck — api, admin, customer, mobile | 4 × exit 0 |
+| Lint — admin, customer, mobile | 3 × exit 0 |
+| Build — `nest build` / `next build` | exit 0 |
+
+### 19.6 Security verification
+
+- **The public route is the only unauthenticated one.** `verify/:token` is
+  marked `@Public()`; every other route requires a permission and a company
+  scope.
+- **The token is the only credential.** It is a random value, not a sequence,
+  and it exposes a projection rather than the document.
+- **No sealed value leaves the API.** The file route streams bytes through the
+  authorised path; nothing returns a storage path.
+- **Tenant isolation is tested** with a second company's principal.
+- **No credential is committed.** The test passwords are the same throwaway
+  strings the other suites use.
+- **Generated PDFs and media are not source.** Both are in `.gitignore`.
+
+### 19.7 A defect found and fixed in this session
+
+The register labelled an `ISSUED` document **"Valid"**. "Valid" is the *public*
+verification vocabulary; the stored lifecycle state is `ISSUED`. The two words
+had been conflated, and the Arabic labels for `REVOKED` and `CANCELLED` were the
+same string (`ملغى`), so an Arabic-speaking administrator could not tell a
+withdrawn document from a cancelled one.
+
+The fix keeps the vocabularies apart in one place:
+
+- `OFFICIAL_DOCUMENT_STATUSES` and `DOCUMENT_VERIFICATION_STATUSES` are separate
+  exports, and `verificationStatusFor` maps one to the other by type.
+- `documentStatusLabelKey` returns a dictionary key only for a stored status, so
+  an unrecognised value renders the neutral "unknown" label rather than a raw
+  enum.
+- The register now reads **Issued** / **صادر** and **Withdrawn** / **مسحوب**,
+  and the cancelled label stays **Cancelled** / **ملغى**.
+- Two guards lock it: a shared test that the two vocabularies do not overlap and
+  a customer test that the four verification outcomes read distinctly in both
+  locales. A browser test drives the Arabic register and asserts the withdrawn
+  label.
+
+### 19.8 Still open
+
+- **Android visual acceptance of Splash and Homepage is still not claimed.** The
+  browser suite drives a desktop Chromium render; a browser render is not a
+  physical device, and this report does not present one as the other.
+- **The merchant-facing document surfaces are not built.** An administrator can
+  issue and withdraw; a provider portal screen for its own documents is not in
+  this phase.
+- **The wider catalogue is not issuable.** Statements, returns and journal
+  entries have a catalogue entry and a template but no issue path yet, and the
+  interface offers a button only for the types the API can render from a stored
+  record.
+- **No APK was published**, per the standing instruction.
+- **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.
