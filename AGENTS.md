@@ -338,6 +338,15 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 
 ### Execution 05 gotchas
 
+- **A Prisma `upsert` on a sequence row races when the row does not exist yet.**
+  `DocumentSequenceService.next()` used `upsert`, so two concurrent *first*
+  postings for the same company and document type both inserted and the loser
+  raised `P2002`. `withTransaction` retries `40001`/`40P01`/`P2034` but **not**
+  `P2002`, so a valid concurrent posting surfaced as a `500`. It now uses
+  `createMany({ skipDuplicates: true })` (`INSERT … ON CONFLICT DO NOTHING`)
+  then `findUniqueOrThrow` + `update`, which converges on one row and serialises
+  on its lock. `apps/api/test/document-numbering.e2e-spec.ts` locks this in.
+
 - **`OPERATIONAL` means it works, nothing weaker.** `deriveState` in
   `apps/api/src/integrations/integrations.service.ts` is the single place that
   decides a provider's state, and `AWAITING_CREDENTIALS` must be checked before
