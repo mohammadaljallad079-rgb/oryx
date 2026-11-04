@@ -1505,7 +1505,14 @@ lint target (`api: lint not configured`).
   asserts a document from another tenant is neither read nor downloaded.
 - **No credentials, tokens or secrets were added.**
 
-### 20.8 Still open
+### 20.8 Final commit
+
+`ac2cc29` — *fix(documents): correct footer pagination, watermark stacking and
+the missing issue types* — carries the code, the bundled mark, the two new
+suites and this section. It sits on top of `b964fb0`, which records the original
+Phase 3 delivery, and nothing was rebased away or overwritten.
+
+### 20.9 Still open
 
 - **Android visual acceptance of Splash and Homepage is still not claimed.** A
   desktop Chromium render is not a physical device.
