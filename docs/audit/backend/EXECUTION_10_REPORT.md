@@ -1432,6 +1432,8 @@ render from a stored record.
 | `apps/api/assets/brand/oryx-logo.png` | new: the official mark, a LANCZOS downscale of the owner-approved `apps/mobile/assets/brand/oryx-logo-on-light.png` (600×137 RGBA) |
 | `apps/api/src/documents/templates/chrome.spec.ts` | new: 7 unit tests for the `&nbsp;` fix, footer escaping and the page-counter placeholders |
 | `apps/api/test/execution-phase3-documents.e2e-spec.ts` | one-page assertion; brand-mark/watermark test; `SALES_RETURN` and `PURCHASE_INVOICE` issue tests; cleanup for the new fixtures |
+| `apps/api/src/common/document-sequence.service.ts` | concurrent first-allocation race fixed (`createMany … skipDuplicates` instead of `upsert`) |
+| `apps/api/test/document-numbering.e2e-spec.ts` | new: 10 numbering regression tests, including a 25-way concurrent burst |
 
 ### 20.3 Branding and the official mark
 
@@ -1445,15 +1447,32 @@ typographic monogram and logs a warning — it never invents a mark.
 
 ### 20.4 Automatic numbering
 
-Numbering was audited and needs no change. Every document number printed on a
-document comes from the **stored source record**, which was itself numbered by
-`DocumentSequenceService.next()` — a monotonic, gap-free sequence allocated by
-incrementing a single `DocumentSequence` row inside the caller's transaction.
-Two concurrent postings serialise on that row and cannot receive the same
-number, and a rolled-back transaction releases its number for reuse. The
-official-document layer reads `invoice.invoiceNumber`, `creditNote.creditNoteNumber`
-and `supplierInvoice.invoiceNumber`; it never generates a number of its own, so
-the printed number and the ledger number cannot diverge.
+Every document number printed on a document comes from the **stored source
+record**, which was itself numbered by `DocumentSequenceService.next()` — a
+monotonic, gap-free sequence allocated by incrementing a single
+`DocumentSequence` row inside the caller's transaction. Two concurrent postings
+serialise on that row and cannot receive the same number, and a rolled-back
+transaction releases its number for reuse. The official-document layer reads
+`invoice.invoiceNumber`, `creditNote.creditNoteNumber` and
+`supplierInvoice.invoiceNumber`; it never generates a number of its own, so the
+printed number and the ledger number cannot diverge.
+
+**A concurrency defect was found and fixed here.** `next()` opened with a Prisma
+`upsert`. The row lock the sequence relies on only exists once the row exists:
+for the *first* allocation of a given company and document type, two concurrent
+postings both find no row and both attempt the `INSERT`, and the loser raises a
+`P2002` unique-constraint violation. `withTransaction` retries serialization
+failures (`40001`, `40P01`, `P2034`) but not `P2002`, so a legitimate concurrent
+first posting could surface as a `500`. The insert is now
+`createMany({ …, skipDuplicates: true })`, which compiles to
+`INSERT … ON CONFLICT DO NOTHING`, followed by a `findUniqueOrThrow` and the
+incrementing `update`. Concurrent first allocations now converge on one row and
+serialise on its lock, which is the behaviour the service always claimed.
+
+A new suite, `apps/api/test/document-numbering.e2e-spec.ts`, locks the rules:
+sequence start and zero-padding, one counter per type, one counter per company,
+a 25-way concurrent burst handing out every number exactly once, rollback
+releasing a number, and the same behaviour over the real HTTP surface.
 
 ### 20.5 Backend endpoints
 
@@ -1470,10 +1489,12 @@ Dedicated PostgreSQL database `oryx_e10` created, migrated (`prisma migrate
 deploy`) and seeded (`tsx prisma/seed.ts`) before the run, with
 `MEDIA_ROOT=/tmp/oryx-media-e10`.
 
-- **Full API e2e suite: 30 suites, 609 tests, all passing** (`jest --config
-  jest-e2e.config.js --runInBand`, 73 s).
+- **Full API e2e suite: 31 suites, 619 tests, all passing** (`jest --config
+  jest-e2e.config.js --runInBand`, 76 s).
 - **Phase 3 documents suite: 25 tests, all passing**, including the two new
   types and the brand-mark assertion.
+- **Numbering suite: 10 tests, all passing** (`document-numbering.e2e-spec.ts`),
+  including the 25-way concurrent burst that exposed the `upsert` race.
 - **API unit suite: 7 tests, all passing** (`chrome.spec.ts`).
 - **Shared package: 215 tests, all passing** (11 files).
 
@@ -1503,6 +1524,11 @@ lint target (`api: lint not configured`).
   `erp.sales.read` and `PURCHASE_INVOICE` still requires `erp.purchasing.read`,
   and the service still scopes both lookups by `companyId`. The e2e suite
   asserts a document from another tenant is neither read nor downloaded.
+- **The numbering fix removes a denial-of-service path.** A caller who could
+  trigger a first-time concurrent posting for a company and document type could
+  previously make one of two valid requests fail with a `500`. The insert now
+  converges under the unique index instead of raising, so the failure mode is
+  gone rather than merely retried.
 - **No credentials, tokens or secrets were added.**
 
 ### 20.8 Final commit

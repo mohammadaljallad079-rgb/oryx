@@ -65,10 +65,17 @@ export class DocumentSequenceService {
    */
   async next(tx: Tx, companyId: string, name: DocumentSequenceName): Promise<string> {
     const { key, prefix } = DOCUMENT_SEQUENCE_KEYS[name];
-    const sequence = await tx.documentSequence.upsert({
+    // `createMany` + `skipDuplicates` compiles to `ON CONFLICT DO NOTHING`, so
+    // two concurrent *first* allocations for the same company and type cannot
+    // both fail on the unique key. An `upsert` races here: the loser raises
+    // P2002, which the transaction wrapper does not retry, so a legitimate
+    // concurrent posting would surface as a 500.
+    await tx.documentSequence.createMany({
+      data: [{ companyId, key, prefix, nextNumber: 1, padding: 5 }],
+      skipDuplicates: true,
+    });
+    const sequence = await tx.documentSequence.findUniqueOrThrow({
       where: { companyId_key: { companyId, key } },
-      create: { companyId, key, prefix, nextNumber: 1, padding: 5 },
-      update: {},
     });
     const allocated = await tx.documentSequence.update({
       where: { id: sequence.id },
