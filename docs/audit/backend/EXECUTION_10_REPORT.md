@@ -1544,6 +1544,11 @@ the original Phase 3 delivery):
 - `6f0db90` — *fix(common): make first-time document numbering safe under
   concurrency* — the sequence race fix, the numbering suite and this section's
   numbering record.
+- `c35c94d` — *docs(agents): record the sequence-upsert concurrency gotcha* —
+  documentation only.
+- `2fec35d` — *fix(documents): fit a fully-populated inspection report on its
+  designed pages* — the dense-table pagination fix and the planned-vs-rendered
+  regression guard (section 20.10).
 
 Nothing was rebased away or overwritten; the branch is a linear fast-forward
 from the previously pushed `b964fb0`.
@@ -1558,3 +1563,37 @@ from the previously pushed `b964fb0`.
 - **The merchant-facing document surfaces are not built.**
 - **No APK was published**, per the standing instruction.
 - **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.
+
+### 20.10 Follow-up: a fully-populated report still spilled a page
+
+The Phase 3 correction left one defect. A report whose sections each carried a
+note on every item rendered more physical pages than the shared planner
+designed: the Engine Compartment page measured **295.4mm** against the 265mm A4
+content limit, so Chromium spilled a page and the stored `pageCount` disagreed
+with the plan.
+
+The e2e suite never compared the planned count with the rendered count, which is
+why the overflow survived. The suite asserted only `pageCount >= 3` and that the
+PDF page tree agreed with the stored value — both true even when a designed page
+had spilled.
+
+**Fix (commit `2fec35d`).** The item table is denser — 0 vertical cell padding,
+7.6pt item text, 6.4pt notes, a 40/42% item/note column split — and the section
+header, block spacing and remarks box are tighter. The stacked bilingual label
+is preserved. The dense Engine Compartment page now measures **244.1mm**, with
+21mm of headroom.
+
+**Regression guard.** A new test,
+`renders exactly the planned pages when every section carries a full checklist`,
+builds an inspection whose every section carries a full checklist, a note on a
+third of its items and a section remark, then asserts the issued `pageCount`
+equals `planInspectionReport(areas).length + 1` and that the PDF page tree
+reports the same count. It fails on the pre-fix template (expected 5, received
+6) and passes after it.
+
+**Verified after the fix:** phase 3 documents suite 26/26, full API e2e 31
+suites / 620 tests, shared 215 tests, API unit 7 tests, `tsc --noEmit` and
+`nest build` all pass.
+
+This is the last Phase 3 pagination correction; the dense page is the worst case
+the interface can produce (every item answered, a third carrying a note).
