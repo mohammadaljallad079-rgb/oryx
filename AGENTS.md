@@ -928,6 +928,29 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 Navigation, guards, plan editing and dashboard tiles all read the same catalog,
 so nothing else needs changing.
 
+### Document rendering gotchas (Phase 3)
+
+- **The stored `pageCount` and the physical PDF page count must agree.** The
+  shared planner (`planInspectionReport`) decides how many pages a report is
+  *designed* to have; Chromium decides how many pages it *renders*. When a
+  designed page is taller than the 265mm A4 content limit, Chromium spills an
+  extra page and the two numbers diverge silently — the test suite asserted only
+  `pageCount >= 3` and that the PDF page tree matched the stored value, both of
+  which stay true after a spill. The dense-payload test now asserts
+  `pageCount === planInspectionReport(areas).length + 1`.
+- **The worst case is a fully-populated checklist.** Every item answered, a note
+  on a third of the items and a section remark is the densest a report can be.
+  Measure that case, not the sparse one, when changing item typography or
+  spacing. The Engine Compartment page is the tallest (13 rows).
+- **Measure with a real Chromium render, not by reading the CSS.** The
+  measurement helpers under `apps/admin/.run-*.mjs` render the dumped HTML and
+  report each designed page's height in mm. Set `ORYX_DUMP_HTML=<dir>` to make
+  `documents.service.ts` write the composed HTML, then measure, then remove the
+  instrumentation — it is debug scaffolding, not a feature.
+- **Do not truncate a note to make a page fit.** An official inspection report
+  that silently drops a technician's finding is a data-integrity defect, not a
+  layout fix. Reduce padding, leading, font size and column widths instead.
+
 ## Constraints from the owner
 
 - Keep future app services structurally ready; the consumer app belongs to a
