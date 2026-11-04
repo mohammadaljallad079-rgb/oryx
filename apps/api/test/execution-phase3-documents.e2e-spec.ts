@@ -1,5 +1,5 @@
 import * as argon2 from 'argon2';
-import { INSPECTION_SECTION_SPECS, MODULE_KEYS } from '@oryx/shared';
+import { INSPECTION_SECTION_SPECS, MODULE_KEYS, planInspectionReport, type InspectionSectionKey } from '@oryx/shared';
 import { PrismaService } from '../src/common/prisma.service';
 import { call, companyCall, createTestApp, login, type TestContext } from './test-app';
 
@@ -248,6 +248,101 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
     return sessionId;
   }
 
+  /**
+   * Create an inspection whose every section carries a full checklist, a result
+   * note on a third of the items and a section remark, then submit and approve
+   * it. `approvedInspection` fills the same checklist but cannot add notes
+   * afterwards: an approved session is locked and a late write returns 409.
+   */
+  async function denseApprovedInspection(areas: InspectionSectionKey[]): Promise<string> {
+    const created = await companyCall<{ id: string }>(ctx.base, companyId, '/automotive/inspections', {
+      method: 'POST',
+      token: issuerToken,
+      body: { customerId, vehicleId, selectedAreas: areas },
+    });
+    expect(created.status).toBe(201);
+    const sessionId = created.body.id;
+
+    const note = 'ملاحظة تفصيلية على البند تم تسجيلها أثناء الفحص الميداني · detailed finding recorded';
+    for (const area of areas) {
+      const spec = INSPECTION_SECTION_SPECS.find((s) => s.key === area)!;
+      const body: Record<string, unknown> = {
+        noFindings: false,
+        remarks: 'ملاحظات القسم المسجلة أثناء الفحص · section remarks recorded during the inspection',
+      };
+      if (spec.items.length > 0) {
+        body.items = spec.items.map((i, index) => ({
+          itemKey: i.key,
+          result: index % 7 === 0 ? 'FAIL' : 'PASS',
+          note: index % 3 === 0 ? note : undefined,
+        }));
+      }
+      const saved = await companyCall(ctx.base, companyId, `/automotive/inspections/${sessionId}/sections/${area}`, {
+        method: 'PUT',
+        token: issuerToken,
+        body,
+      });
+      expect([200, 201]).toContain(saved.status);
+
+      if (spec.kind === 'DIAGRAM_PAINT') {
+        const markers = await companyCall(ctx.base, companyId, `/automotive/inspections/${sessionId}/paint-markers`, {
+          method: 'PUT',
+          token: issuerToken,
+          body: {
+            markers: [
+              { condition: 'PAINT', x: 0.4, y: 0.3, panelKey: 'frontLeftDoor', note: 'Resprayed' },
+              { condition: 'FILLER', x: 0.6, y: 0.5, panelKey: 'rearRightDoor', note: 'Filler detected' },
+            ],
+          },
+        });
+        expect([200, 201]).toContain(markers.status);
+      }
+      if (spec.kind === 'DIAGRAM_CHASSIS') {
+        const regions = await companyCall(ctx.base, companyId, `/automotive/inspections/${sessionId}/chassis-regions`, {
+          method: 'PUT',
+          token: issuerToken,
+          body: { regions: [{ regionKey: 'FRONT', condition: 'OK' }, { regionKey: 'REAR', condition: 'RUST' }] },
+        });
+        expect([200, 201]).toContain(regions.status);
+      }
+      if (spec.kind === 'DIAGNOSTIC') {
+        const entry = await companyCall(ctx.base, companyId, `/automotive/inspections/${sessionId}/diagnostics`, {
+          method: 'POST',
+          token: issuerToken,
+          body: {
+            module: 'Engine control unit',
+            faultCode: 'P0301',
+            description: 'Cylinder 1 misfire detected during the road test',
+            observation: 'Intermittent; clears when the engine is warm',
+            severity: 'MINOR',
+          },
+        });
+        expect([200, 201]).toContain(entry.status);
+      }
+    }
+
+    const updated = await companyCall(ctx.base, companyId, `/automotive/inspections/${sessionId}`, {
+      method: 'PATCH',
+      token: issuerToken,
+      body: { finalAssessment: 'المركبة بحالة جيدة · Vehicle in good condition' },
+    });
+    expect([200, 201]).toContain(updated.status);
+
+    const submitted = await companyCall(ctx.base, companyId, `/automotive/inspections/${sessionId}/submit`, {
+      method: 'POST',
+      token: issuerToken,
+    });
+    expect([200, 201]).toContain(submitted.status);
+
+    const approved = await companyCall(ctx.base, companyId, `/automotive/inspections/${sessionId}/review`, {
+      method: 'POST',
+      token: issuerToken,
+      body: { decision: 'APPROVE' },
+    });
+    expect([200, 201]).toContain(approved.status);
+    return sessionId;
+  }
+
   describe('issuing an inspection report', () => {
     let sessionId = '';
 
@@ -331,6 +426,36 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
       expect(text).toContain('/Type0');
       expect(text).not.toContain('/Type3');
     });
+
+    it('renders exactly the planned pages when every section carries a full checklist', async () => {
+      // Regression guard: the designed page heights must fit one A4 sheet. A
+      // report whose section pages are taller than the printable area renders
+      // more physical pages than the planner designed, and the stored
+      // pageCount then disagrees with the plan.
+      const areas: InspectionSectionKey[] = ['INTERIOR', 'EXTERIOR', 'ENGINE_COMPARTMENT', 'ROAD_TEST', 'COMPUTER_UNIT'];
+      const dense = await denseApprovedInspection(areas);
+
+      const issued = await companyCall<{ id: string; pageCount: number }>(
+        ctx.base,
+        companyId,
+        `/documents/inspections/${dense}/issue`,
+        { method: 'POST', token: issuerToken },
+      );
+      expect(issued.status).toBe(201);
+
+      // The planner already counts the identification page; the report always
+      // appends one summary page because the assessment is set.
+      const planned = planInspectionReport(areas).length + 1;
+      expect(issued.body.pageCount).toBe(planned);
+
+      const pdf = await fetch(`${ctx.base}/api/v1/documents/${issued.body.id}/file`, {
+        headers: { Authorization: `Bearer ${issuerToken}`, 'x-oryx-company-id': companyId },
+      });
+      const text = Buffer.from(await pdf.arrayBuffer()).toString('latin1');
+      const counts = [...text.matchAll(/\/Count\s+(\d+)/g)].map((m) => Number(m[1]));
+      expect(Math.max(...counts)).toBe(issued.body.pageCount);
+    }, 240_000);
+
 
     it('re-issuing supersedes the previous version instead of overwriting it', async () => {
       const first = await companyCall<Array<{ id: string; version: number }>>(

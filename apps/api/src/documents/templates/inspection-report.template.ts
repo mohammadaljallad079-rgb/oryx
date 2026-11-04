@@ -430,26 +430,26 @@ export const INSPECTION_REPORT_CSS = `
   .terms{ margin-top:12px; border:1px solid var(--line); border-radius:6px; padding:9px; background:#f7f9fc; }
   .terms-title{ font-size:9.5pt; font-weight:700; color:var(--navy); margin-bottom:4px; }
   .terms p{ font-size:8pt; color:var(--muted); margin:0 0 5px; }
-  .sec-block{ margin-bottom:12px; }
+  .sec-block{ margin-bottom:6px; }
   .sec-head{ display:flex; justify-content:space-between; align-items:baseline;
-    background:var(--navy); color:#fff; padding:6px 10px; border-radius:5px 5px 0 0; }
+    background:var(--navy); color:#fff; padding:3px 10px; border-radius:5px 5px 0 0; }
   .sec-head-ar{ font-size:11.5pt; font-weight:700; }
   .sec-head-en{ font-size:8pt; color:var(--gold-soft); text-transform:uppercase; letter-spacing:.5px; }
   .items{ border:1px solid var(--line); border-top:none; }
-  .items th,.items td{ border-bottom:1px solid var(--line); padding:4px 8px; font-size:8.5pt; vertical-align:top; }
+  .items th,.items td{ border-bottom:1px solid var(--line); padding:0 6px; font-size:7.6pt; line-height:1.06; vertical-align:top; }
   .items thead th{ background:#eef2f8; color:var(--navy); font-size:8pt; text-align:start; }
   .c-idx{ width:6%; text-align:center; }
-  .c-item{ width:44%; }
+  .c-item{ width:40%; }
   .c-res{ width:12%; text-align:center; }
-  .c-note{ width:38%; color:var(--muted); }
-  .item-ar{ display:block; font-size:9pt; color:var(--ink); }
-  .item-en{ display:block; font-size:7.5pt; color:var(--muted); }
+  .c-note{ width:42%; color:var(--muted); font-size:6.4pt; line-height:1.06; }
+  .item-ar{ display:block; font-size:7.6pt; line-height:1.06; color:var(--ink); }
+  .item-en{ display:block; font-size:6.2pt; line-height:1.06; color:var(--muted); }
   .pill{ display:inline-block; min-width:16px; padding:1px 5px; border-radius:3px; font-weight:700; font-size:9pt; }
   .r-pass{ background:#dcfce7; color:var(--ok); }
   .r-fail{ background:#fee2e2; color:var(--bad); }
   .r-na{ background:#eef2f8; color:var(--muted); }
   .r-unset{ background:#f5f5f5; color:#9aa4b2; }
-  .sec-remarks{ border:1px solid var(--line); border-top:none; padding:6px 9px; font-size:8.5pt; color:var(--ink); background:#fbfcfe; }
+  .sec-remarks{ border:1px solid var(--line); border-top:none; padding:6px 9px; font-size:7.4pt; line-height:1.05; color:var(--ink); background:#fbfcfe; }
   .no-findings{ border:1px solid var(--line); border-radius:5px; padding:8px; font-size:8.5pt;
     color:var(--muted); background:#f7f9fc; text-align:center; }
   .diagram-block,.chassis-block,.diag-block,.photo-block{ margin:10px 0; }

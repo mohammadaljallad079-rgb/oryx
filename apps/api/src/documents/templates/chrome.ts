@@ -204,7 +204,7 @@ export const CHROME_CSS = `
     justify-content:center; pointer-events:none; z-index:-1; }
   .doc-watermark img{ width:78%; height:auto; opacity:0.05; }
   .doc-head{ position:relative; z-index:1; display:flex; justify-content:space-between; align-items:flex-start;
-    border-bottom:3px solid var(--navy); padding-bottom:8px; }
+    border-bottom:3px solid var(--navy); padding-bottom:6px; }
   .doc-head-left{ flex:1 1 auto; }
   .doc-head-right{ flex:0 0 auto; margin-inline-start:14px; }
   .doc-issuer-en{ font-size:15pt; font-weight:700; color:var(--navy); }
@@ -215,12 +215,12 @@ export const CHROME_CSS = `
     color:var(--gold); display:flex; align-items:center; justify-content:center;
     font-weight:700; font-size:17pt; letter-spacing:.5px; }
   .doc-title-band{ display:flex; justify-content:space-between; align-items:baseline;
-    margin-top:10px; border-inline-start:5px solid var(--gold); padding-inline-start:10px; }
+    margin-top:6px; border-inline-start:5px solid var(--gold); padding-inline-start:10px; }
   .doc-title-ar{ font-size:16pt; font-weight:700; color:var(--navy); }
   .doc-title-en{ font-size:10pt; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; }
-  .doc-idbar{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
-  .doc-idbar-item{ flex:1 1 30%; border:1px solid var(--line); border-radius:5px; padding:5px 8px; background:#f7f9fc; }
-  .doc-idbar-wide{ flex:1 1 100%; }
+  .doc-idbar{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .doc-idbar-item{ flex:1 1 30%; border:1px solid var(--line); border-radius:5px; padding:3px 8px; background:#f7f9fc; }
+  .doc-idbar-wide{ flex:1 1 34%; }
   .doc-idbar-label{ display:block; font-size:7.5pt; color:var(--muted); }
   .doc-idbar-value{ display:block; font-size:10.5pt; font-weight:700; color:var(--navy); }
   .verify{ display:flex; gap:12px; align-items:center; margin-top:14px;
