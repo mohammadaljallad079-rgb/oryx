@@ -1531,12 +1531,22 @@ lint target (`api: lint not configured`).
   gone rather than merely retried.
 - **No credentials, tokens or secrets were added.**
 
-### 20.8 Final commit
+### 20.8 Final commits
 
-`ac2cc29` — *fix(documents): correct footer pagination, watermark stacking and
-the missing issue types* — carries the code, the bundled mark, the two new
-suites and this section. It sits on top of `b964fb0`, which records the original
-Phase 3 delivery, and nothing was rebased away or overwritten.
+Three commits carry this section, in order, on top of `b964fb0` (which records
+the original Phase 3 delivery):
+
+- `ac2cc29` — *fix(documents): correct footer pagination, watermark stacking and
+  the missing issue types* — the document corrections, the bundled mark, the
+  chrome unit spec and the phase3 e2e additions.
+- `b66591c` — *docs(execution-phase3): record the correction commit hash* —
+  documentation only.
+- `6f0db90` — *fix(common): make first-time document numbering safe under
+  concurrency* — the sequence race fix, the numbering suite and this section's
+  numbering record.
+
+Nothing was rebased away or overwritten; the branch is a linear fast-forward
+from the previously pushed `b964fb0`.
 
 ### 20.9 Still open
 
