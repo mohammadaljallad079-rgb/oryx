@@ -8,8 +8,8 @@ import {
   type InspectionSectionSpec,
 } from '@oryx/shared';
 import {
-  documentFooter,
   documentHeader,
+  documentWatermark,
   signatureBlock,
   verificationBlock,
   type DocumentChrome,
@@ -58,6 +58,7 @@ export function identificationPage(input: InspectionReportInput, chrome: Documen
   const v = p.vehicle;
   return `
   <section class="doc-page">
+    ${documentWatermark(chrome.issuer)}
     ${documentHeader(chrome)}
     <div class="id-grid">
       <div class="id-box">
@@ -118,7 +119,6 @@ export function identificationPage(input: InspectionReportInput, chrome: Documen
       { ar: 'توقيع العميل', en: 'Customer', name: p.customerName },
       { ar: 'اعتماد الإدارة', en: 'Authorised Signatory', name: p.reviewedByName },
     ])}
-    ${documentFooter(chrome, 1, 0)}
   </section>`;
 }
 
@@ -359,9 +359,9 @@ export function sectionPage(
 
   return `
   <section class="doc-page">
+    ${documentWatermark(chrome.issuer)}
     ${documentHeader(chrome)}
     ${body}
-    ${documentFooter(chrome, pageNumber, 0)}
   </section>`;
 }
 
@@ -382,6 +382,7 @@ export function summaryPage(
 
   return `
   <section class="doc-page">
+    ${documentWatermark(chrome.issuer)}
     ${documentHeader(chrome)}
     ${
       rows.length
@@ -409,7 +410,6 @@ export function summaryPage(
       { ar: 'توقيع الفاحص', en: 'Inspector', name: p.inspectorName },
       { ar: 'اعتماد المراجع', en: 'Reviewed By', name: p.reviewedByName },
     ])}
-    ${documentFooter(chrome, pageNumber, 0)}
   </section>`;
 }
 

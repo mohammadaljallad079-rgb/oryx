@@ -1372,3 +1372,146 @@ The fix keeps the vocabularies apart in one place:
   record.
 - **No APK was published**, per the standing instruction.
 - **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.
+
+## 20. Continuation session — official-document design, numbering and the missing types (Execution Phase 3 corrections)
+
+This session carried out the Phase 3 final corrections: the exact document
+design, the automatic numbering audit, the watermark and branding, footer and
+pagination correctness, and the two missing document types (`SALES_RETURN`,
+`PURCHASE_INVOICE`).
+
+### 20.1 What was corrected
+
+**The footer was in the content flow, so it created pages.** The footer used to
+be a `<footer>` element inside the document body. Chromium prints in-flow
+content, so a one-line invoice that only just fitted was pushed onto a second
+page whose only content was the signature strip. The footer is now a Chromium
+*page footer template* (`footerTemplate` in `chrome.ts`, threaded through
+`PdfRendererService.render(html, { footerHtml })`). It is painted inside the
+bottom page margin, consumes no content height, and carries a real
+`.pageNumber` / `.totalPages` counter that Chromium substitutes per page.
+
+**The page margins had two owners.** The renderer set margins in millimetres
+and the base stylesheet also declared `@page { margin: … }`. The CSS declaration
+silently won and clipped the footer template. The stylesheet now declares only
+`@page { size: A4 }`; the renderer's `margin` option is the single source of
+truth for the page box.
+
+**The signature strip was too tall.** With the footer fixed, the strip still
+needed more room than the ~23 mm left on a one-page invoice. `margin-top` went
+from 20 mm to 10 mm and the rule height from 30 px to 22 px, which keeps a
+one-page invoice on one page. A regression test asserts `pageCount === 1`.
+
+**A literal `&nbsp;` leaked into the PDF text layer.** `signatureBlock` called
+`esc(l.name ?? '&nbsp;')`, and `esc` escaped the ampersand, so an unnamed
+signature printed the six characters `&nbsp;`. The branch now emits the real
+non-breaking space and escapes only a supplied name.
+
+**The watermark sat above the content.** `documentWatermark` was inserted with
+`z-index: 0`, which stacked it over the body text. It is now `z-index: -1`, so
+the official mark sits behind the content, and the opacity is low enough that
+black body text and the navy table headings stay legible on top of it.
+
+**Two document types had a template but no issue path.** `SALES_RETURN` and
+`PURCHASE_INVOICE` were in the catalogue and the service could build them, but
+`ISSUABLE_FINANCIAL_TYPES` rejected both at the DTO, so a caller received a 400
+before the service ran. The list now matches what the service can actually
+render from a stored record.
+
+### 20.2 Files changed
+
+| File | Change |
+| --- | --- |
+| `apps/api/src/documents/templates/chrome.ts` | `footerTemplate` + `DocumentFooterInput` replace `documentFooter`; `documentWatermark`; `signatureBlock` `&nbsp;` fix; watermark `z-index: -1`; compact signature strip; in-flow `.doc-foot*` CSS removed |
+| `apps/api/src/documents/templates/financial-document.template.ts` | watermark inserted; in-flow footer removed |
+| `apps/api/src/documents/templates/inspection-report.template.ts` | watermark inserted; in-flow footers removed |
+| `apps/api/src/documents/templates/report-html.ts` | obsolete `patchFooter` / `withFooters` page-counter patching removed |
+| `apps/api/src/documents/pdf/pdf-renderer.service.ts` | `render(html, { footerHtml })`; footer template wired into Chromium; page margins are the single source of truth (`@page` margin removed from the stylesheet) |
+| `apps/api/src/documents/documents.service.ts` | bundled official logo read once and cached (`brandLogoDataUri`); footer template passed to the renderer |
+| `apps/api/src/documents/documents.dto.ts` | `SALES_RETURN` and `PURCHASE_INVOICE` added to `ISSUABLE_FINANCIAL_TYPES` |
+| `apps/api/assets/brand/oryx-logo.png` | new: the official mark, a LANCZOS downscale of the owner-approved `apps/mobile/assets/brand/oryx-logo-on-light.png` (600×137 RGBA) |
+| `apps/api/src/documents/templates/chrome.spec.ts` | new: 7 unit tests for the `&nbsp;` fix, footer escaping and the page-counter placeholders |
+| `apps/api/test/execution-phase3-documents.e2e-spec.ts` | one-page assertion; brand-mark/watermark test; `SALES_RETURN` and `PURCHASE_INVOICE` issue tests; cleanup for the new fixtures |
+
+### 20.3 Branding and the official mark
+
+The chrome resolves the issuer logo from the company's uploaded asset first and
+falls back to a bundled official mark. The bundled file is **not a redraw**: it
+is a LANCZOS downscale of the owner-approved light-colourway artwork already in
+the repository, verified pixel-for-pixel (mean absolute difference 0.0 against a
+LANCZOS resize of the source). The dark navy in the mark is `#0E2247`, the
+approved ORYX navy. If the bundled file is missing, the chrome falls back to a
+typographic monogram and logs a warning — it never invents a mark.
+
+### 20.4 Automatic numbering
+
+Numbering was audited and needs no change. Every document number printed on a
+document comes from the **stored source record**, which was itself numbered by
+`DocumentSequenceService.next()` — a monotonic, gap-free sequence allocated by
+incrementing a single `DocumentSequence` row inside the caller's transaction.
+Two concurrent postings serialise on that row and cannot receive the same
+number, and a rolled-back transaction releases its number for reuse. The
+official-document layer reads `invoice.invoiceNumber`, `creditNote.creditNoteNumber`
+and `supplierInvoice.invoiceNumber`; it never generates a number of its own, so
+the printed number and the ledger number cannot diverge.
+
+### 20.5 Backend endpoints
+
+Unchanged from §19.3 except that the issue endpoint now accepts two more types:
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `POST` | `/documents/issue` | `type` now also accepts `SALES_RETURN` and `PURCHASE_INVOICE` |
+| `GET` | `/documents/:id/file` | unchanged |
+
+### 20.6 Real HTTP test results
+
+Dedicated PostgreSQL database `oryx_e10` created, migrated (`prisma migrate
+deploy`) and seeded (`tsx prisma/seed.ts`) before the run, with
+`MEDIA_ROOT=/tmp/oryx-media-e10`.
+
+- **Full API e2e suite: 30 suites, 609 tests, all passing** (`jest --config
+  jest-e2e.config.js --runInBand`, 73 s).
+- **Phase 3 documents suite: 25 tests, all passing**, including the two new
+  types and the brand-mark assertion.
+- **API unit suite: 7 tests, all passing** (`chrome.spec.ts`).
+- **Shared package: 215 tests, all passing** (11 files).
+
+The one-page assertion was verified on a real Chromium render: the invoice PDF
+came back with `pageCount: 1`, a text layer of 1,705 characters, the footer
+`SI-00073 · 1 / 1`, and no `&amp;nbsp;` in the raw bytes. The brand-mark test
+counts three `/Subtype /Image` objects in the PDF — the header logo, the QR
+code and the watermark.
+
+Typecheck (`tsc --noEmit`) and `nest build` both pass; the API package has no
+lint target (`api: lint not configured`).
+
+### 20.7 Security verification
+
+- **The bundled logo is a local file, not remote input.** `brandLogoDataUri`
+  reads a fixed path under `apps/api/assets/brand` (overridable only through
+  `DOCUMENT_BRAND_DIR`) and inlines it as a data URI. No URL is fetched.
+- **Every value interpolated into the footer template is escaped** through
+  `esc`, including the issuer name. A unit test asserts an issuer name carrying
+  an `<img onerror=…>` payload cannot inject markup.
+- **A missing logo degrades safely.** The service logs a warning and returns
+  null; the chrome falls back to a monogram. A missing asset cannot throw
+  during a document render.
+- **The watermark is decorative.** It carries `aria-hidden="true"`, sits behind
+  the content and is non-interactive.
+- **The DTO change does not widen access.** `SALES_RETURN` still requires
+  `erp.sales.read` and `PURCHASE_INVOICE` still requires `erp.purchasing.read`,
+  and the service still scopes both lookups by `companyId`. The e2e suite
+  asserts a document from another tenant is neither read nor downloaded.
+- **No credentials, tokens or secrets were added.**
+
+### 20.8 Still open
+
+- **Android visual acceptance of Splash and Homepage is still not claimed.** A
+  desktop Chromium render is not a physical device.
+- **The wider catalogue is still not issuable.** Statements, returns, journal
+  entries and the purchase return have a catalogue entry and a template but no
+  issue path.
+- **The merchant-facing document surfaces are not built.**
+- **No APK was published**, per the standing instruction.
+- **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.

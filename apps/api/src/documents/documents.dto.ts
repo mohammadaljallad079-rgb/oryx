@@ -7,6 +7,10 @@ export const ISSUABLE_FINANCIAL_TYPES = [
   'SALES_INVOICE',
   'SALES_ORDER',
   'QUOTATION',
+  // A sales return is rendered from its credit note and a purchase invoice from
+  // its supplier invoice; both have a real source record, so both are issuable.
+  'SALES_RETURN',
+  'PURCHASE_INVOICE',
   'PAYMENT_RECEIPT',
   'PAYMENT_VOUCHER',
 ] as const satisfies readonly OfficialDocumentType[];

@@ -49,6 +49,13 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
 
     await prisma.officialDocumentEvent.deleteMany({ where: { companyId: { in: companyIds } } });
     await prisma.officialDocument.deleteMany({ where: { companyId: { in: companyIds } } });
+    // Credit notes and supplier invoices are children of the customer, supplier
+    // and product rows below, so they must be removed before them.
+    await prisma.creditNoteLine.deleteMany({ where: { creditNote: { companyId: { in: companyIds } } } });
+    await prisma.creditNote.deleteMany({ where: { companyId: { in: companyIds } } });
+    await prisma.supplierInvoiceLine.deleteMany({ where: { invoice: { companyId: { in: companyIds } } } });
+    await prisma.supplierInvoice.deleteMany({ where: { companyId: { in: companyIds } } });
+    await prisma.supplier.deleteMany({ where: { companyId: { in: companyIds } } });
     await prisma.inspectionAttachment.deleteMany({ where: { sessionId: { in: sessionIds } } });
     await prisma.inspectionDiagnosticEntry.deleteMany({ where: { sessionId: { in: sessionIds } } });
     await prisma.inspectionChassisRegion.deleteMany({ where: { sessionId: { in: sessionIds } } });
@@ -151,6 +158,7 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
       'erp.inspection.report.approve',
       'erp.sales.read',
       'erp.sales.write',
+      'erp.purchasing.read',
       'erp.accounting.read',
       'erp.dashboard.read',
     ]);
@@ -550,7 +558,10 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
       expect(res.status === 201 ? '' : JSON.stringify(res.body)).toBe('');
       expect(res.body.type).toBe('SALES_INVOICE');
       expect(res.body.documentNumber).toBe(`${PREFIX}-INV-1`);
-      expect(res.body.pageCount).toBeGreaterThanOrEqual(1);
+      // A one-line invoice must fit on one page. The signature strip used to be
+      // in the document flow, so it spilled onto a second page whose only
+      // content was the signatures; the footer is now a page-margin template.
+      expect(res.body.pageCount).toBe(1);
 
       const pdf = await fetch(`${ctx.base}/api/v1/documents/${res.body.id}/file`, {
         headers: { Authorization: `Bearer ${issuerToken}`, 'x-oryx-company-id': companyId },
@@ -564,6 +575,131 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
       expect(text).toContain('NotoSans');
       expect(text).toContain('/Type0');
       expect(text).not.toContain('/Type3');
+      // A literal `&nbsp;` in the text layer is the escaped-entity regression.
+      expect(text).not.toContain('&amp;nbsp;');
+    });
+
+    it('prints the official brand mark and a faint watermark without a tenant upload', async () => {
+      // This tenant never uploaded a logo, so the header must carry the bundled
+      // official ORYX lockup rather than a text monogram, and the same mark must
+      // appear as the page watermark.
+      const res = await companyCall<{ id: string }>(ctx.base, companyId, '/documents/issue', {
+        method: 'POST',
+        token: issuerToken,
+        body: { type: 'SALES_INVOICE', sourceId: invoiceId },
+      });
+      const pdf = await fetch(`${ctx.base}/api/v1/documents/${res.body.id}/file`, {
+        headers: { Authorization: `Bearer ${issuerToken}`, 'x-oryx-company-id': companyId },
+      });
+      const bytes = Buffer.from(await pdf.arrayBuffer());
+      // The bundled logo is a 600px-wide PNG; Chromium embeds the same bytes
+      // twice (header + watermark), so the object appears at least twice.
+      const matches = bytes.toString('latin1').match(/\/Subtype\s*\/Image/g) ?? [];
+      expect(matches.length).toBeGreaterThanOrEqual(2);
+      expect(bytes.toString('latin1')).toContain('/Subtype /Image');
+    });
+
+    it('issues a sales return from the stored credit note', async () => {
+      // SALES_RETURN is backed by a credit note. The figures must come from the
+      // credit-note line, and the document must print as a real PDF.
+      const creditNote = await prisma.creditNote.create({
+        data: {
+          companyId,
+          creditNoteNumber: `${PREFIX}-CN-1`,
+          customerId,
+          invoiceId,
+          status: 'POSTED',
+          subtotalMinor: 100_000,
+          taxMinor: 10_000,
+          totalMinor: 110_000,
+          currency: 'BHD',
+          createdById: 'system',
+          lines: {
+            create: [
+              {
+                description: 'Returned inspection service',
+                quantity: 1,
+                unitPriceMinor: 100_000,
+                taxPercentBp: 1000,
+                lineTotalMinor: 110_000,
+                sortOrder: 0,
+              },
+            ],
+          },
+        },
+      });
+
+      const res = await companyCall<{ id: string; type: string; documentNumber: string; pageCount: number }>(
+        ctx.base,
+        companyId,
+        '/documents/issue',
+        { method: 'POST', token: issuerToken, body: { type: 'SALES_RETURN', sourceId: creditNote.id } },
+      );
+      expect(res.status === 201 ? '' : JSON.stringify(res.body)).toBe('');
+      expect(res.body.type).toBe('SALES_RETURN');
+      expect(res.body.documentNumber).toContain('CN-1');
+
+      const pdf = await fetch(`${ctx.base}/api/v1/documents/${res.body.id}/file`, {
+        headers: { Authorization: `Bearer ${issuerToken}`, 'x-oryx-company-id': companyId },
+      });
+      expect(pdf.status).toBe(200);
+      const bytes = Buffer.from(await pdf.arrayBuffer());
+      expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    });
+
+    it('issues a purchase invoice from the stored supplier invoice', async () => {
+      const supplier = await prisma.supplier.create({
+        data: {
+          companyId,
+          code: `${PREFIX}-SUP`,
+          nameEn: 'EP3 Supplier',
+          nameAr: 'مورد المستندات',
+        },
+      });
+      const supplierInvoice = await prisma.supplierInvoice.create({
+        data: {
+          companyId,
+          invoiceNumber: `${PREFIX}-PI-1`,
+          supplierInvoiceNumber: 'VENDOR-778',
+          supplierId: supplier.id,
+          status: 'POSTED',
+          subtotalMinor: 200_000,
+          taxMinor: 20_000,
+          totalMinor: 220_000,
+          currency: 'BHD',
+          createdById: 'system',
+          lines: {
+            create: [
+              {
+                description: 'Bulk engine oil',
+                quantity: 10,
+                unitCostMinor: 20_000,
+                taxPercentBp: 1000,
+                lineSubtotalMinor: 200_000,
+                taxMinor: 20_000,
+                lineTotalMinor: 220_000,
+                sortOrder: 0,
+              },
+            ],
+          },
+        },
+      });
+
+      const res = await companyCall<{ id: string; type: string; documentNumber: string; pageCount: number }>(
+        ctx.base,
+        companyId,
+        '/documents/issue',
+        { method: 'POST', token: issuerToken, body: { type: 'PURCHASE_INVOICE', sourceId: supplierInvoice.id } },
+      );
+      expect(res.status === 201 ? '' : JSON.stringify(res.body)).toBe('');
+      expect(res.body.type).toBe('PURCHASE_INVOICE');
+      expect(res.body.documentNumber).toContain('PI-1');
+
+      const pdf = await fetch(`${ctx.base}/api/v1/documents/${res.body.id}/file`, {
+        headers: { Authorization: `Bearer ${issuerToken}`, 'x-oryx-company-id': companyId },
+      });
+      expect(pdf.status).toBe(200);
+      expect(Buffer.from(await pdf.arrayBuffer()).subarray(0, 5).toString('latin1')).toBe('%PDF-');
     });
 
     it('refuses an unknown document type', async () => {

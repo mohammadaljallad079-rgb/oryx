@@ -1,4 +1,4 @@
-import { CHROME_CSS, documentFooter, documentHeader, signatureBlock, verificationBlock, type DocumentChrome } from './chrome';
+import { CHROME_CSS, documentHeader, documentWatermark, signatureBlock, verificationBlock, type DocumentChrome } from './chrome';
 import { esc, escMultiline, money, quantity, docDate } from './html.util';
 import type { DocumentIssuer, DocumentVerification, FinancialDocumentPayload } from '../document-payload';
 
@@ -153,6 +153,7 @@ ${FINANCIAL_CSS}
 </head>
 <body>
 <section class="doc-page">
+  ${documentWatermark(input.issuer)}
   ${documentHeader(chrome)}
   ${counterpartyBlock(payload)}
   <div class="lines-wrap">${lineTable(payload)}</div>
@@ -163,7 +164,6 @@ ${FINANCIAL_CSS}
     { ar: 'توقيع المستلم', en: 'Received By', name: payload.payment?.receivedByName ?? null },
     { ar: 'اعتماد الشركة', en: 'Authorised Signatory', name: input.issuer.nameEn },
   ])}
-  ${documentFooter(chrome, 1, 1)}
 </section>
 </body>
 </html>`;

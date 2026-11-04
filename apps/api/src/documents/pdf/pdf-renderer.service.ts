@@ -60,7 +60,10 @@ export class PdfRendererService implements OnModuleDestroy {
    * shaded tables, and Chromium drops background colours when printing by
    * default.
    */
-  async render(html: string): Promise<{ pdf: Buffer; pageCount: number }> {
+  async render(
+    html: string,
+    options: { footerHtml?: string } = {},
+  ): Promise<{ pdf: Buffer; pageCount: number }> {
     const browser = await this.browser();
     const context = await browser.newContext({ viewport: { width: 1240, height: 1754 } });
     const page = await context.newPage();
@@ -72,11 +75,21 @@ export class PdfRendererService implements OnModuleDestroy {
       await page.evaluate(() => document.fonts.ready);
       await page.emulateMedia({ media: 'print' });
 
+      // The footer is a Chromium *footer template*, not in-flow markup. A footer
+      // in the flow sits after the content and pushes a short document onto a
+      // second page; the template is painted in the page margin instead, so it
+      // never consumes content height and the real page counter is available.
+      // Chromium only substitutes `.pageNumber`/`.totalPages` when the template
+      // sets a font size, and margins must be non-zero for the band to show.
+      const footerHtml = options.footerHtml;
       const pdf = await page.pdf({
         format: 'A4',
         printBackground: true,
-        preferCSSPageSize: true,
-        margin: { top: '0', right: '0', bottom: '0', left: '0' },
+        preferCSSPageSize: false,
+        displayHeaderFooter: Boolean(footerHtml),
+        headerTemplate: '<span></span>',
+        footerTemplate: footerHtml ?? '<span></span>',
+        margin: { top: '12mm', right: '12mm', bottom: '20mm', left: '12mm' },
       });
 
       const buffer = Buffer.from(pdf);
@@ -130,7 +143,11 @@ export const BASE_PRINT_CSS = `
     --warn:#b45309;
     --bad:#b91c1c;
   }
-  @page{ size:A4; margin:14mm 12mm 18mm 12mm; }
+  /* The page *margins* are set by the renderer, not here: the footer is a
+     Chromium footer template that is painted inside the bottom margin, and a
+     margin declared in CSS would silently win over the renderer's value and
+     clip it. Only the paper size is declared. */
+  @page{ size:A4; }
   *{ box-sizing:border-box; }
   html,body{ margin:0; padding:0; }
   body{

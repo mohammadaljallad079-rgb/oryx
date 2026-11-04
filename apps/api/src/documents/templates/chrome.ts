@@ -20,6 +20,20 @@ export interface DocumentChrome {
   subtitle?: string | null;
 }
 
+/**
+ * The subset of the chrome a page footer template needs.
+ *
+ * Deliberately narrower than `DocumentChrome`: the footer is its own document
+ * and never renders the title, the timestamp or the verification block, so
+ * requiring them would make every caller pass values it does not use.
+ */
+export interface DocumentFooterInput {
+  issuer: DocumentIssuer;
+  titleEn: string;
+  titleAr: string;
+  documentNumber: string;
+}
+
 function logoBlock(issuer: DocumentIssuer): string {
   if (issuer.logoDataUri) {
     return `<img class="doc-logo" src="${esc(issuer.logoDataUri)}" alt="${esc(issuer.nameEn)}">`;
@@ -31,6 +45,19 @@ function logoBlock(issuer: DocumentIssuer): string {
     .map((w) => w[0]?.toUpperCase() ?? '')
     .join('');
   return `<div class="doc-monogram">${esc(initials || 'OR')}</div>`;
+}
+
+/**
+ * The faint ORYX watermark behind the page content.
+ *
+ * Rendered as the official logo at low opacity, placed *behind* the content and
+ * non-interactive. The opacity is deliberately low enough that black body text
+ * and the navy table headings stay fully legible on top of it — a watermark that
+ * competes with the data is worse than none.
+ */
+export function documentWatermark(issuer: DocumentIssuer): string {
+  if (!issuer.logoDataUri) return '';
+  return `<div class="doc-watermark" aria-hidden="true"><img src="${esc(issuer.logoDataUri)}" alt=""></div>`;
 }
 
 /** The running header on the first page of a document. */
@@ -121,7 +148,7 @@ export function signatureBlock(
         (l) => `
       <div class="sig">
         <div class="sig-line"></div>
-        <div class="sig-name">${esc(l.name ?? '&nbsp;')}</div>
+        <div class="sig-name">${l.name ? esc(l.name) : '&nbsp;'}</div>
         <div class="sig-label-ar">${esc(l.ar)}</div>
         <div class="sig-label-en">${esc(l.en)}</div>
       </div>`,
@@ -130,19 +157,53 @@ export function signatureBlock(
   </section>`;
 }
 
-/** The running footer printed on every page. */
-export function documentFooter(chrome: DocumentChrome, page: number, total: number): string {
+/**
+ * The running footer, rendered by Chromium as a page *footer template*.
+ *
+ * A footer in the normal flow sits after the content, so a document that only
+ * just fits is pushed onto a second page whose only content is the footer. The
+ * template is painted inside the bottom page margin instead, which keeps the
+ * footer at the foot of every printed page and consumes no content height.
+ *
+ * The template is its own document: it cannot rely on the page stylesheet, the
+ * embedded Arabic faces or the CSS variables, so everything is inlined and the
+ * identity is Latin-only. The Arabic identity belongs in the in-flow header.
+ * `.pageNumber` and `.totalPages` are substituted by Chromium, and it only
+ * performs that substitution when the template declares a `font-size`.
+ */
+export function footerTemplate(chrome: DocumentFooterInput): string {
+  const issuer = chrome.issuer;
+  const contact = [issuer.phone, issuer.email, issuer.websiteUrl].filter(Boolean).join(' · ');
+  const address = [issuer.addressLine, issuer.city].filter(Boolean).join(', ');
+  const meta = [address, issuer.taxNumber ? `CR / VAT: ${issuer.taxNumber}` : '', contact]
+    .filter(Boolean)
+    .join('  ·  ');
+  const style = [
+    'font-family:Arial,Helvetica,sans-serif',
+    'font-size:8px',
+    'color:#5b6472',
+    'width:100%',
+    'padding:0 12mm',
+    'box-sizing:border-box',
+    '-webkit-print-color-adjust:exact',
+  ].join(';');
   return `
-  <footer class="doc-foot">
-    <div class="doc-foot-left">${esc(chrome.issuer.nameEn)} · ${esc(chrome.issuer.code)}</div>
-    <div class="doc-foot-mid">${esc(chrome.documentNumber)}</div>
-    <div class="doc-foot-right num">${page} / ${total}</div>
-  </footer>`;
+<div style="${style}">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid #9aa4b2;padding-top:4px;">
+    <span>${esc(issuer.nameEn)}${issuer.code ? ` · ${esc(issuer.code)}` : ''}</span>
+    <span style="font-weight:700;color:#0b2545;">${esc(chrome.documentNumber)}</span>
+    <span><span class="pageNumber"></span> / <span class="totalPages"></span></span>
+  </div>
+  ${meta ? `<div style="margin-top:2px;text-align:center;font-size:7px;">${esc(meta)}</div>` : ''}
+</div>`;
 }
 
 /** The CSS for the shared chrome. */
 export const CHROME_CSS = `
-  .doc-head{ display:flex; justify-content:space-between; align-items:flex-start;
+  .doc-watermark{ position:absolute; inset:0; display:flex; align-items:center;
+    justify-content:center; pointer-events:none; z-index:-1; }
+  .doc-watermark img{ width:78%; height:auto; opacity:0.05; }
+  .doc-head{ position:relative; z-index:1; display:flex; justify-content:space-between; align-items:flex-start;
     border-bottom:3px solid var(--navy); padding-bottom:8px; }
   .doc-head-left{ flex:1 1 auto; }
   .doc-head-right{ flex:0 0 auto; margin-inline-start:14px; }
@@ -162,7 +223,6 @@ export const CHROME_CSS = `
   .doc-idbar-wide{ flex:1 1 100%; }
   .doc-idbar-label{ display:block; font-size:7.5pt; color:var(--muted); }
   .doc-idbar-value{ display:block; font-size:10.5pt; font-weight:700; color:var(--navy); }
-  .doc-foot{ position:running(foot); }
   .verify{ display:flex; gap:12px; align-items:center; margin-top:14px;
     border:1px solid var(--line-strong); border-radius:6px; padding:10px; background:#fbfcfe; }
   .verify-qr img{ width:96px; height:96px; display:block; }
@@ -173,9 +233,11 @@ export const CHROME_CSS = `
   .verify-code{ margin-top:6px; font-size:9.5pt; font-weight:700; color:var(--ink);
     word-break:break-all; border:1px dashed var(--line-strong); border-radius:4px; padding:4px 6px; background:#fff; }
   .verify-url{ font-size:8pt; color:var(--navy-soft); margin-top:3px; word-break:break-all; }
-  .signatures{ display:flex; gap:20px; margin-top:20px; }
+  /* Kept compact on purpose: an invoice that fits one page must not spill a
+     page whose only content is the signature strip. */
+  .signatures{ display:flex; gap:20px; margin-top:10px; }
   .sig{ flex:1 1 0; text-align:center; }
-  .sig-line{ border-bottom:1px solid var(--ink); height:30px; }
+  .sig-line{ border-bottom:1px solid var(--ink); height:22px; }
   .sig-name{ font-size:9.5pt; font-weight:700; margin-top:3px; }
   .sig-label-ar{ font-size:8.5pt; color:var(--ink); }
   .sig-label-en{ font-size:7.5pt; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }

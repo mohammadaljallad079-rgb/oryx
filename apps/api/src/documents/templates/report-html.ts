@@ -14,8 +14,8 @@ import {
  *
  * The page list comes from the shared planner, so the pagination a test asserts
  * and the pagination the customer receives are produced by the same function.
- * The final page count is patched into each footer after the plan is known —
- * a running footer needs the total, which is only known once the plan exists.
+ * The running footer is a Chromium page template built by the caller, so it is
+ * not emitted here.
  */
 
 export interface ReportRenderInput {
@@ -65,8 +65,6 @@ export function renderInspectionReportHtml(input: ReportRenderInput): string {
     pages.push(summaryPage(input, chrome, pages.length + 1));
   }
 
-  const total = pages.length;
-  const withFooters = pages.map((html, index) => patchFooter(html, index + 1, total));
 
   return `<!doctype html>
 <html lang="ar" dir="rtl">
@@ -79,21 +77,7 @@ ${INSPECTION_REPORT_CSS}
 </style>
 </head>
 <body>
-${withFooters.join('\n')}
+${pages.join('\n')}
 </body>
 </html>`;
-}
-
-/**
- * Replaces the placeholder page counter in a page footer with the real values.
- *
- * The page body is generated before the total is known, so the footer is emitted
- * with a `0 / 0` placeholder and corrected here rather than threading the total
- * through every page builder.
- */
-function patchFooter(html: string, page: number, total: number): string {
-  return html.replace(
-    /<div class="doc-foot-right num">\d+ \/ 0<\/div>/,
-    `<div class="doc-foot-right num">${page} / ${total}</div>`,
-  );
 }

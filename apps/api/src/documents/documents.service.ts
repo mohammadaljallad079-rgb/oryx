@@ -23,6 +23,7 @@ import { DocumentStorageService } from './document-storage.service';
 import { PdfRendererService } from './pdf/pdf-renderer.service';
 import { QrService } from './pdf/qr.service';
 import { renderInspectionReportHtml } from './templates/report-html';
+import { footerTemplate } from './templates/chrome';
 import { renderFinancialDocumentHtml } from './templates/financial-document.template';
 import type {
   DocumentIssuer,
@@ -51,6 +52,8 @@ import type {
 @Injectable()
 export class DocumentsService {
   private readonly logger = new Logger(DocumentsService.name);
+  /** `undefined` = not read yet; `null` = read and absent. */
+  private brandLogo: string | null | undefined;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -215,7 +218,15 @@ export class DocumentsService {
       ? bodyHtml
       : bodyHtml.replace('<style>', `<style>${baseCss}\n`);
 
-    const { pdf, pageCount } = await this.renderer.render(html);
+    // The footer is a Chromium page template, so the page counter is real on
+    // every page and the footer cannot push content onto a blank page.
+    const footerHtml = footerTemplate({
+      issuer: args.issuer,
+      titleEn: spec.labelEn,
+      titleAr: spec.labelAr,
+      documentNumber: args.documentNumber,
+    });
+    const { pdf, pageCount } = await this.renderer.render(html, { footerHtml });
 
     const documentId = newDocumentId();
     const storageKey = this.storage.keyFor(args.companyId, documentId, version);
@@ -482,6 +493,10 @@ export class DocumentsService {
     if (logoKey) {
       logoDataUri = await this.inlineImage(logoKey, company.branding?.logoAsset?.mimeType);
     }
+    // A tenant that has not uploaded its own mark still gets the official ORYX
+    // lockup rather than a text monogram: the printed identity is part of the
+    // approved design, not a per-tenant preference.
+    logoDataUri ??= await this.brandLogoDataUri();
 
     return {
       companyId,
@@ -517,6 +532,33 @@ export class DocumentsService {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * The bundled official ORYX logo, read once and cached.
+   *
+   * `assets/brand/oryx-logo.png` is a LANCZOS downscale of the owner-approved
+   * `apps/mobile/assets/brand/oryx-logo-on-light.png`, kept here so the API
+   * renders the official mark without depending on the mobile app's directory.
+   * It is a derived copy of the approved artwork and must never be redrawn.
+   *
+   * `assets/brand` sits beside the compiled output, so the path resolves in both
+   * `ts-node` and `dist`. A missing file is not fatal — the chrome falls back to
+   * a monogram — so this returns null rather than throwing.
+   */
+  private async brandLogoDataUri(): Promise<string | null> {
+    if (this.brandLogo !== undefined) return this.brandLogo;
+    const path = process.env.DOCUMENT_BRAND_DIR
+      ? join(process.env.DOCUMENT_BRAND_DIR, 'oryx-logo.png')
+      : join(__dirname, '..', '..', 'assets', 'brand', 'oryx-logo.png');
+    try {
+      const bytes = await readFile(path);
+      this.brandLogo = `data:image/png;base64,${bytes.toString('base64')}`;
+    } catch {
+      this.logger.warn(`Bundled brand logo missing at ${path}; documents use a monogram.`);
+      this.brandLogo = null;
+    }
+    return this.brandLogo;
   }
 
   /** Builds the immutable inspection payload from the stored session. */
@@ -826,6 +868,93 @@ export class DocumentsService {
           },
         };
       }
+
+      if (type === 'SALES_RETURN') {
+        // A sales return is a credit note: it is the record that reduces what the
+        // customer owes and optionally restocks the goods. Rendering it from the
+        // credit note keeps one source of truth for the returned value.
+        const creditNote = await this.prisma.creditNote.findFirst({
+          where: { id: sourceId, companyId },
+          include: { lines: { orderBy: { sortOrder: 'asc' } }, customer: true },
+        });
+        if (!creditNote) return null;
+        const lines = creditNote.lines.map((l) => ({
+          description: l.description,
+          sku: null,
+          quantity: l.quantity,
+          unitPriceMinor: l.unitPriceMinor,
+          discountMinor: 0,
+          taxMinor: basisPointsOfMinor(lineAmountMinor(l.quantity, l.unitPriceMinor), l.taxPercentBp),
+          lineTotalMinor: l.lineTotalMinor,
+        }));
+        return {
+          documentNumber: creditNote.creditNoteNumber,
+          sourceType: 'CreditNote',
+          sourceId: creditNote.id,
+          payload: {
+            kind: 'FINANCIAL',
+            titleEn: spec.labelEn,
+            titleAr: spec.labelAr,
+            documentNumber: creditNote.creditNoteNumber,
+            documentDate: creditNote.issueDate.toISOString(),
+            dueDate: null,
+            status: creditNote.status,
+            counterparty: counterparty(creditNote.customer),
+            lines,
+            subtotalMinor: creditNote.subtotalMinor,
+            discountMinor: 0,
+            taxMinor: creditNote.taxMinor,
+            totalMinor: creditNote.totalMinor,
+            paidMinor: 0,
+            balanceMinor: creditNote.totalMinor,
+            currency: creditNote.currency || (await currencyOf()),
+            notes: creditNote.reason,
+          },
+        };
+      }
+    }
+
+    if (type === 'PURCHASE_INVOICE') {
+      const invoice = await this.prisma.supplierInvoice.findFirst({
+        where: { id: sourceId, companyId },
+        include: { lines: { orderBy: { sortOrder: 'asc' } }, supplier: true },
+      });
+      if (!invoice) return null;
+      return {
+        documentNumber: invoice.invoiceNumber,
+        sourceType: 'SupplierInvoice',
+        sourceId: invoice.id,
+        payload: {
+          kind: 'FINANCIAL',
+          titleEn: spec.labelEn,
+          titleAr: spec.labelAr,
+          documentNumber: invoice.invoiceNumber,
+          documentDate: invoice.invoiceDate.toISOString(),
+          dueDate: invoice.dueDate?.toISOString() ?? null,
+          status: invoice.status,
+          counterparty: counterparty(invoice.supplier),
+          lines: invoice.lines.map((l) => {
+            const gross = lineAmountMinor(l.quantity, l.unitCostMinor);
+            return {
+              description: l.description,
+              sku: null,
+              quantity: l.quantity,
+              unitPriceMinor: l.unitCostMinor,
+              discountMinor: 0,
+              taxMinor: basisPointsOfMinor(gross, l.taxPercentBp),
+              lineTotalMinor: l.lineTotalMinor,
+            };
+          }),
+          subtotalMinor: invoice.subtotalMinor,
+          discountMinor: 0,
+          taxMinor: invoice.taxMinor,
+          totalMinor: invoice.totalMinor,
+          paidMinor: invoice.amountPaidMinor,
+          balanceMinor: invoice.totalMinor - invoice.amountPaidMinor,
+          currency: invoice.currency || (await currencyOf()),
+          notes: invoice.notes,
+        },
+      };
     }
 
     if (type === 'PAYMENT_RECEIPT' || type === 'PAYMENT_VOUCHER') {
