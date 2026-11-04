@@ -1148,7 +1148,13 @@ audit summary falls back the same way.
 | Build | `next build` in admin | exit 0, `/automotive/inspections/[id]` present |
 | React pin | mobile `lib.test.ts` | react and react-dom both `19.1.0` |
 
-### 18.9 Still open
+### 18.9 Final commit
+
+`32b03ca` — *feat(automotive): add the structured vehicle inspection engine* —
+carries the engine, the workspace, the migrations and both new suites. The
+commit that records this section changes documentation only.
+
+### 18.10 Still open
 
 - **Android visual acceptance of Splash and Homepage is still not claimed.** The
   browser suite drives a desktop Chromium render; a browser render is not a
