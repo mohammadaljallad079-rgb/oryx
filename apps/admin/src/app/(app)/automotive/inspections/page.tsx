@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
-import { useAsync } from '@/lib/hooks';
+import { useAsync, useDebounced } from '@/lib/hooks';
 import { money, toMinorInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import {
@@ -22,16 +22,19 @@ import {
   StatusBadge,
   TableShell,
 } from '@/components/ui';
-import type { InspectionBookingDto, InspectionServiceDto, VehicleDto } from '@oryx/shared';
+import type { InspectionBookingDto, InspectionServiceDto, VehicleDto, CustomerDto } from '@oryx/shared';
+import { INSPECTION_SECTION_SPECS, type InspectionSectionKey } from '@oryx/shared';
+import { useRouter } from 'next/navigation';
 
-type Tab = 'vehicles' | 'bookings' | 'services';
+type Tab = 'jobs' | 'vehicles' | 'bookings' | 'services';
 
 export default function InspectionsPage() {
   const { t } = useUi();
   const { can } = useAuth();
-  const [tab, setTab] = useState<Tab>('vehicles');
+  const [tab, setTab] = useState<Tab>('jobs');
 
   const tabs: Array<{ key: Tab; label: string }> = [
+    { key: 'jobs', label: t('inspection.jobs') },
     { key: 'vehicles', label: t('erp.automotive.vehicles') },
     { key: 'bookings', label: t('erp.automotive.inspectionBookings') },
     { key: 'services', label: t('erp.automotive.inspectionServices') },
@@ -61,6 +64,7 @@ export default function InspectionsPage() {
         ))}
       </div>
 
+      {tab === 'jobs' ? <JobsTab canWrite={can('erp.inspection.write')} /> : null}
       {tab === 'vehicles' ? <VehiclesTab canManage={can('erp.vehicle.manage')} /> : null}
       {tab === 'bookings' ? (
         <BookingsTab
@@ -71,6 +75,212 @@ export default function InspectionsPage() {
       ) : null}
       {tab === 'services' ? <ServicesTab canManage={can('erp.inspection.service.manage')} /> : null}
     </div>
+  );
+}
+
+/**
+ * The structured inspection jobs (Execution Phase 2).
+ *
+ * This is the entry point to the interactive inspection: a job is created here
+ * by choosing the customer, the vehicle and the inspection types, then opened in
+ * the workspace where the sections are filled in.
+ */
+function JobsTab({ canWrite }: { canWrite: boolean }) {
+  const { t, locale } = useUi();
+  const router = useRouter();
+  const [search, setSearch] = useState('');
+  const [open, setOpen] = useState(false);
+  const debounced = useDebounced(search);
+  const list = useAsync(() => api.inspectionSessions({ search: debounced || undefined }), [debounced]);
+
+  return (
+    <div className="flex flex-col gap-3" data-testid="inspection-jobs">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <input
+          className="oryx-input max-w-xs"
+          placeholder={t('common.search')}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          data-testid="inspection-job-search"
+        />
+        {canWrite ? (
+          <Button variant="primary" onClick={() => setOpen(true)} data-testid="new-inspection-job">
+            <Icon name="plus" size={14} />
+            {t('inspection.newJob')}
+          </Button>
+        ) : null}
+      </div>
+
+      {list.loading ? <Skeleton height={180} /> : null}
+      {list.error ? <ErrorBanner message={list.error} onRetry={list.reload} retryLabel={t('common.retry')} /> : null}
+
+      {list.data ? (
+        list.data.items.length === 0 ? (
+          <EmptyState title={t('common.empty')} hint={t('inspection.noJobs')} />
+        ) : (
+          <TableShell label={t('inspection.jobs')}>
+            <table className="oryx-table">
+              <thead>
+                <tr>
+                  <th>{t('common.code')}</th>
+                  <th>{t('inspection.customer')}</th>
+                  <th>{t('inspection.selectVehicle')}</th>
+                  <th>{t('inspection.selectTypes')}</th>
+                  <th>{t('common.status')}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {list.data.items.map((j) => (
+                  <tr key={j.id} data-testid={`job-row-${j.id}`}>
+                    <td className="font-semibold">{j.jobNumber}</td>
+                    <td>{j.customerName}</td>
+                    <td>
+                      {j.make} {j.model} · {j.modelYear}
+                      {j.plateNumber ? <span className="oryx-faint"> · {j.plateNumber}</span> : null}
+                    </td>
+                    <td className="oryx-faint text-[12px]">
+                      {j.selectedAreas
+                        .map((a) => {
+                          const spec = INSPECTION_SECTION_SPECS.find((x) => x.key === a);
+                          return spec ? (locale === 'ar' ? spec.labelAr : spec.labelEn) : a;
+                        })
+                        .join(' · ')}
+                    </td>
+                    <td>
+                      <StatusBadge status={j.status} label={t(`inspection.status.${j.status}`)} />
+                    </td>
+                    <td className="text-end">
+                      <Button size="sm" onClick={() => router.push(`/automotive/inspections/${j.id}`)} data-testid={`open-job-${j.id}`}>
+                        {t('inspection.open')}
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableShell>
+        )
+      ) : null}
+
+      {open ? <NewJobModal onClose={() => setOpen(false)} onCreated={list.reload} /> : null}
+    </div>
+  );
+}
+
+/**
+ * Create an inspection.
+ *
+ * The vehicle list is filtered to the chosen customer's vehicles, because a
+ * vehicle belongs to a customer and inspecting one customer's car under
+ * another's name is a data-integrity error the server would reject anyway. The
+ * identification fields are prefilled from the vehicle so the administrator
+ * only confirms them.
+ */
+function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => Promise<void> }) {
+  const { t, locale } = useUi();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [customerId, setCustomerId] = useState('');
+  const [vehicleId, setVehicleId] = useState('');
+  const [areas, setAreas] = useState<InspectionSectionKey[]>([]);
+  const customers = useAsync(() => api.salesCustomers(), []);
+  const vehicles = useAsync(() => api.vehicles({ customerId: customerId || undefined }), [customerId]);
+
+  const toggleArea = (key: InspectionSectionKey) =>
+    setAreas((prev) => (prev.includes(key) ? prev.filter((a) => a !== key) : [...prev, key]));
+
+  const submit = async () => {
+    if (!customerId || !vehicleId || areas.length === 0) {
+      setError(t('inspection.selectTypesHint'));
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await api.createInspectionSession({ customerId, vehicleId, selectedAreas: areas });
+      await onCreated();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      open
+      title={t('inspection.newJobTitle')}
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button variant="primary" disabled={busy} onClick={submit} data-testid="create-inspection-job">
+            {busy ? t('common.loading') : t('inspection.createJob')}
+          </Button>
+        </>
+      }
+    >
+      {error ? <ErrorBanner message={error} /> : null}
+      <div className="flex flex-col gap-3">
+        <Field label={t('inspection.selectCustomer')} required>
+          <select
+            className="oryx-select"
+            value={customerId}
+            onChange={(e) => {
+              setCustomerId(e.target.value);
+              setVehicleId('');
+            }}
+            data-testid="job-customer"
+          >
+            <option value="">{t('common.select')}</option>
+            {(customers.data?.items ?? []).map((c: CustomerDto) => (
+              <option key={c.id} value={c.id}>
+                {c.nameEn || c.nameAr || c.code}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label={t('inspection.selectVehicle')} required>
+          <select
+            className="oryx-select"
+            value={vehicleId}
+            onChange={(e) => setVehicleId(e.target.value)}
+            disabled={!customerId}
+            data-testid="job-vehicle"
+          >
+            <option value="">{t('common.select')}</option>
+            {(vehicles.data?.items ?? []).map((v: VehicleDto) => (
+              <option key={v.id} value={v.id}>
+                {v.make} {v.model} · {v.modelYear} · {v.vin}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <div>
+          <span className="oryx-label">{t('inspection.selectTypes')}</span>
+          <div className="grid gap-2 sm:grid-cols-2" data-testid="job-types">
+            {INSPECTION_SECTION_SPECS.map((spec) => (
+              <label
+                key={spec.key}
+                className={`oryx-job-type${areas.includes(spec.key) ? ' is-selected' : ''}`}
+                data-testid={`job-type-${spec.key}`}
+              >
+                <input type="checkbox" checked={areas.includes(spec.key)} onChange={() => toggleArea(spec.key)} />
+                <span>
+                  <span className="block font-semibold">{locale === 'ar' ? spec.labelAr : spec.labelEn}</span>
+                  <span className="oryx-faint block text-[11.5px]">{locale === 'ar' ? spec.summaryAr : spec.summaryEn}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          <p className="oryx-faint mt-1 text-[11.5px]">{t('inspection.selectTypesHint')}</p>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

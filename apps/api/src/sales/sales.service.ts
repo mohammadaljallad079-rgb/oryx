@@ -112,12 +112,19 @@ export class SalesService {
     ]);
     const dup = await this.prisma.customer.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Customer code ${dto.code} already exists.`);
+    // The two names are independent, but a customer with no name at all would be
+    // unidentifiable in a list, so at least one is required.
+    const nameEn = (dto.nameEn ?? '').trim();
+    const nameAr = (dto.nameAr ?? '').trim();
+    if (!nameEn && !nameAr) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide the customer name in English, Arabic, or both.');
+    }
     const customer = await this.prisma.customer.create({
       data: {
         companyId,
         code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        nameEn,
+        nameAr,
         email: dto.email ?? null,
         phone: dto.phone ?? null,
         taxNumber: dto.taxNumber ?? null,
@@ -136,7 +143,7 @@ export class SalesService {
       action: 'sales.customer_created',
       targetType: 'CUSTOMER',
       targetId: customer.id,
-      summary: `Created customer ${customer.code} ${customer.nameEn}`,
+      summary: `Created customer ${customer.code} ${customer.nameEn || customer.nameAr}`,
     });
     return toCustomerDto(customer);
   }

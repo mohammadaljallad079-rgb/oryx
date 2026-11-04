@@ -1074,6 +1074,470 @@ body::before {
   gap: 10px;
 }
 
+/* ================================================= inspection workspace (P2)
+ * The interactive inspection screens. The diagrams are drawn with SVG and
+ * positioned markers in normalised percentages, so the same markup works at any
+ * size and a marker lands on the same panel on a phone and a tablet. Colours
+ * come from the palette tokens, so the dark and light themes both work without
+ * a second set of rules.
+ */
+
+/* ------------------------------------------------------------ the rail */
+.oryx-rail-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.oryx-rail-item:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.oryx-rail-item.is-active {
+  border-color: var(--border-strong);
+  background: var(--tint-fill);
+  color: var(--gold-on-tint);
+}
+
+.oryx-rail-item.is-complete {
+  border-color: color-mix(in srgb, var(--success) 45%, transparent);
+}
+
+.oryx-rail-item__dot {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--border-soft);
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-inverse);
+}
+
+.oryx-rail-item.is-complete .oryx-rail-item__dot {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.oryx-rail-item__count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+/* ------------------------------------------------------- the checklist */
+.oryx-checklist {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.oryx-checklist__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.oryx-checklist__row:last-child {
+  border-bottom: 0;
+}
+
+.oryx-checklist__row:nth-child(even) {
+  background: var(--tint-wash);
+}
+
+.oryx-checklist__label {
+  font-size: 13px;
+  min-width: 0;
+}
+
+/* A failed item is visible at a glance while scrolling a long checklist. */
+.oryx-checklist__row[data-result='FAIL'] {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.oryx-result-btn {
+  min-width: 58px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.oryx-result-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.oryx-result-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.oryx-result-btn--pass.is-active {
+  background: color-mix(in srgb, var(--success) 22%, transparent);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.oryx-result-btn--fail.is-active {
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.oryx-result-btn--na.is-active {
+  background: var(--tint-fill);
+  border-color: var(--border-strong);
+  color: var(--gold-on-tint);
+}
+
+/* -------------------------------------------------------- the diagrams */
+.oryx-diagram {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.oryx-diagram__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.oryx-paint-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.oryx-paint-tool:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.oryx-paint-tool.is-active {
+  border-color: var(--border-strong);
+  background: var(--tint-fill);
+  color: var(--gold-on-tint);
+}
+
+.oryx-paint-tool__dot {
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.oryx-paint-tool__label-rtl {
+  opacity: 0.6;
+  font-weight: 500;
+}
+
+/* The canvas is the positioned ancestor for every marker. `touch-action: none`
+ * stops the browser scrolling the page while a marker is dragged. */
+.oryx-diagram__canvas {
+  position: relative;
+  width: 100%;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.oryx-diagram__canvas--body {
+  aspect-ratio: 1000 / 400;
+}
+
+.oryx-diagram__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.oryx-diagram__body {
+  fill: color-mix(in srgb, var(--text) 8%, transparent);
+  stroke: var(--border-strong);
+  stroke-width: 3;
+}
+
+.oryx-diagram__glass {
+  fill: color-mix(in srgb, var(--info) 22%, transparent);
+  stroke: var(--border-soft);
+  stroke-width: 2;
+}
+
+.oryx-diagram__panel {
+  stroke: var(--border-soft);
+  stroke-width: 2;
+  fill: none;
+}
+
+.oryx-diagram__wheel {
+  fill: color-mix(in srgb, var(--text-inverse) 60%, transparent);
+  stroke: var(--border-soft);
+  stroke-width: 2;
+}
+
+.oryx-diagram__rim {
+  fill: color-mix(in srgb, var(--text) 22%, transparent);
+}
+
+.oryx-diagram__marker {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: grab;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+.oryx-diagram__marker.is-selected {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  z-index: 2;
+}
+
+.oryx-diagram__marker:active {
+  cursor: grabbing;
+}
+
+.oryx-diagram__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.oryx-diagram__selected {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---------------------------------------------------- the chassis view */
+.oryx-chassis {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+  aspect-ratio: 400 / 700;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface-raised);
+}
+
+.oryx-chassis__body {
+  fill: color-mix(in srgb, var(--text) 8%, transparent);
+  stroke: var(--border-strong);
+  stroke-width: 3;
+}
+
+.oryx-chassis__cabin {
+  fill: color-mix(in srgb, var(--info) 14%, transparent);
+  stroke: var(--border-soft);
+  stroke-width: 2;
+}
+
+.oryx-chassis__axle {
+  fill: color-mix(in srgb, var(--text-inverse) 45%, transparent);
+}
+
+.oryx-chassis-region {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.oryx-chassis-region__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid var(--border-soft);
+  background: transparent;
+}
+
+.oryx-chassis-region.is-ok {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.oryx-chassis-region.is-ok .oryx-chassis-region__dot {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.oryx-chassis-region.is-damage {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.oryx-chassis-region.is-damage .oryx-chassis-region__dot {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+/* The accessible control list mirrors the diagram, so a region can be set with
+ * the keyboard and read by a screen reader. */
+.oryx-chassis-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.oryx-chassis-list__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 12.5px;
+}
+
+.oryx-chassis-list__row:last-child {
+  border-bottom: 0;
+}
+
+.oryx-chassis-list__name {
+  min-width: 0;
+}
+
+/* ------------------------------------------- inspection type picker */
+.oryx-job-type {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.oryx-job-type:hover {
+  background: var(--surface-hover);
+}
+
+.oryx-job-type.is-selected {
+  border-color: var(--border-strong);
+  background: var(--tint-fill);
+}
+
+.oryx-job-type input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+/* ----------------------------------------------------- diagnostics */
+.oryx-diagnostic-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--tint-wash);
+}
+
+/* ---------------------------------------------------- attachments */
+.oryx-attachment {
+  position: relative;
+  aspect-ratio: 1;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-raised);
+}
+
+.oryx-attachment__thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.oryx-attachment__file {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--text-faint);
+}
+
+.oryx-attachment__remove {
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 4px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  cursor: pointer;
+}
+
 /* Below 480px there is no room for a 190px floor, so the band becomes an
  * explicit two-column split. Above it `auto-fill` is left to decide, which
  * keeps the card at its compact width instead of stretching two columns across

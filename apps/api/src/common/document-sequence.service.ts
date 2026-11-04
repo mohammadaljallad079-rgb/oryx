@@ -35,6 +35,8 @@ export const DOCUMENT_SEQUENCE_KEYS = {
   workOrder: { key: 'WORK_ORDER', prefix: 'WO' },
   project: { key: 'PROJECT', prefix: 'PRJ' },
   inspectionBooking: { key: 'INSPECTION_BOOKING', prefix: 'INS' },
+  // Execution Phase 2 — the structured inspection job number.
+  inspectionSession: { key: 'INSPECTION_SESSION', prefix: 'JOB' },
   maintenanceBooking: { key: 'MAINTENANCE_BOOKING', prefix: 'MB' },
   jobCard: { key: 'JOB_CARD', prefix: 'JC' },
   repairEstimate: { key: 'REPAIR_ESTIMATE', prefix: 'EST' },

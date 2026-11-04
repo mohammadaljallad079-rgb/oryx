@@ -1796,3 +1796,164 @@ export interface FitmentResultDto {
   /** False when the product has no fitment rows at all — unknown, not incompatible. */
   fitmentKnown: boolean;
 }
+
+// ---------------------------------------------------- inspection engine (Phase 2)
+
+export type InspectionAreaKey =
+  | 'PAINT_BODY'
+  | 'CHASSIS_UNDERCARRIAGE'
+  | 'INTERIOR'
+  | 'EXTERIOR'
+  | 'ENGINE_COMPARTMENT'
+  | 'ROAD_TEST'
+  | 'COMPUTER_UNIT';
+
+export type InspectionResultValue = 'UNSET' | 'PASS' | 'FAIL' | 'NA';
+export type InspectionPaintCondition = 'PAINT' | 'FILLER' | 'CHANGE' | 'SECTIONED';
+export type InspectionChassisCondition = 'UNSET' | 'OK' | 'DAMAGE';
+export type InspectionSessionStatusValue =
+  | 'DRAFT'
+  | 'IN_PROGRESS'
+  | 'PENDING_REVIEW'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'CANCELLED';
+
+/** One checklist item's stored result. */
+export interface InspectionItemResultDto {
+  itemKey: string;
+  result: InspectionResultValue;
+  note: string | null;
+}
+
+/** A body-diagram marker. Coordinates are normalised 0–1 and unmirrored. */
+export interface InspectionBodyMarkerDto {
+  id: string;
+  condition: InspectionPaintCondition;
+  x: number;
+  y: number;
+  panelKey: string | null;
+  note: string | null;
+}
+
+export interface InspectionChassisRegionDto {
+  id: string;
+  regionKey: string;
+  condition: InspectionChassisCondition;
+  note: string | null;
+}
+
+export interface InspectionDiagnosticEntryDto {
+  id: string;
+  module: string;
+  faultCode: string | null;
+  description: string;
+  observation: string | null;
+  severity: 'INFO' | 'MINOR' | 'MAJOR' | 'CRITICAL';
+}
+
+export interface InspectionAttachmentDto {
+  id: string;
+  url: string | null;
+  sectionArea: InspectionAreaKey | null;
+  itemKey: string | null;
+  originalName: string;
+  mimeType: string;
+  byteSize: number;
+  width: number | null;
+  height: number | null;
+  caption: string | null;
+  createdAt: string;
+}
+
+/** One selected section, with only the payload its kind uses. */
+export interface InspectionSectionDto {
+  id: string;
+  area: InspectionAreaKey;
+  remarks: string | null;
+  /**
+   * Set when the inspector explicitly recorded that the section has nothing to
+   * report. Distinct from "not looked at": a diagram or diagnostic section is
+   * only complete with markers, entries, or this acknowledgement.
+   */
+  noFindings: boolean;
+  completedAt: string | null;
+  items: InspectionItemResultDto[];
+  markers: InspectionBodyMarkerDto[];
+  chassisRegions: InspectionChassisRegionDto[];
+  diagnostics: InspectionDiagnosticEntryDto[];
+}
+
+/** The identification header repeated on every section. */
+export interface InspectionIdentityDto {
+  jobNumber: string;
+  inspectedAt: string;
+  make: string;
+  model: string;
+  modelYear: number;
+  plateNumber: string | null;
+  vin: string;
+  odometer: number | null;
+}
+
+export interface InspectionSessionSummaryDto {
+  id: string;
+  jobNumber: string;
+  status: InspectionSessionStatusValue;
+  customerId: string;
+  customerName: string;
+  vehicleId: string;
+  make: string;
+  model: string;
+  modelYear: number;
+  plateNumber: string | null;
+  vin: string;
+  selectedAreas: InspectionAreaKey[];
+  inspectorUserId: string | null;
+  inspectedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InspectionSessionDto extends InspectionSessionSummaryDto {
+  identity: InspectionIdentityDto;
+  contactNumber: string | null;
+  color: string | null;
+  odometer: number | null;
+  branchId: string | null;
+  bookingId: string | null;
+  generalRemarks: string | null;
+  interiorRemarks: string | null;
+  exteriorRemarks: string | null;
+  engineRemarks: string | null;
+  roadTestRemarks: string | null;
+  finalAssessment: string | null;
+  submittedById: string | null;
+  submittedAt: string | null;
+  reviewedById: string | null;
+  reviewedAt: string | null;
+  reviewNotes: string | null;
+  createdById: string;
+  sections: InspectionSectionDto[];
+  attachments: InspectionAttachmentDto[];
+}
+
+/** The completion state of one selected section, for the progress rail. */
+export interface InspectionProgressSectionDto {
+  area: InspectionAreaKey;
+  labelEn: string;
+  labelAr: string;
+  totalItems: number;
+  completedItems: number;
+  /** For diagram sections, how many markers/regions have been recorded. */
+  recorded: number;
+  /** True when nothing mandatory is outstanding. */
+  complete: boolean;
+}
+
+export interface InspectionProgressDto {
+  sections: InspectionProgressSectionDto[];
+  complete: boolean;
+  /** The mandatory items still unset, as `<area>:<itemKey>`. */
+  outstanding: string[];
+}

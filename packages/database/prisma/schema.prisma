@@ -543,6 +543,15 @@ model Company {
   inspectionBookings       InspectionBooking[]
   inspectionFindings       InspectionFinding[]
   inspectionReports        InspectionReport[]
+
+  // Execution Phase 2 — the structured inspection engine.
+  inspectionSessions       InspectionSession[]
+  inspectionSections       InspectionSectionResult[]
+  inspectionItemResults    InspectionItemResult[]
+  inspectionBodyMarkers    InspectionBodyMarker[]
+  inspectionChassisRegions InspectionChassisRegion[]
+  inspectionDiagnostics    InspectionDiagnosticEntry[]
+  inspectionAttachments    InspectionAttachment[]
   workshopBays             WorkshopBay[]
   maintenanceBookings      MaintenanceBooking[]
   jobCards                 JobCard[]
@@ -633,6 +642,8 @@ model Branch {
   workingHours     WorkingHours[]
   bookingSlots     BookingSlot[]
   paymentIntents   PaymentIntent[]
+
+  inspectionSessions InspectionSession[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -1759,6 +1770,7 @@ model Customer {
   // consumer account through the vehicle and booking relations.
   bookingSlots   BookingSlot[]
   paymentIntents PaymentIntent[]
+  inspectionSessions InspectionSession[]
 
   @@unique([companyId, code])
   @@index([companyId, isActive])
@@ -3634,6 +3646,9 @@ model Vehicle {
   inspectionPhotos CustomerInspectionPhoto[]
   bookingSlots     BookingSlot[]
 
+  // Execution Phase 2 — the structured inspection engine.
+  inspectionSessions InspectionSession[]
+
   // Execution 20 — P4 RFQ, P5 recovery, P6 fleet membership, P7 suggestions.
   rfqs           CustomerRfq[]
   recoveryRequests RecoveryRequest[]
@@ -3739,6 +3754,8 @@ model InspectionBooking {
   findings InspectionFinding[]
   report   InspectionReport?
   branch   Branch?             @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  /// The structured inspection created from this booking, when one exists.
+  session  InspectionSession?
 
   @@unique([companyId, bookingNumber])
   @@index([companyId, status])
@@ -3784,6 +3801,283 @@ model InspectionReport {
   booking InspectionBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@index([companyId, status])
+}
+
+// =====================================================================
+// Inspection engine (Execution Phase 2)
+//
+// A structured, per-section inspection. The existing `InspectionBooking` and
+// `InspectionReport` remain the scheduling and approval records; these tables
+// hold *what the inspector actually recorded* — item results, body-diagram
+// markers, chassis regions and diagnostic entries — so the results are
+// queryable data rather than a rendered document.
+//
+// The catalogue of sections and items lives in `packages/shared/src/inspection.ts`
+// and is not duplicated here: the keys stored on these rows are the catalogue's
+// keys, so a section can never exist in the database without a definition.
+// =====================================================================
+
+/// The seven selectable inspection areas. `PAINT_BODY` and `COMPUTER_UNIT` are
+/// diagram/diagnostic driven, so their items live in their own tables.
+enum InspectionArea {
+  PAINT_BODY
+  CHASSIS_UNDERCARRIAGE
+  INTERIOR
+  EXTERIOR
+  ENGINE_COMPARTMENT
+  ROAD_TEST
+  COMPUTER_UNIT
+}
+
+/// A recorded result. `UNSET` is deliberate: an item that has not been looked at
+/// must not read as a pass, and final validation refuses to submit with one.
+enum InspectionResult {
+  UNSET
+  PASS
+  FAIL
+  NA
+}
+
+/// The four body-panel conditions of the diagnostic scheme.
+enum PaintCondition {
+  PAINT
+  FILLER
+  CHANGE
+  SECTIONED
+}
+
+/// A chassis region is sound or damaged; there is no third state.
+enum ChassisCondition {
+  UNSET
+  OK
+  DAMAGE
+}
+
+/// The lifecycle of an inspection, broader than the three-state report enum so a
+/// draft, an in-progress job and a returned-for-correction job are distinct.
+enum InspectionSessionStatus {
+  DRAFT
+  IN_PROGRESS
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model InspectionSession {
+  id              String                  @id @default(cuid())
+  companyId       String
+  /// Human job number, allocated from the shared document sequence.
+  jobNumber       String
+  /// The scheduling record, when the inspection came from a booking.
+  bookingId       String?                 @unique
+  customerId      String
+  vehicleId       String
+  branchId        String?
+  status          InspectionSessionStatus @default(DRAFT)
+  inspectorUserId String?
+  inspectedAt     DateTime                @default(now())
+
+  // ---- identification header (page 1 of the report) ----
+  customerName  String
+  contactNumber String?
+  /// Snapshotted from the vehicle so a later edit cannot rewrite history.
+  plateNumber   String?
+  make          String
+  model         String
+  modelYear     Int
+  odometer      Int?
+  color         String?
+  vin           String
+
+  /// The sections the customer selected. Only these are required, only these are
+  /// rendered, and only these appear in the report.
+  selectedAreas InspectionArea[]
+
+  /// The general remarks block. Per-section remarks live on the section row.
+  generalRemarks  String?
+  interiorRemarks String?
+  exteriorRemarks String?
+  engineRemarks   String?
+  roadTestRemarks String?
+  finalAssessment String?
+
+  submittedById String?
+  submittedAt   DateTime?
+  reviewedById  String?
+  reviewedAt    DateTime?
+  reviewNotes   String?
+  createdById   String
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  company  Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer           @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  vehicle  Vehicle            @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  booking  InspectionBooking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  branch   Branch?            @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  sections       InspectionSectionResult[]
+  itemResults    InspectionItemResult[]
+  markers        InspectionBodyMarker[]
+  chassisRegions InspectionChassisRegion[]
+  diagnostics    InspectionDiagnosticEntry[]
+  attachments    InspectionAttachment[]
+
+  @@unique([companyId, jobNumber])
+  @@index([companyId, status])
+  @@index([companyId, vehicleId])
+  @@index([companyId, customerId])
+}
+
+/// One selected section of an inspection. A row exists only for a section the
+/// customer chose, which is what keeps an unrelated area out of the job.
+model InspectionSectionResult {
+  id          String         @id @default(cuid())
+  companyId   String
+  sessionId   String
+  area        InspectionArea
+  /// The section-level technical remarks block.
+  remarks     String?
+  /// Set when the inspector explicitly recorded that the section has nothing to
+  /// report (a clean body, or no computer faults). Distinct from "not looked at":
+  /// a diagram or diagnostic section is only complete with markers, entries, or
+  /// this explicit acknowledgement.
+  noFindings  Boolean        @default(false)
+  completedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  company        Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  session        InspectionSession       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  items          InspectionItemResult[]
+  markers        InspectionBodyMarker[]
+  chassisRegions InspectionChassisRegion[]
+  diagnostics    InspectionDiagnosticEntry[]
+
+  @@unique([sessionId, area])
+  @@index([companyId])
+}
+
+/// One checklist item result within a section.
+model InspectionItemResult {
+  id        String           @id @default(cuid())
+  companyId String
+  sessionId String
+  sectionId String
+  /// The catalogue item key, e.g. `engine.fluids`.
+  itemKey   String
+  result    InspectionResult @default(UNSET)
+  note      String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  company Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  session InspectionSession       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  section InspectionSectionResult @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, itemKey])
+  @@index([sectionId])
+}
+
+/// A marker on the body-panels diagnostic diagram.
+///
+/// Coordinates are normalised to the diagram box (0–1 on each axis), not
+/// screen pixels, so a marker sits on the same panel at any viewport size and
+/// reopens at exactly the position it was placed. The diagram is a top view and
+/// is not mirrored in RTL, so the stored `x` is unambiguous.
+model InspectionBodyMarker {
+  id        String         @id @default(cuid())
+  companyId String
+  sessionId String
+  sectionId String
+  condition PaintCondition
+  /// 0–1 across the diagram.
+  x         Float
+  /// 0–1 down the diagram.
+  y         Float
+  panelKey  String?
+  note      String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  company Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  session InspectionSession       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  section InspectionSectionResult @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([sectionId])
+}
+
+/// One of the eight chassis safety regions. A row exists only once the region has
+/// been assessed, so an unassessed region is absent rather than defaulting to OK.
+model InspectionChassisRegion {
+  id        String           @id @default(cuid())
+  companyId String
+  sessionId String
+  sectionId String
+  regionKey String
+  condition ChassisCondition @default(UNSET)
+  note      String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  company Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  session InspectionSession       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  section InspectionSectionResult @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, regionKey])
+  @@index([sectionId])
+}
+
+/// A computer-unit diagnostic fault record. The report prints a titled
+/// "Computer Module Faults" area with no fixed rows, so these are entered by the
+/// inspector; nothing is fabricated on their behalf.
+model InspectionDiagnosticEntry {
+  id          String          @id @default(cuid())
+  companyId   String
+  sessionId   String
+  sectionId   String
+  module      String
+  faultCode   String?
+  description String
+  observation String?
+  severity    FindingSeverity @default(INFO)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  company Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  session InspectionSession       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  section InspectionSectionResult @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+/// A photograph or document attached to an inspection, optionally tied to a
+/// specific finding. Bytes go through `MediaStorageService`, so the file is
+/// re-encoded, EXIF-stripped and reachable only through an authorised media
+/// route — never a public storage URL.
+model InspectionAttachment {
+  id           String          @id @default(cuid())
+  companyId    String
+  sessionId    String
+  mediaAssetId String?
+  /// The section or item the attachment supports, when it is tied to one.
+  sectionArea  InspectionArea?
+  itemKey      String?
+  originalName String
+  mimeType     String
+  byteSize     Int
+  width        Int?
+  height       Int?
+  caption      String?
+  uploadedById String?
+  createdAt    DateTime        @default(now())
+
+  company Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  session InspectionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, sessionId])
 }
 
 model WorkshopBay {

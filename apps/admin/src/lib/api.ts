@@ -78,6 +78,14 @@ import type {
   WorkOrderDto,
   WorkOrderChecklistItemDto,
   OperationsDashboardDto,
+  InspectionSessionDto,
+  InspectionSessionSummaryDto,
+  InspectionProgressDto,
+  InspectionBodyMarkerDto,
+  InspectionChassisRegionDto,
+  InspectionDiagnosticEntryDto,
+  InspectionAttachmentDto,
+  InspectionAreaKey,
   VehicleDto,
   InspectionServiceDto,
   InspectionBookingDto,
@@ -1017,6 +1025,36 @@ export const api = {
     request<Record<string, unknown>>(`/automotive/inspection-bookings/${id}/report/decide`, { method: 'POST', body: { decision } }),
   invoiceInspection: (id: string, body: Record<string, unknown> = {}) =>
     request<{ invoiceNumber: string; totalMinor: number }>(`/automotive/inspection-bookings/${id}/invoice`, { method: 'POST', body }),
+
+  // ---- inspection engine (Execution Phase 2) ----
+  inspectionSessions: (params: { search?: string; status?: string; customerId?: string; vehicleId?: string; page?: number } = {}) =>
+    request<Paginated<InspectionSessionSummaryDto>>(`/automotive/inspections?${toQuery(params)}`),
+  inspectionSession: (id: string) => request<InspectionSessionDto>(`/automotive/inspections/${id}`),
+  createInspectionSession: (body: Record<string, unknown>) =>
+    request<InspectionSessionDto>('/automotive/inspections', { method: 'POST', body }),
+  updateInspectionSession: (id: string, body: Record<string, unknown>) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}`, { method: 'PATCH', body }),
+  inspectionProgress: (id: string) => request<InspectionProgressDto>(`/automotive/inspections/${id}/progress`),
+  saveInspectionSection: (id: string, area: InspectionAreaKey, body: Record<string, unknown>) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/sections/${area}`, { method: 'PUT', body }),
+  saveInspectionMarkers: (id: string, markers: Array<Partial<InspectionBodyMarkerDto>>) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/paint-markers`, { method: 'PUT', body: { markers } }),
+  saveInspectionChassis: (id: string, regions: Array<Partial<InspectionChassisRegionDto>>) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/chassis-regions`, { method: 'PUT', body: { regions } }),
+  addInspectionDiagnostic: (id: string, body: Record<string, unknown>) =>
+    request<InspectionDiagnosticEntryDto>(`/automotive/inspections/${id}/diagnostics`, { method: 'POST', body }),
+  removeInspectionDiagnostic: (id: string, entryId: string) =>
+    request<{ removed: boolean }>(`/automotive/inspections/${id}/diagnostics/${entryId}`, { method: 'DELETE' }),
+  uploadInspectionAttachment: (id: string, form: FormData) =>
+    request<InspectionAttachmentDto>(`/automotive/inspections/${id}/attachments`, { method: 'POST', body: form, raw: true }),
+  removeInspectionAttachment: (id: string, attachmentId: string) =>
+    request<{ removed: boolean }>(`/automotive/inspections/${id}/attachments/${attachmentId}`, { method: 'DELETE' }),
+  submitInspectionSession: (id: string) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/submit`, { method: 'POST', body: {} }),
+  reviewInspectionSession: (id: string, decision: 'APPROVE' | 'REJECT', notes?: string) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/review`, { method: 'POST', body: { decision, notes } }),
+  cancelInspectionSession: (id: string) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/cancel`, { method: 'POST', body: {} }),
   workshopBays: (params: { companyId?: string } = {}) =>
     request<Paginated<Record<string, unknown>>>(`/automotive/bays?${toQuery(params)}`),
   createWorkshopBay: (body: Record<string, unknown>) => request<Record<string, unknown>>('/automotive/bays', { method: 'POST', body }),

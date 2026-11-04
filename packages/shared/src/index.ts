@@ -7,6 +7,7 @@ export * from './bahrain';
 export * from './scheduling';
 export * from './service-categories';
 export * from './vehicle-catalog';
+export * from './inspection';
 export * from './geo';
 export * from './tokens';
 export * from './authorization';

@@ -99,15 +99,25 @@ export class CreateCustomerDto {
   @MaxLength(40)
   code!: string;
 
+  /**
+   * The two name fields are optional independently: an administrator may know
+   * the customer by one language only, and forcing both would make them invent
+   * a name. At least one must be supplied — enforced in the service, because a
+   * class-validator rule cannot express "one of these two".
+   *
+   * A missing name is stored as an empty string rather than null, so the many
+   * existing reads of `nameEn`/`nameAr` across sales, accounting and reports do
+   * not have to handle a null. The interface falls back to whichever name exists.
+   */
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(200)
-  nameEn!: string;
+  nameEn?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(200)
-  nameAr!: string;
+  nameAr?: string;
 
   @IsOptional()
   @IsString()

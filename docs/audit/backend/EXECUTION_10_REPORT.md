@@ -908,3 +908,253 @@ The commit that records this report changes documentation only.
 ---
 
 *Written by an AI agent (OpenHands) on behalf of the repository owner.*
+
+---
+
+## 18. Continuation session — the interactive vehicle inspection engine (Execution Phase 2)
+
+This section records the work done in this session. It does not repeat the
+Execution 09 or earlier Execution 10 work; it adds the structured vehicle
+inspection engine, its admin workspace and its test evidence.
+
+### 18.1 What was added
+
+The previous "automotive inspections" feature was a booking plus a free-text
+findings blob and a single approved/unapproved report flag. It could record that
+an inspection happened and that someone approved it, but it could not record
+*what was inspected*: there was no per-item result, no body-panel diagram, no
+chassis map, no fault-code list, and no way to prove a section had been assessed
+rather than skipped.
+
+Execution Phase 2 replaces that with a structured engine:
+
+- **Seven selectable inspection areas** — Paint & Body, Chassis & Undercarriage,
+  Interior, Exterior, Engine Compartment, Road Test, Computer Unit — declared
+  once in `packages/shared/src/inspection.ts`.
+- **A per-item checklist** for the four list-driven sections, with the result set
+  the section allows (`PASS_FAIL` or `PASS_FAIL_NA`). The catalogue carries the
+  report's own item counts: Interior 12, Exterior 6, Engine Compartment 13, Road
+  Test 13.
+- **Two interactive diagrams.** A side-elevation body diagram with four paint
+  conditions (paint / filler / change / sectioned) stored as normalised
+  coordinates, and a top-view chassis diagram with eight assessed regions.
+- **A computer-unit diagnostic list** — module, fault code, description,
+  observation, severity — added and removed one record at a time.
+- **An explicit "nothing to report"** flag for the diagram and diagnostic
+  sections, so an inspector can assert a clean result deliberately rather than by
+  leaving a section blank.
+- **Photographic attachments** through the existing `MediaStorageService`.
+- **A submit / review / approve workflow** with server-enforced state
+  transitions and a server-enforced completeness gate.
+
+### 18.2 Files changed
+
+**New — shared contract**
+
+| File | Purpose |
+| --- | --- |
+| `packages/shared/src/inspection.ts` | The section catalogue, item specs, result sets, paint conditions, chassis regions and the state helpers. The single source of truth for the API and the interface. |
+| `packages/shared/test/inspection.test.ts` | 9 tests asserting the catalogue's item counts, the section keys, the result sets and the state helpers. |
+
+**New — API**
+
+| File | Purpose |
+| --- | --- |
+| `apps/api/src/automotive/inspection.dto.ts` | Validated request bodies for every write. |
+| `apps/api/src/automotive/inspection.service.ts` | The engine: creation, section writes, diagrams, diagnostics, attachments, progress, submit, review, cancel. |
+| `apps/api/src/automotive/inspection.controller.ts` | 16 routes under `/api/v1/automotive/inspections`. |
+
+**New — admin interface**
+
+| File | Purpose |
+| --- | --- |
+| `apps/admin/src/app/(app)/automotive/inspections/[id]/page.tsx` | The workspace: identity card, progress rail, section editors, attachments panel and workflow panel. |
+| `apps/admin/src/components/inspection/diagrams.tsx` | The body diagram and the chassis diagram. |
+
+**New — database**
+
+| File | Purpose |
+| --- | --- |
+| `packages/database/prisma/migrations/20261104002318_execution_phase2_inspection_engine/` | The inspection tables. |
+| `packages/database/prisma/migrations/20261104002429_inspection_section_no_findings/` | Adds `InspectionSectionResult.noFindings`. |
+
+**New — tests**
+
+| File | Purpose |
+| --- | --- |
+| `apps/api/test/execution-phase2-inspection.e2e-spec.ts` | 36 API integration tests over real HTTP. |
+| `apps/admin/e2e/execution-phase2-inspection.spec.ts` | 8 browser tests driving the real interface against the real API. |
+
+**Modified**
+
+| File | Change |
+| --- | --- |
+| `packages/database/prisma/schema.prisma` | Nine inspection tables and their enums. |
+| `packages/shared/src/contracts.ts` | The inspection DTOs, including `InspectionSectionDto.noFindings` and `InspectionSessionDto.odometer`. |
+| `packages/shared/src/index.ts` | Re-exports the inspection catalogue. |
+| `apps/api/src/automotive/automotive.module.ts` | Registers the controller and service. |
+| `apps/api/src/common/document-sequence.service.ts` | Adds the `JOB` sequence for the inspection job number. |
+| `apps/api/src/sales/sales.dto.ts`, `apps/api/src/sales/sales.service.ts` | Customer names become independently optional (see §18.6). |
+| `apps/admin/src/app/(app)/automotive/inspections/page.tsx` | A fourth tab, "Inspection jobs", and the job-creation modal. |
+| `apps/admin/src/lib/api.ts` | 15 inspection client methods. |
+| `apps/admin/src/i18n/dictionaries.ts` | The inspection keys, English and Arabic. |
+| `apps/admin/src/app/globals.css` | The inspection workspace styles. |
+
+### 18.3 Backend endpoints
+
+All under `/api/v1/automotive/inspections`, all requiring the
+`automotive_inspections` module and a tenant-scoped principal.
+
+| Method | Path | Permission | Purpose |
+| --- | --- | --- | --- |
+| GET | `/` | `erp.inspection.read` | List jobs, paginated and searchable. |
+| POST | `/` | `erp.inspection.write` | Create a job for a customer's vehicle and a set of areas. |
+| GET | `/:id` | `erp.inspection.read` | The full workspace payload. |
+| PATCH | `/:id` | `erp.inspection.write` | Update the header fields. |
+| GET | `/:id/progress` | `erp.inspection.read` | Completion state per section and overall. |
+| PUT | `/:id/sections/:area` | `erp.inspection.write` | Replace a checklist section's results. |
+| PUT | `/:id/paint-markers` | `erp.inspection.write` | Replace the body-diagram marker set. |
+| PUT | `/:id/chassis-regions` | `erp.inspection.write` | Replace the chassis region assessments. |
+| POST | `/:id/diagnostics` | `erp.inspection.write` | Add a computer-unit fault record. |
+| DELETE | `/:id/diagnostics/:entryId` | `erp.inspection.write` | Remove one. |
+| POST | `/:id/attachments` | `erp.inspection.write` | Upload a photograph through the media pipeline. |
+| DELETE | `/:id/attachments/:attachmentId` | `erp.inspection.write` | Remove one. |
+| POST | `/:id/submit` | `erp.inspection.write` | Submit for review. |
+| POST | `/:id/review` | `erp.inspection.report.approve` | Approve or return for correction. |
+| POST | `/:id/cancel` | `erp.inspection.write` | Cancel a draft. |
+
+### 18.4 Server-enforced rules
+
+These are the invariants the tests exist to protect. Each is enforced in the
+service, not in the interface.
+
+1. **Only the selected areas exist.** Creating a job with no area, or with an
+   unknown area, is rejected. Writing to an area that was not selected is
+   rejected. This is what keeps a paint-only job from asking about the engine.
+2. **A section only accepts its own items and its own result set.** An item key
+   from another section is rejected; `N/A` is rejected on a `PASS_FAIL` section.
+3. **The vehicle must belong to the customer.** Creating a job against another
+   customer's vehicle is rejected.
+4. **Submission requires completeness.** Every item in every selected area must
+   carry a result. A diagram section must carry at least one marker or an explicit
+   "nothing to report". A diagnostic section must carry at least one fault or an
+   explicit "nothing to report".
+5. **An approved inspection is frozen.** Section writes and cancellation return
+   `409` once approved.
+6. **Approval needs its own permission.** An inspector with
+   `erp.inspection.write` but not `erp.inspection.report.approve` is refused with
+   `403`.
+7. **Tenant isolation.** Another tenant's inspection reads as `404`, and a write
+   against it is refused.
+8. **Coordinates are bounded.** A marker outside the diagram is rejected by
+   validation rather than silently clamped, so a bad client cannot store a marker
+   that the report cannot draw.
+
+### 18.5 Real HTTP test results
+
+**API integration** — `apps/api/test/execution-phase2-inspection.e2e-spec.ts`,
+36 tests, all passing, against a seeded PostgreSQL database over real HTTP with
+the real guards, the real Prisma client and the real media pipeline:
+
+| Group | Tests | Result |
+| --- | --- | --- |
+| creation and tenancy | 6 | 6 passed |
+| selected sections only | 4 | 4 passed |
+| progress and submission gating | 6 | 6 passed |
+| body diagram markers | 4 | 4 passed |
+| chassis regions | 2 | 2 passed |
+| computer-unit diagnostics | 2 | 2 passed |
+| attachments | 4 | 4 passed |
+| approval workflow | 6 | 6 passed |
+| customer name optionality | 2 | 2 passed |
+
+The attachment tests upload a real 96×96 PNG through a multipart request and
+assert the stored asset: the media service sniffs the type, decodes it with
+`sharp`, re-encodes it to WebP to strip EXIF, and the test asserts the normalised
+`image/webp` type and the `/api/v1/cms/media/…/file` route rather than the
+upload's own content type.
+
+**Full API regression** — 29 suites, **584 tests, all passing**. The suite count
+grew from 28 to 29 and the test count from 548 to 584 with this work.
+
+**Browser** — `apps/admin/e2e/execution-phase2-inspection.spec.ts`, 8 tests, all
+passing, driving the real interface against the real API:
+
+| Test | What it proves |
+| --- | --- |
+| creates a job from the list page and opens its workspace | The job is created through the interface, gets a `JOB-` number, and only the selected sections appear on the rail. |
+| records a checklist section and reports its progress | Answering every item flips the rail to complete and enables submit. |
+| refuses to submit a section that is only partly answered | A partially answered section keeps submit disabled. |
+| places a body-panel marker on the paint diagram and saves it | A marker is placed by pointer, saved, and unlocks submit. |
+| assesses the chassis regions on the safety diagram | Region assessment unlocks submit. |
+| records a computer-unit fault and can remove it again | A fault is added and removed through the interface. |
+| approves a submitted inspection and then freezes it | Approval succeeds and the checklist becomes read-only. |
+| renders the workspace in Arabic with RTL direction | The Arabic labels come from the shared catalogue and the layout is RTL. |
+
+**Full browser regression** — 208 tests, **207 passed, 1 skipped**. The suite
+grew from 200 to 208 with this work.
+
+**Shared package** — 10 files, **191 tests, all passing**, including the 9 new
+inspection-catalogue tests.
+
+### 18.6 A customer may be known by one name only
+
+While building the job-creation interface, the customer-name requirement was
+found to be a real obstacle: `CreateCustomerDto` required both `nameEn` and
+`nameAr` with a minimum length of two, so an administrator who knows a customer
+only in Arabic had to invent an English name to save them at all.
+
+Both names are now independently optional, with at least one required — enforced
+in the service, because a class-validator rule cannot express "one of these two".
+A missing name is stored as an empty string rather than `null`, so the many
+existing reads of `nameEn`/`nameAr` across sales, accounting and reports do not
+have to handle a null, and the interface falls back to whichever name exists. The
+audit summary falls back the same way.
+
+### 18.7 Security verification
+
+- **Authorization is server-side.** Every route carries `@RequireModule` and
+  `@RequirePermissions`; the interface hiding a control is not the control. The
+  test "refuses a reader without the write permission" and the test "refuses
+  approval from an inspector without the approval permission" prove the
+  distinction between write and approve.
+- **Tenant isolation is enforced on read and write.** The service resolves the
+  company scope from the principal and filters every query by it; another
+  tenant's job returns `404` rather than leaking its existence.
+- **Uploads are validated, not trusted.** The file type is sniffed from the
+  bytes, the image is decoded to prove it is not truncated, a minimum dimension is
+  enforced, the storage key is derived from a UUID rather than a client-supplied
+  path, and EXIF is stripped by re-encoding.
+- **No credential or token appears in the inspection payloads.** Attachments
+  return a media route and a caption, never a storage path.
+- **The lockout on a seeded account was an environment artefact**, not a defect:
+  earlier failed sign-ins with a shell-quoted password variable locked the account
+  for the configured cool-down. It was cleared, the run repeated, and the suite
+  passed. This is recorded so a future reader does not mistake it for an
+  authentication regression.
+
+### 18.8 Verification summary
+
+| Gate | Command | Result |
+| --- | --- | --- |
+| API integration | `jest --config jest-e2e.config.js --runInBand` | 29 suites, 584 passed |
+| New API suite | `jest … test/execution-phase2-inspection.e2e-spec.ts` | 36 passed |
+| Browser | `playwright test --project=desktop-dark` | 207 passed, 1 skipped |
+| New browser suite | `playwright test e2e/execution-phase2-inspection.spec.ts` | 8 passed |
+| Shared | `vitest run` | 191 passed |
+| Mobile | `vitest run` | 194 passed |
+| Typecheck | `tsc --noEmit` in api, admin, customer, mobile | 4 × exit 0 |
+| Lint | `eslint . --max-warnings=0` in admin, customer, mobile | 3 × exit 0 |
+| Build | `next build` in admin | exit 0, `/automotive/inspections/[id]` present |
+| React pin | mobile `lib.test.ts` | react and react-dom both `19.1.0` |
+
+### 18.9 Still open
+
+- **Android visual acceptance of Splash and Homepage is still not claimed.** The
+  browser suite drives a desktop Chromium render; a browser render is not a
+  physical device and this report does not present one as the other.
+- **The Execution 10 mobile work is unchanged by this section.** The customer
+  authentication, booking, merchant and media work described in §1–§17 remains as
+  reported there; this section adds the inspection engine only.
+- **No APK was published**, per the standing instruction.
+- **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.

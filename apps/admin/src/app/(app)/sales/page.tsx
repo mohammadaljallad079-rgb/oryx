@@ -131,8 +131,8 @@ function CustomersTab({ canManage }: { canManage: boolean }) {
               <tr key={c.id} data-testid={`customer-row-${c.code}`}>
                 <td className="font-mono text-[12px]">{c.code}</td>
                 <td>
-                  <span className="block font-semibold">{c.nameEn}</span>
-                  <span className="oryx-faint block text-[11px]">{c.nameAr}</span>
+                  <span className="block font-semibold">{c.nameEn || c.nameAr || c.code}</span>
+                  <span className="oryx-faint block text-[11px]">{c.nameEn && c.nameAr ? c.nameAr : ''}</span>
                 </td>
                 <td className="text-[12.5px]">{c.phone ?? '—'}</td>
                 <td className="tabular-nums text-[12.5px]">{money(c.creditLimitMinor)}</td>
@@ -157,10 +157,14 @@ function CustomerModal({ open, onClose, onCreated }: { open: boolean; onClose: (
     setBusy(true);
     setError(null);
     try {
+      if (!form.nameEn.trim() && !form.nameAr.trim()) {
+        setError(t('erp.sales.nameRequired'));
+        return;
+      }
       await api.createCustomer({
         code: form.code,
-        nameEn: form.nameEn,
-        nameAr: form.nameAr,
+        ...(form.nameEn.trim() ? { nameEn: form.nameEn.trim() } : {}),
+        ...(form.nameAr.trim() ? { nameAr: form.nameAr.trim() } : {}),
         phone: form.phone || undefined,
         creditLimitMinor: toMinorInput(form.creditLimit),
         paymentTermsDays: Number(form.paymentTermsDays) || 0,
@@ -196,10 +200,10 @@ function CustomerModal({ open, onClose, onCreated }: { open: boolean; onClose: (
         <Field label={t('erp.sales.phone')}>
           <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
         </Field>
-        <Field label={`${t('common.name')} (EN)`} required>
+        <Field label={`${t('common.name')} (EN)`} hint={t('erp.sales.nameOptionalHint')}>
           <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="customer-name-en" />
         </Field>
-        <Field label={`${t('common.name')} (AR)`} required>
+        <Field label={`${t('common.name')} (AR)`} hint={t('erp.sales.nameOptionalHint')}>
           <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="customer-name-ar" />
         </Field>
         <Field label={t('erp.sales.creditLimit')}>
