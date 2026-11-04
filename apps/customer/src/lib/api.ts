@@ -232,6 +232,40 @@ async function publicGet<T>(path: string): Promise<T> {
 
 // ------------------------------------------------------------------ shapes
 
+/**
+ * The projection a QR scan returns.
+ *
+ * Deliberately narrow: enough to confirm the document is genuine and identify
+ * it, and nothing more. No amount, no line item and no contact detail is
+ * present, so a screenshot of the verification page cannot leak a customer's
+ * financial position.
+ */
+export interface DocumentVerificationView {
+  status: 'VALID' | 'REVOKED' | 'SUPERSEDED' | 'CANCELLED';
+  type: string;
+  typeLabelEn: string;
+  typeLabelAr: string;
+  documentNumber: string;
+  version: number;
+  issuerNameEn: string;
+  issuerNameAr: string;
+  issuerCode: string;
+  issuedAt: string;
+  subject?: {
+    jobNumber: string;
+    plateNumber: string | null;
+    vinMasked: string;
+    make: string;
+    model: string;
+    modelYear: number;
+  };
+}
+
+export interface DocumentVerificationResult {
+  found: boolean;
+  document: DocumentVerificationView | null;
+}
+
 export interface CustomerProfile {
   id: string;
   email: string;
@@ -540,6 +574,16 @@ export interface FitmentResult {
 }
 
 export const customerApi = {
+  /**
+   * Verifies a printed document from its QR token.
+   *
+   * Public and anonymous: the scan arrives with no session, and the token is the
+   * only credential. The API answers `found: false` for an unknown token rather
+   * than 404, so the page can distinguish "not issued" from "the API is down".
+   */
+  verifyDocument: (token: string) =>
+    publicGet<DocumentVerificationResult>(`/documents/verify/${encodeURIComponent(token)}`),
+
   // ---------------------------------------------------------------- auth
   register: (body: { email: string; password: string; fullName: string; phone?: string }) =>
     IS_STATIC_PREVIEW

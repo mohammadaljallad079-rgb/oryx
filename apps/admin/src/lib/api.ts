@@ -95,6 +95,8 @@ import type {
   ServiceRequestDto,
   ProviderSettlementDto,
   WarehouseDto,
+  OfficialDocumentType,
+  OfficialDocumentStatus,
 } from '@oryx/shared';
 
 /**
@@ -407,6 +409,40 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+/** One issued official document, as the API projects it. */
+export interface OfficialDocumentDto {
+  id: string;
+  type: OfficialDocumentType;
+  documentNumber: string;
+  status: OfficialDocumentStatus;
+  version: number;
+  verificationToken: string;
+  verificationUrl: string;
+  sourceType: string;
+  sourceId: string;
+  pageCount: number | null;
+  byteSize: number | null;
+  issuedAt: string;
+  issuerNameEn: string;
+  issuerNameAr: string;
+  issuerCode: string;
+  supersededAt: string | null;
+  revokedAt: string | null;
+  revokeReason: string | null;
+  downloadable: boolean;
+}
+
+/** A document plus its append-only event trail. */
+export interface OfficialDocumentDetailDto extends OfficialDocumentDto {
+  events: Array<{
+    id: string;
+    event: string;
+    detail: string | null;
+    actorId: string | null;
+    createdAt: string;
+  }>;
 }
 
 export const api = {
@@ -1025,6 +1061,37 @@ export const api = {
     request<Record<string, unknown>>(`/automotive/inspection-bookings/${id}/report/decide`, { method: 'POST', body: { decision } }),
   invoiceInspection: (id: string, body: Record<string, unknown> = {}) =>
     request<{ invoiceNumber: string; totalMinor: number }>(`/automotive/inspection-bookings/${id}/invoice`, { method: 'POST', body }),
+
+  // ---- official documents (Execution Phase 3) ----
+  issueInspectionDocument: (sessionId: string) =>
+    request<OfficialDocumentDto>(`/documents/inspections/${sessionId}/issue`, { method: 'POST', body: {} }),
+  issueFinancialDocument: (type: OfficialDocumentType, sourceId: string) =>
+    request<OfficialDocumentDto>('/documents/issue', { method: 'POST', body: { type, sourceId } }),
+  documentsForSource: (sourceType: string, sourceId: string) =>
+    request<OfficialDocumentDto[]>(
+      `/documents?sourceType=${encodeURIComponent(sourceType)}&sourceId=${encodeURIComponent(sourceId)}`,
+    ),
+  officialDocument: (id: string) => request<OfficialDocumentDetailDto>(`/documents/${id}`),
+  revokeOfficialDocument: (id: string, reason: string) =>
+    request<OfficialDocumentDto>(`/documents/${id}/revoke`, { method: 'POST', body: { reason } }),
+
+  /**
+   * The stored PDF as a blob URL.
+   *
+   * Fetched rather than linked because the route needs the bearer token and the
+   * company header; an `<a href>` would arrive unauthenticated. The caller owns
+   * the URL and must revoke it.
+   */
+  officialDocumentBlobUrl: async (id: string): Promise<string> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    const res = await fetch(`${API_BASE}/v1/documents/${id}/file`, { headers, credentials: 'include' });
+    if (!res.ok) throw new ApiError(res.status, 'document_download_failed', 'The document could not be opened.');
+    return URL.createObjectURL(await res.blob());
+  },
 
   // ---- inspection engine (Execution Phase 2) ----
   inspectionSessions: (params: { search?: string; status?: string; customerId?: string; vehicleId?: string; page?: number } = {}) =>

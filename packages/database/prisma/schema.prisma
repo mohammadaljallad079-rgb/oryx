@@ -553,6 +553,10 @@ model Company {
   inspectionDiagnostics    InspectionDiagnosticEntry[]
   inspectionAttachments    InspectionAttachment[]
   workshopBays             WorkshopBay[]
+
+  // Execution Phase 3 — official documents, printing and QR verification.
+  officialDocuments        OfficialDocument[]
+  documentEvents           OfficialDocumentEvent[]
   maintenanceBookings      MaintenanceBooking[]
   jobCards                 JobCard[]
   labourOperations         LabourOperation[]
@@ -6176,4 +6180,120 @@ enum AiSuggestionReview {
   PENDING
   APPROVED
   REJECTED
+}
+
+// ---------------------------------------------------------------------------
+// Execution Phase 3 — official documents, printing and QR verification.
+// ---------------------------------------------------------------------------
+
+/// The kinds of official document the platform can render and verify.
+enum OfficialDocumentType {
+  VEHICLE_INSPECTION_REPORT
+  SALES_INVOICE
+  PURCHASE_INVOICE
+  SALES_ORDER
+  PURCHASE_ORDER
+  SALES_RETURN
+  PURCHASE_RETURN
+  PAYMENT_RECEIPT
+  PAYMENT_VOUCHER
+  QUOTATION
+  CUSTOMER_STATEMENT
+  SUPPLIER_STATEMENT
+  JOURNAL_ENTRY
+}
+
+/// The lifecycle of an issued document.
+///
+/// `ISSUED` is the normal state. `SUPERSEDED` marks a version that was replaced
+/// by a re-issue; the row is kept so the earlier issuance stays auditable.
+/// `CANCELLED` and `REVOKED` are terminal and are surfaced by the public
+/// verification page, so a scanned QR never reports a withdrawn document as
+/// authentic.
+enum OfficialDocumentStatus {
+  DRAFT
+  ISSUED
+  SUPERSEDED
+  CANCELLED
+  REVOKED
+}
+
+/// An issued official document.
+///
+/// One row per (company, type, document number). The rendered PDF is stored
+/// through `MediaStorageService`, so the bytes are re-encoded and reachable only
+/// through an authorised route. `verificationToken` is the public credential
+/// embedded in the QR code: a random 32-byte value, never a sequential id, so a
+/// scan cannot be guessed or enumerated across tenants.
+model OfficialDocument {
+  id          String               @id @default(cuid())
+  companyId   String
+  type        OfficialDocumentType
+  /// The human document number (invoice number, job number, receipt number).
+  documentNumber String
+  status      OfficialDocumentStatus @default(DRAFT)
+  /// Bumped on every re-issue. Version 1 is the first issued document.
+  version     Int                  @default(1)
+  /// Groups every version of the same logical document.
+  seriesId    String               @default(cuid())
+
+  /// The public verification credential. Unique across the whole platform.
+  verificationToken String           @unique
+
+  /// The source record this document renders, e.g. an `InspectionSession` id.
+  sourceType  String
+  sourceId    String
+
+  /// Snapshot of the data the PDF was rendered from, so a later edit to the
+  /// source record cannot silently change an issued document.
+  payload     Json
+
+  /// The stored PDF, when one has been generated. The bytes live under the
+  /// document storage root, not the image store: a PDF is not re-encoded by
+  /// sharp and must never be served from the public image route.
+  storageKey   String?
+  byteSize     Int?
+  pageCount    Int?
+
+  /// Company identity captured at issue time.
+  issuerNameEn String
+  issuerNameAr String
+  issuerCode   String
+
+  issuedAt     DateTime             @default(now())
+  issuedById   String?
+  supersededAt DateTime?
+  cancelledAt  DateTime?
+  revokedAt    DateTime?
+  revokeReason String?
+
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  company  Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  events   OfficialDocumentEvent[]
+
+  @@unique([companyId, type, documentNumber, version])
+  @@index([companyId, type, status])
+  @@index([companyId, sourceType, sourceId])
+  @@index([seriesId])
+}
+
+/// An append-only audit entry for an official document. Never updated, never
+/// deleted; a status change writes a row rather than mutating history.
+model OfficialDocumentEvent {
+  id         String   @id @default(cuid())
+  companyId  String
+  documentId String
+  /// `ISSUED`, `REPRINTED`, `SUPERSEDED`, `CANCELLED`, `REVOKED`, `DOWNLOADED`.
+  event      String
+  detail     String?
+  actorId    String?
+  createdAt  DateTime @default(now())
+
+  company  Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  document OfficialDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, createdAt])
+  @@index([companyId])
 }

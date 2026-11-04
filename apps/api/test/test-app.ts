@@ -394,6 +394,11 @@ export async function cleanupFixtures(prisma: PrismaService): Promise<void> {
   });
   await prisma.bookingResource.deleteMany({ where: { companyId: { in: ids } } });
 
+  // Execution Phase 3 — issued documents reference the company and are
+  // children of it, so they go before the company row.
+  await prisma.officialDocumentEvent.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.officialDocument.deleteMany({ where: { companyId: { in: ids } } });
+
   await prisma.branch.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.auditLog.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.company.deleteMany({ where: { id: { in: ids } } });

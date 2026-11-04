@@ -1,0 +1,153 @@
+import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
+import type { Browser } from 'playwright';
+import { DocumentFontService, DOCUMENT_FONT_STACK } from './document-fonts.service';
+
+/**
+ * Renders HTML to a print-ready PDF with a real layout engine.
+ *
+ * Chromium is used rather than a PDF-drawing library because the documents are
+ * laid out with the same CSS a browser uses — Arabic shaping, bidi runs, table
+ * pagination, `@page` margins and repeated table headers all come for free and
+ * correctly. A hand-drawn PDF builder would have to reimplement Arabic joining
+ * and RTL bidi itself, and would get it subtly wrong.
+ *
+ * One browser instance is reused across renders; launching Chromium takes longer
+ * than rendering a document, so a per-request launch would dominate the response
+ * time and leak a process if a request was cancelled.
+ */
+@Injectable()
+export class PdfRendererService implements OnModuleDestroy {
+  private readonly logger = new Logger(PdfRendererService.name);
+  private browserPromise: Promise<Browser> | null = null;
+
+  constructor(private readonly fonts: DocumentFontService) {}
+
+  private async browser(): Promise<Browser> {
+    if (!this.browserPromise) {
+      this.browserPromise = (async () => {
+        // Imported lazily so the API can boot (and unit tests can run) without
+        // the browser binary present; only a PDF request needs it.
+        const { chromium } = await import('playwright');
+        const browser = await chromium.launch({
+          args: ['--no-sandbox', '--disable-dev-shm-usage', '--font-render-hinting=none'],
+        });
+        this.logger.log('PDF renderer browser started');
+        return browser;
+      })().catch((error) => {
+        // Reset so a later request retries instead of reusing a rejected promise.
+        this.browserPromise = null;
+        throw error;
+      });
+    }
+    return this.browserPromise;
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (!this.browserPromise) return;
+    try {
+      const browser = await this.browserPromise;
+      await browser.close();
+    } catch {
+      // A browser that never started has nothing to close.
+    }
+    this.browserPromise = null;
+  }
+
+  /**
+   * Renders a full HTML document to PDF bytes.
+   *
+   * `background: true` is required — the report uses filled header bars and
+   * shaded tables, and Chromium drops background colours when printing by
+   * default.
+   */
+  async render(html: string): Promise<{ pdf: Buffer; pageCount: number }> {
+    const browser = await this.browser();
+    const context = await browser.newContext({ viewport: { width: 1240, height: 1754 } });
+    const page = await context.newPage();
+    try {
+      await page.setContent(html, { waitUntil: 'load', timeout: 30_000 });
+
+      // `font-display:block` keeps text invisible until the face is ready; wait
+      // for it explicitly so the first page is not rendered in a fallback font.
+      await page.evaluate(() => document.fonts.ready);
+      await page.emulateMedia({ media: 'print' });
+
+      const pdf = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        preferCSSPageSize: true,
+        margin: { top: '0', right: '0', bottom: '0', left: '0' },
+      });
+
+      const buffer = Buffer.from(pdf);
+      return { pdf: buffer, pageCount: countPdfPages(buffer) };
+    } finally {
+      await context.close();
+    }
+  }
+
+  /** The `@font-face` rules plus the base print stylesheet every document shares. */
+  async baseStyles(): Promise<string> {
+    return `${await this.fonts.fontFaceCss()}\n${BASE_PRINT_CSS}`;
+  }
+}
+
+/**
+ * Counts pages by reading the PDF page tree.
+ *
+ * Chromium does not report a page count, and a caller needs one for the stored
+ * document row. The count is read from the raw bytes rather than by pulling in a
+ * PDF parser: `/Type /Page` appears once per page and the `/Count` entry of the
+ * page tree gives the total, which is enough for a document we just generated
+ * ourselves.
+ */
+export function countPdfPages(pdf: Buffer): number {
+  const text = pdf.toString('latin1');
+  const counts = [...text.matchAll(/\/Count\s+(\d+)/g)].map((m) => Number(m[1]));
+  if (counts.length > 0) return Math.max(...counts);
+  const pages = text.match(/\/Type\s*\/Page[^s]/g);
+  return pages ? pages.length : 1;
+}
+
+/**
+ * Shared print CSS.
+ *
+ * The palette is the approved ORYX identity: deep navy and gold. `@page` carries
+ * the A4 size and the running margin box; each template supplies its own header
+ * and footer because the footer differs per document.
+ */
+export const BASE_PRINT_CSS = `
+  :root{
+    --navy:#0b2545;
+    --navy-soft:#13315c;
+    --gold:#c9a227;
+    --gold-soft:#e6cf7a;
+    --ink:#111827;
+    --muted:#5b6472;
+    --line:#d7dce3;
+    --line-strong:#9aa4b2;
+    --ok:#15803d;
+    --warn:#b45309;
+    --bad:#b91c1c;
+  }
+  @page{ size:A4; margin:14mm 12mm 18mm 12mm; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    font-family:${DOCUMENT_FONT_STACK};
+    color:var(--ink);
+    font-size:10.5pt;
+    line-height:1.45;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+  .ltr{ direction:ltr; unicode-bidi:isolate; font-family:'ORYX Sans',sans-serif; }
+  .num{ font-family:'ORYX Sans',sans-serif; font-variant-numeric:tabular-nums; direction:ltr; unicode-bidi:isolate; }
+  .doc-page{ page-break-after:always; position:relative; }
+  .doc-page:last-child{ page-break-after:auto; }
+  h1,h2,h3,h4{ margin:0; font-weight:700; }
+  table{ width:100%; border-collapse:collapse; }
+  thead{ display:table-header-group; }
+  tr{ page-break-inside:avoid; }
+  .avoid-break{ page-break-inside:avoid; }
+`;

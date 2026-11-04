@@ -189,7 +189,28 @@ export const ERP_NAV: NavGroup[] = [
   { key: 'commerce', labelKey: 'nav.group.commerce', items: COMMERCE.map(erpItem) },
   { key: 'operations', labelKey: 'nav.group.operations', items: OPERATIONS.map(erpItem) },
   { key: 'customer', labelKey: 'nav.group.customer', items: CUSTOMER.map(erpItem) },
-  { key: 'automotive', labelKey: 'nav.group.automotive', items: AUTOMOTIVE.map(erpItem) },
+  {
+    key: 'automotive',
+    labelKey: 'nav.group.automotive',
+    items: [
+      ...AUTOMOTIVE.map(erpItem),
+      // Official documents are issued from an inspection, an invoice or an
+      // order, so the entry sits with the automotive group and reuses the
+      // inspection read permission rather than inventing a new one.
+      {
+        key: 'documents',
+        labelKey: 'nav.documents',
+        href: '/documents',
+        icon: 'scroll',
+        anyPermission: [
+          'erp.inspection.read',
+          'erp.sales.read',
+          'erp.purchasing.read',
+          'erp.accounting.read',
+        ],
+      },
+    ],
+  },
   { key: 'analytics', labelKey: 'nav.group.analytics', items: ANALYTICS.map(erpItem) },
   { key: 'administration', labelKey: 'nav.group.administration', items: ADMIN.map(erpItem) },
 ];

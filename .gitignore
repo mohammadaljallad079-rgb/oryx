@@ -27,6 +27,13 @@ packages/database/prisma/migrations/dev.db*
 .oryx-tmp/
 tsconfig.build.tsbuildinfo
 
+# Generated official documents (PDFs) and uploaded media are runtime data, not
+# source. The paths match DOCUMENT_STORAGE_ROOT and MEDIA_ROOT.
+apps/api/.documents/
+apps/api/.media/
+.documents/
+.media/
+
 # Local test artifacts
 apps/admin/test-results/
 apps/admin/playwright-report/

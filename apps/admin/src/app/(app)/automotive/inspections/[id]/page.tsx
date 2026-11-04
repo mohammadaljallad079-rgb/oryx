@@ -16,6 +16,7 @@ import { useUi } from '@/lib/ui-context';
 import { Icon } from '@/components/icons';
 import { Badge, Button, Card, ErrorBanner, Field, Modal, SectionHeader, Skeleton, StatusBadge } from '@/components/ui';
 import { BodyDiagram, ChassisDiagram, type ChassisRegionValue, type PaintMarker } from '@/components/inspection/diagrams';
+import { DocumentsPanel } from '@/components/documents-panel';
 
 /**
  * The inspection workspace.
@@ -36,6 +37,9 @@ export default function InspectionWorkspacePage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [issueError, setIssueError] = useState<string | null>(null);
+  const [issuing, setIssuing] = useState(false);
+  const [docsKey, setDocsKey] = useState(0);
 
   const canWrite = can('erp.inspection.write');
   const canApprove = can('erp.inspection.report.approve');
@@ -147,6 +151,47 @@ export default function InspectionWorkspacePage() {
           />
         </div>
       </div>
+
+      {session.status === 'APPROVED' ? (
+        <DocumentsPanel
+          sourceType="InspectionSession"
+          sourceId={id}
+          refreshKey={docsKey}
+          actions={
+            canWrite ? (
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={issuing}
+                data-testid="inspection-issue-report"
+                onClick={async () => {
+                  setIssuing(true);
+                  setIssueError(null);
+                  try {
+                    await api.issueInspectionDocument(id);
+                    setDocsKey((k) => k + 1);
+                  } catch (e) {
+                    setIssueError(e instanceof Error ? e.message : t('common.error'));
+                  } finally {
+                    setIssuing(false);
+                  }
+                }}
+              >
+                <Icon name="scroll" size={14} />
+                {t('documents.issueReport')}
+              </Button>
+            ) : null
+          }
+        />
+      ) : (
+        <Card>
+          <p className="oryx-faint m-0 text-[12.5px]" data-testid="inspection-report-locked">
+            {t('documents.approvedOnly')}
+          </p>
+        </Card>
+      )}
+
+      {issueError ? <ErrorBanner message={issueError} /> : null}
 
       {reviewOpen ? (
         <ReviewModal

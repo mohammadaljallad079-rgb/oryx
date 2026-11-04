@@ -75,6 +75,20 @@ describe('customer status localisation', () => {
     expect(dictionaries.en[`bookingType.${type}`]).toBeTruthy();
   });
 
+  it('gives each verification outcome a distinct label in both locales', () => {
+    // A scanned document reports one of four outcomes. `revoked` and
+    // `cancelled` both read "ملغى" before this guard, so an Arabic reader
+    // could not tell a withdrawn report from a cancelled one.
+    for (const locale of ['ar', 'en'] as const) {
+      const titles = ['valid', 'revoked', 'superseded', 'cancelled'].map((outcome) => {
+        const title = dictionaries[locale][`verify.${outcome}Title`];
+        expect(title, `${locale} verify.${outcome}Title`).toBeTruthy();
+        return title;
+      });
+      expect(new Set(titles).size).toBe(titles.length);
+    }
+  });
+
   it('never renders a status label as the raw enum', () => {
     for (const status of STATUSES) {
       expect(dictionaries.ar[`status.${status}`]).not.toBe(status);
