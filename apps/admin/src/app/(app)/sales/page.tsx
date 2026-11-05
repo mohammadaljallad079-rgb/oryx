@@ -27,6 +27,7 @@ import type {
   SalesDocumentDto,
   WarehouseDto,
 } from '@oryx/shared';
+import { DocumentActions } from '@/components/document-actions';
 
 type Tab = 'invoices' | 'orders' | 'quotations' | 'credit-notes' | 'pos' | 'customers';
 
@@ -262,6 +263,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.sales.total')}</th>
               <th>{t('erp.sales.outstanding')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -273,6 +275,14 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(inv.totalMinor, inv.currency)}</td>
                 <td className="tabular-nums text-[12.5px]">{money(inv.outstandingMinor ?? 0, inv.currency)}</td>
                 <td><StatusBadge status={inv.status} label={inv.status} /></td>
+                <td>
+                  <DocumentActions
+                    sourceType="SalesInvoice"
+                    sourceId={inv.id}
+                    type="SALES_INVOICE"
+                    permissions={['erp.sales.read', 'erp.accounting.read']}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -329,6 +339,7 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.sales.customer')}</th>
               <th>{t('erp.sales.total')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -339,6 +350,14 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{o.customerNameEn}</td>
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(o.totalMinor, o.currency)}</td>
                 <td><StatusBadge status={o.status} label={o.status} /></td>
+                <td>
+                  <DocumentActions
+                    sourceType="SalesOrder"
+                    sourceId={o.id}
+                    type="SALES_ORDER"
+                    permissions={['erp.sales.read', 'erp.accounting.read']}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -407,18 +426,26 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(q.totalMinor, q.currency)}</td>
                 <td><StatusBadge status={q.status} label={q.status} /></td>
                 <td>
-                  {canManage && q.status !== 'CONVERTED' ? (
-                    <Button
-                      size="sm"
-                      onClick={async () => {
-                        await api.convertQuotation(q.id, warehouses.data?.items[0]?.id);
-                        await list.reload();
-                      }}
-                      data-testid={`convert-quotation-${q.quoteNumber}`}
-                    >
-                      {t('erp.sales.convert')}
-                    </Button>
-                  ) : null}
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <DocumentActions
+                      sourceType="Quotation"
+                      sourceId={q.id}
+                      type="QUOTATION"
+                      permissions={['erp.sales.read', 'erp.accounting.read']}
+                    />
+                    {canManage && q.status !== 'CONVERTED' ? (
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          await api.convertQuotation(q.id, warehouses.data?.items[0]?.id);
+                          await list.reload();
+                        }}
+                        data-testid={`convert-quotation-${q.quoteNumber}`}
+                      >
+                        {t('erp.sales.convert')}
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -476,6 +503,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.sales.total')}</th>
               <th>{t('erp.sales.restock')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -487,6 +515,14 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(n.totalMinor, n.currency)}</td>
                 <td className="text-[12.5px]">{(n as { restockInventory?: boolean }).restockInventory ? '✓' : '—'}</td>
                 <td><StatusBadge status={n.status} label={n.status} /></td>
+                <td>
+                  <DocumentActions
+                    sourceType="CreditNote"
+                    sourceId={n.id}
+                    type="SALES_RETURN"
+                    permissions={['erp.sales.read', 'erp.accounting.read']}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>

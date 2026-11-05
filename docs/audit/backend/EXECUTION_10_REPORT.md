@@ -1846,3 +1846,124 @@ is genuinely idempotent (42/42, then 42/42).
   dump is not a device render.
 - **No APK was published**, per the standing instruction.
 - **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.
+
+---
+
+## 23. Continuation session — the sales register produces official documents
+
+### 23.1 What was missing
+
+The Execution Phase 3 work made every catalogue document type issuable and gave
+the platform a documents register, but the register was the *only* entry point:
+an operator had to open `/documents`, choose a source type and paste a record id
+by hand. The sales register — where an operator actually looks at an invoice,
+order, quotation or credit note — had no way to produce the official document for
+the record in front of them, and the quotations tab's single action was "Convert".
+
+### 23.2 What was added
+
+`apps/admin/src/components/document-actions.tsx` is a per-row cell that reads the
+existing `GET /documents?sourceType&sourceId` route and offers the correct action
+for the row's state:
+
+- No document yet → an **Issue** button labelled with the document type.
+- A document exists → **Preview** (opens the stored PDF in a modal iframe, with
+  **Download** and **Print**) and **Reissue** (a new version, which supersedes
+  the prior one in the same transaction the API already runs).
+- A `permissions` prop decides visibility with the same
+  `erp.sales.read` / `erp.accounting.read` the API enforces. The UI only hides
+  what the API would reject; it never becomes the security boundary.
+
+The cell is wired into all three sales tabs that carry an issuable source type:
+invoices (`SALES_INVOICE`), orders (`SALES_ORDER`) and quotations (`QUOTATION`).
+Credit notes are issuable too and use the same `DocumentActions` cell where the
+register exposes them. All four source types are already handled by
+`loadFinancialSource` in the API, so no backend change was needed — this is a
+UI gap, not an API gap.
+
+The preview modal widens to `min(1100px, 100%)` and the frame is
+`min(72vh, 900px)` tall (`.oryx-doc-preview` in `globals.css`): an A4 page in a
+720px modal is illegible, and a preview exists to be read before printing. Three
+icons (`refresh`, `download`, `print`) were added to the shared icon set.
+
+### 23.3 Files changed
+
+| File | Change |
+| --- | --- |
+| `apps/admin/src/components/document-actions.tsx` | **New** — the per-row issue/preview/reissue cell |
+| `apps/admin/src/app/(app)/sales/page.tsx` | Wire the cell into the invoices, orders and quotations tabs |
+| `apps/admin/src/app/globals.css` | `.oryx-doc-preview` frame and the widened preview modal |
+| `apps/admin/src/components/icons.tsx` | `refresh`, `download`, `print` icons |
+| `apps/admin/src/i18n/dictionaries.ts` | `documents.preview/download/print/reissue` in EN and AR |
+| `apps/admin/e2e/execution10-document-actions.spec.ts` | **New** — three browser tests over the real register |
+| `.run/serve-mobile-web.mjs` | Root the static server at the export's real `dist/web` directory |
+
+### 23.4 Real HTTP test results
+
+`apps/admin/e2e/execution10-document-actions.spec.ts` — **3 tests, 3 passing**
+(desktop-dark, `npx playwright test`):
+
+1. **An invoice row issues, previews and downloads a real PDF.** The test creates
+   its own customer, product and warehouse over HTTP, creates the invoice, finds
+   its row in the register, clicks Issue, waits for the cell to swap to
+   Preview/Reissue, opens the modal, asserts the frame `src` is a `blob:` URL,
+   then fetches `GET /documents/:id/file` directly and asserts the first five
+   bytes are `%PDF-`.
+2. **A quotation row issues and previews its document.**
+3. **The issued document appears in the register and verifies anonymously.**
+   The document is looked up by source record on `/documents` and its QR token is
+   verified through the anonymous `GET /documents/verify/:token`, asserting
+   `{ found: true, document.status: 'VALID' }`.
+
+The tests create their own fixtures rather than reusing seeded rows: the demo
+tenant's first seeded customer sits at its credit limit, so an invoice against it
+is refused by a real business rule (`sales.credit_limit_exceeded`) — a passing
+test must assert documents, not credit.
+
+### 23.5 Full-suite re-verification (this session)
+
+| Suite | Result |
+| --- | --- |
+| `@oryx/shared` unit | 11 files, **217 passing** |
+| `@oryx/api` e2e | 32 suites, **636 passing**, 0 failing |
+| `@oryx/admin` browser | **217 passing**, 1 skipped, 0 failing |
+| `@oryx/mobile` unit | 10 files, **206 passing** |
+| `@oryx/mobile-erp` unit | 2 files, **31 passing** |
+| `@oryx/customer` unit | 2 files, **54 passing** |
+| Typecheck (`tsc --noEmit`) | admin, mobile, mobile-erp, customer — all clean |
+| Lint (`eslint . --max-warnings=0`) | admin, mobile, mobile-erp, customer — all clean |
+| Build | `@oryx/api` emits `dist/main.js`; `next build` for admin completes |
+
+React is `19.1.0` in `apps/admin`, `apps/customer` and `apps/mobile` alike, so the
+hoisting regression the Execution 04 notes describe cannot recur.
+
+The API build first emitted nothing because of the stale `tsconfig.build.tsbuildinfo`
+the repository notes warn about; `pnpm --filter @oryx/api build` clears it first
+and emits `dist/main.js` (3219 bytes). This is the documented gotcha, not a
+regression.
+
+The mobile web preview returned 500 because the Expo export now writes the web
+bundle to `dist/web` (the Android export took `dist/android`), while the static
+server still rooted at `dist`. The server now roots at `dist/web` and
+`http://localhost:8081/mobile/` returns 200 with the ORYX shell.
+
+### 23.6 Security verification
+
+- The issue, preview, download and reissue actions all call routes that already
+  require `erp.sales.read` / `erp.accounting.read` server-side; the cell's
+  `permissions` prop only hides controls.
+- The preview frame holds a blob from an authenticated fetch; the stored PDF is
+  served `Cache-Control: private, no-store` by the API, so a revoked document
+  cannot keep showing as valid from a cached copy.
+- The verification endpoint is anonymous by design and exposes only
+  non-sensitive identity fields (number, type, issuer, version, status) — no
+  payload, no customer, no amount.
+- No credential, token or secret value is written to a log or a response.
+
+### 23.7 Still open
+
+- **Android visual acceptance of Splash and Homepage is still not claimed.** No
+  physical device or emulator exists in this environment; a DOM or UI-hierarchy
+  dump is not a device render.
+- **No APK was published**, per the standing instruction.
+- **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.

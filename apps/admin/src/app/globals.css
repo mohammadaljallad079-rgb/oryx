@@ -855,6 +855,26 @@ body::before {
   box-shadow: var(--shadow-modal);
 }
 
+/*
+ * A document preview needs the full width and height of the viewport: an A4
+ * page rendered into a 720px modal is illegible, and the point of a preview is
+ * to read the page before printing it. The frame holds the browser's own PDF
+ * viewer, so it inherits that viewer's toolbar and zoom.
+ */
+.oryx-doc-preview {
+  display: block;
+  width: 100%;
+  height: min(72vh, 900px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-raised);
+}
+
+/* A modal that holds a document preview widens to suit the page. */
+.oryx-modal:has(.oryx-doc-preview) {
+  width: min(1100px, 100%);
+}
+
 /* ----------------------------------------------------------- brand lockup */
 
 /*

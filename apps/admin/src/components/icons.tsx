@@ -338,6 +338,26 @@ export const Icons = {
       <path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01" />
     </Base>
   ),
+  refresh: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M20 11a8 8 0 1 0-.6 4" />
+      <path d="M20 4.5V11h-6.5" />
+    </Base>
+  ),
+  download: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M12 3.5v11" />
+      <path d="m7.5 10 4.5 4.5 4.5-4.5" />
+      <path d="M4.5 19.5h15" />
+    </Base>
+  ),
+  print: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M7 9V3.5h10V9" />
+      <rect x="4" y="9" width="16" height="7.5" rx="1.5" />
+      <path d="M7 16.5h10V21H7z" />
+    </Base>
+  ),
 } as const;
 
 export type IconName = keyof typeof Icons;
