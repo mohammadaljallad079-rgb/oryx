@@ -79,11 +79,13 @@ export function Button({
 export function Field({
   label,
   hint,
+  error,
   children,
   required,
 }: {
   label: string;
   hint?: string;
+  error?: string;
   children: ReactNode;
   required?: boolean;
 }) {
@@ -94,7 +96,13 @@ export function Field({
         {required ? <span className="oryx-gold"> *</span> : null}
       </span>
       {children}
-      {hint ? <span className="oryx-faint mt-1 block text-[11.5px]">{hint}</span> : null}
+      {error ? (
+        <span className="mt-1 block text-[11.5px] font-semibold" style={{ color: 'var(--danger)' }}>
+          {error}
+        </span>
+      ) : hint ? (
+        <span className="oryx-faint mt-1 block text-[11.5px]">{hint}</span>
+      ) : null}
     </label>
   );
 }

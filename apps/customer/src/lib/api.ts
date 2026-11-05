@@ -32,6 +32,9 @@ import {
   PREVIEW_VEHICLES,
   previewProvider,
   previewProviders,
+  previewProductDetail,
+  previewProducts,
+  previewStores,
   previewWebsiteContent,
 } from './preview-data';
 
@@ -970,7 +973,14 @@ export const publicApi = {
       pageSize?: number;
     },
   ) => {
-    if (IS_STATIC_PREVIEW) return { items: [] as CatalogProduct[], total: 0, page: 1, pageSize: 20 };
+    if (IS_STATIC_PREVIEW) {
+      const result = previewProducts({
+        locale: params.locale,
+        query: params.query,
+        sort: params.sort,
+      });
+      return { items: result.items, total: result.total, page: 1, pageSize: result.items.length };
+    }
     const qs = new URLSearchParams({ locale: params.locale });
     if (params.companyId) qs.set('companyId', params.companyId);
     if (params.query) qs.set('query', params.query);
@@ -984,7 +994,11 @@ export const publicApi = {
 
   /** One product with its images, store and related items. */
   product: async (id: string, locale: string) => {
-    if (IS_STATIC_PREVIEW) throw new ApiError(404, 'not_found', 'Product not found.');
+    if (IS_STATIC_PREVIEW) {
+      const found = previewProductDetail(id, locale);
+      if (!found) throw new ApiError(404, 'not_found', 'Product not found.');
+      return found;
+    }
     return publicGet<CatalogProduct & { images: Array<{ url: string | null }>; related: CatalogProduct[] }>(
       `/customer/catalog/products/${encodeURIComponent(id)}?locale=${locale}`,
     );
@@ -992,7 +1006,7 @@ export const publicApi = {
 
   /** The marketplace stores that actually have published products. */
   stores: async (locale: string) => {
-    if (IS_STATIC_PREVIEW) return { items: [] as CatalogStore[], total: 0 };
+    if (IS_STATIC_PREVIEW) return previewStores(locale);
     return publicGet<{ items: CatalogStore[]; total: number }>(
       `/customer/catalog/stores?locale=${locale}`,
     );

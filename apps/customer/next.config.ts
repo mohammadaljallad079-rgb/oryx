@@ -58,10 +58,25 @@ const nextConfig: NextConfig = {
         images: { unoptimized: true },
       }
     : {}),
-  // Response headers are a server feature and are not emitted by an export.
+  // Rewrites and response headers are server features, not emitted by an export.
   ...(isStaticExport
     ? {}
     : {
+        /**
+         * The browser bundle is built with `NEXT_PUBLIC_API_BASE_URL=/api` so
+         * the deployed site talks to the API same-origin (the consumer refresh
+         * cookie is scoped to `/api/v1/customer`). Behind the staging preview
+         * proxy the `/api` prefix never reaches Next. When the site is served
+         * directly on its own port, nothing owns `/api`, so the bundle's calls
+         * 404. This forwards them to the API in that case.
+         */
+        async rewrites() {
+          const apiTarget = (process.env.ORYX_API_INTERNAL ?? 'http://127.0.0.1:3001').replace(
+            /\/$/,
+            '',
+          );
+          return [{ source: '/api/:path*', destination: `${apiTarget}/api/:path*` }];
+        },
         async headers() {
           return [
             {

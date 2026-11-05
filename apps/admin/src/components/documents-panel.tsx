@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { documentStatusLabelKey } from '@oryx/shared';
 import { api, type OfficialDocumentDto, type OfficialDocumentDetailDto } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -15,6 +15,10 @@ import { Badge, Button, Card, EmptyState, ErrorBanner, Field, Modal, Skeleton, T
  * issued, opened and withdrawn through exactly one code path. The panel never
  * composes a PDF itself: it asks the API to issue one and then links to the
  * stored copy, which is what keeps the register and the printed page in step.
+ *
+ * The preview is an in-page iframe over a blob URL, not `window.open`: the bytes
+ * are fetched with the staff token, so the tab cannot be opened synchronously
+ * and the browser hands back a blank `about:blank` popup.
  */
 
 export interface DocumentsPanelProps {
@@ -52,7 +56,9 @@ export function DocumentsPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<OfficialDocumentDetailDto | null>(null);
+  const [preview, setPreview] = useState<{ url: string; document: OfficialDocumentDto } | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const frameRef = useRef<HTMLIFrameElement>(null);
   const [revoking, setRevoking] = useState<OfficialDocumentDto | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -82,16 +88,40 @@ export function DocumentsPanel({
     setError(null);
     try {
       // Fetch the trail and the bytes together: a document whose PDF cannot be
-      // fetched should say so here rather than opening an empty tab.
+      // fetched should say so here rather than opening an empty preview.
       const [record, url] = await Promise.all([api.officialDocument(row.id), api.officialDocumentBlobUrl(row.id)]);
       setDetail(record);
-      window.open(url, '_blank', 'noopener,noreferrer');
+      setPreview({ url, document: row });
       void load();
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
       setDetailLoading(false);
     }
+  };
+
+  const closePreview = () => {
+    if (preview) URL.revokeObjectURL(preview.url);
+    setPreview(null);
+    setDetail(null);
+  };
+
+  // Printing the frame prints the stored PDF through the browser's own viewer
+  // rather than a re-render, so a print can never disagree with the copy on
+  // file.
+  const print = () => {
+    const frame = frameRef.current;
+    if (!frame?.contentWindow) return;
+    frame.contentWindow.focus();
+    frame.contentWindow.print();
+  };
+
+  const download = () => {
+    if (!preview) return;
+    const a = window.document.createElement('a');
+    a.href = preview.url;
+    a.download = `${preview.document.documentNumber}.pdf`;
+    a.click();
   };
 
   const copyLink = async (row: OfficialDocumentDto) => {
@@ -215,26 +245,51 @@ export function DocumentsPanel({
         </TableShell>
       )}
 
-      {detail ? (
-        <div className="mt-3 rounded border border-[var(--border)] p-3" data-testid="document-detail">
-          <div className="flex items-center justify-between">
-            <strong>{t('documents.eventTrail')}</strong>
-            <Button size="sm" variant="ghost" onClick={() => setDetail(null)}>
-              {t('common.close')}
-            </Button>
+      {detail && preview ? (
+        <Modal
+          open
+          title={`${t('documents.preview')} — ${preview.document.documentNumber}`}
+          onClose={closePreview}
+          footer={
+            <>
+              <Button variant="ghost" onClick={closePreview} data-testid="document-preview-close">
+                {t('common.close')}
+              </Button>
+              <Button variant="ghost" onClick={download} data-testid="document-download">
+                <Icon name="download" size={14} />
+                {t('documents.download')}
+              </Button>
+              <Button variant="primary" onClick={print} data-testid="document-print">
+                <Icon name="print" size={14} />
+                {t('documents.print')}
+              </Button>
+            </>
+          }
+        >
+          <iframe
+            ref={frameRef}
+            src={preview.url}
+            title={preview.document.documentNumber}
+            className="oryx-doc-preview"
+            data-testid="document-frame"
+          />
+          <div className="mt-3 rounded border border-[var(--border)] p-3" data-testid="document-detail">
+            <div className="flex items-center justify-between">
+              <strong>{t('documents.eventTrail')}</strong>
+            </div>
+            <p className="oryx-faint m-0 text-[12px]">
+              {detail.documentNumber} · v{detail.version} · {detail.pageCount ?? 0} {t('documents.pages')}
+            </p>
+            <ul className="m-0 mt-2 list-none p-0">
+              {detail.events.map((event) => (
+                <li key={event.id} className="flex justify-between border-b border-[var(--border)] py-1 text-[12.5px]">
+                  <span>{t(`documents.event.${event.event}`)}</span>
+                  <span className="oryx-faint num">{new Date(event.createdAt).toLocaleString(locale)}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-          <p className="oryx-faint m-0 text-[12px]">
-            {detail.documentNumber} · v{detail.version} · {detail.pageCount ?? 0} {t('documents.pages')}
-          </p>
-          <ul className="m-0 mt-2 list-none p-0">
-            {detail.events.map((event) => (
-              <li key={event.id} className="flex justify-between border-b border-[var(--border)] py-1 text-[12.5px]">
-                <span>{t(`documents.event.${event.event}`)}</span>
-                <span className="oryx-faint num">{new Date(event.createdAt).toLocaleString(locale)}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        </Modal>
       ) : null}
 
       <Modal

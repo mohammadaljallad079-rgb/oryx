@@ -232,6 +232,8 @@ export class OrganizationsService {
         ...(dto.industry !== undefined ? { industry: dto.industry } : {}),
         ...(dto.countryCode !== undefined ? { countryCode: dto.countryCode } : {}),
         ...(dto.currency !== undefined ? { currency: dto.currency } : {}),
+        ...(dto.functionalCurrency !== undefined ? { functionalCurrency: dto.functionalCurrency || null } : {}),
+        ...(dto.defaultTaxRateBp !== undefined ? { defaultTaxRateBp: dto.defaultTaxRateBp } : {}),
         ...(dto.taxNumber !== undefined ? { taxNumber: dto.taxNumber } : {}),
         ...(dto.parentCompanyId !== undefined ? { parentCompanyId: dto.parentCompanyId } : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
@@ -461,6 +463,10 @@ export class OrganizationsService {
     industry: string | null;
     countryCode: string | null;
     currency: string;
+    functionalCurrency: string | null;
+    defaultTaxRateBp: number;
+    taxNumber: string | null;
+    notes: string | null;
     parentCompanyId: string | null;
     createdAt: Date;
     parent?: { nameEn: string } | null;
@@ -491,6 +497,10 @@ export class OrganizationsService {
       industry: c.industry,
       countryCode: c.countryCode,
       currency: c.currency,
+      functionalCurrency: c.functionalCurrency,
+      defaultTaxRateBp: c.defaultTaxRateBp,
+      taxNumber: c.taxNumber,
+      notes: c.notes,
       parentCompanyId: c.parentCompanyId,
       parentCompanyNameEn: c.parent?.nameEn ?? null,
       createdAt: c.createdAt.toISOString(),

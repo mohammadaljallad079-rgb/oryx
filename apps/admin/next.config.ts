@@ -18,6 +18,19 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   ...(isDockerBuild ? { output: 'standalone' as const } : {}),
+  /**
+   * The browser bundle is built with `NEXT_PUBLIC_API_BASE_URL=/api` so the
+   * deployed app talks to the API same-origin (required for the HttpOnly
+   * refresh cookie and the CSRF double-submit). Behind the staging preview
+   * proxy the `/api` prefix is intercepted before it reaches Next. When the app
+   * is served directly on its own port — a local `next start`, or the
+   * Playwright suite — nothing owns `/api`, so the bundle's calls 404. This
+   * rewrite forwards them to the API in that case.
+   */
+  async rewrites() {
+    const apiTarget = (process.env.ORYX_API_INTERNAL ?? 'http://127.0.0.1:3001').replace(/\/$/, '');
+    return [{ source: '/api/:path*', destination: `${apiTarget}/api/:path*` }];
+  },
   async headers() {
     return [
       {

@@ -121,6 +121,49 @@ const DEMO_SUPPLIERS = [
   { code: 'SUP-002', nameEn: 'Lubricants Wholesale', nameAr: 'تجارة الزيوت بالجملة' },
 ];
 
+/**
+ * One vehicle per demo customer.
+ *
+ * The inspection workspace, the document register and the merchant screens all
+ * issue their work from a customer's vehicle, so a seeded database without one
+ * cannot exercise them at all: the vehicle selector is empty and every browser
+ * acceptance test that opens an inspection fails. The first customer's vehicle
+ * is therefore stable and fixed — the suites pick the first customer and its
+ * first vehicle by name, so the VIN and make here are what those assertions
+ * expect.
+ */
+const DEMO_VEHICLES: Array<{
+  customerCode: string;
+  vin: string;
+  plateNumber: string;
+  make: string;
+  model: string;
+  modelYear: number;
+  color: string;
+  mileage: number;
+}> = [
+  {
+    customerCode: 'CUST-001',
+    vin: 'JTMHV05J204123456',
+    plateNumber: '12345',
+    make: 'Toyota',
+    model: 'Land Cruiser',
+    modelYear: 2022,
+    color: 'White',
+    mileage: 41500,
+  },
+  {
+    customerCode: 'CUST-002',
+    vin: 'JN1TBNT32Z0123456',
+    plateNumber: '67890',
+    make: 'Nissan',
+    model: 'Patrol',
+    modelYear: 2021,
+    color: 'Silver',
+    mileage: 62800,
+  },
+];
+
 
 async function seedModules() {
   for (const [index, m] of MODULES.entries()) {
@@ -776,6 +819,7 @@ async function seedErpBaseline(idByCode: Map<string, string>, superAdminId: stri
   let products = 0;
   let customers = 0;
   let suppliers = 0;
+  let vehicles = 0;
 
   for (const company of companies) {
     // Upsert every standard account by code so a chart that predates a new
@@ -904,6 +948,32 @@ async function seedErpBaseline(idByCode: Map<string, string>, superAdminId: stri
       suppliers += 1;
     }
 
+    for (const v of DEMO_VEHICLES) {
+      const owner = await prisma.customer.findUnique({
+        where: { companyId_code: { companyId: company.id, code: v.customerCode } },
+        select: { id: true },
+      });
+      if (!owner) continue;
+      // Keyed on the per-company VIN so a re-seed updates the plate and mileage
+      // an operator may have corrected rather than failing on the unique index.
+      await prisma.vehicle.upsert({
+        where: { companyId_vin: { companyId: company.id, vin: v.vin } },
+        update: {},
+        create: {
+          companyId: company.id,
+          customerId: owner.id,
+          vin: v.vin,
+          plateNumber: v.plateNumber,
+          make: v.make,
+          model: v.model,
+          modelYear: v.modelYear,
+          color: v.color,
+          mileage: v.mileage,
+        },
+      });
+      vehicles += 1;
+    }
+
     // Opening stock so the warehouse is not empty.
     for (const p of DEMO_PRODUCTS) {
       const product = await prisma.product.findUnique({
@@ -945,7 +1015,7 @@ async function seedErpBaseline(idByCode: Map<string, string>, superAdminId: stri
 
   console.log(
     `  erp baseline: ${accounts} accounts, ${years} fiscal years, ${warehouses} warehouses, ` +
-      `${products} products, ${customers} customers, ${suppliers} suppliers`,
+      `${products} products, ${customers} customers, ${suppliers} suppliers, ${vehicles} vehicles`,
   );
 }
 

@@ -242,6 +242,12 @@ export interface CompanyDto {
   industry: string | null;
   countryCode: string | null;
   currency: string;
+  /** Presentation currency; null means "report in `currency`". */
+  functionalCurrency: string | null;
+  /** Default tax rate in basis points (1500 = 15%). */
+  defaultTaxRateBp: number;
+  taxNumber: string | null;
+  notes: string | null;
   parentCompanyId: string | null;
   parentCompanyNameEn: string | null;
   createdAt: string;

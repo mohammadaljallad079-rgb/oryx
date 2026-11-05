@@ -175,6 +175,14 @@ jobs:
       - name: Verify the schema is in sync with the migrations
         run: pnpm --filter @oryx/database exec prisma migrate status
 
+      # The document and PDF suites render real PDFs through Playwright's
+      # Chromium, so the browser must be present even though this job runs no
+      # browser test. Without it every document test fails with
+      # `browserType.launch: Executable doesn't exist`, which reads as a code
+      # defect rather than a missing dependency.
+      - name: Install the Playwright browser used by the PDF renderer
+        run: pnpm --filter @oryx/admin exec playwright install --with-deps chromium
+
       - name: Run authorization unit tests
         run: pnpm --filter @oryx/shared test
 
@@ -272,6 +280,12 @@ jobs:
       - name: Build the admin app
         run: pnpm --filter @oryx/admin build
 
+      # The document suite asserts that the public verification page is served
+      # by the customer site, not the admin app, so the customer site must be
+      # running. `next start` serves the build produced above.
+      - name: Build the customer app
+        run: pnpm --filter @oryx/customer build
+
       - name: Install Playwright browsers
         run: pnpm --filter @oryx/admin exec playwright install --with-deps chromium
 
@@ -303,17 +317,33 @@ jobs:
           done
           echo "Admin app failed to become ready"; tail -50 /tmp/oryx-admin.log; exit 1
 
+      # Start the customer site and wait for it to answer, so the public
+      # verification assertion does not race a half-started server.
+      - name: Start the customer site
+        run: |
+          (cd apps/customer && pnpm start > /tmp/oryx-customer.log 2>&1 &)
+          for i in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://localhost:3002/; then
+              echo "Customer site is ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Customer site failed to become ready"; tail -50 /tmp/oryx-customer.log; exit 1
+
       - name: Run browser acceptance, MFA, responsive and functional suites
         run: pnpm --filter @oryx/admin test:ui
         env:
           ORYX_ADMIN_URL: http://localhost:3000
           ORYX_API: http://localhost:3001/api/v1
+          ORYX_CUSTOMER_URL: http://localhost:3002
 
       - name: Show server logs on failure
         if: failure()
         run: |
           echo '--- API log ---'; tail -100 /tmp/oryx-api.log || true
           echo '--- Admin log ---'; tail -100 /tmp/oryx-admin.log || true
+          echo '--- Customer log ---'; tail -100 /tmp/oryx-customer.log || true
 
       - name: Upload Playwright report
         if: always()

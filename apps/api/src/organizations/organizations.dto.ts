@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -110,6 +111,22 @@ export class UpdateCompanyDto {
   @IsString()
   @MaxLength(3)
   currency?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(3)
+  functionalCurrency?: string;
+
+  /**
+   * Default tax rate in basis points (1500 = 15%). Bounded to 0–10000 so a
+   * mistyped percentage cannot be stored as 150000 basis points.
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(10000)
+  defaultTaxRateBp?: number;
 
   @IsOptional()
   @IsString()

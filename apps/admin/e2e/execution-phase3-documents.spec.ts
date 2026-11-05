@@ -155,21 +155,24 @@ test.describe('Execution Phase 3 — official documents', () => {
     await expectNoServerError(page);
   });
 
-  test('opens the stored PDF and copies the verification link', async ({ page, context }) => {
+  test('opens the stored PDF and copies the verification link', async ({ page }) => {
     const session = await approvedInspection(page, ['INTERIOR']);
     await page.goto(`/automotive/inspections/${session.id}`);
     await page.getByTestId('inspection-issue-report').click();
     const row = page.locator('[data-testid^="document-row-"]').first();
     await expect(row).toBeVisible();
 
-    // The control opens a viewer tab; Chromium's PDF viewer owns the tab, so
-    // the assertion is that a tab opened rather than that it finished loading.
-    const [popup] = await Promise.all([
-      context.waitForEvent('page'),
-      row.locator('[data-testid^="document-open-"]').click(),
-    ]);
-    expect(popup).toBeTruthy();
-    await popup.close();
+    // The control opens an in-page frame over a blob URL. It is not a popup:
+    // the bytes need the staff token, so they are fetched asynchronously and a
+    // `window.open` after that await would hand back a blank tab.
+    await row.locator('[data-testid^="document-open-"]').click();
+    const frame = page.getByTestId('document-frame');
+    await expect(frame).toBeVisible({ timeout: 15_000 });
+    await expect(frame).toHaveAttribute('src', /^blob:/, { timeout: 15_000 });
+    await expect(page.getByTestId('document-download')).toBeEnabled();
+    await expect(page.getByTestId('document-print')).toBeEnabled();
+    await page.getByTestId('document-preview-close').click();
+    await expect(frame).toHaveCount(0);
 
     // The bytes behind that control are a real multi-page PDF, fetched through
     // the same endpoint the panel calls.
@@ -275,6 +278,10 @@ test.describe('Execution Phase 3 — official documents', () => {
     await setLocale(page, 'en');
     await page.goto('/documents');
     await expect(page.getByTestId('documents-page')).toBeVisible();
+
+    // The register is the landing view; the issue-by-source lookup is a tab.
+    await expect(page.getByTestId('document-register')).toBeVisible();
+    await page.getByTestId('documents-tab-issue').click();
     await expect(page.getByText('Choose a source record')).toBeVisible();
 
     // Submitting with no id keeps the empty state rather than querying.

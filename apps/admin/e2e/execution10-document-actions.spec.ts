@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ENTERPRISE_ADMIN, apiToken, setLocale, setTheme, signIn } from './helpers';
+import { ENTERPRISE_ADMIN, apiToken, expectNoServerError, setLocale, setTheme, signIn } from './helpers';
 
 /**
  * Sales-register document actions.
@@ -235,6 +235,7 @@ test.describe('Sales register — official document actions', () => {
     // The register is a lookup: choose the source record, then search.
     await page.goto('/documents');
     await expect(page.getByTestId('documents-page')).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId('documents-tab-issue').click();
     await page.getByTestId('documents-source-type').selectOption('SalesInvoice');
     await page.getByTestId('documents-source-id').fill(issued.invoiceId);
     await page.getByTestId('documents-lookup').click();
@@ -253,6 +254,91 @@ test.describe('Sales register — official document actions', () => {
     );
     expect(verified.status).toBe(200);
     expect(verified.body.found).toBe(true);
+    expect(verified.body.document?.status).toBe('VALID');
+  });
+
+  test('4. the tenant register lists, searches, filters and opens the issued PDF', async ({ page }) => {
+    const bearer = await apiToken(page, ENTERPRISE_ADMIN);
+    const ids = await scenario(page, bearer);
+
+    // Issue a real invoice document so the register has a known row to find.
+    const issued = await page.evaluate(
+      async ({ api, bearer: token, ids: idsIn }) => {
+        const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+        const invoice = (await (
+          await fetch(`${api}/sales/invoices`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              customerId: idsIn.customerId,
+              invoiceDate: new Date().toISOString().slice(0, 10),
+              warehouseId: idsIn.warehouseId,
+              lines: [
+                {
+                  productId: idsIn.productId,
+                  description: 'Register search line',
+                  quantity: 10000,
+                  unitPriceMinor: 10000,
+                  taxPercentBp: 1500,
+                },
+              ],
+            }),
+          })
+        ).json()) as { id: string };
+        return (await (
+          await fetch(`${api}/documents/issue`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ type: 'SALES_INVOICE', sourceId: invoice.id }),
+          })
+        ).json()) as { documentNumber: string; verificationToken: string };
+      },
+      { api: API, bearer, ids },
+    );
+    expect(issued.documentNumber).toBeTruthy();
+
+    await page.goto('/documents');
+    await expect(page.getByTestId('document-register')).toBeVisible({ timeout: 30_000 });
+
+    // The register is server-backed: searching by the number the API returned
+    // must narrow the table to exactly that row.
+    await page.getByTestId('register-search').fill(issued.documentNumber);
+    const row = page.getByTestId(`register-row-${issued.documentNumber}`);
+    await expect(row).toBeVisible({ timeout: 30_000 });
+    await expect(row).toContainText('Tax invoice');
+    await expect(row).toContainText('Issued');
+    await expectNoServerError(page);
+
+    // The type filter keeps the row; a filter that excludes the type drops it.
+    await page.getByTestId('register-type').selectOption('SALES_INVOICE');
+    await expect(row).toBeVisible();
+    await page.getByTestId('register-type').selectOption('QUOTATION');
+    await expect(row).toHaveCount(0);
+    await page.getByTestId('register-type').selectOption('');
+
+    // Opening the row fetches the stored PDF from the documents endpoint and
+    // shows it in an in-page frame over a blob URL. A popup would be blank:
+    // the bytes need the staff token, so they are fetched asynchronously and
+    // `window.open` is no longer tied to the click by then.
+    await page.getByTestId(`register-open-${issued.documentNumber}`).click();
+    const frame = page.getByTestId('register-frame');
+    await expect(frame).toBeVisible({ timeout: 15_000 });
+    await expect(frame).toHaveAttribute('src', /^blob:/, { timeout: 15_000 });
+    await expect(page.getByTestId('register-download')).toBeEnabled();
+    await expect(page.getByTestId('register-print')).toBeEnabled();
+    await page.getByTestId('register-detail').waitFor();
+    await page.getByTestId('register-preview-close').click();
+    await expect(frame).toHaveCount(0);
+
+    // The verification link the register exposes resolves anonymously.
+    const verified = await page.evaluate(
+      async ({ api, token }) => {
+        const res = await fetch(`${api}/documents/verify/${token}`);
+        return { status: res.status, body: (await res.json()) as { document?: { status?: string } } };
+      },
+      { api: API, token: issued.verificationToken },
+    );
+    expect(verified.status).toBe(200);
     expect(verified.body.document?.status).toBe('VALID');
   });
 });

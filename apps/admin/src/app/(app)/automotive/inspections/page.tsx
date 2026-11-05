@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -185,7 +185,33 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   const [vehicleId, setVehicleId] = useState('');
   const [areas, setAreas] = useState<InspectionSectionKey[]>([]);
   const customers = useAsync(() => api.salesCustomers(), []);
-  const vehicles = useAsync(() => api.vehicles({ customerId: customerId || undefined }), [customerId]);
+
+  // The vehicle options are stored together with the customer they were loaded
+  // for, and only used while that customer is still selected. Storing a bare
+  // list would leave the previous customer's vehicles selectable for one render
+  // after the customer changes — long enough to pick another customer's car and
+  // have the server reject the job.
+  const [vehicleSource, setVehicleSource] = useState<{ customerId: string; items: VehicleDto[] } | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!customerId) return;
+    let active = true;
+    api
+      .vehicles({ customerId })
+      .then((res) => {
+        if (active) setVehicleSource({ customerId, items: res.items ?? [] });
+      })
+      .catch(() => {
+        if (active) setVehicleSource({ customerId, items: [] });
+      });
+    return () => {
+      active = false;
+    };
+  }, [customerId]);
+
+  const vehiclesLoading = Boolean(customerId) && vehicleSource?.customerId !== customerId;
+  const vehicleOptions = vehicleSource?.customerId === customerId ? vehicleSource.items : [];
 
   const toggleArea = (key: InspectionSectionKey) =>
     setAreas((prev) => (prev.includes(key) ? prev.filter((a) => a !== key) : [...prev, key]));
@@ -248,11 +274,11 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
             className="oryx-select"
             value={vehicleId}
             onChange={(e) => setVehicleId(e.target.value)}
-            disabled={!customerId}
+            disabled={!customerId || vehiclesLoading}
             data-testid="job-vehicle"
           >
             <option value="">{t('common.select')}</option>
-            {(vehicles.data?.items ?? []).map((v: VehicleDto) => (
+            {vehicleOptions.map((v: VehicleDto) => (
               <option key={v.id} value={v.id}>
                 {v.make} {v.model} · {v.modelYear} · {v.vin}
               </option>

@@ -24,6 +24,7 @@ import { SITE_PHOTOS, sitePhotoForCategory } from './site-media';
 import type {
   Address,
   BookingSlot,
+  CatalogProduct,
   CustomerProfile,
   NotificationItem,
   NotificationPreference,
@@ -320,6 +321,178 @@ export const PREVIEW_HERO_PHOTO = SITE_PHOTOS.autoService.src;
 
 /** A secondary photograph for the partner panel. */
 export const PREVIEW_PARTNER_PHOTO = SITE_PHOTOS.mechanicEngine.src;
+
+// --------------------------------------------------------------- products
+
+/**
+ * The catalogue products the seed publishes, as the public projection.
+ *
+ * The static export cannot reach `GET /customer/catalog/products`, so the
+ * product list and the product detail page would both be empty and the export
+ * would have no dynamic path to emit. These rows mirror the seeded
+ * `DEMO_PRODUCTS` — the same SKUs, names and prices — so the preview shows the
+ * catalogue a seeded deployment returns. Availability is a boolean, exactly as
+ * the API projects it: a public page never exposes a stock quantity.
+ */
+const PREVIEW_PRODUCT_ROWS: Array<{
+  id: string;
+  storeId: string;
+  sku: string;
+  nameEn: string;
+  nameAr: string;
+  unit: string;
+  priceMinor: number;
+  available: boolean;
+  photoKey: keyof typeof SITE_PHOTOS;
+}> = [
+  {
+    id: 'oil-5w30',
+    storeId: 'oryx-auto',
+    sku: 'OIL-5W30',
+    nameEn: 'Engine oil 5W-30 (4L)',
+    nameAr: 'زيت محرك 5W-30 (4 لتر)',
+    unit: 'bottle',
+    priceMinor: 12500,
+    available: true,
+    photoKey: 'mechanicEngine',
+  },
+  {
+    id: 'filter-air',
+    storeId: 'oryx-auto',
+    sku: 'FILTER-AIR',
+    nameEn: 'Air filter',
+    nameAr: 'فلتر هواء',
+    unit: 'piece',
+    priceMinor: 6500,
+    available: true,
+    photoKey: 'partsStore',
+  },
+  {
+    id: 'brake-pad-f',
+    storeId: 'oryx-auto',
+    sku: 'BRAKE-PAD-F',
+    nameEn: 'Front brake pad set',
+    nameAr: 'طقم فحمات فرامل أمامية',
+    unit: 'set',
+    priceMinor: 28000,
+    available: true,
+    photoKey: 'partsStore',
+  },
+  {
+    id: 'svc-inspect',
+    storeId: 'oryx-auto',
+    sku: 'SVC-INSPECT',
+    nameEn: 'Vehicle inspection service',
+    nameAr: 'خدمة فحص مركبة',
+    unit: 'service',
+    priceMinor: 35000,
+    available: true,
+    photoKey: 'inspectionBay',
+  },
+];
+
+const PREVIEW_STORE = {
+  id: 'oryx-auto',
+  code: 'ORYX-AUTO',
+  nameEn: 'ORYX Auto Services',
+  nameAr: 'أوريكس لخدمات السيارات',
+};
+
+function previewProduct(row: (typeof PREVIEW_PRODUCT_ROWS)[number], locale: string): CatalogProduct {
+  const name = locale === 'ar' ? row.nameAr : row.nameEn;
+  return {
+    id: row.id,
+    storeId: row.storeId,
+    sku: row.sku,
+    name,
+    nameEn: row.nameEn,
+    nameAr: row.nameAr,
+    type: 'PRODUCT',
+    unit: row.unit,
+    priceMinor: row.priceMinor,
+    taxRateBp: 1000,
+    available: row.available,
+    imageUrl: SITE_PHOTOS[row.photoKey].src,
+    store: {
+      id: PREVIEW_STORE.id,
+      code: PREVIEW_STORE.code,
+      name: locale === 'ar' ? PREVIEW_STORE.nameAr : PREVIEW_STORE.nameEn,
+    },
+  };
+}
+
+/** The published catalogue, filtered the same way the API filters it. */
+export function previewProducts(params: { locale: string; query?: string; sort?: string }): {
+  items: CatalogProduct[];
+  total: number;
+} {
+  const needle = params.query?.trim().toLowerCase() ?? '';
+  let rows = PREVIEW_PRODUCT_ROWS.filter(
+    (row) =>
+      !needle ||
+      row.sku.toLowerCase().includes(needle) ||
+      row.nameEn.toLowerCase().includes(needle) ||
+      row.nameAr.includes(needle),
+  );
+  if (params.sort === 'price_asc') rows = [...rows].sort((a, b) => a.priceMinor - b.priceMinor);
+  if (params.sort === 'price_desc') rows = [...rows].sort((a, b) => b.priceMinor - a.priceMinor);
+  if (params.sort === 'name') {
+    rows = [...rows].sort((a, b) => a.nameEn.localeCompare(b.nameEn));
+  }
+  const items = rows.map((row) => previewProduct(row, params.locale));
+  return { items, total: items.length };
+}
+
+/** One product with its gallery and related items, mirroring the API shape. */
+export function previewProductDetail(
+  id: string,
+  locale: string,
+): (CatalogProduct & { images: Array<{ url: string | null }>; related: CatalogProduct[] }) | null {
+  const row = PREVIEW_PRODUCT_ROWS.find((p) => p.id === id);
+  if (!row) return null;
+  const base = previewProduct(row, locale);
+  return {
+    ...base,
+    images: [{ url: SITE_PHOTOS[row.photoKey].src }],
+    related: PREVIEW_PRODUCT_ROWS.filter((p) => p.id !== id).map((p) => previewProduct(p, locale)),
+  };
+}
+
+/** The ids the static export must emit a product page for. */
+export function previewProductIds(): string[] {
+  return PREVIEW_PRODUCT_ROWS.map((row) => row.id);
+}
+
+/** The stores that have published products, mirroring the API projection. */
+export function previewStores(locale: string): {
+  items: Array<{
+    id: string;
+    code: string;
+    name: string;
+    nameEn: string;
+    nameAr: string;
+    countryCode: string;
+    providerId: string | null;
+    categoryKey: string | null;
+    productCount: number;
+  }>;
+  total: number;
+} {
+  const items = [
+    {
+      id: PREVIEW_STORE.id,
+      code: PREVIEW_STORE.code,
+      name: locale === 'ar' ? PREVIEW_STORE.nameAr : PREVIEW_STORE.nameEn,
+      nameEn: PREVIEW_STORE.nameEn,
+      nameAr: PREVIEW_STORE.nameAr,
+      countryCode: 'BH',
+      providerId: null,
+      categoryKey: null,
+      productCount: PREVIEW_PRODUCT_ROWS.length,
+    },
+  ];
+  return { items, total: items.length };
+}
 
 /** The gallery strip on the services page. */
 export const PREVIEW_GALLERY = [

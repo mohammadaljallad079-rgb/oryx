@@ -8,6 +8,7 @@ import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
 import { Badge, Button, Card, EmptyState, ErrorBanner, Field, SectionHeader, Skeleton } from '@/components/ui';
 import { BrandingPanel } from '@/components/branding-panel';
+import { CompanySettingsPanel } from '@/components/company-settings-panel';
 
 export default function SettingsPage() {
   const { t, locale, theme, setLocale, setTheme } = useUi();
@@ -152,6 +153,12 @@ export default function SettingsPage() {
           <BrandingPanel companyId={companyId} />
         </Card>
       ) : null}
+
+      <Card className="p-4" data-testid="settings-company">
+        <p className="oryx-panel-title m-0 mb-1">{t('settings.company')}</p>
+        <p className="oryx-muted m-0 mb-4 text-[12px]">{t('settings.companyHint')}</p>
+        <CompanySettingsPanel />
+      </Card>
 
       {companyId ? (
         <Card className="p-4" data-testid="settings-entitlements">

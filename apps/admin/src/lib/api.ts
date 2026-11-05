@@ -1071,6 +1071,21 @@ export const api = {
     request<OfficialDocumentDto[]>(
       `/documents?sourceType=${encodeURIComponent(sourceType)}&sourceId=${encodeURIComponent(sourceId)}`,
     ),
+  /**
+   * The tenant-wide document register.
+   *
+   * Distinct from `documentsForSource`: that lists the documents of one record,
+   * this lists every document the company has issued with server-side search,
+   * type and status filters and pagination. The API scopes the result to the
+   * caller's company, so no company id is sent.
+   */
+  documentsRegister: (params: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    type?: string;
+    status?: string;
+  } = {}) => request<Paginated<OfficialDocumentDto>>(`/documents/register?${toQuery(params)}`),
   officialDocument: (id: string) => request<OfficialDocumentDetailDto>(`/documents/${id}`),
   revokeOfficialDocument: (id: string, reason: string) =>
     request<OfficialDocumentDto>(`/documents/${id}/revoke`, { method: 'POST', body: { reason } }),

@@ -57,6 +57,16 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await expect(page.getByTestId('job-type-COMPUTER_UNIT')).toBeVisible();
 
     await page.getByTestId('job-customer').selectOption({ index: 1 });
+
+    // The vehicle list must be scoped to the chosen customer and must never be
+    // offered from a stale, unfiltered fetch. The second seeded customer owns
+    // the Nissan, so its VIN appearing here would mean the previous customer's
+    // vehicles leaked into the selector — the defect that let an operator pick
+    // another customer's car and have the server reject the job.
+    await expect(page.getByTestId('job-vehicle')).toBeEnabled();
+    const vehicleOptions = await page.getByTestId('job-vehicle').locator('option').allInnerTexts();
+    expect(vehicleOptions.some((text) => text.includes('JN1TBNT32Z0123456'))).toBe(false);
+
     await page.getByTestId('job-vehicle').selectOption({ index: 1 });
     await page.getByTestId('job-type-INTERIOR').click();
     await page.getByTestId('job-type-EXTERIOR').click();

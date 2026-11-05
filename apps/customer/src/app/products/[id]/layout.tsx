@@ -1,14 +1,19 @@
+import { IS_STATIC_PREVIEW, previewProductIds } from '@/lib/preview-data';
+
 /**
- * Satisfies `output: export` for the dynamic product segment.
+ * Enumerates the product pages the static export should generate.
  *
- * A static export cannot render a dynamic segment it has no paths for, and the
- * page itself is a client component, so it cannot declare this. The preview has
- * no product rows to enumerate — the catalogue reads from the API, which does
- * not exist on GitHub Pages — so the list is empty and no product page is
- * generated. A normal server build keeps rendering this route on demand.
+ * `output: export` cannot render a dynamic segment it has no paths for, and a
+ * client component cannot export this itself — hence a server layout in the
+ * same segment. The export must return at least one path: Next.js rejects an
+ * empty parameter list for a dynamic route under `output: export`, which is
+ * what broke the design-preview build. The preview catalogue therefore supplies
+ * the ids, and outside the preview the list is empty so a normal build keeps
+ * server-rendering this route on demand exactly as before.
  */
 export function generateStaticParams() {
-  return [];
+  if (!IS_STATIC_PREVIEW) return [];
+  return previewProductIds().map((id) => ({ id }));
 }
 
 export default function ProductDetailLayout({ children }: { children: React.ReactNode }) {

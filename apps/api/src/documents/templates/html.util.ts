@@ -1,4 +1,4 @@
-import { currencySymbol, fromMinor, toMajor } from '@oryx/shared';
+import { currencySymbol, fromMinor, fromQuantity, toMajor } from '@oryx/shared';
 
 /**
  * Escapes text for interpolation into generated HTML.
@@ -45,9 +45,17 @@ export function money(minor: number | null | undefined, currency = 'BHD'): strin
   return `${body} ${currencySymbol(currency, 'ar')}`;
 }
 
-/** A plain quantity, without a currency symbol. */
+/**
+ * A plain quantity, without a currency symbol.
+ *
+ * `line.quantity` is stored scaled by `QUANTITY_SCALE` (10^4), the same
+ * convention `lineAmountMinor` consumes, so it must be divided back down before
+ * it is printed. Rendering the raw integer would print "10,000" for one unit,
+ * which misstates the invoice. Trailing zeros are trimmed so a whole count
+ * reads "2" rather than "2.0000".
+ */
 export function quantity(value: number): string {
-  return value.toLocaleString('en-US');
+  return fromQuantity(value).replace(/\.?0+$/, '') || '0';
 }
 
 /** A short date in both the Gregorian and the Bahraini convention. */
