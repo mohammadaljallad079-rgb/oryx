@@ -1819,6 +1819,15 @@ uses two existing routes as they were designed:
 - **Mobile suite** — 10 files, **206 passing**, including the React-version
   regression test (`react` and `react-dom` both `19.1.0`).
 
+The sandbox was recycled between sessions, which removed the PostgreSQL server
+package and the Playwright Chromium build while leaving the seeded cluster and
+the workspace intact. Both were restored before the run
+(`.run/start-stack.sh`'s install path for PostgreSQL; `npx playwright install
+chromium` for the browser). The documents suite failed 17 tests until Chromium
+was reinstalled — a missing browser, not a code regression — and passed 29/29
+afterwards. The suite was then re-run twice in a row to confirm the teardown fix
+is genuinely idempotent (42/42, then 42/42).
+
 ### 22.5 Security verification
 
 - The discount amount is computed server-side from a basis-point rate; the DTO
