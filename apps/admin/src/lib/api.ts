@@ -87,6 +87,7 @@ import type {
   InspectionAttachmentDto,
   InspectionAreaKey,
   VehicleDto,
+  VehicleDocumentDto,
   InspectionServiceDto,
   InspectionBookingDto,
   JobCardDto,
@@ -1042,6 +1043,12 @@ export const api = {
   updateVehicle: (id: string, body: Record<string, unknown>) => request<VehicleDto>(`/automotive/vehicles/${id}`, { method: 'PATCH', body }),
   recordMileage: (id: string, mileage: number) =>
     request<Record<string, unknown>>(`/automotive/vehicles/${id}/mileage`, { method: 'POST', body: { mileage } }),
+  vehicleDocuments: (id: string) =>
+    request<Paginated<VehicleDocumentDto>>(`/automotive/vehicles/${id}/documents`),
+  addVehicleDocument: (id: string, form: FormData) =>
+    request<VehicleDocumentDto>(`/automotive/vehicles/${id}/documents`, { method: 'POST', body: form, raw: true }),
+  removeVehicleDocument: (id: string, documentId: string) =>
+    request<{ removed: boolean }>(`/automotive/vehicles/${id}/documents/${documentId}`, { method: 'DELETE' }),
   inspectionServices: (params: { companyId?: string } = {}) =>
     request<Paginated<InspectionServiceDto>>(`/automotive/inspection-services?${toQuery(params)}`),
   createInspectionService: (body: Record<string, unknown>) =>

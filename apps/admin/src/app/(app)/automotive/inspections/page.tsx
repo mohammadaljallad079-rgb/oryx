@@ -22,8 +22,8 @@ import {
   StatusBadge,
   TableShell,
 } from '@/components/ui';
-import type { InspectionBookingDto, InspectionServiceDto, VehicleDto, CustomerDto } from '@oryx/shared';
-import { INSPECTION_SECTION_SPECS, type InspectionSectionKey } from '@oryx/shared';
+import type { InspectionBookingDto, InspectionServiceDto, VehicleDto, VehicleDocumentDto, CustomerDto } from '@oryx/shared';
+import { INSPECTION_SECTION_SPECS, VEHICLE_DOCUMENT_CATEGORIES, type InspectionSectionKey } from '@oryx/shared';
 import { useRouter } from 'next/navigation';
 
 type Tab = 'jobs' | 'vehicles' | 'bookings' | 'services';
@@ -314,6 +314,7 @@ function VehiclesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [documentsFor, setDocumentsFor] = useState<VehicleDto | null>(null);
   const list = useAsync(() => api.vehicles({ search: search || undefined }), [search]);
   const customers = useAsync(() => api.salesCustomers(), []);
 
@@ -346,6 +347,7 @@ function VehiclesTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.sales.customer')}</th>
               <th>{t('erp.automotive.mileage')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -357,13 +359,193 @@ function VehiclesTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{v.customerNameEn ?? '—'}</td>
                 <td className="tabular-nums text-[12.5px]">{v.mileage.toLocaleString()}</td>
                 <td><StatusBadge status={v.status} label={v.status} /></td>
+                <td>
+                  <Button size="sm" onClick={() => setDocumentsFor(v)} data-testid={`vehicle-documents-${v.vin}`}>
+                    <Icon name="folder" size={15} />
+                    {t('erp.automotive.documents')}
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
       <CreateVehicleModal open={open} customers={customers.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <VehicleDocumentsModal vehicle={documentsFor} canManage={canManage} onClose={() => setDocumentsFor(null)} />
     </Card>
+  );
+}
+
+/**
+ * Vehicle papers — registration card, insurance, permits.
+ *
+ * A scan is optional. When one is supplied it is sent as multipart, re-encoded
+ * by the shared media store and referenced by asset id, so a document never
+ * carries a client-chosen path.
+ */
+function VehicleDocumentsModal({
+  vehicle,
+  canManage,
+  onClose,
+}: {
+  vehicle: VehicleDto | null;
+  canManage: boolean;
+  onClose: () => void;
+}) {
+  const { t } = useUi();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [category, setCategory] = useState('registration');
+  const [number, setNumber] = useState('');
+  const [expiresAt, setExpiresAt] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const vehicleId = vehicle?.id ?? null;
+  const docs = useAsync(
+    () => (vehicleId ? api.vehicleDocuments(vehicleId) : Promise.resolve(null)),
+    [vehicleId],
+  );
+
+  useEffect(() => {
+    if (!vehicle) return;
+    setCategory('registration');
+    setNumber('');
+    setExpiresAt('');
+    setFile(null);
+    setError(null);
+  }, [vehicle]);
+
+  const submit = async () => {
+    if (!vehicleId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.append('category', category);
+      if (number) form.append('number', number);
+      if (expiresAt) form.append('expiresAt', expiresAt);
+      if (file) form.append('file', file);
+      await api.addVehicleDocument(vehicleId, form);
+      setNumber('');
+      setExpiresAt('');
+      setFile(null);
+      await docs.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (documentId: string) => {
+    if (!vehicleId) return;
+    if (!window.confirm(t('erp.automotive.confirmRemoveDocument'))) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.removeVehicleDocument(vehicleId, documentId);
+      await docs.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const categories = VEHICLE_DOCUMENT_CATEGORIES;
+  // The stored category is a stable key, not a localized label, so a document
+  // recorded in Arabic still reads correctly for an English operator. Known
+  // keys are translated; anything else (a legacy or API-supplied value) is
+  // shown verbatim rather than hidden.
+  const categoryLabel = (value: string) =>
+    (categories as readonly string[]).includes(value) ? t(`erp.automotive.docCategory.${value}`) : value;
+
+  return (
+    <Modal
+      open={Boolean(vehicle)}
+      title={`${t('erp.automotive.documents')}${vehicle ? ` — ${vehicle.make} ${vehicle.model} (${vehicle.vin})` : ''}`}
+      onClose={onClose}
+      footer={<Button onClick={onClose}>{t('common.close')}</Button>}
+    >
+      <div className="flex flex-col gap-4" data-testid="vehicle-documents">
+        {error ? <ErrorBanner message={error} /> : null}
+
+        {canManage ? (
+          <div className="grid gap-3 rounded-xl border border-[var(--border)] p-3 sm:grid-cols-2">
+            <Field label={t('erp.automotive.documentCategory')} required>
+              <select className="oryx-select" value={category} onChange={(e) => setCategory(e.target.value)} data-testid="document-category">
+                {categories.map((c) => (
+                  <option key={c} value={c}>{t(`erp.automotive.docCategory.${c}`)}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label={t('erp.automotive.documentNumber')}>
+              <input className="oryx-input" value={number} onChange={(e) => setNumber(e.target.value)} maxLength={80} data-testid="document-number" />
+            </Field>
+            <Field label={t('erp.automotive.expiresAt')}>
+              <input type="date" className="oryx-input" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} data-testid="document-expires" />
+            </Field>
+            <Field label={t('erp.automotive.documentScan')} hint={t('erp.automotive.documentScanHint')}>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/avif"
+                className="oryx-input"
+                disabled={busy}
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                data-testid="document-file"
+              />
+            </Field>
+            <div className="sm:col-span-2">
+              <Button variant="primary" size="sm" disabled={busy} onClick={submit} data-testid="save-document">
+                <Icon name="plus" size={15} />
+                {busy ? t('common.loading') : t('erp.automotive.addDocument')}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {docs.loading ? (
+          <Skeleton height={80} />
+        ) : (docs.data?.items.length ?? 0) === 0 ? (
+          <EmptyState title={t('common.empty')} hint={t('erp.automotive.emptyDocuments')} />
+        ) : (
+          <TableShell>
+            <thead>
+              <tr>
+                <th>{t('erp.automotive.documentCategory')}</th>
+                <th>{t('erp.automotive.documentNumber')}</th>
+                <th>{t('erp.automotive.expiresAt')}</th>
+                <th>{t('erp.automotive.documentScan')}</th>
+                {canManage ? <th>{t('common.actions')}</th> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {docs.data!.items.map((d: VehicleDocumentDto) => (
+                <tr key={d.id} data-testid={`document-row-${d.id}`}>
+                  <td className="text-[12.5px]">{categoryLabel(d.category)}</td>
+                  <td className="font-mono text-[12px]">{d.number ?? '—'}</td>
+                  <td className="text-[12.5px]">{d.expiresAt ? d.expiresAt.slice(0, 10) : '—'}</td>
+                  <td className="text-[12.5px]">
+                    {d.fileUrl ? (
+                      <Button size="sm" variant="ghost" onClick={() => window.open(d.fileUrl!, '_blank', 'noopener')} data-testid={`view-document-${d.id}`}>
+                        <Icon name="eye" size={15} />
+                        {t('common.view')}
+                      </Button>
+                    ) : '—'}
+                  </td>
+                  {canManage ? (
+                    <td>
+                      <Button size="sm" variant="danger" disabled={busy} onClick={() => remove(d.id)} data-testid={`remove-document-${d.id}`}>
+                        {t('common.delete')}
+                      </Button>
+                    </td>
+                  ) : null}
+                </tr>
+              ))}
+            </tbody>
+          </TableShell>
+        )}
+      </div>
+    </Modal>
   );
 }
 

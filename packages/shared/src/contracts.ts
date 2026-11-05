@@ -1319,6 +1319,42 @@ export interface VehicleDto {
   registrationExpiresAt: string | null;
 }
 
+/**
+ * The vehicle-document category catalogue.
+ *
+ * `category` is a persisted, locale-independent key. The admin screen renders
+ * it through the i18n dictionary, so a document recorded in Arabic reads
+ * correctly for an English operator and the API never stores a translated
+ * label. One list feeds the admin picker and the API's validation, so a new
+ * category cannot be added to a form that the API would then reject.
+ */
+export const VEHICLE_DOCUMENT_CATEGORIES = [
+  'registration',
+  'insurance',
+  'permit',
+  'ownership',
+  'other',
+] as const;
+
+export type VehicleDocumentCategory = (typeof VEHICLE_DOCUMENT_CATEGORIES)[number];
+
+/**
+ * A registration card, insurance policy, permit or similar paper held against a
+ * vehicle. `fileRef` is the `CmsMediaAsset` id of the scanned copy; `fileUrl` is
+ * the servable URL derived from it. `number` and `expiresAt` are the facts an
+ * operator reads off the card.
+ */
+export interface VehicleDocumentDto {
+  id: string;
+  vehicleId: string;
+  category: string;
+  number: string | null;
+  expiresAt: string | null;
+  fileRef: string | null;
+  fileUrl: string | null;
+  createdAt: string;
+}
+
 export interface InspectionServiceDto {
   id: string;
   code: string;

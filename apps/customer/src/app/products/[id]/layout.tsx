@@ -8,13 +8,12 @@ import { IS_STATIC_PREVIEW, previewProductIds } from '@/lib/preview-data';
  * same segment. The export must return at least one path: Next.js rejects an
  * empty parameter list for a dynamic route under `output: export`, which is
  * what broke the design-preview build. The preview catalogue therefore supplies
- * the ids, and outside the preview the list is empty so a normal build keeps
- * server-rendering this route on demand exactly as before.
+ * the ids. Outside the preview the export is `undefined`, so the route keeps
+ * server-rendering on demand.
  */
-export function generateStaticParams() {
-  if (!IS_STATIC_PREVIEW) return [];
-  return previewProductIds().map((id) => ({ id }));
-}
+export const generateStaticParams = IS_STATIC_PREVIEW
+  ? () => previewProductIds().map((id) => ({ id }))
+  : undefined;
 
 export default function ProductDetailLayout({ children }: { children: React.ReactNode }) {
   return children;

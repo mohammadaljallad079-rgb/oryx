@@ -1,4 +1,5 @@
 import { Type } from 'class-transformer';
+import { VEHICLE_DOCUMENT_CATEGORIES } from '@oryx/shared';
 import {
   ArrayMinSize,
   IsArray,
@@ -82,10 +83,10 @@ export class RecordMileageDto {
 }
 
 export class VehicleDocumentDto {
-  @IsString() @MinLength(2) @MaxLength(80) category!: string;
+  @IsIn(VEHICLE_DOCUMENT_CATEGORIES as unknown as string[])
+  category!: string;
   @IsOptional() @IsString() @MaxLength(80) number?: string;
   @IsOptional() @IsISO8601() expiresAt?: string;
-  @IsOptional() @IsString() @MaxLength(400) fileRef?: string;
 }
 
 // --------------------------------------------------------------- inspections
