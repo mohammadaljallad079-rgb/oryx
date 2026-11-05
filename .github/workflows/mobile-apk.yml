@@ -9,6 +9,12 @@ name: Mobile APK
 # operator dispatches it, reads the commit and the SHA-256 out of the run
 # summary, and downloads the artifact.
 #
+# The app is a live client: it signs in against the API and falls back to bundled
+# demo data only for browsing. The API base URL is therefore baked in at build
+# time from `api_base_url`, and the bundle check asserts the configured host is
+# present rather than asserting the app never reaches a backend — an offline
+# bundle would leave the shipped app unable to reach any API.
+#
 # The build is **debug-signed** by the Expo template's `release` build type. It
 # installs with "unknown sources" enabled and is not a store artefact. No signing
 # material is committed and no secret is required, so the workflow is safe for a
@@ -23,6 +29,11 @@ on:
         description: 'Commit, branch or tag to build (defaults to the dispatched ref)'
         required: false
         type: string
+      api_base_url:
+        description: 'API base URL the APK talks to (defaults to the production API)'
+        required: false
+        type: string
+        default: 'https://api.oryxbhr.com/api'
 
   # GitHub only offers a `workflow_dispatch` workflow in the Actions UI once it
   # exists on the default branch, so a dispatch from this feature branch would
@@ -147,6 +158,10 @@ jobs:
       - name: Build the release APK
         working-directory: apps/mobile/android
         timeout-minutes: 45
+        env:
+          # Expo inlines EXPO_PUBLIC_* at bundle time, so this is what the
+          # shipped APK talks to. It defaults to the production API host.
+          EXPO_PUBLIC_API_BASE_URL: ${{ inputs.api_base_url || 'https://api.oryxbhr.com/api' }}
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Locate the APK
@@ -175,24 +190,28 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "$SHA  oryx-marketplace.apk" > "${{ github.workspace }}/oryx-marketplace.apk.sha256"
 
-      # A self-contained bundle check: the demo must not reach a host. Any of
-      # these literals in the bundled JS would mean the app expects a backend.
-      - name: Assert the bundle is self-contained
+      # A live-client check: the bundle must carry the API host it was built to
+      # talk to. The old assertion here required the bundle to contain no backend
+      # host at all, which was true of the offline demo but is wrong for the
+      # shipped client — it would fail every build whose bundle names the API.
+      - name: Assert the bundle carries the configured API host
         working-directory: apps/mobile
+        env:
+          EXPECTED_API_BASE_URL: ${{ inputs.api_base_url || 'https://api.oryxbhr.com/api' }}
         run: |
           set -e
           BUNDLE="$(find android/app/build -name 'index.android.bundle' | head -1)"
           if [ -z "$BUNDLE" ]; then
-            echo "::warning::no index.android.bundle found; skipping the self-contained check"
+            echo "::warning::no index.android.bundle found; skipping the API-host check"
             exit 0
           fi
-          for needle in 'localhost:3001' '10.0.2.2' 'http://127.0.0.1:3001'; do
-            if grep -qF "$needle" "$BUNDLE"; then
-              echo "::error::the bundle references $needle; the demo is not offline"
-              exit 1
-            fi
-          done
-          echo "bundle is self-contained"
+          # The host without its scheme is what survives Metro's string inlining.
+          HOST="$(printf '%s' "$EXPECTED_API_BASE_URL" | sed -E 's#^https?://##; s#/.*$##')"
+          if ! grep -qF "$HOST" "$BUNDLE"; then
+            echo "::error::the bundle does not reference $HOST; the app was not built against the configured API"
+            exit 1
+          fi
+          echo "bundle carries the API host $HOST"
 
       - name: Write the run summary
         run: |
