@@ -40,16 +40,40 @@ export interface InspectionReportInput {
   verification: DocumentVerification | null;
 }
 
-/** A pass/fail/NA pill. The symbol is text, so it survives a mono photocopy. */
-function resultPill(result: string): string {
-  const map: Record<string, { cls: string; label: string }> = {
-    PASS: { cls: 'r-pass', label: '✓' },
-    FAIL: { cls: 'r-fail', label: '✗' },
-    NA: { cls: 'r-na', label: '—' },
-    UNSET: { cls: 'r-unset', label: '·' },
+/**
+ * A pass/fail mark, drawn as a vector rather than a text glyph.
+ *
+ * The bundled faces carry no U+2713 / U+2715 / U+2717, so Chromium synthesises a
+ * Type3 bitmap font from whatever host face has the glyph. That breaks the PDF
+ * text layer — the marks are not selectable or searchable — and it makes the
+ * output depend on the host: a machine with the face renders one PDF, a CI
+ * runner without it another. A vector mark has no font dependency.
+ */
+type MarkKind = 'check' | 'cross' | 'x';
+function markGlyph(kind: MarkKind, sizePt: number): string {
+  const stroke =
+    `stroke="currentColor" stroke-width="1.7" stroke-linecap="round" ` +
+    `stroke-linejoin="round" fill="none"`;
+  const body: Record<MarkKind, string> = {
+    check: `<path d="M3 8.2 6.3 11.4 12.2 3.2" ${stroke}/>`,
+    cross: `<path d="M3.2 3.2 11.8 11.8 M11.8 3.2 3.2 11.8" ${stroke}/>`,
+    x: `<path d="M4 4 11 11 M11 4 4 11" ${stroke}/>`,
   };
-  const entry = map[result] ?? map.UNSET;
-  return `<span class="pill ${entry.cls}">${entry.label}</span>`;
+  return (
+    `<svg class="mark mark-${kind}" width="${sizePt}" height="${sizePt}" ` +
+    `viewBox="0 0 15 15" aria-hidden="true">${body[kind]}</svg>`
+  );
+}
+
+/** A pass/fail/NA pill. */
+function resultPill(result: string): string {
+  const map: Record<string, string> = {
+    PASS: `<span class="pill r-pass">${markGlyph('check', 9)}</span>`,
+    FAIL: `<span class="pill r-fail">${markGlyph('cross', 9)}</span>`,
+    NA: '<span class="pill r-na">—</span>',
+    UNSET: '<span class="pill r-unset">·</span>',
+  };
+  return map[result] ?? map.UNSET;
 }
 
 /** The identification block on page 1. */
@@ -172,14 +196,14 @@ function itemsSection(section: InspectionReportSection): string {
 function paintDiagram(section: InspectionReportSection): string {
   const legend = PAINT_CONDITIONS.map(
     (c) =>
-      `<span class="legend-item"><span class="legend-dot ld-${c.color}">${c.cross ? '✕' : ''}</span>${esc(c.labelAr)} / ${esc(c.labelEn)}</span>`,
+      `<span class="legend-item"><span class="legend-dot ld-${c.color}">${c.cross ? markGlyph('x', 7) : ''}</span>${esc(c.labelAr)} / ${esc(c.labelEn)}</span>`,
   ).join('');
 
   const markers = section.markers
     .map((m) => {
       const spec = PAINT_CONDITIONS.find((c) => c.key === m.condition);
       const color = spec?.color ?? 'green';
-      return `<span class="marker m-${color}" style="left:${(m.x * 100).toFixed(2)}%;top:${(m.y * 100).toFixed(2)}%" title="${esc(m.note ?? '')}">${spec?.cross ? '✕' : ''}</span>`;
+      return `<span class="marker m-${color}" style="left:${(m.x * 100).toFixed(2)}%;top:${(m.y * 100).toFixed(2)}%" title="${esc(m.note ?? '')}">${spec?.cross ? markGlyph('x', 7) : ''}</span>`;
     })
     .join('');
 
@@ -238,7 +262,7 @@ function chassisDiagram(section: InspectionReportSection): string {
     const row = byKey.get(region.key);
     const state = row?.condition ?? 'UNSET';
     const cls = state === 'OK' ? 'ch-ok' : state === 'DAMAGE' ? 'ch-bad' : 'ch-unset';
-    const symbol = state === 'OK' ? '✓' : state === 'DAMAGE' ? '✗' : '·';
+    const symbol = state === 'OK' ? markGlyph('check', 11) : state === 'DAMAGE' ? markGlyph('cross', 11) : '·';
     return `
     <div class="ch-region ${cls}">
       <div class="ch-region-head">
@@ -445,6 +469,8 @@ export const INSPECTION_REPORT_CSS = `
   .item-ar{ display:block; font-size:7.6pt; line-height:1.06; color:var(--ink); }
   .item-en{ display:block; font-size:6.2pt; line-height:1.06; color:var(--muted); }
   .pill{ display:inline-block; min-width:16px; padding:1px 5px; border-radius:3px; font-weight:700; font-size:9pt; }
+  /* Vector marks (check / cross / x) align to the text baseline without a font. */
+  .mark{ display:inline-block; vertical-align:-2px; }
   .r-pass{ background:#dcfce7; color:var(--ok); }
   .r-fail{ background:#fee2e2; color:var(--bad); }
   .r-na{ background:#eef2f8; color:var(--muted); }
