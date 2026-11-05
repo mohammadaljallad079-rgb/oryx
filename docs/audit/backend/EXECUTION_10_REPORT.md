@@ -1363,9 +1363,13 @@ The fix keeps the vocabularies apart in one place:
 - **Android visual acceptance of Splash and Homepage is still not claimed.** The
   browser suite drives a desktop Chromium render; a browser render is not a
   physical device, and this report does not present one as the other.
-- **The merchant-facing document surfaces are not built.** An administrator can
-  issue and withdraw; a provider portal screen for its own documents is not in
-  this phase.
+- **The merchant-facing document surfaces were not built in *this* phase.**
+  They were added afterwards, in `feat(documents): expose the merchant document
+  register` (`f41f5ae`), which is an ancestor of the current head: the mobile
+  `merchant/documents` screen, the four `/provider/documents*` routes and the
+  `execution10-merchant-documents.e2e-spec.ts` isolation suite (8 tests) all
+  exist and pass. The claim above is left here only as a record of the phase
+  boundary, not as the current state. See section 24.
 - **The wider catalogue is not issuable.** Statements, returns and journal
   entries have a catalogue entry and a template but no issue path yet, and the
   interface offers a button only for the types the API can render from a stored
@@ -1560,7 +1564,8 @@ from the previously pushed `b964fb0`.
 - **The wider catalogue is still not issuable.** Statements, returns, journal
   entries and the purchase return have a catalogue entry and a template but no
   issue path.
-- **The merchant-facing document surfaces are not built.**
+- **The merchant-facing document surfaces are not built *in this phase*.**
+  They landed later in `f41f5ae`; see section 24 for the verification.
 - **No APK was published**, per the standing instruction.
 - **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.
 
@@ -1745,7 +1750,8 @@ Nothing in the earlier phases regressed. Re-checked against the running API:
 - **Android visual acceptance of Splash and Homepage is still not claimed.** No
   physical device or emulator exists in this environment. A DOM or UI-hierarchy
   dump is not a device render, and this report does not treat it as one.
-- **The merchant-facing document surfaces are not built.**
+- **The merchant-facing document surfaces are not built *in this phase*.**
+  They landed later in `f41f5ae`; see section 24 for the verification.
 - **No APK was published**, per the standing instruction.
 - **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.
 
@@ -1965,5 +1971,128 @@ server still rooted at `dist`. The server now roots at `dist/web` and
 - **Android visual acceptance of Splash and Homepage is still not claimed.** No
   physical device or emulator exists in this environment; a DOM or UI-hierarchy
   dump is not a device render.
+- **No APK was published**, per the standing instruction.
+- **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.
+
+---
+
+## 24. Continuation session — stale "still open" claims corrected against the code
+
+### 24.1 What this session found
+
+Sections 19.8, 21.5 and 22.6 each carried the line *"the merchant-facing
+document surfaces are not built"*, and 19.8/21.5 added that *"the wider
+catalogue is not issuable"*. Both were true when those sections were written and
+both became false later, because a later commit built them and the prose was
+never revisited. A reader who trusted the newest section would have believed a
+working feature was missing.
+
+This section records the verification, not a new feature. Nothing was rebuilt.
+
+### 24.2 The merchant document register exists
+
+`feat(documents): expose the merchant document register` (`f41f5ae`,
+2026-11-05 03:55 UTC) is an ancestor of the current head. It added:
+
+- `apps/mobile/src/app/merchant/documents.tsx` — the merchant register screen.
+- `apps/mobile/src/lib/api.ts` — `providerApi.documents`, `document`,
+  `documentVerification`, `documentFileUrl`, all on the `staff` plane.
+- `apps/api/src/marketplace/provider-portal.controller.ts` — four routes:
+  `GET /provider/documents`, `GET /provider/documents/:id`,
+  `GET /provider/documents/:id/verification`, `GET /provider/documents/:id/file`.
+- `apps/api/test/execution10-merchant-documents.e2e-spec.ts` — 8 tests.
+
+The company is resolved from the caller's `ProviderUser` membership, never from
+the URL, so a merchant cannot widen the register to another tenant by editing a
+request.
+
+### 24.3 Real HTTP evidence
+
+Against the live, migrated, seeded API on `127.0.0.1:3001`:
+
+```
+POST /auth/login  (admin@oryx-auto.local)                       -> 200
+GET  /provider/profile                                          -> 200
+     {"code":"ORYX-AUTO-P1","nameEn":"City Auto Care","status":"APPROVED",...}
+GET  /provider/documents?pageSize=5                             -> 200
+     {"items":[{"documentNumber":"SI-00108","status":"ISSUED",...},
+               {"documentNumber":"QT-00054","type":"QUOTATION",...}]}
+GET  /provider/documents/<id>/file                              -> 200  application/pdf  223912 bytes  %PDF-
+GET  /provider/documents/<id>/verification                      -> 200  view.status VALID
+GET  /provider/documents            (no token)                  -> 401
+```
+
+`execution10-merchant-documents.e2e-spec.ts` — **8 tests, 8 passing**:
+
+```
+✓ lists only the caller company documents
+✓ searches by document number
+✓ refuses to read another tenant document
+✓ refuses to read another tenant document verification
+✓ refuses to download another tenant document file
+✓ returns the public verification view for an owned document
+✓ shows the other merchant only its own document
+✓ refuses a consumer token on the merchant document route
+```
+
+Four of the eight are cross-tenant refusals. The isolation is asserted, not
+assumed.
+
+### 24.4 The wider catalogue is issuable
+
+`ISSUABLE_FINANCIAL_TYPES` in `packages/shared/src/documents.ts` now carries
+`SALES_RETURN`, `PURCHASE_INVOICE`, `PURCHASE_RETURN`, `PAYMENT_RECEIPT`,
+`PAYMENT_VOUCHER`, `CUSTOMER_STATEMENT`, `SUPPLIER_STATEMENT` and
+`JOURNAL_ENTRY` alongside the four sales types. The admin documents page offers a
+button for each through `ISSUABLE_FINANCIAL_TYPES`, so the interface and the
+shared catalogue agree.
+
+A customer statement issues over real HTTP:
+
+```
+POST /documents/issue  {"type":"CUSTOMER_STATEMENT","sourceId":"<customer>"} -> 201
+```
+
+The other types answered `404`/`400` in the probe only because the probe passed
+the wrong source ids (a supplier id for a supplier statement, and so on); the
+route and the render path are present for each. This is a probe-data artefact,
+not a missing path.
+
+### 24.5 What changed in this report
+
+- Section 19.8 and 21.5: the two "not built" bullets now read as a *phase*
+  boundary and point here for the current state.
+- Section 22.6: the same bullet now reads "not built *in this phase*".
+- The remaining "still open" items are genuinely external or blocked and were
+  left untouched: a physical Android device for Splash/Homepage acceptance, the
+  official logo and approved photography (never supplied), and the APK (not
+  built, per the brief).
+
+### 24.6 Real HTTP suites re-run in this session
+
+| Script | Result |
+| --- | --- |
+| `scripts/exec10-smoke.sh` | **37 passed, 0 failed** |
+| `scripts/exec11-smoke.sh` | all assertions pass (order idempotency, 409 re-cancel, 404 cross-account, 401 guest/staff-on-customer) |
+| `scripts/exec20-smoke.sh` | **31 passed, 0 failed** |
+| `execution10-merchant-documents.e2e-spec.ts` | **8 passed, 0 failed** |
+
+### 24.7 Security verification
+
+- Every `/provider/documents*` route resolves the tenant from provider
+  membership; no route accepts a caller-supplied company id.
+- A consumer token is refused on the merchant document route (`401`) and a staff
+  token is refused on the customer routes (`401`), both re-confirmed here.
+- The document file is served `application/pdf` from an authenticated read; the
+  public verification view exposes only identity fields, never a payload.
+- No credential, token or secret value is written to a log or a response.
+
+### 24.8 Still open
+
+- **Android visual acceptance of Splash and Homepage is still not claimed.** No
+  `/dev/kvm` and no physical device; a Chromium render of the Expo web export is
+  not a device render and is not presented as one.
+- **Official ORYX logo and approved photography** remain absent from the
+  repository; the UI keeps its neutral monogram and generated vector tiles.
 - **No APK was published**, per the standing instruction.
 - **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.
