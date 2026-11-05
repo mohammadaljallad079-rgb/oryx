@@ -1,6 +1,6 @@
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import type { Browser } from 'playwright';
-import { DocumentFontService, DOCUMENT_FONT_STACK } from './document-fonts.service';
+import { DocumentFontService, DOCUMENT_FONT_STACK, DOCUMENT_LATIN_STACK } from './document-fonts.service';
 
 /**
  * Renders HTML to a print-ready PDF with a real layout engine.
@@ -158,8 +158,8 @@ export const BASE_PRINT_CSS = `
     -webkit-print-color-adjust:exact;
     print-color-adjust:exact;
   }
-  .ltr{ direction:ltr; unicode-bidi:isolate; font-family:'ORYX Sans',sans-serif; }
-  .num{ font-family:'ORYX Sans',sans-serif; font-variant-numeric:tabular-nums; direction:ltr; unicode-bidi:isolate; }
+  .ltr{ direction:ltr; unicode-bidi:isolate; font-family:${DOCUMENT_LATIN_STACK}; }
+  .num{ font-family:${DOCUMENT_LATIN_STACK}; font-variant-numeric:tabular-nums; direction:ltr; unicode-bidi:isolate; }
   .doc-page{ page-break-after:always; position:relative; }
   .doc-page:last-child{ page-break-after:auto; }
   h1,h2,h3,h4{ margin:0; font-weight:700; }
