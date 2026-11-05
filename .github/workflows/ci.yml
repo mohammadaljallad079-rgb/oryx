@@ -112,7 +112,10 @@ jobs:
   # ------------------------------------------------------- unit + API suites
   test-api:
     name: Unit and API integration tests
-    runs-on: ubuntu-latest
+    # Pinned like the browser job: this job installs the Playwright Chromium the
+    # PDF renderer uses, and Playwright 1.56.1 refuses to install it on
+    # ubuntu26.04-x64, which `ubuntu-latest` now resolves to.
+    runs-on: ubuntu-24.04
     needs: quality
 
     services:
