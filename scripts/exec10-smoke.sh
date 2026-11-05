@@ -49,6 +49,40 @@ S=$(code -X POST "$B/customer/auth/refresh" -H 'Content-Type: application/json' 
 S=$(code -X POST "$B/customer/auth/logout" -H "Authorization: Bearer $TOK"); check "logout" "$S" 204
 
 echo
+echo "== mid-session rotation (the client's 401 recovery path) =="
+# A fresh session, so the checks above cannot mask a rotation failure.
+EMAIL="e10-rot-$(date +%s%N)@oryx.local"
+S=$(code -X POST "$B/customer/auth/register" -H 'Content-Type: application/json' -H 'x-oryx-client: mobile' \
+  -d "{\"email\":\"$EMAIL\",\"password\":\"$PW\",\"fullName\":\"Rot\",\"preferredLocale\":\"en\"}")
+check "register a rotating session" "$S" 201
+RTOK=$(jget "['accessToken']" < "$TMP/out")
+REFRESH=$(jget "['refreshToken']" < "$TMP/out")
+CSRF=$(jget "['csrfToken']" < "$TMP/out")
+S=$(code -X POST "$B/customer/auth/refresh" -H 'Content-Type: application/json' -H 'x-oryx-client: mobile' \
+  -H "x-oryx-csrf: $CSRF" -d "{\"refreshToken\":\"$REFRESH\"}")
+check "rotate the refresh token" "$S" 200
+NEWTOK=$(jget "['accessToken']" < "$TMP/out")
+NEWREFRESH=$(jget "['refreshToken']" < "$TMP/out")
+NEWCSRF=$(jget "['csrfToken']" < "$TMP/out")
+# The rotated access token is the one the client replays the failed request with.
+S=$(code "$B/customer/bookings" -H "Authorization: Bearer $NEWTOK")
+check "the rotated access token is accepted" "$S" 200
+# A refresh token is single-use: replaying the old one is refused, which is what
+# stops a stolen token outliving the rotation.
+S=$(code -X POST "$B/customer/auth/refresh" -H 'Content-Type: application/json' -H 'x-oryx-client: mobile' \
+  -H "x-oryx-csrf: $NEWCSRF" -d "{\"refreshToken\":\"$REFRESH\"}")
+check "the superseded refresh token is refused" "$S" 401
+S=$(code -X POST "$B/customer/auth/logout" -H 'Content-Type: application/json' -H 'x-oryx-client: mobile' \
+  -H "Authorization: Bearer $NEWTOK" -H "x-oryx-csrf: $NEWCSRF" -d "{\"refreshToken\":\"$NEWREFRESH\"}")
+check "logout the rotated session" "$S" 204
+# Logout revokes the refresh family, so the session cannot be extended. The
+# already-issued access token is a short-lived bearer token and stays valid until
+# it expires — stateless by design, not a gap.
+S=$(code -X POST "$B/customer/auth/refresh" -H 'Content-Type: application/json' -H 'x-oryx-client: mobile' \
+  -H "x-oryx-csrf: $NEWCSRF" -d "{\"refreshToken\":\"$NEWREFRESH\"}")
+check "the logged-out session cannot be extended" "$S" 401
+
+echo
 echo "== vehicle garage =="
 TOK=$(newtok veh)
 VIN="E10$(date +%s%N | tail -c 15)"

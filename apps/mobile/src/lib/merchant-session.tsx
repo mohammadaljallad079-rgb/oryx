@@ -19,6 +19,8 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import {
   ApiError,
   providerApi,
+  setSessionExpiredHandler,
+  setSessionRefresher,
   setStaffAccessToken,
   setStaffCsrfToken,
   staffAuthApi,
@@ -156,6 +158,31 @@ export function MerchantSessionProvider({ children }: { children: React.ReactNod
     bootstrapped.current = true;
     void restore();
   }, [restore]);
+
+  /** Registers this store as the staff plane's refresher; see `live-session`. */
+  useEffect(() => {
+    setSessionRefresher('staff', async () => {
+      const stored = await getSecret(REFRESH_KEY);
+      if (!stored) return false;
+      try {
+        const session = await staffAuthApi.refresh(stored);
+        await adopt(session);
+        return true;
+      } catch (err) {
+        if (err instanceof ApiError && (err.kind === 'unauthorized' || err.kind === 'forbidden')) {
+          await clear();
+        }
+        return false;
+      }
+    });
+    setSessionExpiredHandler('staff', () => {
+      void clear();
+    });
+    return () => {
+      setSessionRefresher('staff', null);
+      setSessionExpiredHandler('staff', null);
+    };
+  }, [adopt, clear]);
 
   const signIn = useCallback(
     async (email: string, password: string) => {

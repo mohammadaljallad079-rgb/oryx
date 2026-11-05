@@ -190,6 +190,63 @@ export function getStaffCsrfToken(): string | null {
   return staffCsrfToken;
 }
 
+// ------------------------------------------------- session refresh seam
+
+type Plane = 'customer' | 'staff';
+type RefreshFn = () => Promise<boolean>;
+type ExpiredFn = () => void;
+
+/**
+ * A per-plane refresher, registered by the session store that owns the token.
+ *
+ * The client cannot rotate a session on its own: the refresh token is a secret
+ * the session layer holds, and swapping a token means updating the store's
+ * account and status too. So the store registers a callback here and the client
+ * calls it when the server answers 401.
+ *
+ * Without this, an access token that expired *during* a session — the common
+ * case, because an access token is deliberately short-lived — surfaced as a
+ * failed action ("could not cancel") and the customer had to restart the app to
+ * trigger the cold-start restore. The refresh existed only on start-up.
+ */
+const sessionRefreshers: Partial<Record<Plane, RefreshFn>> = {};
+
+/** Called when a refresh was attempted and the server still refused the token. */
+const sessionExpiredHandlers: Partial<Record<Plane, ExpiredFn>> = {};
+
+/** One in-flight refresh per plane, so a burst of 401s rotates the token once. */
+const inFlightRefresh: Partial<Record<Plane, Promise<boolean>>> = {};
+
+export function setSessionRefresher(plane: Plane, fn: RefreshFn | null): void {
+  if (fn) sessionRefreshers[plane] = fn;
+  else delete sessionRefreshers[plane];
+}
+
+export function setSessionExpiredHandler(plane: Plane, fn: ExpiredFn | null): void {
+  if (fn) sessionExpiredHandlers[plane] = fn;
+  else delete sessionExpiredHandlers[plane];
+}
+
+/** Rotates a plane's session at most once across concurrent 401s. */
+function refreshSession(plane: Plane): Promise<boolean> {
+  const refresher = sessionRefreshers[plane];
+  if (!refresher) return Promise.resolve(false);
+  const existing = inFlightRefresh[plane];
+  if (existing) return existing;
+  const run = refresher()
+    .catch(() => false)
+    .finally(() => {
+      delete inFlightRefresh[plane];
+    });
+  inFlightRefresh[plane] = run;
+  return run;
+}
+
+/** Whether a plane has a registered refresher, so a request knows if a retry is possible. */
+export function canRefreshSession(plane: Plane): boolean {
+  return Boolean(sessionRefreshers[plane]);
+}
+
 /**
  * Whether the device currently has a usable connection.
  *
@@ -231,55 +288,72 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     throw new ApiError('offline', null, 'No internet connection');
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  // A caller's signal cancels this request too, without replacing the timeout.
-  const onAbort = () => controller.abort();
-  signal?.addEventListener('abort', onAbort);
+  const send = async (): Promise<T> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    // A caller's signal cancels this request too, without replacing the timeout.
+    const onAbort = () => controller.abort();
+    signal?.addEventListener('abort', onAbort);
 
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    // The API returns the refresh token in the body only for this client kind.
-    // A native app has no cookie jar, so the cookie-only path would leave it
-    // unable to rotate a session.
-    'x-oryx-client': 'mobile',
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      // The API returns the refresh token in the body only for this client kind.
+      // A native app has no cookie jar, so the cookie-only path would leave it
+      // unable to rotate a session.
+      'x-oryx-client': 'mobile',
+    };
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    const token = plane === 'staff' ? staffAccessToken : accessToken;
+    if (auth && token) headers.Authorization = `Bearer ${token}`;
+    // The refresh cookie rides along in the platform cookie jar, so the API's
+    // `CsrfGuard` demands the matching header on every unsafe method. Only unsafe
+    // methods need it: a GET carries no double submit, and echoing the token on
+    // reads would leak it into every request log.
+    if (method !== 'GET') {
+      const csrf = plane === 'staff' ? staffCsrfToken : csrfToken;
+      if (csrf) headers['x-oryx-csrf'] = csrf;
+    }
+
+    try {
+      const response = await fetch(`${V1}${path}`, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) throw await toError(response);
+      // A 204 has no body; returning undefined is correct for a DELETE.
+      if (response.status === 204) return undefined as T;
+      return (await response.json()) as T;
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      if (error instanceof Error && error.name === 'AbortError') {
+        // Distinguish the caller cancelling from the clock running out.
+        if (signal?.aborted) throw new ApiError('unknown', null, 'Request cancelled');
+        throw new ApiError('timeout', null, 'The request took too long');
+      }
+      // A fetch rejection with no response is the network.
+      throw new ApiError('offline', null, 'Could not reach the server');
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+    }
   };
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
-  const token = plane === 'staff' ? staffAccessToken : accessToken;
-  if (auth && token) headers.Authorization = `Bearer ${token}`;
-  // The refresh cookie rides along in the platform cookie jar, so the API's
-  // `CsrfGuard` demands the matching header on every unsafe method. Only unsafe
-  // methods need it: a GET carries no double submit, and echoing the token on
-  // reads would leak it into every request log.
-  if (method !== 'GET') {
-    const csrf = plane === 'staff' ? staffCsrfToken : csrfToken;
-    if (csrf) headers['x-oryx-csrf'] = csrf;
-  }
 
   try {
-    const response = await fetch(`${V1}${path}`, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) throw await toError(response);
-    // A 204 has no body; returning undefined is correct for a DELETE.
-    if (response.status === 204) return undefined as T;
-    return (await response.json()) as T;
+    return await send();
   } catch (error) {
-    if (error instanceof ApiError) throw error;
-    if (error instanceof Error && error.name === 'AbortError') {
-      // Distinguish the caller cancelling from the clock running out.
-      if (signal?.aborted) throw new ApiError('unknown', null, 'Request cancelled');
-      throw new ApiError('timeout', null, 'The request took too long');
+    // A 401 on an authenticated request means the access token expired mid-
+    // session, not that the credentials are wrong. Rotate once and replay; if
+    // the rotation fails the session is genuinely over, so the store is told to
+    // drop it and the original 401 is surfaced.
+    if (error instanceof ApiError && error.kind === 'unauthorized' && auth && canRefreshSession(plane)) {
+      const rotated = await refreshSession(plane);
+      if (rotated) return send();
+      sessionExpiredHandlers[plane]?.();
     }
-    // A fetch rejection with no response is the network.
-    throw new ApiError('offline', null, 'Could not reach the server');
-  } finally {
-    clearTimeout(timer);
-    signal?.removeEventListener('abort', onAbort);
+    throw error;
   }
 }
 
@@ -1354,50 +1428,69 @@ export async function uploadFile<T>(
 ): Promise<T> {
   if (isOffline()) throw new ApiError('offline', null, 'No internet connection');
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 60_000);
-  const onAbort = () => controller.abort();
-  options.signal?.addEventListener('abort', onAbort);
+  const plane = options.plane ?? 'customer';
 
-  const form = new FormData();
-  for (const [key, value] of Object.entries(fields)) form.append(key, value);
-  // React Native's FormData accepts a `{ uri, name, type }` part; the web
-  // `FormData` accepts a Blob, so the file is fetched into one first.
-  if (typeof (globalThis as { document?: unknown }).document !== 'undefined') {
-    const blob = await (await fetch(file.uri)).blob();
-    form.append('file', blob, file.name);
-  } else {
-    form.append('file', { uri: file.uri, name: file.name, type: file.mimeType } as never);
-  }
+  const send = async (): Promise<T> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 60_000);
+    const onAbort = () => controller.abort();
+    options.signal?.addEventListener('abort', onAbort);
 
-  const headers: Record<string, string> = { Accept: 'application/json', 'x-oryx-client': 'mobile' };
-  const token = options.plane === 'staff' ? staffAccessToken : accessToken;
-  if (token) headers.Authorization = `Bearer ${token}`;
-  // An upload is a POST, so it needs the same double-submit header as any other
-  // unsafe method — the refresh cookie is in the jar either way.
-  const csrf = options.plane === 'staff' ? staffCsrfToken : csrfToken;
-  if (csrf) headers['x-oryx-csrf'] = csrf;
+    // The form is rebuilt per attempt: a multipart body is not safely re-sent
+    // after a failed fetch, and a replay must carry the rotated token.
+    const form = new FormData();
+    for (const [key, value] of Object.entries(fields)) form.append(key, value);
+    // React Native's FormData accepts a `{ uri, name, type }` part; the web
+    // `FormData` accepts a Blob, so the file is fetched into one first.
+    if (typeof (globalThis as { document?: unknown }).document !== 'undefined') {
+      const blob = await (await fetch(file.uri)).blob();
+      form.append('file', blob, file.name);
+    } else {
+      form.append('file', { uri: file.uri, name: file.name, type: file.mimeType } as never);
+    }
+
+    const headers: Record<string, string> = { Accept: 'application/json', 'x-oryx-client': 'mobile' };
+    const token = plane === 'staff' ? staffAccessToken : accessToken;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    // An upload is a POST, so it needs the same double-submit header as any other
+    // unsafe method — the refresh cookie is in the jar either way.
+    const csrf = plane === 'staff' ? staffCsrfToken : csrfToken;
+    if (csrf) headers['x-oryx-csrf'] = csrf;
+
+    try {
+      const response = await fetch(`${V1}${path}`, {
+        method: 'POST',
+        headers,
+        body: form,
+        signal: controller.signal,
+      });
+      if (!response.ok) throw await toError(response);
+      if (response.status === 204) return undefined as T;
+      return (await response.json()) as T;
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      if (error instanceof Error && error.name === 'AbortError') {
+        if (options.signal?.aborted) throw new ApiError('unknown', null, 'Upload cancelled');
+        throw new ApiError('timeout', null, 'The upload took too long');
+      }
+      throw new ApiError('offline', null, 'Could not reach the server');
+    } finally {
+      clearTimeout(timer);
+      options.signal?.removeEventListener('abort', onAbort);
+    }
+  };
 
   try {
-    const response = await fetch(`${V1}${path}`, {
-      method: 'POST',
-      headers,
-      body: form,
-      signal: controller.signal,
-    });
-    if (!response.ok) throw await toError(response);
-    if (response.status === 204) return undefined as T;
-    return (await response.json()) as T;
+    return await send();
   } catch (error) {
-    if (error instanceof ApiError) throw error;
-    if (error instanceof Error && error.name === 'AbortError') {
-      if (options.signal?.aborted) throw new ApiError('unknown', null, 'Upload cancelled');
-      throw new ApiError('timeout', null, 'The upload took too long');
+    // An expired access token must not lose the photograph the customer just
+    // took; rotate once and re-send. See `request` for the same recovery.
+    if (error instanceof ApiError && error.kind === 'unauthorized' && canRefreshSession(plane)) {
+      const rotated = await refreshSession(plane);
+      if (rotated) return send();
+      sessionExpiredHandlers[plane]?.();
     }
-    throw new ApiError('offline', null, 'Could not reach the server');
-  } finally {
-    clearTimeout(timer);
-    options.signal?.removeEventListener('abort', onAbort);
+    throw error;
   }
 }
 

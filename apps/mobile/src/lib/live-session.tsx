@@ -25,7 +25,15 @@
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ApiError, authApi, setAccessToken, setCsrfToken, type CustomerSession } from './api';
+import {
+  ApiError,
+  authApi,
+  setAccessToken,
+  setCsrfToken,
+  setSessionExpiredHandler,
+  setSessionRefresher,
+  type CustomerSession,
+} from './api';
 import { deleteSecret, getSecret, setSecret } from './session-storage';
 
 /** Where the refresh token is sealed. Distinct from the demo session key. */
@@ -175,6 +183,39 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
     bootstrapped.current = true;
     void restore();
   }, [restore]);
+
+  /**
+   * Registers this store as the customer plane's session refresher.
+   *
+   * The API client calls it when an authenticated request is answered 401 — the
+   * access token expired mid-session. Returning `true` lets the client replay
+   * the request; returning `false` tells it the session is over, and it calls
+   * the expired handler so the app becomes a guest instead of failing every
+   * action until the next restart.
+   */
+  useEffect(() => {
+    setSessionRefresher('customer', async () => {
+      const stored = await getSecret(REFRESH_KEY);
+      if (!stored) return false;
+      try {
+        const session = await authApi.refresh(stored);
+        await adopt(session);
+        return true;
+      } catch (err) {
+        if (err instanceof ApiError && (err.kind === 'unauthorized' || err.kind === 'forbidden')) {
+          await clear();
+        }
+        return false;
+      }
+    });
+    setSessionExpiredHandler('customer', () => {
+      void clear();
+    });
+    return () => {
+      setSessionRefresher('customer', null);
+      setSessionExpiredHandler('customer', null);
+    };
+  }, [adopt, clear]);
 
   const signIn = useCallback(
     async (email: string, password: string) => {
