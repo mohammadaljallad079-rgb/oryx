@@ -1597,3 +1597,161 @@ suites / 620 tests, shared 215 tests, API unit 7 tests, `tsc --noEmit` and
 
 This is the last Phase 3 pagination correction; the dense page is the worst case
 the interface can produce (every item answered, a third carrying a note).
+
+---
+
+## 21. Continuation session — the last unissuable document types, and mid-session token expiry
+
+This session finished two pieces of work: the four document types the catalogue
+declared but the API could not issue, and the mobile client's failure to recover
+an access token that expired *during* a session.
+
+### 21.1 The four unissuable document types
+
+Section 20.9 recorded that statements, returns, journal entries and the purchase
+return had a catalogue entry and a template but no issue path. The admin screen
+therefore offered buttons the API answered with `400`. All four are now issuable.
+
+| Type | Source |
+| --- | --- |
+| `PURCHASE_RETURN` | The stored return record, mirroring the sales return |
+| `CUSTOMER_STATEMENT` | Movement over the company's current fiscal period, with an opening and a closing balance around one row per invoice and payment |
+| `SUPPLIER_STATEMENT` | The same shape against the supplier's own invoices and payments |
+| `JOURNAL_ENTRY` | A debit/credit table built from the entry's own lines, not a priced line table |
+
+The issuable list now lives once, in `packages/shared/src/documents.ts`
+(`ISSUABLE_FINANCIAL_TYPES`). The API's DTO whitelist and the admin issue buttons
+both read it, so the two cannot drift again — the drift was the original defect.
+
+**Files changed:** `packages/shared/src/documents.ts`,
+`packages/shared/test/documents.test.ts`,
+`apps/api/src/documents/document-payload.ts`,
+`apps/api/src/documents/documents.dto.ts`,
+`apps/api/src/documents/documents.service.ts`,
+`apps/api/src/documents/templates/financial-document.template.ts`,
+`apps/admin/src/app/(app)/documents/page.tsx`,
+`apps/api/test/execution-phase3-documents.e2e-spec.ts`.
+
+**Verified:** the Phase 3 documents suite is 29/29 (3 new tests: purchase return,
+supplier statement, journal entry). The full API e2e suite is **31 suites, 623
+tests, all passing**. The shared package is **217 tests, all passing**. A live
+probe against the seeded database issued JournalEntry, Customer and Supplier
+statements in `ORYX-AUTO`, and a super-admin cross-tenant issue was correctly
+refused with `authz.cross_tenant_denied`.
+
+Commit: `65ae1d4`.
+
+### 21.2 Mid-session access-token expiry
+
+**The defect.** `live-session` and `merchant-session` refreshed only at cold
+start. An access token that expired while the app was open — the common case,
+because an access token is deliberately short-lived — made every action fail.
+The customer saw "could not cancel" or "upload failed" and had to restart the
+app to reach the restore path. The refresh existed, but only on start-up.
+
+**The fix.** The API client gained a per-plane refresh seam
+(`setSessionRefresher`, `setSessionExpiredHandler`). Each session store registers
+a refresher. On a `401` to an authenticated request the client:
+
+1. rotates the token once and replays the request, or
+2. when the rotation itself is refused, calls the expired handler so the store
+   drops the session and the app becomes a guest.
+
+A single-flight guard (`inFlightRefresh`) means a burst of concurrent 401s
+rotates the token **once**, not once per request. Uploads recover the same way,
+so a photograph taken just before expiry is not lost. A `403` is deliberately
+*not* treated as an expiry: it is a permission refusal and rotating would not
+change it.
+
+**Files changed:** `apps/mobile/src/lib/api.ts` (`request` and `uploadFile`),
+`apps/mobile/src/lib/live-session.tsx`,
+`apps/mobile/src/lib/merchant-session.tsx`,
+`apps/mobile/test/session-refresh.test.ts` (**new**, 9 tests),
+`scripts/exec10-smoke.sh` (rotation section).
+
+**Real HTTP evidence** (`scripts/exec10-smoke.sh`, live API, seeded database):
+**37 passed, 0 failed**. The new section proves rotation returns a usable access
+token, the superseded refresh token is refused (single-use), and a logged-out
+session cannot be extended.
+
+```
+== mid-session rotation (the client's 401 recovery path) ==
+  PASS register a rotating session (201)
+  PASS rotate the refresh token (200)
+  PASS the rotated access token is accepted (200)
+  PASS the superseded refresh token is refused (401)
+  PASS logout the rotated session (204)
+  PASS the logged-out session cannot be extended (401)
+```
+
+**Unit evidence:** `apps/mobile/test/session-refresh.test.ts` — 9 tests covering
+replay-on-success, expire-on-refusal, no refresh on an unauthenticated request,
+no refresh on a `403`, single-flight across concurrent 401s, plane independence,
+and upload recovery.
+
+**Mobile suite:** 10 files, **203 tests passing**. `tsc --noEmit` and
+`eslint --max-warnings=0` pass. The Android export (`expo export --platform
+android`) completes.
+
+Commit: `dbaddbb`.
+
+### 21.3 Re-verification of the earlier Execution 10 phases
+
+Nothing in the earlier phases regressed. Re-checked against the running API:
+
+- **Customer authentication (Phase 2).** Register, login, logout, restore,
+  refresh rotation, guest browsing and plane separation all exercised over real
+  HTTP. The identity-plane tests (21) and the smoke script confirm a consumer
+  token is refused on a staff route and the reverse.
+- **Live bookings (Phase 3).** The `execution10-mobile-integration` suite covers
+  real availability inside configured opening hours, hold-then-confirm, history,
+  detail with resource, permitted cancellation and slot release — 61 tests across
+  the three mobile-integration suites.
+- **Merchant portal (Phase 4).** A live staff login as the seeded provider owner
+  resolved the provider from membership and read `/provider/profile`,
+  `/provider/listings`, `/provider/offers`, `/provider/orders`,
+  `/provider/requests` and `/provider/earnings`. Staff refresh rotation and
+  post-logout refusal both behaved.
+- **Product images (Phase 5).** A real 200×200 PNG was uploaded to a product
+  through `POST /inventory/products/:id/images`, stored, served back as
+  `image/webp` and removed. A 1×1 image was refused with "Images must be at
+  least 64×64 pixels" — the validation works.
+- **SENSAGE uploads (Phase 6).** The smoke script uploads a real PNG, serves the
+  stored bytes, lists the history and refuses a non-image whose content-type
+  lies, plus an unauthenticated upload.
+- **Design preservation (Phase 7).** The admin branding suite is 6/6, including
+  "the dashboard banner carries no vehicle image and centres the ORYX mark".
+  `SPLASH_MIN_MS` is still 2000 and still starts on the image's `onLoad`.
+
+### 21.4 Security verification
+
+- **Token rotation is single-use.** Replaying a superseded refresh token is
+  refused (`auth.refresh_reused`); the smoke test asserts it.
+- **A logged-out session cannot be extended.** Logout revokes the refresh family;
+  the smoke test asserts the follow-up refresh is `401`. The already-issued
+  access token remains valid until it expires — stateless by design, not a gap.
+- **The refresh seam cannot be abused to widen access.** A `403` never triggers a
+  rotation. The client rotates only on `401` for an authenticated request.
+- **Ownership is still server-enforced.** Booking, vehicle and photo endpoints
+  scope by the bearer token's account; the smoke test confirms a foreign vehicle
+  and a foreign booking are `404`.
+- **Uploads still validate the real bytes.** A non-image with a lying
+  content-type is refused; the size floor and ceiling are enforced.
+- **No secret is logged or returned.** The smoke output shows only status codes
+  and boolean "present" flags for tokens.
+
+### 21.5 Still open
+
+- **Android visual acceptance of Splash and Homepage is still not claimed.** No
+  physical device or emulator exists in this environment. A DOM or UI-hierarchy
+  dump is not a device render, and this report does not treat it as one.
+- **The merchant-facing document surfaces are not built.**
+- **No APK was published**, per the standing instruction.
+- **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.
+
+### 21.6 Final commits
+
+| Commit | Change |
+| --- | --- |
+| `65ae1d4` | Every catalogue document type is issuable |
+| `dbaddbb` | Mobile recovers an expired access token mid-session |

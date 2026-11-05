@@ -724,6 +724,22 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 
 ### Mobile gotchas
 
+- **An access token expires mid-session, not at start-up.** Cold-start restore is
+  not enough: the common expiry happens while the app is open, and before the
+  refresh seam existed every action then failed ("could not cancel", "upload
+  failed") until the app was restarted. `apps/mobile/src/lib/api.ts` exposes a
+  per-plane seam — `setSessionRefresher` / `setSessionExpiredHandler` — that each
+  session store registers. On a `401` to an authenticated request the client
+  rotates **once** (single-flight, so a burst of 401s is one rotation), replays
+  the request, and calls the expired handler when the rotation is refused.
+  `uploadFile` recovers the same way so a photograph is not lost. A `403` is
+  **never** treated as an expiry: it is a permission refusal. Pinned by
+  `apps/mobile/test/session-refresh.test.ts`.
+- **Logout revokes the refresh family, not the issued access token.** After
+  logout a refresh is `401` (`auth.refresh_reused`), but the already-issued
+  short-lived access token stays valid until it expires. Do not assert that
+  logout invalidates an access token — assert that the session cannot be
+  *extended*.
 - **The double-submit token must be adopted from the login/refresh body.** A native
   client has no `document.cookie`, but React Native's cookie jar still replays the
   HttpOnly `oryx_crt` / `oryx_rt` cookie on every request to its scope, so
