@@ -414,6 +414,46 @@ describe('ORYX ERP core (e2e)', () => {
       expect(res.status).toBe(200);
       expect(res.body.items.some((i) => i.sku === 'WIDGET')).toBe(true);
     });
+
+    it('deactivates and reactivates a catalogue item through isActive', async () => {
+      // The admin list offers a Deactivate/Reactivate action, which is a PATCH of
+      // `isActive`. The toggle must round-trip and must not touch the SKU, which
+      // inventory movements and posted invoices reference.
+      const off = await erp<{ isActive: boolean; sku: string }>(`/inventory/products/${productId}`, {
+        method: 'PATCH',
+        body: { isActive: false },
+      });
+      expect(off.status).toBe(200);
+      expect(off.body.isActive).toBe(false);
+      expect(off.body.sku).toBe('WIDGET');
+
+      const stored = await ctx.prisma.product.findUniqueOrThrow({ where: { id: productId } });
+      expect(stored.isActive).toBe(false);
+
+      const on = await erp<{ isActive: boolean }>(`/inventory/products/${productId}`, {
+        method: 'PATCH',
+        body: { isActive: true },
+      });
+      expect(on.body.isActive).toBe(true);
+      expect((await ctx.prisma.product.findUniqueOrThrow({ where: { id: productId } })).isActive).toBe(true);
+    });
+
+    it('deactivates and reactivates a warehouse through isActive', async () => {
+      const off = await erp<{ isActive: boolean; code: string }>(`/inventory/warehouses/${warehouseId}`, {
+        method: 'PATCH',
+        body: { isActive: false },
+      });
+      expect(off.status).toBe(200);
+      expect(off.body.isActive).toBe(false);
+      expect(off.body.code).toBe('MAIN');
+
+      const on = await erp<{ isActive: boolean }>(`/inventory/warehouses/${warehouseId}`, {
+        method: 'PATCH',
+        body: { isActive: true },
+      });
+      expect(on.body.isActive).toBe(true);
+      expect((await ctx.prisma.warehouse.findUniqueOrThrow({ where: { id: warehouseId } })).isActive).toBe(true);
+    });
   });
 
   // ---------------------------------------------------------------------- sales
@@ -607,6 +647,84 @@ describe('ORYX ERP core (e2e)', () => {
       expect(closed.body.status).toBe('CLOSED');
       expect(closed.body.expectedCashMinor).toBe(31500);
       expect(closed.body.varianceMinor).toBe(-1500);
+    });
+  });
+
+  describe('sales — POS line discount', () => {
+    let sessionId: string;
+
+    it('applies a cashier discount to the line total and to the ledger', async () => {
+      const session = await erp<{ id: string }>('/sales/cashier-sessions', {
+        method: 'POST',
+        body: { branchId, warehouseId, openingFloatMinor: 0 },
+      });
+      expect(session.status).toBe(201);
+      sessionId = session.body.id;
+
+      // 1.00 × 100.00 = 100.00 gross, 10% off = 90.00 net, 15% VAT = 13.50.
+      const sale = await erp<{ id: string; totalMinor: number; changeMinor: number }>('/sales/pos-sales', {
+        method: 'POST',
+        body: {
+          branchId,
+          cashierSessionId: sessionId,
+          warehouseId,
+          paymentMethod: 'CASH',
+          lines: [
+            {
+              productId,
+              description: 'Widget',
+              quantity: 10000,
+              unitPriceMinor: 10000,
+              discountPercentBp: 1000,
+              taxPercentBp: 1500,
+            },
+          ],
+        },
+      });
+      expect(sale.status).toBe(201);
+      expect(sale.body.totalMinor).toBe(10350);
+
+      const posSale = await ctx.prisma.posSale.findUniqueOrThrow({ where: { id: sale.body.id } });
+      expect(posSale.discountMinor).toBe(1000);
+      expect(posSale.taxMinor).toBe(1350);
+      expect(posSale.totalMinor).toBe(10350);
+
+      const invoice = await ctx.prisma.salesInvoice.findUniqueOrThrow({
+        where: { id: posSale.salesInvoiceId! },
+      });
+      expect(invoice.discountMinor).toBe(1000);
+      expect(invoice.taxMinor).toBe(1350);
+      expect(invoice.totalMinor).toBe(10350);
+    });
+
+    it('refuses a discount above 100%', async () => {
+      const res = await erp<{ code: string }>('/sales/pos-sales', {
+        method: 'POST',
+        body: {
+          branchId,
+          cashierSessionId: sessionId,
+          warehouseId,
+          paymentMethod: 'CASH',
+          lines: [
+            {
+              description: 'Widget',
+              quantity: 10000,
+              unitPriceMinor: 10000,
+              discountPercentBp: 10001,
+              taxPercentBp: 0,
+            },
+          ],
+        },
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('closes the discount session', async () => {
+      const closed = await erp<{ status: string }>(`/sales/cashier-sessions/${sessionId}/close`, {
+        method: 'POST',
+        body: { countedCashMinor: 10350 },
+      });
+      expect(closed.body.status).toBe('CLOSED');
     });
   });
 

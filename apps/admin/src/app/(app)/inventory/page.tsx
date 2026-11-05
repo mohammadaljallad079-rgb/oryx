@@ -206,7 +206,7 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
                 </td>
                 {canManage ? (
                   <td>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Button size="sm" onClick={() => setEditing(p)} data-testid={`edit-product-${p.sku}`}>
                         {t('common.edit')}
                       </Button>
@@ -214,6 +214,31 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
                         <Icon name="eye" size={15} />
                         {t('erp.inventory.images')}
                       </Button>
+                      {p.isActive ? (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={async () => {
+                            await api.updateProduct(p.id, { isActive: false });
+                            await list.reload();
+                          }}
+                          data-testid={`deactivate-product-${p.sku}`}
+                        >
+                          {t('common.deactivate')}
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          onClick={async () => {
+                            await api.updateProduct(p.id, { isActive: true });
+                            await list.reload();
+                          }}
+                          data-testid={`reactivate-product-${p.sku}`}
+                        >
+                          {t('common.reactivate')}
+                        </Button>
+                      )}
                     </div>
                   </td>
                 ) : null}
@@ -261,6 +286,7 @@ function EditProductModal({
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15', isActive: true,
+    barcode: '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
   });
 
   useEffect(() => {
@@ -274,6 +300,11 @@ function EditProductModal({
       costPrice: minorToInput(product.costPriceMinor),
       taxRate: (product.taxRateBp / 100).toString(),
       isActive: product.isActive,
+      barcode: product.barcode ?? '',
+      // The stored reorder level is scaled by 10^4; `qty` renders it back.
+      reorderLevel: String(product.reorderLevel / 10_000),
+      reorderQuantity: String(product.reorderQuantity / 10_000),
+      trackStock: product.trackStock,
     });
   }, [product]);
 
@@ -290,6 +321,10 @@ function EditProductModal({
         costPriceMinor: toMinorInput(form.costPrice),
         taxRateBp: Math.round(Number(form.taxRate) * 100),
         isActive: form.isActive,
+        barcode: form.barcode,
+        reorderLevel: toQuantityInput(form.reorderLevel),
+        reorderQuantity: toQuantityInput(form.reorderQuantity),
+        trackStock: form.trackStock,
       });
       await onSaved();
     } catch (e) {
@@ -336,7 +371,26 @@ function EditProductModal({
         <Field label={t('erp.inventory.taxRate')}>
           <input className="oryx-input" value={form.taxRate} onChange={(e) => setForm({ ...form, taxRate: e.target.value })} />
         </Field>
+        <Field label={t('erp.inventory.barcode')}>
+          <input className="oryx-input" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} data-testid="edit-product-barcode" />
+        </Field>
+        <Field label={t('erp.inventory.reorderLevel')}>
+          <input className="oryx-input" value={form.reorderLevel} onChange={(e) => setForm({ ...form, reorderLevel: e.target.value })} data-testid="edit-product-reorder-level" />
+        </Field>
+        <Field label={t('erp.inventory.reorderQuantity')}>
+          <input className="oryx-input" value={form.reorderQuantity} onChange={(e) => setForm({ ...form, reorderQuantity: e.target.value })} />
+        </Field>
       </div>
+      <label className="mt-4 flex items-center gap-2 text-[12.5px] font-semibold">
+        <input
+          type="checkbox"
+          className="oryx-checkbox"
+          checked={form.trackStock}
+          onChange={(e) => setForm({ ...form, trackStock: e.target.checked })}
+          data-testid="edit-product-track-stock"
+        />
+        {t('erp.inventory.trackStock')}
+      </label>
       <label className="mt-4 flex items-center gap-2 text-[12.5px] font-semibold">
         <input
           type="checkbox"
@@ -519,6 +573,7 @@ function CreateProductModal({ open, onClose, onCreated }: { open: boolean; onClo
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
+    barcode: '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
   });
 
   const submit = async () => {
@@ -533,6 +588,11 @@ function CreateProductModal({ open, onClose, onCreated }: { open: boolean; onClo
         salesPriceMinor: toMinorInput(form.salesPrice),
         costPriceMinor: toMinorInput(form.costPrice),
         taxRateBp: Math.round(Number(form.taxRate) * 100),
+        barcode: form.barcode || undefined,
+        // The reorder level is stored scaled by 10^4, exactly like a quantity.
+        reorderLevel: toQuantityInput(form.reorderLevel),
+        reorderQuantity: toQuantityInput(form.reorderQuantity),
+        trackStock: form.trackStock,
       });
       await onCreated();
       onClose();
@@ -580,7 +640,26 @@ function CreateProductModal({ open, onClose, onCreated }: { open: boolean; onClo
         <Field label={t('erp.inventory.taxRate')}>
           <input className="oryx-input" value={form.taxRate} onChange={(e) => setForm({ ...form, taxRate: e.target.value })} />
         </Field>
+        <Field label={t('erp.inventory.barcode')}>
+          <input className="oryx-input" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} data-testid="product-barcode" />
+        </Field>
+        <Field label={t('erp.inventory.reorderLevel')}>
+          <input className="oryx-input" value={form.reorderLevel} onChange={(e) => setForm({ ...form, reorderLevel: e.target.value })} data-testid="product-reorder-level" />
+        </Field>
+        <Field label={t('erp.inventory.reorderQuantity')}>
+          <input className="oryx-input" value={form.reorderQuantity} onChange={(e) => setForm({ ...form, reorderQuantity: e.target.value })} />
+        </Field>
       </div>
+      <label className="mt-4 flex items-center gap-2 text-[12.5px] font-semibold">
+        <input
+          type="checkbox"
+          className="oryx-checkbox"
+          checked={form.trackStock}
+          onChange={(e) => setForm({ ...form, trackStock: e.target.checked })}
+          data-testid="product-track-stock"
+        />
+        {t('erp.inventory.trackStock')}
+      </label>
     </Modal>
   );
 }
@@ -612,6 +691,7 @@ function WarehousesTab({ canManage }: { canManage: boolean }) {
               <th>{t('common.name')}</th>
               <th>{t('erp.inventory.branch')}</th>
               <th>{t('common.status')}</th>
+              {canManage ? <th>{t('common.actions')}</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -621,6 +701,35 @@ function WarehousesTab({ canManage }: { canManage: boolean }) {
                 <td>{w.nameEn}</td>
                 <td className="text-[12.5px]">{w.branchNameEn ?? '—'}</td>
                 <td><Badge tone={w.isActive ? 'success' : 'neutral'}>{w.isActive ? t('common.active') : t('common.inactive')}</Badge></td>
+                {canManage ? (
+                  <td>
+                    {w.isActive ? (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={async () => {
+                          await api.updateWarehouse(w.id, { isActive: false });
+                          await list.reload();
+                        }}
+                        data-testid={`deactivate-warehouse-${w.code}`}
+                      >
+                        {t('common.deactivate')}
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={async () => {
+                          await api.updateWarehouse(w.id, { isActive: true });
+                          await list.reload();
+                        }}
+                        data-testid={`reactivate-warehouse-${w.code}`}
+                      >
+                        {t('common.reactivate')}
+                      </Button>
+                    )}
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>

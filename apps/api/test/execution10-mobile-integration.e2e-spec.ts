@@ -65,6 +65,8 @@ describe('Execution 10 — product images & inspection uploads (e2e)', () => {
   let accountB = '';
   let vehicleA = '';
   let vehicleB = '';
+  /** The tenant customer rows this suite owns, deleted by exact id at teardown. */
+  let tenantCustomerIds: string[] = [];
 
   async function register(email: string): Promise<{ token: string; accountId: string }> {
     const res = await call<{ accessToken: string; account: { id: string } }>(
@@ -83,6 +85,43 @@ describe('Execution 10 — product images & inspection uploads (e2e)', () => {
   beforeAll(async () => {
     ctx = await createTestApp();
     prisma = ctx.prisma;
+
+    // A run that failed mid-way leaves its own fixtures behind, and the next run
+    // then dies on a unique `sku`/`code` instead of exercising the product. Sweep
+    // this suite's own rows first so a run is idempotent. The predicates are
+    // exact values this suite creates — never a `startsWith` sweep, which would
+    // also catch unrelated rows and abort on a foreign key.
+    await prisma.productImage.deleteMany({
+      where: { product: { sku: { in: [`${PREFIX}-P1`, `${PREFIX}-OP1`] } } },
+    });
+    await prisma.product.deleteMany({ where: { sku: { in: [`${PREFIX}-P1`, `${PREFIX}-OP1`] } } });
+    await prisma.vehicle.deleteMany({ where: { customer: { code: { in: [`${PREFIX}-CA`, `${PREFIX}-CB`] } } } });
+    await prisma.customer.deleteMany({ where: { code: { in: [`${PREFIX}-CA`, `${PREFIX}-CB`] } } });
+    await prisma.company.deleteMany({ where: { code: `${PREFIX}-OTHER` } });
+    await prisma.providerServiceListing.deleteMany({
+      where: { provider: { code: `${PREFIX}-PROV` } },
+    });
+    await prisma.providerUser.deleteMany({ where: { provider: { code: `${PREFIX}-PROV` } } });
+    await prisma.marketplaceProvider.deleteMany({ where: { code: `${PREFIX}-PROV` } });
+    const staleUsers = [`${PREFIX.toLowerCase()}-merchant@test.local`, `${PREFIX.toLowerCase()}-noprovider@test.local`];
+    await prisma.membership.deleteMany({ where: { user: { email: { in: staleUsers } } } });
+    await prisma.user.deleteMany({ where: { email: { in: staleUsers } } });
+    const staleMerchantCompany = await prisma.company.findUnique({ where: { code: `${PREFIX}-MERCH` } });
+    if (staleMerchantCompany) {
+      await prisma.subscription.deleteMany({ where: { companyId: staleMerchantCompany.id } });
+      await prisma.company.delete({ where: { id: staleMerchantCompany.id } });
+    }
+    await prisma.customerInspectionPhoto.deleteMany({
+      where: {
+        customerAccount: {
+          email: { in: [`${PREFIX.toLowerCase()}-a@test.local`, `${PREFIX.toLowerCase()}-b@test.local`] },
+        },
+      },
+    });
+    await prisma.customerAccount.deleteMany({
+      where: { email: { in: [`${PREFIX.toLowerCase()}-a@test.local`, `${PREFIX.toLowerCase()}-b@test.local`] } },
+    });
+    await prisma.cmsMediaAsset.deleteMany({ where: { originalName: { startsWith: 'e10-' } } });
 
     adminToken = await login(ctx.base, SEED_COMPANY_ADMIN.email, SEED_COMPANY_ADMIN.password);
 
@@ -163,6 +202,7 @@ describe('Execution 10 — product images & inspection uploads (e2e)', () => {
       },
     });
     vehicleB = vb.id;
+    tenantCustomerIds = [tenantCustomerA.id, tenantCustomerB.id];
   }, 180_000);
 
   afterAll(async () => {
@@ -173,7 +213,12 @@ describe('Execution 10 — product images & inspection uploads (e2e)', () => {
     });
     await prisma.cmsMediaAsset.deleteMany({ where: { originalName: { startsWith: 'e10-' } } });
     await prisma.vehicle.deleteMany({ where: { id: { in: [vehicleA, vehicleB] } } });
-    await prisma.customer.deleteMany({ where: { code: { startsWith: PREFIX } } });
+    // Delete only the two customers this suite created. A `startsWith: PREFIX`
+    // predicate also matched an unrelated `E10-DEMO` row left behind by an
+    // earlier run, and a customer that already carries an invoice cannot be
+    // deleted, so the teardown aborted before the remaining fixtures were
+    // removed.
+    await prisma.customer.deleteMany({ where: { id: { in: tenantCustomerIds } } });
     // This suite borrows the seeded DEMO-ALNOOR tenant as its fixture, so it must
     // delete only the products it created. A company-scoped delete also removed
     // the seeded catalog and opening stock, which broke the Execution 02

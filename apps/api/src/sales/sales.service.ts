@@ -988,7 +988,7 @@ export class SalesService {
         description: l.description,
         quantity: l.quantity,
         unitPriceMinor: l.unitPriceMinor,
-        discountPercentBp: 0,
+        discountPercentBp: l.discountPercentBp ?? 0,
         taxPercentBp: l.taxPercentBp ?? 0,
       }));
       const totals = computeDocumentTotals(lineInputs);

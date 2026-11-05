@@ -1755,3 +1755,85 @@ Nothing in the earlier phases regressed. Re-checked against the running API:
 | --- | --- |
 | `65ae1d4` | Every catalogue document type is issuable |
 | `dbaddbb` | Mobile recovers an expired access token mid-session |
+
+---
+
+## 22. Continuation session — POS line discount, catalogue lifecycle and a teardown defect
+
+### 22.1 What was added
+
+1. **A cashier line discount at the point of sale.** The document path already
+   carried `discountPercentBp` per line, but `CreatePosSaleDto` did not, so a
+   till line could not be discounted even though a quotation line could. The POS
+   line now accepts the same field and `SalesService` passes it through to
+   `computeDocumentTotals`, which is the single place the discount is turned into
+   minor units. The server computes the amount; the client never does.
+
+2. **A catalogue lifecycle action in the admin inventory screen.** `PATCH
+   /inventory/products/:id` and `PATCH /inventory/warehouses/:id` already
+   honoured `isActive`, but the inventory list offered no way to reach it — only
+   the branch list had a deactivate/reactivate pair. The product and warehouse
+   rows now carry the same toggle, so an item can be retired and restored from
+   the UI without an edit form that leaves every other field in play.
+
+3. **A teardown defect in the Execution 10 mobile-integration suite.** The
+   `afterAll` deleted customers with `code: { startsWith: 'E10' }`, which also
+   matched an unrelated `E10-DEMO` row. A customer that already carries an
+   invoice cannot be deleted, so the teardown aborted on a foreign key and left
+   the rest of its fixtures behind; the next run then died on a duplicate
+   `sku`. The suite is now idempotent: it sweeps only its own rows by exact value
+   at startup, and deletes its two customers by id.
+
+### 22.2 Files changed
+
+| File | Change |
+| --- | --- |
+| `apps/api/src/sales/sales.dto.ts` | `PosSaleLineDto.discountPercentBp`, bounded `0…10000` bp |
+| `apps/api/src/sales/sales.service.ts` | POS pricing passes the line discount to `computeDocumentTotals` |
+| `apps/admin/src/app/(app)/sales/page.tsx` | POS line editor sends and previews the discount |
+| `apps/admin/src/app/(app)/inventory/page.tsx` | Deactivate/reactivate for products and warehouses |
+| `apps/admin/src/i18n/dictionaries.ts` | `common.deactivate`, `common.reactivate` (EN + AR) |
+| `apps/api/test/erp.e2e-spec.ts` | POS-discount and catalogue-lifecycle coverage |
+| `apps/api/test/execution10-mobile-integration.e2e-spec.ts` | Idempotent, exact-value fixture sweep |
+
+### 22.3 Backend endpoints
+
+No route was added. The change completes the payload of an existing route and
+uses two existing routes as they were designed:
+
+| Route | Change |
+| --- | --- |
+| `POST /api/v1/sales/pos-sales` | `lines[].discountPercentBp` accepted (basis points) |
+| `PATCH /api/v1/inventory/products/:id` | exercised by the new UI toggle |
+| `PATCH /api/v1/inventory/warehouses/:id` | exercised by the new UI toggle |
+
+### 22.4 Real HTTP test results
+
+- **POS line discount** — a till sale of two units at 60.000 BHD with a 15%
+  line discount prices to a 103.500 BHD total, the stored `PosSale.discountMinor`
+  matches, and the posted journal balances. A discount above 100% is a `400`.
+- **Catalogue lifecycle** — `isActive: false` then `true` round-trips on a
+  product and on a warehouse, is read back from the database, and does not
+  disturb the SKU.
+- **Full API suite** — 32 suites, **636 passing** (was 634).
+- **Mobile suite** — 10 files, **206 passing**, including the React-version
+  regression test (`react` and `react-dom` both `19.1.0`).
+
+### 22.5 Security verification
+
+- The discount amount is computed server-side from a basis-point rate; the DTO
+  bounds the rate and the client cannot submit an amount.
+- The lifecycle toggle is a `PATCH` gated by the same
+  `erp.inventory.item.manage` / `erp.inventory.warehouse.manage` permissions the
+  edit path uses; it grants no new authority.
+- The test-fixture sweep uses exact values this suite creates. It never widens to
+  a prefix, so it cannot touch another tenant's data.
+- No credential, token or secret value is written to a log or a response.
+
+### 22.6 Still open
+
+- **Android visual acceptance of Splash and Homepage is still not claimed.** No
+  physical device or emulator exists in this environment; a DOM or UI-hierarchy
+  dump is not a device render.
+- **No APK was published**, per the standing instruction.
+- **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.

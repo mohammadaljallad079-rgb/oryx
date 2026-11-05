@@ -35,10 +35,19 @@ interface LineDraft {
   description: string;
   quantity: string;
   unitPrice: string;
+  /** A per-line discount in whole percent, converted to basis points on submit. */
+  discountPercent: string;
   taxPercent: string;
 }
 
-const emptyLine = (): LineDraft => ({ productId: '', description: '', quantity: '1', unitPrice: '0.00', taxPercent: '15' });
+const emptyLine = (): LineDraft => ({
+  productId: '',
+  description: '',
+  quantity: '1',
+  unitPrice: '0.00',
+  discountPercent: '0',
+  taxPercent: '15',
+});
 
 export default function SalesPage() {
   const { t } = useUi();
@@ -660,7 +669,10 @@ function PosSaleModal({
   const [paid, setPaid] = useState('');
 
   const total = lines.reduce((sum, l) => {
-    const net = toQuantityInput(l.quantity) * toMinorInput(l.unitPrice) / 10000;
+    const gross = toQuantityInput(l.quantity) * toMinorInput(l.unitPrice) / 10000;
+    // The discount is applied to the gross line before tax, exactly as the
+    // server's `computeDocumentTotals` does.
+    const net = gross * (1 - (Number(l.discountPercent) || 0) / 100);
     const tax = net * (Number(l.taxPercent) || 0) / 100;
     return sum + Math.round(net + tax);
   }, 0);
@@ -681,6 +693,7 @@ function PosSaleModal({
           description: l.description,
           quantity: toQuantityInput(l.quantity),
           unitPriceMinor: toMinorInput(l.unitPrice),
+          discountPercentBp: Math.round((Number(l.discountPercent) || 0) * 100),
           taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
         })),
       });
@@ -806,7 +819,7 @@ function LineEditor({
       {lines.map((line, i) => (
         <div key={i} className="grid grid-cols-12 gap-2">
           <select
-            className="oryx-select col-span-4"
+            className="oryx-select col-span-3"
             value={line.productId}
             onChange={(e) => {
               const product = products.find((p) => p.id === e.target.value);
@@ -846,6 +859,13 @@ function LineEditor({
             value={line.unitPrice}
             onChange={(e) => update(i, { unitPrice: e.target.value })}
             data-testid={`${testIdPrefix}-price-${i}`}
+          />
+          <input
+            className="oryx-input col-span-1"
+            placeholder={t('erp.sales.discount')}
+            value={line.discountPercent}
+            onChange={(e) => update(i, { discountPercent: e.target.value })}
+            data-testid={`${testIdPrefix}-discount-${i}`}
           />
           <input
             className="oryx-input col-span-1"
@@ -912,6 +932,7 @@ function DocumentModal({
           description: l.description || 'Item',
           quantity: toQuantityInput(l.quantity),
           unitPriceMinor: toMinorInput(l.unitPrice),
+          discountPercentBp: Math.round((Number(l.discountPercent) || 0) * 100),
           taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
         })),
       });

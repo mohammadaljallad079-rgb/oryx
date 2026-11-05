@@ -8,6 +8,7 @@ import {
   IsISO8601,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -461,6 +462,19 @@ export class PosSaleLineDto {
   @IsInt()
   @Min(0)
   unitPriceMinor!: number;
+
+  /**
+   * A cashier discount on this line, in basis points (500 = 5%).
+   *
+   * Bounded to 100% by the same clamp the document path uses; the server
+   * computes the discount minor amount, never the client.
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(10_000)
+  discountPercentBp?: number;
 
   @IsOptional()
   @Type(() => Number)
