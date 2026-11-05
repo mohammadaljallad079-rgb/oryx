@@ -341,6 +341,25 @@ export class DocumentsService {
     req?: RequestLike,
   ): Promise<{ bytes: Buffer; filename: string; contentType: string }> {
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    return this.downloadScoped(companyId, id, actor, req);
+  }
+
+  /** The bytes for a company already resolved by the caller (the merchant portal). */
+  async downloadForCompany(
+    companyId: string,
+    id: string,
+    actor: ActorContext,
+    req?: RequestLike,
+  ) {
+    return this.downloadScoped(companyId, id, actor, req);
+  }
+
+  private async downloadScoped(
+    companyId: string,
+    id: string,
+    actor: ActorContext,
+    req?: RequestLike,
+  ): Promise<{ bytes: Buffer; filename: string; contentType: string }> {
     const row = await this.prisma.officialDocument.findFirst({ where: { id, companyId } });
     if (!row) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Document not found.');
     if (!row.storageKey || !isDocumentDownloadable(row.status)) {
@@ -375,6 +394,90 @@ export class DocumentsService {
       bytes,
       filename: `${row.documentNumber}-v${row.version}.pdf`,
       contentType: 'application/pdf',
+    };
+  }
+
+  // -------------------------------------------------- merchant (provider) reads
+
+  /**
+   * The issued documents for a company, for the merchant portal.
+   *
+   * Scoped by an explicit `companyId` — resolved from `ProviderUser` membership
+   * by the portal controller — rather than by a request principal. A provider
+   * user's principal is platform/company scoped and must not be trusted to pick
+   * its own tenant; keeping the resolution in the portal means this read cannot
+   * be widened by a principal field that happens to be absent.
+   */
+  async listForCompany(
+    companyId: string,
+    params: {
+      page: number;
+      pageSize: number;
+      search?: string;
+      type?: string;
+      status?: string;
+      sourceType?: string;
+    },
+  ) {
+    const search = params.search?.trim();
+    const where = {
+      companyId,
+      ...(params.type ? { type: params.type as OfficialDocumentType } : {}),
+      ...(params.status ? { status: params.status as never } : {}),
+      ...(params.sourceType ? { sourceType: params.sourceType } : {}),
+      ...(search
+        ? {
+            OR: [
+              { documentNumber: { contains: search, mode: 'insensitive' as const } },
+              { sourceId: search },
+            ],
+          }
+        : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.officialDocument.findMany({
+        where,
+        orderBy: [{ issuedAt: 'desc' }, { id: 'desc' }],
+        skip: (params.page - 1) * params.pageSize,
+        take: params.pageSize,
+      }),
+      this.prisma.officialDocument.count({ where }),
+    ]);
+    return {
+      items: rows.map((r) => this.toDto(r)),
+      total,
+      page: params.page,
+      pageSize: params.pageSize,
+    };
+  }
+
+  /** One issued document within a company, with its append-only trail. */
+  async getForCompany(companyId: string, id: string) {
+    const row = await this.prisma.officialDocument.findFirst({
+      where: { id, companyId },
+      include: { events: { orderBy: { createdAt: 'desc' } } },
+    });
+    if (!row) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Document not found.');
+    return {
+      ...this.toDto(row),
+      events: row.events.map((e) => ({
+        id: e.id,
+        event: e.event,
+        detail: e.detail,
+        actorId: e.actorId,
+        createdAt: e.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  /** The public verification view for a document inside a company. */
+  async verifyForCompany(companyId: string, id: string) {
+    const row = await this.prisma.officialDocument.findFirst({ where: { id, companyId } });
+    if (!row) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Document not found.');
+    return {
+      verificationUrl: this.qr.verificationUrl(row.verificationToken),
+      verificationToken: row.verificationToken,
+      view: await this.verifyPublic(row.verificationToken),
     };
   }
 

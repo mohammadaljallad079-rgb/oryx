@@ -224,6 +224,23 @@ export default function MerchantProfile() {
           </View>
         </Card>
 
+        {isSignedIn ? (
+          <Card>
+            <SectionLabel>{t('documentsTitle')}</SectionLabel>
+            <Body size="caption" muted style={{ marginTop: space.sm }}>
+              {t('documentsSubtitle')}
+            </Body>
+            <View style={{ marginTop: space.md }}>
+              <Button
+                testID="merchant-documents"
+                title={t('documentsTitle')}
+                variant="secondary"
+                onPress={() => router.push('/merchant/documents')}
+              />
+            </View>
+          </Card>
+        ) : null}
+
         <Card>
           <SectionLabel>{t('erpTools')}</SectionLabel>
           <View style={[styles.row, { flexDirection: direction === 'rtl' ? 'row-reverse' : 'row' }]}>

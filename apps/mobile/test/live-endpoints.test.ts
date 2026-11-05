@@ -127,6 +127,38 @@ describe('merchant recovery queue', () => {
   });
 });
 
+describe('merchant document register (requirement A)', () => {
+  it('reads /provider/documents on the staff plane, sending no company id', async () => {
+    stubFetch(200, { items: [], total: 0, page: 1, pageSize: 20 });
+    setAccessToken('consumer-token');
+    setStaffAccessToken('staff-token');
+    await providerApi.documents({ search: 'INV-001', type: 'SALES_INVOICE' });
+    expect(captured[0]?.url).toContain('/provider/documents?');
+    expect(captured[0]?.url).toContain('search=INV-001');
+    expect(captured[0]?.url).toContain('type=SALES_INVOICE');
+    // The tenant is resolved from provider membership server-side; a company id
+    // here would be a cross-tenant read waiting to happen.
+    expect(captured[0]?.url).not.toContain('companyId');
+    expect(captured[0]?.headers.Authorization).toBe('Bearer staff-token');
+  });
+
+  it('reads one document and its verification view through the provider routes', async () => {
+    stubFetch(200, { id: 'd1', documentNumber: 'INV-001' });
+    setStaffAccessToken('staff-token');
+    await providerApi.document('d1');
+    expect(captured[0]?.url).toContain('/provider/documents/d1');
+    expect(captured[0]?.headers.Authorization).toBe('Bearer staff-token');
+
+    stubFetch(200, { verificationUrl: 'http://localhost:3000/verify/tok', view: null });
+    await providerApi.documentVerification('d1');
+    expect(captured[0]?.url).toContain('/provider/documents/d1/verification');
+  });
+
+  it('builds the PDF file URL under the provider route', () => {
+    expect(providerApi.documentFileUrl('d1')).toContain('/provider/documents/d1/file');
+  });
+});
+
 describe('vehicle service history', () => {
   it('reads /customer/vehicles/:id/history and encodes the id', async () => {
     stubFetch(200, { vehicle: { id: 'a/b' }, inspections: [], maintenance: [], jobCards: [], warranties: [] });

@@ -1787,6 +1787,79 @@ export interface ProviderEarnings {
   paidToDate: { count: number; netMinor: number };
 }
 
+/** The kinds of official document the platform issues. */
+export type OfficialDocumentType =
+  | 'SALES_INVOICE'
+  | 'SALES_QUOTATION'
+  | 'SALES_RETURN'
+  | 'PURCHASE_INVOICE'
+  | 'PURCHASE_RETURN'
+  | 'RECEIPT'
+  | 'PAYMENT_RECEIPT'
+  | 'JOURNAL_VOUCHER'
+  | 'ACCOUNT_STATEMENT'
+  | 'INSPECTION_REPORT';
+
+/** One issued official document, as the document endpoints project it. */
+export interface OfficialDocument {
+  id: string;
+  type: OfficialDocumentType;
+  documentNumber: string;
+  status: 'DRAFT' | 'ISSUED' | 'SUPERSEDED' | 'CANCELLED' | 'REVOKED';
+  version: number;
+  verificationToken: string;
+  verificationUrl: string;
+  sourceType: string;
+  sourceId: string;
+  pageCount: number | null;
+  byteSize: number | null;
+  issuedAt: string;
+  issuerNameEn: string;
+  issuerNameAr: string;
+  issuerCode: string;
+  supersededAt: string | null;
+  revokedAt: string | null;
+  revokeReason: string | null;
+}
+
+/** A document plus its append-only event trail. */
+export interface OfficialDocumentDetail extends OfficialDocument {
+  events: Array<{
+    id: string;
+    event: string;
+    detail: string | null;
+    actorId: string | null;
+    createdAt: string;
+  }>;
+}
+
+/** The public verification view a QR scan resolves to. */
+export interface DocumentVerification {
+  verificationUrl: string;
+  verificationToken: string;
+  view: {
+    status: string;
+    type: OfficialDocumentType;
+    typeLabelEn: string;
+    typeLabelAr: string;
+    documentNumber: string;
+    version: number;
+    issuerNameEn: string;
+    issuerNameAr: string;
+    issuerCode: string;
+    issuedAt: string;
+    subject?: Record<string, unknown>;
+  } | null;
+}
+
+/** A page of results, as the paginated list endpoints return them. */
+export interface Paginated<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 /**
  * The merchant/provider portal.
  *
@@ -1968,4 +2041,51 @@ export const providerApi = {
       body: note ? { status, note } : { status },
       plane: 'staff',
     }),
+
+  /**
+   * The official documents the platform issued for this merchant's own company.
+   *
+   * Invoices, quotations, receipts and inspection reports — read from
+   * `/provider/documents`, which resolves the company from the authenticated
+   * provider membership. No company id is sent, so the register cannot be
+   * widened to another tenant by editing the request.
+   */
+  documents: (
+    params: {
+      search?: string;
+      type?: string;
+      status?: string;
+      sourceType?: string;
+      page?: number;
+      pageSize?: number;
+    } = {},
+    signal?: AbortSignal,
+  ) => {
+    const q = new URLSearchParams();
+    if (params.search) q.set('search', params.search);
+    if (params.type) q.set('type', params.type);
+    if (params.status) q.set('status', params.status);
+    if (params.sourceType) q.set('sourceType', params.sourceType);
+    q.set('page', String(params.page ?? 1));
+    q.set('pageSize', String(params.pageSize ?? 20));
+    return requestWithRetry<Paginated<OfficialDocument>>(`/provider/documents?${q}`, {
+      signal,
+      plane: 'staff',
+    });
+  },
+
+  document: (id: string, signal?: AbortSignal) =>
+    requestWithRetry<OfficialDocumentDetail>(`/provider/documents/${encodeURIComponent(id)}`, {
+      signal,
+      plane: 'staff',
+    }),
+
+  documentVerification: (id: string, signal?: AbortSignal) =>
+    requestWithRetry<DocumentVerification>(
+      `/provider/documents/${encodeURIComponent(id)}/verification`,
+      { signal, plane: 'staff' },
+    ),
+
+  /** The absolute URL of the stored PDF, for the device browser to open. */
+  documentFileUrl: (id: string) => `${BASE_URL}/provider/documents/${encodeURIComponent(id)}/file`,
 };

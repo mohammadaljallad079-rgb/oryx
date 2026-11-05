@@ -8,16 +8,26 @@ import {
   Patch,
   Post,
   Query,
+  Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { RequirePermissions } from '../auth/auth.decorators';
 import { PrincipalGuard } from '../auth/principal.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { CurrentPrincipal, type RequestPrincipal } from '../auth/auth.decorators';
 import { MarketplaceService } from './marketplace.service';
 import { CustomerOrderService } from './customer-order.service';
+import { DocumentsService } from '../documents/documents.service';
+import { actorFrom } from '../common/erp-context.service';
 import { ERROR_CODES, notFound } from '../common/errors';
+
+interface RequestLike {
+  ip?: string;
+  headers: Record<string, string | string[] | undefined>;
+}
 import {
   CancelRequestDto,
   CompleteServiceRequestDto,
@@ -56,6 +66,7 @@ export class ProviderPortalController {
   constructor(
     private readonly marketplace: MarketplaceService,
     private readonly orders: CustomerOrderService,
+    private readonly documents: DocumentsService,
   ) {}
 
   /** Resolve and authorise the provider this request acts for. */
@@ -386,5 +397,97 @@ export class ProviderPortalController {
     return this.orders.transition(id, dto.status, 'MERCHANT', dto.note ?? null, {
       companyId: provider.providerCompanyId,
     });
+  }
+
+  // -------------------------------------------------------------- documents
+
+  /**
+   * The merchant's own issued documents.
+   *
+   * A merchant reads the official documents — invoices, quotations, receipts,
+   * inspection reports — that the platform issued for *its* company. The company
+   * comes from `ProviderUser` membership, never from the URL, so one provider
+   * can never list another provider's documents. A provider with no linked
+   * company sees an empty register rather than the whole platform's.
+   */
+  @Get('documents')
+  @RequirePermissions('erp.provider_portal.manage')
+  @ApiOperation({ summary: 'List the issued documents for the provider company' })
+  async listDocuments(
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Query('page') page = '1',
+    @Query('pageSize') pageSize = '20',
+    @Query('search') search?: string,
+    @Query('type') type?: string,
+    @Query('status') status?: string,
+    @Query('sourceType') sourceType?: string,
+  ) {
+    const provider = await this.provider(principal);
+    if (!provider.providerCompanyId) {
+      return { items: [], total: 0, page: 1, pageSize: 20 };
+    }
+    return this.documents.listForCompany(provider.providerCompanyId, {
+      page: Math.max(1, Number(page) || 1),
+      pageSize: Math.min(50, Math.max(1, Number(pageSize) || 20)),
+      search,
+      type,
+      status,
+      sourceType,
+    });
+  }
+
+  @Get('documents/:id')
+  @RequirePermissions('erp.provider_portal.manage')
+  @ApiOperation({ summary: 'Read one issued document with its trail' })
+  async getDocument(@CurrentPrincipal() principal: RequestPrincipal, @Param('id') id: string) {
+    const provider = await this.provider(principal);
+    if (!provider.providerCompanyId) {
+      throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Document not found.');
+    }
+    return this.documents.getForCompany(provider.providerCompanyId, id);
+  }
+
+  @Get('documents/:id/verification')
+  @RequirePermissions('erp.provider_portal.manage')
+  @ApiOperation({ summary: 'The QR verification view for one document' })
+  async verifyDocument(@CurrentPrincipal() principal: RequestPrincipal, @Param('id') id: string) {
+    const provider = await this.provider(principal);
+    if (!provider.providerCompanyId) {
+      throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Document not found.');
+    }
+    return this.documents.verifyForCompany(provider.providerCompanyId, id);
+  }
+
+  /**
+   * The stored PDF for one of the provider company's documents.
+   *
+   * Served inline so a merchant can preview and print it in the browser. The
+   * company scope is applied inside `downloadForCompany`, so the file of another
+   * tenant is a `404`, not a leaked download.
+   */
+  @Get('documents/:id/file')
+  @RequirePermissions('erp.provider_portal.manage')
+  @ApiOperation({ summary: 'Download the stored PDF for the provider company' })
+  async documentFile(
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Param('id') id: string,
+    @Req() req: RequestLike,
+    @Res() res: Response,
+  ) {
+    const provider = await this.provider(principal);
+    if (!provider.providerCompanyId) {
+      throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Document not found.');
+    }
+    const { bytes, filename, contentType } = await this.documents.downloadForCompany(
+      provider.providerCompanyId,
+      id,
+      actorFrom(principal, req),
+      req,
+    );
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Length', String(bytes.length));
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.status(200).send(bytes);
   }
 }

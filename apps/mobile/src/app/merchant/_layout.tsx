@@ -100,6 +100,7 @@ export default function MerchantLayout() {
           renders as a stray tab labelled with its raw route name. */}
       <Tabs.Screen name="plan" options={{ href: null }} />
       <Tabs.Screen name="promotions" options={{ href: null }} />
+      <Tabs.Screen name="documents" options={{ href: null }} />
     </Tabs>
   );
 }

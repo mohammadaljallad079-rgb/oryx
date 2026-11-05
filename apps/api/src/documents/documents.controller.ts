@@ -19,7 +19,7 @@ import {
   RequirePermissions,
   type RequestPrincipal,
 } from '../auth/auth.decorators';
-import { actorFrom } from '../common/erp-context.service';
+import { actorFrom, ErpContextService } from '../common/erp-context.service';
 import { DocumentsService } from './documents.service';
 import { IssueFinancialDocumentDto, RevokeDocumentDto } from './documents.dto';
 
@@ -46,7 +46,10 @@ interface RequestLike {
 @ApiBearerAuth()
 @Controller('documents')
 export class DocumentsController {
-  constructor(private readonly documents: DocumentsService) {}
+  constructor(
+    private readonly documents: DocumentsService,
+    private readonly context: ErpContextService,
+  ) {}
 
   // ------------------------------------------------------------- public
 
@@ -120,6 +123,43 @@ export class DocumentsController {
     @CurrentPrincipal() p: RequestPrincipal,
   ) {
     return this.documents.listForSource(sourceType, sourceId, p);
+  }
+
+  /**
+   * The company's document register.
+   *
+   * Every document the tenant has issued, searchable by number, filterable by
+   * type and status. Scoped to the caller's company by `resolveCompanyScope`, so
+   * the register can never show another tenant's documents.
+   *
+   * Declared before `:id` so `register` is not captured as a document id.
+   */
+  @Get('register')
+  @RequireAnyPermission(
+    'erp.sales.read',
+    'erp.purchasing.read',
+    'erp.accounting.read',
+    'erp.inspection.read',
+  )
+  @ApiOperation({ summary: 'The tenant document register, searchable and filterable' })
+  async register(
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Query('page') page = '1',
+    @Query('pageSize') pageSize = '20',
+    @Query('search') search?: string,
+    @Query('type') type?: string,
+    @Query('status') status?: string,
+    @Query('sourceType') sourceType?: string,
+  ) {
+    const { companyId } = await this.context.resolveCompanyScope(p);
+    return this.documents.listForCompany(companyId, {
+      page: Math.max(1, Number(page) || 1),
+      pageSize: Math.min(50, Math.max(1, Number(pageSize) || 20)),
+      search,
+      type,
+      status,
+      sourceType,
+    });
   }
 
   @Get(':id')
