@@ -130,6 +130,118 @@ function paymentBlock(payload: FinancialDocumentPayload): string {
   </div>`;
 }
 
+/**
+ * The account-statement body.
+ *
+ * A statement reports movement over a period: an opening balance, one row per
+ * invoice/payment, and a closing balance. It reuses the priced line table shape
+ * but labels the amount column as the movement's effect, and brackets the table
+ * with the opening and closing balances so the arithmetic is visible.
+ */
+function statementBlock(payload: FinancialDocumentPayload): string {
+  const s = payload.statement;
+  if (!s) return '';
+  return `
+  <div class="statement-wrap">
+    <table class="lines">
+      <thead>
+        <tr>
+          <th class="l-idx">#</th>
+          <th class="l-desc">البيان · Description</th>
+          <th class="l-price">التاريخ · Date</th>
+          <th class="l-total">مدين / حركة · Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="statement-opening">
+          <td class="l-idx num">—</td>
+          <td class="l-desc">الرصيد الافتتاحي · Opening balance</td>
+          <td class="l-price num">${esc(docDate(s.periodFrom))}</td>
+          <td class="l-total num">${esc(money(s.openingBalanceMinor, payload.currency))}</td>
+        </tr>
+        ${payload.lines
+          .map(
+            (line, index) => `
+        <tr>
+          <td class="l-idx num">${index + 1}</td>
+          <td class="l-desc">${esc(line.description)}</td>
+          <td class="l-price num">${esc(docDate(line.sku ?? s.periodTo))}</td>
+          <td class="l-total num">${esc(money(line.lineTotalMinor, payload.currency))}</td>
+        </tr>`,
+          )
+          .join('')}
+      </tbody>
+      <tfoot>
+        <tr class="totals-grand">
+          <th colspan="3">الرصيد الختامي · Closing balance</th>
+          <td class="num">${esc(money(s.closingBalanceMinor, payload.currency))}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>`;
+}
+
+/** The journal-entry body: a debit/credit table, never a priced line table. */
+function journalBlock(payload: FinancialDocumentPayload): string {
+  const j = payload.journal;
+  if (!j) return '';
+  return `
+  <div class="journal-wrap">
+    <div class="id-grid">
+      <div class="id-box">
+        <div class="id-box-title">بيانات القيد · Entry</div>
+        <table class="kv">
+          <tr><th>رقم القيد / Entry</th><td class="num">${esc(j.entryNumber)}</td></tr>
+          <tr><th>التاريخ / Date</th><td class="num">${esc(docDate(j.entryDate))}</td></tr>
+          <tr><th>المصدر / Source</th><td>${esc(j.sourceType)}</td></tr>
+          <tr><th>العملة / Currency</th><td class="num">${esc(payload.currency)}</td></tr>
+        </table>
+      </div>
+      <div class="id-box">
+        <div class="id-box-title">البيان · Memo</div>
+        <table class="kv">
+          <tr><td>${escMultiline(j.memo ?? '—')}</td></tr>
+        </table>
+      </div>
+    </div>
+    <table class="lines journal">
+      <thead>
+        <tr>
+          <th class="j-idx">#</th>
+          <th class="j-acc">الحساب · Account</th>
+          <th class="j-desc">البيان · Description</th>
+          <th class="j-dr">مدين · Debit</th>
+          <th class="j-cr">دائن · Credit</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${j.rows
+          .map(
+            (row) => `
+        <tr>
+          <td class="j-idx num">${row.lineNumber}</td>
+          <td class="j-acc">
+            <span class="num">${esc(row.accountCode)}</span>
+            <span class="line-sku">${esc(row.accountNameAr || row.accountNameEn)}</span>
+          </td>
+          <td class="j-desc">${esc(row.description ?? '—')}</td>
+          <td class="j-dr num">${row.debitMinor ? esc(money(row.debitMinor, payload.currency)) : '—'}</td>
+          <td class="j-cr num">${row.creditMinor ? esc(money(row.creditMinor, payload.currency)) : '—'}</td>
+        </tr>`,
+          )
+          .join('')}
+      </tbody>
+      <tfoot>
+        <tr class="totals-grand">
+          <th colspan="3">الإجمالي · Totals</th>
+          <td class="num">${esc(money(j.totalDebitMinor, payload.currency))}</td>
+          <td class="num">${esc(money(j.totalCreditMinor, payload.currency))}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>`;
+}
+
 export function renderFinancialDocumentHtml(input: FinancialRenderInput): string {
   const payload = input.payload;
   const chrome: DocumentChrome = {
@@ -140,6 +252,18 @@ export function renderFinancialDocumentHtml(input: FinancialRenderInput): string
     issuedAt: input.issuedAt,
     subtitle: payload.counterparty.nameEn,
   };
+
+  // A statement and a journal are structurally different documents, so the body
+  // is chosen explicitly rather than by stacking every block and hiding the
+  // empty ones.
+  const body = payload.journal
+    ? `${journalBlock(payload)}`
+    : payload.statement
+      ? `${counterpartyBlock(payload)}${statementBlock(payload)}`
+      : `${counterpartyBlock(payload)}
+  <div class="lines-wrap">${lineTable(payload)}</div>
+  ${totalsBlock(payload)}
+  ${paymentBlock(payload)}`;
 
   return `<!doctype html>
 <html lang="ar" dir="rtl">
@@ -155,10 +279,7 @@ ${FINANCIAL_CSS}
 <section class="doc-page">
   ${documentWatermark(input.issuer)}
   ${documentHeader(chrome)}
-  ${counterpartyBlock(payload)}
-  <div class="lines-wrap">${lineTable(payload)}</div>
-  ${totalsBlock(payload)}
-  ${paymentBlock(payload)}
+  ${body}
   ${verificationBlock(input.verification)}
   ${signatureBlock([
     { ar: 'توقيع المستلم', en: 'Received By', name: payload.payment?.receivedByName ?? null },
@@ -198,4 +319,13 @@ export const FINANCIAL_CSS = `
   .totals-grand th{ color:var(--navy); font-weight:700; background:var(--navy); color:#fff; }
   .totals-grand td{ background:var(--navy); color:#fff; font-weight:700; font-size:11pt; }
   .payment-block{ margin-top:12px; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+  .statement-wrap{ margin-top:12px; }
+  .statement-opening td{ color:var(--muted); font-style:italic; }
+  .journal-wrap{ margin-top:12px; }
+  .journal .j-idx{ width:5%; text-align:center; }
+  .journal .j-acc{ width:26%; }
+  .journal .j-desc{ width:29%; }
+  .journal .j-dr,.journal .j-cr{ width:20%; text-align:end; }
+  .journal tfoot th,.journal tfoot td{ padding:5px 7px; font-size:9.5pt; text-align:start; }
+  .journal tfoot td{ text-align:end; }
 `;

@@ -49,6 +49,17 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
 
     await prisma.officialDocumentEvent.deleteMany({ where: { companyId: { in: companyIds } } });
     await prisma.officialDocument.deleteMany({ where: { companyId: { in: companyIds } } });
+    // A purchase return and a journal entry are sources for the new document
+    // types, so they must be removed before the suppliers, warehouses and
+    // accounts they reference.
+    await prisma.purchaseReturnLine.deleteMany({ where: { purchaseReturn: { companyId: { in: companyIds } } } });
+    await prisma.purchaseReturn.deleteMany({ where: { companyId: { in: companyIds } } });
+    await prisma.journalLine.deleteMany({ where: { entry: { companyId: { in: companyIds } } } });
+    await prisma.journalEntry.deleteMany({ where: { companyId: { in: companyIds } } });
+    await prisma.fiscalPeriod.deleteMany({ where: { companyId: { in: companyIds } } });
+    await prisma.fiscalYear.deleteMany({ where: { companyId: { in: companyIds } } });
+    await prisma.warehouse.deleteMany({ where: { companyId: { in: companyIds } } });
+    await prisma.account.deleteMany({ where: { companyId: { in: companyIds } } });
     // Credit notes and supplier invoices are children of the customer, supplier
     // and product rows below, so they must be removed before them.
     await prisma.creditNoteLine.deleteMany({ where: { creditNote: { companyId: { in: companyIds } } } });
@@ -825,6 +836,204 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
       });
       expect(pdf.status).toBe(200);
       expect(Buffer.from(await pdf.arrayBuffer()).subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    });
+
+    it('issues a purchase return from the stored return record', async () => {
+      const supplier = await prisma.supplier.create({
+        data: {
+          companyId,
+          code: `${PREFIX}-SUP-PR`,
+          nameEn: 'EP3 Return Supplier',
+          nameAr: 'مورد المرتجع',
+        },
+      });
+      const warehouse = await prisma.warehouse.create({
+        data: { companyId, code: `${PREFIX}-WH`, nameEn: 'EP3 Warehouse', nameAr: 'مستودع' },
+      });
+      const purchaseReturn = await prisma.purchaseReturn.create({
+        data: {
+          companyId,
+          returnNumber: `${PREFIX}-PR-1`,
+          supplierId: supplier.id,
+          warehouseId: warehouse.id,
+          status: 'POSTED',
+          subtotalMinor: 50_000,
+          taxMinor: 5_000,
+          totalMinor: 55_000,
+          reason: 'Damaged goods',
+          currency: 'BHD',
+          createdById: 'system',
+          lines: {
+            create: [
+              {
+                productId: 'ep3-product-ref',
+                description: 'Returned brake pads',
+                quantity: 2,
+                unitCostMinor: 25_000,
+                taxPercentBp: 1000,
+                lineTotalMinor: 55_000,
+                sortOrder: 0,
+              },
+            ],
+          },
+        },
+      });
+
+      const res = await companyCall<{ id: string; type: string; documentNumber: string; pageCount: number }>(
+        ctx.base,
+        companyId,
+        '/documents/issue',
+        { method: 'POST', token: issuerToken, body: { type: 'PURCHASE_RETURN', sourceId: purchaseReturn.id } },
+      );
+      expect(res.status === 201 ? '' : JSON.stringify(res.body)).toBe('');
+      expect(res.body.type).toBe('PURCHASE_RETURN');
+      expect(res.body.documentNumber).toBe(`${PREFIX}-PR-1`);
+      expect(res.body.pageCount).toBeGreaterThanOrEqual(1);
+
+      const pdf = await fetch(`${ctx.base}/api/v1/documents/${res.body.id}/file`, {
+        headers: { Authorization: `Bearer ${issuerToken}`, 'x-oryx-company-id': companyId },
+      });
+      expect(pdf.status).toBe(200);
+      expect(Buffer.from(await pdf.arrayBuffer()).subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    });
+
+    it('issues a customer statement over the fiscal period from the stored invoices and payments', async () => {
+      // The statement must derive its figures from the ledger-side records, so a
+      // movement row can never disagree with the invoice it names.
+      await prisma.fiscalYear.create({
+        data: {
+          companyId,
+          code: `${PREFIX}-FY-ST`,
+          startDate: new Date('2024-01-01T00:00:00.000Z'),
+          endDate: new Date('2026-12-31T00:00:00.000Z'),
+          periods: {
+            create: [
+              {
+                companyId,
+                periodNumber: 1,
+                nameEn: 'Statement Period',
+                nameAr: 'فترة الكشف',
+                startDate: new Date('2024-01-01T00:00:00.000Z'),
+                endDate: new Date('2026-12-31T00:00:00.000Z'),
+                status: 'OPEN',
+              },
+            ],
+          },
+        },
+      });
+
+      const res = await companyCall<{ id: string; type: string; pageCount: number }>(
+        ctx.base,
+        companyId,
+        '/documents/issue',
+        { method: 'POST', token: issuerToken, body: { type: 'CUSTOMER_STATEMENT', sourceId: customerId } },
+      );
+      expect(res.status === 201 ? '' : JSON.stringify(res.body)).toBe('');
+      expect(res.body.type).toBe('CUSTOMER_STATEMENT');
+
+      const pdf = await fetch(`${ctx.base}/api/v1/documents/${res.body.id}/file`, {
+        headers: { Authorization: `Bearer ${issuerToken}`, 'x-oryx-company-id': companyId },
+      });
+      expect(pdf.status).toBe(200);
+      expect(Buffer.from(await pdf.arrayBuffer()).subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    });
+
+    it('issues a supplier statement and a journal entry', async () => {
+      // Self-contained: a statement is rendered from its own party, so the test
+      // creates the supplier rather than depending on an earlier test's fixture.
+      const supplier = await prisma.supplier.create({
+        data: {
+          companyId,
+          code: `${PREFIX}-SUP-ST`,
+          nameEn: 'EP3 Statement Supplier',
+          nameAr: 'مورد الكشف',
+        },
+      });
+      const statement = await companyCall<{ id: string; type: string }>(
+        ctx.base,
+        companyId,
+        '/documents/issue',
+        { method: 'POST', token: issuerToken, body: { type: 'SUPPLIER_STATEMENT', sourceId: supplier.id } },
+      );
+      expect(statement.status === 201 ? '' : JSON.stringify(statement.body)).toBe('');
+      expect(statement.body.type).toBe('SUPPLIER_STATEMENT');
+
+      // A journal entry renders a debit/credit table, not a priced line table.
+      // The fixture company is created without a chart of accounts, so the two
+      // accounts the entry needs are created here.
+      const account = await prisma.account.create({
+        data: {
+          companyId,
+          code: `${PREFIX}-1000`,
+          nameEn: 'Cash',
+          nameAr: 'النقدية',
+          type: 'ASSET',
+          normalBalance: 'DEBIT',
+        },
+      });
+      const counter = await prisma.account.create({
+        data: {
+          companyId,
+          code: `${PREFIX}-4000`,
+          nameEn: 'Revenue',
+          nameAr: 'الإيرادات',
+          type: 'REVENUE',
+          normalBalance: 'CREDIT',
+        },
+      });
+      const entry = await prisma.journalEntry.create({
+        data: {
+          companyId,
+          entryNumber: `${PREFIX}-JE-1`,
+          entryDate: new Date(),
+          status: 'POSTED',
+          sourceType: 'MANUAL',
+          memo: 'Opening adjustment',
+          currency: 'BHD',
+          totalDebitMinor: 10_000,
+          totalCreditMinor: 10_000,
+          createdById: 'system',
+          lines: {
+            create: [
+              {
+                companyId,
+                lineNumber: 1,
+                accountId: account.id,
+                description: 'Debit leg',
+                debitMinor: 10_000,
+                creditMinor: 0,
+              },
+              {
+                companyId,
+                lineNumber: 2,
+                accountId: counter.id,
+                description: 'Credit leg',
+                debitMinor: 0,
+                creditMinor: 10_000,
+              },
+            ],
+          },
+        },
+      });
+
+      const journal = await companyCall<{ id: string; type: string; documentNumber: string }>(
+        ctx.base,
+        companyId,
+        '/documents/issue',
+        { method: 'POST', token: issuerToken, body: { type: 'JOURNAL_ENTRY', sourceId: entry.id } },
+      );
+      expect(journal.status === 201 ? '' : JSON.stringify(journal.body)).toBe('');
+      expect(journal.body.type).toBe('JOURNAL_ENTRY');
+      expect(journal.body.documentNumber).toBe(`${PREFIX}-JE-1`);
+
+      const pdf = await fetch(`${ctx.base}/api/v1/documents/${journal.body.id}/file`, {
+        headers: { Authorization: `Bearer ${issuerToken}`, 'x-oryx-company-id': companyId },
+      });
+      expect(pdf.status).toBe(200);
+      const bytes = Buffer.from(await pdf.arrayBuffer());
+      expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      // The journal's own account codes must be in the text layer.
+      expect(bytes.toString('latin1')).toContain('/Type0');
     });
 
     it('refuses an unknown document type', async () => {

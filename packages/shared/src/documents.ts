@@ -165,6 +165,34 @@ export function officialDocumentSpec(type: string): OfficialDocumentSpec {
   return found;
 }
 
+/**
+ * The financial document types that can be issued from a stored source record.
+ *
+ * A type is listed here only when a real loader exists for it, so the API's
+ * whitelist and the admin screen's buttons read the same list and cannot drift.
+ * `VEHICLE_INSPECTION_REPORT` is absent because it is issued from an inspection
+ * through its own route.
+ */
+export const ISSUABLE_FINANCIAL_TYPES = [
+  'SALES_INVOICE',
+  'SALES_ORDER',
+  'QUOTATION',
+  // A sales return is rendered from its credit note, a purchase invoice from
+  // its supplier invoice and a purchase return from the return record.
+  'SALES_RETURN',
+  'PURCHASE_INVOICE',
+  'PURCHASE_RETURN',
+  'PAYMENT_RECEIPT',
+  'PAYMENT_VOUCHER',
+  // A statement is rendered from the party it reports on over the company's
+  // current fiscal period; a journal entry is rendered from the entry itself.
+  'CUSTOMER_STATEMENT',
+  'SUPPLIER_STATEMENT',
+  'JOURNAL_ENTRY',
+] as const satisfies readonly OfficialDocumentType[];
+
+export type IssuableFinancialType = (typeof ISSUABLE_FINANCIAL_TYPES)[number];
+
 // ---------------------------------------------------------------------------
 // Inspection-report composition
 // ---------------------------------------------------------------------------

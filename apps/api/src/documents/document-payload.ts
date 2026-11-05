@@ -175,6 +175,46 @@ export interface FinancialDocumentPayload {
     receivedByName: string | null;
     paidAt: string;
   } | null;
+  /**
+   * Account-statement fields, present only for a customer or supplier statement.
+   *
+   * A statement is not a demand for payment: it is a movement report over a
+   * period, so it carries an opening balance and a closing balance around the
+   * `lines` table rather than a totals block. The `lines` array is reused — each
+   * row is one movement and `lineTotalMinor` carries its signed effect on the
+   * balance.
+   */
+  statement?: {
+    periodFrom: string;
+    periodTo: string;
+    openingBalanceMinor: number;
+    closingBalanceMinor: number;
+    totalDebitMinor: number;
+    totalCreditMinor: number;
+  } | null;
+  /**
+   * Journal-entry fields, present only for a journal entry.
+   *
+   * A journal has a debit column and a credit column instead of a priced line
+   * table, so it carries its own rows rather than reusing `lines`.
+   */
+  journal?: {
+    entryNumber: string;
+    entryDate: string;
+    sourceType: string;
+    memo: string | null;
+    rows: Array<{
+      lineNumber: number;
+      accountCode: string;
+      accountNameEn: string;
+      accountNameAr: string;
+      description: string | null;
+      debitMinor: number;
+      creditMinor: number;
+    }>;
+    totalDebitMinor: number;
+    totalCreditMinor: number;
+  } | null;
 }
 
 export type DocumentPayload = InspectionReportPayload | FinancialDocumentPayload;

@@ -55,18 +55,11 @@ export default function DashboardHomePage() {
 
       {/* ------------------------------------------------ hero banner */}
       <section className="oryx-hero" data-testid="dashboard-hero">
-        <div
-          className="oryx-hero__media"
-          style={{ backgroundImage: 'url(/tiles/banner-automotive.svg)' }}
-        />
-        <div className="oryx-hero__scrim" />
         <div className="oryx-hero__content">
-          <BrandLogo height={34} className="oryx-hero__logo" />
-          <div className="max-w-[56ch]">
-            <p className="oryx-hero__eyebrow m-0">{scopeLabel ?? ''}</p>
-            <h1 className="m-0 mt-2 text-[27px] font-extrabold leading-tight">{t('dash.heroTitle')}</h1>
-            <p className="m-0 mt-2 max-w-[52ch] text-[13.5px] text-white/80">{t('dash.heroBody')}</p>
-          </div>
+          <BrandLogo height={40} className="oryx-hero__logo" />
+          <p className="oryx-hero__eyebrow m-0">{scopeLabel ?? ''}</p>
+          <h1 className="oryx-hero__title m-0">{t('dash.heroTitle')}</h1>
+          <p className="oryx-hero__body m-0">{t('dash.heroBody')}</p>
         </div>
       </section>
 

@@ -7,6 +7,7 @@ import {
   isDocumentDownloadable,
   isStoredDocumentStatus,
   maskVin,
+  ISSUABLE_FINANCIAL_TYPES,
   officialDocumentSpec,
   planInspectionReport,
   sectionsOnReportPage,
@@ -221,5 +222,20 @@ describe('verification projection', () => {
   it('has a catalogue spec for every document type used in the projection', () => {
     const types: OfficialDocumentType[] = OFFICIAL_DOCUMENTS.map((d) => d.type);
     for (const t of types) expect(() => officialDocumentSpec(t)).not.toThrow();
+  });
+
+  it('only lists issuable types that exist in the catalogue', () => {
+    // The API whitelist and the admin issue buttons both read this list, so a
+    // typo here would offer a document type the API cannot render.
+    const catalogue = new Set(OFFICIAL_DOCUMENTS.map((d) => d.type));
+    for (const t of ISSUABLE_FINANCIAL_TYPES) expect(catalogue.has(t)).toBe(true);
+  });
+
+  it('never lists the inspection report as a financial type', () => {
+    // The report is issued from an inspection through its own route, so it must
+    // not appear in the financial issue list.
+    expect((ISSUABLE_FINANCIAL_TYPES as readonly string[]).includes('VEHICLE_INSPECTION_REPORT')).toBe(
+      false,
+    );
   });
 });

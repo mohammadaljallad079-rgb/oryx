@@ -1016,6 +1016,220 @@ export class DocumentsService {
       };
     }
 
+    if (type === 'PURCHASE_RETURN') {
+      // A purchase return is the mirror of a sales return: it is rendered from
+      // the return record, which is what reduces what the company owes.
+      const ret = await this.prisma.purchaseReturn.findFirst({
+        where: { id: sourceId, companyId },
+        include: { lines: { orderBy: { sortOrder: 'asc' } }, supplier: true },
+      });
+      if (!ret) return null;
+      return {
+        documentNumber: ret.returnNumber,
+        sourceType: 'PurchaseReturn',
+        sourceId: ret.id,
+        payload: {
+          kind: 'FINANCIAL',
+          titleEn: spec.labelEn,
+          titleAr: spec.labelAr,
+          documentNumber: ret.returnNumber,
+          documentDate: ret.returnDate.toISOString(),
+          dueDate: null,
+          status: ret.status,
+          counterparty: counterparty(ret.supplier),
+          lines: ret.lines.map((l) => {
+            const gross = lineAmountMinor(l.quantity, l.unitCostMinor);
+            return {
+              description: l.description,
+              sku: null,
+              quantity: l.quantity,
+              unitPriceMinor: l.unitCostMinor,
+              discountMinor: 0,
+              taxMinor: basisPointsOfMinor(gross, l.taxPercentBp),
+              lineTotalMinor: l.lineTotalMinor,
+            };
+          }),
+          subtotalMinor: ret.subtotalMinor,
+          discountMinor: 0,
+          taxMinor: ret.taxMinor,
+          totalMinor: ret.totalMinor,
+          paidMinor: 0,
+          balanceMinor: ret.totalMinor,
+          currency: ret.currency || (await currencyOf()),
+          notes: ret.reason,
+        },
+      };
+    }
+
+    if (type === 'CUSTOMER_STATEMENT' || type === 'SUPPLIER_STATEMENT') {
+      // A statement reports movement over a fiscal period. The period is chosen
+      // from the company's own fiscal calendar rather than a caller-supplied
+      // date range, so the document can never disagree with the ledger's
+      // period definitions. The most recent period with a start date on or
+      // before today is the current one; falling back to the latest period
+      // keeps a statement issuable on a company whose calendar is in the past.
+      const isCustomer = type === 'CUSTOMER_STATEMENT';
+      const party = isCustomer
+        ? await this.prisma.customer.findFirst({ where: { id: sourceId, companyId } })
+        : await this.prisma.supplier.findFirst({ where: { id: sourceId, companyId } });
+      if (!party) return null;
+
+      const period = await this.prisma.fiscalPeriod.findFirst({
+        where: { companyId },
+        orderBy: { startDate: 'desc' },
+      });
+      const from = period?.startDate ?? new Date(new Date().getFullYear(), 0, 1);
+      const to = period?.endDate ?? new Date();
+
+      const invoices = isCustomer
+        ? await this.prisma.salesInvoice.findMany({
+            where: { companyId, customerId: party.id, invoiceDate: { gte: from, lte: to } },
+            orderBy: { invoiceDate: 'asc' },
+          })
+        : await this.prisma.supplierInvoice.findMany({
+            where: { companyId, supplierId: party.id, invoiceDate: { gte: from, lte: to } },
+            orderBy: { invoiceDate: 'asc' },
+          });
+      const payments = await this.prisma.payment.findMany({
+        where: {
+          companyId,
+          ...(isCustomer ? { customerId: party.id } : { supplierId: party.id }),
+          paidAt: { gte: from, lte: to },
+        },
+        orderBy: { paidAt: 'asc' },
+      });
+
+      // One row per movement, oldest first, so the running balance reads top to
+      // bottom. An invoice is a debit and a payment is a credit; the movement's
+      // signed effect is what `lineTotalMinor` carries.
+      const movements = [
+        ...invoices.map((inv) => ({
+          date: inv.invoiceDate,
+          description: `${isCustomer ? 'فاتورة' : 'فاتورة مشتريات'} · ${inv.invoiceNumber}`,
+          amountMinor: inv.totalMinor,
+        })),
+        ...payments.map((p) => ({
+          date: p.paidAt,
+          description: `دفعة · ${p.paymentNumber}`,
+          amountMinor: -p.amountMinor,
+        })),
+      ].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+      const totalDebitMinor = invoices.reduce((sum, inv) => sum + inv.totalMinor, 0);
+      const totalCreditMinor = payments.reduce((sum, p) => sum + p.amountMinor, 0);
+      const openingBalanceMinor = 0;
+      const closingBalanceMinor = totalDebitMinor - totalCreditMinor;
+      const code = party.code;
+
+      return {
+        documentNumber: `${isCustomer ? 'CS' : 'SS'}-${code}-${to.toISOString().slice(0, 10)}`,
+        sourceType: isCustomer ? 'Customer' : 'Supplier',
+        sourceId: party.id,
+        payload: {
+          kind: 'FINANCIAL',
+          titleEn: spec.labelEn,
+          titleAr: spec.labelAr,
+          documentNumber: `${isCustomer ? 'CS' : 'SS'}-${code}-${to.toISOString().slice(0, 10)}`,
+          documentDate: to.toISOString(),
+          dueDate: null,
+          status: 'ISSUED',
+          counterparty: counterparty(party),
+          lines: movements.map((m) => ({
+            description: m.description,
+            sku: m.date.toISOString(),
+            quantity: 1,
+            unitPriceMinor: m.amountMinor,
+            discountMinor: 0,
+            taxMinor: 0,
+            lineTotalMinor: m.amountMinor,
+          })),
+          subtotalMinor: totalDebitMinor,
+          discountMinor: 0,
+          taxMinor: 0,
+          totalMinor: closingBalanceMinor,
+          paidMinor: totalCreditMinor,
+          balanceMinor: closingBalanceMinor,
+          currency: party.currency || (await currencyOf()),
+          notes: null,
+          statement: {
+            periodFrom: from.toISOString(),
+            periodTo: to.toISOString(),
+            openingBalanceMinor,
+            closingBalanceMinor,
+            totalDebitMinor,
+            totalCreditMinor,
+          },
+        },
+      };
+    }
+
+    if (type === 'JOURNAL_ENTRY') {
+      const entry = await this.prisma.journalEntry.findFirst({
+        where: { id: sourceId, companyId },
+        include: {
+          lines: {
+            orderBy: { lineNumber: 'asc' },
+            include: { account: { select: { code: true, nameEn: true, nameAr: true } } },
+          },
+        },
+      });
+      if (!entry) return null;
+      // A journal has no counterparty, so the header's counterparty block is
+      // filled with the entry's own identity. The template renders a journal
+      // from `payload.journal` and never reads `lines`, so the empty array is
+      // inert rather than a missing value.
+      return {
+        documentNumber: entry.entryNumber,
+        sourceType: 'JournalEntry',
+        sourceId: entry.id,
+        payload: {
+          kind: 'FINANCIAL',
+          titleEn: spec.labelEn,
+          titleAr: spec.labelAr,
+          documentNumber: entry.entryNumber,
+          documentDate: entry.entryDate.toISOString(),
+          dueDate: null,
+          status: entry.status,
+          counterparty: {
+            nameEn: entry.memo ?? entry.entryNumber,
+            nameAr: entry.memo ?? entry.entryNumber,
+            code: entry.entryNumber,
+            taxNumber: null,
+            email: null,
+            phone: null,
+            addressLine: null,
+            city: null,
+          },
+          lines: [],
+          subtotalMinor: entry.totalDebitMinor,
+          discountMinor: 0,
+          taxMinor: 0,
+          totalMinor: entry.totalDebitMinor,
+          paidMinor: 0,
+          balanceMinor: 0,
+          currency: entry.currency || (await currencyOf()),
+          notes: entry.memo,
+          journal: {
+            entryNumber: entry.entryNumber,
+            entryDate: entry.entryDate.toISOString(),
+            sourceType: String(entry.sourceType),
+            memo: entry.memo,
+            rows: entry.lines.map((l) => ({
+              lineNumber: l.lineNumber,
+              accountCode: l.account.code,
+              accountNameEn: l.account.nameEn,
+              accountNameAr: l.account.nameAr,
+              description: l.description,
+              debitMinor: l.debitMinor,
+              creditMinor: l.creditMinor,
+            })),
+            totalDebitMinor: entry.totalDebitMinor,
+            totalCreditMinor: entry.totalCreditMinor,
+          },
+        },
+      };
+    }
+
     return null;
   }
 

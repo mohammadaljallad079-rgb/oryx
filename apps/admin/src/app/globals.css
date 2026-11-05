@@ -103,24 +103,15 @@
   --media-chip-bg: rgba(0, 15, 30, 0.55);
   --media-chip-border: rgba(212, 175, 55, 0.5);
   /*
-   * The hero scrim. Copy sits on the inline-start half, so the near-opaque end
-   * is mirrored in RTL; both are declared here so the rule needs no direction
-   * override of its own.
+   * The dashboard banner field. A navy gradient with a warm gold bloom, so the
+   * centred white/gold lockup sits on a deep ground in the dark theme and on a
+   * rich navy panel in the light one. Both values are opaque, so the banner
+   * never depends on a photograph and needs no scrim.
    */
-  --hero-scrim: linear-gradient(
-    100deg,
-    rgba(0, 15, 30, 0.62) 0%,
-    rgba(0, 18, 34, 0.34) 34%,
-    rgba(0, 22, 43, 0.08) 62%,
-    rgba(0, 22, 43, 0) 100%
-  );
-  --hero-scrim-rtl: linear-gradient(
-    260deg,
-    rgba(0, 15, 30, 0.62) 0%,
-    rgba(0, 18, 34, 0.34) 34%,
-    rgba(0, 22, 43, 0.08) 62%,
-    rgba(0, 22, 43, 0) 100%
-  );
+  --hero-field: linear-gradient(135deg, #0c4271 0%, #052440 46%, #000912 100%);
+  --hero-bloom: radial-gradient(760px 320px at 50% -30%, rgba(212, 175, 55, 0.22), transparent 68%),
+    radial-gradient(520px 260px at 82% 118%, rgba(74, 168, 255, 0.14), transparent 70%);
+  --hero-border: rgba(212, 175, 55, 0.28);
   /* Ambient wash behind the shell. */
   --ambient-wash: radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.09), transparent 62%),
     radial-gradient(900px 460px at 6% 4%, rgba(74, 168, 255, 0.06), transparent 58%);
@@ -230,22 +221,15 @@
   --on-media-shadow-soft: rgba(0, 0, 0, 0.75);
   --media-chip-bg: rgba(0, 15, 30, 0.55);
   --media-chip-border: rgba(212, 175, 55, 0.5);
-  /* The hero scrim is theme-independent: the artwork's own falloff supplies the
-   * light end, so the same navy gradient reads correctly on ivory. */
-  --hero-scrim: linear-gradient(
-    100deg,
-    rgba(0, 15, 30, 0.62) 0%,
-    rgba(0, 18, 34, 0.34) 34%,
-    rgba(0, 22, 43, 0.08) 62%,
-    rgba(0, 22, 43, 0) 100%
-  );
-  --hero-scrim-rtl: linear-gradient(
-    260deg,
-    rgba(0, 15, 30, 0.62) 0%,
-    rgba(0, 18, 34, 0.34) 34%,
-    rgba(0, 22, 43, 0.08) 62%,
-    rgba(0, 22, 43, 0) 100%
-  );
+  /* The dashboard banner is a navy panel in the light theme too: the ORYX
+   * lockup's on-light colourway is navy/gold ink, which needs the darker
+   * "on-dark" colourway here, exactly as the sidebar does. The field is
+   * therefore identical in both themes, and the banner carries its own
+   * contrast instead of inheriting the ivory page. */
+  --hero-field: linear-gradient(135deg, #0c4271 0%, #052440 46%, #000912 100%);
+  --hero-bloom: radial-gradient(760px 320px at 50% -30%, rgba(212, 175, 55, 0.26), transparent 68%),
+    radial-gradient(520px 260px at 82% 118%, rgba(74, 168, 255, 0.12), transparent 70%);
+  --hero-border: rgba(212, 175, 55, 0.32);
   /* A warm gold bloom rather than the dark theme's blue one, so the ivory field
    * does not pick up a cold cast. */
   --ambient-wash: radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.16), transparent 62%),
@@ -909,6 +893,20 @@ body::before {
   display: block;
 }
 
+/*
+ * The dashboard banner keeps its navy field in both themes, so it always uses
+ * the on-dark colourway. The theme rules above are deliberately overridden here
+ * rather than in the banner's own block, so the exception is visible next to
+ * the rule it defeats.
+ */
+:root[data-theme='light'] .oryx-hero .oryx-brand-logo__on-dark {
+  display: block;
+}
+
+:root[data-theme='light'] .oryx-hero .oryx-brand-logo__on-light {
+  display: none;
+}
+
 /* A tenant-uploaded logo is centred in the lockup slot; the packaged ORYX
  * lockup is anchored to the reading edge instead. */
 .oryx-brand-logo--custom img {
@@ -1566,35 +1564,67 @@ body::before {
   white-space: nowrap;
 }
 
+/*
+ * The dashboard banner.
+ *
+ * The owner's brief is explicit: no vehicle image, the ORYX mark centred, and a
+ * background that reads correctly in both themes. The banner is therefore a
+ * pure CSS composition — a navy field with a soft gold bloom — rather than a
+ * raster. Nothing here depends on a photograph, so there is no asset to fall
+ * back to and no crop to keep aligned with the copy.
+ */
 .oryx-hero {
   position: relative;
   overflow: hidden;
   border-radius: 18px;
-  border: 1px solid var(--border);
-  min-height: 268px;
+  border: 1px solid var(--hero-border);
+  min-height: 224px;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   color: var(--on-media);
+  background: var(--hero-field);
   isolation: isolate;
 }
 
-/* Banner copy sits over the darker left half of the artwork in LTR, and over
- * the mirrored right half in RTL, so the car is never hidden by text. */
+/* A faint gold sweep behind the lockup, drawn with a pseudo-element so the
+ * banner needs no image request and no scrim layer. */
+.oryx-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--hero-bloom);
+  pointer-events: none;
+}
+
 .oryx-hero__content {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  align-items: center;
+  gap: 10px;
   width: 100%;
-  padding: 26px;
+  max-width: 720px;
+  padding: 30px 26px;
 }
 
 .oryx-hero__logo {
-  align-self: flex-start;
+  align-self: center;
+  margin-bottom: 6px;
 }
 
-:root[data-dir='rtl'] .oryx-hero__logo {
-  align-self: flex-start;
+.oryx-hero__title {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.oryx-hero__body {
+  max-width: 56ch;
+  font-size: 13.5px;
+  color: var(--on-media-muted);
 }
 
 .oryx-hero__eyebrow {
@@ -1603,37 +1633,6 @@ body::before {
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--on-media-accent);
-}
-
-.oryx-hero__media {
-  position: absolute;
-  inset: 0;
-  z-index: -2;
-  background-size: cover;
-  background-position: center;
-}
-
-/* The artwork carries its own light falloff on the copy side (left). In RTL the
- * copy moves to the right, so the whole image is mirrored rather than shifted:
- * shifting would crop the car away at handset widths, mirroring keeps the
- * composition intact and puts the darker half behind the text. */
-:root[data-dir='rtl'] .oryx-hero__media {
-  transform: scaleX(-1);
-}
-
-/* The artwork carries its own light falloff on the copy side, so this scrim is
- * deliberately light: it only needs to guarantee contrast for the headline and
- * must not bury the vehicle. Keep the car side almost clear. The gradient is a
- * token so the RTL mirror needs no separate rule. */
-.oryx-hero__scrim {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--hero-scrim);
-}
-
-:root[data-dir='rtl'] .oryx-hero__scrim {
-  background: var(--hero-scrim-rtl);
 }
 
 .oryx-focus-ring:focus-visible {

@@ -103,32 +103,71 @@ test.describe('branding and direction', () => {
     await expect(onDark).toBeHidden();
   });
 
-  test('the approved design reference is never used as dashboard artwork', async ({ page }) => {
+  test('the dashboard banner carries no vehicle image and centres the ORYX mark', async ({ page }) => {
     await setLocale(page, 'en');
     await setTheme(page, 'dark');
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle');
 
-    // The banner must be the purpose-drawn vector, not a crop of the approved
-    // design reference. `hero-automotive.jpg` is a crop of
-    // docs/assets/ORYX Auto Services Dashboard.png and must not appear here.
-    const heroMedia = await page
-      .locator('.oryx-hero__media')
-      .evaluate((el) => getComputedStyle(el).backgroundImage);
-    expect(heroMedia).toContain('banner-automotive.svg');
-    expect(heroMedia).not.toContain('hero-automotive');
-
-    // No element on the dashboard may reference the reference crop.
+    // The owner's brief: no vehicle image in the banner. The banner is a pure
+    // CSS field, so no element may reference the old automotive artwork.
     const offenders = await page.evaluate(() =>
       Array.from(document.querySelectorAll('*')).flatMap((el) => {
         const bg = getComputedStyle(el).backgroundImage;
         const src = el instanceof HTMLImageElement ? el.getAttribute('src') ?? '' : '';
-        return bg.includes('hero-automotive') || src.includes('hero-automotive')
+        return bg.includes('banner-automotive') ||
+          bg.includes('automotive-hero') ||
+          src.includes('banner-automotive') ||
+          src.includes('automotive-hero')
           ? [el.className || el.tagName]
           : [];
       }),
     );
     expect(offenders).toEqual([]);
+
+    // The approved design reference must never be used as banner artwork either.
+    const heroMedia = await page.evaluate(() =>
+      getComputedStyle(document.querySelector('.oryx-hero') as Element).backgroundImage,
+    );
+    expect(heroMedia).not.toContain('hero-automotive');
+
+    // The banner paints an opaque navy field of its own.
+    expect(heroMedia).toMatch(/gradient|rgb/);
+
+    // The mark is centred: the lockup's centre is the banner's centre.
+    const banner = await page.getByTestId('dashboard-hero').boundingBox();
+    const logo = await page
+      .locator('.oryx-hero .oryx-brand-logo')
+      .first()
+      .boundingBox();
+    expect(banner).not.toBeNull();
+    expect(logo).not.toBeNull();
+    const bannerCentre = banner!.x + banner!.width / 2;
+    const logoCentre = logo!.x + logo!.width / 2;
+    expect(Math.abs(bannerCentre - logoCentre)).toBeLessThan(2);
+
+    // The lockup must actually load, not fall back to an empty box.
+    const natural = await page
+      .locator('.oryx-hero .oryx-brand-logo__on-dark')
+      .evaluate((el) => {
+        const img = el as HTMLImageElement;
+        return { w: img.naturalWidth, h: img.naturalHeight };
+      });
+    expect(natural.w).toBeGreaterThan(100);
+
+    // In the light theme the banner keeps its navy field, so it must still use
+    // the on-dark colourway rather than swapping to the navy-ink one.
+    await setTheme(page, 'light');
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.oryx-hero .oryx-brand-logo__on-dark')).toBeVisible();
+    await expect(page.locator('.oryx-hero .oryx-brand-logo__on-light')).toBeHidden();
+  });
+
+  test('every dashboard module tile uses its own original vector artwork', async ({ page }) => {
+    await setLocale(page, 'en');
+    await setTheme(page, 'dark');
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle');
 
     // The dashboard module tile must resolve to real, non-empty artwork.
     const tileUrl = await page

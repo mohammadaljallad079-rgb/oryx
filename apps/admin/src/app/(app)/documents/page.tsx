@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { OFFICIAL_DOCUMENTS } from '@oryx/shared';
+import { ISSUABLE_FINANCIAL_TYPES, OFFICIAL_DOCUMENTS } from '@oryx/shared';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -32,17 +32,12 @@ export default function DocumentsPage() {
   const canIssueFinancial =
     can('erp.sales.read') || can('erp.purchasing.read') || can('erp.accounting.read');
 
-  // Only the types the API can actually render from a stored record. The
-  // catalogue is wider (statements, returns, journal entries) and those have no
-  // issue path yet, so offering a button for one would produce a 400.
-  const ISSUABLE: readonly string[] = [
-    'SALES_INVOICE',
-    'SALES_ORDER',
-    'QUOTATION',
-    'PAYMENT_RECEIPT',
-    'PAYMENT_VOUCHER',
-  ];
-  const financialTypes = OFFICIAL_DOCUMENTS.filter((doc) => ISSUABLE.includes(doc.type));
+  // Only the types the API can actually render from a stored record. The list
+  // is the shared catalogue's, so the buttons here and the API's whitelist are
+  // the same list and cannot drift.
+  const financialTypes = OFFICIAL_DOCUMENTS.filter((doc) =>
+    (ISSUABLE_FINANCIAL_TYPES as readonly string[]).includes(doc.type),
+  );
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
