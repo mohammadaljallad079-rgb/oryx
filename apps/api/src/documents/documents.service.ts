@@ -1021,6 +1021,49 @@ export class DocumentsService {
       }
     }
 
+    if (type === 'PURCHASE_ORDER') {
+      const order = await this.prisma.purchaseOrder.findFirst({
+        where: { id: sourceId, companyId },
+        include: { lines: { orderBy: { sortOrder: 'asc' } }, supplier: true },
+      });
+      if (!order) return null;
+      return {
+        documentNumber: order.orderNumber,
+        sourceType: 'PurchaseOrder',
+        sourceId: order.id,
+        payload: {
+          kind: 'FINANCIAL',
+          titleEn: spec.labelEn,
+          titleAr: spec.labelAr,
+          documentNumber: order.orderNumber,
+          documentDate: order.orderDate.toISOString(),
+          dueDate: order.expectedDate?.toISOString() ?? null,
+          status: order.status,
+          counterparty: counterparty(order.supplier),
+          lines: order.lines.map((l) => {
+            const gross = lineAmountMinor(l.quantity, l.unitCostMinor);
+            return {
+              description: l.description,
+              sku: null,
+              quantity: l.quantity,
+              unitPriceMinor: l.unitCostMinor,
+              discountMinor: 0,
+              taxMinor: basisPointsOfMinor(gross, l.taxPercentBp),
+              lineTotalMinor: l.lineTotalMinor,
+            };
+          }),
+          subtotalMinor: order.subtotalMinor,
+          discountMinor: 0,
+          taxMinor: order.taxMinor,
+          totalMinor: order.totalMinor,
+          paidMinor: 0,
+          balanceMinor: order.totalMinor,
+          currency: order.currency || (await currencyOf()),
+          notes: order.notes,
+        },
+      };
+    }
+
     if (type === 'PURCHASE_INVOICE') {
       const invoice = await this.prisma.supplierInvoice.findFirst({
         where: { id: sourceId, companyId },

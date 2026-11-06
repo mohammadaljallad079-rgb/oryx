@@ -769,10 +769,15 @@ export class PurchasingService {
       const variance = totals.totalMinor - returnedValue - totals.taxMinor;
       if (variance !== 0) {
         const varianceAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.PURCHASE_PRICE_VARIANCE);
+        // The debit is the payable at the invoiced value; the credits are the
+        // stock at moving-average cost and the input VAT. When the invoice
+        // exceeds the carrying value the credit side is short, so the variance
+        // must be credited to balance; the opposite holds when the stock is
+        // worth more than it was invoiced for.
         journalLines.push(
           variance > 0
-            ? { accountId: varianceAccount, debit: variance }
-            : { accountId: varianceAccount, credit: -variance },
+            ? { accountId: varianceAccount, credit: variance }
+            : { accountId: varianceAccount, debit: -variance },
         );
       }
       const journal = await this.posting.postJournal(tx, {

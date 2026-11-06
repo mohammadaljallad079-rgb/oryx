@@ -54,6 +54,10 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
     // accounts they reference.
     await prisma.purchaseReturnLine.deleteMany({ where: { purchaseReturn: { companyId: { in: companyIds } } } });
     await prisma.purchaseReturn.deleteMany({ where: { companyId: { in: companyIds } } });
+    // A purchase order is a source for PURCHASE_ORDER and owns lines that
+    // reference the supplier, so it must go before the supplier below.
+    await prisma.purchaseOrderLine.deleteMany({ where: { order: { companyId: { in: companyIds } } } });
+    await prisma.purchaseOrder.deleteMany({ where: { companyId: { in: companyIds } } });
     await prisma.journalLine.deleteMany({ where: { entry: { companyId: { in: companyIds } } } });
     await prisma.journalEntry.deleteMany({ where: { companyId: { in: companyIds } } });
     await prisma.fiscalPeriod.deleteMany({ where: { companyId: { in: companyIds } } });
@@ -888,6 +892,59 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
       expect(res.status === 201 ? '' : JSON.stringify(res.body)).toBe('');
       expect(res.body.type).toBe('PURCHASE_RETURN');
       expect(res.body.documentNumber).toBe(`${PREFIX}-PR-1`);
+      expect(res.body.pageCount).toBeGreaterThanOrEqual(1);
+
+      const pdf = await fetch(`${ctx.base}/api/v1/documents/${res.body.id}/file`, {
+        headers: { Authorization: `Bearer ${issuerToken}`, 'x-oryx-company-id': companyId },
+      });
+      expect(pdf.status).toBe(200);
+      expect(Buffer.from(await pdf.arrayBuffer()).subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    });
+
+    it('issues a purchase order from the stored order record', async () => {
+      const supplier = await prisma.supplier.create({
+        data: {
+          companyId,
+          code: `${PREFIX}-SUP-PO`,
+          nameEn: 'EP3 Order Supplier',
+          nameAr: 'مورد أمر الشراء',
+        },
+      });
+      const order = await prisma.purchaseOrder.create({
+        data: {
+          companyId,
+          orderNumber: `${PREFIX}-PO-1`,
+          supplierId: supplier.id,
+          status: 'APPROVED',
+          subtotalMinor: 300_000,
+          taxMinor: 30_000,
+          totalMinor: 330_000,
+          currency: 'BHD',
+          createdById: 'system',
+          lines: {
+            create: [
+              {
+                description: 'Front brake discs',
+                quantity: 4,
+                unitCostMinor: 75_000,
+                taxPercentBp: 1000,
+                lineTotalMinor: 330_000,
+                sortOrder: 0,
+              },
+            ],
+          },
+        },
+      });
+
+      const res = await companyCall<{ id: string; type: string; documentNumber: string; pageCount: number }>(
+        ctx.base,
+        companyId,
+        '/documents/issue',
+        { method: 'POST', token: issuerToken, body: { type: 'PURCHASE_ORDER', sourceId: order.id } },
+      );
+      expect(res.status === 201 ? '' : JSON.stringify(res.body)).toBe('');
+      expect(res.body.type).toBe('PURCHASE_ORDER');
+      expect(res.body.documentNumber).toBe(`${PREFIX}-PO-1`);
       expect(res.body.pageCount).toBeGreaterThanOrEqual(1);
 
       const pdf = await fetch(`${ctx.base}/api/v1/documents/${res.body.id}/file`, {

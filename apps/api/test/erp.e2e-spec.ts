@@ -875,6 +875,49 @@ describe('ORYX ERP core (e2e)', () => {
       });
       expect(before.quantity - after.quantity).toBe(10000);
     });
+
+    it('balances a purchase return whose invoiced cost differs from the stock carrying value', async () => {
+      // Regression guard: the journal debits the payable at the invoiced value
+      // and credits stock at moving-average cost plus input VAT. When the two
+      // costs differ the plug must land on the opposite side to the difference,
+      // or the entry is short by twice the variance and the posting is refused.
+      const level = await ctx.prisma.stockLevel.findUniqueOrThrow({
+        where: { warehouseId_productId: { warehouseId, productId } },
+      });
+      const carryingMinor = Math.round(level.averageCostMinor / 100);
+
+      const ret = await erp<{ id: string; totalMinor: number }>('/purchasing/returns', {
+        method: 'POST',
+        body: {
+          supplierId,
+          warehouseId,
+          returnDate: '2026-06-11',
+          reason: 'Price correction',
+          lines: [
+            {
+              productId,
+              description: 'Widget',
+              quantity: 10000,
+              unitCostMinor: carryingMinor + 1234,
+              taxPercentBp: 1500,
+            },
+          ],
+        },
+      });
+      expect(ret.status).toBe(201);
+
+      const journal = await ctx.prisma.journalEntry.findFirstOrThrow({
+        where: { sourceType: 'PURCHASE_RETURN', sourceId: ret.body.id },
+        include: { lines: true },
+      });
+      const debit = journal.lines.reduce((sum, l) => sum + l.debitMinor, 0);
+      const credit = journal.lines.reduce((sum, l) => sum + l.creditMinor, 0);
+      expect(debit).toBe(credit);
+      expect(debit).toBeGreaterThan(0);
+
+      const trial = await erp<{ balanced: boolean }>('/reports/accounting');
+      expect(trial.body.balanced).toBe(true);
+    });
   });
 
   // --------------------------------------------------------------------- reports

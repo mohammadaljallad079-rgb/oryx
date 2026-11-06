@@ -592,3 +592,33 @@ figcaption strong {
   max-width: 46ch;
 }
 
+
+/* ------------------------------------------------- official documents */
+.doc-card {
+  margin-top: 34px;
+  padding: 18px 18px 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.doc-card .section-head {
+  margin-top: 0;
+}
+
+.doc-card__ar {
+  font-size: 0.72em;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+/* Page rasters are taller than they are wide, so a narrower track than the
+ * default gallery keeps two or three pages on a row instead of one. */
+.gallery--pages {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 0.9em;
+}

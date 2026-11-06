@@ -2,11 +2,9 @@
 /**
  * Regenerate the official-document PDF samples from the CURRENT tree.
  *
- * The committed samples in `docs/audit/pdf-samples/` were produced before the
- * inspection-mark and font-stack fixes (`de85190f`, `e0b02557`), so they are
- * stale evidence. This script drives the live API with real seeded data and
- * writes fresh PDFs plus the raw JSON the API returned, so every claim in the
- * acceptance report points at an artefact from this revision.
+ * Drives the live API with real seeded data and writes one PDF per issuable
+ * official-document type plus the raw JSON the API returned, so every claim in
+ * the acceptance report points at an artefact from this revision.
  *
  * It only reads/creates demo rows in the development database and stores the
  * resulting PDFs under docs/audit/pdf-samples/. It never touches production.
@@ -164,10 +162,23 @@ async function download(documentId) {
   return Buffer.from(await res.arrayBuffer());
 }
 
-function save(name, buf) {
-  const path = resolve(OUT, name);
-  writeFileSync(path, buf);
-  console.log(`wrote ${name} (${buf.length} bytes)`);
+const manifest = { generatedAt: new Date().toISOString(), base: BASE, documents: [] };
+
+async function save(name, doc, extra = {}) {
+  const buf = await download(doc.id);
+  writeFileSync(resolve(OUT, name), buf);
+  manifest.documents.push({
+    name,
+    type: doc.type,
+    documentNumber: doc.documentNumber,
+    pageCount: doc.pageCount,
+    byteSize: buf.length,
+    verificationToken: doc.verificationToken,
+    ...extra,
+  });
+  console.log(
+    `wrote ${name.padEnd(34)} ${doc.documentNumber.padEnd(14)} ${String(doc.pageCount).padStart(2)}pp  ${buf.length} bytes`,
+  );
 }
 
 async function main() {
@@ -177,22 +188,21 @@ async function main() {
   const vehicleCustomerId = vehicle.customerId ?? customer.id;
   const warehouse = await firstId('/inventory/warehouses');
   const product = await firstId('/inventory/products');
+  const supplier = await firstId('/purchasing/suppliers');
+  const accounts = await api('/accounting/accounts?pageSize=200');
+  const accountRows = Array.isArray(accounts) ? accounts : accounts.items ?? [];
+  const byCode = (code) => accountRows.find((a) => a.code === code);
   const TODAY = new Date().toISOString();
-  const manifest = { generatedAt: new Date().toISOString(), base: BASE, documents: [] };
 
   // --- Full inspection: every selectable area -----------------------------
   const fullAreas = INSPECTION_SECTION_SPECS.map((s) => s.key);
   const fullSession = await createInspection(vehicleCustomerId, vehicle.id, fullAreas, { dense: true });
-  const fullDoc = await issueInspection(fullSession);
-  save('vehicle-inspection-full.pdf', await download(fullDoc.id));
-  manifest.documents.push({ name: 'vehicle-inspection-full.pdf', type: fullDoc.type, documentNumber: fullDoc.documentNumber, pageCount: fullDoc.pageCount, byteSize: fullDoc.byteSize, verificationToken: fullDoc.verificationToken, areas: fullAreas });
+  await save('vehicle-inspection-full.pdf', await issueInspection(fullSession), { areas: fullAreas });
 
   // --- Partial inspection: three areas ------------------------------------
   const partialAreas = ['PAINT_BODY', 'ENGINE_COMPARTMENT', 'COMPUTER_UNIT'];
   const partialSession = await createInspection(vehicleCustomerId, vehicle.id, partialAreas, { dense: false });
-  const partialDoc = await issueInspection(partialSession);
-  save('vehicle-inspection-partial.pdf', await download(partialDoc.id));
-  manifest.documents.push({ name: 'vehicle-inspection-partial.pdf', type: partialDoc.type, documentNumber: partialDoc.documentNumber, pageCount: partialDoc.pageCount, byteSize: partialDoc.byteSize, verificationToken: partialDoc.verificationToken, areas: partialAreas });
+  await save('vehicle-inspection-partial.pdf', await issueInspection(partialSession), { areas: partialAreas });
 
   // --- Quotation ----------------------------------------------------------
   const quotation = await api('/sales/quotations', {
@@ -209,9 +219,22 @@ async function main() {
       ],
     },
   });
-  const quotationDoc = await issueFinancial('QUOTATION', quotation.id);
-  save('quotation.pdf', await download(quotationDoc.id));
-  manifest.documents.push({ name: 'quotation.pdf', type: quotationDoc.type, documentNumber: quotationDoc.documentNumber, pageCount: quotationDoc.pageCount, byteSize: quotationDoc.byteSize, verificationToken: quotationDoc.verificationToken });
+  await save('quotation.pdf', await issueFinancial('QUOTATION', quotation.id));
+
+  // --- Sales order --------------------------------------------------------
+  const order = await api('/sales/orders', {
+    method: 'POST',
+    body: {
+      customerId: customer.id,
+      warehouseId: warehouse.id,
+      documentDate: TODAY,
+      confirm: true,
+      lines: [
+        { productId: product.id, description: product.nameEn ?? 'Genuine spare part', quantity: 1 * 10000, unitPriceMinor: 45000, taxPercentBp: 1000 },
+      ],
+    },
+  });
+  await save('sales-order.pdf', await issueFinancial('SALES_ORDER', order.id));
 
   // --- Sales invoice ------------------------------------------------------
   const invoice = await api('/sales/invoices', {
@@ -227,32 +250,130 @@ async function main() {
       ],
     },
   });
-  const invoiceDoc = await issueFinancial('SALES_INVOICE', invoice.id);
-  save('sales-invoice.pdf', await download(invoiceDoc.id));
-  manifest.documents.push({ name: 'sales-invoice.pdf', type: invoiceDoc.type, documentNumber: invoiceDoc.documentNumber, pageCount: invoiceDoc.pageCount, byteSize: invoiceDoc.byteSize, verificationToken: invoiceDoc.verificationToken });
+  await save('sales-invoice.pdf', await issueFinancial('SALES_INVOICE', invoice.id));
 
-  // --- Sales order --------------------------------------------------------
-  const order = await api('/sales/orders', {
+  // --- Sales return (credit note) -----------------------------------------
+  const creditNote = await api('/sales/credit-notes', {
     method: 'POST',
     body: {
       customerId: customer.id,
       warehouseId: warehouse.id,
       documentDate: TODAY,
-      confirm: true,
+      reason: 'عميل أعاد القطعة · customer returned the part',
+      restockInventory: true,
       lines: [
-        { productId: product.id, description: product.nameEn ?? 'Genuine spare part', quantity: 1 * 10000, unitPriceMinor: 45000, taxPercentBp: 1000 },
+        { productId: product.id, description: product.nameEn ?? 'Returned spare part', quantity: 1 * 10000, unitPriceMinor: 45000, taxPercentBp: 1000 },
       ],
     },
   });
-  const orderDoc = await issueFinancial('SALES_ORDER', order.id);
-  save('sales-order.pdf', await download(orderDoc.id));
-  manifest.documents.push({ name: 'sales-order.pdf', type: orderDoc.type, documentNumber: orderDoc.documentNumber, pageCount: orderDoc.pageCount, byteSize: orderDoc.byteSize, verificationToken: orderDoc.verificationToken });
+  await save('sales-return.pdf', await issueFinancial('SALES_RETURN', creditNote.id));
+
+  // --- Purchase order -----------------------------------------------------
+  const purchaseOrder = await api('/purchasing/orders', {
+    method: 'POST',
+    body: {
+      supplierId: supplier.id,
+      warehouseId: warehouse.id,
+      orderDate: TODAY,
+      expectedDate: new Date(Date.now() + 14 * 864e5).toISOString(),
+      approve: true,
+      notes: 'توريد قطع غيار أصلية · genuine parts supply',
+      lines: [
+        { productId: product.id, description: product.nameEn ?? 'Genuine spare part', quantity: 4 * 10000, unitCostMinor: 30000, taxPercentBp: 1000 },
+        { description: 'Freight and handling', quantity: 1 * 10000, unitCostMinor: 15000, taxPercentBp: 1000 },
+      ],
+    },
+  });
+  await save('purchase-order.pdf', await issueFinancial('PURCHASE_ORDER', purchaseOrder.id));
+
+  // --- Purchase invoice (supplier invoice) --------------------------------
+  const supplierInvoice = await api('/purchasing/supplier-invoices', {
+    method: 'POST',
+    body: {
+      supplierId: supplier.id,
+      supplierInvoiceNumber: `VENDOR-${Date.now().toString().slice(-6)}`,
+      invoiceDate: TODAY,
+      dueDate: new Date(Date.now() + 30 * 864e5).toISOString(),
+      post: true,
+      notes: 'مشتريات شهرية · monthly purchase',
+      lines: [
+        { productId: product.id, description: product.nameEn ?? 'Genuine spare part', quantity: 6 * 10000, unitCostMinor: 30000, taxPercentBp: 1000 },
+      ],
+    },
+  });
+  await save('purchase-invoice.pdf', await issueFinancial('PURCHASE_INVOICE', supplierInvoice.id));
+
+  // --- Purchase return ----------------------------------------------------
+  const purchaseReturn = await api('/purchasing/returns', {
+    method: 'POST',
+    body: {
+      supplierId: supplier.id,
+      warehouseId: warehouse.id,
+      returnDate: TODAY,
+      reason: 'بضاعة تالفة · damaged goods',
+      lines: [
+        { productId: product.id, description: product.nameEn ?? 'Returned spare part', quantity: 1 * 10000, unitCostMinor: 30000, taxPercentBp: 1000 },
+      ],
+    },
+  });
+  await save('purchase-return.pdf', await issueFinancial('PURCHASE_RETURN', purchaseReturn.id));
+
+  // --- Payment receipt (customer receipt) ---------------------------------
+  const receipt = await api('/accounting/payments', {
+    method: 'POST',
+    body: {
+      direction: 'RECEIPT',
+      partyType: 'CUSTOMER',
+      customerId: customer.id,
+      method: 'CASH',
+      amountMinor: 50000,
+      paidAt: TODAY,
+      reference: 'RCPT-DEMO-1',
+      notes: 'دفعة نقدية من العميل · cash received from customer',
+    },
+  });
+  await save('payment-receipt.pdf', await issueFinancial('PAYMENT_RECEIPT', receipt.id));
+
+  // --- Payment voucher (supplier payment) ---------------------------------
+  const voucher = await api('/accounting/payments', {
+    method: 'POST',
+    body: {
+      direction: 'PAYMENT',
+      partyType: 'SUPPLIER',
+      supplierId: supplier.id,
+      method: 'BANK_TRANSFER',
+      amountMinor: 75000,
+      paidAt: TODAY,
+      reference: 'VCHR-DEMO-1',
+      notes: 'حوالة بنكية للمورد · bank transfer to supplier',
+    },
+  });
+  await save('payment-voucher.pdf', await issueFinancial('PAYMENT_VOUCHER', voucher.id));
+
+  // --- Customer statement -------------------------------------------------
+  await save('customer-statement.pdf', await issueFinancial('CUSTOMER_STATEMENT', customer.id));
+
+  // --- Supplier statement -------------------------------------------------
+  await save('supplier-statement.pdf', await issueFinancial('SUPPLIER_STATEMENT', supplier.id));
+
+  // --- Journal entry ------------------------------------------------------
+  const cash = byCode('1000') ?? accountRows[0];
+  const revenue = byCode('4000') ?? accountRows[1];
+  const journal = await api('/accounting/journals', {
+    method: 'POST',
+    body: {
+      entryDate: TODAY,
+      memo: 'قيد افتتاحي تجريبي · demo opening entry',
+      lines: [
+        { accountId: cash.id, debitMinor: 100000, description: 'Opening cash' },
+        { accountId: revenue.id, creditMinor: 100000, description: 'Opening revenue offset' },
+      ],
+    },
+  });
+  await save('journal-entry.pdf', await issueFinancial('JOURNAL_ENTRY', journal.id));
 
   writeFileSync(resolve(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2));
-  console.log('\nmanifest:');
-  for (const d of manifest.documents) {
-    console.log(`  ${d.name.padEnd(34)} ${d.documentNumber.padEnd(16)} ${String(d.pageCount).padStart(2)}pp  ${d.byteSize} bytes`);
-  }
+  console.log(`\n${manifest.documents.length} documents written; manifest updated.`);
 }
 
 main().catch((err) => {

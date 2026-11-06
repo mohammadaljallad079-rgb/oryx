@@ -2,19 +2,21 @@
 
 Acceptance date: 2026-11-06 (revised).
 Branch: `feature/execution-07-premium-web` (PR #7, **open and Draft**).
-Local HEAD at acceptance: `fcab9aea` (`fix(sales): drop the unused
-customer-drawer callback`), which sits on top of the customer-master work
-(`30b49b75`, `656c60b4`) and the earlier defect fixes (`de85190f`, `e0b02557`,
-`fc26eb02`, `7d14d4d7`).
+Local HEAD at acceptance: `2bc5c37b` (`docs(acceptance): record the green CI run
+on 52e947c7`), which sits on top of the optional whole-amount rounding work
+(`c55ab6d0`), the customer-master work (`30b49b75`, `656c60b4`) and the earlier
+defect fixes (`fcab9aea`, `de85190f`, `e0b02557`, `fc26eb02`).
 Environment: an isolated preview stack — a separate PostgreSQL database
 (`oryx_dev`) with seeded synthetic demo records. No production database and no
 production secret is involved.
 
-> **Revision note (2026-11-06).** This revision re-ran every suite on the
-> current tree after a sandbox rebuild, added the optional whole-amount rounding
-> feature (`RoundingMode`, migration `20261106060000_whole_amount_rounding`), and
-> refreshed the PDF samples and the twelve acceptance surfaces. Counts below are
-> from this run, not carried over from the previous report.
+> **Revision note (2026-11-06, second revision).** This revision re-ran every
+> suite on the current tree after a sandbox rebuild, fixed a real purchasing
+> defect (a purchase return whose invoiced cost differs from the stock carrying
+> value posted an unbalanced journal — section 1.11), expanded the PDF evidence
+> generator to all fourteen issuable document types, and added an
+> official-documents gallery to the published GitHub Pages preview. Counts below
+> are from this run, not carried over from the previous report.
 
 > **Scope.** This report continues an existing, far-advanced project. The
 > handover brief described the state as of commit `d6a65d2` and Executions
@@ -146,22 +148,46 @@ it.
 | Real PDFs generated and rendered | PASS | `docs/audit/pdf-samples/*.pdf` + rendered PNGs in `pdf-samples/preview/` |
 | No technician finding truncated | PASS | dense-checklist regression test |
 
+### 1.11 Purchasing defect fixed this session
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| A purchase return whose invoiced unit cost differs from the moving-average carrying cost posts a balanced journal | PASS | defect reproduced live (`400 Journal does not balance: debits 62810 vs credits 3190`), fixed in `purchasing.service.ts`, then `201`; regression test `erp.e2e-spec.ts › balances a purchase return whose invoiced cost differs from the stock carrying value` (37/37 suite) |
+
+The defect: the return's journal debits the payable at the invoiced value and
+credits stock at moving-average cost plus input VAT. When the two costs differ,
+the price-variance plug was posted on the same side as the difference instead of
+the opposite side, leaving the entry short by `2 × variance` and the posting
+refused. The plug now lands on the side that balances the entry, and the trial
+balance is asserted `balanced:true` in the new test.
+
+### 1.12 Official documents in the published preview
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| Every issuable document type has a real sample PDF | PASS | 14 PDFs in `docs/audit/pdf-samples/` (invoice, quotation, order, sales return, purchase order, purchase invoice, purchase return, receipt, voucher, customer statement, supplier statement, journal entry, full and partial inspection) |
+| Rendered pages are published as evidence | PASS | `documents/` section on the GitHub Pages preview; `preview:verify` `documents-desktop-en-light`/`-dark` 200, 24 images, 0 broken; `preview:check` 458 pages crawled, 14 PDFs checked, 0 bad responses, 0 dark issues |
+| QR block encodes a real verification URL | PASS | `DOCUMENT_VERIFY_BASE_URL=https://oryxbhr.com`; live `GET /documents/verify/:token` → `found:true`, `VALID`; unknown token → `found:false` |
+
 ## 2. Test results (re-run this session on the current tree)
 
 | Suite | Command | Result |
 |---|---|---|
 | Shared unit | `pnpm --filter @oryx/shared test` | **223 passed / 223** (11 files) |
-| API integration | `pnpm --filter @oryx/api test:e2e` | **671 passed / 671** (36 suites) |
+| API integration | `pnpm --filter @oryx/api test:e2e` | **673 passed / 673** (36 suites) |
 | API unit | `pnpm --filter @oryx/api test` | **20 passed / 20** (5 files) |
-| Whole-amount rounding | `… test:e2e -- whole-amount-rounding` | **7 passed / 7** (in the 671) |
+| Whole-amount rounding | `… test:e2e -- whole-amount-rounding` | **7 passed / 7** (in the 673) |
+| Purchase-return variance | `… test:e2e -- erp` | **37 passed / 37** (incl. the new variance test) |
 | Mobile | `pnpm --filter @oryx/mobile test` | **206 passed / 206** (10 files) |
 | Mobile ERP | `pnpm --filter @oryx/mobile-erp test` | **31 passed / 31** (2 files) |
-| Admin browser | `pnpm --filter @oryx/admin test:ui` | **223 passed, 1 skipped** (8.5 min) |
+| Admin browser | `pnpm --filter @oryx/admin test:ui` | **223 passed, 1 skipped** (8.6 min) |
 | Workspace lint | `pnpm -r lint` | PASS (exit 0) |
 | Workspace typecheck | `pnpm -r typecheck` | PASS (exit 0) |
 | Builds | api / admin / customer | PASS (exit 0) |
 | Migrations | `prisma migrate status` | **up to date** (31 migrations applied to `oryx_dev`) |
-| PDF sample render | `python3 .run/render-pdf-samples.py` | **ALL PASS** (14 PNGs; Arabic + Latin, no Type3) |
+| PDF sample render | `python3 .run/render-pdf-samples.py` | **ALL PASS** (14 PDFs, 23 PNGs; Arabic + Latin, no Type3) |
+| Preview render check | `pnpm preview:verify` | **65 page/theme combinations, issues: none** |
+| Preview link crawl | `pnpm preview:check` | **458 pages, 14 PDFs, 0 bad responses, 0 dark-mode issues** |
 
 ### 2.1 CI workflows
 
@@ -178,6 +204,7 @@ result and were run on this tree.
 | Inspection PDF carried mark glyphs the embedded fonts lack, so the text layer fell back to a host font | Template used a symbol codepoint for the paint/body and chassis marks | Draw the marks as vectors instead of font glyphs | `inspection-report.template.spec.ts`; CI API job |
 | Tax-invoice PDF emitted a `/Type3` font (broken text layer) | `.num` / `.ltr` hardcoded `'ORYX Sans', sans-serif`; ORYX Sans has no Arabic, but a money cell prints the Arabic BHD symbol `د.ب`, so the two glyphs escaped the embedded faces | Point both classes at `DOCUMENT_LATIN_STACK`, which already named the Arabic face | Playwright render: old stack resolves `د`/`ب` to host `DejaVuSans`, new stack to embedded `NotoNaskhArabic`; `pdf-renderer.service.spec.ts`; CI API job |
 | `Mobile APK` workflow failed on every mobile/shared push | The bundle check required the bundled JS to contain no backend host, on the assumption the demo was offline-only; the app is a live client, so a valid bundle names its API host | Assert the bundle carries the configured API host; add an `api_base_url` dispatch input inlined via `EXPO_PUBLIC_API_BASE_URL` | `Mobile APK` run `fc26eb02` — first green build |
+| A purchase return whose invoiced cost differs from the stock carrying value posted an unbalanced journal and was refused | The price-variance plug was posted on the same side as the difference instead of the opposite side, so the entry was short by `2 × variance` | Post the plug on the balancing side | reproduced live (`400 Journal does not balance: debits 62810 vs credits 3190`) then `201`; regression test in `erp.e2e-spec.ts`; trial balance `balanced:true` |
 
 ## 3. Live preview and visual evidence
 
@@ -218,11 +245,51 @@ their document number from the live register (`QT-00001`, `JOB-00002`) instead
 of a stale hard-coded value, so they render the real record. The 39-surface
 sweep (`.run/sweep-preview.mjs`) is **39 / 39** green.
 
-PDF samples: `docs/audit/pdf-samples/{sales-invoice,quotation,sales-order,
-vehicle-inspection-full,vehicle-inspection-partial}.pdf`, with rendered page
-PNGs in `docs/audit/pdf-samples/preview/` and a machine-readable
+PDF samples: `docs/audit/pdf-samples/*.pdf` — **fourteen** document types, each with
+rendered page PNGs in `docs/audit/pdf-samples/preview/` and a machine-readable
 `docs/audit/pdf-samples/manifest.json` (document number, page count, byte size
-and verification token per sample).
+and verification token per sample):
+
+| # | Sample | Type | Pages |
+|---|---|---|---|
+| 1 | `sales-invoice.pdf` | `SALES_INVOICE` | 1 |
+| 2 | `quotation.pdf` | `QUOTATION` | 1 |
+| 3 | `sales-order.pdf` | `SALES_ORDER` | 1 |
+| 4 | `sales-return.pdf` | `SALES_RETURN` (credit note) | 1 |
+| 5 | `purchase-order.pdf` | `PURCHASE_ORDER` | 1 |
+| 6 | `purchase-invoice.pdf` | `PURCHASE_INVOICE` | 1 |
+| 7 | `purchase-return.pdf` | `PURCHASE_RETURN` | 1 |
+| 8 | `payment-receipt.pdf` | `PAYMENT_RECEIPT` | 1 |
+| 9 | `payment-voucher.pdf` | `PAYMENT_VOUCHER` | 1 |
+| 10 | `customer-statement.pdf` | `CUSTOMER_STATEMENT` | 1 |
+| 11 | `supplier-statement.pdf` | `SUPPLIER_STATEMENT` | 1 |
+| 12 | `journal-entry.pdf` | `JOURNAL_ENTRY` | 1 |
+| 13 | `vehicle-inspection-full.pdf` | `VEHICLE_INSPECTION_REPORT` | 6 |
+| 14 | `vehicle-inspection-partial.pdf` | `VEHICLE_INSPECTION_REPORT` | 5 |
+
+Every sample carries both Arabic and Latin text, an embedded Arabic face and no
+`/Type3` font. The QR block encodes `https://oryxbhr.com/verify/<token>`.
+
+### 3.1 The published GitHub Pages preview
+
+The `Design preview` workflow publishes a static site to GitHub Pages on every
+push to this branch:
+
+`https://mohammadaljallad079-rgb.github.io/oryx/`
+
+It is built only from files committed to the branch, so it can never show
+something the repository does not contain. Alongside the exported customer
+website at the root, this session added an **Official documents** section
+(`/documents/`) that lists all fourteen document types with every rendered page,
+a per-document download link and the QR verification target, and updated the
+overview page with a documents KPI and card. The workflow's own `verify` job runs
+`preview:verify` and `preview:check` against the built site before publishing, so
+a regression that breaks a page or an asset fails the deploy.
+
+Because GitHub Pages serves static files only, the preview cannot run the API, so
+the QR verification link is shown as the address the printed code encodes rather
+than resolved on that host; the live verification endpoint is exercised
+separately (section 3, item 12).
 
 ## 4. External blockers
 
@@ -239,32 +306,29 @@ and verification token per sample).
 
 ## 5. Files changed in this session
 
-This session (2026-11-06) re-ran the full verification on the recovered tree and
-added the optional whole-amount rounding feature on top of it.
+This session (2026-11-06, second revision) fixed a real purchasing defect,
+expanded the PDF evidence to all fourteen document types and added the
+official-documents gallery to the published preview.
 
 | File | Change |
 |---|---|
-| `packages/shared/src/money.ts` | `ROUNDING_MODES`, `roundingIncrementMinor`, `roundMinor` |
-| `packages/shared/src/contracts.ts` | `CompanyDto.roundingMode`, `SalesDocumentDto`/`PosSaleDto.roundingMinor` |
-| `packages/database/prisma/schema.prisma` | `RoundingMode` enum; `Company.roundingMode`; `roundingMinor` on Quotation, SalesOrder, SalesInvoice, CreditNote, PosSale |
-| `packages/database/prisma/migrations/20261106060000_whole_amount_rounding/migration.sql` | New migration (additive, defaults preserve exact totals) |
-| `packages/database/prisma/seed.ts`, `apps/api/src/accounting/accounting.service.ts` | Chart account `5930` rounding gain/loss |
-| `apps/api/src/common/accounting-posting.service.ts` | `SYSTEM_ROLES.ROUNDING_GAIN_LOSS` |
-| `apps/api/src/common/document-totals.ts` | `computeDocumentTotals` applies the mode and reports `roundingMinor` |
-| `apps/api/src/common/erp-context.service.ts` | `companyRoundingMode(companyId, tx)` |
-| `apps/api/src/sales/sales.service.ts` | Rounding applied to quotations, orders, invoices; posting splits AR vs rounding account |
-| `apps/api/src/documents/document-payload.ts`, `documents.service.ts`, `templates/financial-document.template.ts` | Rounding row in the PDF totals block |
-| `apps/api/src/organizations/organizations.dto.ts`, `organizations.service.ts` | `roundingMode` on the company update path |
-| `apps/admin/src/components/company-settings-panel.tsx` | Rounding selector (`company-rounding-mode`) |
-| `apps/admin/src/app/(app)/sales/page.tsx` | POS mirrors the rounded total (`pos-rounding`) |
-| `apps/admin/src/i18n/dictionaries.ts` | Arabic and English labels for the new settings and POS row |
-| `apps/api/test/whole-amount-rounding.e2e-spec.ts` | New 7-test e2e (default, rounded total, balanced ledger, per-tenant) |
-| `apps/api/test/company-settings.e2e-spec.ts` | Rounding-mode persistence assertions |
-| `apps/admin/e2e/erp.spec.ts` | Test 9: rounding is a persisted company setting |
-| `.run/regenerate-pdf-evidence.mjs` | Regenerates the PDF samples and `manifest.json` from the live API |
-| `.run/capture-final-evidence.mjs` | Derives document numbers from the live register instead of a stale constant |
-| `docs/audit/pdf-samples/*` | Fresh samples, rendered pages and `manifest.json` |
+| `apps/api/src/purchasing/purchasing.service.ts` | Post the purchase-return price-variance plug on the balancing side |
+| `apps/api/test/erp.e2e-spec.ts` | New regression test: a return whose invoiced cost differs from the carrying value balances and the trial balance stays balanced |
+| `.run/regenerate-pdf-evidence.mjs` | Generate all fourteen issuable document types from the live API and rewrite `manifest.json` |
+| `apps/api/src/documents/documents.service.ts`, `apps/api/test/execution-phase3-documents.e2e-spec.ts` | Document-issue path and the purchase-order document test |
+| `packages/shared/src/documents.ts` | Document type catalogue used by the evidence generator |
+| `scripts/preview/build-preview.mjs` | New `buildDocuments()` section; `documents` nav entry, reserved-route guard, overview KPI and card |
+| `scripts/preview/verify-preview.mjs` | Verify the new `/documents/` page in both themes |
+| `scripts/preview/check-links.mjs` | Crawl from `/overview/` and `/documents/`; verify PDF assets by request instead of navigating to them |
+| `scripts/preview/site.css` | Styles for the document cards and the page gallery |
+| `docs/audit/pdf-samples/*` | Fresh fourteen-type samples, rendered pages and `manifest.json` |
 | `docs/audit/ORYX_FINAL_ACCEPTANCE.md` | This report |
+
+Earlier this session: the optional whole-amount rounding feature
+(`packages/shared/src/money.ts`, `packages/database/prisma/schema.prisma`,
+migration `20261106060000_whole_amount_rounding`, `apps/api/src/sales/sales.service.ts`,
+`apps/api/src/common/document-totals.ts`, `apps/admin/src/components/company-settings-panel.tsx`,
+`apps/api/test/whole-amount-rounding.e2e-spec.ts`, `apps/admin/e2e/erp.spec.ts`).
 
 Earlier defect fixes from the previous session remain in the history:
 `de85190f` (inspection marks as vectors), `e0b02557` (Arabic face in the numeric
@@ -297,14 +361,20 @@ The changes are committed and pushed to the existing branch
 - The platform is far more complete than the handover brief described; the brief
   reflected Execution 05, the tree is at Execution 20.
 - Every automated suite is green on the current tree after a sandbox rebuild:
-  shared 223, API e2e 671 (36 suites), API unit 20, mobile 206, mobile-erp 31,
+  shared 223, API e2e 673 (36 suites), API unit 20, mobile 206, mobile-erp 31,
   admin browser 223 (+1 skipped). Lint and typecheck are clean; admin, customer
   and API builds pass; migrations apply cleanly.
-- This session added the optional whole-amount rounding feature end to end
-  (shared maths, migration, company setting, sales and POS application, ledger
-  posting to account `5930`, PDF totals row, Arabic and English labels) with a
-  7-test API e2e and an admin browser test as proof. `NONE` is the default, so a
-  tenant that never opts in is unaffected.
+- This session fixed a real defect: a purchase return whose invoiced unit cost
+  differs from the moving-average carrying cost posted an unbalanced journal and
+  was refused (reproduced live as `400 Journal does not balance: debits 62810 vs
+  credits 3190`). The variance plug now lands on the balancing side, a regression
+  test covers it, and the trial balance is asserted balanced.
+- The PDF evidence now covers all fourteen issuable document types, and the
+  published GitHub Pages preview gained an **Official documents** section that
+  shows every rendered page with a download link and the QR verification target.
+  The preview's own `verify` job passes (65 page/theme combinations, no issues)
+  and its link crawl is clean (458 pages, 14 PDFs, 0 bad responses, 0 dark-mode
+  issues).
 - The merchant document surface, the inspection engine, the official-document
   engine and QR verification are implemented, DB-backed and tested. All twelve
   acceptance surfaces and all 39 preview surfaces were re-captured this session.

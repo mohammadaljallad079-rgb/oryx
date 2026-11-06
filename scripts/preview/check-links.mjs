@@ -1,7 +1,7 @@
 import { chromium } from 'playwright';
 
 const BASE = process.env.PREVIEW_BASE || 'http://127.0.0.1:8099';
-const START = ['/', '/evidence/', '/reports/', '/brand/', '/reports/04phaseelighttheme.html'];
+const START = ['/', '/overview/', '/documents/', '/evidence/', '/reports/', '/brand/', '/reports/04phaseelighttheme.html'];
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
@@ -11,6 +11,11 @@ const bad = [];
 page.on('response', (r) => {
   if (r.status() >= 400) bad.push(`${r.status()} ${r.url()}`);
 });
+
+// Collect the asset links (PDFs) rather than navigating to them, and keep the
+// page links for the crawl. A PDF is a download, not a document `page.goto`
+// can navigate to, so the assets are requested directly below instead.
+const assets = new Set();
 
 const seen = new Set();
 const queue = [...START];
@@ -24,9 +29,21 @@ while (queue.length) {
     if (!href || /^https?:|^mailto:|^#/.test(href)) continue;
     const resolved = new URL(href, BASE + url);
     const path = resolved.pathname + resolved.search;
+    if (/\.pdf$/i.test(path)) {
+      assets.add(path);
+      continue;
+    }
     if (!seen.has(path)) queue.push(path);
   }
 }
+
+// Every collected asset must resolve. `fetch` from inside the page keeps the
+// same origin the crawl used, so a missing file is caught here.
+for (const asset of assets) {
+  const res = await page.request.get(BASE + asset);
+  if (!res.ok()) bad.push(`asset ${res.status()} ${asset}`);
+}
+console.log(`assets checked: ${assets.size}`);
 
 // Dark render of every page reached above.
 //

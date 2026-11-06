@@ -178,8 +178,10 @@ export const ISSUABLE_FINANCIAL_TYPES = [
   'SALES_ORDER',
   'QUOTATION',
   // A sales return is rendered from its credit note, a purchase invoice from
-  // its supplier invoice and a purchase return from the return record.
+  // its supplier invoice, a purchase order from the order record and a
+  // purchase return from the return record.
   'SALES_RETURN',
+  'PURCHASE_ORDER',
   'PURCHASE_INVOICE',
   'PURCHASE_RETURN',
   'PAYMENT_RECEIPT',
