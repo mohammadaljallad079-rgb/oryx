@@ -392,8 +392,26 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   cookie without a matching `x-oryx-csrf` header. The refresh branch above it
   echoes the cookie; the login branch must too.
 
-### Malformed-input gotchas (Execution 16)
+### Whole-amount rounding gotchas
 
+- **`NONE` is the default and must stay exact.** `roundMinor` in
+  `packages/shared/src/money.ts` returns `{ rounded: total, adjustment: 0 }` when
+  the mode is `NONE`, so a tenant that never opts in is byte-for-byte unchanged.
+  Do not "simplify" the default to a non-zero increment.
+- **The rounding difference is posted, never dropped.** A document stores the
+  rounded `totalMinor` and a signed `roundingMinor`; `postSalesInvoice` splits
+  the receivable from `ROUNDING_GAIN_LOSS` (account `5930`) so the journal still
+  balances. The invariant is `subtotal − discount + tax + rounding === total`.
+  Any new document path that rounds must post the same way.
+- **The chart defines `5930` in two places.** Keep `STANDARD_CHART` in
+  `apps/api/src/accounting/accounting.service.ts` and in
+  `packages/database/prisma/seed.ts` in step, exactly as for every other system
+  role, or a freshly seeded tenant will miss the rounding account.
+- **The POS preview must mirror the server.** `sales/page.tsx` calls the same
+  `roundMinor` the API does, so the cashier sees the charged total before
+  submit. Do not compute the POS total a second, different way.
+
+### Malformed-input gotchas (Execution 16)
 - **An unvalidated `?status=` string is a 400, not a 500.** Most list routes pass
   the query straight into a Prisma filter (`status: query.status as never`).
   A value that is not a member of the enum makes Prisma throw

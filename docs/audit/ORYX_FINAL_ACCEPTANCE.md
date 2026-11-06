@@ -48,7 +48,7 @@ tree.
 | Requirement | Status | Evidence |
 |---|---|---|
 | Invoice and quotation PDF templates | PASS | `financial-document.template.ts`; `docs/audit/pdf-samples/sales-invoice.pdf`, `quotation.pdf` |
-| Vehicle inspection PDF generation | PASS | `docs/audit/pdf-samples/vehicle-inspection-full.pdf` (6 pp), `vehicle-inspection-partial.pdf` (3 pp) |
+| Vehicle inspection PDF generation | PASS | `docs/audit/pdf-samples/vehicle-inspection-full.pdf` (6 pp), `vehicle-inspection-partial.pdf` (5 pp) |
 | Dynamic report composition | PASS | `planInspectionReport()`; partial report has no gaps |
 | Document numbering | PASS | `document-numbering.e2e-spec.ts` — concurrency and first-allocation |
 | QR verification | PASS | live: `GET /documents/verify/:token` returns `VALID` / `REVOKED`; unknown → `found:false`; `/verify/:token` page 200 |
@@ -61,7 +61,7 @@ tree.
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| Concurrency-safe first allocation | PASS | `document-numbering.e2e-spec.ts` (in the 47-test document run) |
+| Concurrency-safe first allocation | PASS | `document-numbering.e2e-spec.ts` (in the 671-test API run) |
 | No duplicate numbers under concurrent requests | PASS | same suite |
 
 ### 1.4 Customer and mobile
@@ -163,21 +163,15 @@ it.
 | Migrations | `prisma migrate status` | **up to date** (31 migrations applied to `oryx_dev`) |
 | PDF sample render | `python3 .run/render-pdf-samples.py` | **ALL PASS** (14 PNGs; Arabic + Latin, no Type3) |
 
-### 2.1 CI workflows (run `fc26eb02`, all jobs green)
+### 2.1 CI workflows
 
-| Workflow | Job | Result |
-|---|---|---|
-| CI | Typecheck and build | success |
-| CI | Unit and API integration tests | success |
-| CI | Browser acceptance tests | success |
-| Mobile APK | Build the debug-signed release APK | success |
-| Design preview | Build / Verify / Publish to GitHub Pages | success |
+On the previous tip `fc26eb02` every workflow was green. The current tip
+`c55ab6d0` re-triggers the same three workflows (`CI`, `Mobile APK`,
+`Design preview`); they were `in_progress` at the time this report was written.
+The local suites below are the authoritative result for `c55ab6d0` and were run
+on this tree.
 
-Before this session the `CI` "Unit and API integration tests" job failed on the
-tax-invoice `/Type3` assertion, and the `Mobile APK` workflow failed on every
-push. Both are fixed and both workflows are now green on the pushed tip.
-
-### 2.2 Defects fixed this session
+### 2.2 Defects fixed in the previous session (preserved)
 
 | Defect | Root cause | Fix | Proof |
 |---|---|---|---|
