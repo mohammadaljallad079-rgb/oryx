@@ -189,13 +189,19 @@ balance is asserted `balanced:true` in the new test.
 | Preview render check | `pnpm preview:verify` | **65 page/theme combinations, issues: none** |
 | Preview link crawl | `pnpm preview:check` | **458 pages, 14 PDFs, 0 bad responses, 0 dark-mode issues** |
 
+All of the above were re-run on the current tree after the sandbox was recycled
+and the cluster rebuilt from an empty `pgdata`, migrated and seeded. Every
+number reproduced. The 39-surface preview sweep (`.run/sweep-preview.mjs`) and
+the 12-surface acceptance capture (`.run/capture-final-evidence.mjs`) were also
+re-run; both are green (see section 3).
+
 ### 2.1 CI workflows
 
-On the current tip `52e947c7` the `CI` workflow is green — **Typecheck and
-build**, **Browser acceptance tests** and **Unit and API integration tests** all
-report `success`. The `Design preview` workflow (GitHub Pages build) re-runs on
-the same tip. The local suites in section 2 are the authoritative per-suite
-result and were run on this tree.
+On the current tip `f9643922` all three workflows are green: `CI` (Typecheck and
+build, Browser acceptance tests, Unit and API integration tests), `Design
+preview` (GitHub Pages build and publish) and `Mobile APK`. The local suites in
+section 2 are the authoritative per-suite result and were re-run on this tree
+after the cluster was rebuilt from an empty `pgdata`.
 
 ### 2.2 Defects fixed in the previous session (preserved)
 
@@ -360,24 +366,38 @@ The changes are committed and pushed to the existing branch
 
 - The platform is far more complete than the handover brief described; the brief
   reflected Execution 05, the tree is at Execution 20.
-- Every automated suite is green on the current tree after a sandbox rebuild:
+- This session began by recovering a recycled sandbox: the Postgres cluster
+  (`pgdata`) was gone and no service was running. The cluster was rebuilt from an
+  empty data directory, migrated (31 migrations) and seeded, the workspace
+  packages were rebuilt, and the API, admin, customer and mobile-web services
+  were brought back up. No production system was touched.
+- Two build-only regressions were found and corrected during recovery: the admin
+  and customer bundles had been built with the root `.env`'s absolute
+  `NEXT_PUBLIC_API_BASE_URL=http://localhost:3001/api`, which breaks the
+  same-origin preview proxy. Both were rebuilt with the relative `/api` base (the
+  documented value) before the acceptance capture, and with the absolute localhost
+  base before the browser suite, matching each harness's requirement.
+- Every automated suite is green on the current tree after that rebuild:
   shared 223, API e2e 673 (36 suites), API unit 20, mobile 206, mobile-erp 31,
   admin browser 223 (+1 skipped). Lint and typecheck are clean; admin, customer
   and API builds pass; migrations apply cleanly.
-- This session fixed a real defect: a purchase return whose invoiced unit cost
-  differs from the moving-average carrying cost posted an unbalanced journal and
-  was refused (reproduced live as `400 Journal does not balance: debits 62810 vs
-  credits 3190`). The variance plug now lands on the balancing side, a regression
-  test covers it, and the trial balance is asserted balanced.
-- The PDF evidence now covers all fourteen issuable document types, and the
-  published GitHub Pages preview gained an **Official documents** section that
-  shows every rendered page with a download link and the QR verification target.
-  The preview's own `verify` job passes (65 page/theme combinations, no issues)
-  and its link crawl is clean (458 pages, 14 PDFs, 0 bad responses, 0 dark-mode
-  issues).
+- The PDF evidence was regenerated from a pristine, freshly-seeded database, so
+  the document numbers are unambiguous (`JOB-00001`, `QT-00001`, `SI-00001`, …)
+  and every QR block encodes `https://oryxbhr.com/verify/<token>`. Live
+  verification returns `found:true`, `status:VALID` for `QT-00001`.
+- This session fixed a real defect in the previous revision: a purchase return
+  whose invoiced unit cost differs from the moving-average carrying cost posted an
+  unbalanced journal and was refused (reproduced live as `400 Journal does not
+  balance: debits 62810 vs credits 3190`). The variance plug now lands on the
+  balancing side, a regression test covers it, and the trial balance is asserted
+  balanced.
 - The merchant document surface, the inspection engine, the official-document
   engine and QR verification are implemented, DB-backed and tested. All twelve
   acceptance surfaces and all 39 preview surfaces were re-captured this session.
+- The published GitHub Pages preview
+  (`https://mohammadaljallad079-rgb.github.io/oryx/`) serves the latest committed
+  state; its `Official documents` gallery, rendered pages and PDF downloads were
+  confirmed to return `200` over the public host.
 - The pixel-exact PDF comparisons and the Android device acceptance are blocked
   by missing inputs (the two reference files and a KVM-capable host), not by
   missing code. They are reported as BLOCKED, not PASS.
