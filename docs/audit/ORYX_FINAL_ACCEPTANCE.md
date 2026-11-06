@@ -312,9 +312,17 @@ separately (section 3, item 12).
 
 ## 5. Files changed in this session
 
-This session (2026-11-06, second revision) fixed a real purchasing defect,
-expanded the PDF evidence to all fourteen document types and added the
-official-documents gallery to the published preview.
+The final revision of this session (commit `c55279ba`) is a verification
+revision: it regenerated the document samples from a pristine, freshly-seeded
+database (`docs/audit/pdf-samples/*`, rendered pages and `manifest.json`), the
+preview sweep evidence (`docs/audit/evidence/exec06-preview-sweep.json`), the
+re-captured screenshots (`docs/audit/screenshots/*`,
+`docs/execution-reports/screenshots/*`, `docs/audit/responsive/*`) and this
+report. No application or database code changed in that revision.
+
+The preceding revision fixed a real purchasing defect, expanded the PDF evidence
+to all fourteen document types and added the official-documents gallery to the
+published preview.
 
 | File | Change |
 |---|---|
