@@ -165,11 +165,11 @@ it.
 
 ### 2.1 CI workflows
 
-On the previous tip `fc26eb02` every workflow was green. The current tip
-`c55ab6d0` re-triggers the same three workflows (`CI`, `Mobile APK`,
-`Design preview`); they were `in_progress` at the time this report was written.
-The local suites below are the authoritative result for `c55ab6d0` and were run
-on this tree.
+On the current tip `52e947c7` the `CI` workflow is green — **Typecheck and
+build**, **Browser acceptance tests** and **Unit and API integration tests** all
+report `success`. The `Design preview` workflow (GitHub Pages build) re-runs on
+the same tip. The local suites in section 2 are the authoritative per-suite
+result and were run on this tree.
 
 ### 2.2 Defects fixed in the previous session (preserved)
 
