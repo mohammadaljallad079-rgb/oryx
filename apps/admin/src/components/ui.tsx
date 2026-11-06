@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Icon } from './icons';
 
 export function Card({
@@ -325,6 +325,138 @@ export function StatGrid({
   return (
     <div className={`oryx-stat-grid ${className}`} {...rest}>
       {children}
+    </div>
+  );
+}
+
+export interface SearchableOption {
+  value: string;
+  label: string;
+  /** Optional secondary text shown under the label (a code, a phone number). */
+  hint?: string;
+  disabled?: boolean;
+}
+
+/**
+ * A filterable dropdown. Native `<select>` cannot be searched, and the
+ * catalogues it is used against (companies, customers, accounts) are paginated,
+ * so the options are supplied by the caller and filtered locally by label.
+ */
+export function SearchableSelect({
+  value,
+  options,
+  onChange,
+  placeholder,
+  emptyLabel,
+  disabled = false,
+  testId,
+  ariaLabel,
+}: {
+  value: string | null;
+  options: SearchableOption[];
+  onChange: (value: string | null) => void;
+  placeholder?: string;
+  /** Option shown for the "no selection" case; omit to make the field required. */
+  emptyLabel?: string;
+  disabled?: boolean;
+  testId?: string;
+  ariaLabel?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const selected = options.find((o) => o.value === value) ?? null;
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter(
+      (o) => o.label.toLowerCase().includes(q) || (o.hint ? o.hint.toLowerCase().includes(q) : false),
+    );
+  }, [options, query]);
+
+  const pick = (next: string | null) => {
+    onChange(next);
+    setOpen(false);
+    setQuery('');
+  };
+
+  return (
+    <div ref={rootRef} className="relative" data-testid={testId}>
+      <button
+        type="button"
+        className="oryx-input flex w-full items-center justify-between gap-2 text-start"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={ariaLabel}
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className={selected ? 'truncate' : 'oryx-faint truncate'}>
+          {selected ? selected.label : placeholder ?? ''}
+        </span>
+        <Icon name="chevronDown" size={14} />
+      </button>
+      {open ? (
+        <div
+          className="oryx-popover absolute z-30 mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-lg"
+          role="listbox"
+        >
+          <input
+            autoFocus
+            className="oryx-input mb-2"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={placeholder}
+            data-testid={testId ? `${testId}-search` : undefined}
+          />
+          <div className="max-h-56 overflow-y-auto">
+            {emptyLabel !== undefined ? (
+              <button
+                type="button"
+                className="block w-full rounded-lg px-3 py-2 text-start text-[12.5px] hover:bg-[var(--surface-2)]"
+                onClick={() => pick(null)}
+              >
+                {emptyLabel}
+              </button>
+            ) : null}
+            {filtered.length === 0 ? (
+              <p className="oryx-faint m-0 px-3 py-2 text-[12px]">—</p>
+            ) : (
+              filtered.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  role="option"
+                  aria-selected={o.value === value}
+                  disabled={o.disabled}
+                  className="block w-full rounded-lg px-3 py-2 text-start hover:bg-[var(--surface-2)] disabled:opacity-50"
+                  onClick={() => pick(o.value)}
+                >
+                  <span className="block text-[12.5px] font-semibold">{o.label}</span>
+                  {o.hint ? <span className="oryx-faint block text-[11px]">{o.hint}</span> : null}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

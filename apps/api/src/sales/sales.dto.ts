@@ -150,6 +150,16 @@ export class CreateCustomerDto {
   @MaxLength(3)
   countryCode?: string;
 
+  /** The lead-source catalogue entry the customer came from. */
+  @IsOptional()
+  @IsString()
+  sourceId?: string;
+
+  /** The sales department that owns the customer. */
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -210,6 +220,14 @@ export class UpdateCustomerDto {
   city?: string;
 
   @IsOptional()
+  @IsString()
+  sourceId?: string;
+
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)
@@ -229,6 +247,29 @@ export class UpdateCustomerDto {
   @IsString()
   @MaxLength(400)
   notes?: string;
+}
+
+export class CustomerAttachmentDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(260)
+  fileName!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  mimeType?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  sizeBytes?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  storageRef?: string;
 }
 
 export class SalesLineDto {

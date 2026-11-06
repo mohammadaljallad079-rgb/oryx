@@ -1761,14 +1761,23 @@ model Customer {
    * Control account for this customer's receivable.
    */
   receivableAccountId String?
+  /**
+   * Where the customer came from (the shared lead-source catalogue) and which
+   * sales department owns them. Both are optional: a customer may predate the
+   * catalogues or have no attributable department.
+   */
+  sourceId            String?
+  departmentId        String?
   currency            String   @default("BHD")
   isActive            Boolean  @default(true)
   notes               String?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  company           Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  receivableAccount Account? @relation(fields: [receivableAccountId], references: [id], onDelete: SetNull)
+  company           Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  receivableAccount Account?   @relation(fields: [receivableAccountId], references: [id], onDelete: SetNull)
+  source            LeadSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  department        Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
   quotations  Quotation[]
   orders      SalesOrder[]
@@ -1790,6 +1799,8 @@ model Customer {
 
   @@unique([companyId, code])
   @@index([companyId, isActive])
+  @@index([sourceId])
+  @@index([departmentId])
 }
 
 model Quotation {
@@ -2657,6 +2668,7 @@ model Department {
   employees  Employee[]
   workOrders WorkOrder[]
   branch     Branch?     @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  customers  Customer[]
 
   @@unique([companyId, code])
   @@index([companyId, isActive])
@@ -3156,6 +3168,7 @@ model LeadSource {
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   leads   Lead[]
+  customers Customer[]
 
   @@unique([companyId, code])
 }

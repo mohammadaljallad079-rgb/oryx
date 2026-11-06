@@ -17,6 +17,8 @@ import type {
   CouponDto,
   CouponValidationResponse,
   CustomerDto,
+  CustomerDetailDto,
+  CustomerAttachmentDto,
   CustomerReturnDto,
   DashboardResponse,
   EcosystemOverviewResponse,
@@ -75,6 +77,7 @@ import type {
   CrmDashboardDto,
   ProjectDto,
   ProjectTaskDto,
+  LeadSourceDto,
   WorkOrderDto,
   WorkOrderChecklistItemDto,
   OperationsDashboardDto,
@@ -827,10 +830,17 @@ export const api = {
   // ------------------------------------------------------------ sales (E02)
   salesCustomers: (params: { companyId?: string; search?: string } = {}) =>
     request<Paginated<CustomerDto>>(`/sales/customers?${toQuery(params)}`),
+  customer: (id: string) => request<CustomerDetailDto>(`/sales/customers/${id}`),
   createCustomer: (body: Record<string, unknown>) =>
     request<CustomerDto>('/sales/customers', { method: 'POST', body }),
   updateCustomer: (id: string, body: Record<string, unknown>) =>
     request<CustomerDto>(`/sales/customers/${id}`, { method: 'POST', body }),
+  customerAttachments: (id: string) =>
+    request<Paginated<CustomerAttachmentDto>>(`/sales/customers/${id}/attachments`),
+  addCustomerAttachment: (id: string, body: Record<string, unknown>) =>
+    request<CustomerAttachmentDto>(`/sales/customers/${id}/attachments`, { method: 'POST', body }),
+  removeCustomerAttachment: (id: string, attachmentId: string) =>
+    request<{ removed: boolean }>(`/sales/customers/${id}/attachments/${attachmentId}`, { method: 'DELETE' }),
   quotations: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<SalesDocumentDto>>(`/sales/quotations?${toQuery(params)}`),
   createQuotation: (body: Record<string, unknown>) =>
@@ -964,8 +974,8 @@ export const api = {
 
   // ------------------------------------------------------------ CRM (E03)
   crmLeadSources: (params: { companyId?: string } = {}) =>
-    request<Paginated<Record<string, unknown>>>(`/crm/lead-sources?${toQuery(params)}`),
-  createLeadSource: (body: Record<string, unknown>) => request<Record<string, unknown>>('/crm/lead-sources', { method: 'POST', body }),
+    request<Paginated<LeadSourceDto>>(`/crm/lead-sources?${toQuery(params)}`),
+  createLeadSource: (body: Record<string, unknown>) => request<LeadSourceDto>('/crm/lead-sources', { method: 'POST', body }),
   crmLeads: (params: { companyId?: string; search?: string; status?: string; page?: number } = {}) =>
     request<Paginated<LeadDto>>(`/crm/leads?${toQuery(params)}`),
   createLead: (body: Record<string, unknown>) => request<LeadDto>('/crm/leads', { method: 'POST', body }),

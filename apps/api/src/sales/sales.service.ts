@@ -97,10 +97,32 @@ export class SalesService {
         : {}),
     };
     const [rows, total] = await Promise.all([
-      this.prisma.customer.findMany({ where, orderBy: { code: 'asc' }, skip: (page - 1) * pageSize, take: pageSize }),
+      this.prisma.customer.findMany({
+        where,
+        orderBy: { code: 'asc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: { source: true, department: true },
+      }),
       this.prisma.customer.count({ where }),
     ]);
     return { items: rows.map(toCustomerDto), total, page, pageSize };
+  }
+
+  /**
+   * Resolve the optional attribution catalogues, refusing an id that belongs to
+   * another tenant. A foreign id would otherwise let a caller attach its
+   * customer to a catalogue row it cannot read, and the relation would leak the
+   * other tenant's source name through `include`.
+   */
+  private async resolveAttribution(companyId: string, sourceId?: string, departmentId?: string) {
+    const [source, department] = await Promise.all([
+      sourceId ? this.prisma.leadSource.findFirst({ where: { id: sourceId, companyId } }) : null,
+      departmentId ? this.prisma.department.findFirst({ where: { id: departmentId, companyId } }) : null,
+    ]);
+    if (sourceId && !source) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer source not found in this company.');
+    if (departmentId && !department) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Department not found in this company.');
+    return { source, department };
   }
 
   async createCustomer(dto: CreateCustomerDto, principal: RequestPrincipal, actor: ActorContext) {
@@ -119,6 +141,7 @@ export class SalesService {
     if (!nameEn && !nameAr) {
       throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide the customer name in English, Arabic, or both.');
     }
+    await this.resolveAttribution(companyId, dto.sourceId, dto.departmentId);
     const customer = await this.prisma.customer.create({
       data: {
         companyId,
@@ -131,11 +154,14 @@ export class SalesService {
         addressLine: dto.addressLine ?? null,
         city: dto.city ?? null,
         countryCode: dto.countryCode ?? defaultCountry,
+        sourceId: dto.sourceId ?? null,
+        departmentId: dto.departmentId ?? null,
         creditLimitMinor: dto.creditLimitMinor ?? 0,
         paymentTermsDays: dto.paymentTermsDays ?? 0,
         currency: dto.currency ?? defaultCurrency,
         notes: dto.notes ?? null,
       },
+      include: { source: true, department: true },
     });
     await this.audit.record({
       actorUserId: actor.userId,
@@ -152,6 +178,7 @@ export class SalesService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const customer = await this.prisma.customer.findFirst({ where: { id, companyId } });
     if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+    await this.resolveAttribution(companyId, dto.sourceId, dto.departmentId);
     const updated = await this.prisma.customer.update({
       where: { id },
       data: {
@@ -162,11 +189,14 @@ export class SalesService {
         ...(dto.taxNumber !== undefined ? { taxNumber: dto.taxNumber } : {}),
         ...(dto.addressLine !== undefined ? { addressLine: dto.addressLine } : {}),
         ...(dto.city !== undefined ? { city: dto.city } : {}),
+        ...(dto.sourceId !== undefined ? { sourceId: dto.sourceId || null } : {}),
+        ...(dto.departmentId !== undefined ? { departmentId: dto.departmentId || null } : {}),
         ...(dto.creditLimitMinor !== undefined ? { creditLimitMinor: dto.creditLimitMinor } : {}),
         ...(dto.paymentTermsDays !== undefined ? { paymentTermsDays: dto.paymentTermsDays } : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
       },
+      include: { source: true, department: true },
     });
     await this.audit.record({
       actorUserId: actor.userId,
@@ -177,6 +207,106 @@ export class SalesService {
       summary: `Updated customer ${updated.code}`,
     });
     return toCustomerDto(updated);
+  }
+
+  /**
+   * A customer's full profile for the customer screen: the record plus the
+   * history counts, recent invoices and registered vehicles, all scoped to the
+   * customer's own company. The vehicle relation is the Execution 03 registry,
+   * not the consumer garage.
+   */
+  async getCustomer(id: string, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const customer = await this.prisma.customer.findFirst({
+      where: { id, companyId },
+      include: { source: true, department: true },
+    });
+    if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+
+    const [quotations, orders, invoices, payments, creditNotes, vehicles, recentInvoices, vehicleRows] = await Promise.all([
+      this.prisma.quotation.count({ where: { companyId, customerId: id } }),
+      this.prisma.salesOrder.count({ where: { companyId, customerId: id } }),
+      this.prisma.salesInvoice.count({ where: { companyId, customerId: id } }),
+      this.prisma.payment.count({ where: { companyId, customerId: id } }),
+      this.prisma.creditNote.count({ where: { companyId, customerId: id } }),
+      this.prisma.vehicle.count({ where: { companyId, customerId: id } }),
+      this.prisma.salesInvoice.findMany({
+        where: { companyId, customerId: id },
+        orderBy: { invoiceDate: 'desc' },
+        take: 10,
+      }),
+      this.prisma.vehicle.findMany({
+        where: { companyId, customerId: id },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      }),
+    ]);
+
+    return {
+      ...toCustomerDto(customer),
+      history: { quotations, orders, invoices, payments, creditNotes, vehicles },
+      recentInvoices: recentInvoices.map((inv) => ({
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        invoiceDate: inv.invoiceDate.toISOString(),
+        status: inv.status,
+        totalMinor: inv.totalMinor,
+        balanceMinor: inv.totalMinor - inv.amountPaidMinor,
+        currency: inv.currency,
+      })),
+      vehicles: vehicleRows.map((v) => ({
+        id: v.id,
+        vin: v.vin,
+        plateNumber: v.plateNumber,
+        make: v.make,
+        model: v.model,
+        modelYear: v.modelYear,
+      })),
+    };
+  }
+
+  // ------------------------------------------------------ customer attachments
+
+  async listCustomerAttachments(customerId: string, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const customer = await this.prisma.customer.findFirst({ where: { id: customerId, companyId }, select: { id: true } });
+    if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+    const rows = await this.prisma.entityAttachment.findMany({
+      where: { companyId, entityType: 'CUSTOMER', entityId: customerId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return { items: rows, total: rows.length, page: 1, pageSize: rows.length };
+  }
+
+  async addCustomerAttachment(customerId: string, body: { fileName: string; mimeType?: string; sizeBytes?: number; storageRef?: string }, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const customer = await this.prisma.customer.findFirst({ where: { id: customerId, companyId }, select: { id: true } });
+    if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+    const attachment = await this.prisma.entityAttachment.create({
+      data: {
+        companyId,
+        entityType: 'CUSTOMER',
+        entityId: customerId,
+        fileName: body.fileName,
+        mimeType: body.mimeType ?? null,
+        sizeBytes: body.sizeBytes ?? 0,
+        storageRef: body.storageRef ?? null,
+        uploadedById: actor.userId,
+      },
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'sales.customer_attachment_added', targetType: 'CUSTOMER', targetId: customerId, summary: `Attached ${body.fileName}` });
+    return attachment;
+  }
+
+  async removeCustomerAttachment(customerId: string, attachmentId: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const attachment = await this.prisma.entityAttachment.findFirst({
+      where: { id: attachmentId, companyId, entityType: 'CUSTOMER', entityId: customerId },
+    });
+    if (!attachment) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Attachment not found.');
+    await this.prisma.entityAttachment.delete({ where: { id: attachmentId } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'sales.customer_attachment_removed', targetType: 'CUSTOMER', targetId: customerId, summary: `Removed ${attachment.fileName}` });
+    return { removed: true };
   }
 
   // -------------------------------------------------------------- quotations
@@ -1217,13 +1347,24 @@ function toCustomerDto(c: {
   addressLine: string | null;
   city: string | null;
   countryCode: string | null;
+  sourceId?: string | null;
+  departmentId?: string | null;
   creditLimitMinor: number;
   paymentTermsDays: number;
   currency: string;
   isActive: boolean;
   notes: string | null;
+  source?: { id: string; code: string; nameEn: string; nameAr: string } | null;
+  department?: { id: string; code: string; nameEn: string; nameAr: string } | null;
 }) {
-  return { ...c };
+  const { source, department, ...rest } = c;
+  return {
+    ...rest,
+    sourceNameEn: source?.nameEn ?? null,
+    sourceNameAr: source?.nameAr ?? null,
+    departmentNameEn: department?.nameEn ?? null,
+    departmentNameAr: department?.nameAr ?? null,
+  };
 }
 
 function toQuotationDto(q: {

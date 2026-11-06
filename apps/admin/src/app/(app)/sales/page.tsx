@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -15,10 +15,12 @@ import {
   ErrorBanner,
   Field,
   Modal,
+  SearchableSelect,
   SectionHeader,
   Skeleton,
   StatusBadge,
   TableShell,
+  type SearchableOption,
 } from '@/components/ui';
 import type {
   CashierSessionDto,
@@ -101,10 +103,34 @@ export default function SalesPage() {
 // ----------------------------------------------------------------- customers
 
 function CustomersTab({ canManage }: { canManage: boolean }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
+  const { companyId } = useAuth();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<CustomerDto | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const list = useAsync(() => api.salesCustomers({ search: search || undefined }), [search]);
+  const sources = useAsync(() => api.crmLeadSources({ companyId: companyId ?? undefined }), [companyId]);
+  const departments = useAsync(() => api.hrDepartments({ companyId: companyId ?? undefined }), [companyId]);
+
+  const sourceOptions: SearchableOption[] = (sources.data?.items ?? []).map((s) => ({
+    value: s.id,
+    label: locale === 'ar' ? s.nameAr : s.nameEn,
+    hint: s.code,
+  }));
+  const departmentOptions: SearchableOption[] = (departments.data?.items ?? []).map((d) => ({
+    value: d.id,
+    label: locale === 'ar' ? d.nameAr : d.nameEn,
+    hint: d.code,
+  }));
+
+  const label = (row: CustomerDto) => (locale === 'ar' ? row.nameAr || row.nameEn : row.nameEn || row.nameAr);
+
+  const setStatus = async (row: CustomerDto, next: boolean) => {
+    if (!window.confirm(t('erp.sales.statusChangeConfirm'))) return;
+    await api.updateCustomer(row.id, { isActive: next });
+    await list.reload();
+  };
 
   return (
     <Card>
@@ -114,7 +140,7 @@ function CustomersTab({ canManage }: { canManage: boolean }) {
           <input className="oryx-input" value={search} onChange={(e) => setSearch(e.target.value)} data-testid="customer-search" />
         </label>
         {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-customer">
+          <Button variant="primary" size="sm" onClick={() => { setEditing(null); setOpen(true); }} data-testid="new-customer">
             <Icon name="plus" size={16} />
             {t('erp.sales.newCustomer')}
           </Button>
@@ -131,9 +157,12 @@ function CustomersTab({ canManage }: { canManage: boolean }) {
             <tr>
               <th>{t('common.code')}</th>
               <th>{t('common.name')}</th>
+              <th>{t('erp.sales.customerSource')}</th>
+              <th>{t('erp.sales.customerDepartment')}</th>
               <th>{t('erp.sales.phone')}</th>
               <th>{t('erp.sales.creditLimit')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -141,27 +170,131 @@ function CustomersTab({ canManage }: { canManage: boolean }) {
               <tr key={c.id} data-testid={`customer-row-${c.code}`}>
                 <td className="font-mono text-[12px]">{c.code}</td>
                 <td>
-                  <span className="block font-semibold">{c.nameEn || c.nameAr || c.code}</span>
-                  <span className="oryx-faint block text-[11px]">{c.nameEn && c.nameAr ? c.nameAr : ''}</span>
+                  <span className="block font-semibold">{label(c) || c.code}</span>
+                  <span className="oryx-faint block text-[11px]">{c.nameEn && c.nameAr ? (locale === 'ar' ? c.nameEn : c.nameAr) : ''}</span>
                 </td>
+                <td className="text-[12.5px]">{locale === 'ar' ? c.sourceNameAr || c.sourceNameEn : c.sourceNameEn || c.sourceNameAr || '—'}</td>
+                <td className="text-[12.5px]">{locale === 'ar' ? c.departmentNameAr || c.departmentNameEn : c.departmentNameEn || c.departmentNameAr || '—'}</td>
                 <td className="text-[12.5px]">{c.phone ?? '—'}</td>
-                <td className="tabular-nums text-[12.5px]">{money(c.creditLimitMinor)}</td>
+                <td className="tabular-nums text-[12.5px]">{money(c.creditLimitMinor, c.currency)}</td>
                 <td><Badge tone={c.isActive ? 'success' : 'neutral'}>{c.isActive ? t('common.active') : t('common.inactive')}</Badge></td>
+                <td>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <Button size="sm" variant="ghost" onClick={() => setDetailId(c.id)} data-testid={`customer-view-${c.code}`}>
+                      {t('common.view')}
+                    </Button>
+                    {canManage ? (
+                      <Button size="sm" variant="ghost" onClick={() => { setEditing(c); setOpen(true); }} data-testid={`customer-edit-${c.code}`}>
+                        {t('common.edit')}
+                      </Button>
+                    ) : null}
+                    {canManage ? (
+                      <Button size="sm" variant="ghost" onClick={() => void setStatus(c, !c.isActive)} data-testid={`customer-toggle-${c.code}`}>
+                        {c.isActive ? t('common.deactivate') : t('common.reactivate')}
+                      </Button>
+                    ) : null}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
-      <CustomerModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <CustomerModal
+        open={open}
+        customer={editing}
+        sourceOptions={sourceOptions}
+        departmentOptions={departmentOptions}
+        onClose={() => { setOpen(false); setEditing(null); }}
+        onCreated={list.reload}
+        onCreatedSource={() => sources.reload()}
+        onCreatedDepartment={() => departments.reload()}
+      />
+      {detailId ? (
+        <CustomerDetailDrawer
+          id={detailId}
+          canManage={canManage}
+          onClose={() => setDetailId(null)}
+          onChanged={() => void list.reload()}
+        />
+      ) : null}
     </Card>
   );
 }
 
-function CustomerModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => Promise<void> }) {
-  const { t } = useUi();
+interface CustomerFormState {
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  email: string;
+  phone: string;
+  taxNumber: string;
+  addressLine: string;
+  city: string;
+  sourceId: string | null;
+  departmentId: string | null;
+  creditLimit: string;
+  paymentTermsDays: string;
+  notes: string;
+}
+
+function CustomerModal({
+  open,
+  customer,
+  sourceOptions,
+  departmentOptions,
+  onClose,
+  onCreated,
+  onCreatedSource,
+  onCreatedDepartment,
+}: {
+  open: boolean;
+  customer: CustomerDto | null;
+  sourceOptions: SearchableOption[];
+  departmentOptions: SearchableOption[];
+  onClose: () => void;
+  onCreated: () => Promise<void>;
+  onCreatedSource: () => Promise<void>;
+  onCreatedDepartment: () => Promise<void>;
+}) {
+  const { t, locale } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', phone: '', creditLimit: '0.00', paymentTermsDays: '30' });
+  const [form, setForm] = useState<CustomerFormState>({
+    code: '',
+    nameEn: '',
+    nameAr: '',
+    email: '',
+    phone: '',
+    taxNumber: '',
+    addressLine: '',
+    city: '',
+    sourceId: null as string | null,
+    departmentId: null as string | null,
+    creditLimit: '0.000',
+    paymentTermsDays: '30',
+    notes: '',
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setForm({
+      code: customer?.code ?? '',
+      nameEn: customer?.nameEn ?? '',
+      nameAr: customer?.nameAr ?? '',
+      email: customer?.email ?? '',
+      phone: customer?.phone ?? '',
+      taxNumber: customer?.taxNumber ?? '',
+      addressLine: customer?.addressLine ?? '',
+      city: customer?.city ?? '',
+      sourceId: customer?.sourceId ?? null,
+      departmentId: customer?.departmentId ?? null,
+      creditLimit: minorToInput(customer?.creditLimitMinor ?? 0, customer?.currency),
+      paymentTermsDays: String(customer?.paymentTermsDays ?? 30),
+      notes: customer?.notes ?? '',
+    });
+  }, [open, customer]);
 
   const submit = async () => {
     setBusy(true);
@@ -171,14 +304,25 @@ function CustomerModal({ open, onClose, onCreated }: { open: boolean; onClose: (
         setError(t('erp.sales.nameRequired'));
         return;
       }
-      await api.createCustomer({
-        code: form.code,
+      const body: Record<string, unknown> = {
         ...(form.nameEn.trim() ? { nameEn: form.nameEn.trim() } : {}),
         ...(form.nameAr.trim() ? { nameAr: form.nameAr.trim() } : {}),
+        email: form.email || undefined,
         phone: form.phone || undefined,
-        creditLimitMinor: toMinorInput(form.creditLimit),
+        taxNumber: form.taxNumber || undefined,
+        addressLine: form.addressLine || undefined,
+        city: form.city || undefined,
+        sourceId: form.sourceId ?? undefined,
+        departmentId: form.departmentId ?? undefined,
+        creditLimitMinor: toMinorInput(form.creditLimit, customer?.currency),
         paymentTermsDays: Number(form.paymentTermsDays) || 0,
-      });
+        notes: form.notes || undefined,
+      };
+      if (customer) {
+        await api.updateCustomer(customer.id, body);
+      } else {
+        await api.createCustomer({ ...body, code: form.code });
+      }
       await onCreated();
       onClose();
     } catch (e) {
@@ -191,7 +335,7 @@ function CustomerModal({ open, onClose, onCreated }: { open: boolean; onClose: (
   return (
     <Modal
       open={open}
-      title={t('erp.sales.newCustomer')}
+      title={customer ? t('erp.sales.customerEdit') : t('erp.sales.newCustomer')}
       onClose={onClose}
       footer={
         <>
@@ -205,7 +349,13 @@ function CustomerModal({ open, onClose, onCreated }: { open: boolean; onClose: (
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="customer-code" />
+          <input
+            className="oryx-input"
+            value={form.code}
+            disabled={Boolean(customer)}
+            onChange={(e) => setForm({ ...form, code: e.target.value })}
+            data-testid="customer-code"
+          />
         </Field>
         <Field label={t('erp.sales.phone')}>
           <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
@@ -216,14 +366,329 @@ function CustomerModal({ open, onClose, onCreated }: { open: boolean; onClose: (
         <Field label={`${t('common.name')} (AR)`} hint={t('erp.sales.nameOptionalHint')}>
           <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="customer-name-ar" />
         </Field>
+        <Field label={t('common.email')}>
+          <input className="oryx-input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="customer-email" />
+        </Field>
+        <Field label={t('erp.sales.taxNumber')}>
+          <input className="oryx-input" value={form.taxNumber} onChange={(e) => setForm({ ...form, taxNumber: e.target.value })} />
+        </Field>
+        <Field label={t('common.address')}>
+          <input className="oryx-input" value={form.addressLine} onChange={(e) => setForm({ ...form, addressLine: e.target.value })} />
+        </Field>
+        <Field label={t('common.city')}>
+          <input className="oryx-input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+        </Field>
+        <Field label={t('erp.sales.customerSource')} hint={t('erp.sales.customerSourceHint')}>
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <SearchableSelect
+                value={form.sourceId}
+                options={sourceOptions}
+                onChange={(v) => setForm({ ...form, sourceId: v })}
+                placeholder={t('common.select')}
+                emptyLabel={t('common.none')}
+                testId="customer-source"
+              />
+            </div>
+            <InlineCreateButton
+              label={t('erp.sales.customerSource')}
+              onCreate={async (code, nameEn, nameAr) => {
+                const created = await api.createLeadSource({ code, nameEn, nameAr });
+                await onCreatedSource();
+                setForm((f) => ({ ...f, sourceId: created.id }));
+              }}
+            />
+          </div>
+        </Field>
+        <Field label={t('erp.sales.customerDepartment')} hint={t('erp.sales.customerDepartmentHint')}>
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <SearchableSelect
+                value={form.departmentId}
+                options={departmentOptions}
+                onChange={(v) => setForm({ ...form, departmentId: v })}
+                placeholder={t('common.select')}
+                emptyLabel={t('common.none')}
+                testId="customer-department"
+              />
+            </div>
+            <InlineCreateButton
+              label={t('erp.sales.customerDepartment')}
+              onCreate={async (code, nameEn, nameAr) => {
+                const created = await api.createDepartment({ code, nameEn, nameAr });
+                await onCreatedDepartment();
+                setForm((f) => ({ ...f, departmentId: created.id }));
+              }}
+            />
+          </div>
+        </Field>
         <Field label={t('erp.sales.creditLimit')}>
           <input className="oryx-input" value={form.creditLimit} onChange={(e) => setForm({ ...form, creditLimit: e.target.value })} />
         </Field>
         <Field label={t('erp.sales.paymentTerms')}>
           <input className="oryx-input" value={form.paymentTermsDays} onChange={(e) => setForm({ ...form, paymentTermsDays: e.target.value })} />
         </Field>
+        <div className="sm:col-span-2">
+          <Field label={t('common.notes')}>
+            <textarea className="oryx-textarea" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          </Field>
+        </div>
       </div>
+      <p className="oryx-faint m-0 mt-3 text-[11px]">{locale === 'ar' ? 'يُسمح باسم واحد على الأقل.' : 'At least one name is required.'}</p>
     </Modal>
+  );
+}
+
+/** A compact "+" that opens a small create dialog for an inline catalogue. */
+function InlineCreateButton({
+  label,
+  onCreate,
+}: {
+  label: string;
+  onCreate: (code: string, nameEn: string, nameAr: string) => Promise<void>;
+}) {
+  const { t } = useUi();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '' });
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await onCreate(form.code, form.nameEn, form.nameAr);
+      setForm({ code: '', nameEn: '', nameAr: '' });
+      setOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <Button size="sm" variant="ghost" onClick={() => setOpen(true)} aria-label={`${t('common.create')} ${label}`} data-testid="inline-create">
+        <Icon name="plus" size={15} />
+      </Button>
+      <Modal
+        open={open}
+        title={`${t('common.create')} — ${label}`}
+        onClose={() => setOpen(false)}
+        footer={
+          <>
+            <Button onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
+            <Button variant="primary" disabled={busy || !form.code || !form.nameEn || !form.nameAr} onClick={submit} data-testid="inline-create-save">
+              {busy ? t('common.loading') : t('common.save')}
+            </Button>
+          </>
+        }
+      >
+        {error ? <ErrorBanner message={error} /> : null}
+        <div className="grid gap-3">
+          <Field label={t('common.code')} required>
+            <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="inline-create-code" />
+          </Field>
+          <Field label={`${t('common.name')} (EN)`} required>
+            <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} />
+          </Field>
+          <Field label={`${t('common.name')} (AR)`} required>
+            <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} />
+          </Field>
+        </div>
+      </Modal>
+    </>
+  );
+}
+
+function CustomerDetailDrawer({
+  id,
+  canManage,
+  onClose,
+  onChanged,
+}: {
+  id: string;
+  canManage: boolean;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const { t, locale } = useUi();
+  const detail = useAsync(() => api.customer(id), [id]);
+  const attachments = useAsync(() => api.customerAttachments(id), [id]);
+  const [busy, setBusy] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [attach, setAttach] = useState({ fileName: '', storageRef: '' });
+
+  const removeAttachment = async (attachmentId: string) => {
+    if (!window.confirm(t('common.confirm'))) return;
+    await api.removeCustomerAttachment(id, attachmentId);
+    await attachments.reload();
+  };
+
+  const addAttachment = async () => {
+    setBusy(true);
+    try {
+      await api.addCustomerAttachment(id, { fileName: attach.fileName, storageRef: attach.storageRef || undefined });
+      setAttach({ fileName: '', storageRef: '' });
+      setAttachOpen(false);
+      await attachments.reload();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const d = detail.data;
+  const historyEntries: Array<[string, number]> = d
+    ? [
+        [t('erp.sales.historyQuotations'), d.history.quotations],
+        [t('erp.sales.historyOrders'), d.history.orders],
+        [t('erp.sales.historyInvoices'), d.history.invoices],
+        [t('erp.sales.historyPayments'), d.history.payments],
+        [t('erp.sales.historyCreditNotes'), d.history.creditNotes],
+        [t('erp.sales.historyVehicles'), d.history.vehicles],
+      ]
+    : [];
+
+  return (
+    <Modal open title={`${t('erp.sales.customerDetails')}${d ? ` — ${d.code}` : ''}`} onClose={onClose} footer={<Button onClick={onClose}>{t('common.close')}</Button>}>
+      {detail.error ? <ErrorBanner message={detail.error} onRetry={detail.reload} /> : null}
+      {detail.loading || !d ? (
+        <Skeleton height={220} />
+      ) : (
+        <div className="flex flex-col gap-4" data-testid="customer-detail">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <DetailRow label={t('common.name')} value={locale === 'ar' ? d.nameAr || d.nameEn : d.nameEn || d.nameAr} />
+            <DetailRow label={t('common.phone')} value={d.phone} />
+            <DetailRow label={t('common.email')} value={d.email} />
+            <DetailRow label={t('erp.sales.taxNumber')} value={d.taxNumber} />
+            <DetailRow label={t('common.address')} value={d.addressLine} />
+            <DetailRow label={t('common.city')} value={d.city} />
+            <DetailRow label={t('erp.sales.customerSource')} value={locale === 'ar' ? d.sourceNameAr || d.sourceNameEn : d.sourceNameEn || d.sourceNameAr} />
+            <DetailRow label={t('erp.sales.customerDepartment')} value={locale === 'ar' ? d.departmentNameAr || d.departmentNameEn : d.departmentNameEn || d.departmentNameAr} />
+            <DetailRow label={t('erp.sales.creditLimit')} value={money(d.creditLimitMinor, d.currency)} />
+            <DetailRow label={t('erp.sales.paymentTerms')} value={String(d.paymentTermsDays)} />
+            <DetailRow label={t('common.status')} value={d.isActive ? t('common.active') : t('common.inactive')} />
+          </div>
+
+          <div>
+            <h3 className="m-0 mb-2 text-[13px] font-bold">{t('erp.sales.customerHistory')}</h3>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {historyEntries.map(([labelText, count]) => (
+                <div key={labelText} className="rounded-xl border border-[var(--border)] px-3 py-2">
+                  <span className="oryx-faint block text-[11px]">{labelText}</span>
+                  <span className="block text-[15px] font-bold tabular-nums">{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {d.recentInvoices.length ? (
+            <div>
+              <h3 className="m-0 mb-2 text-[13px] font-bold">{t('erp.sales.recentInvoices')}</h3>
+              <TableShell>
+                <thead>
+                  <tr>
+                    <th>{t('erp.sales.invoiceNumber')}</th>
+                    <th>{t('common.status')}</th>
+                    <th>{t('erp.sales.total')}</th>
+                    <th>{t('erp.sales.outstanding')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {d.recentInvoices.map((inv) => (
+                    <tr key={inv.id}>
+                      <td className="font-mono text-[12px]">{inv.invoiceNumber}</td>
+                      <td><StatusBadge status={inv.status} label={inv.status} /></td>
+                      <td className="tabular-nums text-[12.5px]">{money(inv.totalMinor, inv.currency)}</td>
+                      <td className="tabular-nums text-[12.5px]">{money(inv.balanceMinor, inv.currency)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </TableShell>
+            </div>
+          ) : null}
+
+          {d.vehicles.length ? (
+            <div>
+              <h3 className="m-0 mb-2 text-[13px] font-bold">{t('erp.sales.registeredVehicles')}</h3>
+              <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                {d.vehicles.map((v) => (
+                  <li key={v.id} className="text-[12.5px]">
+                    <span className="font-semibold">{v.plateNumber ?? v.vin}</span> — {v.make} {v.model} ({v.modelYear})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="m-0 text-[13px] font-bold">{t('erp.sales.customerAttachments')}</h3>
+              {canManage ? (
+                <Button size="sm" variant="ghost" onClick={() => setAttachOpen(true)} data-testid="add-customer-attachment">
+                  <Icon name="plus" size={15} />
+                  {t('erp.sales.addAttachment')}
+                </Button>
+              ) : null}
+            </div>
+            {attachments.loading ? (
+              <Skeleton height={40} />
+            ) : (attachments.data?.items.length ?? 0) === 0 ? (
+              <p className="oryx-faint m-0 text-[12px]">{t('erp.sales.noAttachments')}</p>
+            ) : (
+              <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                {attachments.data!.items.map((a) => (
+                  <li key={a.id} className="flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2 text-[12.5px]">
+                    <span>
+                      <span className="font-semibold">{a.fileName}</span>
+                      {a.storageRef ? <span className="oryx-faint block text-[11px]">{a.storageRef}</span> : null}
+                    </span>
+                    {canManage ? (
+                      <Button size="sm" variant="ghost" onClick={() => void removeAttachment(a.id)}>
+                        {t('common.delete')}
+                      </Button>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+
+      <Modal
+        open={attachOpen}
+        title={t('erp.sales.addAttachment')}
+        onClose={() => setAttachOpen(false)}
+        footer={
+          <>
+            <Button onClick={() => setAttachOpen(false)}>{t('common.cancel')}</Button>
+            <Button variant="primary" disabled={busy || !attach.fileName} onClick={addAttachment} data-testid="save-customer-attachment">
+              {busy ? t('common.loading') : t('common.save')}
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-3">
+          <Field label={t('erp.sales.attachmentName')} required>
+            <input className="oryx-input" value={attach.fileName} onChange={(e) => setAttach({ ...attach, fileName: e.target.value })} data-testid="attachment-file-name" />
+          </Field>
+          <Field label={t('erp.sales.attachmentReference')}>
+            <input className="oryx-input" value={attach.storageRef} onChange={(e) => setAttach({ ...attach, storageRef: e.target.value })} />
+          </Field>
+        </div>
+      </Modal>
+    </Modal>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div className="flex flex-col">
+      <span className="oryx-faint text-[11px]">{label}</span>
+      <span className="text-[12.5px] font-semibold">{value || '—'}</span>
+    </div>
   );
 }
 

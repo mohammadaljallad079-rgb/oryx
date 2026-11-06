@@ -783,11 +783,68 @@ export interface CustomerDto {
   addressLine: string | null;
   city: string | null;
   countryCode: string | null;
+  /** Lead-source catalogue id and the resolved bilingual label. */
+  sourceId: string | null;
+  sourceNameEn: string | null;
+  sourceNameAr: string | null;
+  /** Owning sales department id and the resolved bilingual label. */
+  departmentId: string | null;
+  departmentNameEn: string | null;
+  departmentNameAr: string | null;
   creditLimitMinor: number;
   paymentTermsDays: number;
   currency: string;
   isActive: boolean;
   notes: string | null;
+}
+
+/** One movement on a customer or supplier account, oldest first. */
+export interface AccountStatementRowDto {
+  date: string;
+  description: string;
+  reference: string | null;
+  debitMinor: number;
+  creditMinor: number;
+  balanceMinor: number;
+}
+
+/** A document reference attached to a customer record. */
+export interface CustomerAttachmentDto {
+  id: string;
+  companyId: string;
+  entityType: string;
+  entityId: string;
+  fileName: string;
+  mimeType: string | null;
+  sizeBytes: number;
+  storageRef: string | null;
+  uploadedById: string | null;
+  createdAt: string;
+}
+
+/**
+ * A customer's full profile: the record plus the operational history the
+ * customer screen shows. Every collection is scoped to the customer's company.
+ */
+export interface CustomerDetailDto extends CustomerDto {
+  history: {
+    quotations: number;
+    orders: number;
+    invoices: number;
+    payments: number;
+    creditNotes: number;
+    vehicles: number;
+  };
+  recentInvoices: Array<{
+    id: string;
+    invoiceNumber: string;
+    invoiceDate: string;
+    status: string;
+    totalMinor: number;
+    balanceMinor: number;
+    currency: string;
+  }>;
+  vehicles: Array<{ id: string; vin: string; plateNumber: string | null; make: string; model: string; modelYear: number }>;
 }
 
 export interface SupplierDto {
@@ -1009,6 +1066,15 @@ export interface DepartmentDto {
   parentId: string | null;
   branchId: string | null;
   employeeCount?: number;
+}
+
+/** A CRM lead source; the catalogue a customer's `sourceId` points at. */
+export interface LeadSourceDto {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  isActive: boolean;
 }
 
 export interface JobTitleDto {

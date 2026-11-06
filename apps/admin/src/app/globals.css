@@ -398,6 +398,18 @@ body::before {
   resize: vertical;
 }
 
+/*
+ * The dropdown panel for `SearchableSelect`. It floats over the field, so it
+ * needs its own raised surface and shadow; `--surface-raised` already flips with
+ * the theme, which keeps the panel legible in both light and dark.
+ */
+.oryx-popover {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.55);
+}
+
 .oryx-input:focus,
 .oryx-select:focus,
 .oryx-textarea:focus {

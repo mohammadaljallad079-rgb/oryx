@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentPrincipal,
@@ -19,6 +19,7 @@ import {
   CreatePosSaleDto,
   CreateQuotationDto,
   CreateSalesOrderDto,
+  CustomerAttachmentDto,
   ListQueryDto,
   UpdateCustomerDto,
 } from './sales.dto';
@@ -48,6 +49,44 @@ export class SalesController {
   @ApiOperation({ summary: 'Create a customer' })
   createCustomer(@Body() dto: CreateCustomerDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.sales.createCustomer(dto, p, actorFrom(p, req));
+  }
+
+  @Get('customers/:id')
+  @RequireAnyPermission('erp.sales.read', 'erp.sales.customer.manage')
+  @ApiOperation({ summary: 'Read one customer with its history' })
+  getCustomer(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.sales.getCustomer(id, p);
+  }
+
+  @Get('customers/:id/attachments')
+  @RequireAnyPermission('erp.sales.read', 'erp.sales.customer.manage')
+  @ApiOperation({ summary: 'List a customer attachments' })
+  customerAttachments(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.sales.listCustomerAttachments(id, p);
+  }
+
+  @Post('customers/:id/attachments')
+  @RequirePermissions('erp.sales.customer.manage')
+  @ApiOperation({ summary: 'Attach a document reference to a customer' })
+  addCustomerAttachment(
+    @Param('id') id: string,
+    @Body() dto: CustomerAttachmentDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.sales.addCustomerAttachment(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('customers/:id/attachments/:attachmentId')
+  @RequirePermissions('erp.sales.customer.manage')
+  @ApiOperation({ summary: 'Remove a customer attachment' })
+  removeCustomerAttachment(
+    @Param('id') id: string,
+    @Param('attachmentId') attachmentId: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.sales.removeCustomerAttachment(id, attachmentId, p, actorFrom(p, req));
   }
 
   @Post('customers/:id')
