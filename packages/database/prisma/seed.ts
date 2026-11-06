@@ -1171,6 +1171,22 @@ async function seedExecution03Baseline(idByCode: Map<string, string>, superAdmin
       await prisma.leadSource.upsert({ where: { companyId_code: { companyId: company.id, code: s.code } }, update: {}, create: { companyId: company.id, code: s.code, nameEn: s.nameEn, nameAr: s.nameAr } });
       leadSources += 1;
     }
+
+    // Attribute the demo customers to a source and the sales department, so the
+    // customer master record is not blank in a fresh seed. `updateMany` with a
+    // null guard means an operator's own attribution is never overwritten.
+    const walkIn = await prisma.leadSource.findUniqueOrThrow({
+      where: { companyId_code: { companyId: company.id, code: 'WALKIN' } },
+    });
+    const salesDept = await prisma.department.findUnique({
+      where: { companyId_code: { companyId: company.id, code: 'OPS' } },
+    });
+    for (const c of DEMO_CUSTOMERS) {
+      await prisma.customer.updateMany({
+        where: { companyId: company.id, code: c.code, sourceId: null },
+        data: { sourceId: walkIn.id, departmentId: salesDept?.id ?? null },
+      });
+    }
     const pipeline = await prisma.pipeline.upsert({
       where: { companyId_code: { companyId: company.id, code: 'DEFAULT' } },
       update: {},

@@ -391,6 +391,7 @@ function CustomerModal({
               />
             </div>
             <InlineCreateButton
+              testId="inline-create-source"
               label={t('erp.sales.customerSource')}
               onCreate={async (code, nameEn, nameAr) => {
                 const created = await api.createLeadSource({ code, nameEn, nameAr });
@@ -413,6 +414,7 @@ function CustomerModal({
               />
             </div>
             <InlineCreateButton
+              testId="inline-create-department"
               label={t('erp.sales.customerDepartment')}
               onCreate={async (code, nameEn, nameAr) => {
                 const created = await api.createDepartment({ code, nameEn, nameAr });
@@ -443,9 +445,11 @@ function CustomerModal({
 function InlineCreateButton({
   label,
   onCreate,
+  testId,
 }: {
   label: string;
   onCreate: (code: string, nameEn: string, nameAr: string) => Promise<void>;
+  testId?: string;
 }) {
   const { t } = useUi();
   const [open, setOpen] = useState(false);
@@ -469,7 +473,7 @@ function InlineCreateButton({
 
   return (
     <>
-      <Button size="sm" variant="ghost" onClick={() => setOpen(true)} aria-label={`${t('common.create')} ${label}`} data-testid="inline-create">
+      <Button size="sm" variant="ghost" onClick={() => setOpen(true)} aria-label={`${t('common.create')} ${label}`} data-testid={testId ?? 'inline-create'}>
         <Icon name="plus" size={15} />
       </Button>
       <Modal
@@ -491,10 +495,10 @@ function InlineCreateButton({
             <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="inline-create-code" />
           </Field>
           <Field label={`${t('common.name')} (EN)`} required>
-            <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} />
+            <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="inline-create-name-en" />
           </Field>
           <Field label={`${t('common.name')} (AR)`} required>
-            <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} />
+            <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="inline-create-name-ar" />
           </Field>
         </div>
       </Modal>
