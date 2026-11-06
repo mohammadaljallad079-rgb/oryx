@@ -2,9 +2,11 @@
 
 Acceptance date: 2026-11-05.
 Branch: `feature/execution-07-premium-web` (PR #7, **open and Draft**).
-Local HEAD at acceptance: `f9bc8a25` (`feat(documents,settings): merchant
-register preview, company finance defaults and PDF evidence`) plus the
-uncommitted working tree described in section 9.
+Local HEAD at acceptance: `fc26eb02` (`fix(ci): assert the APK bundle carries
+its API host, not that it is offline`) on top of `e0b02557`
+(`fix(documents): keep an Arabic face in the numeric and Latin font stacks`)
+and `de85190f` (`fix(documents): draw inspection marks as vectors, not font
+glyphs`).
 Environment: an isolated preview stack — a separate PostgreSQL database
 (`oryx_test`) with seeded synthetic demo records. No production database and no
 production secret is involved.
@@ -134,15 +136,38 @@ it.
 |---|---|---|
 | Shared unit | `pnpm --filter @oryx/shared test` | **217 passed / 217** (11 files) |
 | API integration | `pnpm --filter @oryx/api test:e2e` | **652 passed / 652** (34 suites) |
+| API unit | `pnpm --filter @oryx/api test` | **20 passed / 20** (5 files) |
 | Documents subset | `… test:e2e -- execution10-merchant-documents execution-phase3-documents document-numbering` | **47 passed / 47** (3 suites) |
 | Vehicle documents | `… test:e2e -- vehicle-documents` | **7 passed / 7** |
 | Mobile | `pnpm --filter @oryx/mobile test` | **206 passed / 206** (10 files) |
 | Mobile ERP | `pnpm --filter @oryx/mobile-erp test` | **31 passed / 31** (2 files) |
-| Admin browser | `pnpm --filter @oryx/admin test:ui` | **218 passed, 1 skipped** (8.5 min) |
+| Admin browser | `pnpm --filter @oryx/admin test:ui` | **218 passed, 1 skipped** (8.4 min) |
 | Workspace lint | `pnpm -r lint` | PASS (exit 0) |
 | Workspace typecheck | `pnpm -r typecheck` | PASS (exit 0) |
 | Builds | api / admin / customer | PASS (exit 0) |
 | Migrations | `prisma migrate status` | **up to date** (29 migrations applied to `oryx_test`) |
+
+### 2.1 CI workflows (run `fc26eb02`, all jobs green)
+
+| Workflow | Job | Result |
+|---|---|---|
+| CI | Typecheck and build | success |
+| CI | Unit and API integration tests | success |
+| CI | Browser acceptance tests | success |
+| Mobile APK | Build the debug-signed release APK | success |
+| Design preview | Build / Verify / Publish to GitHub Pages | success |
+
+Before this session the `CI` "Unit and API integration tests" job failed on the
+tax-invoice `/Type3` assertion, and the `Mobile APK` workflow failed on every
+push. Both are fixed and both workflows are now green on the pushed tip.
+
+### 2.2 Defects fixed this session
+
+| Defect | Root cause | Fix | Proof |
+|---|---|---|---|
+| Inspection PDF carried mark glyphs the embedded fonts lack, so the text layer fell back to a host font | Template used a symbol codepoint for the paint/body and chassis marks | Draw the marks as vectors instead of font glyphs | `inspection-report.template.spec.ts`; CI API job |
+| Tax-invoice PDF emitted a `/Type3` font (broken text layer) | `.num` / `.ltr` hardcoded `'ORYX Sans', sans-serif`; ORYX Sans has no Arabic, but a money cell prints the Arabic BHD symbol `د.ب`, so the two glyphs escaped the embedded faces | Point both classes at `DOCUMENT_LATIN_STACK`, which already named the Arabic face | Playwright render: old stack resolves `د`/`ب` to host `DejaVuSans`, new stack to embedded `NotoNaskhArabic`; `pdf-renderer.service.spec.ts`; CI API job |
+| `Mobile APK` workflow failed on every mobile/shared push | The bundle check required the bundled JS to contain no backend host, on the assumption the demo was offline-only; the app is a live client, so a valid bundle names its API host | Assert the bundle carries the configured API host; add an `api_base_url` dispatch input inlined via `EXPO_PUBLIC_API_BASE_URL` | `Mobile APK` run `fc26eb02` — first green build |
 
 ## 3. Live preview and visual evidence
 
@@ -195,20 +220,20 @@ PNGs in `docs/audit/pdf-samples/preview/`.
 
 ## 5. Files changed in this session
 
-Non-image working-tree changes (uncommitted at the time of writing):
+Three defects were fixed on top of the recovered tree. The commits are
+`de85190f`, `e0b02557` and `fc26eb02`.
 
-- `apps/api/src/automotive/vehicle.controller.ts` — document upload/delete routes
-- `apps/api/src/automotive/vehicle.service.ts` — multipart scan storage, tenant-scoped read/remove
-- `apps/api/src/automotive/automotive.dto.ts` — category validated against the shared catalogue
-- `apps/admin/src/app/(app)/automotive/inspections/page.tsx` — vehicle-documents modal
-- `apps/admin/src/lib/api.ts` — document client methods
-- `apps/admin/src/i18n/dictionaries.ts` — bilingual document labels
-- `packages/shared/src/contracts.ts` — `VehicleDocumentDto`, `VEHICLE_DOCUMENT_CATEGORIES`
-- `apps/customer/src/app/products/[id]/layout.tsx`, `providers/[id]/layout.tsx` — dynamic-route export fix
-- `apps/api/test/vehicle-documents.e2e-spec.ts` — new 7-test suite
-- `.run/sweep-preview.mjs`, `.run/verify-customer-auth.mjs` — deterministic login selector
-- Refreshed browser-suite screenshots under `docs/audit/screenshots/` and
-  `docs/execution-reports/screenshots/`
+| File | Change |
+|---|---|
+| `apps/api/src/documents/templates/inspection-report.template.ts` | Inspection marks drawn as vectors, not font-glyph codepoints (commit `de85190f`) |
+| `apps/api/src/documents/templates/inspection-report.template.spec.ts` | New spec: no template may depend on a mark glyph the embedded fonts lack |
+| `apps/api/src/documents/pdf/pdf-renderer.service.ts` | `.num` / `.ltr` use `DOCUMENT_LATIN_STACK` so the Arabic currency symbol stays in the embedded faces (commit `e0b02557`) |
+| `apps/api/src/documents/pdf/pdf-renderer.service.spec.ts` | New spec: both stacks must name an Arabic face |
+| `.github/workflows/mobile-apk.yml` | Bundle assertion now requires the configured API host instead of an offline bundle; `api_base_url` dispatch input (commit `fc26eb02`) |
+| `docs/audit/ORYX_FINAL_ACCEPTANCE.md` | This report |
+
+Earlier working-tree changes, now committed, are listed in the prior revision of
+this section and are unchanged by this session.
 
 ## 6. Database migrations
 
@@ -227,14 +252,23 @@ and the media library.
 | Production untouched | PASS (no deploy, no restart, no production migration) |
 | PR #7 open and Draft | PASS |
 
-The code is ready to be committed and pushed to the existing branch. It is **not**
-deployed and PR #7 is **not** marked ready for review.
+The three fixes are committed and pushed to the existing branch
+(`feature/execution-07-premium-web`). The working tree is clean, the remote tip
+is `fc26eb02`, PR #7 is open and Draft, and every CI workflow is green on that
+tip. The code is **not** deployed and PR #7 is **not** marked ready for review.
 
 ## 8. Honest summary
 
 - The platform is far more complete than the handover brief described; the brief
   reflected Execution 05, the tree is at Execution 20.
-- Every automated suite is green on the current tree.
+- Every automated suite is green on the current tree, and every CI workflow —
+  including the previously-red API integration job and the Mobile APK build — is
+  green on the pushed tip.
+- This session found and fixed three real defects: the inspection report's
+  font-dependent marks, the tax invoice's Type3 host-font fallback (the Arabic
+  BHD symbol in a Latin-only stack), and the stale Mobile APK bundle assertion
+  that failed every mobile push. Each has a regression guard or a green CI job
+  as proof, and none weakens a test.
 - The merchant document surface, the inspection engine, the official-document
   engine and QR verification are implemented, DB-backed and tested.
 - The pixel-exact PDF comparisons and the Android device acceptance are blocked
