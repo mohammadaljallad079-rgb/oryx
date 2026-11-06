@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { fromQuantity, sumMinor } from '@oryx/shared';
+import { fromQuantity, sumMinor, type RoundingMode } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccountingPostingService, SYSTEM_ROLES } from '../common/accounting-posting.service';
@@ -42,6 +42,9 @@ interface InvoiceSource {
   actorUserId: string;
   /** When false, stock is not issued (services / untracked items). */
   issueStock: boolean;
+  /** Company whole-amount cash rounding applied to the document total. */
+  roundingMode?: RoundingMode;
+  roundingScale?: number;
 }
 
 /**
@@ -335,7 +338,8 @@ export class SalesService {
     await this.assertCustomer(companyId, dto.customerId);
 
     const currency = dto.currency ?? (await this.context.companyCurrency(companyId));
-    const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })));
+    const rounding = await this.context.companyRoundingMode(companyId);
+    const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })), rounding.mode, rounding.scale);
     const quotation = await this.posting.withTransaction(async (tx) => {
       const quoteNumber = await this.sequences.next(tx, companyId, 'quotation');
       return tx.quotation.create({
@@ -350,6 +354,7 @@ export class SalesService {
           subtotalMinor: totals.subtotalMinor,
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
           currency,
           notes: dto.notes ?? null,
@@ -393,6 +398,7 @@ export class SalesService {
           subtotalMinor: quote.subtotalMinor,
           discountMinor: quote.discountMinor,
           taxMinor: quote.taxMinor,
+          roundingMinor: quote.roundingMinor,
           totalMinor: quote.totalMinor,
           currency: quote.currency,
           createdById: actor.userId,
@@ -452,7 +458,8 @@ export class SalesService {
     if (dto.warehouseId) await this.assertWarehouse(companyId, dto.warehouseId);
 
     const currency = dto.currency ?? (await this.context.companyCurrency(companyId));
-    const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })));
+    const rounding = await this.context.companyRoundingMode(companyId);
+    const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })), rounding.mode, rounding.scale);
     const order = await this.posting.withTransaction(async (tx) => {
       const orderNumber = await this.sequences.next(tx, companyId, 'salesOrder');
       return tx.salesOrder.create({
@@ -467,6 +474,7 @@ export class SalesService {
           subtotalMinor: totals.subtotalMinor,
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
           currency,
           notes: dto.notes ?? null,
@@ -585,7 +593,8 @@ export class SalesService {
       }
 
       await this.assertCustomerTx(tx, companyId, customerId!);
-      const totals = computeDocumentTotals(lineInputs);
+      const rounding = await this.context.companyRoundingMode(companyId, tx);
+      const totals = computeDocumentTotals(lineInputs, rounding.mode, rounding.scale);
 
       // Credit limit check for a posted (non-draft) invoice.
       const willPost = dto.post !== false;
@@ -613,6 +622,7 @@ export class SalesService {
           subtotalMinor: totals.subtotalMinor,
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
           currency,
           notes: dto.notes ?? null,
@@ -635,6 +645,8 @@ export class SalesService {
           sourceId: invoice.id,
           actorUserId: actor.userId,
           issueStock: dto.issueStock ?? true,
+          roundingMode: rounding.mode,
+          roundingScale: rounding.scale,
         });
 
         // Mark the source order invoiced and update its lines.
@@ -676,10 +688,17 @@ export class SalesService {
    * moving-average cost captured by the stock ledger.
    */
   private async postSalesInvoice(tx: Tx, src: InvoiceSource) {
-    const totals = computeDocumentTotals(src.lines);
+    const totals = computeDocumentTotals(src.lines, src.roundingMode ?? 'NONE', src.roundingScale ?? 2);
     const arAccount = await this.posting.systemAccount(tx, src.companyId, SYSTEM_ROLES.AR_CONTROL);
     const revenueAccount = await this.posting.systemAccount(tx, src.companyId, SYSTEM_ROLES.SALES_REVENUE);
 
+    // A cash-rounding difference is a small gain (credit) when the total rounds
+    // up and a loss (debit) when it rounds down, so AR always settles the exact
+    // rounded total while revenue and VAT keep their exact figures.
+    const roundingAccount =
+      totals.roundingMinor !== 0
+        ? await this.posting.systemAccount(tx, src.companyId, SYSTEM_ROLES.ROUNDING_GAIN_LOSS)
+        : null;
     const lines = [
       { accountId: arAccount, debit: totals.totalMinor },
       ...(totals.discountMinor > 0
@@ -688,6 +707,12 @@ export class SalesService {
       { accountId: revenueAccount, credit: totals.subtotalMinor },
       ...(totals.taxMinor > 0
         ? [{ accountId: await this.posting.systemAccount(tx, src.companyId, SYSTEM_ROLES.VAT_OUTPUT), credit: totals.taxMinor }]
+        : []),
+      ...(roundingAccount && totals.roundingMinor > 0
+        ? [{ accountId: roundingAccount, credit: totals.roundingMinor }]
+        : []),
+      ...(roundingAccount && totals.roundingMinor < 0
+        ? [{ accountId: roundingAccount, debit: -totals.roundingMinor }]
         : []),
     ];
 
@@ -761,7 +786,8 @@ export class SalesService {
    * commit or roll back together. Posting is idempotent per source document.
    */
   async issueInvoice(tx: Tx, input: IssueInvoiceInput) {
-    const totals = computeDocumentTotals(input.lines);
+    const rounding = await this.context.companyRoundingMode(input.companyId, tx);
+    const totals = computeDocumentTotals(input.lines, rounding.mode, rounding.scale);
     const invoiceNumber = await this.sequences.next(tx, input.companyId, 'salesInvoice');
     // A module-issued invoice follows the tenant's currency unless told otherwise.
     const currency = input.currency ?? (await this.context.companyCurrency(input.companyId, tx));
@@ -777,6 +803,7 @@ export class SalesService {
         subtotalMinor: totals.subtotalMinor,
         discountMinor: totals.discountMinor,
         taxMinor: totals.taxMinor,
+        roundingMinor: totals.roundingMinor,
         totalMinor: totals.totalMinor,
         currency,
         notes: input.notes ?? null,
@@ -797,6 +824,8 @@ export class SalesService {
       sourceId: invoice.id,
       actorUserId: input.actorUserId,
       issueStock: input.issueStock,
+      roundingMode: rounding.mode,
+      roundingScale: rounding.scale,
     });
     return posted;
   }
@@ -836,7 +865,8 @@ export class SalesService {
         warehouseId = warehouseId ?? invoice.warehouseId;
       }
 
-      const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })));
+      const rounding = await this.context.companyRoundingMode(companyId, tx);
+      const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })), rounding.mode, rounding.scale);
       const creditNoteNumber = await this.sequences.next(tx, companyId, 'creditNote');
       const issueDate = new Date(resolveDocumentDate(dto)!);
 
@@ -852,6 +882,7 @@ export class SalesService {
           issueDate,
           subtotalMinor: totals.subtotalMinor,
           taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
           reason: dto.reason ?? null,
           currency: dto.currency ?? companyCurrency,
@@ -875,10 +906,20 @@ export class SalesService {
 
       const revenueAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.SALES_REVENUE);
       const arAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.AR_CONTROL);
+      const roundingAccount =
+        totals.roundingMinor !== 0
+          ? await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.ROUNDING_GAIN_LOSS)
+          : null;
       const journalLines = [
         { accountId: revenueAccount, debit: totals.subtotalMinor },
         ...(totals.taxMinor > 0
           ? [{ accountId: await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.VAT_OUTPUT), debit: totals.taxMinor }]
+          : []),
+        ...(roundingAccount && totals.roundingMinor > 0
+          ? [{ accountId: roundingAccount, debit: totals.roundingMinor }]
+          : []),
+        ...(roundingAccount && totals.roundingMinor < 0
+          ? [{ accountId: roundingAccount, credit: -totals.roundingMinor }]
           : []),
         { accountId: arAccount, credit: totals.totalMinor },
       ];
@@ -1121,7 +1162,8 @@ export class SalesService {
         discountPercentBp: l.discountPercentBp ?? 0,
         taxPercentBp: l.taxPercentBp ?? 0,
       }));
-      const totals = computeDocumentTotals(lineInputs);
+      const rounding = await this.context.companyRoundingMode(companyId, tx);
+      const totals = computeDocumentTotals(lineInputs, rounding.mode, rounding.scale);
       const paidMinor = dto.paidMinor ?? totals.totalMinor;
       if (paidMinor < totals.totalMinor) {
         throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Paid amount is less than the sale total.');
@@ -1144,6 +1186,7 @@ export class SalesService {
           subtotalMinor: totals.subtotalMinor,
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
           currency: companyCurrency,
           notes: `POS sale in session ${session.sessionNumber}`,
@@ -1165,6 +1208,8 @@ export class SalesService {
         sourceId: invoice.id,
         actorUserId: actor.userId,
         issueStock: true,
+        roundingMode: rounding.mode,
+        roundingScale: rounding.scale,
       });
 
       // Settle the invoice immediately with a receipt.
@@ -1186,6 +1231,7 @@ export class SalesService {
           subtotalMinor: totals.subtotalMinor,
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
           paidMinor,
           changeMinor,
@@ -1377,6 +1423,7 @@ function toQuotationDto(q: {
   subtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
+  roundingMinor: number;
   totalMinor: number;
   currency: string;
   notes: string | null;
@@ -1396,6 +1443,7 @@ function toQuotationDto(q: {
     subtotalMinor: q.subtotalMinor,
     discountMinor: q.discountMinor,
     taxMinor: q.taxMinor,
+    roundingMinor: q.roundingMinor,
     totalMinor: q.totalMinor,
     currency: q.currency,
     notes: q.notes,
@@ -1413,6 +1461,7 @@ function toSalesOrderDto(o: {
   subtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
+  roundingMinor: number;
   totalMinor: number;
   currency: string;
   notes: string | null;
@@ -1430,6 +1479,7 @@ function toSalesOrderDto(o: {
     subtotalMinor: o.subtotalMinor,
     discountMinor: o.discountMinor,
     taxMinor: o.taxMinor,
+    roundingMinor: o.roundingMinor,
     totalMinor: o.totalMinor,
     currency: o.currency,
     notes: o.notes,
@@ -1448,6 +1498,7 @@ function toInvoiceDto(inv: {
   subtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
+  roundingMinor: number;
   totalMinor: number;
   amountPaidMinor: number;
   currency: string;
@@ -1469,6 +1520,7 @@ function toInvoiceDto(inv: {
     subtotalMinor: inv.subtotalMinor,
     discountMinor: inv.discountMinor,
     taxMinor: inv.taxMinor,
+    roundingMinor: inv.roundingMinor,
     totalMinor: inv.totalMinor,
     amountPaidMinor: inv.amountPaidMinor,
     outstandingMinor: inv.totalMinor - inv.amountPaidMinor,
@@ -1488,6 +1540,7 @@ function toCreditNoteDto(n: {
   issueDate: Date;
   subtotalMinor: number;
   taxMinor: number;
+  roundingMinor: number;
   totalMinor: number;
   reason: string | null;
   currency: string;
@@ -1506,6 +1559,7 @@ function toCreditNoteDto(n: {
     issueDate: n.issueDate.toISOString(),
     subtotalMinor: n.subtotalMinor,
     taxMinor: n.taxMinor,
+    roundingMinor: n.roundingMinor,
     totalMinor: n.totalMinor,
     reason: n.reason,
     currency: n.currency,
@@ -1556,6 +1610,7 @@ function toPosSaleDto(s: {
   subtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
+  roundingMinor: number;
   totalMinor: number;
   paidMinor: number;
   changeMinor: number;
@@ -1571,6 +1626,7 @@ function toPosSaleDto(s: {
     subtotalMinor: s.subtotalMinor,
     discountMinor: s.discountMinor,
     taxMinor: s.taxMinor,
+    roundingMinor: s.roundingMinor,
     totalMinor: s.totalMinor,
     paidMinor: s.paidMinor,
     changeMinor: s.changeMinor,

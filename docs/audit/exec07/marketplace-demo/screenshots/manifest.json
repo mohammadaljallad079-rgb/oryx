@@ -2,24 +2,6 @@
   {
     "locale": "en",
     "theme": "light",
-    "name": "launch-en",
-    "route": "/",
-    "label": "Launch screen",
-    "url": "http://127.0.0.1:8081/mobile/",
-    "text": "Everything Your Car Needs | Parts · Services · Trusted Providers | Verified spare parts"
-  },
-  {
-    "locale": "ar",
-    "theme": "light",
-    "name": "launch-ar",
-    "route": "/",
-    "label": "شاشة البداية",
-    "url": "http://127.0.0.1:8081/mobile/",
-    "text": "كل ما تحتاجه سيارتك | قطع غيار · خدمات · مزودون موثوقون | قطع غيار موثقة"
-  },
-  {
-    "locale": "en",
-    "theme": "light",
     "name": "onboarding",
     "route": "/onboarding",
     "label": "Onboarding",
@@ -33,7 +15,7 @@
     "route": "/login",
     "label": "Sign in",
     "url": "http://127.0.0.1:8081/mobile/login",
-    "text": "Sign in | Enter your details, or use a one-tap demo sign-in. | Email | Password | Sign in | No account yet? Create account | DEMO ACCESS | Enter as customer | Browse, buy, book and request recovery. |"
+    "text": "Sign in | Enter your details, or use a one-tap demo sign-in. | Email | Password | Sign in | Forgot password? | No account yet? Create account | DEMO ACCESS | Enter as customer | Browse, buy, book and "
   },
   {
     "locale": "en",
@@ -42,7 +24,7 @@
     "route": "/home",
     "label": "Home",
     "url": "http://127.0.0.1:8081/mobile/home",
-    "text": "ع | 🛒 | 🔔 | Everything Your Car Needs | Parts · Services · Trusted Providers | Explore now → | ⌕ | Search for parts, services, or providers. | Spare parts | Maintenance | Car inspection | Towing | A"
+    "text": "ع | Everything | Your Car Needs | Parts • Services • Trusted Providers | Explore now → | Search for parts, services, or providers. | Spare parts | Maintenance | Car inspection | Towing | Accessories |"
   },
   {
     "locale": "en",
@@ -51,7 +33,7 @@
     "route": "/categories",
     "label": "Categories",
     "url": "http://127.0.0.1:8081/mobile/categories",
-    "text": "ع | 🛒 | 🔔 | Demo data | A review build. All data is local and not real. | CATEGORIES | Spare parts | › See all | Maintenance | › See all | Car inspection | › See all | Towing | › See all | Accessori"
+    "text": "ع | CATEGORIES | Spare parts | › See all | Maintenance | › See all | Car inspection | › See all | Towing | › See all | Accessories | › See all | FEATURED STORES | See all | Nothing here yet. | FEATURE"
   },
   {
     "locale": "en",
@@ -60,7 +42,7 @@
     "route": "/search",
     "label": "Search",
     "url": "http://127.0.0.1:8081/mobile/search",
-    "text": "ع | 🛒 | 🔔 | Search | All | Parts | Stores | Services | Search for parts, services, or providers. | ⌂ | ⌂ | Home | ▦ | ▦ | Categories | ⌕ | ⌕ | Search | ▤ | ▤ | Bookings | ◉ | ◉ | Profile"
+    "text": "ع | Search | All | Parts | Stores | Services | Search for parts, services, or providers. | Home | Categories | Search | Bookings | Profile"
   },
   {
     "locale": "en",
@@ -69,7 +51,7 @@
     "route": "/parts",
     "label": "Parts shop",
     "url": "http://127.0.0.1:8081/mobile/parts",
-    "text": "ع | 🛒 | 🔔 | Parts | Stores | Search | Filters | 56 results | Brake Caliper Assembly | Valeo | 29.501 BHD | ★ 5.0 (182) | Air Filter Element | TRW | 1.470 BHD | ★ 4.9 (283) | Timing Belt Kit | Sachs "
+    "text": "ع | Could not load the data. Check your connection and try again. | Retry"
   },
   {
     "locale": "en",
@@ -78,7 +60,7 @@
     "route": "/parts/prod-001",
     "label": "Part detail",
     "url": "http://127.0.0.1:8081/mobile/parts/prod-001",
-    "text": "‹ Back | Front Brake Pad Set | SKF | ★ 3.8 (36) | SKF | In stock | 4.200 BHD | 5.349 BHD | 21% off | Al Noor Auto Parts | Free · Sold by | Verified | Description | Front Brake Pad Set — Brakes by SKF,"
+    "text": "‹ Back | Something went wrong | Nothing matches those filters. | Retry"
   },
   {
     "locale": "en",
@@ -87,7 +69,7 @@
     "route": "/parts/store/store-01",
     "label": "Store",
     "url": "http://127.0.0.1:8081/mobile/parts/store/store-01",
-    "text": "‹ Back | Al Noor Auto Parts | ★ 4.1 (343) | Verified | 2023 | Delivery | Free | Subtotal | from 10.000 BHD | OEM | Fast delivery | PRODUCTS | Relevance | Price: low to high | Price: high to low | 22% "
+    "text": "‹ Back | Something went wrong | Nothing matches those filters. | Retry"
   },
   {
     "locale": "en",
@@ -96,7 +78,7 @@
     "route": "/services",
     "label": "Service directory",
     "url": "http://127.0.0.1:8081/mobile/services",
-    "text": "ع | 🛒 | 🔔 | Search | All | Inspection | Maintenance | Recovery | All | Manama | Riffa | Muharraq | Isa Town | Hamad Town | Sitrah | 28 Service providers | National Inspection Centre | Verified | ★ 4"
+    "text": "ع | Could not load the data. Check your connection and try again. | Retry"
   },
   {
     "locale": "en",
@@ -105,7 +87,7 @@
     "route": "/services/inspection-01",
     "label": "Service detail",
     "url": "http://127.0.0.1:8081/mobile/services/inspection-01",
-    "text": "‹ Back | National Inspection Centre | Licensed inspection station with factory-trained technicians, calibrated test lanes and same-day written reports. | ★ 4.8 (316) | Verified | 4.8 km | Call | Direc"
+    "text": "‹ Back | Something went wrong | Nothing matches those filters. | Retry"
   },
   {
     "locale": "en",
@@ -114,7 +96,7 @@
     "route": "/sensage",
     "label": "SENSAGE",
     "url": "http://127.0.0.1:8081/mobile/sensage",
-    "text": "ع | 🛒 | 🔔 | Demo data | A review build. All data is local and not real. | SENSAGE smart check | Pick your car, add photos, and get a demo condition report with likely faults and advice. | Add photos"
+    "text": "ع | Demo data | A review build. All data is local and not real. | SENSAGE smart check | Pick your car, add photos, and get a demo condition report with likely faults and advice. | Add photos | Capture"
   },
   {
     "locale": "en",
@@ -123,7 +105,7 @@
     "route": "/sensage/new",
     "label": "SENSAGE booking",
     "url": "http://127.0.0.1:8081/mobile/sensage/new",
-    "text": "‹ Back | SENSAGE smart check | Start analysis | SELECT A VEHICLE | Toyota Land Cruiser Prado | 2021 · 1234 ABC | 78,420 km | Nissan Patrol | 2019 · 8877 XYZ | 132,900 km | Hyundai Tucson | 2023 · 5541"
+    "text": "‹ Back | SENSAGE smart check | Pick your car, add photos, and get a demo condition report with likely faults and advice. | SELECT A VEHICLE | Toyota Land Cruiser Prado | 2021 · 1234 ABC | 78,420 km | "
   },
   {
     "locale": "en",
@@ -141,7 +123,7 @@
     "route": "/bookings",
     "label": "Bookings",
     "url": "http://127.0.0.1:8081/mobile/bookings",
-    "text": "‹ Back | My bookings | 10 | Pre-purchase inspection | CONFIRMED | National Inspection Centre | 2026-10-22 · 09:00 | 28.000 BHD | Oil and filter change | PENDING | Riffa Vehicle Testing | 2026-10-23 · "
+    "text": "‹ Back | My bookings | 10 | DEMO MODE | Not connected. What you see is local demo data. | Pre-purchase inspection | Confirmed | National Inspection Centre | 2026-10-22 · 09:00 | 28.000 BHD | Oil and f"
   },
   {
     "locale": "en",
@@ -150,7 +132,7 @@
     "route": "/bookings/new",
     "label": "New booking",
     "url": "http://127.0.0.1:8081/mobile/bookings/new",
-    "text": "‹ Back | Book now | SERVICE PROVIDERS | National Inspection Centre | 4 Services and prices | Riffa Vehicle Testing | 4 Services and prices | Muharraq Auto Check | 4 Services and prices | Isa Town Test"
+    "text": "‹ Back | Book now | SERVICE PROVIDERS | Service providers | Choose a service provider | ▾ | National Inspection Centre | 4 Services and prices | Riffa Vehicle Testing | 4 Services and prices | Muharra"
   },
   {
     "locale": "en",
@@ -159,7 +141,7 @@
     "route": "/cart",
     "label": "Cart",
     "url": "http://127.0.0.1:8081/mobile/cart",
-    "text": "‹ Back | Cart | 0 Items | Your cart is empty. | Continue shopping"
+    "text": "‹ Back | Cart | 0 Items | Your cart is empty. | Continue shopping | Demo data"
   },
   {
     "locale": "en",
@@ -168,7 +150,7 @@
     "route": "/checkout",
     "label": "Checkout",
     "url": "http://127.0.0.1:8081/mobile/checkout",
-    "text": "‹ Back | Checkout | Delivery address | Delivery address | Payment method | Order summary | Order placed | DELIVERY ADDRESS | Addresses | continue"
+    "text": "‹ Back | Checkout | Sign in to continue. | Sign in to continue. | You need an account to place and follow an order. Your cart is saved. | Sign in | Create account"
   },
   {
     "locale": "en",
@@ -177,7 +159,7 @@
     "route": "/orders",
     "label": "Orders",
     "url": "http://127.0.0.1:8081/mobile/orders",
-    "text": "‹ Back | My orders | 20 | All | PENDING | PREPARING | SHIPPED | DELIVERED | CANCELLED | ORD-2026-4119 | PREPARING | Prime Auto Electrical | 1 Items · 24 Oct 2026 | 41.369 BHD | ORD-2026-4118 | PENDING"
+    "text": "‹ Back | My orders | 20 | All | PENDING | CONFIRMED | PREPARING | READY | OUT_FOR_DELIVERY | DELIVERED | COMPLETED | CANCELLED | ORD-2026-4119 | Preparing | Prime Auto Electrical | 1 Items · 24 Oct 20"
   },
   {
     "locale": "en",
@@ -186,7 +168,7 @@
     "route": "/orders/order-001",
     "label": "Order detail",
     "url": "http://127.0.0.1:8081/mobile/orders/order-001",
-    "text": "‹ Back | ORD-2026-4100 | Al Noor Auto Parts | PENDING | 443.741 BHD | Placed | Preparing | Out for delivery | Delivered | ESTIMATED ARRIVAL | 07 Oct 2026, 16:00 | Order number | ORD-2026-4100 | Placed"
+    "text": "‹ Back | ORD-2026-4100 | Al Noor Auto Parts | Pending | 443.741 BHD | Placed | Preparing | Out for delivery | Delivered | ESTIMATED ARRIVAL | 07 Oct 2026, 16:00 | Order number | ORD-2026-4100 | Placed"
   },
   {
     "locale": "en",
@@ -222,7 +204,7 @@
     "route": "/vehicles/new",
     "label": "Add vehicle",
     "url": "http://127.0.0.1:8081/mobile/vehicles/new",
-    "text": "‹ Back | Add vehicle | MY VEHICLES | Make | Model | Model year | Plate number | VIN | Colour | Mileage (km) | Save"
+    "text": "‹ Back | Add vehicle | MY VEHICLES | Make | Make | ▾ | Model | Make | ▾ | Model year | Model | ▾ | Plate number | VIN | Colour | Mileage (km) | Save"
   },
   {
     "locale": "en",
@@ -231,7 +213,7 @@
     "route": "/addresses",
     "label": "Addresses",
     "url": "http://127.0.0.1:8081/mobile/addresses",
-    "text": "‹ Back | Addresses | Home | Default | Addresses | Villa 214, Road 1907, Block 719, Riffa | Work | Addresses | Office 1104, Bahrain Financial Harbour, Manama | Family | Addresses | House 9, Road 33, Bl"
+    "text": "‹ Back | Addresses | Nothing here yet. | Add address | A review build. All data is local and not real."
   },
   {
     "locale": "en",
@@ -258,7 +240,7 @@
     "route": "/account",
     "label": "Account",
     "url": "http://127.0.0.1:8081/mobile/account",
-    "text": "ع | 🛒 | 🔔 | Demo data | A review build. All data is local and not real. | AM | Ahmed Al Mannai | customer@oryx.demo | +973 3612 4477 | MY VEHICLES | Toyota Land Cruiser Prado | 2021 · 1234 ABC | 78,"
+    "text": "ع | Demo data | A review build. All data is local and not real. | AM | Ahmed Al Mannai | customer@oryx.demo | +973 3612 4477 | MY VEHICLES | Toyota Land Cruiser Prado | 2021 · 1234 ABC | 78,420 km | N"
   },
   {
     "locale": "en",
@@ -294,7 +276,7 @@
     "route": "/login",
     "label": "Sign in",
     "url": "http://127.0.0.1:8081/mobile/login",
-    "text": "تسجيل الدخول | أدخل بياناتك أو استخدم دخولاً تجريبياً سريعاً. | البريد الإلكتروني | كلمة المرور | تسجيل الدخول | ليس لديك حساب؟ إنشاء حساب | دخول تجريبي | دخول كعميل | تصفح، اشترِ، احجز، واطلب سحباً. "
+    "text": "تسجيل الدخول | أدخل بياناتك أو استخدم دخولاً تجريبياً سريعاً. | البريد الإلكتروني | كلمة المرور | تسجيل الدخول | نسيت كلمة المرور؟ | ليس لديك حساب؟ إنشاء حساب | دخول تجريبي | دخول كعميل | تصفح، اشترِ،"
   },
   {
     "locale": "ar",
@@ -303,7 +285,7 @@
     "route": "/home",
     "label": "Home",
     "url": "http://127.0.0.1:8081/mobile/home",
-    "text": "EN | 🛒 | 🔔 | كل ما تحتاجه سيارتك | قطع غيار · خدمات · مزودون موثوقون | اكتشف الآن ← | ⌕ | ابحث عن قطع غيار، خدمات أو مزودين. | قطع الغيار | الصيانة | فحص السيارات | سحب السيارات | إكسسوارات | ◎ | SE"
+    "text": "EN | كل ما تحتاجه | لسيارتك | قطع غيار • خدمات • مزودون موثوقون | اكتشف الآن ← | ابحث عن قطع غيار، خدمات أو مزودين. | قطع الغيار | الصيانة | فحص السيارات | سحب السيارات | إكسسوارات | SENSAGE AI | فحص "
   },
   {
     "locale": "ar",
@@ -312,7 +294,7 @@
     "route": "/categories",
     "label": "Categories",
     "url": "http://127.0.0.1:8081/mobile/categories",
-    "text": "EN | 🛒 | 🔔 | بيانات تجريبية | نسخة تجريبية للمراجعة. البيانات محلية وليست حقيقية. | التصنيفات | قطع الغيار | ‹ عرض الكل | الصيانة | ‹ عرض الكل | فحص السيارات | ‹ عرض الكل | سحب السيارات | ‹ عرض الكل"
+    "text": "EN | التصنيفات | قطع الغيار | ‹ عرض الكل | الصيانة | ‹ عرض الكل | فحص السيارات | ‹ عرض الكل | سحب السيارات | ‹ عرض الكل | إكسسوارات | ‹ عرض الكل | متاجر مميزة | عرض الكل | لا يوجد شيء هنا بعد. | المزو"
   },
   {
     "locale": "ar",
@@ -321,7 +303,7 @@
     "route": "/search",
     "label": "Search",
     "url": "http://127.0.0.1:8081/mobile/search",
-    "text": "EN | 🛒 | 🔔 | بحث | الكل | قطع الغيار | المتاجر | الخدمات | ابحث عن قطع غيار، خدمات أو مزودين. | ⌂ | ⌂ | الرئيسية | ▦ | ▦ | الأقسام | ⌕ | ⌕ | البحث | ▤ | ▤ | حجوزاتي | ◉ | ◉ | حسابي"
+    "text": "EN | بحث | الكل | قطع الغيار | المتاجر | الخدمات | ابحث عن قطع غيار، خدمات أو مزودين. | الرئيسية | الأقسام | البحث | حجوزاتي | حسابي"
   },
   {
     "locale": "ar",
@@ -330,7 +312,7 @@
     "route": "/parts",
     "label": "Parts shop",
     "url": "http://127.0.0.1:8081/mobile/parts",
-    "text": "EN | 🛒 | 🔔 | قطع الغيار | المتاجر | بحث | التصفية | ٥٦ نتيجة | كاليبر فرامل | Valeo | 29.501 BHD | ★ ٥.٠ (١٨٢) | فلتر الهواء | TRW | 1.470 BHD | ★ ٤.٩ (٢٨٣) | طقم سير التوقيت | Sachs | 184.350 BHD |"
+    "text": "EN | تعذّر تحميل البيانات. تحقّق من اتصالك وأعد المحاولة. | إعادة المحاولة"
   },
   {
     "locale": "ar",
@@ -339,7 +321,7 @@
     "route": "/parts/prod-001",
     "label": "Part detail",
     "url": "http://127.0.0.1:8081/mobile/parts/prod-001",
-    "text": "› رجوع | طقم فحمات فرامل أمامية | SKF | ★ ٣.٨ (٣٦) | SKF | متوفر | 4.200 BHD | 5.349 BHD | ٢١% خصم | النور لقطع غيار السيارات | مجاناً · يبيعه | موثق | الوصف | طقم فحمات فرامل أمامية — الفرامل من SKF."
+    "text": "› رجوع | حدث خطأ | لا توجد نتائج مطابقة. | إعادة المحاولة"
   },
   {
     "locale": "ar",
@@ -348,7 +330,7 @@
     "route": "/parts/store/store-01",
     "label": "Store",
     "url": "http://127.0.0.1:8081/mobile/parts/store/store-01",
-    "text": "› رجوع | النور لقطع غيار السيارات | ★ ٤.١ (٣٤٣) | موثق | ٢٠٢٣ | التوصيل | مجاناً | المجموع الفرعي | من 10.000 BHD | OEM | Fast delivery | المنتجات | الأكثر صلة | الأرخص أولاً | الأغلى أولاً | ٢٢% خصم "
+    "text": "› رجوع | حدث خطأ | لا توجد نتائج مطابقة. | إعادة المحاولة"
   },
   {
     "locale": "ar",
@@ -357,7 +339,7 @@
     "route": "/services",
     "label": "Service directory",
     "url": "http://127.0.0.1:8081/mobile/services",
-    "text": "EN | 🛒 | 🔔 | بحث | الكل | الفحص | الصيانة | السحب | الكل | المنامة | الرفاع | المحرق | مدينة عيسى | مدينة حمد | سترة | ٢٨ مزودو الخدمة | المركز الوطني للفحص | موثق | ★ ٤.٨ (٣١٦) | ٤.٨ كم يبعد | من 9"
+    "text": "EN | تعذّر تحميل البيانات. تحقّق من اتصالك وأعد المحاولة. | إعادة المحاولة"
   },
   {
     "locale": "ar",
@@ -366,7 +348,7 @@
     "route": "/services/inspection-01",
     "label": "Service detail",
     "url": "http://127.0.0.1:8081/mobile/services/inspection-01",
-    "text": "› رجوع | المركز الوطني للفحص | محطة فحص مرخصة بفنيين مدربين ومسارات فحص معايرة وتقارير مكتوبة في نفس اليوم. | ★ ٤.٨ (٣١٦) | موثق | ٤.٨ كم | اتصال | الاتجاهات | الخدمات والأسعار | الفحص الدوري | المدة:"
+    "text": "› رجوع | حدث خطأ | لا توجد نتائج مطابقة. | إعادة المحاولة"
   },
   {
     "locale": "ar",
@@ -375,7 +357,7 @@
     "route": "/sensage",
     "label": "SENSAGE",
     "url": "http://127.0.0.1:8081/mobile/sensage",
-    "text": "EN | 🛒 | 🔔 | بيانات تجريبية | نسخة تجريبية للمراجعة. البيانات محلية وليست حقيقية. | الفحص الذكي SENSAGE | اختر سيارتك، أضف الصور، واحصل على تقرير حالة تجريبي بالأعطال المحتملة والتوصيات. | أضف الصور"
+    "text": "EN | بيانات تجريبية | نسخة تجريبية للمراجعة. البيانات محلية وليست حقيقية. | الفحص الذكي SENSAGE | اختر سيارتك، أضف الصور، واحصل على تقرير حالة تجريبي بالأعطال المحتملة والتوصيات. | أضف الصور | التقط ص"
   },
   {
     "locale": "ar",
@@ -384,7 +366,7 @@
     "route": "/sensage/new",
     "label": "SENSAGE booking",
     "url": "http://127.0.0.1:8081/mobile/sensage/new",
-    "text": "› رجوع | الفحص الذكي SENSAGE | ابدأ التحليل | اختر السيارة | Toyota Land Cruiser Prado | ٢٠٢١ · 1234 ABC | ٧٨,٤٢٠ كم | Nissan Patrol | ٢٠١٩ · 8877 XYZ | ١٣٢,٩٠٠ كم | Hyundai Tucson | ٢٠٢٣ · 5541 KHM |"
+    "text": "› رجوع | الفحص الذكي SENSAGE | اختر سيارتك، أضف الصور، واحصل على تقرير حالة تجريبي بالأعطال المحتملة والتوصيات. | اختر السيارة | Toyota Land Cruiser Prado | ٢٠٢١ · 1234 ABC | ٧٨,٤٢٠ كم | Nissan Patrol"
   },
   {
     "locale": "ar",
@@ -402,7 +384,7 @@
     "route": "/bookings",
     "label": "Bookings",
     "url": "http://127.0.0.1:8081/mobile/bookings",
-    "text": "› رجوع | حجوزاتي | 10 | فحص ما قبل الشراء | CONFIRMED | المركز الوطني للفحص | ٢٠٢٦-١٠-٢٢ · ٠٩:٠٠ | 28.000 BHD | تغيير الزيت والفلتر | PENDING | فحص الرفاع للمركبات | ٢٠٢٦-١٠-٢٣ · ١٠:٣٠ | 14.500 BHD | "
+    "text": "› رجوع | حجوزاتي | 10 | الوضع التجريبي | غير متصل. البيانات المعروضة محلية وتجريبية. | فحص ما قبل الشراء | مؤكد | المركز الوطني للفحص | ٢٠٢٦-١٠-٢٢ · ٠٩:٠٠ | 28.000 BHD | تغيير الزيت والفلتر | قيد الان"
   },
   {
     "locale": "ar",
@@ -411,7 +393,7 @@
     "route": "/bookings/new",
     "label": "New booking",
     "url": "http://127.0.0.1:8081/mobile/bookings/new",
-    "text": "› رجوع | احجز الآن | مزودو الخدمة | المركز الوطني للفحص | ٤ الخدمات والأسعار | فحص الرفاع للمركبات | ٤ الخدمات والأسعار | فحص المحرق للسيارات | ٤ الخدمات والأسعار | مسار الفحص بمدينة عيسى | ٤ الخدمات "
+    "text": "› رجوع | احجز الآن | مزودو الخدمة | مزودو الخدمة | اختر مزود الخدمة | ▾ | المركز الوطني للفحص | ٤ الخدمات والأسعار | فحص الرفاع للمركبات | ٤ الخدمات والأسعار | فحص المحرق للسيارات | ٤ الخدمات والأسعار"
   },
   {
     "locale": "ar",
@@ -420,7 +402,7 @@
     "route": "/cart",
     "label": "Cart",
     "url": "http://127.0.0.1:8081/mobile/cart",
-    "text": "› رجوع | السلة | ٠ الأصناف | سلتك فارغة. | مواصلة التسوق"
+    "text": "› رجوع | السلة | ٠ الأصناف | سلتك فارغة. | مواصلة التسوق | بيانات تجريبية"
   },
   {
     "locale": "ar",
@@ -429,7 +411,7 @@
     "route": "/checkout",
     "label": "Checkout",
     "url": "http://127.0.0.1:8081/mobile/checkout",
-    "text": "› رجوع | إتمام الطلب | عنوان التوصيل | عنوان التوصيل | طريقة الدفع | ملخص الطلب | تم تأكيد طلبك | عنوان التوصيل | العناوين | continue"
+    "text": "› رجوع | إتمام الطلب | سجّل الدخول للمتابعة. | سجّل الدخول للمتابعة. | تحتاج إلى حساب لإتمام الطلب ومتابعته. سلتك محفوظة. | تسجيل الدخول | إنشاء حساب"
   },
   {
     "locale": "ar",
@@ -438,7 +420,7 @@
     "route": "/orders",
     "label": "Orders",
     "url": "http://127.0.0.1:8081/mobile/orders",
-    "text": "› رجوع | طلباتي | 20 | الكل | PENDING | PREPARING | SHIPPED | DELIVERED | CANCELLED | ORD-2026-4119 | PREPARING | برايم للكهرباء | ١ الأصناف · 24 Oct 2026 | 41.369 BHD | ORD-2026-4118 | PENDING | ديزر"
+    "text": "› رجوع | طلباتي | 20 | الكل | PENDING | CONFIRMED | PREPARING | READY | OUT_FOR_DELIVERY | DELIVERED | COMPLETED | CANCELLED | ORD-2026-4119 | قيد التجهيز | برايم للكهرباء | ١ الأصناف · 24 Oct 2026 | "
   },
   {
     "locale": "ar",
@@ -447,7 +429,7 @@
     "route": "/orders/order-001",
     "label": "Order detail",
     "url": "http://127.0.0.1:8081/mobile/orders/order-001",
-    "text": "› رجوع | ORD-2026-4100 | النور لقطع غيار السيارات | PENDING | 443.741 BHD | تم الطلب | قيد التحضير | في الطريق | تم التسليم | الوصول المتوقع | 07 Oct 2026, 16:00 | رقم الطلب | ORD-2026-4100 | تاريخ ال"
+    "text": "› رجوع | ORD-2026-4100 | النور لقطع غيار السيارات | قيد الانتظار | 443.741 BHD | تم الطلب | قيد التحضير | في الطريق | تم التسليم | الوصول المتوقع | 07 Oct 2026, 16:00 | رقم الطلب | ORD-2026-4100 | تار"
   },
   {
     "locale": "ar",
@@ -483,7 +465,7 @@
     "route": "/vehicles/new",
     "label": "Add vehicle",
     "url": "http://127.0.0.1:8081/mobile/vehicles/new",
-    "text": "› رجوع | إضافة سيارة | سياراتي | الشركة المصنعة | الطراز | سنة الصنع | رقم اللوحة | رقم الهيكل (VIN) | اللون | العداد (كم) | حفظ"
+    "text": "› رجوع | إضافة سيارة | سياراتي | الشركة المصنعة | الشركة المصنعة | ▾ | الطراز | الشركة المصنعة | ▾ | سنة الصنع | الطراز | ▾ | رقم اللوحة | رقم الهيكل (VIN) | اللون | العداد (كم) | حفظ"
   },
   {
     "locale": "ar",
@@ -492,7 +474,7 @@
     "route": "/addresses",
     "label": "Addresses",
     "url": "http://127.0.0.1:8081/mobile/addresses",
-    "text": "› رجوع | العناوين | المنزل | الافتراضي | العناوين | فيلا ٢١٤، طريق ١٩٠٧، مجمع ٧١٩، الرفاع | العمل | العناوين | مكتب ١١٠٤، مرفأ البحرين المالي، المنامة | العائلة | العناوين | منزل ٩، طريق ٣٣، مجمع ٢٠١،"
+    "text": "› رجوع | العناوين | لا يوجد شيء هنا بعد. | إضافة عنوان | نسخة تجريبية للمراجعة. البيانات محلية وليست حقيقية."
   },
   {
     "locale": "ar",
@@ -519,7 +501,7 @@
     "route": "/account",
     "label": "Account",
     "url": "http://127.0.0.1:8081/mobile/account",
-    "text": "EN | 🛒 | 🔔 | بيانات تجريبية | نسخة تجريبية للمراجعة. البيانات محلية وليست حقيقية. | AM | أحمد المناعي | customer@oryx.demo | +973 3612 4477 | سياراتي | Toyota Land Cruiser Prado | ٢٠٢١ · 1234 ABC | "
+    "text": "EN | بيانات تجريبية | نسخة تجريبية للمراجعة. البيانات محلية وليست حقيقية. | AM | أحمد المناعي | customer@oryx.demo | +973 3612 4477 | سياراتي | Toyota Land Cruiser Prado | ٢٠٢١ · 1234 ABC | ٧٨,٤٢٠ كم "
   },
   {
     "locale": "ar",
@@ -546,7 +528,7 @@
     "route": "/merchant/dashboard",
     "label": "Merchant dashboard",
     "url": "http://127.0.0.1:8081/mobile/merchant/dashboard",
-    "text": "ع | 🛒 | 🔔 | Demo data | A review build. All data is local and not real. | Al Noor Auto Parts | Store dashboard | Revenue | 452 BHD | Demo data | Total sales | 2 | Last 30 days | Preparing | 1 | Comp"
+    "text": "ع | Demo data | A review build. All data is local and not real. | Al Noor Auto Parts | Store dashboard | Revenue | 452 BHD | Demo data | Total sales | 2 | Last 30 days | Preparing | 1 | Completed | 1 "
   },
   {
     "locale": "en",
@@ -555,7 +537,7 @@
     "route": "/merchant/orders",
     "label": "Merchant orders",
     "url": "http://127.0.0.1:8081/mobile/merchant/orders",
-    "text": "ع | 🛒 | 🔔 | MANAGE ORDERS | All | PENDING (1) | PREPARING  | SHIPPED  | DELIVERED (1) | CANCELLED  | Total sales | 452.141 BHD | Preparing | 1 | Completed | 1 | ORD-2026-4100 | PENDING | Al Noor Aut"
+    "text": "ع | MANAGE ORDERS | All | PENDING (1) | PREPARING  | SHIPPED  | DELIVERED (1) | CANCELLED  | Total sales | 452.141 BHD | Preparing | 1 | Completed | 1 | ORD-2026-4100 | Pending | Al Noor Auto Parts | "
   },
   {
     "locale": "en",
@@ -564,7 +546,7 @@
     "route": "/merchant/products",
     "label": "Merchant products",
     "url": "http://127.0.0.1:8081/mobile/merchant/products",
-    "text": "ع | 🛒 | 🔔 | PRODUCTS | 5 Products | Low stock: 1 | Reorder alerts | Add product | Front Brake Pad Set | ORYX-BRA-1001 · SKF | 4.200 BHD | Stock: 57 | Edit product | Delete product | Fuel Filter Cart"
+    "text": "ع | PRODUCTS | 5 Products | Low stock: 1 | Reorder alerts | Add product | Front Brake Pad Set | ORYX-BRA-1001 · SKF | 4.200 BHD | Stock: 57 | Edit product | Delete product | Fuel Filter Cartridge | OR"
   },
   {
     "locale": "en",
@@ -573,7 +555,7 @@
     "route": "/merchant/services",
     "label": "Merchant services",
     "url": "http://127.0.0.1:8081/mobile/merchant/services",
-    "text": "ع | 🛒 | 🔔 | My bookings | Recovery requests | Manage services | Pre-purchase inspection | CONFIRMED | National Inspection Centre | 2026-10-22 · 09:00 | 28.000 BHD | Oil and filter change | PENDING |"
+    "text": "ع | My bookings | Recovery requests | Manage services | Pre-purchase inspection | Confirmed | National Inspection Centre | 2026-10-22 · 09:00 | 28.000 BHD | Oil and filter change | Pending | Riffa Veh"
   },
   {
     "locale": "en",
@@ -582,7 +564,7 @@
     "route": "/merchant/promotions",
     "label": "Merchant promotions",
     "url": "http://127.0.0.1:8081/mobile/merchant/promotions",
-    "text": "‹ Back | Promotions | ADD PROMOTION | Product name | off | percentage, e.g. 15 | Categories | Save | A review build. All data is local and not real. | OFFERS AND DISCOUNTS | 22% off brake parts | Al N"
+    "text": "‹ Back | Promotions | ADD PROMOTION | Product name | off | percentage, e.g. 15 | Categories | Save | OFFERS AND DISCOUNTS | 22% off brake parts | Al Noor Auto Parts, this week only. | off 22% | 02 Nov"
   },
   {
     "locale": "en",
@@ -591,7 +573,7 @@
     "route": "/merchant/profile",
     "label": "Merchant profile",
     "url": "http://127.0.0.1:8081/mobile/merchant/profile",
-    "text": "ع | 🛒 | 🔔 | YN | Yousef Al Noor | merchant@oryx.demo | +973 3944 1188 | Al Noor Auto Parts | Verified | from 2023 | Delivery | Free | Rating | 4.1 | Reviews | 343 | STORE PROFILE | Store description"
+    "text": "ع | YN | Yousef Al Noor | merchant@oryx.demo | +973 3944 1188 | Al Noor Auto Parts | Verified | from 2023 | Delivery | Free | Rating | 4.1 | Reviews | 343 | STORE PROFILE | Store description | Edit | "
   },
   {
     "locale": "en",
@@ -601,5 +583,14 @@
     "label": "Merchant plan",
     "url": "http://127.0.0.1:8081/mobile/merchant/plan",
     "text": "‹ Back | Subscription and plans | Choose this plan | Starter | 12.000 BHD | per month | Platform commission: 6.00% | ✓ Store profile | ✓ Up to 40 products | ✓ Order management | ✓ Basic analytics | ER"
+  },
+  {
+    "locale": "en",
+    "theme": "light",
+    "name": "merchant-documents",
+    "route": "/merchant/documents",
+    "label": "Merchant documents",
+    "url": "http://127.0.0.1:8081/mobile/merchant/documents",
+    "text": "ع | Official documents | Official documents are available on a live merchant session only. | ⌂ | ⌂ | Store dashboard | ▦ | ▦ | Products | ⛃ | ⛃ | My orders | ✦ | ✦ | Services | ◉ | ◉ | Store profile"
   }
 ]

@@ -128,6 +128,15 @@ export class UpdateCompanyDto {
   @Max(10000)
   defaultTaxRateBp?: number;
 
+  /**
+   * Optional whole-amount cash rounding for issued documents. `NONE` keeps the
+   * exact total; the other modes snap it to the nearest whole or half unit and
+   * post the small difference to the rounding account.
+   */
+  @IsOptional()
+  @IsIn(['NONE', 'NEAREST_WHOLE', 'NEAREST_HALF'])
+  roundingMode?: 'NONE' | 'NEAREST_WHOLE' | 'NEAREST_HALF';
+
   @IsOptional()
   @IsString()
   @MaxLength(40)

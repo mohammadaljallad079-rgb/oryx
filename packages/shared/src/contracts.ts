@@ -3,6 +3,7 @@ import type {
   IntegrationImplementation,
   IntegrationProviderState,
 } from './integrations';
+import type { RoundingMode } from './money';
 
 /** Shared API contracts between the ORYX API and the admin app. */
 
@@ -246,6 +247,8 @@ export interface CompanyDto {
   functionalCurrency: string | null;
   /** Default tax rate in basis points (1500 = 15%). */
   defaultTaxRateBp: number;
+  /** Optional whole-amount cash rounding applied to document totals. */
+  roundingMode: RoundingMode;
   taxNumber: string | null;
   notes: string | null;
   parentCompanyId: string | null;
@@ -883,6 +886,8 @@ export interface SalesDocumentDto {
   subtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
+  /** Signed adjustment applied to `totalMinor` by the company rounding mode. */
+  roundingMinor: number;
   totalMinor: number;
   amountPaidMinor?: number;
   outstandingMinor?: number;
@@ -919,6 +924,8 @@ export interface PosSaleDto {
   subtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
+  /** Signed adjustment applied to `totalMinor` by the company rounding mode. */
+  roundingMinor: number;
   totalMinor: number;
   paidMinor: number;
   changeMinor: number;

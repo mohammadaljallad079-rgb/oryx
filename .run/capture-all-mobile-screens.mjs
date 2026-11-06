@@ -66,6 +66,7 @@ const MERCHANT_ROUTES = [
   ['merchant-promotions', '/merchant/promotions', 'Merchant promotions'],
   ['merchant-profile', '/merchant/profile', 'Merchant profile'],
   ['merchant-plan', '/merchant/plan', 'Merchant plan'],
+  ['merchant-documents', '/merchant/documents', 'Merchant documents'],
 ];
 
 const browser = await chromium.launch();

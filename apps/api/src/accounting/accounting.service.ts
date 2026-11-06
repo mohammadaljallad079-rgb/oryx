@@ -55,6 +55,8 @@ const STANDARD_CHART: Array<{
   // Execution 04 — marketplace
   { code: '4200', nameEn: 'Marketplace commission revenue', nameAr: 'إيرادات عمولة السوق', type: 'REVENUE', normalBalance: 'CREDIT', systemRole: SYSTEM_ROLES.MARKETPLACE_COMMISSION },
   { code: '2230', nameEn: 'Service provider payable', nameAr: 'مستحقات مزودي الخدمة', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: SYSTEM_ROLES.PROVIDER_PAYABLE },
+  // Optional whole-amount cash rounding gain/loss
+  { code: '5930', nameEn: 'Rounding gain / loss', nameAr: 'فروق التقريب', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: SYSTEM_ROLES.ROUNDING_GAIN_LOSS },
 ];
 
 const DEBIT_TYPES = new Set(['ASSET', 'EXPENSE']);

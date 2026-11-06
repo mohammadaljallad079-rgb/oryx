@@ -101,6 +101,8 @@ const STANDARD_CHART: Array<{
   // Execution 04 — marketplace commissions and provider settlements
   { code: '4200', nameEn: 'Marketplace commission revenue', nameAr: 'إيرادات عمولة السوق', type: 'REVENUE', normalBalance: 'CREDIT', systemRole: 'MARKETPLACE_COMMISSION' },
   { code: '2230', nameEn: 'Service provider payable', nameAr: 'مستحقات مزودي الخدمة', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: 'PROVIDER_PAYABLE' },
+  // Optional whole-amount cash rounding gain/loss
+  { code: '5930', nameEn: 'Rounding gain / loss', nameAr: 'فروق التقريب', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: 'ROUNDING_GAIN_LOSS' },
 ];
 
 /** Quantities are scaled by 10^4 (10000 = 1 unit). */

@@ -93,6 +93,7 @@ function totalsBlock(payload: FinancialDocumentPayload): string {
   ];
   if (payload.discountMinor) rows.push(['الخصم / Discount', money(payload.discountMinor, payload.currency)]);
   if (payload.taxMinor) rows.push(['الضريبة / VAT', money(payload.taxMinor, payload.currency)]);
+  if (payload.roundingMinor) rows.push(['تقريب المبلغ / Rounding', money(payload.roundingMinor, payload.currency)]);
   rows.push(['الإجمالي / Total', money(payload.totalMinor, payload.currency)]);
   if (payload.paidMinor) rows.push(['المدفوع / Paid', money(payload.paidMinor, payload.currency)]);
   if (payload.paidMinor || payload.balanceMinor !== payload.totalMinor) {

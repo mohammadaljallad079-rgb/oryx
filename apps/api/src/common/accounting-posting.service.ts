@@ -61,6 +61,7 @@ export const SYSTEM_ROLES = {
   // Execution 04 — marketplace commissions and provider settlements
   MARKETPLACE_COMMISSION: 'MARKETPLACE_COMMISSION',
   PROVIDER_PAYABLE: 'PROVIDER_PAYABLE',
+  ROUNDING_GAIN_LOSS: 'ROUNDING_GAIN_LOSS',
 } as const;
 
 export type SystemRole = (typeof SYSTEM_ROLES)[keyof typeof SYSTEM_ROLES];

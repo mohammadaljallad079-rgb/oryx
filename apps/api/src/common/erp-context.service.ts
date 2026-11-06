@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DEFAULT_COUNTRY_CODE, DEFAULT_CURRENCY } from '@oryx/shared';
+import { currencyScale, DEFAULT_COUNTRY_CODE, DEFAULT_CURRENCY, type RoundingMode } from '@oryx/shared';
 import { PrismaService } from './prisma.service';
 import type { Tx } from './document-sequence.service';
 import { forbidden, ERROR_CODES, badRequest } from './errors';
@@ -98,6 +98,26 @@ export class ErpContextService {
       select: { countryCode: true },
     });
     return company?.countryCode ?? DEFAULT_COUNTRY_CODE;
+  }
+
+  /**
+   * The company's optional whole-amount cash rounding, with the currency scale
+   * the increment is expressed in. A missing row (or the `NONE` default) yields
+   * an exact total, so this is safe to call on every document path.
+   */
+  async companyRoundingMode(
+    companyId: string,
+    tx?: Tx,
+  ): Promise<{ mode: RoundingMode; scale: number }> {
+    const client: Tx = tx ?? this.prisma;
+    const company = await client.company.findUnique({
+      where: { id: companyId },
+      select: { roundingMode: true, currency: true },
+    });
+    return {
+      mode: (company?.roundingMode ?? 'NONE') as RoundingMode,
+      scale: currencyScale(company?.currency ?? DEFAULT_CURRENCY),
+    };
   }
 
   /**

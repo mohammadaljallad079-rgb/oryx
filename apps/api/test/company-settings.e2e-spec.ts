@@ -27,6 +27,7 @@ interface CompanyView {
   currency: string;
   functionalCurrency: string | null;
   defaultTaxRateBp: number;
+  roundingMode: 'NONE' | 'NEAREST_WHOLE' | 'NEAREST_HALF';
   taxNumber: string | null;
   legalNameEn: string | null;
   notes: string | null;
@@ -40,7 +41,15 @@ describe('company settings (e2e)', () => {
   let companyAdminToken: string;
   let companyId: string;
   let otherCompanyId: string;
-  let original: { currency: string; functionalCurrency: string | null; defaultTaxRateBp: number; taxNumber: string | null; legalNameEn: string | null; notes: string | null };
+  let original: {
+    currency: string;
+    functionalCurrency: string | null;
+    defaultTaxRateBp: number;
+    roundingMode: 'NONE' | 'NEAREST_WHOLE' | 'NEAREST_HALF';
+    taxNumber: string | null;
+    legalNameEn: string | null;
+    notes: string | null;
+  };
 
   beforeAll(async () => {
     const ctx = await createTestApp();
@@ -60,6 +69,7 @@ describe('company settings (e2e)', () => {
       currency: demo.currency,
       functionalCurrency: demo.functionalCurrency,
       defaultTaxRateBp: demo.defaultTaxRateBp,
+      roundingMode: demo.roundingMode,
       taxNumber: demo.taxNumber,
       legalNameEn: demo.legalNameEn,
       notes: demo.notes,
@@ -82,11 +92,36 @@ describe('company settings (e2e)', () => {
         currency: 'BHD',
         functionalCurrency: null,
         defaultTaxRateBp: 0,
+        roundingMode: 'NONE',
         taxNumber: null,
         legalNameEn: null,
         notes: null,
       },
     });
+  });
+
+  it('defaults to exact totals and stores a whole-amount rounding mode', async () => {
+    const initial = await companyCall<CompanyView>(base, companyId, `/companies/${companyId}`, {
+      token: superToken,
+    });
+    expect(initial.body.roundingMode).toBe('NONE');
+
+    const set = await companyCall<CompanyView>(base, companyId, `/companies/${companyId}`, {
+      method: 'PATCH',
+      token: superToken,
+      body: { roundingMode: 'NEAREST_WHOLE' },
+    });
+    expect(set.status).toBe(200);
+    expect(set.body.roundingMode).toBe('NEAREST_WHOLE');
+  });
+
+  it('rejects an unknown rounding mode', async () => {
+    const res = await companyCall(base, companyId, `/companies/${companyId}`, {
+      method: 'PATCH',
+      token: superToken,
+      body: { roundingMode: 'ROUND_UP' },
+    });
+    expect(res.status).toBe(400);
   });
 
   it('returns the finance defaults on the company detail', async () => {

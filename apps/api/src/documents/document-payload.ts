@@ -163,6 +163,8 @@ export interface FinancialDocumentPayload {
   subtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
+  /** Signed whole-amount rounding adjustment; omitted/zero when not applied. */
+  roundingMinor?: number;
   totalMinor: number;
   paidMinor: number;
   balanceMinor: number;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CURRENCIES, type CompanyDto } from '@oryx/shared';
+import { CURRENCIES, type CompanyDto, type RoundingMode } from '@oryx/shared';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -46,6 +46,7 @@ export function CompanySettingsPanel() {
     currency: '',
     functionalCurrency: '',
     defaultTaxPercent: '',
+    roundingMode: 'NONE' as RoundingMode,
   });
 
   // A platform principal searches the catalogue; a company principal already
@@ -95,6 +96,7 @@ export function CompanySettingsPanel() {
         currency: res.currency,
         functionalCurrency: res.functionalCurrency ?? '',
         defaultTaxPercent: String((res.defaultTaxRateBp ?? 0) / 100),
+        roundingMode: res.roundingMode ?? 'NONE',
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
@@ -132,6 +134,7 @@ export function CompanySettingsPanel() {
         currency: form.currency,
         functionalCurrency: form.functionalCurrency,
         defaultTaxRateBp: taxBp,
+        roundingMode: form.roundingMode,
       });
       setCompany(updated);
       setSaved(true);
@@ -300,6 +303,19 @@ export function CompanySettingsPanel() {
                 disabled={!canEdit}
                 data-testid="company-default-tax"
               />
+            </Field>
+            <Field label={t('settings.rounding')} hint={t('settings.roundingHint')}>
+              <select
+                className="oryx-select"
+                value={form.roundingMode}
+                onChange={(e) => setForm({ ...form, roundingMode: e.target.value as RoundingMode })}
+                disabled={!canEdit}
+                data-testid="company-rounding-mode"
+              >
+                <option value="NONE">{t('settings.roundingNone')}</option>
+                <option value="NEAREST_WHOLE">{t('settings.roundingWhole')}</option>
+                <option value="NEAREST_HALF">{t('settings.roundingHalf')}</option>
+              </select>
             </Field>
           </div>
 

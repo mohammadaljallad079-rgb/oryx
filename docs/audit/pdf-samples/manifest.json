@@ -1,0 +1,60 @@
+{
+  "generatedAt": "2026-11-06T05:08:50.905Z",
+  "base": "http://127.0.0.1:3001",
+  "documents": [
+    {
+      "name": "vehicle-inspection-full.pdf",
+      "type": "VEHICLE_INSPECTION_REPORT",
+      "documentNumber": "JOB-00001",
+      "pageCount": 6,
+      "byteSize": 330145,
+      "verificationToken": "r8WgEHtZxl25TTIFi71NEvkuUrGguZZhkKCu1YuVwN4",
+      "areas": [
+        "PAINT_BODY",
+        "CHASSIS_UNDERCARRIAGE",
+        "INTERIOR",
+        "EXTERIOR",
+        "ENGINE_COMPARTMENT",
+        "ROAD_TEST",
+        "COMPUTER_UNIT"
+      ]
+    },
+    {
+      "name": "vehicle-inspection-partial.pdf",
+      "type": "VEHICLE_INSPECTION_REPORT",
+      "documentNumber": "JOB-00002",
+      "pageCount": 5,
+      "byteSize": 274541,
+      "verificationToken": "k7MHflKV87_uwULu1wiKDbNX5AawIfgs3jCND-3sPxs",
+      "areas": [
+        "PAINT_BODY",
+        "ENGINE_COMPARTMENT",
+        "COMPUTER_UNIT"
+      ]
+    },
+    {
+      "name": "quotation.pdf",
+      "type": "QUOTATION",
+      "documentNumber": "QT-00001",
+      "pageCount": 1,
+      "byteSize": 218110,
+      "verificationToken": "Z1IrzlFxO2JkqBTIjOghFiqs2FxNhWDC-fxCH6tBKy0"
+    },
+    {
+      "name": "sales-invoice.pdf",
+      "type": "SALES_INVOICE",
+      "documentNumber": "SI-00001",
+      "pageCount": 1,
+      "byteSize": 217899,
+      "verificationToken": "T0MVksr-oJCXmu1fwFMDlFZY-_0a6nBaTI62klW08ok"
+    },
+    {
+      "name": "sales-order.pdf",
+      "type": "SALES_ORDER",
+      "documentNumber": "SO-00001",
+      "pageCount": 1,
+      "byteSize": 214205,
+      "verificationToken": "-nN1LZoaLFVEuZykbtX5BUeVLLyhoKpOCN-baRFdLr4"
+    }
+  ]
+}

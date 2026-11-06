@@ -1,15 +1,20 @@
 # ORYX Auto Services — Final Acceptance
 
-Acceptance date: 2026-11-05.
+Acceptance date: 2026-11-06 (revised).
 Branch: `feature/execution-07-premium-web` (PR #7, **open and Draft**).
-Local HEAD at acceptance: `fc26eb02` (`fix(ci): assert the APK bundle carries
-its API host, not that it is offline`) on top of `e0b02557`
-(`fix(documents): keep an Arabic face in the numeric and Latin font stacks`)
-and `de85190f` (`fix(documents): draw inspection marks as vectors, not font
-glyphs`).
+Local HEAD at acceptance: `fcab9aea` (`fix(sales): drop the unused
+customer-drawer callback`), which sits on top of the customer-master work
+(`30b49b75`, `656c60b4`) and the earlier defect fixes (`de85190f`, `e0b02557`,
+`fc26eb02`, `7d14d4d7`).
 Environment: an isolated preview stack — a separate PostgreSQL database
-(`oryx_test`) with seeded synthetic demo records. No production database and no
+(`oryx_dev`) with seeded synthetic demo records. No production database and no
 production secret is involved.
+
+> **Revision note (2026-11-06).** This revision re-ran every suite on the
+> current tree after a sandbox rebuild, added the optional whole-amount rounding
+> feature (`RoundingMode`, migration `20261106060000_whole_amount_rounding`), and
+> refreshed the PDF samples and the twelve acceptance surfaces. Counts below are
+> from this run, not carried over from the previous report.
 
 > **Scope.** This report continues an existing, far-advanced project. The
 > handover brief described the state as of commit `d6a65d2` and Executions
@@ -102,13 +107,24 @@ tree.
 | Vehicles: full info, registration-card photo upload, secure documents | PASS | vehicle-documents feature (section 9); `vehicle-documents.e2e-spec.ts` 7/7 |
 | Vehicles: OCR-assisted extraction | **BLOCKED** | No OCR provider is configured (no vendor credential); the capture path stores a scan for manual review. See section 4. |
 | Inventory: barcodes, lookup, warehouse selection, movements, min-stock alerts, status controls | PASS | `inventory.service.ts` (barcode search), `d579e02e` |
-| Sales/POS: sessions, invoices, quotations, tax, discounts, rounding, payments, returns, refunds, attachments | PASS | ERP e2e; `execution16-sales-contract` |
+| Sales/POS: sessions, invoices, quotations, tax, discounts, rounding, payments, returns, refunds, attachments | PASS | ERP e2e; `execution16-sales-contract`; optional whole-amount rounding (`RoundingMode`, section 1.8) |
 | Purchases: suppliers, POs, purchase invoices/returns, statements, payments | PASS | purchasing e2e |
-| Accounting: auto chart numbering, hierarchy, journals, statements, receipts, vouchers, attachments, correct reporting | PASS | `erp.spec.ts`; `AccountingPostingService` |
+| Accounting: auto chart numbering, hierarchy, journals, statements, receipts, vouchers, attachments, correct reporting | PASS | `erp.spec.ts`; `AccountingPostingService`; rounding posts to `5930` so the ledger still balances |
 | HR: employees, attendance, hours, salary, payroll, permissions | PASS | HR e2e; payroll snapshot + idempotent posting |
 | Shared UI: searchable dropdowns, authorized inline create/edit/activate/deactivate/reactivate/delete, confirmations, audit | PASS | shared `ui.tsx` components; audit trail |
 
-### 1.8 Mobile and external integrations (brief §8)
+### 1.8 Optional whole-amount rounding (added this session)
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| Company opt-in `RoundingMode` (`NONE` / `NEAREST_WHOLE` / `NEAREST_HALF`) | PASS | migration `20261106060000_whole_amount_rounding`; `company-settings.e2e-spec.ts` |
+| `NONE` default leaves totals exact | PASS | `money.test.ts`; `whole-amount-rounding.e2e-spec.ts` 7/7 |
+| Rounded total is what the document, receipt and POS charge | PASS | `whole-amount-rounding.e2e-spec.ts` |
+| Ledger still balances: `subtotal − discount + tax + rounding === total` | PASS | rounding posts to account `5930` (`ROUNDING_GAIN_LOSS`); trial balance `balanced:true` asserted |
+| Setting is per-tenant | PASS | another company keeps its own mode; asserted in the e2e |
+| POS shows the exact rounded total before submit | PASS | `sales/page.tsx` mirrors `roundMinor`; `pos-rounding` testid; `erp.spec.ts` test 9 |
+
+### 1.9 Mobile and external integrations (brief §8)
 
 | Requirement | Status | Evidence |
 |---|---|---|
@@ -121,7 +137,7 @@ tree.
 No live integration result is claimed without the credential that would produce
 it.
 
-### 1.9 PDF design references (brief §7)
+### 1.10 PDF design references (brief §7)
 
 | Requirement | Status | Evidence |
 |---|---|---|
@@ -134,18 +150,18 @@ it.
 
 | Suite | Command | Result |
 |---|---|---|
-| Shared unit | `pnpm --filter @oryx/shared test` | **217 passed / 217** (11 files) |
-| API integration | `pnpm --filter @oryx/api test:e2e` | **652 passed / 652** (34 suites) |
+| Shared unit | `pnpm --filter @oryx/shared test` | **223 passed / 223** (11 files) |
+| API integration | `pnpm --filter @oryx/api test:e2e` | **671 passed / 671** (36 suites) |
 | API unit | `pnpm --filter @oryx/api test` | **20 passed / 20** (5 files) |
-| Documents subset | `… test:e2e -- execution10-merchant-documents execution-phase3-documents document-numbering` | **47 passed / 47** (3 suites) |
-| Vehicle documents | `… test:e2e -- vehicle-documents` | **7 passed / 7** |
+| Whole-amount rounding | `… test:e2e -- whole-amount-rounding` | **7 passed / 7** (in the 671) |
 | Mobile | `pnpm --filter @oryx/mobile test` | **206 passed / 206** (10 files) |
 | Mobile ERP | `pnpm --filter @oryx/mobile-erp test` | **31 passed / 31** (2 files) |
-| Admin browser | `pnpm --filter @oryx/admin test:ui` | **218 passed, 1 skipped** (8.4 min) |
+| Admin browser | `pnpm --filter @oryx/admin test:ui` | **223 passed, 1 skipped** (8.5 min) |
 | Workspace lint | `pnpm -r lint` | PASS (exit 0) |
 | Workspace typecheck | `pnpm -r typecheck` | PASS (exit 0) |
 | Builds | api / admin / customer | PASS (exit 0) |
-| Migrations | `prisma migrate status` | **up to date** (29 migrations applied to `oryx_test`) |
+| Migrations | `prisma migrate status` | **up to date** (31 migrations applied to `oryx_dev`) |
+| PDF sample render | `python3 .run/render-pdf-samples.py` | **ALL PASS** (14 PNGs; Arabic + Latin, no Type3) |
 
 ### 2.1 CI workflows (run `fc26eb02`, all jobs green)
 
@@ -198,12 +214,21 @@ Twelve acceptance surfaces (`.run/capture-final-evidence.mjs`, screenshots in
 | 8 | Quotation | issued PDF `QT-*` | PASS |
 | 9 | Purchase Invoice | `/purchasing` | PASS |
 | 10 | Full Vehicle Inspection | `vehicle-inspection-full.pdf` (6 pp) | PASS |
-| 11 | Partial Vehicle Inspection | `vehicle-inspection-partial.pdf` (3 pp) | PASS |
+| 11 | Partial Vehicle Inspection | `vehicle-inspection-partial.pdf` (5 pp) | PASS |
 | 12 | QR Verification | `/verify/<token>` + `GET /documents/verify/<token>` | PASS |
+
+The twelve surfaces were re-captured this session
+(`.run/capture-final-evidence.mjs`): **captured 12, failed 0**. The two
+document-preview surfaces (`08-quotation`, `11-partial-inspection`) now derive
+their document number from the live register (`QT-00001`, `JOB-00002`) instead
+of a stale hard-coded value, so they render the real record. The 39-surface
+sweep (`.run/sweep-preview.mjs`) is **39 / 39** green.
 
 PDF samples: `docs/audit/pdf-samples/{sales-invoice,quotation,sales-order,
 vehicle-inspection-full,vehicle-inspection-partial}.pdf`, with rendered page
-PNGs in `docs/audit/pdf-samples/preview/`.
+PNGs in `docs/audit/pdf-samples/preview/` and a machine-readable
+`docs/audit/pdf-samples/manifest.json` (document number, page count, byte size
+and verification token per sample).
 
 ## 4. External blockers
 
@@ -220,27 +245,44 @@ PNGs in `docs/audit/pdf-samples/preview/`.
 
 ## 5. Files changed in this session
 
-Three defects were fixed on top of the recovered tree. The commits are
-`de85190f`, `e0b02557` and `fc26eb02`.
+This session (2026-11-06) re-ran the full verification on the recovered tree and
+added the optional whole-amount rounding feature on top of it.
 
 | File | Change |
 |---|---|
-| `apps/api/src/documents/templates/inspection-report.template.ts` | Inspection marks drawn as vectors, not font-glyph codepoints (commit `de85190f`) |
-| `apps/api/src/documents/templates/inspection-report.template.spec.ts` | New spec: no template may depend on a mark glyph the embedded fonts lack |
-| `apps/api/src/documents/pdf/pdf-renderer.service.ts` | `.num` / `.ltr` use `DOCUMENT_LATIN_STACK` so the Arabic currency symbol stays in the embedded faces (commit `e0b02557`) |
-| `apps/api/src/documents/pdf/pdf-renderer.service.spec.ts` | New spec: both stacks must name an Arabic face |
-| `.github/workflows/mobile-apk.yml` | Bundle assertion now requires the configured API host instead of an offline bundle; `api_base_url` dispatch input (commit `fc26eb02`) |
+| `packages/shared/src/money.ts` | `ROUNDING_MODES`, `roundingIncrementMinor`, `roundMinor` |
+| `packages/shared/src/contracts.ts` | `CompanyDto.roundingMode`, `SalesDocumentDto`/`PosSaleDto.roundingMinor` |
+| `packages/database/prisma/schema.prisma` | `RoundingMode` enum; `Company.roundingMode`; `roundingMinor` on Quotation, SalesOrder, SalesInvoice, CreditNote, PosSale |
+| `packages/database/prisma/migrations/20261106060000_whole_amount_rounding/migration.sql` | New migration (additive, defaults preserve exact totals) |
+| `packages/database/prisma/seed.ts`, `apps/api/src/accounting/accounting.service.ts` | Chart account `5930` rounding gain/loss |
+| `apps/api/src/common/accounting-posting.service.ts` | `SYSTEM_ROLES.ROUNDING_GAIN_LOSS` |
+| `apps/api/src/common/document-totals.ts` | `computeDocumentTotals` applies the mode and reports `roundingMinor` |
+| `apps/api/src/common/erp-context.service.ts` | `companyRoundingMode(companyId, tx)` |
+| `apps/api/src/sales/sales.service.ts` | Rounding applied to quotations, orders, invoices; posting splits AR vs rounding account |
+| `apps/api/src/documents/document-payload.ts`, `documents.service.ts`, `templates/financial-document.template.ts` | Rounding row in the PDF totals block |
+| `apps/api/src/organizations/organizations.dto.ts`, `organizations.service.ts` | `roundingMode` on the company update path |
+| `apps/admin/src/components/company-settings-panel.tsx` | Rounding selector (`company-rounding-mode`) |
+| `apps/admin/src/app/(app)/sales/page.tsx` | POS mirrors the rounded total (`pos-rounding`) |
+| `apps/admin/src/i18n/dictionaries.ts` | Arabic and English labels for the new settings and POS row |
+| `apps/api/test/whole-amount-rounding.e2e-spec.ts` | New 7-test e2e (default, rounded total, balanced ledger, per-tenant) |
+| `apps/api/test/company-settings.e2e-spec.ts` | Rounding-mode persistence assertions |
+| `apps/admin/e2e/erp.spec.ts` | Test 9: rounding is a persisted company setting |
+| `.run/regenerate-pdf-evidence.mjs` | Regenerates the PDF samples and `manifest.json` from the live API |
+| `.run/capture-final-evidence.mjs` | Derives document numbers from the live register instead of a stale constant |
+| `docs/audit/pdf-samples/*` | Fresh samples, rendered pages and `manifest.json` |
 | `docs/audit/ORYX_FINAL_ACCEPTANCE.md` | This report |
 
-Earlier working-tree changes, now committed, are listed in the prior revision of
-this section and are unchanged by this session.
+Earlier defect fixes from the previous session remain in the history:
+`de85190f` (inspection marks as vectors), `e0b02557` (Arabic face in the numeric
+and Latin stacks) and `fc26eb02` (Mobile APK bundle assertion).
 
 ## 6. Database migrations
 
-29 migrations are applied and the schema is up to date on `oryx_test`. The newest
-is `20261105185112_company_finance_defaults`. No migration was added in this
-session; the vehicle-documents feature uses the existing `VehicleDocument` table
-and the media library.
+31 migrations are applied and the schema is up to date on `oryx_dev`. The newest
+is `20261106060000_whole_amount_rounding`, which adds the `RoundingMode` enum,
+`Company.roundingMode` (default `NONE`) and a `roundingMinor` column (default 0)
+on the five sales document tables. Every column is additive with a default, so
+applying it to an existing tenant leaves every stored total exact.
 
 ## 7. Deployment readiness
 
@@ -252,26 +294,28 @@ and the media library.
 | Production untouched | PASS (no deploy, no restart, no production migration) |
 | PR #7 open and Draft | PASS |
 
-The three fixes are committed and pushed to the existing branch
-(`feature/execution-07-premium-web`). The working tree is clean, the remote tip
-is `fc26eb02`, PR #7 is open and Draft, and every CI workflow is green on that
-tip. The code is **not** deployed and PR #7 is **not** marked ready for review.
+The changes are committed and pushed to the existing branch
+(`feature/execution-07-premium-web`). PR #7 stays open and Draft. The code is
+**not** deployed and PR #7 is **not** marked ready for review.
 
 ## 8. Honest summary
 
 - The platform is far more complete than the handover brief described; the brief
   reflected Execution 05, the tree is at Execution 20.
-- Every automated suite is green on the current tree, and every CI workflow —
-  including the previously-red API integration job and the Mobile APK build — is
-  green on the pushed tip.
-- This session found and fixed three real defects: the inspection report's
-  font-dependent marks, the tax invoice's Type3 host-font fallback (the Arabic
-  BHD symbol in a Latin-only stack), and the stale Mobile APK bundle assertion
-  that failed every mobile push. Each has a regression guard or a green CI job
-  as proof, and none weakens a test.
+- Every automated suite is green on the current tree after a sandbox rebuild:
+  shared 223, API e2e 671 (36 suites), API unit 20, mobile 206, mobile-erp 31,
+  admin browser 223 (+1 skipped). Lint and typecheck are clean; admin, customer
+  and API builds pass; migrations apply cleanly.
+- This session added the optional whole-amount rounding feature end to end
+  (shared maths, migration, company setting, sales and POS application, ledger
+  posting to account `5930`, PDF totals row, Arabic and English labels) with a
+  7-test API e2e and an admin browser test as proof. `NONE` is the default, so a
+  tenant that never opts in is unaffected.
 - The merchant document surface, the inspection engine, the official-document
-  engine and QR verification are implemented, DB-backed and tested.
+  engine and QR verification are implemented, DB-backed and tested. All twelve
+  acceptance surfaces and all 39 preview surfaces were re-captured this session.
 - The pixel-exact PDF comparisons and the Android device acceptance are blocked
-  by missing inputs, not by missing code. They are reported as BLOCKED, not PASS.
+  by missing inputs (the two reference files and a KVM-capable host), not by
+  missing code. They are reported as BLOCKED, not PASS.
 - No requirement is claimed complete without the command or artefact that proves
   it.

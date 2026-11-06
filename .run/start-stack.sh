@@ -120,10 +120,11 @@ start_proxy proxy-admin 12000 3000
 start_proxy proxy-customer 12001 3002
 
 log "--- public checks ---"
+RUNTIME_ID="${RUNTIME_ID:-yumhfnmvqfdgaghd}"
 for url in \
-  "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/login" \
-  "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/" \
-  "https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev/mobile/"; do
+  "https://work-1-$RUNTIME_ID.prod-runtime.all-hands.dev/login" \
+  "https://work-2-$RUNTIME_ID.prod-runtime.all-hands.dev/" \
+  "https://work-2-$RUNTIME_ID.prod-runtime.all-hands.dev/mobile/"; do
   code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url")
   log "$code  $url"
 done

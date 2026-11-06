@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { minorToInput, money, qty, toMinorInput, toQuantityInput } from '@/lib/erp-format';
+import { currencyScale as currencyScaleOf, roundMinor, type RoundingMode } from '@oryx/shared';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -1013,6 +1014,29 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
 
 function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boolean }) {
   const { t } = useUi();
+  const { companyId } = useAuth();
+  const [roundingMode, setRoundingMode] = useState<RoundingMode>('NONE');
+  const [currencyScale, setCurrencyScale] = useState(2);
+  useEffect(() => {
+    if (!companyId) {
+      setRoundingMode('NONE');
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const company = await api.getCompany(companyId);
+        if (cancelled) return;
+        setRoundingMode(company.roundingMode ?? 'NONE');
+        setCurrencyScale(currencyScaleOf(company.currency));
+      } catch {
+        if (!cancelled) setRoundingMode('NONE');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
   const sessions = useAsync(() => api.cashierSessions(), []);
   const sales = useAsync(() => api.posSales({ page: 1 }), []);
   const branches = useAsync(() => api.context(), []);
@@ -1128,6 +1152,8 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
         open={saleOpen}
         session={openSession ?? null}
         products={products.data?.items ?? []}
+        roundingMode={roundingMode}
+        currencyScale={currencyScale}
         onClose={() => setSaleOpen(false)}
         onDone={async () => {
           await sales.reload();
@@ -1151,12 +1177,16 @@ function PosSaleModal({
   open,
   session,
   products,
+  roundingMode,
+  currencyScale,
   onClose,
   onDone,
 }: {
   open: boolean;
   session: CashierSessionDto | null;
   products: Array<{ id: string; sku: string; nameEn: string; salesPriceMinor: number; taxRateBp: number }>;
+  roundingMode: RoundingMode;
+  currencyScale: number;
   onClose: () => void;
   onDone: () => Promise<void>;
 }) {
@@ -1166,7 +1196,7 @@ function PosSaleModal({
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
   const [paid, setPaid] = useState('');
 
-  const total = lines.reduce((sum, l) => {
+  const exactTotal = lines.reduce((sum, l) => {
     const gross = toQuantityInput(l.quantity) * toMinorInput(l.unitPrice) / 10000;
     // The discount is applied to the gross line before tax, exactly as the
     // server's `computeDocumentTotals` does.
@@ -1174,6 +1204,9 @@ function PosSaleModal({
     const tax = net * (Number(l.taxPercent) || 0) / 100;
     return sum + Math.round(net + tax);
   }, 0);
+  // Mirror the server's optional whole-amount rounding so the cashier sees the
+  // exact total that will be charged before submitting.
+  const { rounded: total, adjustment: roundingMinor } = roundMinor(exactTotal, roundingMode, currencyScale);
 
   const submit = async () => {
     if (!session) return;
@@ -1226,7 +1259,12 @@ function PosSaleModal({
         <Field label={t('erp.sales.paid')}>
           <input className="oryx-input" value={paid} onChange={(e) => setPaid(e.target.value)} placeholder={String(total / 100)} data-testid="pos-paid" />
         </Field>
-        <div className="flex items-end">
+        <div className="flex flex-col items-end justify-end gap-1">
+          {roundingMinor !== 0 ? (
+            <span className="oryx-muted text-[12px]" data-testid="pos-rounding">
+              {t('erp.sales.rounding')}: <strong className="tabular-nums">{money(roundingMinor)}</strong>
+            </span>
+          ) : null}
           <span className="oryx-muted text-[13px]">
             {t('erp.sales.total')}: <strong className="tabular-nums">{money(total)}</strong>
           </span>

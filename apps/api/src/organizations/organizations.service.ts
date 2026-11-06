@@ -234,6 +234,7 @@ export class OrganizationsService {
         ...(dto.currency !== undefined ? { currency: dto.currency } : {}),
         ...(dto.functionalCurrency !== undefined ? { functionalCurrency: dto.functionalCurrency || null } : {}),
         ...(dto.defaultTaxRateBp !== undefined ? { defaultTaxRateBp: dto.defaultTaxRateBp } : {}),
+        ...(dto.roundingMode !== undefined ? { roundingMode: dto.roundingMode } : {}),
         ...(dto.taxNumber !== undefined ? { taxNumber: dto.taxNumber } : {}),
         ...(dto.parentCompanyId !== undefined ? { parentCompanyId: dto.parentCompanyId } : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
@@ -465,6 +466,7 @@ export class OrganizationsService {
     currency: string;
     functionalCurrency: string | null;
     defaultTaxRateBp: number;
+    roundingMode: string;
     taxNumber: string | null;
     notes: string | null;
     parentCompanyId: string | null;
@@ -499,6 +501,7 @@ export class OrganizationsService {
       currency: c.currency,
       functionalCurrency: c.functionalCurrency,
       defaultTaxRateBp: c.defaultTaxRateBp,
+      roundingMode: c.roundingMode as CompanyDto['roundingMode'],
       taxNumber: c.taxNumber,
       notes: c.notes,
       parentCompanyId: c.parentCompanyId,

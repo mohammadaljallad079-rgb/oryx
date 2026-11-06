@@ -220,6 +220,43 @@ export function allocateMinor(total: number, weights: number[]): number[] {
   return parts.map((p) => assertSafeInteger(negative ? -p : p, 'Allocation part'));
 }
 
+/**
+ * How a document total may be rounded for cash settlement.
+ *
+ * `NONE` leaves the exact total. `NEAREST_WHOLE` rounds to the nearest whole
+ * major unit (1.000 BHD, 1.00 USD) and `NEAREST_HALF` to the nearest half unit
+ * (0.500 BHD). Both are half-up, matching every other rounding in this module.
+ */
+export const ROUNDING_MODES = ['NONE', 'NEAREST_WHOLE', 'NEAREST_HALF'] as const;
+export type RoundingMode = (typeof ROUNDING_MODES)[number];
+
+/** The minor-unit increment a rounding mode snaps to, given a currency scale. */
+export function roundingIncrementMinor(mode: RoundingMode, scale = 2): number {
+  if (mode === 'NONE') return 1;
+  const whole = 10 ** scale;
+  return mode === 'NEAREST_HALF' ? whole / 2 : whole;
+}
+
+/**
+ * Round a total to the increment of `mode` and report the signed adjustment.
+ *
+ * The adjustment is `rounded - total`: positive when the customer pays a little
+ * more than the exact total, negative when less. It is posted to a rounding
+ * account so the ledger still balances against the rounded receivable.
+ */
+export function roundMinor(
+  total: number,
+  mode: RoundingMode,
+  scale = 2,
+): { rounded: number; adjustment: number } {
+  if (!Number.isInteger(total)) throw new MoneyError('Minor units must be an integer.');
+  const increment = roundingIncrementMinor(mode, scale);
+  if (increment <= 1) return { rounded: total, adjustment: 0 };
+  const rounded = divRoundHalfUp(BigInt(total), BigInt(increment)) * BigInt(increment);
+  const value = assertSafeInteger(rounded, 'Rounded amount');
+  return { rounded: value, adjustment: value - total };
+}
+
 /** Sum of a list of minor-unit amounts. */
 export function sumMinor(amounts: number[]): number {
   return addMinor(...amounts);

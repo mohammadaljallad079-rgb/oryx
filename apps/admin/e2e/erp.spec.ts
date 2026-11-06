@@ -137,4 +137,30 @@ test.describe('Execution 02 — ERP core interfaces', () => {
     // Licensed here because the demo tenant is on the Enterprise plan.
     expect(accounting!.licensed).toBe(true);
   });
+
+  test('9. whole-amount rounding is a persisted company setting', async ({ page }) => {
+    const me = await apiCall<{ context: { companyId: string | null } }>(page, '/auth/me');
+    const companyId = me.body.context.companyId!;
+    const before = await apiCall<{ roundingMode: string }>(page, `/companies/${companyId}`);
+    const original = before.body.roundingMode;
+
+    try {
+      await page.goto('/settings');
+      await expect(page.getByTestId('company-settings')).toBeVisible();
+      const select = page.getByTestId('company-rounding-mode');
+      await expect(select).toBeVisible({ timeout: 20_000 });
+      await select.selectOption('NEAREST_HALF');
+      await page.getByTestId('company-settings-save').click();
+      await expect(page.getByTestId('company-settings-saved')).toBeVisible({ timeout: 20_000 });
+
+      // The change is persisted, not just shown.
+      const after = await apiCall<{ roundingMode: string }>(page, `/companies/${companyId}`);
+      expect(after.body.roundingMode).toBe('NEAREST_HALF');
+    } finally {
+      await apiCall(page, `/companies/${companyId}`, {
+        method: 'PATCH',
+        body: { roundingMode: original },
+      });
+    }
+  });
 });
