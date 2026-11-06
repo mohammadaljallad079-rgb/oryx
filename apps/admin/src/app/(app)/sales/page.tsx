@@ -211,12 +211,7 @@ function CustomersTab({ canManage }: { canManage: boolean }) {
         onCreatedDepartment={() => departments.reload()}
       />
       {detailId ? (
-        <CustomerDetailDrawer
-          id={detailId}
-          canManage={canManage}
-          onClose={() => setDetailId(null)}
-          onChanged={() => void list.reload()}
-        />
+        <CustomerDetailDrawer id={detailId} canManage={canManage} onClose={() => setDetailId(null)} />
       ) : null}
     </Card>
   );
@@ -510,12 +505,10 @@ function CustomerDetailDrawer({
   id,
   canManage,
   onClose,
-  onChanged,
 }: {
   id: string;
   canManage: boolean;
   onClose: () => void;
-  onChanged: () => void;
 }) {
   const { t, locale } = useUi();
   const detail = useAsync(() => api.customer(id), [id]);
