@@ -1,6 +1,6 @@
 # ORYX Auto Services — Final Acceptance
 
-Acceptance date: 2026-11-06 (revised 2026-11-07, seventh revision).
+Acceptance date: 2026-11-06 (revised 2026-11-07, eighth revision).
 Branch: `feature/execution-07-premium-web` (PR #7, **open and Draft**).
 Local HEAD at acceptance: `de940631` (`feat(automotive): registration-card OCR
 extraction for vehicle documents`), which sits on top of the tenant-tax /
@@ -10,6 +10,14 @@ extraction (brief §5) and corrects the integration catalogue count.
 Environment: an isolated preview stack — a separate PostgreSQL database
 (`oryx_dev`) with seeded synthetic demo records. No production database and no
 production secret is involved.
+
+> **Revision note (2026-11-07, eighth revision).** This revision re-ran the
+> end-to-end evidence on the OCR tree: the admin browser suite (**228 passed /
+> 1 skipped**), the twelve acceptance captures (**12 captured, 0 failed**), the
+> 39-surface preview sweep (**39 / 39**), and the fifteen PDF samples
+> regenerated from the live API (full inspection six pages, partial five, no
+> `/Type3`). CI on `de940631` is green for `CI`, `Design preview` and
+> `Mobile APK`.
 
 > **Revision note (2026-11-07, seventh revision).** This revision closed the last
 > functional gap in brief §5 — **registration-card OCR-assisted extraction**.
@@ -24,6 +32,12 @@ production secret is involved.
 > suite **2 / 2**. The integration catalogue is now **10 providers**; the stale
 > "8 providers" note in `docs/audit/05_INTEGRATION_READINESS.md` and the
 > "20-provider" note in `AGENTS.md` were both corrected.
+>
+> On the same tree the admin browser suite re-ran at **228 passed / 1 skipped**,
+> the twelve acceptance surfaces re-captured at **12 / 0**, the 39-surface
+> preview sweep returned **39 / 39**, and the fifteen PDF samples were
+> regenerated from the live API with the six-page / five-page inspection split
+> intact and no `/Type3` font.
 
 > **Revision note (2026-11-06, second revision).** This revision re-ran every
 > suite on the current tree after a sandbox rebuild, fixed a real purchasing
@@ -343,7 +357,7 @@ production deployment always talks to the vendor.
 | Purchase-return variance | `… test:e2e -- erp` | **37 passed / 37** (incl. the variance test) |
 | Mobile | `pnpm --filter @oryx/mobile test` | **206 passed / 206** (10 files) |
 | Mobile ERP | `pnpm --filter @oryx/mobile-erp test` | **31 passed / 31** (2 files) |
-| Admin browser | `pnpm --filter @oryx/admin test:ui` | **224 passed, 1 skipped** (10.0 min) |
+| Admin browser | `pnpm --filter @oryx/admin test:ui` | **228 passed, 1 skipped** (9.2 min) |
 | OCR browser | `… playwright test e2e/execution-ocr.spec.ts` | **2 passed / 2** |
 | Workspace lint | `pnpm -r lint` | PASS (exit 0) |
 | Workspace typecheck | `pnpm -r typecheck` | PASS (exit 0) |
@@ -353,7 +367,10 @@ production deployment always talks to the vendor.
 | Preview render check | `pnpm preview:verify` | **65 page/theme combinations, issues: none** |
 | Preview link crawl | `pnpm preview:check` | **459 pages, 15 PDFs, 0 bad responses, 0 dark-mode issues** |
 | Brief §10 preview surfaces | `.run/verify-brief10-links.mjs` | **12 / 12 reachable, 0 failed** |
-| CI (`ci.yml`) on `4142eee2` | GitHub Actions | **all three jobs green** (typecheck+build, unit+API, browser 12m38s) |
+| 39-surface preview sweep | `.run/sweep-preview.mjs` | **39 / 39 green** (1 expected unauthenticated 401) |
+| 12-surface acceptance capture | `.run/capture-final-evidence.mjs` | **captured 12, failed 0** |
+| PDF evidence regeneration | `.run/regenerate-pdf-evidence.mjs` | **15 documents written; manifest updated** |
+| CI (`ci.yml`) on the tip | GitHub Actions | see section 2.1 |
 
 All of the above were re-run on the current tree after the sandbox was recycled
 and the cluster rebuilt from an empty `pgdata`, migrated and seeded. Every
@@ -363,13 +380,12 @@ re-run; both are green (see section 3).
 
 ### 2.1 CI workflows
 
-On the current tip `666512f8` both workflows are green: `CI` (Typecheck and
-build, Browser acceptance tests, Unit and API integration tests) and
-`Design preview` (GitHub Pages build and publish). The theme-switch flake fix
-(`4142eee2`) was the first commit to hold green across all three CI jobs; every
-documentation-only commit after it re-ran green. The local suites in section 2
-are the authoritative per-suite result and were re-run on this tree after the
-cluster was rebuilt from an empty `pgdata`.
+On the OCR commit `de940631` all three workflows are green: `CI` (Typecheck and
+build, Browser acceptance tests, Unit and API integration tests), `Design
+preview` (GitHub Pages build and publish) and `Mobile APK`. The evidence commit
+`ecc7d3fd` re-runs the same three; the local suites in section 2 are the
+authoritative per-suite result and were re-run on this tree after the cluster
+was rebuilt from an empty `pgdata`.
 
 ### 2.2 Defects fixed in the previous session (preserved)
 
@@ -657,11 +673,12 @@ The changes are committed and pushed to the existing branch
   production system was touched.
 - **Seventh revision (2026-11-07) — re-run on the current tree:** shared **231**,
   API e2e **694** (38 suites, incl. the new OCR suite), API unit **20**, mobile
-  **206**, mobile-erp **31**, admin browser **224 passed / 1 skipped**, OCR
+  **206**, mobile-erp **31**, admin browser **228 passed / 1 skipped**, OCR
   browser **2**, workspace lint clean, workspace typecheck clean. Registration-card
   OCR extraction is implemented end-to-end and covered by
   `vehicle-ocr.e2e-spec.ts` (8) and `execution-ocr.spec.ts` (2). The integration
-  catalogue is 10 providers.
+  catalogue is 10 providers. CI on `de940631` is green for `CI`, `Design preview`
+  and `Mobile APK`.
 - **Fourth revision (2026-11-07) — re-run on the current tree:** shared **231**,
   API e2e **685** (37 suites), API unit **20**, mobile **206**, mobile-erp **31**,
   admin browser **224 passed / 1 skipped**, workspace lint clean, workspace
