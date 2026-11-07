@@ -1,11 +1,12 @@
 # ORYX Auto Services — Final Acceptance
 
-Acceptance date: 2026-11-06 (revised 2026-11-07).
+Acceptance date: 2026-11-06 (revised 2026-11-07, seventh revision).
 Branch: `feature/execution-07-premium-web` (PR #7, **open and Draft**).
-Local HEAD at acceptance: `8935b5aa` (`docs(acceptance): fifth revision — POS
-receipt in evidence, twelve verified preview surfaces`), which sits on top of the
-tenant-tax / POS-terminal work (`c7aec12f`), the POS-receipt document work
-(`da6dc803`) and the earlier defect fixes.
+Local HEAD at acceptance: `de940631` (`feat(automotive): registration-card OCR
+extraction for vehicle documents`), which sits on top of the tenant-tax /
+POS-terminal work (`c7aec12f`), the POS-receipt document work (`da6dc803`) and
+the earlier defect fixes. The seventh revision adds registration-card OCR
+extraction (brief §5) and corrects the integration catalogue count.
 Environment: an isolated preview stack — a separate PostgreSQL database
 (`oryx_dev`) with seeded synthetic demo records. No production database and no
 production secret is involved.
