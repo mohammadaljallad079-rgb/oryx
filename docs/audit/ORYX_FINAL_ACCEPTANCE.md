@@ -18,6 +18,42 @@ production secret is involved.
 > official-documents gallery to the published GitHub Pages preview. Counts below
 > are from this run, not carried over from the previous report.
 
+> **Revision note (2026-11-07, third revision).** This revision finished the
+> brief's remaining admin and merchant items on top of `da6dc803`:
+>
+> - **Tenant tax management** (brief §5 company settings). A new `TaxModule`
+>   (`apps/api/src/tax/*`, migration `20261108010000_tax_management`) lets a
+>   tenant author its own rates (code, bilingual name, rate in basis points,
+>   `SALES`/`PURCHASES`/`BOTH` scope, `LINE`/`TOTAL` application, include-tax
+>   flag, default flag, active flag) instead of typing a percentage on every
+>   document. Reads accept the same permissions the sales/purchasing/POS screens
+>   already hold; writes require `company.settings.update`. The admin settings
+>   page gains the `tax-rates-panel` and the sales/purchasing/POS forms select
+>   from the list. `tax-management.e2e-spec.ts` covers it.
+> - **POS terminal** (brief §5 sales/POS). The `/sales` POS tab is a working
+>   till: a catalogue grid from `GET /inventory/pos-catalog`, tap-to-add and
+>   barcode-scan-to-add, a cart with per-line percentage discount, a rounding row
+>   that mirrors the company `RoundingMode`, tender/change, and completion that
+>   posts `POST /sales/pos-sales`. The settled sale issues a real `POS_RECEIPT`
+>   official document (carrying the till reference, not the invoice number).
+>   `execution07-pos-terminal.spec.ts` drives it end to end.
+> - **Purchasing and document-register print actions** (brief §6). The purchasing
+>   register and the document register gain the same issue/preview/print/download
+>   cell the sales register already had, so no official document type is reachable
+>   only by pasting an id. The row-level controls use `doc-row-print-*` /
+>   `doc-row-download-*` test ids, distinct from the modal footer's
+>   `doc-print-*` / `doc-download-*`, so a strict-mode locator cannot match two
+>   buttons.
+> - **Two defects found and fixed by re-running the suites.** A browser assertion
+>   still expected the retired `JOB-` prefix for an inspection job number; it now
+>   asserts the brief-mandated `Z\d{5}`. And the duplicated `doc-download-*` test
+>   id above was a real strict-mode violation, not a test artefact.
+> - **i18n parity.** Two keys (`common.activate`, `erp.sales.taxNumber`) were
+>   missing from both locales and rendered raw; both are added to `en` and `ar`,
+>   and key parity was re-checked.
+>
+> Counts below are from this run on `da6dc803` + the working tree.
+
 > **Scope.** This report continues an existing, far-advanced project. The
 > handover brief described the state as of commit `d6a65d2` and Executions
 > 01–05. The repository is now at Execution 20: every ERP module catalog entry is
@@ -160,6 +196,20 @@ the price-variance plug was posted on the same side as the difference instead of
 the opposite side, leaving the entry short by `2 × variance` and the posting
 refused. The plug now lands on the side that balances the entry, and the trial
 balance is asserted `balanced:true` in the new test.
+
+### 1.11b Tenant tax management, POS terminal and register print actions (brief §5–§6)
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| Tenant-managed tax rates (bilingual, basis points, scope, application, default, active) | PASS | `apps/api/src/tax/*`; migration `20261108010000_tax_management`; `tax-management.e2e-spec.ts` |
+| Tax reads hold the sales/purchasing permissions; writes hold `company.settings.update` | PASS | `tax.controller.ts` `@RequireAnyPermission` / `@RequirePermissions`; cross-permission refusals asserted in the e2e |
+| Admin tax panel and form tax selectors | PASS | `apps/admin/src/components/tax-rates-panel.tsx`; settings page; sales/purchasing/POS selectors |
+| POS terminal: catalogue grid, scan/tap add, per-line discount, rounding row, tender/change, complete | PASS | `apps/admin/src/app/(app)/sales/page.tsx`; `execution07-pos-terminal.spec.ts` (drives `POST /sales/pos-sales`) |
+| POS receipt is a real official document with the till reference | PASS | `POS_RECEIPT` in `packages/shared/src/documents.ts`; `documents.service.ts`; commit `da6dc803` |
+| Purchasing register issue/preview/print/download | PASS | `apps/admin/src/app/(app)/purchasing/page.tsx`; `document-actions.tsx` |
+| Document register issue/preview/print/download on every row | PASS | `apps/admin/src/components/document-register.tsx`; `doc-row-print-*` / `doc-row-download-*` |
+| Merchant document screens (list, filters, detail, preview, download, print, status, QR, ar/en, responsive) | PASS | API `/provider/documents*`, mobile `merchant/documents.tsx`, tenant register; `execution10-merchant-documents.e2e-spec.ts` 8/8 |
+| i18n parity for the new keys | PASS | `common.activate`, `erp.sales.taxNumber` added to both locales; parity re-checked |
 
 ### 1.12 Official documents in the published preview
 
@@ -389,6 +439,14 @@ The changes are committed and pushed to the existing branch
   shared 223, API e2e 673 (36 suites), API unit 20, mobile 206, mobile-erp 31,
   admin browser 223 (+1 skipped). Lint and typecheck are clean; admin, customer
   and API builds pass; migrations apply cleanly.
+- **Third revision (2026-11-07) — re-run on `da6dc803` + the working tree:**
+  shared **231**, API e2e **685** (37 suites, incl. the new tax suite), mobile
+  **206**, mobile-erp **31**, admin browser **224** (0 failed, +1 skipped),
+  admin/customer/mobile lint clean, workspace typecheck clean, migrations 33
+  found and the database up to date. The two browser failures this run exposed
+  are fixed (section 1.11b). The API e2e log shows inspection reports still
+  issuing at their planned page count (`… Z00001 v1 (5p)`), so the dense-layout
+  pagination guard holds.
 - The PDF evidence was regenerated from a pristine, freshly-seeded database, so
   the document numbers are unambiguous (`JOB-00001`, `QT-00001`, `SI-00001`, …)
   and every QR block encodes `https://oryxbhr.com/verify/<token>`. Live

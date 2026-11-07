@@ -167,6 +167,19 @@ export class InventoryController {
     return this.inventory.reorderAlerts(p, companyId);
   }
 
+  /**
+   * The point-of-sale product grid: active products with their lead image and
+   * on-hand position, so the till renders a card and a stock badge without a
+   * request per tile. Gated by the POS operate permission, since it exists for
+   * the till and exposes on-hand figures the catalogue list does not.
+   */
+  @Get('pos-catalog')
+  @RequireAnyPermission('erp.sales.pos.operate', 'erp.sales.pos.manage', 'erp.inventory.read')
+  @ApiOperation({ summary: 'Point-of-sale product grid with stock status and image' })
+  posCatalog(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.inventory.posCatalog(query, p);
+  }
+
   // ---------------------------------------------------------- product images
   /**
    * Product photography.

@@ -775,6 +775,33 @@ export interface ReorderAlertDto {
   belowReorderLevel: boolean;
 }
 
+/** The stock position of a product, used to badge a POS tile. */
+export type StockStatus = 'IN_STOCK' | 'LOW' | 'OUT';
+
+/**
+ * A product as the point-of-sale grid needs it: the catalogue fields plus its
+ * lead photograph and on-hand position, so the till can render a card and warn
+ * about an empty shelf without a second round trip per product.
+ */
+export interface PosProductDto {
+  id: string;
+  sku: string;
+  nameEn: string;
+  nameAr: string;
+  barcode: string | null;
+  unit: string;
+  salesPriceMinor: number;
+  taxRateBp: number;
+  trackStock: boolean;
+  isActive: boolean;
+  /** The servable URL of the primary image, or null when the product has none. */
+  imageUrl: string | null;
+  /** On-hand quantity scaled by 10^4, summed across the company's warehouses. */
+  onHand: number;
+  reorderLevel: number;
+  stockStatus: StockStatus;
+}
+
 export interface CustomerDto {
   id: string;
   code: string;
@@ -1082,6 +1109,31 @@ export interface LeadSourceDto {
   nameEn: string;
   nameAr: string;
   isActive: boolean;
+}
+
+export const TAX_SCOPES = ['SALES', 'PURCHASES', 'BOTH'] as const;
+export type TaxScope = (typeof TAX_SCOPES)[number];
+
+export const TAX_APPLICATION_LEVELS = ['LINE', 'TOTAL'] as const;
+export type TaxApplication = (typeof TAX_APPLICATION_LEVELS)[number];
+
+/** A tenant-configurable tax the operator picks instead of typing a rate. */
+export interface TaxRateDto {
+  id: string;
+  companyId: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  /** The rate in basis points (1500 = 15%). */
+  rateBp: number;
+  scope: TaxScope;
+  applicationLevel: TaxApplication;
+  pricesIncludeTax: boolean;
+  isDefault: boolean;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface JobTitleDto {

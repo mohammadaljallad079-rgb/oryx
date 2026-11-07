@@ -1,12 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
-import { useAsync } from '@/lib/hooks';
+import { useAsync, useDebounced } from '@/lib/hooks';
 import { minorToInput, money, qty, toMinorInput, toQuantityInput } from '@/lib/erp-format';
-import { currencyScale as currencyScaleOf, roundMinor, type RoundingMode } from '@oryx/shared';
+import {
+  basisPointsOfMinor,
+  currencyScale as currencyScaleOf,
+  fromMinor,
+  lineAmountMinor,
+  roundMinor,
+  sumMinor,
+  type RoundingMode,
+} from '@oryx/shared';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -26,6 +34,7 @@ import {
 import type {
   CashierSessionDto,
   CustomerDto,
+  PosProductDto,
   PosSaleDto,
   SalesDocumentDto,
   WarehouseDto,
@@ -41,6 +50,9 @@ interface LineDraft {
   unitPrice: string;
   /** A per-line discount in whole percent, converted to basis points on submit. */
   discountPercent: string;
+  /** The chosen tax row, or a synthetic id when the product carries a rate that
+   * is not in the tenant's saved list. */
+  taxId: string;
   taxPercent: string;
 }
 
@@ -50,8 +62,77 @@ const emptyLine = (): LineDraft => ({
   quantity: '1',
   unitPrice: '0.00',
   discountPercent: '0',
+  taxId: '',
   taxPercent: '15',
 });
+
+/** The payment methods a POS sale may be settled with. */
+type PosPaymentMethod = 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'WALLET';
+
+/** One line of the POS cart, held in integer minor units and basis points. */
+interface CartLine {
+  key: string;
+  productId: string;
+  description: string;
+  sku: string;
+  quantity: number;
+  unitPriceMinor: number;
+  taxPercentBp: number;
+  discountPercentBp: number;
+}
+
+/**
+ * Price a POS cart exactly as the server will.
+ *
+ * This is the shared `document-totals` algorithm re-expressed on the client:
+ * the line subtotal is a single half-up rounding of quantity × price, the
+ * discount and tax are each a single half-up rounding of the running amount, and
+ * the subtotal is the sum of the rounded line subtotals rather than a re-rounded
+ * aggregate. Mirroring the server here is deliberate — the till shows the exact
+ * figure that will be posted, and `subtotal − discount + tax + rounding = total`
+ * holds on both sides.
+ */
+function computePosTotals(
+  lines: Array<{
+    quantity: number;
+    unitPriceMinor: number;
+    discountPercentBp: number;
+    taxPercentBp: number;
+  }>,
+  roundingMode: RoundingMode,
+  scale: number,
+) {
+  const priced = lines.map((l) => {
+    const lineSubtotalMinor = lineAmountMinor(l.quantity, l.unitPriceMinor);
+    const discountMinor = basisPointsOfMinor(lineSubtotalMinor, l.discountPercentBp);
+    const net = lineSubtotalMinor - discountMinor;
+    const taxMinor = basisPointsOfMinor(net, l.taxPercentBp);
+    return { lineSubtotalMinor, discountMinor, taxMinor, lineTotalMinor: net + taxMinor };
+  });
+  const subtotalMinor = sumMinor(priced.map((l) => l.lineSubtotalMinor));
+  const discountMinor = sumMinor(priced.map((l) => l.discountMinor));
+  const taxMinor = sumMinor(priced.map((l) => l.taxMinor));
+  const exactTotal = sumMinor(priced.map((l) => l.lineTotalMinor));
+  const { rounded: totalMinor, adjustment: roundingMinor } = roundMinor(exactTotal, roundingMode, scale);
+  return { subtotalMinor, discountMinor, taxMinor, roundingMinor, totalMinor };
+}
+
+/**
+ * The tenant's saved taxes as dropdown options. `value` is the rate in basis
+ * points so a product's own `taxRateBp` can be matched without a lookup table,
+ * and `label` is the display percentage the line parses back on selection.
+ */
+function useTaxOptions(companyId: string | null | undefined): SearchableOption[] {
+  const taxes = useAsync(
+    () => api.taxes({ companyId: companyId ?? undefined, includeInactive: 'false' }),
+    [companyId],
+  );
+  return (taxes.data?.items ?? []).map((tax) => ({
+    value: String(tax.rateBp),
+    label: `${tax.rateBp / 100}%`,
+    hint: tax.nameEn,
+  }));
+}
 
 export default function SalesPage() {
   const { t } = useUi();
@@ -694,11 +775,13 @@ function DetailRow({ label, value }: { label: string; value: string | null | und
 
 function InvoicesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
+  const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
   const list = useAsync(() => api.salesInvoices({ page: 1 }), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
+  const taxOptions = useTaxOptions(companyId);
 
   return (
     <Card>
@@ -757,6 +840,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         customers={customers.data?.items ?? []}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
+        taxOptions={taxOptions}
         showWarehouse
         testIdPrefix="invoice"
         onClose={() => setOpen(false)}
@@ -773,11 +857,13 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
 
 function OrdersTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
+  const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
   const list = useAsync(() => api.salesOrders(), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
+  const taxOptions = useTaxOptions(companyId);
 
   return (
     <Card>
@@ -832,6 +918,7 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
         customers={customers.data?.items ?? []}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
+        taxOptions={taxOptions}
         showWarehouse
         testIdPrefix="order"
         onClose={() => setOpen(false)}
@@ -848,11 +935,13 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
 
 function QuotationsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
+  const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
   const list = useAsync(() => api.quotations(), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
+  const taxOptions = useTaxOptions(companyId);
 
   return (
     <Card>
@@ -921,6 +1010,7 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
         customers={customers.data?.items ?? []}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
+        taxOptions={taxOptions}
         testIdPrefix="quotation"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
@@ -936,11 +1026,13 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
 
 function CreditNotesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
+  const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
   const list = useAsync(() => api.creditNotes(), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
+  const taxOptions = useTaxOptions(companyId);
 
   return (
     <Card>
@@ -997,6 +1089,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
         customers={customers.data?.items ?? []}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
+        taxOptions={taxOptions}
         showWarehouse
         showRestock
         testIdPrefix="credit-note"
@@ -1041,7 +1134,7 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
   const sales = useAsync(() => api.posSales({ page: 1 }), []);
   const branches = useAsync(() => api.context(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
-  const products = useAsync(() => api.products(), []);
+  const customers = useAsync(() => api.salesCustomers(), []);
   const [saleOpen, setSaleOpen] = useState(false);
   const [closeTarget, setCloseTarget] = useState<CashierSessionDto | null>(null);
 
@@ -1160,7 +1253,8 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
       <PosSaleModal
         open={saleOpen}
         session={openSession ?? null}
-        products={products.data?.items ?? []}
+        customers={customers.data?.items ?? []}
+        warehouses={warehouses.data?.items ?? []}
         roundingMode={roundingMode}
         currencyScale={currencyScale}
         onClose={() => setSaleOpen(false)}
@@ -1182,10 +1276,22 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
   );
 }
 
+/**
+ * The point-of-sale terminal.
+ *
+ * A full-screen, touch-first till: a product grid on one side and a live cart on
+ * the other. Products are tiles with a photograph, price and a stock badge;
+ * a barcode scan or a typed search narrows the grid, and a scan that matches one
+ * product adds it to the cart immediately, which is what a cashier expects from
+ * a scanner. Every figure shown here is computed by the same `@oryx/shared`
+ * pricing helpers the server uses, so the total on screen is the total that is
+ * posted — the browser never sends a total, only the lines.
+ */
 function PosSaleModal({
   open,
   session,
-  products,
+  customers,
+  warehouses,
   roundingMode,
   currencyScale,
   onClose,
@@ -1193,54 +1299,153 @@ function PosSaleModal({
 }: {
   open: boolean;
   session: CashierSessionDto | null;
-  products: Array<{ id: string; sku: string; nameEn: string; salesPriceMinor: number; taxRateBp: number }>;
+  customers: CustomerDto[];
+  warehouses: WarehouseDto[];
   roundingMode: RoundingMode;
   currencyScale: number;
   onClose: () => void;
   onDone: () => Promise<void>;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
+  const { companyId } = useAuth();
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounced(search, 250);
+  const [cart, setCart] = useState<CartLine[]>([]);
+  const [customerId, setCustomerId] = useState('');
+  const [warehouseId, setWarehouseId] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PosPaymentMethod>('CASH');
+  const [paid, setPaid] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
-  const [paid, setPaid] = useState('');
+  const [notice, setNotice] = useState<string | null>(null);
+  const scanRef = useRef<HTMLInputElement>(null);
 
-  const exactTotal = lines.reduce((sum, l) => {
-    const gross = toQuantityInput(l.quantity) * toMinorInput(l.unitPrice) / 10000;
-    // The discount is applied to the gross line before tax, exactly as the
-    // server's `computeDocumentTotals` does.
-    const net = gross * (1 - (Number(l.discountPercent) || 0) / 100);
-    const tax = net * (Number(l.taxPercent) || 0) / 100;
-    return sum + Math.round(net + tax);
-  }, 0);
-  // Mirror the server's optional whole-amount rounding so the cashier sees the
-  // exact total that will be charged before submitting.
-  const { rounded: total, adjustment: roundingMinor } = roundMinor(exactTotal, roundingMode, currencyScale);
+  const catalog = useAsync(
+    () => api.posCatalog({ companyId: companyId ?? undefined, search: debouncedSearch || undefined }),
+    [companyId, debouncedSearch],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setNotice(null);
+    setSearch('');
+    setCart([]);
+    setPaid('');
+    setPaymentMethod('CASH');
+    setCustomerId('');
+    setWarehouseId(session?.warehouseId ?? warehouses[0]?.id ?? '');
+    // Focus the scan field so a USB scanner's keystrokes land in it without a
+    // click; the field doubles as the search box.
+    const id = window.setTimeout(() => scanRef.current?.focus(), 50);
+    return () => window.clearTimeout(id);
+  }, [open, session, warehouses]);
+
+  const addProduct = useCallback(
+    (product: PosProductDto) => {
+      setNotice(null);
+      setCart((prev) => {
+        const existing = prev.find((l) => l.productId === product.id);
+        if (existing) {
+          return prev.map((l) =>
+            l.productId === product.id ? { ...l, quantity: l.quantity + 1 } : l,
+          );
+        }
+        const line: CartLine = {
+          key: `${product.id}-${Date.now()}`,
+          productId: product.id,
+          description: locale === 'ar' && product.nameAr ? product.nameAr : product.nameEn,
+          sku: product.sku,
+          quantity: 1,
+          unitPriceMinor: product.salesPriceMinor,
+          taxPercentBp: product.taxRateBp,
+          discountPercentBp: 0,
+        };
+        return [...prev, line];
+      });
+    },
+    [locale],
+  );
+
+  // A scanner types the barcode and presses Enter. The lookup is immediate and
+  // independent of the debounced grid query, because a scanner emits the whole
+  // code and the Enter in one burst — waiting for a 250 ms debounce would miss
+  // it. An exact barcode match wins; otherwise a lone search result is taken;
+  // otherwise the term stays in the field as an ordinary search.
+  const onScanSubmit = async () => {
+    const term = search.trim();
+    if (!term) return;
+    try {
+      const { items } = await api.posCatalog({
+        companyId: companyId ?? undefined,
+        search: term,
+      });
+      const exact = items.filter((p) => p.barcode && p.barcode === term);
+      if (exact.length === 1) {
+        addProduct(exact[0]);
+        setSearch('');
+        return;
+      }
+      if (items.length === 1) {
+        addProduct(items[0]);
+        setSearch('');
+        return;
+      }
+      setNotice(t('erp.sales.pos.notFound'));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    }
+  };
+
+  const updateLine = (key: string, patch: Partial<CartLine>) =>
+    setCart((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+
+  const removeLine = (key: string) => setCart((prev) => prev.filter((l) => l.key !== key));
+
+  const totals = useMemo(
+    () =>
+      computePosTotals(
+        cart.map((l) => ({
+          quantity: l.quantity,
+          unitPriceMinor: l.unitPriceMinor,
+          discountPercentBp: l.discountPercentBp,
+          taxPercentBp: l.taxPercentBp,
+        })),
+        roundingMode,
+        currencyScale,
+      ),
+    [cart, roundingMode, currencyScale],
+  );
+
+  const paidMinor = paid.trim() === '' ? totals.totalMinor : toMinorInput(paid);
+  const changeMinor = paidMinor - totals.totalMinor;
 
   const submit = async () => {
-    if (!session) return;
+    if (!session || cart.length === 0) return;
     setBusy(true);
     setError(null);
     try {
       await api.createPosSale({
         branchId: session.branchId,
         cashierSessionId: session.id,
-        warehouseId: session.warehouseId ?? undefined,
-        paymentMethod: 'CASH',
-        paidMinor: paid ? toMinorInput(paid) : total,
-        lines: lines.map((l) => ({
-          productId: l.productId || undefined,
-          description: l.description,
-          quantity: toQuantityInput(l.quantity),
-          unitPriceMinor: toMinorInput(l.unitPrice),
-          discountPercentBp: Math.round((Number(l.discountPercent) || 0) * 100),
-          taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
+        warehouseId: warehouseId || undefined,
+        customerId: customerId || undefined,
+        paymentMethod,
+        paidMinor,
+        lines: cart.map((l) => ({
+          productId: l.productId,
+          description: l.description || 'Item',
+          quantity: l.quantity,
+          unitPriceMinor: l.unitPriceMinor,
+          discountPercentBp: l.discountPercentBp,
+          taxPercentBp: l.taxPercentBp,
         })),
       });
       await onDone();
-      onClose();
-      setLines([emptyLine()]);
+      setCart([]);
       setPaid('');
+      setNotice(t('erp.sales.pos.receiptReady'));
+      scanRef.current?.focus();
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
@@ -1248,41 +1453,358 @@ function PosSaleModal({
     }
   };
 
+  const items = catalog.data?.items ?? [];
+
   return (
     <Modal
       open={open}
       title={t('erp.sales.newPosSale')}
       onClose={onClose}
+      size="full"
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy} onClick={submit} data-testid="save-pos-sale">
-            {busy ? t('common.loading') : t('common.save')}
+          <Button
+            variant="primary"
+            disabled={busy || cart.length === 0 || !session}
+            onClick={submit}
+            data-testid="save-pos-sale"
+          >
+            <Icon name="check" size={15} />
+            {busy ? t('common.loading') : `${t('erp.sales.pos.complete')} · ${money(totals.totalMinor)}`}
           </Button>
         </>
       }
     >
+      {!session ? (
+        <div className="p-4">
+          <ErrorBanner message={t('erp.sales.pos.noSession')} />
+        </div>
+      ) : null}
       {error ? <ErrorBanner message={error} /> : null}
-      <LineEditor lines={lines} setLines={setLines} products={products} testIdPrefix="pos-line" />
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <Field label={t('erp.sales.paid')}>
-          <input className="oryx-input" value={paid} onChange={(e) => setPaid(e.target.value)} placeholder={String(total / 100)} data-testid="pos-paid" />
-        </Field>
-        <div className="flex flex-col items-end justify-end gap-1">
-          {roundingMinor !== 0 ? (
-            <span className="oryx-muted text-[12px]" data-testid="pos-rounding">
-              {t('erp.sales.rounding')}: <strong className="tabular-nums">{money(roundingMinor)}</strong>
-            </span>
-          ) : null}
-          <span className="oryx-muted text-[13px]">
-            {t('erp.sales.total')}: <strong className="tabular-nums">{money(total)}</strong>
-          </span>
+      {notice ? (
+        <p className="oryx-muted m-0 mb-3 text-[12.5px]" role="status" data-testid="pos-notice">
+          {notice}
+        </p>
+      ) : null}
+
+      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        {/* ---------------------------------------------------- product grid */}
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <span className="pointer-events-none absolute inset-y-0 start-3 grid place-items-center text-[var(--muted)]">
+                <Icon name="search" size={16} />
+              </span>
+              <input
+                ref={scanRef}
+                className="oryx-input ps-9"
+                value={search}
+                placeholder={t('erp.sales.pos.searchPlaceholder')}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    void onScanSubmit();
+                  }
+                }}
+                aria-label={t('erp.sales.pos.scan')}
+                data-testid="pos-search"
+              />
+            </div>
+            <Button variant="ghost" onClick={() => void catalog.reload()} aria-label={t('common.refresh')}>
+              <Icon name="refresh" size={16} />
+            </Button>
+          </div>
+
+          {catalog.error ? <ErrorBanner message={catalog.error} onRetry={catalog.reload} /> : null}
+
+          {catalog.loading ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} height={148} />
+              ))}
+            </div>
+          ) : items.length === 0 ? (
+            <EmptyState title={t('common.empty')} hint={t('erp.sales.pos.notFound')} />
+          ) : (
+            <div
+              className="grid max-h-[46vh] grid-cols-2 gap-3 overflow-y-auto pe-1 sm:grid-cols-3 xl:grid-cols-4"
+              data-testid="pos-grid"
+            >
+              {items.map((p) => (
+                <PosProductTile key={p.id} product={p} onAdd={() => addProduct(p)} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ---------------------------------------------------------- cart */}
+        <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-3">
+          <div className="flex items-center justify-between">
+            <p className="oryx-panel-title m-0 flex items-center gap-2">
+              <Icon name="cart" size={16} />
+              {t('erp.sales.pos.cart')}
+              <Badge tone="neutral">
+                {cart.reduce((n, l) => n + l.quantity, 0)} {t('erp.sales.pos.itemCount')}
+              </Badge>
+            </p>
+            {cart.length > 0 ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  if (window.confirm(t('erp.sales.pos.confirmClear'))) setCart([]);
+                }}
+                data-testid="pos-clear-cart"
+              >
+                <Icon name="trash" size={14} />
+                {t('erp.sales.pos.clearCart')}
+              </Button>
+            ) : null}
+          </div>
+
+          {cart.length === 0 ? (
+            <p className="oryx-faint m-0 px-1 py-8 text-center text-[12.5px]">
+              {t('erp.sales.pos.emptyCart')}
+            </p>
+          ) : (
+            <div className="flex max-h-[30vh] flex-col gap-2 overflow-y-auto pe-1">
+              {cart.map((l) => (
+                <CartRow
+                  key={l.key}
+                  line={l}
+                  onChange={(patch) => updateLine(l.key, patch)}
+                  onRemove={() => removeLine(l.key)}
+                />
+              ))}
+            </div>
+          )}
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Field label={t('erp.sales.pos.customer')}>
+              <select
+                className="oryx-select"
+                value={customerId}
+                onChange={(e) => setCustomerId(e.target.value)}
+                data-testid="pos-customer"
+              >
+                <option value="">{t('erp.sales.pos.walkIn')}</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.code} — {c.nameEn || c.nameAr}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label={t('erp.sales.pos.warehouse')}>
+              <select
+                className="oryx-select"
+                value={warehouseId}
+                onChange={(e) => setWarehouseId(e.target.value)}
+                data-testid="pos-warehouse"
+              >
+                <option value="">—</option>
+                {warehouses.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.code} — {w.nameEn}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          <dl className="m-0 flex flex-col gap-1 border-t border-[var(--border)] pt-3 text-[12.5px]">
+            <Row label={t('erp.sales.pos.subtotal')} value={money(totals.subtotalMinor)} />
+            {totals.discountMinor !== 0 ? (
+              <Row label={t('erp.sales.pos.discountTotal')} value={`− ${money(totals.discountMinor)}`} />
+            ) : null}
+            <Row label={t('erp.sales.pos.tax')} value={money(totals.taxMinor)} />
+            {totals.roundingMinor !== 0 ? (
+              <Row label={t('erp.sales.rounding')} value={money(totals.roundingMinor)} testId="pos-rounding" />
+            ) : null}
+            <Row
+              label={t('erp.sales.total')}
+              value={money(totals.totalMinor)}
+              strong
+              testId="pos-total"
+            />
+          </dl>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Field label={t('erp.sales.pos.payment')}>
+              <select
+                className="oryx-select"
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value as PosPaymentMethod)}
+                data-testid="pos-payment-method"
+              >
+                <option value="CASH">{t('erp.sales.payment.CASH')}</option>
+                <option value="CARD">{t('erp.sales.payment.CARD')}</option>
+                <option value="BANK_TRANSFER">{t('erp.sales.payment.BANK_TRANSFER')}</option>
+                <option value="WALLET">{t('erp.sales.payment.WALLET')}</option>
+              </select>
+            </Field>
+            <Field label={t('erp.sales.pos.paid')}>
+              <input
+                className="oryx-input text-end"
+                inputMode="decimal"
+                value={paid}
+                placeholder={fromMinor(totals.totalMinor, currencyScale)}
+                onChange={(e) => setPaid(e.target.value)}
+                data-testid="pos-paid"
+              />
+            </Field>
+          </div>
+          <p className="oryx-muted m-0 flex items-center justify-between text-[12.5px]" data-testid="pos-change">
+            <span>{t('erp.sales.pos.change')}</span>
+            <strong className={`tabular-nums ${changeMinor < 0 ? 'text-[var(--danger)]' : ''}`}>
+              {money(changeMinor)}
+            </strong>
+          </p>
         </div>
       </div>
     </Modal>
   );
 }
 
+/** One product tile in the POS grid. */
+function PosProductTile({ product, onAdd }: { product: PosProductDto; onAdd: () => void }) {
+  const { t, locale } = useUi();
+  const imageUrl = api.resolveImage(product.imageUrl);
+  const soldOut = product.trackStock && product.stockStatus === 'OUT';
+  return (
+    <button
+      type="button"
+      onClick={onAdd}
+      disabled={soldOut}
+      className="oryx-pos-tile"
+      data-testid={`pos-product-${product.sku}`}
+    >
+      <span className="oryx-pos-tile__media">
+        {imageUrl ? (
+          // The catalogue serves a card-sized variant; a plain img keeps the
+          // grid cheap for hundreds of tiles.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={imageUrl} alt="" loading="lazy" />
+        ) : (
+          <span className="grid h-full w-full place-items-center text-[var(--muted)]">
+            <Icon name="package" size={22} />
+          </span>
+        )}
+        <span className="oryx-pos-tile__badge">
+          <Badge tone={soldOut ? 'danger' : product.stockStatus === 'LOW' ? 'gold' : 'success'}>
+            {soldOut
+              ? t('erp.sales.pos.outOfStock')
+              : product.stockStatus === 'LOW'
+                ? t('erp.sales.pos.lowStock')
+                : t('erp.sales.pos.inStock')}
+          </Badge>
+        </span>
+      </span>
+      <span className="oryx-pos-tile__body">
+        <span className="oryx-pos-tile__name">
+          {locale === 'ar' && product.nameAr ? product.nameAr : product.nameEn}
+        </span>
+        <span className="oryx-faint font-mono text-[10.5px]">{product.sku}</span>
+        <span className="oryx-pos-tile__price tabular-nums">{money(product.salesPriceMinor)}</span>
+      </span>
+    </button>
+  );
+}
+
+/** One editable cart line. */
+function CartRow({
+  line,
+  onChange,
+  onRemove,
+}: {
+  line: CartLine;
+  onChange: (patch: Partial<CartLine>) => void;
+  onRemove: () => void;
+}) {
+  const { t } = useUi();
+  const lineTotal = computePosTotals(
+    [
+      {
+        quantity: line.quantity,
+        unitPriceMinor: line.unitPriceMinor,
+        discountPercentBp: line.discountPercentBp,
+        taxPercentBp: line.taxPercentBp,
+      },
+    ],
+    'NONE',
+    2,
+  ).totalMinor;
+  return (
+    <div className="flex flex-col gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2">
+      <div className="flex items-start justify-between gap-2">
+        <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold">{line.description}</span>
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-label={`${t('common.delete')} ${line.description}`}
+          onClick={onRemove}
+          data-testid={`pos-remove-${line.sku}`}
+        >
+          <Icon name="close" size={13} />
+        </Button>
+      </div>
+      <div className="grid grid-cols-4 gap-1">
+        <input
+          className="oryx-input text-center text-[12px]"
+          type="number"
+          min={1}
+          value={line.quantity}
+          aria-label={t('erp.inventory.quantity')}
+          onChange={(e) => onChange({ quantity: Math.max(1, Math.round(Number(e.target.value) || 1)) })}
+          data-testid={`pos-qty-${line.sku}`}
+        />
+        <input
+          className="oryx-input text-end text-[12px]"
+          inputMode="decimal"
+          value={minorToInput(line.unitPriceMinor)}
+          aria-label={t('erp.sales.unitPrice')}
+          onChange={(e) => onChange({ unitPriceMinor: toMinorInput(e.target.value) })}
+          data-testid={`pos-price-${line.sku}`}
+        />
+        <input
+          className="oryx-input text-center text-[12px]"
+          inputMode="decimal"
+          value={line.discountPercentBp / 100}
+          aria-label={t('erp.sales.discount')}
+          onChange={(e) =>
+            onChange({ discountPercentBp: Math.round((Number(e.target.value) || 0) * 100) })
+          }
+          data-testid={`pos-discount-${line.sku}`}
+        />
+        <span className="grid place-items-center text-[12px] font-semibold tabular-nums">
+          {money(lineTotal)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** A label/value pair in the cart totals. */
+function Row({
+  label,
+  value,
+  strong = false,
+  testId,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+  testId?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between" data-testid={testId}>
+      <dt className={strong ? 'font-bold' : 'oryx-muted'}>{label}</dt>
+      <dd className={`m-0 tabular-nums ${strong ? 'text-[15px] font-bold' : ''}`}>{value}</dd>
+    </div>
+  );
+}
 function CloseSessionModal({
   session,
   onClose,
@@ -1344,11 +1866,13 @@ function LineEditor({
   lines,
   setLines,
   products,
+  taxOptions,
   testIdPrefix,
 }: {
   lines: LineDraft[];
   setLines: (lines: LineDraft[]) => void;
   products: Array<{ id: string; sku: string; nameEn: string; salesPriceMinor: number; taxRateBp: number }>;
+  taxOptions: SearchableOption[];
   testIdPrefix: string;
 }) {
   const { t } = useUi();
@@ -1368,11 +1892,18 @@ function LineEditor({
             value={line.productId}
             onChange={(e) => {
               const product = products.find((p) => p.id === e.target.value);
+              // A product carries its own rate; if it is not in the saved tax
+              // list, keep the numeric value and clear the selection rather than
+              // silently switching the line to a different tax.
+              const matched = product
+                ? taxOptions.find((o) => o.value === String(product.taxRateBp))
+                : undefined;
               update(i, {
                 productId: e.target.value,
                 description: product ? product.nameEn : line.description,
                 unitPrice: product ? minorToInput(product.salesPriceMinor) : line.unitPrice,
                 taxPercent: product ? String(product.taxRateBp / 100) : line.taxPercent,
+                taxId: product ? (matched ? matched.value : '') : line.taxId,
               });
             }}
             data-testid={`${testIdPrefix}-product-${i}`}
@@ -1412,13 +1943,19 @@ function LineEditor({
             onChange={(e) => update(i, { discountPercent: e.target.value })}
             data-testid={`${testIdPrefix}-discount-${i}`}
           />
-          <input
-            className="oryx-input col-span-1"
-            placeholder="%"
-            value={line.taxPercent}
-            onChange={(e) => update(i, { taxPercent: e.target.value })}
-            data-testid={`${testIdPrefix}-tax-${i}`}
-          />
+          <div className="col-span-1">
+            <SearchableSelect
+              value={line.taxId || null}
+              options={taxOptions}
+              onChange={(v) => {
+                const chosen = taxOptions.find((o) => o.value === v);
+                update(i, { taxId: v ?? '', taxPercent: chosen ? chosen.label.replace(/[^\d.]/g, '') : line.taxPercent });
+              }}
+              placeholder="%"
+              emptyLabel={t('common.none')}
+              testId={`${testIdPrefix}-tax-${i}`}
+            />
+          </div>
           <Button size="sm" variant="ghost" className="col-span-1" disabled={lines.length <= 1} onClick={() => setLines(lines.filter((_, idx) => idx !== i))}>
             <Icon name="close" size={14} />
           </Button>
@@ -1438,6 +1975,7 @@ function DocumentModal({
   customers,
   products,
   warehouses,
+  taxOptions,
   showWarehouse,
   showRestock,
   testIdPrefix,
@@ -1449,6 +1987,7 @@ function DocumentModal({
   customers: CustomerDto[];
   products: Array<{ id: string; sku: string; nameEn: string; salesPriceMinor: number; taxRateBp: number }>;
   warehouses: WarehouseDto[];
+  taxOptions: SearchableOption[];
   showWarehouse?: boolean;
   showRestock?: boolean;
   testIdPrefix: string;
@@ -1539,7 +2078,7 @@ function DocumentModal({
         ) : null}
       </div>
       <div className="mt-4">
-        <LineEditor lines={lines} setLines={setLines} products={products} testIdPrefix={testIdPrefix} />
+        <LineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} testIdPrefix={testIdPrefix} />
       </div>
       <span className="hidden">{qty(0)}</span>
     </Modal>

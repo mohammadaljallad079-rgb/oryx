@@ -76,7 +76,9 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     const row = page.locator('[data-testid^="job-row-"]').first();
     await expect(row).toBeVisible();
     const jobNumber = (await row.locator('td').first().innerText()).trim();
-    expect(jobNumber).toMatch(/^JOB-/);
+    // The brief mandates a single leading letter with no separator; the
+    // inspection-session letter is `Z` (`Z00028`), not the retired `JOB-` form.
+    expect(jobNumber).toMatch(/^Z\d{5}$/);
 
     await row.locator('[data-testid^="open-job-"]').click();
     await page.waitForURL('**/automotive/inspections/**');

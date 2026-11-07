@@ -376,6 +376,8 @@ export async function cleanupFixtures(prisma: PrismaService): Promise<void> {
   await prisma.product.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.warehouse.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.account.deleteMany({ where: { companyId: { in: ids } } });
+  // Tenant-managed taxes belong to the company and are removed with it.
+  await prisma.taxRate.deleteMany({ where: { companyId: { in: ids } } });
 
   // Execution 04 — payments, bookings and the marketplace. A refund restricts
   // the deletion of its intent, so the payment rows go before the company.

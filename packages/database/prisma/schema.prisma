@@ -481,6 +481,7 @@ model Company {
 
   // Execution 02 — ERP core (all tenant-owned rows carry companyId).
   documentSequences    DocumentSequence[]
+  taxRates             TaxRate[]
   accounts             Account[]
   fiscalYears          FiscalYear[]
   fiscalPeriods        FiscalPeriod[]
@@ -616,6 +617,50 @@ model Company {
   @@index([type])
   @@index([status])
   @@index([parentCompanyId])
+}
+
+/**
+ * A tenant-configurable tax the operator picks from a list instead of typing a
+ * rate per line. The rate is stored in basis points (1500 = 15%) to match every
+ * other rate in the data model.
+ *
+ * `scope` says where the tax applies (sales, purchases or both) and
+ * `applicationLevel` says whether the printed document shows it per line or
+ * only on the totals block. `isDefault` marks the one rate a new line or a new
+ * company default pre-selects; at most one row per company carries it, enforced
+ * by a partial unique index written in the migration.
+ */
+model TaxRate {
+  id               String         @id @default(cuid())
+  companyId        String
+  code             String
+  nameEn           String
+  nameAr           String
+  rateBp           Int            @default(0)
+  scope            TaxScope       @default(BOTH)
+  applicationLevel TaxApplication @default(LINE)
+  pricesIncludeTax Boolean        @default(false)
+  isDefault        Boolean        @default(false)
+  isActive         Boolean        @default(true)
+  sortOrder        Int            @default(0)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, code])
+  @@index([companyId, isActive])
+}
+
+enum TaxScope {
+  SALES
+  PURCHASES
+  BOTH
+}
+
+enum TaxApplication {
+  LINE
+  TOTAL
 }
 
 model Branch {

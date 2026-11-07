@@ -199,7 +199,7 @@ describe('Execution Phase 2 — inspection engine (e2e)', () => {
   describe('creation and tenancy', () => {
     it('creates an inspection with a generated job number and copies the vehicle identity', async () => {
       const created = await createSession(['ENGINE_COMPARTMENT', 'ROAD_TEST']);
-      expect(created.jobNumber).toMatch(/^JOB-/);
+      expect(created.jobNumber).toMatch(/^Z\d{5}$/);
       expect(created.selectedAreas).toEqual(['ENGINE_COMPARTMENT', 'ROAD_TEST']);
 
       const detail = await companyCall<Record<string, unknown>>(

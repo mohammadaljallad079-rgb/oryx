@@ -282,7 +282,7 @@ describe('ORYX Execution 03 (e2e)', () => {
 
       const converted = await erp<{ quoteNumber: string; totalMinor: number }>(`/crm/opportunities/${opportunityId}/convert`, { method: 'POST', body: {} });
       expect(converted.status).toBe(201);
-      expect(converted.body.quoteNumber).toMatch(/^QT-/);
+      expect(converted.body.quoteNumber).toMatch(/^Q\d{5}$/);
       expect(converted.body.totalMinor).toBe(500000);
 
       // The quotation is a real sales quotation, visible through the sales module.

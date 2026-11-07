@@ -358,6 +358,20 @@ export const Icons = {
       <path d="M7 16.5h10V21H7z" />
     </Base>
   ),
+  edit: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M4 20h4l10-10-4-4L4 16z" />
+      <path d="m14 6 4 4" />
+    </Base>
+  ),
+  trash: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M4.5 6.5h15" />
+      <path d="M9.5 6.5V4h5v2.5" />
+      <path d="M6.5 6.5 7.5 20h9l1-13.5" />
+      <path d="M10.5 10v6M13.5 10v6" />
+    </Base>
+  ),
 } as const;
 
 export type IconName = keyof typeof Icons;

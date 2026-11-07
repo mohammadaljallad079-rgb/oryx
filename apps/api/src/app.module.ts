@@ -36,6 +36,7 @@ import { PlatformModule } from './platform/platform.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { BrandingModule } from './branding/branding.module';
 import { EcosystemModule } from './ecosystem/ecosystem.module';
+import { TaxModule } from './tax/tax.module';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { EcosystemModule } from './ecosystem/ecosystem.module';
     CouponsModule,
     BrandingModule,
     EcosystemModule,
+    TaxModule,
   ],
   providers: [
     // Global rate limiting; sensitive auth routes override with @Throttle.

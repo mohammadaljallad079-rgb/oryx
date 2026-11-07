@@ -46,6 +46,7 @@ import type {
   PurchasingReportDto,
   RecoveryRequestDto,
   ReorderAlertDto,
+  PosProductDto,
   RequisitionDto,
   RoleDto,
   SalesDocumentDto,
@@ -78,6 +79,7 @@ import type {
   ProjectDto,
   ProjectTaskDto,
   LeadSourceDto,
+  TaxRateDto,
   WorkOrderDto,
   WorkOrderChecklistItemDto,
   OperationsDashboardDto,
@@ -826,6 +828,12 @@ export const api = {
     ),
   reorderAlerts: (companyId?: string) =>
     request<{ items: ReorderAlertDto[] }>(`/inventory/reorder-alerts${companyId ? `?companyId=${companyId}` : ''}`),
+  /**
+   * The POS product grid: active products with their lead image and on-hand
+   * position. `search` matches a scanned barcode as well as a name or SKU.
+   */
+  posCatalog: (params: { companyId?: string; search?: string } = {}) =>
+    request<{ items: PosProductDto[]; total: number }>(`/inventory/pos-catalog?${toQuery(params)}`),
 
   // ------------------------------------------------------------ sales (E02)
   salesCustomers: (params: { companyId?: string; search?: string } = {}) =>
@@ -976,6 +984,15 @@ export const api = {
   crmLeadSources: (params: { companyId?: string } = {}) =>
     request<Paginated<LeadSourceDto>>(`/crm/lead-sources?${toQuery(params)}`),
   createLeadSource: (body: Record<string, unknown>) => request<LeadSourceDto>('/crm/lead-sources', { method: 'POST', body }),
+  // Tax management (§5 of the completion brief). A saved list the sales,
+  // purchasing and POS forms select from instead of a free-text percentage.
+  taxes: (params: { companyId?: string; scope?: string; search?: string; includeInactive?: string } = {}) =>
+    request<Paginated<TaxRateDto>>(`/tax?${toQuery(params)}`),
+  createTax: (body: Record<string, unknown>) => request<TaxRateDto>('/tax', { method: 'POST', body }),
+  updateTax: (id: string, body: Record<string, unknown>) => request<TaxRateDto>(`/tax/${id}`, { method: 'PATCH', body }),
+  setTaxActive: (id: string, isActive: boolean) =>
+    request<TaxRateDto>(`/tax/${id}/active`, { method: 'PATCH', body: { isActive } }),
+  deleteTax: (id: string) => request<{ deleted: boolean }>(`/tax/${id}`, { method: 'DELETE' }),
   crmLeads: (params: { companyId?: string; search?: string; status?: string; page?: number } = {}) =>
     request<Paginated<LeadDto>>(`/crm/leads?${toQuery(params)}`),
   createLead: (body: Record<string, unknown>) => request<LeadDto>('/crm/leads', { method: 'POST', body }),

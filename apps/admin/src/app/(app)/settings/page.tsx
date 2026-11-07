@@ -9,6 +9,7 @@ import { Icon } from '@/components/icons';
 import { Badge, Button, Card, EmptyState, ErrorBanner, Field, SectionHeader, Skeleton } from '@/components/ui';
 import { BrandingPanel } from '@/components/branding-panel';
 import { CompanySettingsPanel } from '@/components/company-settings-panel';
+import { TaxRatesPanel } from '@/components/tax-rates-panel';
 
 export default function SettingsPage() {
   const { t, locale, theme, setLocale, setTheme } = useUi();
@@ -159,6 +160,14 @@ export default function SettingsPage() {
         <p className="oryx-muted m-0 mb-4 text-[12px]">{t('settings.companyHint')}</p>
         <CompanySettingsPanel />
       </Card>
+
+      {companyId ? (
+        <Card className="p-4" data-testid="settings-taxes">
+          <p className="oryx-panel-title m-0 mb-1">{t('tax.title')}</p>
+          <p className="oryx-muted m-0 mb-4 text-[12px]">{t('tax.hint')}</p>
+          <TaxRatesPanel />
+        </Card>
+      ) : null}
 
       {companyId ? (
         <Card className="p-4" data-testid="settings-entitlements">

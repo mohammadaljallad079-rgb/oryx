@@ -144,6 +144,47 @@ export function DocumentRegister() {
     a.click();
   };
 
+  // Direct row actions: fetch the stored PDF on demand and print or download it
+  // without first opening the detail modal, so the operator never has to leave
+  // the register to act on a row.
+  const rowPrint = async (row: OfficialDocumentDto) => {
+    setError(null);
+    try {
+      const url = await api.officialDocumentBlobUrl(row.id);
+      const frame = window.document.createElement('iframe');
+      frame.style.position = 'fixed';
+      frame.style.width = '0';
+      frame.style.height = '0';
+      frame.style.border = '0';
+      frame.src = url;
+      frame.onload = () => {
+        frame.contentWindow?.focus();
+        frame.contentWindow?.print();
+      };
+      window.document.body.appendChild(frame);
+      window.setTimeout(() => {
+        frame.remove();
+        URL.revokeObjectURL(url);
+      }, 60_000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    }
+  };
+
+  const rowDownload = async (row: OfficialDocumentDto) => {
+    setError(null);
+    try {
+      const url = await api.officialDocumentBlobUrl(row.id);
+      const a = window.document.createElement('a');
+      a.href = url;
+      a.download = `${row.documentNumber}.pdf`;
+      a.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    }
+  };
+
   const copyLink = async (row: OfficialDocumentDto) => {
     try {
       await navigator.clipboard.writeText(row.verificationUrl);
@@ -292,6 +333,26 @@ export function DocumentRegister() {
                       >
                         <Icon name="scroll" size={14} />
                         {t('documents.open')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={!row.downloadable}
+                        onClick={() => void rowPrint(row)}
+                        data-testid={`register-print-row-${row.documentNumber}`}
+                      >
+                        <Icon name="print" size={14} />
+                        {t('documents.print')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={!row.downloadable}
+                        onClick={() => void rowDownload(row)}
+                        data-testid={`register-download-row-${row.documentNumber}`}
+                      >
+                        <Icon name="download" size={14} />
+                        {t('documents.download')}
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => void copyLink(row)}>
                         <Icon name="globe" size={14} />

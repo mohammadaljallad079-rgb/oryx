@@ -16,10 +16,12 @@ import {
   ErrorBanner,
   Field,
   Modal,
+  SearchableSelect,
   SectionHeader,
   Skeleton,
   StatusBadge,
   TableShell,
+  type SearchableOption,
 } from '@/components/ui';
 import type { PurchaseDocumentDto, RequisitionDto, SupplierDto, WarehouseDto } from '@oryx/shared';
 
@@ -30,10 +32,28 @@ interface LineDraft {
   description: string;
   quantity: string;
   unitCost: string;
+  /** The chosen tax row, or empty when the product's rate is not in the list. */
+  taxId: string;
   taxPercent: string;
 }
 
-const emptyLine = (): LineDraft => ({ productId: '', description: '', quantity: '1', unitCost: '0.00', taxPercent: '15' });
+const emptyLine = (): LineDraft => ({ productId: '', description: '', quantity: '1', unitCost: '0.00', taxId: '', taxPercent: '15' });
+
+/**
+ * The tenant's saved purchase-applicable taxes as dropdown options. `value` is
+ * the rate in basis points, so a product's own rate can be matched directly.
+ */
+function useTaxOptions(companyId: string | null | undefined): SearchableOption[] {
+  const taxes = useAsync(
+    () => api.taxes({ companyId: companyId ?? undefined, scope: 'PURCHASES' }),
+    [companyId],
+  );
+  return (taxes.data?.items ?? []).map((tax) => ({
+    value: String(tax.rateBp),
+    label: `${tax.rateBp / 100}%`,
+    hint: tax.nameEn,
+  }));
+}
 
 export default function PurchasingPage() {
   const { t } = useUi();
@@ -203,6 +223,8 @@ function SupplierModal({ open, onClose, onCreated }: { open: boolean; onClose: (
 // ---------------------------------------------------------------- requisitions
 
 function RequisitionsTab({ canManage }: { canManage: boolean }) {
+  const { companyId } = useAuth();
+  const taxOptions = useTaxOptions(companyId);
   const { t } = useUi();
   const [open, setOpen] = useState(false);
   const list = useAsync(() => api.requisitions(), []);
@@ -276,6 +298,7 @@ function RequisitionsTab({ canManage }: { canManage: boolean }) {
         open={open}
         suppliers={suppliers.data?.items ?? []}
         products={products.data?.items ?? []}
+        taxOptions={taxOptions}
         onClose={() => setOpen(false)}
         onCreated={list.reload}
       />
@@ -284,6 +307,7 @@ function RequisitionsTab({ canManage }: { canManage: boolean }) {
 }
 
 function RequisitionModal({
+  taxOptions,
   open,
   suppliers,
   products,
@@ -293,6 +317,7 @@ function RequisitionModal({
   open: boolean;
   suppliers: SupplierDto[];
   products: Array<{ id: string; sku: string; nameEn: string; costPriceMinor: number }>;
+  taxOptions: SearchableOption[];
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
@@ -350,7 +375,7 @@ function RequisitionModal({
         </select>
       </Field>
       <div className="mt-4">
-        <CostLineEditor lines={lines} setLines={setLines} products={products} testIdPrefix="requisition-line" costLabel={t('erp.inventory.estimatedCost')} />
+        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} testIdPrefix="requisition-line" costLabel={t('erp.inventory.estimatedCost')} />
       </div>
     </Modal>
   );
@@ -359,6 +384,8 @@ function RequisitionModal({
 // -------------------------------------------------------------------- orders
 
 function OrdersTab({ canManage }: { canManage: boolean }) {
+  const { companyId } = useAuth();
+  const taxOptions = useTaxOptions(companyId);
   const { t } = useUi();
   const [open, setOpen] = useState(false);
   const list = useAsync(() => api.purchaseOrders(), []);
@@ -432,6 +459,7 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
         suppliers={suppliers.data?.items ?? []}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
+        taxOptions={taxOptions}
         onClose={() => setOpen(false)}
         onCreated={list.reload}
       />
@@ -440,6 +468,7 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
 }
 
 function PurchaseOrderModal({
+  taxOptions,
   open,
   suppliers,
   products,
@@ -451,6 +480,7 @@ function PurchaseOrderModal({
   suppliers: SupplierDto[];
   products: Array<{ id: string; sku: string; nameEn: string; costPriceMinor: number }>;
   warehouses: WarehouseDto[];
+  taxOptions: SearchableOption[];
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
@@ -525,7 +555,7 @@ function PurchaseOrderModal({
         </Field>
       </div>
       <div className="mt-4">
-        <CostLineEditor lines={lines} setLines={setLines} products={products} testIdPrefix="purchase-order-line" costLabel={t('erp.inventory.unitCost')} />
+        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} testIdPrefix="purchase-order-line" costLabel={t('erp.inventory.unitCost')} />
       </div>
     </Modal>
   );
@@ -593,6 +623,8 @@ function ReceiptsTab({ canManage }: { canManage: boolean }) {
 // ------------------------------------------------------------------ invoices
 
 function InvoicesTab({ canManage }: { canManage: boolean }) {
+  const { companyId } = useAuth();
+  const taxOptions = useTaxOptions(companyId);
   const { t } = useUi();
   const [open, setOpen] = useState(false);
   const list = useAsync(() => api.supplierInvoices(), []);
@@ -652,6 +684,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         open={open}
         suppliers={suppliers.data?.items ?? []}
         products={products.data?.items ?? []}
+        taxOptions={taxOptions}
         onClose={() => setOpen(false)}
         onCreated={list.reload}
       />
@@ -660,6 +693,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
 }
 
 function SupplierInvoiceModal({
+  taxOptions,
   open,
   suppliers,
   products,
@@ -669,6 +703,7 @@ function SupplierInvoiceModal({
   open: boolean;
   suppliers: SupplierDto[];
   products: Array<{ id: string; sku: string; nameEn: string; costPriceMinor: number }>;
+  taxOptions: SearchableOption[];
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
@@ -740,7 +775,7 @@ function SupplierInvoiceModal({
         </Field>
       </div>
       <div className="mt-4">
-        <CostLineEditor lines={lines} setLines={setLines} products={products} testIdPrefix="supplier-invoice-line" costLabel={t('erp.inventory.unitCost')} />
+        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} testIdPrefix="supplier-invoice-line" costLabel={t('erp.inventory.unitCost')} />
       </div>
     </Modal>
   );
@@ -804,12 +839,14 @@ function CostLineEditor({
   lines,
   setLines,
   products,
+  taxOptions,
   testIdPrefix,
   costLabel,
 }: {
   lines: LineDraft[];
   setLines: (lines: LineDraft[]) => void;
   products: Array<{ id: string; sku: string; nameEn: string; costPriceMinor: number }>;
+  taxOptions: SearchableOption[];
   testIdPrefix: string;
   costLabel: string;
 }) {
@@ -866,13 +903,19 @@ function CostLineEditor({
             onChange={(e) => update(i, { unitCost: e.target.value })}
             data-testid={`${testIdPrefix}-cost-${i}`}
           />
-          <input
-            className="oryx-input col-span-1"
-            placeholder="%"
-            value={line.taxPercent}
-            onChange={(e) => update(i, { taxPercent: e.target.value })}
-            data-testid={`${testIdPrefix}-tax-${i}`}
-          />
+          <div className="col-span-1">
+            <SearchableSelect
+              value={line.taxId || null}
+              options={taxOptions}
+              onChange={(v) => {
+                const chosen = taxOptions.find((o) => o.value === v);
+                update(i, { taxId: v ?? '', taxPercent: chosen ? chosen.label.replace(/[^\d.]/g, '') : line.taxPercent });
+              }}
+              placeholder="%"
+              emptyLabel={t('common.none')}
+              testId={`${testIdPrefix}-tax-${i}`}
+            />
+          </div>
           <Button size="sm" variant="ghost" className="col-span-1" disabled={lines.length <= 1} onClick={() => setLines(lines.filter((_, idx) => idx !== i))}>
             <Icon name="close" size={14} />
           </Button>

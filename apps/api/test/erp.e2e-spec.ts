@@ -207,7 +207,7 @@ describe('ORYX ERP core (e2e)', () => {
         },
       });
       expect(ok.status).toBe(201);
-      expect(ok.body.entryNumber).toMatch(/^JE-/);
+      expect(ok.body.entryNumber).toMatch(/^J\d{5}$/);
 
       const unbalanced = await erp<{ code: string }>('/accounting/journals', {
         method: 'POST',
@@ -453,6 +453,55 @@ describe('ORYX ERP core (e2e)', () => {
       });
       expect(on.body.isActive).toBe(true);
       expect((await ctx.prisma.warehouse.findUniqueOrThrow({ where: { id: warehouseId } })).isActive).toBe(true);
+    });
+
+    it('serves a POS catalogue with image, on-hand quantity and stock status', async () => {
+      // The POS terminal's product grid reads this endpoint: it must carry the
+      // price the till charges, the tax the till adds, and enough stock
+      // information to disable a sold-out tile. Reorder level is scaled by 10^4,
+      // so 100000000 is an absurdly high threshold that forces a LOW status.
+      await erp(`/inventory/products/${productId}`, {
+        method: 'PATCH',
+        body: { reorderLevel: 100000000, barcode: '6281000000017' },
+      });
+
+      const res = await erp<{
+        total: number;
+        items: Array<{
+          id: string;
+          sku: string;
+          barcode: string | null;
+          salesPriceMinor: number;
+          taxRateBp: number;
+          onHand: number;
+          reorderLevel: number;
+          stockStatus: string;
+          imageUrl: string | null;
+          isActive: boolean;
+        }>;
+      }>('/inventory/pos-catalog');
+      expect(res.status).toBe(200);
+      const widget = res.body.items.find((i) => i.sku === 'WIDGET');
+      expect(widget).toBeDefined();
+      expect(widget!.barcode).toBe('6281000000017');
+      expect(widget!.stockStatus).toBe('LOW');
+      expect(Number.isInteger(widget!.onHand)).toBe(true);
+      expect('imageUrl' in widget!).toBe(true);
+      expect(widget!.isActive).toBe(true);
+
+      // A scan sends the barcode as the search term; it must find the product.
+      const scan = await erp<{ items: Array<{ sku: string }> }>(
+        '/inventory/pos-catalog?search=6281000000017',
+      );
+      expect(scan.body.items.map((i) => i.sku)).toContain('WIDGET');
+
+      // An inactive product must never appear on the till.
+      await erp(`/inventory/products/${productId}`, { method: 'PATCH', body: { isActive: false } });
+      const hidden = await erp<{ items: Array<{ sku: string }> }>(
+        '/inventory/pos-catalog?search=6281000000017',
+      );
+      expect(hidden.body.items.map((i) => i.sku)).not.toContain('WIDGET');
+      await erp(`/inventory/products/${productId}`, { method: 'PATCH', body: { isActive: true } });
     });
   });
 

@@ -1174,6 +1174,31 @@ async function seedExecution03Baseline(idByCode: Map<string, string>, superAdmin
       leadSources += 1;
     }
 
+    // Tax list. The standard Bahrain VAT rate is the tenant default, and a
+    // zero-rated row exists so an exempt line can be chosen rather than typed.
+    for (const t of [
+      { code: 'VAT5', nameEn: 'VAT 5%', nameAr: 'ضريبة القيمة المضافة ٥٪', rateBp: 500, isDefault: false, sortOrder: 5 },
+      { code: 'VAT10', nameEn: 'VAT 10%', nameAr: 'ضريبة القيمة المضافة ١٠٪', rateBp: 1000, isDefault: false, sortOrder: 10 },
+      { code: 'VAT15', nameEn: 'VAT 15%', nameAr: 'ضريبة القيمة المضافة ١٥٪', rateBp: 1500, isDefault: true, sortOrder: 15 },
+      { code: 'ZERO', nameEn: 'Zero-rated', nameAr: 'معفاة', rateBp: 0, isDefault: false, sortOrder: 20 },
+    ]) {
+      await prisma.taxRate.upsert({
+        where: { companyId_code: { companyId: company.id, code: t.code } },
+        update: {},
+        create: {
+          companyId: company.id,
+          code: t.code,
+          nameEn: t.nameEn,
+          nameAr: t.nameAr,
+          rateBp: t.rateBp,
+          scope: 'BOTH',
+          applicationLevel: 'LINE',
+          isDefault: t.isDefault,
+          sortOrder: t.sortOrder,
+        },
+      });
+    }
+
     // Attribute the demo customers to a source and the sales department, so the
     // customer master record is not blank in a fresh seed. `updateMany` with a
     // null guard means an operator's own attribution is never overwritten.

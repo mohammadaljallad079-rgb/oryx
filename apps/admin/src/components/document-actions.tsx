@@ -128,12 +128,21 @@ export function DocumentActions({ sourceType, sourceId, type, permissions }: Doc
     }
   };
 
+  /** Fetch the stored PDF once and reuse the blob URL for preview/print/download. */
+  const ensureBlob = useCallback(async (): Promise<string | null> => {
+    if (!document) return null;
+    if (preview) return preview;
+    const url = await api.officialDocumentBlobUrl(document.id);
+    setPreview(url);
+    return url;
+  }, [document, preview]);
+
   const openPreview = async () => {
     if (!document) return;
     setPreviewLoading(true);
     setError(null);
     try {
-      setPreview(await api.officialDocumentBlobUrl(document.id));
+      await ensureBlob();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : t('common.error'));
     } finally {
@@ -148,19 +157,47 @@ export function DocumentActions({ sourceType, sourceId, type, permissions }: Doc
 
   // The preview iframe holds the blob; printing the frame prints the stored PDF
   // through the browser's own PDF viewer rather than a re-render.
-  const print = () => {
-    const frame = frameRef.current;
-    if (!frame?.contentWindow) return;
-    frame.contentWindow.focus();
-    frame.contentWindow.print();
+  const print = async () => {
+    try {
+      const url = await ensureBlob();
+      if (!url) return;
+      const frame = frameRef.current;
+      if (frame?.contentWindow) {
+        frame.contentWindow.focus();
+        frame.contentWindow.print();
+        return;
+      }
+      // No open preview modal: print the blob in a detached frame so the action
+      // still works straight from the row.
+      const detached = window.document.createElement('iframe');
+      detached.style.position = 'fixed';
+      detached.style.width = '0';
+      detached.style.height = '0';
+      detached.style.border = '0';
+      detached.src = url;
+      detached.onload = () => {
+        detached.contentWindow?.focus();
+        detached.contentWindow?.print();
+      };
+      window.document.body.appendChild(detached);
+      window.setTimeout(() => detached.remove(), 60_000);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : t('common.error'));
+    }
   };
 
-  const download = () => {
-    if (!preview || !document) return;
-    const a = window.document.createElement('a');
-    a.href = preview;
-    a.download = `${document.documentNumber}.pdf`;
-    a.click();
+  const download = async () => {
+    if (!document) return;
+    try {
+      const url = await ensureBlob();
+      if (!url) return;
+      const a = window.document.createElement('a');
+      a.href = url;
+      a.download = `${document.documentNumber}.pdf`;
+      a.click();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : t('common.error'));
+    }
   };
 
   if (!canRead) return null;
@@ -177,9 +214,30 @@ export function DocumentActions({ sourceType, sourceId, type, permissions }: Doc
             disabled={previewLoading || !document.downloadable}
             onClick={() => void openPreview()}
             data-testid={`doc-preview-${sourceId}`}
+            title={!document.downloadable ? t('documents.notPrintable') : t('documents.preview')}
           >
             <Icon name="scroll" size={14} />
             {t('documents.preview')}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={!document.downloadable}
+            onClick={() => void print()}
+            data-testid={`doc-row-print-${sourceId}`}
+          >
+            <Icon name="print" size={14} />
+            {t('documents.print')}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={!document.downloadable}
+            onClick={() => void download()}
+            data-testid={`doc-row-download-${sourceId}`}
+          >
+            <Icon name="download" size={14} />
+            {t('documents.download')}
           </Button>
           <Button
             size="sm"
