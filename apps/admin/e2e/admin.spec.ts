@@ -139,6 +139,85 @@ test.describe('company and branch management', () => {
     await expect(page.getByTestId(`company-row-${code}`)).toBeVisible({ timeout: 20_000 });
   });
 
+  test('super admin can edit, archive and restore a company', async ({ page }) => {
+    await signIn(page);
+    await setLocale(page, 'en');
+
+    // Provision a dedicated tenant so the assertions are independent of other
+    // data and safe to re-run.
+    const suffix = Date.now().toString().slice(-6);
+    const code = `E2EE-${suffix}`;
+    await page.goto('/companies');
+    await page.getByTestId('new-company').click();
+    await page.getByTestId('company-code').fill(code);
+    await page.getByTestId('company-name-en').fill(`E2E Edit ${suffix}`);
+    await page.getByTestId('company-name-ar').fill(`شركة تعديل ${suffix}`);
+    await page.getByTestId('create-company-submit').click();
+    await expect(page.getByTestId('new-company')).toBeVisible({ timeout: 20_000 });
+
+    await page.getByTestId('company-search').fill(code);
+    await expect(page.getByTestId(`company-row-${code}`)).toBeVisible({ timeout: 20_000 });
+
+    // --- Edit: change the Arabic name and the default tax, then re-open and
+    // confirm the values were persisted and reloaded from the API.
+    await page.getByTestId(`company-edit-${code}`).click();
+    await expect(page.getByTestId('edit-company-name-ar')).toBeVisible();
+    await page.getByTestId('edit-company-name-ar').fill(`شركة تعديل محدّثة ${suffix}`);
+    await page.getByTestId('edit-company-tax-percent').fill('7.5');
+    await page.getByTestId('edit-company-submit').click();
+    await expect(page.locator('.oryx-modal')).toHaveCount(0, { timeout: 20_000 });
+
+    await page.getByTestId(`company-edit-${code}`).click();
+    await expect(page.getByTestId('edit-company-name-ar')).toHaveValue(`شركة تعديل محدّثة ${suffix}`);
+    await expect(page.getByTestId('edit-company-tax-percent')).toHaveValue('7.5');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.oryx-modal')).toHaveCount(0, { timeout: 20_000 });
+
+    // --- Archive (safe delete): confirm dialog, then the row shows Archived and
+    // offers Restore instead of Delete.
+    page.once('dialog', (d) => void d.accept());
+    await page.getByTestId(`company-archive-${code}`).click();
+    await expect(page.getByTestId(`company-restore-${code}`)).toBeVisible({ timeout: 20_000 });
+
+    // --- Restore: back to Active.
+    page.once('dialog', (d) => void d.accept());
+    await page.getByTestId(`company-restore-${code}`).click();
+    await expect(page.getByTestId(`company-archive-${code}`)).toBeVisible({ timeout: 20_000 });
+  });
+
+  test('company status filter narrows the list to archived tenants', async ({ page }) => {
+    await signIn(page);
+    await setLocale(page, 'en');
+    await page.goto('/companies');
+
+    // Archive a dedicated tenant through the API so the filter has a known row.
+    const suffix = Date.now().toString().slice(-6);
+    const code = `E2EF-${suffix}`;
+    const bearer = await apiToken(page);
+    await page.evaluate(
+      async ({ sfx, token }) => {
+        const base = 'http://localhost:3001/api/v1';
+        const res = await fetch(`${base}/companies`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: sfx, nameEn: `E2E Filter ${sfx}`, nameAr: `شركة تصفية ${sfx}`, type: 'SAAS_TENANT' }),
+        });
+        const body = (await res.json()) as { company: { id: string } };
+        await fetch(`${base}/companies/${body.company.id}/status`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'ARCHIVED' }),
+        });
+      },
+      { sfx: code, token: bearer },
+    );
+
+    await page.getByTestId('company-status-filter').selectOption('ARCHIVED');
+    await page.getByTestId('company-search').fill(code);
+    await expect(page.getByTestId(`company-row-${code}`)).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId(`company-restore-${code}`)).toBeVisible();
+  });
+
   test('branch creation is enforced by plan limits and persists', async ({ page }) => {
     await signIn(page);
     await setLocale(page, 'en');

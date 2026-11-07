@@ -541,6 +541,16 @@ export const api = {
     request<CompanyDto>(`/companies/${id}`, { method: 'PATCH', body }),
   setCompanyStatus: (id: string, status: string, reason?: string) =>
     request<CompanyDto>(`/companies/${id}/status`, { method: 'PATCH', body: { status, reason } }),
+  /**
+   * Archive a company (soft delete).
+   *
+   * A tenant carries accounting, stock and payroll history, so it is never
+   * physically deleted — the row is moved to `ARCHIVED`, which hides it from the
+   * working lists while every linked record stays intact and the action stays in
+   * the audit trail. Restoring is the same call with `ACTIVE`.
+   */
+  archiveCompany: (id: string, reason?: string) =>
+    request<CompanyDto>(`/companies/${id}/status`, { method: 'PATCH', body: { status: 'ARCHIVED', reason } }),
 
   // ---------------------------------------------------------------- branding
   /**
