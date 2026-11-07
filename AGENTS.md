@@ -72,7 +72,7 @@ Security baseline (do not regress):
   adapters that report themselves unconfigured without credentials) and the
   ORYX customer mobile application (`apps/mobile`, Expo/React Native).
 - **Execution 05 (implemented and tested):** the External Integrations Center
-  (an 8-provider catalogue declared once in `packages/shared/src/integrations.ts`,
+  (a 10-provider catalogue declared once in `packages/shared/src/integrations.ts`,
   AES-256-GCM sealed credentials, a company-scope override, an enablement guard
   that refuses to enable a provider with a missing required credential, a real
   connection-test path with append-only check history, audit logging by key and
@@ -378,6 +378,18 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `IMPLEMENTED` means no credentials are needed and the work is real (cash, card
   terminal). `ADAPTER_ONLY` means the adapter exists but the vendor call is not
   implemented, so `verify` must report "not implemented" rather than a success.
+  Two `ADAPTER_ONLY` providers are exceptions whose vendor call *is* written:
+  `SENSAGE_AI` and `REGISTRATION_OCR` perform a real request in `verify`, so a
+  failure there is a genuine failure and only a validated response is
+  `VERIFIED`. Do not extend that exception to a provider without a working
+  adapter.
+- **Registration-card OCR extracts, it never saves.** `POST
+  /automotive/vehicles/:id/documents/ocr` reads a scan and returns suggested
+  fields for an operator to review; it writes no `VehicleDocument` and no
+  `CmsMediaAsset`, so a discarded extraction leaves nothing behind. The scan
+  bytes stay in memory. With no `OCR_API_KEY` it returns `configured:false` and
+  no fields — never a canned answer. The deterministic adapter is selected only
+  by an explicit `test://` base URL.
 - **The browser suite mutates integration state.** A test that stores
   credentials must remove them again, or the later tests that assert
   `AWAITING_CREDENTIALS` fail. `execution05.spec.ts` seeds and clears

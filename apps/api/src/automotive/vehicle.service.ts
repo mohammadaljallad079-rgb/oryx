@@ -5,10 +5,11 @@ import { AuditService } from '../common/audit.service';
 import { AccountingPostingService } from '../common/accounting-posting.service';
 import { DocumentSequenceService } from '../common/document-sequence.service';
 import { ErpContextService } from '../common/erp-context.service';
-import { MediaStorageService } from '../cms/media-storage.service';
+import { MediaStorageService, sniffMime } from '../cms/media-storage.service';
 import { SalesService } from '../sales/sales.service';
 import { computeDocumentTotals } from '../common/document-totals';
 import { badRequest, conflict, ERROR_CODES, forbidden, notFound } from '../common/errors';
+import { VehicleOcrService } from './vehicle-ocr.service';
 import type { ActorContext } from '../organizations/organizations.service';
 import type { RequestPrincipal } from '../auth/auth.decorators';
 import type {
@@ -50,6 +51,7 @@ export class VehicleService {
     private readonly context: ErpContextService,
     private readonly storage: MediaStorageService,
     private readonly sales: SalesService,
+    private readonly ocr: VehicleOcrService,
   ) {}
 
   // ------------------------------------------------------------------ vehicles
@@ -242,6 +244,54 @@ export class VehicleService {
     // The media asset stays in the library: it may be referenced elsewhere.
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.vehicle_document_removed', targetType: 'VEHICLE', targetId: id, summary: `Removed vehicle document ${doc.category}` });
     return { removed: true };
+  }
+
+  /**
+   * Read a registration-card or insurance scan and return suggested fields.
+   *
+   * Nothing is persisted. The suggestion is returned to the form, where an
+   * operator reviews and edits it before saving through `addVehicleDocument` —
+   * the only path that writes a document. The scan bytes are held in memory for
+   * the duration of the call and are never stored by this method, so a
+   * discarded extraction leaves no orphan asset behind.
+   */
+  async extractVehicleDocument(
+    id: string,
+    dto: { category: string },
+    principal: RequestPrincipal,
+    file?: { buffer: Buffer; originalname: string; mimetype: string },
+  ) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    await this.assertVehicle(companyId, id);
+
+    if (!file || file.buffer.length === 0) {
+      throw badRequest(ERROR_CODES.AI_INPUT_INVALID, 'Attach a scan to extract its fields.');
+    }
+    const mime = sniffMime(file.buffer);
+    if (!mime) {
+      throw badRequest(
+        ERROR_CODES.AI_INPUT_INVALID,
+        'The scan must be a JPEG, PNG, WebP or AVIF image.',
+      );
+    }
+
+    const result = await this.ocr.extract(
+      { buffer: file.buffer, mimeType: mime, category: dto.category },
+      companyId,
+    );
+
+    // The extraction is a read, but it is recorded so an operator can see who
+    // read which scan; the suggestion itself is never stored.
+    await this.audit.record({
+      actorUserId: principal.userId,
+      companyId,
+      action: 'automotive.vehicle_document_ocr',
+      targetType: 'VEHICLE',
+      targetId: id,
+      summary: `OCR extraction on a ${dto.category} scan (${result.configured ? `${result.fields.length} field(s)` : 'provider unconfigured'})`,
+    });
+
+    return result;
   }
 
   // -------------------------------------------------------------- inspections

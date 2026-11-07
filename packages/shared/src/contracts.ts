@@ -1485,6 +1485,24 @@ export interface VehicleDocumentDto {
   createdAt: string;
 }
 
+/**
+ * One field an OCR extraction suggested for a vehicle document. It is a
+ * suggestion for an operator to review; it is never saved on its own.
+ */
+export interface VehicleDocumentOcrFieldDto {
+  key: 'number' | 'expiresAt' | 'plateNumber';
+  value: string;
+  confidence: number | null;
+}
+
+/** The result of an OCR extraction. `configured:false` means no provider key. */
+export interface VehicleDocumentOcrResultDto {
+  configured: boolean;
+  fields: VehicleDocumentOcrFieldDto[];
+  rawText: string;
+  latencyMs: number;
+}
+
 export interface InspectionServiceDto {
   id: string;
   code: string;

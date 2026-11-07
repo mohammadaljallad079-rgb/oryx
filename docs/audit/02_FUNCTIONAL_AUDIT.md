@@ -88,14 +88,17 @@ export of the mobile app and a real PostgreSQL database. Nothing was mocked.
 ### External Integrations Center (Execution 05)
 
 - The catalogue lives once in `packages/shared/src/integrations.ts` and feeds the
-  API, the admin page and the customer capabilities endpoint. 20 providers.
+  API, the admin page and the customer capabilities endpoint. 10 providers.
 - Credential reads return a `hint` only; an empty value deletes the row; changing
   a credential clears the verification.
 - `deriveState` is the single place that decides a provider's state, and
   `AWAITING_CREDENTIALS` is checked before a stored `verificationStatus`. Only
   `OPERATIONAL` is advertised through `GET /customer/capabilities`.
-- Live check: 8 providers render, 2 `OPERATIONAL` (cash, card terminal — the
-  internal, no-credential providers), 6 `AWAITING_CREDENTIALS`.
+- Live check: 10 providers render, 2 `OPERATIONAL` (cash, card terminal — the
+  internal, no-credential providers), the rest `AWAITING_CREDENTIALS`.
+- `SENSAGE_AI` and `REGISTRATION_OCR` are `ADAPTER_ONLY` but their vendor calls
+  are written, so `verify` performs a real request and reports `VERIFIED` only on
+  a validated response.
 
 ## Frontend/backend connection audit
 

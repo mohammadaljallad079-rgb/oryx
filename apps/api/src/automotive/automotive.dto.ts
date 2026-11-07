@@ -89,6 +89,16 @@ export class VehicleDocumentDto {
   @IsOptional() @IsISO8601() expiresAt?: string;
 }
 
+/**
+ * The OCR extraction request. It carries the same category the eventual
+ * document will hold, so the adapter knows what kind of paper it is reading,
+ * but no field values: extraction only suggests, it never saves.
+ */
+export class OcrExtractDto {
+  @IsIn(VEHICLE_DOCUMENT_CATEGORIES as unknown as string[])
+  category!: string;
+}
+
 // --------------------------------------------------------------- inspections
 
 export class CreateInspectionServiceDto {

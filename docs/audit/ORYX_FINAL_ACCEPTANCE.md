@@ -10,6 +10,20 @@ Environment: an isolated preview stack — a separate PostgreSQL database
 (`oryx_dev`) with seeded synthetic demo records. No production database and no
 production secret is involved.
 
+> **Revision note (2026-11-07, seventh revision).** This revision closed the last
+> functional gap in brief §5 — **registration-card OCR-assisted extraction**.
+> The vehicle-document capture path now offers a "read the scan" action that
+> returns suggested fields for an operator to review and correct before saving.
+> The extraction is stateless: it persists no document and holds the scan only
+> for the call, so a discarded suggestion leaves nothing behind. With no
+> provider key the endpoint reports `configured:false` and suggests nothing —
+> honest degradation, never a canned answer. Two new suites cover it:
+> `vehicle-ocr.e2e-spec.ts` (8) and `execution-ocr.spec.ts` (2). The API suite is
+> now **694 passed / 694**, the shared suite **231 / 231**, and the OCR browser
+> suite **2 / 2**. The integration catalogue is now **10 providers**; the stale
+> "8 providers" note in `docs/audit/05_INTEGRATION_READINESS.md` and the
+> "20-provider" note in `AGENTS.md` were both corrected.
+
 > **Revision note (2026-11-06, second revision).** This revision re-ran every
 > suite on the current tree after a sandbox rebuild, fixed a real purchasing
 > defect (a purchase return whose invoiced cost differs from the stock carrying
@@ -220,7 +234,7 @@ tree.
 | Company settings: searchable selector, functional currency, default tax | PASS | `company_finance_defaults` migration; commit `f9bc8a25` |
 | Customers: bilingual names (≥1 required), source, status, department, history, attachments | PASS | `erp.spec.ts`; customer forms |
 | Vehicles: full info, registration-card photo upload, secure documents | PASS | vehicle-documents feature (section 9); `vehicle-documents.e2e-spec.ts` 7/7 |
-| Vehicles: OCR-assisted extraction | **BLOCKED** | No OCR provider is configured (no vendor credential); the capture path stores a scan for manual review. See section 4. |
+| Vehicles: OCR-assisted extraction | PASS | `POST /automotive/vehicles/:id/documents/ocr` reads a scan and returns suggested fields for review; `vehicle-ocr.e2e-spec.ts` 8/8; `execution-ocr.spec.ts` 2/2. Requires an `OCR_API_KEY`; without one it reports `configured:false` and suggests nothing (honest degradation, not a failure). |
 | Inventory: barcodes, lookup, warehouse selection, movements, min-stock alerts, status controls | PASS | `inventory.service.ts` (barcode search), `d579e02e` |
 | Sales/POS: sessions, invoices, quotations, tax, discounts, rounding, payments, returns, refunds, attachments | PASS | ERP e2e; `execution16-sales-contract`; optional whole-amount rounding (`RoundingMode`, section 1.8) |
 | Purchases: suppliers, POs, purchase invoices/returns, statements, payments | PASS | purchasing e2e |
@@ -288,6 +302,26 @@ balance is asserted `balanced:true` in the new test.
 | Merchant document screens (list, filters, detail, preview, download, print, status, QR, ar/en, responsive) | PASS | API `/provider/documents*`, mobile `merchant/documents.tsx`, tenant register; `execution10-merchant-documents.e2e-spec.ts` 8/8 |
 | i18n parity for the new keys | PASS | `common.activate`, `erp.sales.taxNumber` added to both locales; parity re-checked |
 
+### 1.11c Registration-card OCR extraction (brief §5, added this session)
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| Registration-card photo upload | PASS | `POST /automotive/vehicles/:id/documents` (existing); `vehicle-documents.e2e-spec.ts` 7/7 |
+| OCR-assisted extraction where configured | PASS | `POST /automotive/vehicles/:id/documents/ocr`; `ocr-adapters.ts`, `vehicle-ocr.service.ts`; `vehicle-ocr.e2e-spec.ts` 8/8 |
+| Manual review before saving extracted data | PASS | The endpoint persists nothing; it returns suggestions the operator confirms in the form. Asserted: `vehicle-ocr.e2e-spec.ts › persists no document`, `execution-ocr.spec.ts › … without saving a document` |
+| Honest degradation with no provider | PASS | With no `OCR_API_KEY` the response is `configured:false` with `fields:[]`; the UI shows "no OCR provider is configured" rather than inventing values |
+| Provider declared once | PASS | `REGISTRATION_OCR` added to `INTEGRATION_PROVIDERS` in `packages/shared/src/integrations.ts`; feeds the API, admin page and capabilities endpoint |
+| Real connection test | PASS | `verifyRegistrationOcr` performs a real extraction; only a validated response is `VERIFIED`; `vehicle-ocr.e2e-spec.ts › verifies the OCR provider … with a real call` |
+| Write boundary + tenant isolation | PASS | A read-only principal is refused (`403`); a foreign tenant is refused (`403`/`404`) |
+| Never returns a sealed credential | PASS | Reads return `hint` only; the OCR credentials follow the same rule as every other provider |
+
+The extraction is **stateless by design**: the scan bytes are held in memory for
+the duration of the call and never stored, and no `VehicleDocument` or
+`CmsMediaAsset` row is created. A discarded suggestion therefore leaves nothing
+behind, which is what "manual review before saving extracted data" requires. The
+deterministic adapter is selected only by an explicit `test://` base URL, so a
+production deployment always talks to the vendor.
+
 ### 1.12 Official documents in the published preview
 
 | Requirement | Status | Evidence |
@@ -301,13 +335,15 @@ balance is asserted `balanced:true` in the new test.
 | Suite | Command | Result |
 |---|---|---|
 | Shared unit | `pnpm --filter @oryx/shared test` | **231 passed / 231** (12 files) |
-| API integration | `pnpm --filter @oryx/api test:e2e` | **685 passed / 685** (37 suites) |
+| API integration | `pnpm --filter @oryx/api test:e2e` | **694 passed / 694** (38 suites) |
+| Registration-card OCR | `… test:e2e -- vehicle-ocr` | **8 passed / 8** (in the 694) |
 | API unit | `pnpm --filter @oryx/api test` | **20 passed / 20** (5 files) |
-| Whole-amount rounding | `… test:e2e -- whole-amount-rounding` | **7 passed / 7** (in the 685) |
+| Whole-amount rounding | `… test:e2e -- whole-amount-rounding` | **7 passed / 7** (in the 694) |
 | Purchase-return variance | `… test:e2e -- erp` | **37 passed / 37** (incl. the variance test) |
 | Mobile | `pnpm --filter @oryx/mobile test` | **206 passed / 206** (10 files) |
 | Mobile ERP | `pnpm --filter @oryx/mobile-erp test` | **31 passed / 31** (2 files) |
 | Admin browser | `pnpm --filter @oryx/admin test:ui` | **224 passed, 1 skipped** (10.0 min) |
+| OCR browser | `… playwright test e2e/execution-ocr.spec.ts` | **2 passed / 2** |
 | Workspace lint | `pnpm -r lint` | PASS (exit 0) |
 | Workspace typecheck | `pnpm -r typecheck` | PASS (exit 0) |
 | Builds | api / admin / customer | PASS (exit 0) |
@@ -478,11 +514,34 @@ twelve brief surfaces are green.
 | No payment-gateway credential | Online intents stay unpaid | A gateway merchant account |
 | No GPS device/provider | No live driver stream | A device and a tracking provider |
 | No AI vendor credential | The live model is not wired | A production AI key |
-| No OCR provider | Registration-card extraction is manual | An OCR provider key |
+| No OCR provider credential | Registration-card extraction runs against the adapter, not a vendor; the endpoint reports `configured:false` and the operator types the details | An OCR vendor key (`OCR_API_KEY`) and base URL (`OCR_BASE_URL`) |
 
 ## 5. Files changed in this session
 
-The sixth revision is an evidence-and-documentation revision; no application or
+The seventh revision adds registration-card OCR extraction (brief §5):
+
+| File | Change |
+|---|---|
+| `packages/shared/src/integrations.ts` | New `REGISTRATION_OCR` provider (ANALYTICS, `ADAPTER_ONLY`, 2 credential fields) |
+| `packages/shared/src/contracts.ts` | New `VehicleDocumentOcrFieldDto` and `VehicleDocumentOcrResultDto` |
+| `apps/api/src/automotive/ocr-adapters.ts` | New: the vendor adapter (timeout, retry, validation) and the deterministic `test://` path |
+| `apps/api/src/automotive/vehicle-ocr.service.ts` | New: resolves credentials, runs the adapter, maps the result |
+| `apps/api/src/automotive/automotive.dto.ts` | New `OcrExtractDto` |
+| `apps/api/src/automotive/vehicle.controller.ts` | New `POST /automotive/vehicles/:id/documents/ocr` |
+| `apps/api/src/automotive/vehicle.service.ts` | `extractVehicleDocument` — holds the scan only for the call |
+| `apps/api/src/automotive/automotive.module.ts` | Wires the OCR service |
+| `apps/api/src/integrations/integrations.service.ts` | `verifyRegistrationOcr` — a real extraction as the connection test |
+| `apps/admin/src/lib/api.ts` | `extractVehicleDocument` client |
+| `apps/admin/src/app/(app)/automotive/inspections/page.tsx` | "Read the scan" action and the suggestion panel |
+| `apps/admin/src/components/icons.tsx` | `sparkles` icon |
+| `apps/admin/src/i18n/dictionaries.ts` | OCR keys in English and Arabic |
+| `apps/api/test/vehicle-ocr.e2e-spec.ts` | New: 8 tests |
+| `apps/admin/e2e/execution-ocr.spec.ts` | New: 2 tests |
+| `docs/audit/05_INTEGRATION_READINESS.md` | Catalogue corrected to 10 providers |
+| `AGENTS.md` | 10-provider count; OCR behaviour and the adapter exception |
+| `docs/audit/ORYX_FINAL_ACCEPTANCE.md` | This revision |
+
+The sixth revision was an evidence-and-documentation revision; no application or
 database code changed:
 
 | File | Change |
@@ -595,6 +654,13 @@ The changes are committed and pushed to the existing branch
   empty data directory, migrated and seeded, the workspace packages were rebuilt,
   and the API, admin, customer and mobile-web services were brought back up. No
   production system was touched.
+- **Seventh revision (2026-11-07) — re-run on the current tree:** shared **231**,
+  API e2e **694** (38 suites, incl. the new OCR suite), API unit **20**, mobile
+  **206**, mobile-erp **31**, admin browser **224 passed / 1 skipped**, OCR
+  browser **2**, workspace lint clean, workspace typecheck clean. Registration-card
+  OCR extraction is implemented end-to-end and covered by
+  `vehicle-ocr.e2e-spec.ts` (8) and `execution-ocr.spec.ts` (2). The integration
+  catalogue is 10 providers.
 - **Fourth revision (2026-11-07) — re-run on the current tree:** shared **231**,
   API e2e **685** (37 suites), API unit **20**, mobile **206**, mobile-erp **31**,
   admin browser **224 passed / 1 skipped**, workspace lint clean, workspace

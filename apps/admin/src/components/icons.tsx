@@ -372,6 +372,12 @@ export const Icons = {
       <path d="M10.5 10v6M13.5 10v6" />
     </Base>
   ),
+  sparkles: (p: IconProps) => (
+    <Base {...p}>
+      <path d="m12 3.5 1.6 4.4 4.4 1.6-4.4 1.6L12 15.5l-1.6-4.4L6 9.5l4.4-1.6Z" />
+      <path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8Z" />
+    </Base>
+  ),
 } as const;
 
 export type IconName = keyof typeof Icons;

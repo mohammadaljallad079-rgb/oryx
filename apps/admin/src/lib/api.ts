@@ -93,6 +93,7 @@ import type {
   InspectionAreaKey,
   VehicleDto,
   VehicleDocumentDto,
+  VehicleDocumentOcrResultDto,
   InspectionServiceDto,
   InspectionBookingDto,
   JobCardDto,
@@ -1084,6 +1085,8 @@ export const api = {
     request<Paginated<VehicleDocumentDto>>(`/automotive/vehicles/${id}/documents`),
   addVehicleDocument: (id: string, form: FormData) =>
     request<VehicleDocumentDto>(`/automotive/vehicles/${id}/documents`, { method: 'POST', body: form, raw: true }),
+  extractVehicleDocument: (id: string, form: FormData) =>
+    request<VehicleDocumentOcrResultDto>(`/automotive/vehicles/${id}/documents/ocr`, { method: 'POST', body: form, raw: true }),
   removeVehicleDocument: (id: string, documentId: string) =>
     request<{ removed: boolean }>(`/automotive/vehicles/${id}/documents/${documentId}`, { method: 'DELETE' }),
   inspectionServices: (params: { companyId?: string } = {}) =>

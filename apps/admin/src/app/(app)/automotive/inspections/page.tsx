@@ -22,7 +22,7 @@ import {
   StatusBadge,
   TableShell,
 } from '@/components/ui';
-import type { InspectionBookingDto, InspectionServiceDto, VehicleDto, VehicleDocumentDto, CustomerDto } from '@oryx/shared';
+import type { InspectionBookingDto, InspectionServiceDto, VehicleDto, VehicleDocumentDto, VehicleDocumentOcrResultDto, CustomerDto } from '@oryx/shared';
 import { INSPECTION_SECTION_SPECS, VEHICLE_DOCUMENT_CATEGORIES, type InspectionSectionKey } from '@oryx/shared';
 import { useRouter } from 'next/navigation';
 
@@ -424,6 +424,9 @@ function VehicleDocumentsModal({
   const [number, setNumber] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [ocrBusy, setOcrBusy] = useState(false);
+  const [ocrNotice, setOcrNotice] = useState<string | null>(null);
+  const [ocrSuggestions, setOcrSuggestions] = useState<VehicleDocumentOcrResultDto | null>(null);
   const vehicleId = vehicle?.id ?? null;
   const docs = useAsync(
     () => (vehicleId ? api.vehicleDocuments(vehicleId) : Promise.resolve(null)),
@@ -437,7 +440,48 @@ function VehicleDocumentsModal({
     setExpiresAt('');
     setFile(null);
     setError(null);
+    setOcrNotice(null);
+    setOcrSuggestions(null);
   }, [vehicle]);
+
+  /**
+   * Read the attached scan and offer its fields.
+   *
+   * The suggestion is written into the form fields so the operator can see and
+   * correct it; it is not saved until they press save. Nothing about this call
+   * creates a document.
+   */
+  const extract = async () => {
+    if (!vehicleId || !file) return;
+    setOcrBusy(true);
+    setOcrNotice(null);
+    setOcrSuggestions(null);
+    try {
+      const form = new FormData();
+      form.append('category', category);
+      form.append('file', file);
+      const result = await api.extractVehicleDocument(vehicleId, form);
+      setOcrSuggestions(result);
+      if (!result.configured) {
+        setOcrNotice(t('erp.automotive.ocrUnconfigured'));
+        return;
+      }
+      if (result.fields.length === 0) {
+        setOcrNotice(t('erp.automotive.ocrNoFields'));
+        return;
+      }
+      const pick = (key: string) => result.fields.find((f) => f.key === key)?.value ?? '';
+      const nextNumber = pick('number');
+      const nextExpiry = pick('expiresAt');
+      if (nextNumber) setNumber(nextNumber);
+      if (nextExpiry) setExpiresAt(nextExpiry);
+      setOcrNotice(t('erp.automotive.ocrReview'));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setOcrBusy(false);
+    }
+  };
 
   const submit = async () => {
     if (!vehicleId) return;
@@ -514,11 +558,36 @@ function VehicleDocumentsModal({
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/avif"
                 className="oryx-input"
-                disabled={busy}
+                disabled={busy || ocrBusy}
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 data-testid="document-file"
               />
             </Field>
+            <div className="sm:col-span-2 flex flex-wrap items-center gap-2">
+              <Button size="sm" disabled={busy || ocrBusy || !file} onClick={extract} data-testid="extract-document">
+                <Icon name="sparkles" size={15} />
+                {ocrBusy ? t('common.loading') : t('erp.automotive.ocrExtract')}
+              </Button>
+              {ocrNotice ? (
+                <span className="oryx-muted text-[12px]" data-testid="ocr-notice">{ocrNotice}</span>
+              ) : null}
+            </div>
+            {ocrSuggestions && ocrSuggestions.fields.length > 0 ? (
+              <div className="sm:col-span-2 rounded-lg border border-[var(--border)] p-3" data-testid="ocr-suggestions">
+                <p className="oryx-muted m-0 mb-2 text-[12px]">{t('erp.automotive.ocrSuggested')}</p>
+                <ul className="m-0 list-none p-0 text-[12.5px]">
+                  {ocrSuggestions.fields.map((f) => (
+                    <li key={f.key} className="flex items-center justify-between gap-3 py-0.5">
+                      <span>{t(`erp.automotive.ocrField.${f.key}`)}</span>
+                      <span className="font-mono">{f.value}</span>
+                      <span className="oryx-faint text-[11px]">
+                        {f.confidence !== null ? `${Math.round(f.confidence * 100)}%` : '—'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <div className="sm:col-span-2">
               <Button variant="primary" size="sm" disabled={busy} onClick={submit} data-testid="save-document">
                 <Icon name="plus" size={15} />

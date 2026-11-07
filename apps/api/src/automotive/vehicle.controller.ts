@@ -18,6 +18,7 @@ import {
   DecideReportDto,
   InvoiceInspectionDto,
   ListQueryDto,
+  OcrExtractDto,
   RecordFindingsDto,
   RecordMileageDto,
   SubmitReportDto,
@@ -113,6 +114,28 @@ export class VehicleController {
     @Req() req: RequestLike,
   ) {
     return this.vehicles.removeVehicleDocument(id, documentId, p, actorFrom(p, req));
+  }
+
+  /**
+   * Read a registration card or insurance scan and return suggested fields.
+   *
+   * Stateless: nothing is persisted. The operator reviews the suggestion in the
+   * form and saves through the ordinary document endpoint, which is the only
+   * path that writes a document.
+   */
+  @Post('vehicles/:id/documents/ocr')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.vehicle.manage')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 12 * 1024 * 1024, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'OCR-assisted extraction from a registration-card scan (suggestions only)' })
+  extractDocument(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() dto: OcrExtractDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+  ) {
+    return this.vehicles.extractVehicleDocument(id, dto, p, file);
   }
 
   // ------------------------------------------------------------- inspections
