@@ -44,7 +44,7 @@ export function ContextSelector() {
           </span>
           <select
             className="oryx-select"
-            style={{ width: '100%', maxWidth: 220, height: 34, minHeight: 34 }}
+            style={{ width: '100%', maxWidth: 220 }}
             value={companyId ?? ''}
             onChange={(e) => setCompanyContext(e.target.value || null, null)}
             aria-label={t('context.company')}
@@ -65,7 +65,7 @@ export function ContextSelector() {
         </span>
         <select
           className="oryx-select"
-          style={{ width: '100%', maxWidth: 190, height: 34, minHeight: 34 }}
+          style={{ width: '100%', maxWidth: 190 }}
           value={branchId ?? ''}
           disabled={!companyId}
           onChange={(e) => setCompanyContext(companyId, e.target.value || null)}

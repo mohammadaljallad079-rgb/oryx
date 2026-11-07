@@ -72,7 +72,7 @@ export default function BookingsPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="bookings-page">
+    <div className="flex flex-col gap-4" data-testid="bookings-page">
       <SectionHeader
         title={t('nav.booking_engine')}
         subtitle={t('erp.booking.subtitle')}

@@ -207,7 +207,7 @@ describe('ORYX ERP core (e2e)', () => {
         },
       });
       expect(ok.status).toBe(201);
-      expect(ok.body.entryNumber).toMatch(/^JE-/);
+      expect(ok.body.entryNumber).toMatch(/^J\d{5}$/);
 
       const unbalanced = await erp<{ code: string }>('/accounting/journals', {
         method: 'POST',
@@ -319,7 +319,7 @@ describe('ORYX ERP core (e2e)', () => {
     });
 
     it('refuses to issue more stock than is on hand', async () => {
-      const res = await erp<{ code: string }>('/inventory/movements', {
+      const res = await erp<{ code: string; message?: string; details?: { onHand: number; requested: number } }>('/inventory/movements', {
         method: 'POST',
         body: {
           warehouseId,
@@ -331,6 +331,12 @@ describe('ORYX ERP core (e2e)', () => {
       });
       expect(res.status).toBe(403);
       expect(res.body.code).toBe('inventory.insufficient_stock');
+      // `details` carries raw 10^4-scaled quantities (matching `onHand`), while
+      // the human message shows whole units. `requested` is the magnitude that
+      // was asked for, never the negative movement the ledger would apply.
+      expect(res.body.details?.requested).toBe(999_000_000);
+      expect(res.body.details?.onHand).toBeGreaterThanOrEqual(0);
+      expect(res.body.message).toContain('requested 99900');
     });
 
     it('keeps stock non-negative under concurrent issues of the same SKU', async () => {
@@ -407,6 +413,95 @@ describe('ORYX ERP core (e2e)', () => {
       const res = await erp<{ items: Array<{ sku: string }> }>('/inventory/reorder-alerts');
       expect(res.status).toBe(200);
       expect(res.body.items.some((i) => i.sku === 'WIDGET')).toBe(true);
+    });
+
+    it('deactivates and reactivates a catalogue item through isActive', async () => {
+      // The admin list offers a Deactivate/Reactivate action, which is a PATCH of
+      // `isActive`. The toggle must round-trip and must not touch the SKU, which
+      // inventory movements and posted invoices reference.
+      const off = await erp<{ isActive: boolean; sku: string }>(`/inventory/products/${productId}`, {
+        method: 'PATCH',
+        body: { isActive: false },
+      });
+      expect(off.status).toBe(200);
+      expect(off.body.isActive).toBe(false);
+      expect(off.body.sku).toBe('WIDGET');
+
+      const stored = await ctx.prisma.product.findUniqueOrThrow({ where: { id: productId } });
+      expect(stored.isActive).toBe(false);
+
+      const on = await erp<{ isActive: boolean }>(`/inventory/products/${productId}`, {
+        method: 'PATCH',
+        body: { isActive: true },
+      });
+      expect(on.body.isActive).toBe(true);
+      expect((await ctx.prisma.product.findUniqueOrThrow({ where: { id: productId } })).isActive).toBe(true);
+    });
+
+    it('deactivates and reactivates a warehouse through isActive', async () => {
+      const off = await erp<{ isActive: boolean; code: string }>(`/inventory/warehouses/${warehouseId}`, {
+        method: 'PATCH',
+        body: { isActive: false },
+      });
+      expect(off.status).toBe(200);
+      expect(off.body.isActive).toBe(false);
+      expect(off.body.code).toBe('MAIN');
+
+      const on = await erp<{ isActive: boolean }>(`/inventory/warehouses/${warehouseId}`, {
+        method: 'PATCH',
+        body: { isActive: true },
+      });
+      expect(on.body.isActive).toBe(true);
+      expect((await ctx.prisma.warehouse.findUniqueOrThrow({ where: { id: warehouseId } })).isActive).toBe(true);
+    });
+
+    it('serves a POS catalogue with image, on-hand quantity and stock status', async () => {
+      // The POS terminal's product grid reads this endpoint: it must carry the
+      // price the till charges, the tax the till adds, and enough stock
+      // information to disable a sold-out tile. Reorder level is scaled by 10^4,
+      // so 100000000 is an absurdly high threshold that forces a LOW status.
+      await erp(`/inventory/products/${productId}`, {
+        method: 'PATCH',
+        body: { reorderLevel: 100000000, barcode: '6281000000017' },
+      });
+
+      const res = await erp<{
+        total: number;
+        items: Array<{
+          id: string;
+          sku: string;
+          barcode: string | null;
+          salesPriceMinor: number;
+          taxRateBp: number;
+          onHand: number;
+          reorderLevel: number;
+          stockStatus: string;
+          imageUrl: string | null;
+          isActive: boolean;
+        }>;
+      }>('/inventory/pos-catalog');
+      expect(res.status).toBe(200);
+      const widget = res.body.items.find((i) => i.sku === 'WIDGET');
+      expect(widget).toBeDefined();
+      expect(widget!.barcode).toBe('6281000000017');
+      expect(widget!.stockStatus).toBe('LOW');
+      expect(Number.isInteger(widget!.onHand)).toBe(true);
+      expect('imageUrl' in widget!).toBe(true);
+      expect(widget!.isActive).toBe(true);
+
+      // A scan sends the barcode as the search term; it must find the product.
+      const scan = await erp<{ items: Array<{ sku: string }> }>(
+        '/inventory/pos-catalog?search=6281000000017',
+      );
+      expect(scan.body.items.map((i) => i.sku)).toContain('WIDGET');
+
+      // An inactive product must never appear on the till.
+      await erp(`/inventory/products/${productId}`, { method: 'PATCH', body: { isActive: false } });
+      const hidden = await erp<{ items: Array<{ sku: string }> }>(
+        '/inventory/pos-catalog?search=6281000000017',
+      );
+      expect(hidden.body.items.map((i) => i.sku)).not.toContain('WIDGET');
+      await erp(`/inventory/products/${productId}`, { method: 'PATCH', body: { isActive: true } });
     });
   });
 
@@ -604,6 +699,84 @@ describe('ORYX ERP core (e2e)', () => {
     });
   });
 
+  describe('sales — POS line discount', () => {
+    let sessionId: string;
+
+    it('applies a cashier discount to the line total and to the ledger', async () => {
+      const session = await erp<{ id: string }>('/sales/cashier-sessions', {
+        method: 'POST',
+        body: { branchId, warehouseId, openingFloatMinor: 0 },
+      });
+      expect(session.status).toBe(201);
+      sessionId = session.body.id;
+
+      // 1.00 × 100.00 = 100.00 gross, 10% off = 90.00 net, 15% VAT = 13.50.
+      const sale = await erp<{ id: string; totalMinor: number; changeMinor: number }>('/sales/pos-sales', {
+        method: 'POST',
+        body: {
+          branchId,
+          cashierSessionId: sessionId,
+          warehouseId,
+          paymentMethod: 'CASH',
+          lines: [
+            {
+              productId,
+              description: 'Widget',
+              quantity: 10000,
+              unitPriceMinor: 10000,
+              discountPercentBp: 1000,
+              taxPercentBp: 1500,
+            },
+          ],
+        },
+      });
+      expect(sale.status).toBe(201);
+      expect(sale.body.totalMinor).toBe(10350);
+
+      const posSale = await ctx.prisma.posSale.findUniqueOrThrow({ where: { id: sale.body.id } });
+      expect(posSale.discountMinor).toBe(1000);
+      expect(posSale.taxMinor).toBe(1350);
+      expect(posSale.totalMinor).toBe(10350);
+
+      const invoice = await ctx.prisma.salesInvoice.findUniqueOrThrow({
+        where: { id: posSale.salesInvoiceId! },
+      });
+      expect(invoice.discountMinor).toBe(1000);
+      expect(invoice.taxMinor).toBe(1350);
+      expect(invoice.totalMinor).toBe(10350);
+    });
+
+    it('refuses a discount above 100%', async () => {
+      const res = await erp<{ code: string }>('/sales/pos-sales', {
+        method: 'POST',
+        body: {
+          branchId,
+          cashierSessionId: sessionId,
+          warehouseId,
+          paymentMethod: 'CASH',
+          lines: [
+            {
+              description: 'Widget',
+              quantity: 10000,
+              unitPriceMinor: 10000,
+              discountPercentBp: 10001,
+              taxPercentBp: 0,
+            },
+          ],
+        },
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('closes the discount session', async () => {
+      const closed = await erp<{ status: string }>(`/sales/cashier-sessions/${sessionId}/close`, {
+        method: 'POST',
+        body: { countedCashMinor: 10350 },
+      });
+      expect(closed.body.status).toBe('CLOSED');
+    });
+  });
+
   // ----------------------------------------------------------------- purchasing
 
   describe('purchasing — requisition to payment', () => {
@@ -658,6 +831,39 @@ describe('ORYX ERP core (e2e)', () => {
 
       const order = await erp<{ items: Array<{ status: string }> }>(`/purchasing/orders?status=RECEIVED`);
       expect(order.body.items.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('refuses to receive more than the order still owes', async () => {
+      const before = await ctx.prisma.stockLevel.findUniqueOrThrow({
+        where: { warehouseId_productId: { warehouseId, productId } },
+      });
+
+      // The order is fully received. An explicit receipt that repeats the whole
+      // ordered quantity must be rejected: without the cap it created a second
+      // receipt, moved stock twice and accrued AP twice for one order line.
+      const over = await erp<{ code: string }>('/purchasing/receipts', {
+        method: 'POST',
+        body: {
+          purchaseOrderId: orderId,
+          warehouseId,
+          receivedAt: new Date().toISOString(),
+          lines: [{ productId, quantity: 50000, unitCostMinor: 6000 }],
+        },
+      });
+      expect(over.status).toBe(400);
+      expect(over.body.code).toBe('purchasing.over_receipt');
+
+      // An automatic receipt (no explicit lines) finds nothing outstanding.
+      const auto = await erp('/purchasing/receipts', {
+        method: 'POST',
+        body: { purchaseOrderId: orderId, warehouseId, receivedAt: new Date().toISOString() },
+      });
+      expect(auto.status).toBe(400);
+
+      const after = await ctx.prisma.stockLevel.findUniqueOrThrow({
+        where: { warehouseId_productId: { warehouseId, productId } },
+      });
+      expect(after.quantity).toBe(before.quantity);
     });
 
     it('records a supplier invoice and pays it', async () => {
@@ -717,6 +923,49 @@ describe('ORYX ERP core (e2e)', () => {
         where: { warehouseId_productId: { warehouseId, productId } },
       });
       expect(before.quantity - after.quantity).toBe(10000);
+    });
+
+    it('balances a purchase return whose invoiced cost differs from the stock carrying value', async () => {
+      // Regression guard: the journal debits the payable at the invoiced value
+      // and credits stock at moving-average cost plus input VAT. When the two
+      // costs differ the plug must land on the opposite side to the difference,
+      // or the entry is short by twice the variance and the posting is refused.
+      const level = await ctx.prisma.stockLevel.findUniqueOrThrow({
+        where: { warehouseId_productId: { warehouseId, productId } },
+      });
+      const carryingMinor = Math.round(level.averageCostMinor / 100);
+
+      const ret = await erp<{ id: string; totalMinor: number }>('/purchasing/returns', {
+        method: 'POST',
+        body: {
+          supplierId,
+          warehouseId,
+          returnDate: '2026-06-11',
+          reason: 'Price correction',
+          lines: [
+            {
+              productId,
+              description: 'Widget',
+              quantity: 10000,
+              unitCostMinor: carryingMinor + 1234,
+              taxPercentBp: 1500,
+            },
+          ],
+        },
+      });
+      expect(ret.status).toBe(201);
+
+      const journal = await ctx.prisma.journalEntry.findFirstOrThrow({
+        where: { sourceType: 'PURCHASE_RETURN', sourceId: ret.body.id },
+        include: { lines: true },
+      });
+      const debit = journal.lines.reduce((sum, l) => sum + l.debitMinor, 0);
+      const credit = journal.lines.reduce((sum, l) => sum + l.creditMinor, 0);
+      expect(debit).toBe(credit);
+      expect(debit).toBeGreaterThan(0);
+
+      const trial = await erp<{ balanced: boolean }>('/reports/accounting');
+      expect(trial.body.balanced).toBe(true);
     });
   });
 

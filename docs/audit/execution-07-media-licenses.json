@@ -1,0 +1,228 @@
+{
+  "retrievedAt": "2026-10-20T17:16:42.362Z",
+  "note": "Every photograph on the customer site, its licence and its provenance. Files are re-encoded to three widths (800/1600/2000–2400) with EXIF removed; the committed bytes are the localFile below plus its -sm and -lg variants. Attribution for the CC BY and CC BY-SA images is rendered on the /credits page.",
+  "shippingCount": 10,
+  "withdrawnCount": 2,
+  "images": [
+    {
+      "key": "auto-service",
+      "intendedUse": "Homepage hero and services page header: a real service workshop",
+      "commonsTitle": "Auto service – Panorama (Sergej Majboroda via Poly Haven).jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Auto_service_%E2%80%93_Panorama_(Sergej_Majboroda_via_Poly_Haven).jpg",
+      "license": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "artist": "Sergej Majboroda",
+      "credit": "Sergej Majboroda via Poly Haven (https://polyhaven.com/a/auto_service)",
+      "usageTerms": "Creative Commons Zero — public domain dedication, no attribution required",
+      "attributionRequired": false,
+      "originalWidth": 8192,
+      "originalHeight": 4096,
+      "localFile": "apps/customer/public/media/auto-service.jpg",
+      "responsiveVariants": [
+        "apps/customer/public/media/auto-service-sm.jpg",
+        "apps/customer/public/media/auto-service.jpg",
+        "apps/customer/public/media/auto-service-lg.jpg"
+      ],
+      "status": "shipping"
+    },
+    {
+      "key": "garage-interior",
+      "intendedUse": "Secondary workshop panel: a professional repair garage interior",
+      "commonsTitle": "Garage – Panorama (Greg Zaal via Poly Haven).jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Garage_%E2%80%93_Panorama_(Greg_Zaal_via_Poly_Haven).jpg",
+      "license": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "artist": "Greg Zaal",
+      "credit": "Greg Zaal via Poly Haven (https://polyhaven.com/a/garage)",
+      "usageTerms": "Creative Commons Zero — public domain dedication, no attribution required",
+      "attributionRequired": false,
+      "originalWidth": 8192,
+      "originalHeight": 4096,
+      "localFile": "apps/customer/public/media/garage-interior.jpg",
+      "responsiveVariants": [
+        "apps/customer/public/media/garage-interior-sm.jpg",
+        "apps/customer/public/media/garage-interior.jpg",
+        "apps/customer/public/media/garage-interior-lg.jpg"
+      ],
+      "status": "shipping"
+    },
+    {
+      "key": "inspection-bay",
+      "intendedUse": "Vehicle inspection category card",
+      "commonsTitle": "Queens Road 125 Vehicle Inspection Bay.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Queens_Road_125_Vehicle_Inspection_Bay.jpg",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "artist": "Hullian111",
+      "credit": "Hullian111, CC BY-SA 4.0, via Wikimedia Commons",
+      "usageTerms": "Creative Commons Attribution-ShareAlike 4.0",
+      "attributionRequired": true,
+      "localFile": "apps/customer/public/media/inspection-bay.jpg",
+      "responsiveVariants": [
+        "apps/customer/public/media/inspection-bay-sm.jpg",
+        "apps/customer/public/media/inspection-bay.jpg",
+        "apps/customer/public/media/inspection-bay-lg.jpg"
+      ],
+      "status": "shipping"
+    },
+    {
+      "key": "mechanic-engine",
+      "intendedUse": "Maintenance and repair category card",
+      "commonsTitle": "Two mechanic working on a car engine.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Two_mechanic_working_on_a_car_engine.jpg",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "artist": "Kwamitsey",
+      "credit": "Kwamitsey, CC BY 4.0, via Wikimedia Commons",
+      "usageTerms": "Creative Commons Attribution 4.0",
+      "attributionRequired": true,
+      "localFile": "apps/customer/public/media/mechanic-engine.jpg",
+      "responsiveVariants": [
+        "apps/customer/public/media/mechanic-engine-sm.jpg",
+        "apps/customer/public/media/mechanic-engine.jpg",
+        "apps/customer/public/media/mechanic-engine-lg.jpg"
+      ],
+      "status": "shipping"
+    },
+    {
+      "key": "parts-store",
+      "intendedUse": "Spare parts category card",
+      "commonsTitle": "Auto Parts Store.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Auto_Parts_Store.jpg",
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "artist": "Visitor7",
+      "credit": "Visitor7, CC BY-SA 3.0, via Wikimedia Commons",
+      "usageTerms": "Creative Commons Attribution-ShareAlike 3.0",
+      "attributionRequired": true,
+      "localFile": "apps/customer/public/media/parts-store.jpg",
+      "responsiveVariants": [
+        "apps/customer/public/media/parts-store-sm.jpg",
+        "apps/customer/public/media/parts-store.jpg",
+        "apps/customer/public/media/parts-store-lg.jpg"
+      ],
+      "status": "shipping"
+    },
+    {
+      "key": "recovery-tow",
+      "intendedUse": "Roadside recovery category card",
+      "commonsTitle": "Naha Okinawa Japan JAF-Towing-car-01.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Naha_Okinawa_Japan_JAF-Towing-car-01.jpg",
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "artist": "CEphoto, Uwe Aranas",
+      "credit": "CEphoto, Uwe Aranas, CC BY-SA 3.0, via Wikimedia Commons",
+      "usageTerms": "Creative Commons Attribution-ShareAlike 3.0",
+      "attributionRequired": true,
+      "localFile": "apps/customer/public/media/recovery-tow.jpg",
+      "responsiveVariants": [
+        "apps/customer/public/media/recovery-tow-sm.jpg",
+        "apps/customer/public/media/recovery-tow.jpg",
+        "apps/customer/public/media/recovery-tow-lg.jpg"
+      ],
+      "status": "shipping"
+    },
+    {
+      "key": "carwash-premium",
+      "intendedUse": "Car wash and detailing category card",
+      "commonsTitle": "Premium Car Wash - La Louvière.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Premium_Car_Wash_-_La_Louvi%C3%A8re.jpg",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "artist": "Le Sharkoïste",
+      "credit": "Le Sharkoïste, CC BY-SA 4.0, via Wikimedia Commons",
+      "usageTerms": "Creative Commons Attribution-ShareAlike 4.0",
+      "attributionRequired": true,
+      "localFile": "apps/customer/public/media/carwash-premium.jpg",
+      "responsiveVariants": [
+        "apps/customer/public/media/carwash-premium-sm.jpg",
+        "apps/customer/public/media/carwash-premium.jpg",
+        "apps/customer/public/media/carwash-premium-lg.jpg"
+      ],
+      "status": "shipping"
+    },
+    {
+      "key": "garage-brastad",
+      "intendedUse": "Equipment garage card",
+      "commonsTitle": "Car repair garage in Brastad - cropped.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Car_repair_garage_in_Brastad_-_cropped.jpg",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "artist": "W.carter",
+      "credit": "W.carter, CC BY-SA 4.0, via Wikimedia Commons",
+      "usageTerms": "Creative Commons Attribution-ShareAlike 4.0",
+      "attributionRequired": true,
+      "localFile": "apps/customer/public/media/garage-brastad.jpg",
+      "responsiveVariants": [
+        "apps/customer/public/media/garage-brastad-sm.jpg",
+        "apps/customer/public/media/garage-brastad.jpg",
+        "apps/customer/public/media/garage-brastad-lg.jpg"
+      ],
+      "status": "shipping"
+    },
+    {
+      "key": "workshop-artdeco",
+      "intendedUse": "Workshop services card",
+      "commonsTitle": "Art Deco Car Workshop. Haynes Ford, Maidstone.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Art_Deco_Car_Workshop._Haynes_Ford,_Maidstone.jpg",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "artist": "John K Thorne",
+      "credit": "John K Thorne, CC BY 4.0, via Wikimedia Commons",
+      "usageTerms": "Creative Commons Attribution 4.0",
+      "attributionRequired": true,
+      "localFile": "apps/customer/public/media/workshop-artdeco.jpg",
+      "responsiveVariants": [
+        "apps/customer/public/media/workshop-artdeco-sm.jpg",
+        "apps/customer/public/media/workshop-artdeco.jpg",
+        "apps/customer/public/media/workshop-artdeco-lg.jpg"
+      ],
+      "status": "shipping"
+    },
+    {
+      "key": "ev-charging",
+      "intendedUse": "Electric vehicle services card",
+      "commonsTitle": "Electric car charging station equipment 2, Vancouver, WA, March 2020.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Electric_car_charging_station_equipment_2,_Vancouver,_WA,_March_2020.jpg",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "artist": "Steven Baltakatei Sandoval",
+      "credit": "Steven Baltakatei Sandoval, CC BY-SA 4.0, via Wikimedia Commons",
+      "usageTerms": "Creative Commons Attribution-ShareAlike 4.0",
+      "attributionRequired": true,
+      "localFile": "apps/customer/public/media/ev-charging.jpg",
+      "responsiveVariants": [
+        "apps/customer/public/media/ev-charging-sm.jpg",
+        "apps/customer/public/media/ev-charging.jpg",
+        "apps/customer/public/media/ev-charging-lg.jpg"
+      ],
+      "status": "shipping"
+    },
+    {
+      "key": "hero-showroom",
+      "intendedUse": "Withdrawn — homepage hero",
+      "withdrawalReason": "A branded Bentley dealership. It showed a marque ORYX does not sell and misrepresented the service, so it was replaced by auto-service.jpg (a real service workshop).",
+      "commonsTitle": "Bentley-Showroom-Dealership-Birmingham.JPG",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Bentley-Showroom-Dealership-Birmingham.JPG",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "artist": "Wandering Diode",
+      "attributionRequired": true,
+      "localFile": null,
+      "status": "withdrawn"
+    },
+    {
+      "key": "showroom-jaguar",
+      "intendedUse": "Withdrawn — marketplace / showroom section",
+      "withdrawalReason": "A branded Jaguar showroom interior. It advertised a third-party marque and was unused by any page, so it was removed rather than shipped as dead weight.",
+      "commonsTitle": "HK Wan Chai 56 Gloucester Road BEA Harbour View Centre shop Jaguar showroom interior white car Nov-2012.JPG",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:HK_Wan_Chai_56_Gloucester_Road_BEA_Harbour_View_Centre_shop_Jaguar_showroom_interior_white_car_Nov-2012.JPG",
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+      "artist": "Swoodchatla",
+      "attributionRequired": true,
+      "localFile": null,
+      "status": "withdrawn"
+    }
+  ]
+}

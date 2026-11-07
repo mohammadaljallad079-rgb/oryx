@@ -287,4 +287,50 @@ test.describe('execution 06 functional audit', () => {
     await expect(page.getByRole('link', { name: /Companies|الشركات/ })).toHaveCount(0);
     await expect(page.getByRole('link', { name: /Audit|سجل التدقيق/ })).toHaveCount(0);
   });
+
+  test('11. the audit filters narrow the trail and clearing restores it', async ({ page }) => {
+    await signIn(page, SUPER_ADMIN);
+    await setLocale(page, 'en');
+    await page.goto('/audit', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('audit-page')).toBeVisible({ timeout: 20_000 });
+
+    // Wait for the unfiltered first page to settle.
+    await expect(page.locator('[data-testid="audit-table"] tbody tr').first()).toBeVisible({ timeout: 20_000 });
+    const unfilteredRows = await page.locator('[data-testid="audit-table"] tbody tr').count();
+    expect(unfilteredRows).toBeGreaterThan(0);
+
+    // A target-type filter that matches nothing must empty the table.
+    await page.getByTestId('audit-target-type').fill('NO_SUCH_TARGET_TYPE');
+    await expect(page.locator('[data-testid="audit-table"] tbody tr')).toHaveCount(0, { timeout: 20_000 });
+
+    // A date window in the past must also return nothing.
+    await page.getByTestId('audit-target-type').fill('');
+    await page.getByTestId('audit-from').fill('1999-01-01');
+    await page.getByTestId('audit-to').fill('1999-12-31');
+    await expect(page.locator('[data-testid="audit-table"] tbody tr')).toHaveCount(0, { timeout: 20_000 });
+
+    // Clearing the filters restores a populated table.
+    await page.getByTestId('audit-clear').click();
+    await expect(page.locator('[data-testid="audit-table"] tbody tr').first()).toBeVisible({ timeout: 20_000 });
+
+    // The API is the real source: a filter the UI sent must be honoured there too.
+    const res = await apiCall<{ items: Array<{ targetType: string; actorUserId: string | null }> }>(
+      page,
+      '/audit-logs?targetType=COMPANY&pageSize=5',
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.items.every((i) => i.targetType === 'COMPANY')).toBe(true);
+
+    // The actor filter narrows to one principal. The id comes from a real row,
+    // so the assertion cannot pass by accident on an empty result.
+    const actor = res.body.items.find((i) => i.actorUserId)?.actorUserId;
+    expect(actor, 'a COMPANY audit row should carry an actor').toBeTruthy();
+    const byActor = await apiCall<{ items: Array<{ actorUserId: string | null }>; total: number }>(
+      page,
+      `/audit-logs?actorUserId=${actor}`,
+    );
+    expect(byActor.status).toBe(200);
+    expect(byActor.body.items.length).toBeGreaterThan(0);
+    expect(byActor.body.items.every((i) => i.actorUserId === actor)).toBe(true);
+  });
 });

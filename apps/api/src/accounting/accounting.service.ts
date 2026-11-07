@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { allocateMinor, fromMinor, sumMinor, toMinor } from '@oryx/shared';
+import { allocateMinor, DEFAULT_CURRENCY, fromMinor, sumMinor, toMinor } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccountingPostingService, SYSTEM_ROLES, type SystemRole } from '../common/accounting-posting.service';
@@ -55,6 +55,8 @@ const STANDARD_CHART: Array<{
   // Execution 04 — marketplace
   { code: '4200', nameEn: 'Marketplace commission revenue', nameAr: 'إيرادات عمولة السوق', type: 'REVENUE', normalBalance: 'CREDIT', systemRole: SYSTEM_ROLES.MARKETPLACE_COMMISSION },
   { code: '2230', nameEn: 'Service provider payable', nameAr: 'مستحقات مزودي الخدمة', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: SYSTEM_ROLES.PROVIDER_PAYABLE },
+  // Optional whole-amount cash rounding gain/loss
+  { code: '5930', nameEn: 'Rounding gain / loss', nameAr: 'فروق التقريب', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: SYSTEM_ROLES.ROUNDING_GAIN_LOSS },
 ];
 
 const DEBIT_TYPES = new Set(['ASSET', 'EXPENSE']);
@@ -72,7 +74,7 @@ export class AccountingService {
   // ------------------------------------------------------------------ accounts
 
   /** Seed the standard chart of accounts for a company that has none. */
-  async seedStandardChart(companyId: string, currency = 'SAR', actorUserId?: string) {
+  async seedStandardChart(companyId: string, currency = DEFAULT_CURRENCY, actorUserId?: string) {
     const existing = await this.prisma.account.count({ where: { companyId } });
     if (existing > 0) return { created: 0 };
     await this.prisma.account.createMany({
@@ -124,6 +126,7 @@ export class AccountingService {
 
   async createAccount(dto: CreateAccountDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const dup = await this.prisma.account.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Account code ${dto.code} already exists.`);
 
@@ -146,7 +149,7 @@ export class AccountingService {
         level,
         isPostable: dto.isPostable ?? true,
         systemRole: dto.systemRole ?? null,
-        currency: dto.currency ?? 'SAR',
+        currency: dto.currency ?? companyCurrency,
       },
     });
     await this.audit.record({

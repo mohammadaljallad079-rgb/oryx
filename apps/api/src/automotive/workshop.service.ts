@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { lineAmountMinor, sumMinor } from '@oryx/shared';
+import { hoursAmountMinor, hoursToQuantity, sumMinor } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccountingPostingService } from '../common/accounting-posting.service';
@@ -30,6 +30,7 @@ import type {
   InvoiceJobCardDto,
   IssueReservationDto,
   ListQueryDto,
+  ReservedStockQueryDto,
   UpdateJobCardDto,
   UpdateMaintenanceBookingDto,
   UpdateServiceRequestDto,
@@ -249,7 +250,7 @@ export class WorkshopService {
       for (const [i, op] of dto.operations.entries()) {
         created.push(
           await tx.labourOperation.create({
-            data: { companyId, jobCardId: id, description: op.description, hours: op.hours, rateMinor: op.rateMinor, amountMinor: lineAmountMinor(op.hours, op.rateMinor), sortOrder: count + i },
+            data: { companyId, jobCardId: id, description: op.description, hours: op.hours, rateMinor: op.rateMinor, amountMinor: hoursAmountMinor(op.hours, op.rateMinor), sortOrder: count + i },
           }),
         );
       }
@@ -413,6 +414,80 @@ export class WorkshopService {
     return result;
   }
 
+  /**
+   * Cancel a parts reservation.
+   *
+   * Only a reservation that has not been issued (or partially issued) can be
+   * cancelled: once stock has left the ledger through `issueReservation`, the
+   * movement is permanent and must be reversed through the inventory module
+   * rather than silently dropped. A cancelled reservation releases the
+   * reserved quantity for other work orders.
+   */
+  async cancelReservation(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const result = await this.posting.withTransaction(async (tx) => {
+      const reservation = await tx.partsReservation.findFirst({ where: { id, companyId }, include: { lines: true } });
+      if (!reservation) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Reservation not found.');
+      if (reservation.status === 'CANCELLED') {
+        throw badRequest(ERROR_CODES.RESERVATION_ALREADY_ISSUED, 'This reservation is already cancelled.');
+      }
+      const issued = reservation.lines.some((l) => l.issuedQuantity > 0);
+      if (issued) {
+        throw badRequest(
+          ERROR_CODES.RESERVATION_ALREADY_ISSUED,
+          'Parts have already been issued from this reservation; reverse the stock movement instead of cancelling.',
+        );
+      }
+      return tx.partsReservation.update({ where: { id }, data: { status: 'CANCELLED' }, include: { lines: true } });
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.parts_reservation_cancelled', targetType: 'PARTS_RESERVATION', targetId: id, summary: 'Cancelled a parts reservation' });
+    return result;
+  }
+
+  /**
+   * Outstanding reserved quantity per product and warehouse.
+   *
+   * A reservation does not touch the stock ledger, so `StockLevel.quantity` is
+   * on-hand only. This reports the quantity that is promised to open job cards
+   * but not yet issued, so a workshop can see what is genuinely available.
+   */
+  async reservedStock(query: ReservedStockQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const lines = await this.prisma.partsReservationLine.findMany({
+      where: {
+        companyId,
+        ...(query.productId ? { productId: query.productId } : {}),
+        reservation: {
+          status: { in: ['RESERVED', 'PARTIALLY_ISSUED'] },
+          ...(query.warehouseId ? { warehouseId: query.warehouseId } : {}),
+        },
+      },
+      include: {
+        reservation: { select: { warehouseId: true, status: true } },
+        product: { select: { sku: true, nameEn: true } },
+      },
+    });
+
+    const byKey = new Map<string, { warehouseId: string; productId: string; sku: string; nameEn: string; reservedQuantity: number }>();
+    for (const line of lines) {
+      const outstanding = line.quantity - line.issuedQuantity;
+      if (outstanding <= 0) continue;
+      const key = `${line.reservation.warehouseId}:${line.productId}`;
+      const entry = byKey.get(key) ?? {
+        warehouseId: line.reservation.warehouseId,
+        productId: line.productId,
+        sku: line.product.sku,
+        nameEn: line.product.nameEn,
+        reservedQuantity: 0,
+      };
+      entry.reservedQuantity += outstanding;
+      byKey.set(key, entry);
+    }
+
+    const items = [...byKey.values()].sort((a, b) => a.sku.localeCompare(b.sku));
+    return { items, total: items.length, page: 1, pageSize: items.length };
+  }
+
   // ----------------------------------------------------------------- invoicing
 
   /**
@@ -443,7 +518,9 @@ export class WorkshopService {
         }
       } else {
         for (const op of job.labour) {
-          lines.push({ productId: null, description: op.description, quantity: op.hours, unitPriceMinor: op.rateMinor, taxPercentBp: 0 });
+          // `op.hours` is hundredths of an hour; invoice lines carry quantities
+          // scaled by QUANTITY_SCALE (10^4), so rescale before pricing.
+          lines.push({ productId: null, description: op.description, quantity: hoursToQuantity(op.hours), unitPriceMinor: op.rateMinor, taxPercentBp: 0 });
         }
       }
       if (lines.length === 0) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'The job card has no billable lines.');
@@ -494,9 +571,34 @@ export class WorkshopService {
 
   // --------------------------------------------------------------- parts data
 
+  /**
+   * Part numbers with an optional free-text search.
+   *
+   * A workshop looks a part up by number, brand or the linked product's SKU or
+   * name, so the filter spans all four rather than the part number alone.
+   */
   async listPartReferences(query: ListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
-    const rows = await this.prisma.partReference.findMany({ where: { companyId }, orderBy: { partNumber: 'asc' }, include: { product: { select: { sku: true, nameEn: true } } } });
+    const search = query.search?.trim();
+    const rows = await this.prisma.partReference.findMany({
+      where: {
+        companyId,
+        ...(query.productId ? { productId: query.productId } : {}),
+        ...(query.status ? { type: query.status as never } : {}),
+        ...(search
+          ? {
+              OR: [
+                { partNumber: { contains: search, mode: 'insensitive' as const } },
+                { brand: { contains: search, mode: 'insensitive' as const } },
+                { product: { sku: { contains: search, mode: 'insensitive' as const } } },
+                { product: { nameEn: { contains: search, mode: 'insensitive' as const } } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: { partNumber: 'asc' },
+      include: { product: { select: { sku: true, nameEn: true } } },
+    });
     return { items: rows, total: rows.length, page: 1, pageSize: rows.length };
   }
 
@@ -532,6 +634,11 @@ export class WorkshopService {
 
   /** Parts compatible with a given vehicle, resolved through the shared catalog. */
   async compatibleParts(make: string, model: string, year: number, principal: RequestPrincipal, companyIdInput?: string) {
+    // Guard the numeric filter even though the controller validates: a NaN
+    // reaching Prisma raises a 500, and this method is callable from elsewhere.
+    if (!Number.isInteger(year)) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'A model year is required.');
+    }
     const { companyId } = await this.context.resolveCompanyScope(principal, companyIdInput);
     const rows = await this.prisma.partCompatibility.findMany({
       where: { companyId, make: { equals: make, mode: 'insensitive' }, model: { equals: model, mode: 'insensitive' }, yearFrom: { lte: year }, OR: [{ yearTo: null }, { yearTo: { gte: year } }] },

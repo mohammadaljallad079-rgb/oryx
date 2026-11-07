@@ -4,8 +4,8 @@
 // a 200 is only recorded when the page actually renders and no request fails.
 import { chromium } from 'playwright';
 
-const ADMIN = 'https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev';
-const CUSTOMER = 'https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev';
+const ADMIN = 'https://work-1-yumhfnmvqfdgaghd.prod-runtime.all-hands.dev';
+const CUSTOMER = 'https://work-2-yumhfnmvqfdgaghd.prod-runtime.all-hands.dev';
 const PASSWORD = 'ChangeMe!Oryx2026';
 const CUSTOMER_PASSWORD = 'OryxDemo!2026';
 
@@ -91,10 +91,13 @@ async function signInOn(pg, base, email, password = PASSWORD) {
   await pg.locator('[data-testid="login-email"]').fill(email);
   await pg.locator('[data-testid="login-password"]').fill(password);
   // The admin login carries a testid on its submit button; the customer login
-  // does not, so fall back to the form's submit control.
+  // does not. Falling back to a bare `button[type="submit"]` is unsafe: the
+  // customer header also renders a search form, so that selector matches two
+  // buttons and Playwright throws in strict mode (or clicks the wrong one).
+  // Submitting from the password field targets the login form unambiguously.
   const submit = pg.locator('[data-testid="login-submit"]');
   if (await submit.count()) await submit.click();
-  else await pg.locator('button[type="submit"]').first().click();
+  else await pg.locator('[data-testid="login-password"]').press('Enter');
   await pg.waitForURL('**/dashboard', { timeout: 90000 });
   await pg.waitForTimeout(1500);
 }

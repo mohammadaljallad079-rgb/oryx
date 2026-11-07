@@ -69,7 +69,8 @@ export class AccountingController {
   @ApiOperation({ summary: 'Seed the standard chart of accounts when empty' })
   async seedChart(@CurrentPrincipal() p: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(p);
-    return this.accounting.seedStandardChart(companyId, 'SAR', p.userId);
+    const currency = await this.context.companyCurrency(companyId);
+    return this.accounting.seedStandardChart(companyId, currency, p.userId);
   }
 
   // ------------------------------------------------------------ fiscal years

@@ -364,6 +364,35 @@ export class CustomerBookingController {
     });
   }
 
+  @Get(':id')
+  @ApiOperation({ summary: 'Read one of your own bookings' })
+  async detail(@Param('id') id: string, @CurrentCustomer() customer: CustomerPrincipal) {
+    return this.bookings.getCustomerBooking(customer.accountId, id);
+  }
+
+  @Post(':id/confirm')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Confirm your own held booking' })
+  async confirm(@Param('id') id: string, @CurrentCustomer() customer: CustomerPrincipal) {
+    return this.bookings.confirmCustomerBooking(customer.accountId, id);
+  }
+
+  @Post(':id/reschedule')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Move your own booking to a new time' })
+  async reschedule(
+    @Param('id') id: string,
+    @Body() dto: RescheduleBookingDto,
+    @CurrentCustomer() customer: CustomerPrincipal,
+  ) {
+    return this.bookings.rescheduleCustomerBooking(
+      customer.accountId,
+      id,
+      new Date(dto.startsAt),
+      dto.durationMinutes,
+    );
+  }
+
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cancel your own booking' })

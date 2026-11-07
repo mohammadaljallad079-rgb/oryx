@@ -3,7 +3,7 @@
 Read **docs/ORYX_MASTER_REFERENCE.md**, **docs/architecture/ARCHITECTURE.md** and
 **docs/architecture/PERMISSION_MATRIX.md** before writing code.
 
-## Current state (Execution 01, 01.1, 02, 03, 04 and 05 complete)
+## Current state (Executions 01–20 complete)
 
 Execution 01 delivered the working Super Admin foundation, Execution 01.1
 hardened it (secure session transport, TOTP MFA, approved photography and
@@ -12,10 +12,15 @@ added HR and payroll, CRM, operations and automotive services, Execution 04
 added the customer platform, the automotive marketplace, the shared booking
 engine, payments, notifications and the ORYX customer mobile application, and
 Execution 05 added the External Integrations Center and platform-completion
-work. It is **not** a mock: a NestJS API, a Next.js admin app, a Next.js
-customer site, an Expo/React Native mobile app and a PostgreSQL database run
-locally and are covered by 445 automated tests (93 shared unit, 218 API
-integration, 120 browser, 14 mobile).
+work. Later executions added the vehicle inspection engine, official documents
+with QR verification, the tenant tax module and the POS terminal. It is **not**
+a mock: a NestJS API, a Next.js admin app, a Next.js customer site, an
+Expo/React Native mobile app and a PostgreSQL database run locally.
+
+Current automated coverage (2026-11-07, re-run on the working tree): **231**
+shared unit, **685** API integration (37 suites), **20** API unit, **224**
+admin browser, **206** mobile, **31** mobile-ERP. See
+`docs/audit/ORYX_FINAL_ACCEPTANCE.md` for the authoritative, dated matrix.
 
 Security baseline (do not regress):
 - The refresh token lives in an HttpOnly cookie scoped to `/api/v1/auth`. It is
@@ -67,7 +72,7 @@ Security baseline (do not regress):
   adapters that report themselves unconfigured without credentials) and the
   ORYX customer mobile application (`apps/mobile`, Expo/React Native).
 - **Execution 05 (implemented and tested):** the External Integrations Center
-  (an 8-provider catalogue declared once in `packages/shared/src/integrations.ts`,
+  (a 10-provider catalogue declared once in `packages/shared/src/integrations.ts`,
   AES-256-GCM sealed credentials, a company-scope override, an enablement guard
   that refuses to enable a provider with a missing required credential, a real
   connection-test path with append-only check history, audit logging by key and
@@ -165,6 +170,12 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   (`toMinor`, `lineAmountMinor`, `basisPointsOfMinor`, `allocateMinor`). Percentages
   in the data model are **basis points** (1500 = 15%); `percentOfMinor`'s scale
   argument is easy to get wrong, so prefer `basisPointsOfMinor`.
+- **Labour hours are hundredths, not `QUANTITY_SCALE` units.** A duration such as
+  2.5 h is stored as `250`, while an inventory quantity of 2.5 is `25000`. Price a
+  labour line with `hoursAmountMinor(hours, rateMinor)`, never `lineAmountMinor` —
+  the latter divides by `10^4` and under-prices the work by 100×. Convert hours
+  onto an invoice line's quantity with `hoursToQuantity`. The same rule covers
+  payroll overtime and unpaid leave.
 - **Every posting goes through `AccountingPostingService.postJournal`.** It asserts
   balance, resolves the open period, allocates the entry number and updates
   account balances in one transaction. Never write journal rows directly.
@@ -215,13 +226,33 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 
 ### Execution 04 gotchas
 
-- **React must resolve to one version across the workspace.** The repository uses
-  `node-linker=hoisted`. A workspace that pins a different React minor (the
-  mobile app originally pinned `19.1.0`) hoists that copy to the root, pairs it
-  with the other `react-dom`, and `next build` then fails at prerender with
-  `Cannot read properties of null (reading 'useRef')`. Keep `react` aligned
-  across `apps/admin`, `apps/customer` and `apps/mobile`; react-native's peer
-  range is `^19.1.0`, so `19.3.0` satisfies it.
+- **React must resolve to exactly one version, and it must be the one
+  react-native bundles.** The repository uses `node-linker=hoisted`. Two rules,
+  and the second one is the one that shipped a crashing APK:
+
+  1. Keep `react` aligned across `apps/admin`, `apps/customer`, `apps/mobile`
+     and `apps/mobile-erp`. A workspace pinning a different React minor hoists
+     that copy to the root, pairs it with the other `react-dom`, and `next build`
+     fails at prerender with `Cannot read properties of null (reading 'useRef')`.
+
+  2. **Do not treat react-native's `^19.1.0` peer range as permission to pick a
+     higher patch.** React asserts an *exact* version match against
+     `react-native-renderer`, which ships inside react-native. `react-native`
+     0.81.5 bundles renderer `19.1.0`, so `react` must be `19.1.0`. With
+     `19.3.0` the app crashed on startup on a real device:
+
+         E/ReactNativeJS: Incompatible React versions: The "react" and
+           "react-native-renderer" packages must have the exact same version.
+           - react: 19.3.0
+           - react-native-renderer: 19.1.0
+
+     The web build never caught it, because the renderer only exists on native.
+     `node_modules/expo/bundledNativeModules.json` is the authority: it pins
+     `react` and `react-dom` to `19.1.0` for `react-native` 0.81.5. Read it before
+     changing a React version. Verify the resolved version with
+     `cat node_modules/react/package.json`, and check the renderer's own version
+     with
+     `grep -o '"19\.[0-9]\+\.[0-9]\+"' node_modules/react-native/Libraries/Renderer/implementations/ReactFabric-prod.js | sort -u`.
 - **The consumer identity plane is separate from staff auth.** A consumer access
   token carries `audience: customer`. It is refused on a staff route and a staff
   token is refused on a consumer route; do not relax either check to make a test
@@ -302,8 +333,24 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `lint` script is `eslint . --max-warnings=0`. `next lint` is deprecated in
   Next 15 and prompts interactively when no config exists, which made
   `pnpm -r lint` hang in CI. CI runs admin and customer lint.
+- **Pin the Chromium jobs to `ubuntu-24.04`, not `ubuntu-latest`.** GitHub moved
+  the `ubuntu-latest` label to Ubuntu 26.04, and Playwright 1.56.1 refuses to
+  install Chromium on it (`Playwright does not support chromium on
+  ubuntu26.04-x64`). The failure lands at `playwright install --with-deps
+  chromium`, before any test runs, so it looks like the commit it happened to be
+  attached to rather than image drift. `test-ui` in `ci.yml` and `verify` in
+  `preview.yml` are pinned; lift the pin when Playwright supports 26.04.
 
 ### Execution 05 gotchas
+
+- **A Prisma `upsert` on a sequence row races when the row does not exist yet.**
+  `DocumentSequenceService.next()` used `upsert`, so two concurrent *first*
+  postings for the same company and document type both inserted and the loser
+  raised `P2002`. `withTransaction` retries `40001`/`40P01`/`P2034` but **not**
+  `P2002`, so a valid concurrent posting surfaced as a `500`. It now uses
+  `createMany({ skipDuplicates: true })` (`INSERT … ON CONFLICT DO NOTHING`)
+  then `findUniqueOrThrow` + `update`, which converges on one row and serialises
+  on its lock. `apps/api/test/document-numbering.e2e-spec.ts` locks this in.
 
 - **`OPERATIONAL` means it works, nothing weaker.** `deriveState` in
   `apps/api/src/integrations/integrations.service.ts` is the single place that
@@ -331,6 +378,18 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `IMPLEMENTED` means no credentials are needed and the work is real (cash, card
   terminal). `ADAPTER_ONLY` means the adapter exists but the vendor call is not
   implemented, so `verify` must report "not implemented" rather than a success.
+  Two `ADAPTER_ONLY` providers are exceptions whose vendor call *is* written:
+  `SENSAGE_AI` and `REGISTRATION_OCR` perform a real request in `verify`, so a
+  failure there is a genuine failure and only a validated response is
+  `VERIFIED`. Do not extend that exception to a provider without a working
+  adapter.
+- **Registration-card OCR extracts, it never saves.** `POST
+  /automotive/vehicles/:id/documents/ocr` reads a scan and returns suggested
+  fields for an operator to review; it writes no `VehicleDocument` and no
+  `CmsMediaAsset`, so a discarded extraction leaves nothing behind. The scan
+  bytes stay in memory. With no `OCR_API_KEY` it returns `configured:false` and
+  no fields — never a canned answer. The deterministic adapter is selected only
+  by an explicit `test://` base URL.
 - **The browser suite mutates integration state.** A test that stores
   credentials must remove them again, or the later tests that assert
   `AWAITING_CREDENTIALS` fail. `execution05.spec.ts` seeds and clears
@@ -350,6 +409,144 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   cookie without a matching `x-oryx-csrf` header. The refresh branch above it
   echoes the cookie; the login branch must too.
 
+### Whole-amount rounding gotchas
+
+- **`NONE` is the default and must stay exact.** `roundMinor` in
+  `packages/shared/src/money.ts` returns `{ rounded: total, adjustment: 0 }` when
+  the mode is `NONE`, so a tenant that never opts in is byte-for-byte unchanged.
+  Do not "simplify" the default to a non-zero increment.
+- **The rounding difference is posted, never dropped.** A document stores the
+  rounded `totalMinor` and a signed `roundingMinor`; `postSalesInvoice` splits
+  the receivable from `ROUNDING_GAIN_LOSS` (account `5930`) so the journal still
+  balances. The invariant is `subtotal − discount + tax + rounding === total`.
+  Any new document path that rounds must post the same way.
+- **The chart defines `5930` in two places.** Keep `STANDARD_CHART` in
+  `apps/api/src/accounting/accounting.service.ts` and in
+  `packages/database/prisma/seed.ts` in step, exactly as for every other system
+  role, or a freshly seeded tenant will miss the rounding account.
+- **The POS preview must mirror the server.** `sales/page.tsx` calls the same
+  `roundMinor` the API does, so the cashier sees the charged total before
+  submit. Do not compute the POS total a second, different way.
+
+### Malformed-input gotchas (Execution 16)
+- **An unvalidated `?status=` string is a 400, not a 500.** Most list routes pass
+  the query straight into a Prisma filter (`status: query.status as never`).
+  A value that is not a member of the enum makes Prisma throw
+  `PrismaClientValidationError`, and a non-UUID `?companyId=` makes it throw
+  P2023. Both are the caller's mistake. `PrismaExceptionFilter`
+  (`apps/api/src/common/prisma-exception.filter.ts`, registered globally in
+  `createApp`) maps the validation error to 400 and P2025/P2002/P2003/P2023 to
+  404/409/400. A genuine bug stays a 500 and is logged, never returned. Do not
+  re-derive this per call site.
+- **Never `throw new Error(...)` from a request path.** Nest reports a plain
+  `Error` as a 500. `resolveCompanyId` in `rbac.controller.ts` did this for a
+  cross-tenant or missing company scope; use `forbidden()` / `badRequest()` from
+  `common/errors.ts` so the status is honest.
+- **Sweep before claiming "no 5xx".** A GET fuzz over every path in
+  `GET /api/docs-json` with junk query values (non-enum `status`, non-UUID
+  `companyId`, `page=abc`, negative `pageSize`) caught 36 failing routes that a
+  happy-path suite never touches. `apps/api/test/execution16-malformed-input.e2e-spec.ts`
+  pins representative cases.
+
+### Sales date and test-isolation gotchas (Execution 17)
+
+- **`@Transform` never fires for an absent key.** `class-transformer` runs a
+  property's transform only when that property is present on the source object.
+  `SalesDocumentDateDto` used a `documentDate` transform to fold the historical
+  `issueDate`/`orderDate`/`invoiceDate` aliases onto it, so a payload carrying
+  only an alias never reached the transform and `@IsISO8601()` rejected a
+  perfectly valid date. Declare each name and read the effective value with
+  `resolveDocumentDate(dto)`; use `@ValidateIf` to require `documentDate` only
+  when no alias is supplied. Verified: `plainToInstance(D, { issueDate })` leaves
+  `documentDate` `undefined`.
+- **Keep `forbidNonWhitelisted` on.** The fix for the alias bug was to *declare*
+  the aliases, not to relax the whitelist. Every name keeps its own
+  `@IsISO8601()`, so a malformed legacy value is still a 400.
+- **A suite that does not test stock must not move stock.** The e2e specs run
+  against the dev database, so `issueStock` defaults to true and an invoice
+  create drains the seeded product. A manual curl check had already consumed the
+  stock, and the suite then failed with a 403 "Insufficient stock" that looked
+  like a date regression. Pass `issueStock: false` (and `restockInventory: false`
+  on a credit note) in specs that assert dates or totals, and re-seed
+  (`pnpm db:seed`) after manual write verification.
+- **Never run two Playwright suites at once.** Concurrent runs contend and every
+  login times out at ~30 s, which looks like a broken app. One suite at a time.
+- **`apps/api` has no unit tests.** `pnpm --filter @oryx/api test` prints
+  "No tests found" because `jest.config.js` ignores `test/`; every API test is an
+  e2e spec run by `test:e2e`. That exit code is not a regression.
+
+### Production-readiness gotchas (Execution 09)
+
+- **`MFA_REQUIRE_SUPER_ADMIN=true` must not lock the owner out.** The guard
+  refuses an unenrolled Super Admin on every route, so without an exemption the
+  owner could log in, get a token, and then be 403'd on `auth/me` — the shell
+  drops the session and bounces back to sign-in, forever. `@AllowMfaEnrollment()`
+  on `auth/me`, `auth/mfa/status`, `auth/mfa/enroll` and `auth/mfa/enroll/confirm`
+  is what makes the documented "set the flag, sign in, enrol TOTP" runbook
+  work. Keep the exemption to those routes: every other platform route stays
+  refused until the second factor exists.
+- **The shipped API image must contain `packages/database/scripts/`.** The
+  first-deploy step runs `production-init` inside the API container so it
+  reaches PostgreSQL on the internal network. The runtime stage copies the
+  script and recreates the `packages/database/node_modules/@oryx/shared`
+  symlink the pruned install omits, and `chown`s both to `oryx` — the file is
+  root-owned and mode 660 in the build stage, so without the `chown` the
+  unprivileged runtime user gets `EACCES` reading its own bootstrap script.
+- **Prisma needs `openssl` in the image.** The `node:*-slim` base omits it, so
+  Prisma logs `failed to detect the libssl/openssl version … Defaulting to
+  "openssl-1.1.x"` and loads a 1.1.x engine against Debian 12's OpenSSL 3. It
+  happens to connect, but the warning is a real mismatch — install `openssl` in
+  the base stage.
+- **Contrast must be measured, not eyeballed.** `scripts/verify-theme-matrix.mjs`
+  drives the real pages and computes WCAG contrast per element. The light theme
+  passes; the approved dark theme has one pre-existing miss,
+  `.oryx-stat__label` at 4.42–4.49 against a 4.5 floor (documented as defect E8,
+  left alone under the "do not alter the approved theme" rule).
+
+### Existing-server pre-deployment gotchas (Execution 10)
+
+- **The deployment host is not reachable from the agent sandbox.** There is no
+  SSH client, no key, no `~/.ssh`, no `DEPLOY_*` variable, and no docker daemon.
+  `deploy.yml` reads its host from repository secrets that an integration token
+  cannot read (`403 Resource not accessible by integration`), and the
+  `production` environment does not exist. A pre-deployment task therefore
+  starts by asking for access, not by assuming a hostname — do not invent one.
+- **`deploy/scripts/inspect-server.sh` is the read-only survey.** It answers the
+  OS, resources, ORYX roots, PM2/Docker, nginx, PostgreSQL, DNS, certificate,
+  version, uploads and env-file questions without writing anything. It prints
+  env-file **paths and modes only, never values**. Run it with `sudo` for the
+  root-only sections; without root it skips them and still produces a partial
+  audit.
+- **Staging isolation is the compose project name, not a second compose file.**
+  `docker compose -p oryx-staging … --env-file .env.staging` gives separate
+  volumes automatically, because compose prefixes volume names with the project.
+  Also change `EDGE_HTTP_PORT`/`EDGE_HTTPS_PORT` and `POSTGRES_DB`; sharing any
+  of them disturbs the live stack.
+- **`deploy.sh` never reverses a migration.** It restores the previous image tag
+  on a failed health probe and stops. A schema rollback is a deliberate restore
+  into a separate database, then a promotion — not an automatic down migration.
+- **`--env-file` does not isolate a container; a service's `env_file:` does.**
+  `--env-file` only interpolates `${...}` inside the compose file. The `api`
+  service's `env_file:` injects keys straight into the container and is
+  overridden only by an explicit `environment:` entry. It used to be hard-coded
+  to `../.env.production`, so a staging stack resolved with the **production**
+  JWT, refresh, MFA and database secrets. It is now
+  `${ORYX_API_ENV_FILE:-../.env.production}`, which keeps production unchanged
+  and lets staging point at its own file. Never remove that indirection, and
+  never "simplify" it back to a literal path.
+- **Prove staging isolation with the checker, not by reading the files.**
+  `deploy/scripts/verify-staging-isolation.sh .env.staging` resolves both stacks
+  with `docker compose config` (no daemon needed) and fails on a shared project
+  name, port, resolved volume name, sensitive value or database. It is verified
+  non-vacuous: it fails on the pre-fix compose file. When writing such a check,
+  compare *resolved* volume names (compose prefixes the project) and skip *empty*
+  values (an unconfigured adapter is empty in both files) — both are easy false
+  positives.
+- **`env_file:` in flow-sequence form cannot hold a `:-` default.** `env_file:
+  [${VAR:-x}]` fails to parse (`did not find expected ',' or ']'`); use the block
+  list form.
+
+
 ### Branding and preview gotchas
 
 - **An exported `NEXT_PUBLIC_API_BASE_URL` silently overrides `.env.local`.** A
@@ -358,6 +555,12 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `http://localhost:3001` from the browser and every login fails CORS. `.env.local`
   is correct with `NEXT_PUBLIC_API_BASE_URL=/api`; build from a clean environment
   and confirm with `grep -r 'http://localhost:3001' apps/*/.next/static/`.
+- **`.env.local` is gitignored, so a sandbox recycle deletes it.** The built
+  `.next/` survives the recycle but the source file does not, so the next rebuild
+  silently falls back to the absolute default and every authenticated customer
+  surface starts redirecting to `/login` again. After a recycle, recreate
+  `apps/customer/.env.local` (and `apps/admin/.env.local`) with
+  `NEXT_PUBLIC_API_BASE_URL=/api` *before* rebuilding.
 - **The customer app's preference keys are namespaced.** It reads
   `oryx.customer.locale` and `oryx.customer.theme`, while the admin app reads
   `oryx.locale` and `oryx.theme`. Seeding the wrong pair leaves the app on its
@@ -378,6 +581,24 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 - **`module` is a reserved lint identifier.** `@next/next/no-assign-module-variable`
   rejects a `for (const module of …)` loop in an app that shares the admin ESLint
   config. Name the binding something else.
+- **Capture the customer app over `localhost`, not `127.0.0.1`.** The exported
+  bundle's `NEXT_PUBLIC_API_BASE_URL` points at `http://localhost:3001`, and the
+  customer refresh token is an HttpOnly cookie. A browser opened on
+  `http://127.0.0.1:12001` treats `localhost:3001` as a different site, so the
+  refresh cookie is not sent, every authenticated surface redirects to `/login`,
+  and a capture script that asserts an authenticated route fails with "landed on
+  /login". Use `http://localhost:12001` and the session survives a reload.
+- **The admin light theme is a warm ivory system, not the customer's tokens.**
+  The two apps keep separate token blocks, but the approved identity is the same:
+  field `#f7f4ed`, raised `#fbf9f4`, body type `#22201d`, muted `#5a544b`, gold
+  text `#7d5f10`. Do not reintroduce the old cold ramp (`#f5f6f8` / `#0d2338`);
+  the customer site never used it and the mismatch reads as two products.
+- **Admin light-theme checks are scripts, not specs.**
+  `.run/check-admin-light-palette.mjs` (WCAG pairs) and
+  `.run/verify-admin-light.mjs` (browser assertions) fail loudly and must stay
+  green. The branding editor is company-scoped, so the verifier signs in a second
+  time as a company administrator to assert it; a Super Admin carries no tenant
+  scope and legitimately does not render it.
 
 
 ### Platform seed gotchas
@@ -408,8 +629,194 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   non-zero without it. Source the root `.env` before `pnpm db:seed` or `test:ui`:
   `set -a; . ./.env; set +a`.
 
+### Execution 07 light-theme gotchas
+
+- **A screenshot named for a theme is not proof of that theme.** The audit
+  capture runs a locale × theme loop and then captures the tablet and mobile
+  dashboards inside the same test; setting the viewport does not reset the
+  locale or the theme, so `dashboard-{tablet,mobile}-ar-dark.png` held an English
+  light render. Set `ar` and `dark` explicitly and assert `data-dir` and
+  `data-theme` before capturing. `.run/verify-exec11-theme.mjs` reads the
+  dominant colour of each capture and fails when a `-light` file is not ivory or
+  a `-dark` file is not navy.
+- **The customer session lives in memory.** A `page.goto` reload between captures
+  races the refresh and can bounce an authenticated surface to `/login`, which
+  then gets captured under the authenticated surface's name. Capture the
+  dashboard immediately after the sign-in redirect, or assert the landing URL.
+- **The theme and locale keys are per-app.** The bootstrap reads
+  `oryx.customer.theme` / `oryx.customer.locale` in `apps/customer` and
+  `oryx.theme` / `oryx.locale` in `apps/admin`; setting any other key is silently
+  ignored and the capture renders the default.
+- **A tall dark footer can dominate a full-page capture.** Read the dominant
+  colour from the top band, not the whole image, or every light page reads as
+  dark.
+- **Gold is two tokens, not one.** A gold *text* colour on an ivory field must be
+  dark enough for 4.5:1; a gold *tint fill* must be light enough for dark ink to
+  read on it. Painting `--gold` as text on a gold tint puts the label in the same
+  colour family as its own background. The chip foreground is `--gold-on-tint`.
+  This is why the light theme has both and the dark theme can reproduce `--gold`.
+- **The tint percentages differ per theme on purpose.** The admin dark ramp keeps
+  the percentages its rules already used (badge 15%/40%, collapsed nav 18%, nav
+  gradient 20%) so the approved dark render stays byte-identical; the light ramp
+  matches `LIGHT_THEME`. `scripts/check-token-parity.mjs` records the dark values
+  as an explicit exemption. "Fixing" the dark ramp to match the light one changes
+  the approved dark theme — don't.
+- **Measure the computed style, not the screenshot, when judging a theme.** A
+  region-average sampler with a loose selector (`main`, `section`) matches the
+  wrong element and reports nonsense such as a dark "card" in a light theme.
+  `scripts/probe-light-chrome.mjs` reads `getComputedStyle` for the page
+  background and text and asserts they equal `LIGHT_THEME`.
+- **The evidence preview server only maps `/evidence/` onto `.run/evidence/`.**
+  A capture copied to `.run/evidence/exec07-final/x.png` is reachable at
+  `/evidence/exec07-final/x.png` on port 12000. Any other path falls through to
+  the Next app and returns that app's HTML shell with a `404`/`200`, so a link to
+  a file that was never copied looks plausible and serves the wrong thing. Check
+  `content-type` before publishing a link.
+
+### Execution 12 gotchas
+
+- **A test must never clean up by company when it borrows a seeded tenant.**
+  `execution10-mobile-integration.e2e-spec.ts` used `DEMO-ALNOOR` as its fixture
+  and then deleted products with `where: { companyId }`, which also removed the
+  seeded catalog and opening stock. The Execution 02 inventory UI test then failed
+  on the *next* run, looking like a code regression. Clean up by the ids you
+  created (`where: { id: { in: [...] } }`), never by the tenant you borrowed.
+- **The API e2e suites run against `oryx_dev`, the same database as the UI suite.**
+  They are not isolated. A destructive `afterAll` corrupts the fixtures the
+  Playwright suite reads, and the symptom appears in a later, unrelated test.
+- **`.env` ships production-ish throttle limits; the UI suite needs the overrides.**
+  `AUTH_THROTTLE_LIMIT=10` in `.env` makes the Playwright suite fail with 30s
+  `waitForURL` timeouts after roughly ten logins. `scripts/dev-up.sh` sources
+  `.env`, so a stack it started is *not* ready for `test:ui`. Start the API with
+  `AUTH_THROTTLE_LIMIT=100000 THROTTLE_LIMIT=1000000 REFRESH_THROTTLE_LIMIT=100000`.
+- **A sandbox restart removes Postgres, pnpm and the Playwright browsers.**
+  `bash scripts/dev-up.sh` restores Postgres, the built API and pnpm. It does
+  *not* restore the browsers: run
+  `pnpm --filter @oryx/admin exec playwright install chromium` afterwards, or every
+  UI test fails in ~3ms with `Executable doesn't exist`.
+- **A 2–3ms failure is a launch failure, not a test failure.** When every test in a
+  suite fails instantly, read one error in isolation (`-g "<name>"`) before
+  suspecting the code.
+
+### Execution 13 gotchas
+
+- **A banner has two independent states, and only the pair reaches customers.**
+  `isActive` is an operator toggling a slide on; `status` (DRAFT/PUBLISHED) is a
+  reviewer approving what it says. The customer homepage serves only `PUBLISHED`
+  **and** `isActive`, so `PUT /cms/banners` must keep writing `status` only when it
+  is supplied — otherwise toggling activation would silently publish a draft.
+- **A catalogue item is never hard-deleted.** There is no `DELETE /inventory/products/:id`;
+  invoices, movements and images reference the row. A test that creates one cleans up
+  by deactivating it (`PATCH { isActive: false }`) and removing its images, not by
+  deleting it.
+- **A catalogue item belongs to a tenant.** The platform Super Admin has no tenant
+  scope, so creating a product as the Super Admin is a `403`. Product fixtures in the
+  UI suite sign in as a tenant administrator (`ENTERPRISE_ADMIN`).
+- **The media pipeline rejects anything under 64×64.** A hand-written PNG fixture must
+  be at least 64px on each side or the upload fails `400 media.dimensions_invalid`.
+  Build one with `zlib.deflateSync` + a CRC32 (see the UI spec's `pngBuffer`), or use
+  `sharp` as the API suites do.
+- **The inventory page opens on the Valuation tab.** A UI test that wants the product
+  table must click `inventory-tab-products` first, and the catalogue is paginated, so
+  locate a fixture through `product-search` rather than assuming page 1.
+- **Announcements address two id spaces.** A staff `userId` is not a
+  `CustomerAccount.id`, and the consumer inbox reads only rows carrying
+  `customerAccountId`. `POST /notifications/announcements` takes `userIds` and
+  `customerAccountIds` / `allCustomers` separately; a broadcast is capped at
+  `MAX_ANNOUNCEMENT_RECIPIENTS` (5,000) so one call cannot queue unbounded rows.
+
+### Planned-ecosystem gotchas (Execution 20)
+
+- **The account id always comes from the token.** Every `/customer/*` route in
+  `apps/api/src/ecosystem/customer-ecosystem.controller.ts` reads the account
+  from `@CurrentCustomer()`, never from a path or body. A foreign RFQ, return,
+  recovery request, fleet, vehicle or photo must be a `404`, not a leak — the
+  suite `execution20.e2e-spec.ts` pins each one.
+- **A consumer token on a staff route is `401`, not `403`.** `CustomerAuthGuard`
+  and the staff principal guard reject the wrong plane before any permission is
+  read, so the smoke test expects `401` on `/provider/rfqs` with a consumer
+  token and `403` only for a *staff* user without provider membership.
+- **Unknown fitment is not incompatibility.** `EcosystemService.checkFitment`
+  returns `fitmentKnown: false` when the product has no fitment rows at all;
+  `compatible` is then `false` too, but the UI must show the unknown state. Never
+  collapse the two.
+- **A fitment query needs a real product id.** An unknown `productId` is a `404`;
+  use an id from `GET /customer/catalog/products` in a smoke test.
+- **The fleet driver response nests the id.** `POST /customer/fleets/:id/drivers`
+  returns `{ drivers: [...] }`, so a new driver's id is `drivers[0].id`, not the
+  top-level `id`.
+- **`OPERATIONAL` still means it works.** `SENSAGE_AI` reports `configured: false`
+  and produces no analysis until a credential is stored; the analysis path stores
+  every result as a `PENDING` suggestion and the mobile screen must never label
+  it a diagnosis. `apps/mobile/test/ecosystem-honesty.test.ts` guards this.
+- **The registration endpoint is throttled.** A smoke test that registers a
+  fresh consumer per section hits the auth limiter and sees `429` (which empties
+  the token and cascades into spurious `401`s). Run the API with
+  `AUTH_THROTTLE_LIMIT=100000 THROTTLE_LIMIT=1000000 REFRESH_THROTTLE_LIMIT=100000`.
+- **Build the API before a smoke test.** `node apps/api/dist/main.js` serves
+  compiled output; after a source change run `pnpm --filter @oryx/api build`
+  first or the server serves stale routes.
+
 ### Mobile gotchas
 
+- **An access token expires mid-session, not at start-up.** Cold-start restore is
+  not enough: the common expiry happens while the app is open, and before the
+  refresh seam existed every action then failed ("could not cancel", "upload
+  failed") until the app was restarted. `apps/mobile/src/lib/api.ts` exposes a
+  per-plane seam — `setSessionRefresher` / `setSessionExpiredHandler` — that each
+  session store registers. On a `401` to an authenticated request the client
+  rotates **once** (single-flight, so a burst of 401s is one rotation), replays
+  the request, and calls the expired handler when the rotation is refused.
+  `uploadFile` recovers the same way so a photograph is not lost. A `403` is
+  **never** treated as an expiry: it is a permission refusal. Pinned by
+  `apps/mobile/test/session-refresh.test.ts`.
+- **Logout revokes the refresh family, not the issued access token.** After
+  logout a refresh is `401` (`auth.refresh_reused`), but the already-issued
+  short-lived access token stays valid until it expires. Do not assert that
+  logout invalidates an access token — assert that the session cannot be
+  *extended*.
+- **The double-submit token must be adopted from the login/refresh body.** A native
+  client has no `document.cookie`, but React Native's cookie jar still replays the
+  HttpOnly `oryx_crt` / `oryx_rt` cookie on every request to its scope, so
+  `CsrfGuard` demands a matching `x-oryx-csrf` header on every unsafe method. The
+  API returns `csrfToken` in the body for `x-oryx-client: mobile`; the app must
+  store it (`setCsrfToken` / `setStaffCsrfToken`) and echo it. Omitting it is not a
+  harmless no-op: the restore is answered `403 auth.csrf_token_invalid` and the
+  customer is silently dropped into offline demo mode. The token is kept **stable**
+  across a refresh — only the refresh token rotates — so the app may echo the same
+  value again. Pinned by `apps/mobile/test/csrf-double-submit.test.ts` and
+  `apps/api/test/execution14-mobile-restore.e2e-spec.ts`.
+- **Android blocks cleartext HTTP from targetSdk 28 on.** A release build cannot
+  reach `http://localhost:3001` without an explicit exemption, and the failure is
+  silent: OkHttp throws `UnknownServiceException`, the app maps it to an offline
+  error, and every live rail renders empty. `plugins/with-cleartext-local-api.js`
+  declares a `network_security_config.xml` scoped to the loopback hosts and the
+  emulator alias only (`localhost`, `127.0.0.1`, `10.0.2.2`, `10.0.3.2`); every
+  other destination stays HTTPS-only. `apps/mobile/android` is generated, so the
+  policy lives in the plugin and is applied by `expo prebuild`.
+- **The home rail reports availability as a boolean, not a count.** A public
+  projection must not expose a tenant's inventory depth, so
+  `GET /customer/homepage` returns `available: boolean` (`trackStock ? onHand > 0 :
+  true`). The card treats `stock <= 0` as sold out, so the client adapter must map
+  the flag rather than default the count to zero, or every in-stock product renders
+  as out of stock.
+- **Every tenant seeds its own copy of the demo catalogue, so an unscoped home
+  query repeats itself.** The demo seed gives ORYX-HOLDING, ORYX-AUTO, the demo
+  tenants and each E2E fixture its own copy of the same five providers and six
+  products. A homepage rail that queried across tenants returned "Front brake pad
+  set" and "Al Noor Parts" about ten times each. `getFeaturedProviders` and
+  `getPopularProducts` in `customer-homepage.service.ts` now de-duplicate — by SKU
+  for products, by display name for providers — and keep the photographed copy so a
+  blank twin cannot displace a photographed one. Read a window of
+  `RAIL_SCAN_LIMIT` (4× the rail) rows before de-duplicating, not `RAIL_LIMIT`, or
+  ten copies of one SKU collapse the rail to a single tile. Pinned by
+  `apps/api/test/execution10-mobile-integration.e2e-spec.ts`.
+- **A local API can be reading `oryx_test`, not `oryx_dev`.** `DATABASE_URL` in the
+  ambient shell wins over `.env`, so a restarted `node dist/main.js` may serve the
+  e2e database — which is empty until the suites seed it. A homepage probe then
+  returns rows whose ids do not exist in `oryx_dev`, which looks like a projection
+  bug. Check `tr '\0' '\n' < /proc/$(pgrep -f "node dist/main.js")/environ | grep
+  DATABASE_URL` before trusting a manual probe, or pass the URL explicitly.
 - **Every file under `(app)` becomes a tab.** Expo Router registers the whole
   directory, so a screen that is only pushed onto the stack (a detail screen, the
   booking wizard, invoices, notifications) renders as an extra tab whose label is
@@ -418,12 +825,148 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `bookings`, and the wrong name silently renders a stray tab instead of the
   screen you meant. `apps/mobile/test/tabs.test.ts` derives the route list from
   the filesystem and fails when a new screen is added without a declaration.
-- **The customer session is in memory.** A full page reload of the Expo web
-  export drops the access token, so an automated check must log in once and then
-  navigate *inside* the app rather than reloading a URL per screen. A reload also
-  makes the browser present the refresh cookie, which the API rejects for a
-  body-carried token — an artefact of running a native client in a browser, not a
-  product path.
+- **The customer session survives a reload on web.** `session-storage.ts` persists
+  the session to `localStorage` (`oryx.marketplace.session`, plus `.cart`,
+  `.favourites`, `.locale`, `.theme`) when running in a browser, so an automated
+  check can sign in once and then navigate to each screen by URL. This replaces
+  the earlier note that the session was in memory only; that is no longer true.
+  A reload still makes the browser present the refresh cookie, which the API
+  rejects for a body-carried token — an artefact of running a native client in a
+  browser, not a product path.
+- **The marketplace tab `href`s are flattened route paths.** The tabs live at
+  `/mobile/{home,parts,services,sensage,account}`, not `/(tabs)/...`. A capture
+  script that drives the tab bar with the group paths finds nothing and silently
+  re-shoots whichever screen it was already on, which looks like 15 identical
+  screenshots rather than an error.
+- **RTL is applied per element, not on `<html>`.** `Screen` and the text
+  components carry `direction` / `writingDirection` from the locale, and rows are
+  reversed with `flexDirection: row-reverse`. There is no `dir` attribute to read
+  on the document element, so assert RTL by counting elements that compute to
+  `rtl` (English ≈ 1, Arabic ≈ 455–678 per screen).
+- **Android 12+ ignores a photographic `splash.png`.** The platform composes the
+  launch screen from a window background and one centred icon, so the splash
+  image is drawn only on older releases. The photography a customer sees on a
+  current device comes from `components/launch.tsx`, which covers the gap until
+  the stored session has been read. Keep its background the same navy as the
+  platform splash or the hand-off shows a colour step.
+- **The APK is a build output and is gitignored.** `apps/mobile/.gitignore`
+  excludes `/android`, so `app-release.apk` never enters the history. The
+  `release` build type points at `signingConfigs.debug` (Expo template default),
+  so it is debug-signed — fine for a demo hand-out, not for a store submission.
+
+### Execution 10 gotchas
+
+- **A seeded deployment had zero bookable slots.** Availability is generated from
+  a `BookingResource` plus its `WorkingHours`, and the seed created only workshop
+  bays, so `GET /customer/bookings/availability` returned `[]` and the mobile
+  wizard showed an empty day with no error. The seed now creates two `BAY`
+  resources per company, open 08:00-20:00 daily. If availability is ever empty
+  again, check the resources before the client.
+- **A write on a pushed screen is invisible to the tab underneath.** The account
+  tab and the address list stay mounted while a detail screen is pushed on top,
+  and their `useAsync` deps do not change, so a vehicle or address created on the
+  pushed screen does not appear until a manual reload. `useReloadOnFocus`
+  (`apps/mobile/src/lib/use-reload-on-focus.ts`) refetches on focus; use it for
+  any list a sibling screen can mutate.
+- **The live-orders store exposes `refresh`, the async hook exposes `reload`.**
+  They are different names for the same idea and mixing them up is a type error
+  rather than a silent bug.
+- **A demo rail must be gated by the session, not by an empty response.**
+  `parts/index.tsx` originally showed the demo product rail whenever the live
+  catalogue came back empty, which is the live case on a fresh tenant. Gate demo
+  data on the absence of a session (`!isLive` / `!isSignedIn`).
+  `apps/mobile/test/demo-gating.test.ts` walks every screen file and fails if one
+  reads the demo `repository` without also reading the session; add a screen to
+  its `ALLOWED` map only when there is genuinely no session to branch on.
+- **`MediaStorageService` sniffs magic bytes and ignores the declared
+  content-type.** A real PNG posted as `application/pdf` is accepted, and
+  non-image bytes posted as `image/png` are refused. A test that asserts on the
+  declared type alone will assert the wrong thing.
+- **A 1x1 PNG is refused by the image pipeline.** Smoke tests need a real image;
+  `scripts/exec10-smoke.sh` generates an 80x80 RGB PNG for exactly this reason.
+- **A booking slot must be labelled in UTC, the zone the engine planned it in.**
+  `assertSlotBookable` plans a day from UTC midnight and returns each slot as an
+  instant, so `slotLabel()` in `apps/mobile/src/lib/format.ts` formats with
+  `getUTCHours()`. A local-time label shows a time the workshop never offered
+  whenever the device is off UTC. Four copies of that formatting were collapsed
+  into the one helper; use it rather than inlining the padStart pair again.
+- **Rescheduling re-checks availability with `excludeSlotId`.** Without that
+  exclusion a booking collides with its own row and every move to a slot in the
+  same window is refused. A unique violation on the new time must surface as
+  `BOOKING_SLOT_UNAVAILABLE` (409), not a generic failure.
+- **A failed upload must not keep reading "uploading".** `sensage/new.tsx` gives
+  each shot its own `uploadState` (`pending`/`failed`) so a failed send is marked
+  and offers a retry. A single screen-level `uploading` flag leaves a shot that
+  never landed looking like work in progress.
+- **A searchable `Select` filters on label, sublabel and `keywords`.** The match
+  lives in `filterOptions` (`apps/mobile/src/lib/options.ts`) so it is unit-tested
+  directly. Pass both scripts as keywords — `keywords: \`${make} ${makeAr}\`` — so
+  an Arabic term finds an English label without switching the app locale.
+- **The e2e suites need `DATABASE_URL` pointed at `oryx_test`.** The API default
+  is `oryx_dev`; running `test:e2e` against the dev database mutates seeded data.
+  Create, migrate and seed `oryx_test` first, then export the URL for the run.
+
+### Execution 11 gotchas
+
+- **A merchant account resolves its provider from `ProviderUser`, not from a
+  permission.** The portal looks up the membership link; an account with the
+  right permission but no link gets `403`. The seed links `admin@oryx-auto.local`
+  to the ORYX-AUTO company's first provider so the merchant portal works on a
+  fresh database — without it every `/provider/...` call answers `403` and looks
+  like a routing bug.
+- **`ProviderUser` has no `upsert`-able name beyond `@@unique([providerId, userId])`.** Seeding the link uses `findFirst` + `create`/`update` rather than `upsert` so the script stays readable.
+- **`GET /subscriptions` scopes to the token's company.** A company administrator
+  reads only their own subscription; sending a `companyId` query does nothing on
+  the company plane. The mobile `subscriptionApi.current()` deliberately sends no
+  id.
+- **`GET /plans` needs `company.subscription.read`,** which every company
+  administrator holds. The catalogue is the same one the platform edits; the
+  mobile screen shows `monthlyPrice` (major units) and the modules each plan
+  licenses.
+- **A plan screen cannot switch plans.** Assigning a subscription is a platform
+  action (`POST /subscriptions/companies/:id/assign`); the mobile screen states
+  that rather than offering a button that changes nothing.
+- **The offer feed filters in SQL, not on the client.** `GET /customer/catalog/offers`
+  returns only `isActive` offers inside their `startsAt`/`endsAt` window, so a
+  withdrawn or expired offer never reaches the app. Do not "fix" an empty rail by
+  relaxing the query.
+- **`percentOffBp` is basis points.** `20000` (200%) is rejected with `400`; the
+  bound is enforced in the DTO, not the screen.
+
+### Inspection engine gotchas (Execution Phase 2)
+
+- **The section catalogue lives once.** `packages/shared/src/inspection.ts`
+  declares the seven areas, their items, their result sets, the paint conditions
+  and the chassis regions. The API validates against it and the admin workspace
+  renders from it. Add an area there, not in a second list.
+- **A section's item count is asserted by a test.** Interior 12, Exterior 6,
+  Engine Compartment 13, Road Test 13. `packages/shared/test/inspection.test.ts`
+  fails if the catalogue drifts from the report it reproduces; update the test
+  deliberately, not to silence it.
+- **Writing to an area the job did not select is rejected.** This is what keeps a
+  paint-only job from asking about the engine. Do not relax it to let a screen
+  render every section.
+- **A marker outside the diagram is rejected, not clamped.** Validation bounds
+  the normalised coordinates. A clamped marker would be stored and then drawn in
+  the wrong place, which is worse than a rejected write.
+- **Submission is gated on completeness server-side.** Every item answered, and
+  every diagram/diagnostic section carrying either content or an explicit
+  `noFindings`. The disabled button is a courtesy; the API is the gate.
+- **`InspectionSectionResult.noFindings` defaults to `false`.** Migration
+  `20261104002429` adds it. A diagram or diagnostic section with neither markers
+  nor this flag cannot be submitted.
+- **Approved inspections are frozen.** Section writes and cancellation return
+  `409`. The workspace hides the controls; the service refuses regardless.
+- **`POST /:id/review` needs `erp.inspection.report.approve`, not
+  `erp.inspection.write`.** An inspector may write the report but not approve it.
+- **Job numbers come from the `JOB` document sequence.** Add a key to
+  `DOCUMENT_SEQUENCE_KEYS` rather than formatting a number in the service.
+- **The media pipeline re-encodes to WebP and strips EXIF.** An upload test must
+  assert `image/webp`, not the type it sent; asserting the sent type fails.
+- **Customer `nameEn` and `nameAr` are independently optional.** At least one is
+  required, enforced in `SalesService.createCustomer` because a class-validator
+  rule cannot express "one of these two". A missing name is stored as `''`, so
+  reads across sales, accounting and reports need no null branch.
 
 ### Adding a new ERP module
 
@@ -436,6 +979,29 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 Navigation, guards, plan editing and dashboard tiles all read the same catalog,
 so nothing else needs changing.
 
+### Document rendering gotchas (Phase 3)
+
+- **The stored `pageCount` and the physical PDF page count must agree.** The
+  shared planner (`planInspectionReport`) decides how many pages a report is
+  *designed* to have; Chromium decides how many pages it *renders*. When a
+  designed page is taller than the 265mm A4 content limit, Chromium spills an
+  extra page and the two numbers diverge silently — the test suite asserted only
+  `pageCount >= 3` and that the PDF page tree matched the stored value, both of
+  which stay true after a spill. The dense-payload test now asserts
+  `pageCount === planInspectionReport(areas).length + 1`.
+- **The worst case is a fully-populated checklist.** Every item answered, a note
+  on a third of the items and a section remark is the densest a report can be.
+  Measure that case, not the sparse one, when changing item typography or
+  spacing. The Engine Compartment page is the tallest (13 rows).
+- **Measure with a real Chromium render, not by reading the CSS.** The
+  measurement helpers under `apps/admin/.run-*.mjs` render the dumped HTML and
+  report each designed page's height in mm. Set `ORYX_DUMP_HTML=<dir>` to make
+  `documents.service.ts` write the composed HTML, then measure, then remove the
+  instrumentation — it is debug scaffolding, not a feature.
+- **Do not truncate a note to make a page fit.** An official inspection report
+  that silently drops a technician's finding is a data-integrity defect, not a
+  layout fix. Reduce padding, leading, font size and column widths instead.
+
 ## Constraints from the owner
 
 - Keep future app services structurally ready; the consumer app belongs to a
@@ -446,3 +1012,34 @@ so nothing else needs changing.
   modules.
 - Never modify or delete pre-existing project code without auditing it first.
 - Do not commit production credentials, tokens or secret keys.
+
+### Cold-sandbox recovery gotchas
+
+- **The sandbox is recycled between sessions.** A restart drops PostgreSQL,
+  nginx and every Node service while leaving the source, the built `dist/`,
+  `.next/`, and the seeded cluster under `.run/pgdata` intact. Recover with
+  `bash .run/start-stack.sh`; it reinstalls PostgreSQL 17 if the package is
+  gone, starts the cluster, then the API, admin, customer, mobile-web and the
+  two preview proxies. Do not re-run migrations or the seed — the demo data
+  survives.
+- **`pnpm` is installed through corepack and disappears with the image.**
+  `command -v pnpm` failing is expected; the start script writes a shim at
+  `$HOME/.local/bin/pnpm`. Add `$HOME/.local/bin` to `PATH` before any `pnpm`
+  call.
+- **Playwright browsers are lost with the image too.** A run that dies with
+  `Executable doesn't exist … headless_shell` needs
+  `pnpm --filter @oryx/admin exec playwright install chromium` again.
+- **PyMuPDF is not in the image.** The PDF validation step
+  (`.run/render-pdf-samples.py`) needs `pip install pymupdf` first.
+- **`restart-customer.sh` kills every `next-server`, including admin's.** The
+  customer restart helper matches `next-server` globally, so after using it the
+  admin proxy returns `502 … upstream 3000 unavailable`. Restart admin with
+  `bash .run/restart-app.sh admin` (which matches by working directory).
+- **The customer app on `:3002` can be left holding a static-export build.**
+  If `/login` renders the "design preview" banner (it does not reach the API),
+  the `.next` tree is the GitHub-Pages export. Rebuild it with the live config:
+  `env -u ORYX_STATIC_EXPORT -u NEXT_PUBLIC_ORYX_STATIC_EXPORT -u ORYX_BASE_PATH NEXT_PUBLIC_API_BASE_URL=/api pnpm --filter @oryx/customer build`,
+  then `bash .run/restart-customer.sh`.
+- **Never leave the admin app on `:3000` down after touching the customer
+  app.** Both preview hosts share the same ingress; a dead upstream turns every
+  admin capture into a `502` screenshot.

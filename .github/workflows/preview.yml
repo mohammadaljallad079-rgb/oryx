@@ -1,0 +1,248 @@
+name: Design preview
+
+# Publishes the Execution 07 design preview to GitHub Pages on every push to the
+# web design branch, so the owner gets a stable HTTPS link instead of a
+# temporary sandbox URL. The site is generated from files already committed to
+# the branch, so the preview can never show something the repository does not
+# contain.
+#
+# The Pages site is served from the `gh-pages` branch, which holds generated
+# output only and must never be edited by hand. That branch is force-updated on
+# every run; no other branch is touched.
+#
+# No repository secret is required: the workflow uses the token GitHub issues to
+# the run itself, and the build reads only committed assets.
+on:
+  push:
+    branches: [feature/execution-07-premium-web]
+  # Allow a manual republish, for example after a transient deployment failure.
+  workflow_dispatch:
+
+# One deployment at a time. A newer push supersedes an in-flight build, but an
+# in-flight deployment is never cancelled, so the published site is never left
+# half-written.
+concurrency:
+  group: design-preview
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '9.15.9'
+  # The stable Pages URL for this repository. Kept explicit so the job summary
+  # cannot drift from the configured site.
+  PREVIEW_URL: https://mohammadaljallad079-rgb.github.io/oryx/
+
+jobs:
+  # ---------------------------------------------------------------- build
+  build:
+    name: Build the static preview
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The published root is the real customer website, so it is built first.
+      # `ORYX_STATIC_EXPORT=1` turns the Next.js app into a static export; the
+      # shared and database packages are built because the app resolves them
+      # from their compiled `dist/`.
+      - name: Build the customer website
+        run: pnpm build:site
+        env:
+          ORYX_BASE_PATH: /oryx
+
+      # `preview:build` copies `apps/customer/out` to the site root and adds the
+      # evidence, report and brand sections below it.
+      - name: Build the preview site
+        run: pnpm preview:build
+        env:
+          PREVIEW_BRANCH: ${{ github.ref_name }}
+          PREVIEW_SHA: ${{ github.sha }}
+
+      - name: Report what was built
+        run: |
+          echo "Pages: $(find build/preview -name '*.html' | wc -l)"
+          echo "Images: $(find build/preview/assets -type f | wc -l)"
+          echo "Size: $(du -sh build/preview | cut -f1)"
+
+      # Pages runs Jekyll unless `.nojekyll` is present, and Jekyll drops every
+      # path beginning with an underscore — which is the whole `_next` directory,
+      # so the site would publish with no CSS and no JavaScript. `upload-artifact`
+      # skips dotfiles by default, so the marker is asserted here and the upload
+      # below is told to include it.
+      - name: Assert the Pages marker and the exported assets are present
+        run: |
+          set -euo pipefail
+          test -f build/preview/.nojekyll || {
+            echo "::error::build/preview/.nojekyll is missing; Pages would strip _next/"
+            exit 1
+          }
+          test -d build/preview/_next/static || {
+            echo "::error::build/preview/_next/static is missing; the export did not run"
+            exit 1
+          }
+          echo "marker ok; $(find build/preview/_next -type f | wc -l) _next files"
+
+      - name: Upload the preview site
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-site
+          path: build/preview/
+          retention-days: 14
+          # Without this the dotfiles are silently dropped, and `.nojekyll` is a
+          # dotfile. That single omission is what broke the published site.
+          include-hidden-files: true
+
+  # --------------------------------------------------------------- verify
+  # Proves the built site actually renders before it is published: every page
+  # loads, every image resolves, no console error, and no horizontal overflow at
+  # a desktop and a mobile viewport.
+  verify:
+    name: Verify the built site
+    # Pinned: `ubuntu-latest` now resolves to Ubuntu 26.04, which Playwright
+    # 1.56.1 refuses to install Chromium on. See the same note in `ci.yml`.
+    runs-on: ubuntu-24.04
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download the preview site
+        uses: actions/download-artifact@v4
+        with:
+          name: preview-site
+          path: build/preview
+
+      - name: Install the Playwright browser
+        run: pnpm --filter @oryx/admin exec playwright install --with-deps chromium
+
+      - name: Serve the site
+        run: |
+          node scripts/preview/serve-preview.mjs 8099 > /tmp/preview-server.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:8099/; then echo "ready after ${i}s"; exit 0; fi
+            sleep 1
+          done
+          echo "preview server failed to start"; cat /tmp/preview-server.log; exit 1
+
+      - name: Render check
+        run: pnpm preview:verify
+        env:
+          PREVIEW_BASE: http://127.0.0.1:8099
+
+      - name: Link and dark-theme crawl
+        run: pnpm preview:check
+        env:
+          PREVIEW_BASE: http://127.0.0.1:8099
+
+  # --------------------------------------------------------------- deploy
+  # This job deliberately does not declare the `github-pages` environment. That
+  # environment is restricted to the `gh-pages` branch, so a job running on the
+  # design branch is held by the branch policy and fails. The environment adds
+  # nothing here: publishing is a plain force-push to `gh-pages`.
+  deploy:
+    name: Publish to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: [build, verify]
+    permissions:
+      contents: write
+    steps:
+      - name: Download the preview site
+        uses: actions/download-artifact@v4
+        with:
+          name: preview-site
+          path: build/preview
+
+      # The published branch is generated output. It is replaced on every run,
+      # so its history carries no meaning and a force-push is the intended
+      # behaviour. Nothing outside this branch is written.
+      - name: Publish the built site to the gh-pages branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd build/preview
+          git init -q -b gh-pages
+          git config user.name 'oryx-preview'
+          git config user.email 'oryx-preview@users.noreply.github.com'
+          git add -A
+          git commit -q -m "Publish the design preview from ${GITHUB_SHA}"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push -q -f origin gh-pages
+
+      - name: Wait for the published site
+        run: |
+          for i in $(seq 1 40); do
+            if curl -fsS -o /dev/null "${PREVIEW_URL}"; then
+              echo "published after ${i} attempt(s)"; exit 0
+            fi
+            sleep 15
+          done
+          echo "the published site did not become reachable"; exit 1
+
+      # The local verify job serves the build from disk, so it cannot see what
+      # Pages does to it. This is the check that would have caught Jekyll
+      # stripping `_next/`: it fetches the *published* HTML, takes the stylesheet
+      # it asks for, and requires that asset to come back.
+      #
+      # Pages serves the previous deployment until the new one finishes building,
+      # so the root URL can answer 200 with stale HTML while the new assets are
+      # not yet live. The check therefore retries, and only fails if the asset is
+      # still missing after the CDN has had time to catch up.
+      - name: Assert the published site actually loads its assets
+        run: |
+          set -euo pipefail
+          ORIGIN=https://mohammadaljallad079-rgb.github.io
+          for attempt in $(seq 1 20); do
+            html=$(curl -fsS "${PREVIEW_URL}" || true)
+            css=$(printf '%s' "$html" | grep -o '/oryx/_next/static/css/[^"]*\.css' | head -1)
+            js=$(printf '%s' "$html" | grep -o '/oryx/_next/static/chunks/[^"]*\.js' | head -1)
+            if [ -n "$css" ] && [ -n "$js" ]; then
+              code=$(curl -s -o /dev/null -w '%{http_code}' "${ORIGIN}${css}")
+              jscode=$(curl -s -o /dev/null -w '%{http_code}' "${ORIGIN}${js}")
+              echo "attempt ${attempt}: css ${code}, js ${jscode}"
+              if [ "$code" = "200" ] && [ "$jscode" = "200" ]; then
+                echo "the published site serves its stylesheet and script"
+                exit 0
+              fi
+            else
+              echo "attempt ${attempt}: the published HTML references no asset yet"
+            fi
+            sleep 15
+          done
+          echo "::error::the published site still 404s its own assets; Pages is stripping _next/ (is .nojekyll published?)"
+          exit 1
+
+      - name: Report the published URL
+        run: |
+          {
+            echo "### Design preview published"
+            echo ""
+            echo "${PREVIEW_URL}"
+            echo ""
+            echo "Built from \`${GITHUB_SHA}\` on \`${GITHUB_REF_NAME}\`."
+          } >> "$GITHUB_STEP_SUMMARY"

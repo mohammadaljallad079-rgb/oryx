@@ -42,13 +42,31 @@ export class AuditService {
     companyId?: string | null;
     actorUserId?: string;
     action?: string;
+    targetType?: string;
+    search?: string;
+    from?: Date;
+    to?: Date;
     page: number;
     pageSize: number;
   }) {
+    const search = params.search?.trim();
     const where = {
       ...(params.companyId ? { companyId: params.companyId } : {}),
       ...(params.actorUserId ? { actorUserId: params.actorUserId } : {}),
       ...(params.action ? { action: params.action } : {}),
+      ...(params.targetType ? { targetType: params.targetType } : {}),
+      ...(params.from || params.to
+        ? { createdAt: { ...(params.from ? { gte: params.from } : {}), ...(params.to ? { lte: params.to } : {}) } }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              { summary: { contains: search, mode: 'insensitive' as const } },
+              { action: { contains: search, mode: 'insensitive' as const } },
+              { targetId: { contains: search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
     };
     const [items, total] = await Promise.all([
       this.prisma.auditLog.findMany({

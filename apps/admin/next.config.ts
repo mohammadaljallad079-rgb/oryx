@@ -1,5 +1,14 @@
 import type { NextConfig } from 'next';
 
+/**
+ * `ORYX_DOCKER_BUILD=1` switches on `output: 'standalone'`, which makes
+ * `next build` emit a self-contained server at `.next/standalone` with only the
+ * traced dependencies. The container image copies that instead of the whole
+ * workspace. It is opt-in rather than always-on so a local `next build` and the
+ * existing Playwright suite keep working against the normal `.next` layout.
+ */
+const isDockerBuild = process.env.ORYX_DOCKER_BUILD === '1';
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
@@ -7,6 +16,20 @@ const nextConfig: NextConfig = {
   eslint: {
     // Linting is run separately via `pnpm --filter @oryx/admin lint`.
     ignoreDuringBuilds: true,
+  },
+  ...(isDockerBuild ? { output: 'standalone' as const } : {}),
+  /**
+   * The browser bundle is built with `NEXT_PUBLIC_API_BASE_URL=/api` so the
+   * deployed app talks to the API same-origin (required for the HttpOnly
+   * refresh cookie and the CSRF double-submit). Behind the staging preview
+   * proxy the `/api` prefix is intercepted before it reaches Next. When the app
+   * is served directly on its own port — a local `next start`, or the
+   * Playwright suite — nothing owns `/api`, so the bundle's calls 404. This
+   * rewrite forwards them to the API in that case.
+   */
+  async rewrites() {
+    const apiTarget = (process.env.ORYX_API_INTERNAL ?? 'http://127.0.0.1:3001').replace(/\/$/, '');
+    return [{ source: '/api/:path*', destination: `${apiTarget}/api/:path*` }];
   },
   async headers() {
     return [

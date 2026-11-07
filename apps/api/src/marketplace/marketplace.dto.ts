@@ -6,6 +6,7 @@ import {
   IsDateString,
   IsEmail,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -91,6 +92,84 @@ export class RejectApplicationDto {
 }
 
 // ------------------------------------------------------------------ listings
+
+export class ProviderOfferDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(160)
+  titleEn!: string;
+
+  @IsString()
+  @MinLength(2)
+  @MaxLength(160)
+  titleAr!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  categoryKey?: string;
+
+  /** Basis points, so 1500 is 15%. */
+  @IsInt()
+  @Min(0)
+  @Max(10_000)
+  percentOffBp!: number;
+
+  @IsOptional()
+  @IsDateString()
+  startsAt?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endsAt?: string;
+}
+
+export class UpdateProviderOfferDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(160)
+  titleEn?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(160)
+  titleAr?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  categoryKey?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10_000)
+  percentOffBp?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsDateString()
+  startsAt?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endsAt?: string;
+}
 
 export class ProviderListingDto {
   @IsString()
@@ -216,6 +295,45 @@ export class UpdateProviderProfileDto {
   @IsString()
   @MaxLength(60)
   categoryKey?: string;
+
+  /**
+   * A `CmsMediaAsset` id from the media library, or null to clear the storefront
+   * photograph. Validated against the library so a stale id cannot be stored.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  imageAssetId?: string | null;
+}
+
+/** An administrator's choice of storefront photograph for a provider. */
+export class SetProviderImageDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  imageAssetId?: string | null;
+}
+
+/**
+ * Auto Map coordinates for a provider (P3).
+ *
+ * Both fields are optional so a caller can clear the location by sending them
+ * as null. They are validated as a pair in the service: a half coordinate is
+ * rejected rather than stored, because a provider with only a latitude cannot be
+ * placed on a map and would silently vanish from every proximity query.
+ */
+export class SetProviderLocationDto {
+  @IsOptional()
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  latitude?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  longitude?: number | null;
 }
 
 // ---------------------------------------------------------- service requests
@@ -369,4 +487,28 @@ export class BuildSettlementDto {
 
   @IsDateString()
   periodEnd!: string;
+}
+
+// ------------------------------------------------------- consumer orders
+
+/** The statuses a merchant may move a consumer order to. */
+export const ORDER_STATUS_VALUES = [
+  'CONFIRMED',
+  'PREPARING',
+  'READY',
+  'OUT_FOR_DELIVERY',
+  'DELIVERED',
+  'COMPLETED',
+  'CANCELLED',
+] as const;
+
+export class OrderStatusDto {
+  @IsString()
+  @IsIn(ORDER_STATUS_VALUES as unknown as string[])
+  status!: (typeof ORDER_STATUS_VALUES)[number];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  note?: string;
 }

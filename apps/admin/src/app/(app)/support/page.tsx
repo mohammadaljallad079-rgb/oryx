@@ -26,7 +26,7 @@ function SupportPageInner() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="flex flex-col gap-5" data-testid="support-page">
+    <div className="flex flex-col gap-4" data-testid="support-page">
       <SectionHeader
         title={t('support.title')}
         subtitle={t('support.subtitle')}

@@ -531,3 +531,77 @@ them; they appear as `next-server`, so kill by port or by PID).
 failed requests**, and `grep -rho "localhost:3001" apps/admin/.next/static/chunks`
 returns nothing.
 
+## Defect 18 — customer refresh answered `404` where the staff plane answers `401`
+
+**Found:** 2026-10-18, by attributing every `>= 400` response to the page that
+produced it (`.run/diag-http-errors.mjs`) during the Execution 07 re-verification.
+The 39-surface sweep reported `2` console errors; a status-code-only check had
+hidden both.
+
+**Defect:** `CustomerAuthController.refresh` threw
+`notFound(ERROR_CODES.AUTH_TOKEN_INVALID, 'No refresh token was presented.')`
+when the request carried no refresh cookie. The equivalent staff handler,
+`AuthController.refresh`, throws `unauthorized(...)` for the same condition.
+Two problems followed:
+
+1. `404` is semantically wrong — the route exists; the caller has no session.
+2. The customer client treats `401`/`403` as *expired* and anything else as a
+   *transient outage*, so `restoreCustomerSession()` retried the call three
+   times with backoff. A first-time visitor's page load produced three failed
+   requests before rendering.
+
+**Fix:** `apps/api/src/customer/customer-auth.controller.ts` throws
+`unauthorized(...)` instead, matching the staff plane. The import changed from
+`notFound` to `unauthorized`.
+
+**Verified:** `.run/diag-http-errors.mjs` now reports `401` on every anonymous
+customer surface; `.run/check-refresh-count.mjs` reports **1** refresh request
+per anonymous homepage load (was 3); the external sweep's console-error count
+fell from 2 to 1, the remaining one being the expected bootstrap `401`.
+
+**Regression guard:** `apps/api/test/execution04.e2e-spec.ts`, section *A.
+customer identity* — `answers a cookieless refresh with 401, never 404`.
+
+## Defect 19 — three category vocabularies made every category filter return nothing
+
+**Found:** 2026-10-18, during the Execution 07 Phase D verification. The
+homepage category cards rendered the bundled vector fallback instead of the CMS
+photograph (`categoryCardsFromCms: 0`), and a direct probe showed
+`GET /marketplace/providers?categoryKey=automotive_maintenance` returning `0`.
+
+**Defect:** three layers each used a different key for the same concept.
+
+| Layer | Keys it used |
+|---|---|
+| Customer website and mobile `SERVICE_CATEGORIES` | `automotive_maintenance`, `automotive_inspection`, `automotive_tyres`, `automotive_bodywork`, `automotive_recovery` |
+| Seeded `ServiceCategory` rows (the CMS imagery target) | `vehicle_inspection`, `maintenance`, `spare_parts`, `recovery`, `car_wash` |
+| Seeded `MarketplaceProvider.categoryKey` | `WORKSHOP` |
+
+The provider directory filters on `categoryKey`, so each category chip sent a key
+no provider carried and the directory returned an empty list. The homepage looked
+up `content.categories` by the website key, found no row, and fell back to vector
+art. Neither failure raised an error; both rendered a plausible but empty result,
+which is why the earlier status-code-only sweeps missed it.
+
+**Fix:** the catalogue now lives once, in
+`packages/shared/src/service-categories.ts`. The seed writes the `ServiceCategory`
+rows and the provider `categoryKey` values from it and creates one approved
+provider per category; the customer website and the mobile app re-export it. The
+keys are the persisted `ServiceCategory.key` values, so the CMS rows, the
+photography and the provider directory agree by construction.
+
+**Verified:** every canonical key now returns providers
+(`vehicle_inspection` / `maintenance` / `spare_parts` / `recovery` / `car_wash`
+→ `27` each; the retired `automotive_maintenance` and `WORKSHOP` → `0`).
+`.run/verify-category-filter.mjs` drives the live UI and records 27 rendered
+provider cards for each of the five categories in
+`docs/audit/exec07/phase-d/category-filter-verification.json`.
+`.run/capture-exec07-phase-d.mjs` now reports `categoryCardsFromCms: 5` in all
+four locale/theme captures (was `0`).
+
+**Regression guard:** `packages/shared/test/service-categories.test.ts` (7 tests,
+including explicit rejection of the retired keys) and three tests in
+`apps/api/test/execution07.e2e-spec.ts`: the CMS category keys and the provider
+directory agree, a retired key matches nothing, and every catalogue category is a
+seeded `ServiceCategory` row.
+

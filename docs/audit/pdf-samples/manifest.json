@@ -1,0 +1,140 @@
+{
+  "generatedAt": "2026-11-07T18:54:18.026Z",
+  "base": "http://127.0.0.1:3001",
+  "documents": [
+    {
+      "name": "vehicle-inspection-full.pdf",
+      "type": "VEHICLE_INSPECTION_REPORT",
+      "documentNumber": "Z00137",
+      "pageCount": 6,
+      "byteSize": 333247,
+      "verificationToken": "jI0d_CordCyw0QwyENWO8A1Y1G3QUL7YK8DBYA_kqPg",
+      "areas": [
+        "PAINT_BODY",
+        "CHASSIS_UNDERCARRIAGE",
+        "INTERIOR",
+        "EXTERIOR",
+        "ENGINE_COMPARTMENT",
+        "ROAD_TEST",
+        "COMPUTER_UNIT"
+      ]
+    },
+    {
+      "name": "vehicle-inspection-partial.pdf",
+      "type": "VEHICLE_INSPECTION_REPORT",
+      "documentNumber": "Z00138",
+      "pageCount": 5,
+      "byteSize": 273557,
+      "verificationToken": "Q9tUEC3yBAcIWumr833N-cDfPuZGX0290UUy_7vKEAo",
+      "areas": [
+        "PAINT_BODY",
+        "ENGINE_COMPARTMENT",
+        "COMPUTER_UNIT"
+      ]
+    },
+    {
+      "name": "quotation.pdf",
+      "type": "QUOTATION",
+      "documentNumber": "Q00055",
+      "pageCount": 1,
+      "byteSize": 218553,
+      "verificationToken": "2YWQEXfHpfTj8qxidj8O5KrTWoe78ODqHZk6YKd5zNg"
+    },
+    {
+      "name": "sales-order.pdf",
+      "type": "SALES_ORDER",
+      "documentNumber": "O00046",
+      "pageCount": 1,
+      "byteSize": 214773,
+      "verificationToken": "BwaDsp897mIofJ6jPFIDGveumy_cQ34cmt5VhMUFPyE"
+    },
+    {
+      "name": "sales-invoice.pdf",
+      "type": "SALES_INVOICE",
+      "documentNumber": "S00156",
+      "pageCount": 1,
+      "byteSize": 218051,
+      "verificationToken": "dJlAdsUU5nnRJRyjzdvxxd8WVvswsIKsJlUKlPn1Va8"
+    },
+    {
+      "name": "sales-return.pdf",
+      "type": "SALES_RETURN",
+      "documentNumber": "C00020",
+      "pageCount": 1,
+      "byteSize": 214884,
+      "verificationToken": "IXEAEp85sFG-ieYJqZ9-mONautSlsAAnfgRpaQ_eL-A"
+    },
+    {
+      "name": "purchase-order.pdf",
+      "type": "PURCHASE_ORDER",
+      "documentNumber": "P00008",
+      "pageCount": 1,
+      "byteSize": 217065,
+      "verificationToken": "XWHgyyVnO-HGCSwRfhxhJyKwms38R1tGx8cVwPbHq7Y"
+    },
+    {
+      "name": "purchase-invoice.pdf",
+      "type": "PURCHASE_INVOICE",
+      "documentNumber": "B00008",
+      "pageCount": 1,
+      "byteSize": 216809,
+      "verificationToken": "1q7_5y3Yb3ZdjesjHgZ1KQXqxIgI9o2cH7GZFm-Mcsc"
+    },
+    {
+      "name": "purchase-return.pdf",
+      "type": "PURCHASE_RETURN",
+      "documentNumber": "U00008",
+      "pageCount": 1,
+      "byteSize": 214881,
+      "verificationToken": "ET-oi8THXIJxeszDPUiHP_XEVd5VOMNs7QKZu6sDWyA"
+    },
+    {
+      "name": "payment-receipt.pdf",
+      "type": "PAYMENT_RECEIPT",
+      "documentNumber": "Y00015",
+      "pageCount": 1,
+      "byteSize": 218500,
+      "verificationToken": "4Se0WsRUBnm0EYGlxd5kg2HAq5bLchDOqKZ5IF31dOw"
+    },
+    {
+      "name": "payment-voucher.pdf",
+      "type": "PAYMENT_VOUCHER",
+      "documentNumber": "Y00016",
+      "pageCount": 1,
+      "byteSize": 216693,
+      "verificationToken": "W_O5VSKDy1oL6R1XZHK_LzA6DwkMthSW6Wz7PUvgRZE"
+    },
+    {
+      "name": "customer-statement.pdf",
+      "type": "CUSTOMER_STATEMENT",
+      "documentNumber": "CS-CUST-001-2026-12-31",
+      "pageCount": 1,
+      "byteSize": 215091,
+      "verificationToken": "llZEQQGl8YXxf2Lx9bKxVlImGT54CU7bmZXFPW4OMAg"
+    },
+    {
+      "name": "supplier-statement.pdf",
+      "type": "SUPPLIER_STATEMENT",
+      "documentNumber": "SS-SUP-001-2026-12-31",
+      "pageCount": 1,
+      "byteSize": 213837,
+      "verificationToken": "myHBalBaRgylGCtO0Oc3Qa-q81411BNyFLw2_N7kwDQ"
+    },
+    {
+      "name": "journal-entry.pdf",
+      "type": "JOURNAL_ENTRY",
+      "documentNumber": "J00302",
+      "pageCount": 1,
+      "byteSize": 210918,
+      "verificationToken": "qpF9il5GCBEynRx9jLzMRKph6L-jhMBnLHztE4drKaM"
+    },
+    {
+      "name": "pos-receipt.pdf",
+      "type": "POS_RECEIPT",
+      "documentNumber": "T00024",
+      "pageCount": 1,
+      "byteSize": 216502,
+      "verificationToken": "OXzlSsVbSjJWbZdZMhNmrYvXpSuNmdE7OFuMcogPlLA"
+    }
+  ]
+}

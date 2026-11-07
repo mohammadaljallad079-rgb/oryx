@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { isBalanced, sumMinor } from '@oryx/shared';
+import { isBalanced, sumMinor, DEFAULT_CURRENCY } from '@oryx/shared';
 import type { JournalSourceType, Prisma } from '@oryx/database';
 import { PrismaService } from './prisma.service';
 import { DocumentSequenceService, type Tx } from './document-sequence.service';
@@ -61,6 +61,7 @@ export const SYSTEM_ROLES = {
   // Execution 04 — marketplace commissions and provider settlements
   MARKETPLACE_COMMISSION: 'MARKETPLACE_COMMISSION',
   PROVIDER_PAYABLE: 'PROVIDER_PAYABLE',
+  ROUNDING_GAIN_LOSS: 'ROUNDING_GAIN_LOSS',
 } as const;
 
 export type SystemRole = (typeof SYSTEM_ROLES)[keyof typeof SYSTEM_ROLES];
@@ -105,6 +106,15 @@ export class AccountingPostingService {
       );
     }
     return { id: period.id };
+  }
+
+  /**
+   * The currency a journal entry is booked in. A tenant's own currency wins so
+   * that a Bahraini company never books in a hard-coded foreign one.
+   */
+  private async companyCurrency(tx: Tx, companyId: string): Promise<string> {
+    const company = await tx.company.findUnique({ where: { id: companyId }, select: { currency: true } });
+    return company?.currency ?? DEFAULT_CURRENCY;
   }
 
   /** Resolve an account by its system role, failing loudly when it is missing. */
@@ -180,6 +190,7 @@ export class AccountingPostingService {
 
     const period = await this.resolveOpenPeriod(tx, input.companyId, input.entryDate);
     const entryNumber = await this.sequences.next(tx, input.companyId, 'journalEntry');
+    const currency = input.currency ?? (await this.companyCurrency(tx, input.companyId));
 
     const entry = await tx.journalEntry.create({
       data: {
@@ -192,7 +203,7 @@ export class AccountingPostingService {
         sourceType: input.sourceType,
         sourceId: input.sourceId ?? null,
         memo: input.memo ?? null,
-        currency: input.currency ?? 'SAR',
+        currency,
         totalDebitMinor,
         totalCreditMinor,
         postedAt: new Date(),

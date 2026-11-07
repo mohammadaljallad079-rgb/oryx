@@ -8,11 +8,61 @@ import {
   IsISO8601,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
+
+/**
+ * The date every sales document carries, under one canonical key.
+ *
+ * The API historically named the same concept differently per document —
+ * `issueDate` on a quotation or credit note, `orderDate` on an order,
+ * `invoiceDate` on an invoice. Each DTO declared only its own name while the
+ * API runs with `forbidNonWhitelisted`, so a shared create form that sent all
+ * three was rejected with "property issueDate should not exist".
+ *
+ * `documentDate` is the contract. The three historical names remain declared
+ * and accepted, so no client is forced to know which document it is posting to.
+ *
+ * The aliases cannot be folded onto `documentDate` with a `@Transform`:
+ * class-transformer only runs a property's transform when that property is
+ * present on the source object, so `{ issueDate }` never reaches a
+ * `documentDate` transform. Instead `documentDate` is required only when no
+ * alias is supplied, and every name is validated on its own. `resolveDocumentDate`
+ * then reads them in precedence order.
+ */
+export class SalesDocumentDateDto {
+  @ValidateIf((o: SalesDocumentDateDto) => !o.issueDate && !o.orderDate && !o.invoiceDate)
+  @IsISO8601()
+  documentDate?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  issueDate?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  orderDate?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  invoiceDate?: string;
+}
+
+/**
+ * The effective date of a sales document, preferring the canonical key.
+ *
+ * Callers pass a validated DTO, so at least one name is guaranteed present;
+ * `undefined` is still returned as a type-level guard rather than a fallback
+ * "now", which would silently backdate a document.
+ */
+export function resolveDocumentDate(dto: SalesDocumentDateDto): string | undefined {
+  return dto.documentDate ?? dto.issueDate ?? dto.orderDate ?? dto.invoiceDate;
+}
 
 export class ListQueryDto {
   @IsOptional()
@@ -50,15 +100,25 @@ export class CreateCustomerDto {
   @MaxLength(40)
   code!: string;
 
+  /**
+   * The two name fields are optional independently: an administrator may know
+   * the customer by one language only, and forcing both would make them invent
+   * a name. At least one must be supplied — enforced in the service, because a
+   * class-validator rule cannot express "one of these two".
+   *
+   * A missing name is stored as an empty string rather than null, so the many
+   * existing reads of `nameEn`/`nameAr` across sales, accounting and reports do
+   * not have to handle a null. The interface falls back to whichever name exists.
+   */
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(200)
-  nameEn!: string;
+  nameEn?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(200)
-  nameAr!: string;
+  nameAr?: string;
 
   @IsOptional()
   @IsString()
@@ -89,6 +149,16 @@ export class CreateCustomerDto {
   @IsString()
   @MaxLength(3)
   countryCode?: string;
+
+  /** The lead-source catalogue entry the customer came from. */
+  @IsOptional()
+  @IsString()
+  sourceId?: string;
+
+  /** The sales department that owns the customer. */
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
 
   @IsOptional()
   @Type(() => Number)
@@ -150,6 +220,14 @@ export class UpdateCustomerDto {
   city?: string;
 
   @IsOptional()
+  @IsString()
+  sourceId?: string;
+
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)
@@ -169,6 +247,29 @@ export class UpdateCustomerDto {
   @IsString()
   @MaxLength(400)
   notes?: string;
+}
+
+export class CustomerAttachmentDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(260)
+  fileName!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  mimeType?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  sizeBytes?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  storageRef?: string;
 }
 
 export class SalesLineDto {
@@ -205,16 +306,13 @@ export class SalesLineDto {
   taxPercentBp?: number;
 }
 
-export class CreateQuotationDto {
+export class CreateQuotationDto extends SalesDocumentDateDto {
   @IsString()
   customerId!: string;
 
   @IsOptional()
   @IsString()
   branchId?: string;
-
-  @IsISO8601()
-  issueDate!: string;
 
   @IsOptional()
   @IsISO8601()
@@ -243,7 +341,7 @@ export class ConvertQuotationDto {
   warehouseId?: string;
 }
 
-export class CreateSalesOrderDto {
+export class CreateSalesOrderDto extends SalesDocumentDateDto {
   @IsString()
   customerId!: string;
 
@@ -258,9 +356,6 @@ export class CreateSalesOrderDto {
   @IsOptional()
   @IsBoolean()
   confirm?: boolean;
-
-  @IsISO8601()
-  orderDate!: string;
 
   @IsOptional()
   @IsString()
@@ -279,7 +374,7 @@ export class CreateSalesOrderDto {
   lines!: SalesLineDto[];
 }
 
-export class CreateInvoiceDto {
+export class CreateInvoiceDto extends SalesDocumentDateDto {
   @IsOptional()
   @IsString()
   customerId?: string;
@@ -295,9 +390,6 @@ export class CreateInvoiceDto {
   @IsOptional()
   @IsString()
   warehouseId?: string;
-
-  @IsISO8601()
-  invoiceDate!: string;
 
   @IsOptional()
   @IsISO8601()
@@ -328,7 +420,7 @@ export class CreateInvoiceDto {
   lines?: SalesLineDto[];
 }
 
-export class CreateCreditNoteDto {
+export class CreateCreditNoteDto extends SalesDocumentDateDto {
   @IsString()
   customerId!: string;
 
@@ -343,9 +435,6 @@ export class CreateCreditNoteDto {
   @IsOptional()
   @IsString()
   warehouseId?: string;
-
-  @IsISO8601()
-  issueDate!: string;
 
   @IsOptional()
   @IsString()
@@ -414,6 +503,19 @@ export class PosSaleLineDto {
   @IsInt()
   @Min(0)
   unitPriceMinor!: number;
+
+  /**
+   * A cashier discount on this line, in basis points (500 = 5%).
+   *
+   * Bounded to 100% by the same clamp the document path uses; the server
+   * computes the discount minor amount, never the client.
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(10_000)
+  discountPercentBp?: number;
 
   @IsOptional()
   @Type(() => Number)

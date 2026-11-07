@@ -12,7 +12,10 @@ const compat = new FlatCompat({ baseDirectory: dirname(fileURLToPath(import.meta
  * directly against this config, so it is deterministic and non-interactive.
  */
 const config = [
-  { ignores: ['.next/**', 'node_modules/**', 'playwright-report/**', 'test-results/**'] },
+  // `out/` is the static-export output (`ORYX_STATIC_EXPORT=1`) that feeds the
+  // GitHub Pages preview; it is generated, minified and git-ignored, so it must
+  // not be linted.
+  { ignores: ['.next/**', 'out/**', 'node_modules/**', 'playwright-report/**', 'test-results/**'] },
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
   {
     rules: {

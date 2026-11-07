@@ -8,7 +8,7 @@ import {
   validateDelegation,
   type Principal,
 } from '../src/authorization';
-import { DELEGABLE_PERMISSION_CODES, PERMISSION_CODES, isKnownPermission } from '../src/permissions';
+import { DELEGABLE_PERMISSION_CODES, PERMISSION_CODES, PLATFORM_SUPER_ADMIN_PERMISSION_CODES, isKnownPermission, reconcilePermissions } from '../src/permissions';
 import { AVAILABLE_MODULE_KEYS, MODULE_KEYS, isKnownModule } from '../src/modules';
 
 /**
@@ -45,6 +45,64 @@ describe('permission catalog integrity', () => {
     expect(AVAILABLE_MODULE_KEYS).toContain('company_management');
     expect(AVAILABLE_MODULE_KEYS).toContain('branch_management');
     expect(AVAILABLE_MODULE_KEYS).toContain('users_permissions');
+  });
+});
+
+/**
+ * The platform Super Admin role is defined once in the catalogue and synced
+ * two-directionally. These tests pin the behaviour that a drifted production
+ * role depends on: an upsert-only sync reported success while leaving the role
+ * broken, and the dashboard then failed with
+ * `Missing any of the required permissions: erp.dashboard.read,
+ * platform.company.read`.
+ */
+describe('platform super admin permission reconciliation', () => {
+  it('grants the whole catalogue to the platform super admin role', () => {
+    expect(PLATFORM_SUPER_ADMIN_PERMISSION_CODES).toEqual(PERMISSION_CODES);
+  });
+
+  it('exposes the two dashboard requirements in the catalogue', () => {
+    // The dashboard guard is satisfied by either code; a repair that produced
+    // neither is the exact production failure this suite guards against.
+    expect(PERMISSION_CODES).toContain('erp.dashboard.read');
+    expect(PERMISSION_CODES).toContain('platform.company.read');
+  });
+
+  it('reports a drifted role as needing the missing codes', () => {
+    const drifted = ['platform.company.read', 'platform.audit.read'];
+    const result = reconcilePermissions(drifted);
+    expect(result.inSync).toBe(false);
+    expect(result.grant).toContain('erp.dashboard.read');
+    expect(result.grant).not.toContain('platform.company.read');
+    expect(result.revoke).toEqual([]);
+  });
+
+  it('revokes a code the catalogue no longer defines', () => {
+    const stale = ['platform.company.read', 'platform.legacy.removed'];
+    const result = reconcilePermissions(stale);
+    expect(result.revoke).toEqual(['platform.legacy.removed']);
+    expect(result.inSync).toBe(false);
+  });
+
+  it('is a no-op when the role already holds the catalogue', () => {
+    const result = reconcilePermissions(PERMISSION_CODES);
+    expect(result.grant).toEqual([]);
+    expect(result.revoke).toEqual([]);
+    expect(result.inSync).toBe(true);
+  });
+
+  it('is idempotent: reconciling a reconciled set changes nothing', () => {
+    const once = reconcilePermissions([]);
+    const twice = reconcilePermissions(once.grant);
+    expect(twice.grant).toEqual([]);
+    expect(twice.revoke).toEqual([]);
+    expect(twice.inSync).toBe(true);
+  });
+
+  it('never revokes a code it also grants', () => {
+    const result = reconcilePermissions(['company.read', 'platform.legacy.removed']);
+    const overlap = result.grant.filter((c) => result.revoke.includes(c));
+    expect(overlap).toEqual([]);
   });
 });
 

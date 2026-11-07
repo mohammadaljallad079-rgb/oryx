@@ -1,0 +1,113 @@
+# ORYX — API runtime image.
+#
+# Multi-stage so the shipped image carries the compiled API and its production
+# dependencies, not the TypeScript toolchain, the test suites or the other apps.
+#
+# Build from the repository root:
+#   docker build -f deploy/docker/Dockerfile.api -t oryx-api .
+#
+# The workspace packages (@oryx/shared, @oryx/database) are resolved from their
+# compiled `dist/`, so they are built before the API in the same stage.
+
+# ---------------------------------------------------------------- base
+FROM node:20-bookworm-slim AS base
+# Prisma selects its query engine by probing the system OpenSSL version. The
+# slim base omits it, so Prisma warns and falls back to the 1.1.x engine against
+# Debian 12's OpenSSL 3 — a mismatch it explicitly says "may not work as
+# expected". Installing it makes engine selection deterministic in every stage.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssl \
+ && rm -rf /var/lib/apt/lists/*
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+ENV CI=true
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+WORKDIR /app
+
+# ------------------------------------------------------------- manifest
+# Copied separately so a source-only change does not invalidate the dependency
+# layer and force a full reinstall.
+FROM base AS manifest
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY packages/shared/package.json        packages/shared/
+COPY packages/database/package.json      packages/database/
+COPY apps/api/package.json               apps/api/
+COPY apps/admin/package.json             apps/admin/
+COPY apps/customer/package.json          apps/customer/
+COPY apps/mobile/package.json            apps/mobile/
+RUN pnpm install --frozen-lockfile --prod=false
+
+# ----------------------------------------------------------------- build
+FROM manifest AS build
+COPY packages ./packages
+COPY apps/api ./apps/api
+RUN pnpm --filter @oryx/shared build \
+ && pnpm --filter @oryx/database build \
+ && pnpm --filter @oryx/api build
+
+# ---------------------------------------------------------------- prune
+# Reinstall production dependencies only, against the same lockfile.
+FROM manifest AS pruned
+RUN pnpm install --frozen-lockfile --prod=true
+
+# -------------------------------------------------------------- migrator
+# `prisma` is a devDependency, so it is absent from the pruned image. This stage
+# keeps the full dependency set and the migration history, and exists purely to
+# run `prisma migrate deploy` as a one-shot job. It is built separately
+# (`target: migrator`) and never serves traffic.
+FROM manifest AS migrator
+ENV NODE_ENV=production
+COPY packages/database/prisma ./packages/database/prisma
+COPY packages/database/package.json ./packages/database/package.json
+CMD ["node", "node_modules/prisma/build/index.js", "migrate", "deploy", "--schema", "packages/database/prisma/schema.prisma"]
+
+# --------------------------------------------------------------- runtime
+FROM base AS runtime
+ENV NODE_ENV=production
+ENV API_PORT=3001
+
+# Run as an unprivileged user. The numeric uid keeps the image usable under a
+# read-only-root-filesystem policy and in restricted cluster runtimes.
+RUN groupadd --system --gid 1001 oryx \
+ && useradd --system --uid 1001 --gid oryx --create-home --shell /usr/sbin/nologin oryx
+
+COPY --from=pruned  /app/node_modules            ./node_modules
+COPY --from=pruned  /app/apps/api/node_modules   ./apps/api/node_modules
+# `@prisma/client` reads its generated code and query engine from
+# `node_modules/.prisma/client`. That directory is produced by `prisma generate`,
+# which only runs in the *build* stage — the pruned stage installs production
+# dependencies without it. Copying the generated client forward is what makes the
+# runtime image able to construct a PrismaClient at all; without it the API exits
+# at boot with "@prisma/client did not initialize yet".
+COPY --from=build   /app/node_modules/.prisma     ./node_modules/.prisma
+COPY --from=build   /app/packages/shared/dist    ./packages/shared/dist
+COPY --from=build   /app/packages/shared/package.json ./packages/shared/package.json
+COPY --from=build   /app/packages/database/dist  ./packages/database/dist
+COPY --from=build   /app/packages/database/package.json ./packages/database/package.json
+COPY --from=build   /app/packages/database/prisma ./packages/database/prisma
+# The production bootstrap (`production:init`) ships with the image so the
+# runbook's first-deploy step can run inside the stack, where the database is
+# reachable. Node resolves `@oryx/shared` from `packages/database/node_modules`,
+# which pnpm links on the host but the pruned install does not create here, so
+# the workspace link is recreated explicitly.
+COPY --from=build   /app/packages/database/scripts ./packages/database/scripts
+RUN mkdir -p packages/database/node_modules/@oryx \
+ && ln -s ../../../shared packages/database/node_modules/@oryx/shared \
+ && chown -R oryx:oryx packages/database/scripts packages/database/node_modules
+COPY --from=build   /app/apps/api/dist           ./apps/api/dist
+COPY --from=build   /app/apps/api/package.json   ./apps/api/package.json
+COPY package.json pnpm-workspace.yaml ./
+
+# Upload root. Declared as a volume so media survives a container replacement.
+RUN mkdir -p /data/media && chown -R oryx:oryx /data
+ENV MEDIA_ROOT=/data/media
+VOLUME ["/data/media"]
+
+USER oryx
+EXPOSE 3001
+
+# The health probe is version-neutral and reports database reachability.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.API_PORT||3001)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+CMD ["node", "apps/api/dist/main.js"]

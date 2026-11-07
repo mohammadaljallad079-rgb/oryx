@@ -1,0 +1,242 @@
+10-26 23:49:43.485 W/unknown:BridgelessReact( 3516): ReactHost{0}.startSurface(surfaceId = 0): Schedule
+10-26 23:49:43.486 W/unknown:BridgelessReact( 3516): ReactHost{0}.attachSurface(surfaceId = 0)
+10-26 23:49:43.509 W/unknown:BridgelessReact( 3516): ReactHost{0}.getOrCreateReactInstanceTask()
+10-26 23:49:43.521 W/unknown:BridgelessReact( 3516): ReactHost{0}.getOrCreateReactInstanceTask(): Start
+10-26 23:49:43.522 W/unknown:BridgelessReact( 3516): ReactHost{0}.getJSBundleLoader()
+10-26 23:49:43.544 W/unknown:BridgelessReact( 3516): ReactHost{0}.getOrCreateReactContext(): Creating BridgelessReactContext
+10-26 23:49:43.634 W/unknown:BridgelessReact( 3516): ReactHost{0}.getOrCreateReactInstanceTask(): Creating ReactInstance
+10-26 23:49:44.101 W/unknown:BridgelessReact( 3516): ReactHost{0}.onHostResume(activity)
+10-26 23:49:44.103 W/unknown:BridgelessReact( 3516): ReactContext.onHostResume()
+10-26 23:49:49.550 W/unknown:BridgelessReact( 3516): ReactHost{0}.getOrCreateReactInstanceTask(): Loading JS Bundle
+10-26 23:49:49.635 W/unknown:BridgelessReact( 3516): ReactHost{0}.getOrCreateReactInstanceTask(): Calling DevSupportManagerBase.onNewReactContextCreated(reactContext)
+10-26 23:49:49.687 W/unknown:BridgelessReact( 3516): ReactContext.onHostResume()
+10-26 23:49:49.688 W/unknown:BridgelessReact( 3516): ReactHost{0}.getOrCreateReactInstanceTask(): Executing ReactInstanceEventListeners
+10-26 23:49:49.696 W/unknown:BridgelessReact( 3516): ReactHost{0}.startSurface(surfaceId = 0): Execute
+10-26 23:49:55.983 W/BridgelessReactContext( 3516): [WARNING] Bridgeless doesn't support CatalystInstance. Accessing an API that's not part of the new architecture is not encouraged usage.
+10-26 23:49:58.066 I/ReactNativeJS( 3516): Running "main"
+10-26 23:49:59.519 E/ReactNativeJS( 3516): [Error: Incompatible React versions: The "react" and "react-native-renderer" packages must have the exact same version. Instead got:
+10-26 23:49:59.519 E/ReactNativeJS( 3516):   - react:                  19.3.0
+10-26 23:49:59.519 E/ReactNativeJS( 3516):   - react-native-renderer:  19.1.0
+10-26 23:49:59.519 E/ReactNativeJS( 3516): Learn more: https://react.dev/warnings/version-mismatch]
+10-26 23:50:00.223 E/ReactNativeJS( 3516): { [TypeError: Cannot read property 'default' of undefined]
+10-26 23:50:00.223 E/ReactNativeJS( 3516):   componentStack: '\n    at LaunchScreen (address at index.android.bundle:1:1232344)\n    at RootNavigator (address at index.android.bundle:1:1229715)\n    at AppProvider (address at index.android.bundle:1:1151315)\n    at RNCSafeAreaProvider (<anonymous>)\n    at SafeAreaProvider (address at index.android.bundle:1:971145)\n    at RootLayout (<anonymous>)\n    at Suspense (<anonymous>)\n    at Route (address at index.android.bundle:1:921021)\n    at BaseRoute (address at index.android.bundle:1:927910)\n    at StaticContainer (address at index.android.bundle:1:890997)\n    at EnsureSingleNavigator (address at index.android.bundle:1:834577)\n    at SceneView (address at index.android.bundle:1:889315)\n    at NavigationProvider (address at index.android.bundle:1:850417)\n    at PreventRemoveProvider (address at index.android.bundle:1:874353)\n    at NavigationStateListenerProvider (address at index.android.bundle:1:873238)\n    at NavigationContent (address at index.android.bundle:1:886093)\n    at anonymous (address at index.android.bundle:1:885996)\n    at Content (address at index.android.bundle:1:1143243)\n    at RNCSafeAreaProvider (<anonymous>)\n    at SafeAreaProvider (address at index.android.bundle:1:971145)\n    at LinkPreviewContextProvider (address at index.android.bundle:1:1047561)\n    at anonymous (address at index.android.bundle:1:1142144)\n    at ThemeProvider (address at index.android.bundle:1:836777)\n    at EnsureSingleNavigator (address at index.android.bundle:1:834577)\n    at BaseNavigationContainer (address at index.android.bundle:1:810678)\n    at NavigationContainerInner (address at index.android.bundle:1:1145103)\n    at ContextNavigator (address at index.android.bundle:1:1142373)\n    at ExpoRoot (address at index.android.bundle:1:1142016)\n    at App (<anonymous>)\n    at RCTView (<anonymous>)\n    at View (address at index.android.bundle:1:463676)\n    at AppContainer (address at index.android.bundle:1:463004)',
+10-26 23:50:00.223 E/ReactNativeJS( 3516):   isComponentError: true }
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): ReactHost{0}.handleHostException(message = "Error: Incompatible React versions: The "react" and "react-native-renderer" packages must have the exact same version. Instead got:
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516):   - react:                  19.3.0
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516):   - react-native-renderer:  19.1.0
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): Learn more: https://react.dev/warnings/version-mismatch, stack:
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): anonymous@1:291823
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): loadModuleImplementation@1:34447
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): guardedLoadModule@1:33970
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): metroRequire@1:33480
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): anonymous@1:284813
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): loadModuleImplementation@1:34447
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): guardedLoadModule@1:33926
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): metroRequire@1:33480
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): findNodeHandle@1:103814
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): _connectAnimatedView2@1:601337
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): __makeNative@1:603579
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): __makeNative@1:592998
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): anonymous@1:162678
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): __makeNative@1:608372
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): __makeNative@1:592998
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): anonymous@1:162678
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): __makeNative@1:580357
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): __startAnimationIfNative@1:599882
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): start@1:618639
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): start@1:618565
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): animate@1:581647
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): start@1:569064
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): start@1:569179
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): anonymous@1:1234157
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitHookEffectListMount@1:254957
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraverseReconnectPassiveEffects@1:261980
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraverseReconnectPassiveEffects@1:261971
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraverseReconnectPassiveEffects@1:261665
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraverseReconnectPassiveEffects@1:261971
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraverseReconnectPassiveEffects@1:261665
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraverseReconnectPassiveEffects@1:261665
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraverseReconnectPassiveEffects@1:261665
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraverseReconnectPassiveEffects@1:261971
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraverseReconnectPassiveEffects@1:261971
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:260812
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261047
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): commitPassiveMountOnFiber@1:261257
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): flushPassiveEffects@1:270742
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): anonymous@1:269415
+10-26 23:50:00.290 W/unknown:BridgelessReact( 3516): ")
+10-26 23:50:00.299 E/AndroidRuntime( 3516): FATAL EXCEPTION: mqt_v_native
+10-26 23:50:00.299 E/AndroidRuntime( 3516): Process: com.oryx.marketplace, PID: 3516
+10-26 23:50:00.299 E/AndroidRuntime( 3516): com.facebook.react.common.JavascriptException: Error: Incompatible React versions: The "react" and "react-native-renderer" packages must have the exact same version. Instead got:
+10-26 23:50:00.299 E/AndroidRuntime( 3516):   - react:                  19.3.0
+10-26 23:50:00.299 E/AndroidRuntime( 3516):   - react-native-renderer:  19.1.0
+10-26 23:50:00.299 E/AndroidRuntime( 3516): Learn more: https://react.dev/warnings/version-mismatch, stack:
+10-26 23:50:00.299 E/AndroidRuntime( 3516): anonymous@1:291823
+10-26 23:50:00.299 E/AndroidRuntime( 3516): loadModuleImplementation@1:34447
+10-26 23:50:00.299 E/AndroidRuntime( 3516): guardedLoadModule@1:33970
+10-26 23:50:00.299 E/AndroidRuntime( 3516): metroRequire@1:33480
+10-26 23:50:00.299 E/AndroidRuntime( 3516): anonymous@1:284813
+10-26 23:50:00.299 E/AndroidRuntime( 3516): loadModuleImplementation@1:34447
+10-26 23:50:00.299 E/AndroidRuntime( 3516): guardedLoadModule@1:33926
+10-26 23:50:00.299 E/AndroidRuntime( 3516): metroRequire@1:33480
+10-26 23:50:00.299 E/AndroidRuntime( 3516): findNodeHandle@1:103814
+10-26 23:50:00.299 E/AndroidRuntime( 3516): _connectAnimatedView2@1:601337
+10-26 23:50:00.299 E/AndroidRuntime( 3516): __makeNative@1:603579
+10-26 23:50:00.299 E/AndroidRuntime( 3516): __makeNative@1:592998
+10-26 23:50:00.299 E/AndroidRuntime( 3516): anonymous@1:162678
+10-26 23:50:00.299 E/AndroidRuntime( 3516): __makeNative@1:608372
+10-26 23:50:00.299 E/AndroidRuntime( 3516): __makeNative@1:592998
+10-26 23:50:00.299 E/AndroidRuntime( 3516): anonymous@1:162678
+10-26 23:50:00.299 E/AndroidRuntime( 3516): __makeNative@1:580357
+10-26 23:50:00.299 E/AndroidRuntime( 3516): __startAnimationIfNative@1:599882
+10-26 23:50:00.299 E/AndroidRuntime( 3516): start@1:618639
+10-26 23:50:00.299 E/AndroidRuntime( 3516): start@1:618565
+10-26 23:50:00.299 E/AndroidRuntime( 3516): animate@1:581647
+10-26 23:50:00.299 E/AndroidRuntime( 3516): start@1:569064
+10-26 23:50:00.299 E/AndroidRuntime( 3516): start@1:569179
+10-26 23:50:00.299 E/AndroidRuntime( 3516): anonymous@1:1234157
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitHookEffectListMount@1:254957
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraverseReconnectPassiveEffects@1:261980
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraverseReconnectPassiveEffects@1:261971
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraverseReconnectPassiveEffects@1:261665
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraverseReconnectPassiveEffects@1:261971
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraverseReconnectPassiveEffects@1:261665
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraverseReconnectPassiveEffects@1:261665
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraverseReconnectPassiveEffects@1:261665
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraverseReconnectPassiveEffects@1:261971
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraverseReconnectPassiveEffects@1:261971
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:260812
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261047
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261432
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261490
+10-26 23:50:00.299 E/AndroidRuntime( 3516): recursivelyTraversePassiveMountEffects@1:260567
+10-26 23:50:00.299 E/AndroidRuntime( 3516): commitPassiveMountOnFiber@1:261257
+10-26 23:50:00.307 E/AndroidRuntime( 3516): flushPassiveEffects@1:270742
+10-26 23:50:00.307 E/AndroidRuntime( 3516): anonymous@1:269415
+10-26 23:50:00.307 E/AndroidRuntime( 3516): 
+10-26 23:50:00.307 E/AndroidRuntime( 3516): 	at com.facebook.react.modules.core.ExceptionsManagerModule.reportException(ExceptionsManagerModule.kt:52)
+10-26 23:50:00.307 E/AndroidRuntime( 3516): 	at com.facebook.jni.NativeRunnable.run(Native Method)
+10-26 23:50:00.307 E/AndroidRuntime( 3516): 	at android.os.Handler.handleCallback(Handler.java:958)
+10-26 23:50:00.307 E/AndroidRuntime( 3516): 	at android.os.Handler.dispatchMessage(Handler.java:99)
+10-26 23:50:00.307 E/AndroidRuntime( 3516): 	at com.facebook.react.bridge.queue.MessageQueueThreadHandler.dispatchMessage(MessageQueueThreadHandler.kt:21)
+10-26 23:50:00.307 E/AndroidRuntime( 3516): 	at android.os.Looper.loopOnce(Looper.java:205)
+10-26 23:50:00.307 E/AndroidRuntime( 3516): 	at android.os.Looper.loop(Looper.java:294)
+10-26 23:50:00.307 E/AndroidRuntime( 3516): 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.startNewBackgroundThread$lambda$1(MessageQueueThreadImpl.kt:175)
+10-26 23:50:00.307 E/AndroidRuntime( 3516): 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.$r8$lambda$ldnZnqelhYFctGaUKkOKYj5rxo4(Unknown Source:0)
+10-26 23:50:00.307 E/AndroidRuntime( 3516): 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+10-26 23:50:00.307 E/AndroidRuntime( 3516): 	at java.lang.Thread.run(Thread.java:1012)

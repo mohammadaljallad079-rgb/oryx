@@ -185,6 +185,65 @@ test.describe('functional audit', () => {
     expect(edited.body.nameEn).toBe('Audit Branch Edited');
   });
 
+  test('3b. branch edit and reactivate run through the UI', async ({ page }) => {
+    await signIn(page);
+    await setLocale(page, 'en');
+
+    const suffix = Date.now().toString().slice(-6);
+    const professionalId = await planId(page, 'professional');
+    const created = await apiCall<{ company: { id: string } }>(page, '/companies', {
+      method: 'POST',
+      body: {
+        code: `${FIXTURE}-E${suffix}`,
+        nameEn: `Audit Edit Co ${suffix}`,
+        nameAr: `شركة تعديل ${suffix}`,
+        type: 'SAAS_TENANT',
+        planId: professionalId,
+      },
+    });
+    const companyId = created.body.company.id;
+
+    await page.goto(`/branches?companyId=${companyId}`);
+    await expect(page.getByTestId('branches-page')).toBeVisible();
+
+    const branchCode = `AE${suffix}`;
+    await page.getByTestId('new-branch').click();
+    await page.getByTestId('branch-code').fill(branchCode);
+    await page.getByTestId('branch-name-en').fill('Audit Edit Branch');
+    await page.getByTestId('branch-name-ar').fill('فرع تعديل');
+    await page.getByTestId('create-branch-submit').click();
+    await expect(page.getByTestId(`branch-row-${branchCode}`)).toBeVisible({ timeout: 20_000 });
+
+    // Edit through the modal: phone and address must persist, not just the name.
+    await page.getByTestId(`edit-branch-${branchCode}`).click();
+    await expect(page.getByTestId('edit-branch-name-en')).toHaveValue('Audit Edit Branch');
+    await page.getByTestId('edit-branch-phone').fill('+97317123456');
+    await page.getByTestId('edit-branch-address').fill('Building 42, Road 7');
+    await page.getByTestId('save-branch').click();
+    // The trigger stays behind the modal, so wait for the modal to leave the DOM.
+    await expect(page.locator('.oryx-modal')).toHaveCount(0, { timeout: 20_000 });
+
+    const branches = await apiCall<{ items: Array<{ id: string; code: string; phone: string | null; addressLine: string | null }> }>(
+      page,
+      `/companies/${companyId}/branches`,
+    );
+    const branch = branches.body.items.find((b) => b.code === branchCode);
+    expect(branch?.phone).toBe('+97317123456');
+    expect(branch?.addressLine).toBe('Building 42, Road 7');
+
+    // Deactivate then reactivate from the row, asserting the API result.
+    await page.getByTestId(`deactivate-branch-${branchCode}`).click();
+    await expect(page.getByTestId(`reactivate-branch-${branchCode}`)).toBeVisible({ timeout: 20_000 });
+    await page.getByTestId(`reactivate-branch-${branchCode}`).click();
+    await expect(page.getByTestId(`deactivate-branch-${branchCode}`)).toBeVisible({ timeout: 20_000 });
+
+    const after = await apiCall<{ items: Array<{ code: string; isActive: boolean }> }>(
+      page,
+      `/companies/${companyId}/branches`,
+    );
+    expect(after.body.items.find((b) => b.code === branchCode)?.isActive).toBe(true);
+  });
+
   test('4. user invitation issues a usable token', async ({ page }) => {
     await signIn(page);
     await setLocale(page, 'en');

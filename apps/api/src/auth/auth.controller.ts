@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -22,7 +23,13 @@ import { CookieService } from './cookie.service';
 import { AuditService } from '../common/audit.service';
 import { PrismaService } from '../common/prisma.service';
 import { EntitlementService } from '../common/entitlement.service';
-import { CsrfExempt, CurrentPrincipal, Public, type RequestPrincipal } from './auth.decorators';
+import {
+  AllowMfaEnrollment,
+  CsrfExempt,
+  CurrentPrincipal,
+  Public,
+  type RequestPrincipal,
+} from './auth.decorators';
 import {
   AcceptInvitationDto,
   ChangePasswordDto,
@@ -64,18 +71,42 @@ export class AuthController {
    * The refresh token is delivered in an HttpOnly cookie so it is never
    * readable by JavaScript. The response carries only the short-lived access
    * token plus a CSRF token the client echoes in the `x-oryx-csrf` header.
+   *
+   * A native client has no cookie jar. When the request identifies itself with
+   * `x-oryx-client: mobile` the refresh token is also returned in the body so
+   * the app can seal it in the platform keychain. The cookie is still set, and
+   * a browser request never sees the token: the header is the only switch. This
+   * is the same contract the customer plane has used since commit fecabed.
    */
   private completeLogin<T extends { refreshToken?: string; csrfToken?: string }>(
     res: Response,
     session: T,
     refreshTtl: number,
     existingCsrf?: string,
-  ): Omit<T, 'refreshToken'> {
+    exposeRefreshToken = false,
+  ): Omit<T, 'refreshToken'> | T {
     if (session.refreshToken) {
       session.csrfToken = this.cookies.setSession(res, session.refreshToken, refreshTtl, existingCsrf);
-      delete session.refreshToken;
+      if (!exposeRefreshToken) delete session.refreshToken;
     }
-    return session as Omit<T, 'refreshToken'>;
+    return session;
+  }
+
+  /** True when a native client asked for the refresh token in the body. */
+  private wantsBodyToken(req: RequestLike): boolean {
+    const raw = req.headers['x-oryx-client'];
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    return value === 'mobile';
+  }
+
+  /**
+   * The device class this request comes from, recorded on the session row.
+   *
+   * Kept in step with the body-token switch above so a session that can carry
+   * its token in the body is always labelled `MOBILE`.
+   */
+  private deviceKind(req: RequestLike): 'WEB' | 'MOBILE' {
+    return this.wantsBodyToken(req) ? 'MOBILE' : 'WEB';
   }
 
   private refreshTtlSeconds(): number {
@@ -91,12 +122,12 @@ export class AuthController {
     summary: 'Authenticate; returns an MFA challenge when the account requires a second factor',
   })
   async login(@Body() dto: LoginDto, @Req() req: RequestLike, @Res({ passthrough: true }) res: Response) {
-    const result = await this.auth.login(dto.email, dto.password, meta(req));
+    const result = await this.auth.login(dto.email, dto.password, meta(req), this.deviceKind(req));
     if (isMfaChallenge(result)) {
       // No session yet: the caller must complete the MFA step.
       return result;
     }
-    return this.completeLogin(res, result, this.refreshTtlSeconds());
+    return this.completeLogin(res, result, this.refreshTtlSeconds(), undefined, this.wantsBodyToken(req));
   }
 
   @Public()
@@ -110,8 +141,13 @@ export class AuthController {
     @Req() req: RequestLike,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const session = await this.auth.loginWithMfa(dto.challengeToken, dto.code, meta(req));
-    return this.completeLogin(res, session, this.refreshTtlSeconds());
+    const session = await this.auth.loginWithMfa(
+      dto.challengeToken,
+      dto.code,
+      meta(req),
+      this.deviceKind(req),
+    );
+    return this.completeLogin(res, session, this.refreshTtlSeconds(), undefined, this.wantsBodyToken(req));
   }
 
   @Public()
@@ -126,7 +162,13 @@ export class AuthController {
     const session = await this.auth.refresh(token, meta(req));
     // Carry the caller's CSRF token forward so a concurrent refresh in another
     // tab is not rejected by the double-submit check.
-    return this.completeLogin(res, session, this.refreshTtlSeconds(), this.cookies.readCsrfToken(req as never));
+    return this.completeLogin(
+      res,
+      session,
+      this.refreshTtlSeconds(),
+      this.cookies.readCsrfToken(req as never),
+      this.wantsBodyToken(req),
+    );
   }
 
   @Public()
@@ -217,9 +259,9 @@ export class AuthController {
       ...meta(req),
     });
 
-    const session = await this.auth.login(user.email, dto.password, meta(req));
+    const session = await this.auth.login(user.email, dto.password, meta(req), this.deviceKind(req));
     if (isMfaChallenge(session)) return session;
-    return this.completeLogin(res, session, this.refreshTtlSeconds());
+    return this.completeLogin(res, session, this.refreshTtlSeconds(), undefined, this.wantsBodyToken(req));
   }
 
   @ApiBearerAuth()
@@ -256,6 +298,7 @@ export class AuthController {
   }
 
   @ApiBearerAuth()
+  @AllowMfaEnrollment()
   @Get('me')
   @ApiOperation({ summary: 'Current user, memberships, effective permissions and MFA status' })
   async me(@CurrentPrincipal() principal: RequestPrincipal) {
@@ -404,14 +447,35 @@ export class AuthController {
     const sessions = await this.prisma.refreshToken.findMany({
       where: { userId: principal.userId, revokedAt: null, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, createdAt: true, expiresAt: true, ipAddress: true, userAgent: true },
+      select: {
+        id: true,
+        deviceKind: true,
+        deviceName: true,
+        createdAt: true,
+        expiresAt: true,
+        ipAddress: true,
+        userAgent: true,
+      },
     });
     return { sessions };
+  }
+
+  @ApiBearerAuth()
+  @Delete('sessions/:sessionId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Revoke one session, for example a lost device' })
+  async revokeSession(
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Param('sessionId') sessionId: string,
+  ) {
+    await this.auth.revokeSession(principal.userId, sessionId);
+    return { revoked: true };
   }
 
   // -------------------------------------------------------------------- MFA
 
   @ApiBearerAuth()
+  @AllowMfaEnrollment()
   @Get('mfa/status')
   @ApiOperation({ summary: 'MFA enrollment status for the current account' })
   mfaStatus(@CurrentPrincipal() principal: RequestPrincipal) {
@@ -419,6 +483,7 @@ export class AuthController {
   }
 
   @ApiBearerAuth()
+  @AllowMfaEnrollment()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('mfa/enroll')
   @HttpCode(HttpStatus.OK)
@@ -428,6 +493,7 @@ export class AuthController {
   }
 
   @ApiBearerAuth()
+  @AllowMfaEnrollment()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('mfa/enroll/confirm')
   @HttpCode(HttpStatus.OK)

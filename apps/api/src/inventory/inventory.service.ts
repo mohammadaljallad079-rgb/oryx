@@ -20,6 +20,7 @@ import type {
   UpdateProductDto,
   UpdateWarehouseDto,
 } from './inventory.dto';
+import type { PosProductDto } from '@oryx/shared';
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -141,7 +142,7 @@ export class InventoryService {
       throw forbidden(
         ERROR_CODES.INSUFFICIENT_STOCK,
         `Insufficient stock for ${product.sku}: on hand ${level.quantity / QTY_FACTOR}, requested ${-input.quantity / QTY_FACTOR}.`,
-        { onHand: level.quantity, requested: input.quantity },
+        { onHand: level.quantity, requested: -input.quantity },
       );
     }
 
@@ -703,6 +704,77 @@ export class InventoryService {
       })
       .filter((a) => a.belowReorderLevel);
     return { items: alerts, total: alerts.length };
+  }
+
+  /**
+   * The product grid the point-of-sale renders.
+   *
+   * One query per table rather than per product: the products, their stock
+   * levels and their primary images are fetched together and stitched in
+   * memory, so a till with a few hundred SKUs is a constant number of round
+   * trips. Only active products are returned — a deactivated item must not be
+   * sellable — and the stock status is derived here so the till and the reorder
+   * alerts agree on what "low" means.
+   */
+  async posCatalog(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const where = {
+      companyId,
+      isActive: true,
+      ...(query.search
+        ? {
+            OR: [
+              { sku: { contains: query.search, mode: 'insensitive' as const } },
+              { nameEn: { contains: query.search, mode: 'insensitive' as const } },
+              { nameAr: { contains: query.search } },
+              { barcode: { contains: query.search } },
+            ],
+          }
+        : {}),
+    };
+    const products = await this.prisma.product.findMany({
+      where,
+      orderBy: { sku: 'asc' },
+      include: {
+        levels: { select: { quantity: true } },
+        images: {
+          orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+          take: 1,
+          select: { mediaAssetId: true, url: true },
+        },
+      },
+    });
+    const items: PosProductDto[] = products.map((p) => {
+      const onHand = sumMinor(p.levels.map((l) => l.quantity));
+      const lead = p.images[0];
+      const imageUrl = lead?.mediaAssetId
+        ? `/api/v1/cms/media/${lead.mediaAssetId}/file?variant=card`
+        : lead?.url ?? null;
+      const stockStatus: PosProductDto['stockStatus'] = !p.trackStock
+        ? 'IN_STOCK'
+        : onHand <= 0
+          ? 'OUT'
+          : p.reorderLevel > 0 && onHand <= p.reorderLevel
+            ? 'LOW'
+            : 'IN_STOCK';
+      return {
+        id: p.id,
+        sku: p.sku,
+        nameEn: p.nameEn,
+        nameAr: p.nameAr,
+        barcode: p.barcode,
+        unit: p.unit,
+        salesPriceMinor: p.salesPriceMinor,
+        taxRateBp: p.taxRateBp,
+        trackStock: p.trackStock,
+        isActive: p.isActive,
+        imageUrl,
+        onHand,
+        reorderLevel: p.reorderLevel,
+        stockStatus,
+      };
+    });
+    return { items, total: items.length };
   }
 
   private async assertWarehouse(companyId: string, warehouseId: string) {

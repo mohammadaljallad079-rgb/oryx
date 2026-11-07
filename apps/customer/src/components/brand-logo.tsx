@@ -1,5 +1,7 @@
 'use client';
 
+import { assetUrl } from '@/lib/api';
+
 /**
  * Official ORYX brand lockup for the customer site.
  *
@@ -15,10 +17,12 @@ export function BrandLogo({ height = 30 }: { height?: number }) {
   return (
     <span className="oryx-brand-logo" style={{ height, width }}>
       {/* The artwork is a single raster lockup, so `next/image`'s loader buys
-          nothing here; both colourways are pre-sized and served as static PNGs. */}
+          nothing here; both colourways are pre-sized and served as static PNGs.
+          `assetUrl` applies the export's base path, which a raw src does not
+          inherit. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/brand/oryx-logo-on-dark.png"
+        src={assetUrl('/brand/oryx-logo-on-dark.png')}
         alt="ORYX"
         className="oryx-brand-logo__on-dark"
         height={height}
@@ -27,7 +31,7 @@ export function BrandLogo({ height = 30 }: { height?: number }) {
       />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/brand/oryx-logo-on-light.png"
+        src={assetUrl('/brand/oryx-logo-on-light.png')}
         alt=""
         aria-hidden="true"
         className="oryx-brand-logo__on-light"

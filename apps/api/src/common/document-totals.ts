@@ -1,4 +1,4 @@
-import { basisPointsOfMinor, lineAmountMinor, sumMinor } from '@oryx/shared';
+import { basisPointsOfMinor, lineAmountMinor, roundMinor, sumMinor, type RoundingMode } from '@oryx/shared';
 
 /**
  * A priced document line before rounding.
@@ -25,6 +25,8 @@ export interface DocumentTotals {
   subtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
+  /** Signed adjustment applied to `totalMinor` by the rounding mode. */
+  roundingMinor: number;
   totalMinor: number;
 }
 
@@ -36,8 +38,17 @@ export interface DocumentTotals {
  * minor-unit totals on the API, in the UI and in a report. The subtotal is the
  * sum of the rounded line subtotals (not a re-rounded aggregate), which is what
  * makes `subtotal - discount + tax === total` hold exactly.
+ *
+ * When `roundingMode` is not `NONE` the line total is snapped to the nearest
+ * whole (or half) major unit and the small difference is reported as
+ * `roundingMinor`, so `subtotal - discount + tax + rounding === total` still
+ * holds and the ledger can post the difference to a rounding account.
  */
-export function computeDocumentTotals(lines: PricedLineInput[]): DocumentTotals {
+export function computeDocumentTotals(
+  lines: PricedLineInput[],
+  roundingMode: RoundingMode = 'NONE',
+  currencyScale = 2,
+): DocumentTotals {
   const priced: PricedLine[] = lines.map((line) => {
     const discountPercentBp = line.discountPercentBp ?? 0;
     const taxPercentBp = line.taxPercentBp ?? 0;
@@ -60,9 +71,14 @@ export function computeDocumentTotals(lines: PricedLineInput[]): DocumentTotals 
   const subtotalMinor = sumMinor(priced.map((l) => l.lineSubtotalMinor));
   const discountMinor = sumMinor(priced.map((l) => l.discountMinor));
   const taxMinor = sumMinor(priced.map((l) => l.taxMinor));
-  const totalMinor = sumMinor(priced.map((l) => l.lineTotalMinor));
+  const exactTotalMinor = sumMinor(priced.map((l) => l.lineTotalMinor));
+  const { rounded: totalMinor, adjustment: roundingMinor } = roundMinor(
+    exactTotalMinor,
+    roundingMode,
+    currencyScale,
+  );
 
-  return { lines: priced, subtotalMinor, discountMinor, taxMinor, totalMinor };
+  return { lines: priced, subtotalMinor, discountMinor, taxMinor, roundingMinor, totalMinor };
 }
 
 /**

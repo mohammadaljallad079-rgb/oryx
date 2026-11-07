@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { currencyScale } from '@oryx/shared';
+import { currencyScale, DEFAULT_CURRENCY } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import {
@@ -130,7 +130,7 @@ export class PaymentService {
     if (existing) return existing;
 
     const gateway = this.gatewayFor(input.provider);
-    const currency = input.currency ?? 'BHD';
+    const currency = input.currency ?? DEFAULT_CURRENCY;
     const intentNumber = await this.nextIntentNumber(input.companyId);
 
     const intent = await this.prisma.paymentIntent.create({

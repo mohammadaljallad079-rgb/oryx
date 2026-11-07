@@ -17,7 +17,7 @@ import {
 import { PrismaService } from '../common/prisma.service';
 import { EntitlementService } from '../common/entitlement.service';
 import { ERROR_CODES, forbidden, unauthorized } from '../common/errors';
-import { IS_PUBLIC_KEY, CUSTOMER_PLANE_KEY, type RequestPrincipal } from './auth.decorators';
+import { IS_PUBLIC_KEY, CUSTOMER_PLANE_KEY, MFA_ENROLLMENT_KEY, type RequestPrincipal } from './auth.decorators';
 import type { AccessTokenPayload } from './auth.service';
 
 export const COMPANY_HEADER = 'x-oryx-company-id';
@@ -90,12 +90,22 @@ export class PrincipalGuard implements CanActivate {
       throw unauthorized(ERROR_CODES.AUTH_TOKEN_EXPIRED, 'Access token is invalid or expired.');
     }
 
-    const principal = await this.buildPrincipal(payload, req);
+    const enrollmentAllowed =
+      this.reflector.getAllAndOverride<boolean>(MFA_ENROLLMENT_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]) === true;
+
+    const principal = await this.buildPrincipal(payload, req, enrollmentAllowed);
     req.principal = principal;
     return true;
   }
 
-  private async buildPrincipal(payload: AccessTokenPayload, req: RequestLike): Promise<RequestPrincipal> {
+  private async buildPrincipal(
+    payload: AccessTokenPayload,
+    req: RequestLike,
+    enrollmentAllowed = false,
+  ): Promise<RequestPrincipal> {
     // A consumer token is a different identity plane entirely. Rejecting it here
     // is what keeps the customer website and mobile app from ever reaching a
     // staff or platform route, regardless of the id it carries.
@@ -113,8 +123,15 @@ export class PrincipalGuard implements CanActivate {
 
     // Privileged platform accounts must complete a second factor. The login
     // flow already refuses to issue a session without it; this is a defence in
-    // depth check for tokens minted before the requirement existed.
-    if (user.isSuperAdmin && !user.mfaEnabled && process.env.MFA_REQUIRE_SUPER_ADMIN === 'true') {
+    // depth check for tokens minted before the requirement existed. The
+    // enrollment routes are exempt: without them an unenrolled principal could
+    // never satisfy the requirement.
+    if (
+      !enrollmentAllowed &&
+      user.isSuperAdmin &&
+      !user.mfaEnabled &&
+      process.env.MFA_REQUIRE_SUPER_ADMIN === 'true'
+    ) {
       throw forbidden(
         ERROR_CODES.MFA_REQUIRED,
         'This account must complete two-factor authentication enrollment before use.',

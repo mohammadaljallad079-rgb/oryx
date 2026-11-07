@@ -329,3 +329,50 @@ export class CreateAdjustmentDto {
   @Type(() => AdjustmentLineDto)
   lines!: AdjustmentLineDto[];
 }
+
+/**
+ * Metadata accompanying a product image upload.
+ *
+ * Note what is absent: no storage path, no URL and no tenant. The file is
+ * re-encoded by the media storage service and the product's own company is
+ * resolved from the principal, so a client cannot choose where bytes land or
+ * attach an image to another tenant's catalogue.
+ */
+export class UploadProductImageDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  altEn?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  altAr?: string;
+
+  /** When `'true'`, this image becomes the product's primary photograph. */
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  isPrimary?: 'true' | 'false';
+}
+
+export class UpdateProductImageDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  altEn?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  altAr?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isPrimary?: boolean;
+}

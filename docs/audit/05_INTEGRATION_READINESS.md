@@ -6,7 +6,7 @@ Source of truth: `packages/shared/src/integrations.ts`
 ## Catalogue
 
 `INTEGRATION_PROVIDERS` is declared once and feeds the API, the admin page and the
-customer capabilities endpoint. The catalogue contains **8 providers**, not 20:
+customer capabilities endpoint. The catalogue contains **10 providers**:
 
 | Key | Category | Implementation | Configurable | Per-company | Credential fields |
 |---|---|---|---|---|---|
@@ -18,10 +18,17 @@ customer capabilities endpoint. The catalogue contains **8 providers**, not 20:
 | `WHATSAPP` | MESSAGING | ADAPTER_ONLY | yes | yes | 2 |
 | `PUSH` | MESSAGING | ADAPTER_ONLY | yes | yes | 2 |
 | `IN_APP` | MESSAGING | IMPLEMENTED | no | no | 0 |
+| `SENSAGE_AI` | ANALYTICS | ADAPTER_ONLY (vendor call written) | yes | yes | 3 |
+| `REGISTRATION_OCR` | ANALYTICS | ADAPTER_ONLY (vendor call written) | yes | yes | 3 |
 
 > **Documentation discrepancy (corrected 2026-10-16).** `AGENTS.md` described
-> "a 20-provider catalogue". The code declares 8, and the guide now says 8 to
-> match `packages/shared/src/integrations.ts`.
+> "a 20-provider catalogue". The code declared 8 at the time, and the guide was
+> corrected to match `packages/shared/src/integrations.ts`.
+>
+> **Updated 2026-11-07.** The catalogue is now 10 providers. `SENSAGE_AI` and
+> `REGISTRATION_OCR` are `ADAPTER_ONLY` but their vendor calls are written, so
+> their `verify` path performs a real request and reports `VERIFIED` only on a
+> validated response.
 
 ## State model
 

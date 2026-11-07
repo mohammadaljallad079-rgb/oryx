@@ -391,4 +391,146 @@ export class NotificationService {
       count: row._count._all,
     }));
   }
+
+  /**
+   * The operator's delivery log, across every tenant.
+   *
+   * This is the staff-plane counterpart to `listForCustomer`. It is deliberately
+   * broader — it shows the recipient and the provider error — so it is guarded
+   * by `platform.notification.read` on the route, never exposed to a customer.
+   * A `companyId` filter narrows it to one tenant when an operator is scoped.
+   */
+  async listDeliveries(params: {
+    companyId?: string | null;
+    channel?: string;
+    status?: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{
+    items: Array<{
+      id: string;
+      channel: string;
+      category: string;
+      templateKey: string | null;
+      locale: string;
+      recipient: string | null;
+      subject: string | null;
+      body: string;
+      status: string;
+      providerState: string;
+      provider: string | null;
+      attempts: number;
+      error: string | null;
+      sentAt: string | null;
+      deliveredAt: string | null;
+      createdAt: string;
+    }>;
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
+    const where = {
+      ...(params.companyId ? { companyId: params.companyId } : {}),
+      ...(params.channel ? { channel: params.channel as never } : {}),
+      ...(params.status ? { status: params.status as never } : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.notificationDelivery.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (params.page - 1) * params.pageSize,
+        take: params.pageSize,
+      }),
+      this.prisma.notificationDelivery.count({ where }),
+    ]);
+    return {
+      items: rows.map((r) => ({
+        id: r.id,
+        channel: r.channel,
+        category: r.category,
+        templateKey: r.templateKey,
+        locale: r.locale,
+        recipient: r.recipient,
+        subject: r.subject,
+        body: r.body,
+        status: r.status,
+        providerState: r.providerState,
+        provider: r.provider,
+        attempts: r.attempts,
+        error: r.error,
+        sentAt: r.sentAt?.toISOString() ?? null,
+        deliveredAt: r.deliveredAt?.toISOString() ?? null,
+        createdAt: r.createdAt.toISOString(),
+      })),
+      total,
+      page: params.page,
+      pageSize: params.pageSize,
+    };
+  }
+
+  /** Channel and status counts for the notification centre, across a scope. */
+  async deliveryBreakdown(companyId?: string | null): Promise<{
+    byChannel: Array<{ key: string; count: number }>;
+    byStatus: Array<{ key: string; count: number }>;
+  }> {
+    const where = companyId ? { companyId } : {};
+    const [byChannel, byStatus] = await Promise.all([
+      this.prisma.notificationDelivery.groupBy({
+        by: ['channel'],
+        where,
+        _count: { _all: true },
+      }),
+      this.prisma.notificationDelivery.groupBy({
+        by: ['status'],
+        where,
+        _count: { _all: true },
+      }),
+    ]);
+    return {
+      byChannel: byChannel.map((r) => ({ key: String(r.channel), count: r._count._all })),
+      byStatus: byStatus.map((r) => ({ key: String(r.status), count: r._count._all })),
+    };
+  }
+
+  /** The notification templates an operator can review and edit. */
+  async listTemplates(): Promise<
+    Array<{
+      id: string;
+      key: string;
+      channel: string;
+      locale: string;
+      subject: string | null;
+      body: string;
+      isActive: boolean;
+    }>
+  > {
+    const rows = await this.prisma.notificationTemplate.findMany({
+      orderBy: [{ key: 'asc' }, { locale: 'asc' }],
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      key: r.key,
+      channel: r.channel,
+      locale: r.locale,
+      subject: r.subject,
+      body: r.body,
+      isActive: r.isActive,
+    }));
+  }
+
+  /**
+   * Enable or disable a notification template.
+   *
+   * A disabled template is skipped by the renderer, so the operator can retire
+   * a message without deleting the history of deliveries that referenced it.
+   */
+  async setTemplateActive(
+    id: string,
+    isActive: boolean,
+  ): Promise<{ id: string; key: string; isActive: boolean }> {
+    const existing = await this.prisma.notificationTemplate.findUnique({ where: { id } });
+    if (!existing) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Notification template not found.');
+    const row = await this.prisma.notificationTemplate.update({ where: { id }, data: { isActive } });
+    return { id: row.id, key: row.key, isActive: row.isActive };
+  }
 }

@@ -4,7 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useUi } from '@/lib/ui-context';
 import { customerApi } from '@/lib/api';
-import { Alert, Button, Card, Field } from '@/components/ui';
+import { Alert, Button, Field } from '@/components/ui';
+import { AuthShell, StatePanel } from '@/components/premium';
 
 /**
  * Password reset request.
@@ -34,10 +35,22 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="oryx-container" style={{ maxWidth: 460 }}>
-      <Card title={t('auth.forgotTitle')}>
+    <AuthShell
+      title={t('auth.forgotTitle')}
+      subtitle={t('auth.forgotSubtitle')}
+      aside={
+        <Link href="/login" className="oryx-link">
+          {t('nav.login')}
+        </Link>
+      }
+    >
         {sent ? (
-          <Alert tone="success">{t('auth.resetSent')}</Alert>
+          <StatePanel
+            tone="success"
+            icon="check"
+            title={t('auth.resetSentTitle')}
+            message={t('auth.resetSent')}
+          />
         ) : (
           <form onSubmit={onSubmit}>
             {error && (
@@ -56,16 +69,10 @@ export default function ForgotPasswordPage() {
               />
             </Field>
             <Button type="submit" variant="primary" disabled={busy}>
-              {t('auth.sendReset')}
+              {busy ? t('common.saving') : t('auth.sendReset')}
             </Button>
           </form>
         )}
-        <p style={{ marginTop: 16, marginBottom: 0 }}>
-          <Link href="/login" className="oryx-muted">
-            {t('nav.login')}
-          </Link>
-        </p>
-      </Card>
-    </div>
+    </AuthShell>
   );
 }

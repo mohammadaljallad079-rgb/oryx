@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
-import { money, toMinorInput, toQuantityInput } from '@/lib/erp-format';
+import { minorToInput, money, toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -38,7 +38,7 @@ export default function MaintenancePage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="maintenance-page">
+    <div className="flex flex-col gap-4" data-testid="maintenance-page">
       <SectionHeader
         title={t('nav.automotive_maintenance')}
         subtitle={t('erp.automotive.maintenanceSubtitle')}
@@ -231,7 +231,7 @@ function EstimateModal({
         <Field label={t('erp.inventory.product')}>
           <select className="oryx-select" value={line.productId} onChange={(e) => {
             const p = products.find((x) => x.id === e.target.value);
-            setLine({ ...line, productId: e.target.value, description: p ? p.nameEn : line.description, unitPrice: p ? (p.salesPriceMinor / 100).toFixed(2) : line.unitPrice, taxRate: p ? String(p.taxRateBp / 100) : line.taxRate });
+            setLine({ ...line, productId: e.target.value, description: p ? p.nameEn : line.description, unitPrice: p ? minorToInput(p.salesPriceMinor) : line.unitPrice, taxRate: p ? String(p.taxRateBp / 100) : line.taxRate });
           }} data-testid="estimate-product">
             <option value="">{t('erp.automotive.labour')}</option>
             {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.nameEn}</option>)}

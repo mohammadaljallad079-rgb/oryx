@@ -63,7 +63,7 @@ export default function PaymentsPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="payments-page">
+    <div className="flex flex-col gap-4" data-testid="payments-page">
       <SectionHeader
         title={t('nav.payments')}
         subtitle={t('erp.payments.subtitle')}

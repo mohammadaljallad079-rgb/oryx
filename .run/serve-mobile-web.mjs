@@ -8,7 +8,10 @@ import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 
-const ROOT = '/workspace/project/oryx/apps/mobile/dist';
+// The export is written to `dist/web` (the Android and iOS exports take their
+// own `dist/<platform>` directories), so the server roots there rather than at
+// `dist`, which holds no `index.html` of its own.
+const ROOT = '/workspace/project/oryx/apps/mobile/dist/web';
 const PREFIX = '/mobile';
 const PORT = Number(process.env.MOBILE_WEB_PORT ?? 8081);
 

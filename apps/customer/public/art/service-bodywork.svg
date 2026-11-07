@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="480" viewBox="0 0 720 480" preserveAspectRatio="xMidYMid slice" role="img">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#05233f"/>
+    <stop offset="52%" stop-color="#001a33"/>
+    <stop offset="100%" stop-color="#000b18"/>
+  </linearGradient>
+  <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#e8c766"/>
+    <stop offset="100%" stop-color="#a9861f"/>
+  </linearGradient>
+  <radialGradient id="glow" cx="0.8" cy="0.1" r="0.9">
+    <stop offset="0%" stop-color="#d4af37" stop-opacity="0.28"/>
+    <stop offset="100%" stop-color="#d4af37" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="cool" cx="0.12" cy="0.9" r="0.8">
+    <stop offset="0%" stop-color="#4aa8ff" stop-opacity="0.16"/>
+    <stop offset="100%" stop-color="#4aa8ff" stop-opacity="0"/>
+  </radialGradient>
+</defs>
+<rect width="720" height="480" fill="url(#bg)"/>
+<rect width="720" height="480" fill="url(#glow)"/>
+<rect width="720" height="480" fill="url(#cool)"/>
+<line x1="0" y1="0" x2="0" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="36" y1="0" x2="36" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="72" y1="0" x2="72" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="108" y1="0" x2="108" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="144" y1="0" x2="144" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="180" y1="0" x2="180" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="216" y1="0" x2="216" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="252" y1="0" x2="252" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="288" y1="0" x2="288" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="324" y1="0" x2="324" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="360" y1="0" x2="360" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="396" y1="0" x2="396" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="432" y1="0" x2="432" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="468" y1="0" x2="468" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="504" y1="0" x2="504" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="540" y1="0" x2="540" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="576" y1="0" x2="576" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="612" y1="0" x2="612" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="648" y1="0" x2="648" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="684" y1="0" x2="684" y2="480" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="0" y1="0" x2="720" y2="0" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="0" y1="36" x2="720" y2="36" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="0" y1="72" x2="720" y2="72" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="0" y1="108" x2="720" y2="108" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="0" y1="144" x2="720" y2="144" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="0" y1="180" x2="720" y2="180" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="0" y1="216" x2="720" y2="216" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="0" y1="252" x2="720" y2="252" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="0" y1="288" x2="720" y2="288" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="0" y1="324" x2="720" y2="324" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="0" y1="360" x2="720" y2="360" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="0" y1="396" x2="720" y2="396" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="0" y1="432" x2="720" y2="432" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/><line x1="0" y1="468" x2="720" y2="468" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/>
+<path d="M180 300 q60 -110 190 -112 q128 -2 176 96" fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="2.8"/>
+<path d="M216 300 q54 -84 158 -86 q104 0 146 74" fill="none" stroke="url(#gold)" stroke-opacity="0.5" stroke-width="2"/>
+<rect x="150" y="150" width="112" height="58" rx="12" fill="none" stroke="#ffffff" stroke-opacity="0.24" stroke-width="2.6"/>
+<path d="M262 166 h44 v26 h-44z" fill="none" stroke="#ffffff" stroke-opacity="0.24" stroke-width="2.4"/>
+<path d="M306 172 h34 v14 h-34z" fill="none" stroke="#d4af37" stroke-opacity="0.6" stroke-width="2.4"/>
+<g stroke="url(#gold)" stroke-opacity="0.5" stroke-width="2" stroke-linecap="round">
+  <path d="M360 150 l40 -22M368 172 l48 -4M360 194 l40 22"/>
+</g>
+<g fill="#d4af37" fill-opacity="0.5">
+  <circle cx="416" cy="118" r="4"/><circle cx="440" cy="160" r="4"/><circle cx="416" cy="212" r="4"/>
+</g>
+</svg>

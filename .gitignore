@@ -8,7 +8,16 @@ coverage/
 .env
 .env.local
 .env.*.local
+# Production and staging secrets live in a real env file and must never be
+# committed. The templates in deploy/env/ are the committed examples.
+.env.production
+.env.staging
 !.env.example
+# TLS private keys and certificates are host-specific secrets, never source.
+# `deploy/nginx/certs/` holds them at runtime; only the .gitkeep placeholder is
+# tracked.
+deploy/nginx/certs/*
+!deploy/nginx/certs/.gitkeep
 .DS_Store
 .agent_tmp/
 test-results/
@@ -17,6 +26,13 @@ packages/database/prisma/migrations/dev.db*
 *.tsbuildinfo
 .oryx-tmp/
 tsconfig.build.tsbuildinfo
+
+# Generated official documents (PDFs) and uploaded media are runtime data, not
+# source. The paths match DOCUMENT_STORAGE_ROOT and MEDIA_ROOT.
+apps/api/.documents/
+apps/api/.media/
+.documents/
+.media/
 
 # Local test artifacts
 apps/admin/test-results/
@@ -29,5 +45,22 @@ apps/admin/playwright-report/
 .run/*.log
 .run/*.pid
 .run/*.pid.lock
+# Live access tokens written by the ad-hoc .run/get-token.mjs helper. The helper
+# script is tracked; the token it writes must never be.
+.run/*.tok
 # Scratch renders served locally for inspection; committed evidence lives in docs/audit/
 .run/evidence/
+
+# Local QA scratch: ad-hoc Playwright scripts and their throwaway captures. The
+# curated evidence that a report cites is copied into docs/audit/.
+qa/
+
+# Uploaded CMS media. The bytes are runtime state produced by the media
+# library, not source; the curated source photography that seeds it lives in
+# apps/customer/public/media/ and is tracked.
+.media/
+apps/api/.media/
+.run/pgsock/
+
+# Local QA account credentials (a live test password; never committed).
+.run/qa-customer-creds.txt
