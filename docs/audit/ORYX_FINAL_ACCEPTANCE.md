@@ -18,6 +18,28 @@ production secret is involved.
 > official-documents gallery to the published GitHub Pages preview. Counts below
 > are from this run, not carried over from the previous report.
 
+> **Revision note (2026-11-07, sixth revision).** This revision continued from
+> the latest pushed commit and closed the last gaps:
+>
+> - **The theme-switch flake is fixed at the source.** The single CI failure on
+>   `c7aec12f` was a hydration race in the harness (the inline bootstrap can read
+>   `localStorage` before the page-written value lands under load). `setTheme` /
+>   `setLocale` now retry the write-and-reload once while still asserting on
+>   every attempt. CI on `4142eee2` is green on all three jobs.
+> - **The live customer preview was serving a stale static-export build.** The
+>   app on `work-2` had the GitHub-Pages export in `.next`, so `/login` rendered
+>   the "design preview" banner instead of the real sign-in form. It was rebuilt
+>   with the live config (`NEXT_PUBLIC_API_BASE_URL=/api`, no `ORYX_STATIC_EXPORT`)
+>   and now talks to the API.
+> - **The twelve acceptance surfaces were re-captured against the current tree**
+>   (`.run/capture-final-evidence.mjs`, **captured 12, failed 0**), and the
+>   screenshot evidence was refreshed from the 224-pass browser run.
+> - **The report no longer carries stale document numbers.** Surfaces 8 and 11
+>   now read their numbers from the live register (`Q00027`, `Z00064`) instead of
+>   the retired `QT-00001` / `JOB-00002`.
+>
+> Counts below are from this run.
+
 > **Revision note (2026-11-07, fifth revision).** This revision re-ran every
 > suite on the current tree and closed the last evidence gaps:
 >
@@ -345,7 +367,7 @@ Twelve acceptance surfaces (`.run/capture-final-evidence.mjs`, screenshots in
 | 5 | Merchant Interface | `/providers` (admin) + `/mobile/merchant/*` | PASS |
 | 6 | Document Register | `/documents` | PASS |
 | 7 | Sales Invoice | `/sales` + issued PDF | PASS |
-| 8 | Quotation | issued PDF `QT-*` | PASS |
+| 8 | Quotation | issued PDF `Q00027` | PASS |
 | 9 | Purchase Invoice | `/purchasing` | PASS |
 | 10 | Full Vehicle Inspection | `vehicle-inspection-full.pdf` (6 pp) | PASS |
 | 11 | Partial Vehicle Inspection | `vehicle-inspection-partial.pdf` (5 pp) | PASS |
@@ -353,10 +375,11 @@ Twelve acceptance surfaces (`.run/capture-final-evidence.mjs`, screenshots in
 
 The twelve surfaces were re-captured this session
 (`.run/capture-final-evidence.mjs`): **captured 12, failed 0**. The two
-document-preview surfaces (`08-quotation`, `11-partial-inspection`) now derive
-their document number from the live register (`QT-00001`, `JOB-00002`) instead
-of a stale hard-coded value, so they render the real record. The 39-surface
-sweep (`.run/sweep-preview.mjs`) is **39 / 39** green.
+document-preview surfaces (`08-quotation`, `11-partial-inspection`) derive
+their document number from the live register and the current PDF manifest
+(`Q00027`, `Z00064`), so they render the real record rather than a stale
+hard-coded value. The 39-surface sweep (`.run/sweep-preview.mjs`) is
+**39 / 39** green.
 
 PDF samples: `docs/audit/pdf-samples/*.pdf` — **fifteen** document types, each with
 rendered page PNGs in `docs/audit/pdf-samples/preview/` and a machine-readable
