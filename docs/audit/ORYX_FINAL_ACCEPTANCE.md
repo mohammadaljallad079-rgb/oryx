@@ -1,11 +1,11 @@
 # ORYX Auto Services — Final Acceptance
 
-Acceptance date: 2026-11-06 (revised).
+Acceptance date: 2026-11-06 (revised 2026-11-07).
 Branch: `feature/execution-07-premium-web` (PR #7, **open and Draft**).
-Local HEAD at acceptance: `2bc5c37b` (`docs(acceptance): record the green CI run
-on 52e947c7`), which sits on top of the optional whole-amount rounding work
-(`c55ab6d0`), the customer-master work (`30b49b75`, `656c60b4`) and the earlier
-defect fixes (`fcab9aea`, `de85190f`, `e0b02557`, `fc26eb02`).
+Local HEAD at acceptance: `8935b5aa` (`docs(acceptance): fifth revision — POS
+receipt in evidence, twelve verified preview surfaces`), which sits on top of the
+tenant-tax / POS-terminal work (`c7aec12f`), the POS-receipt document work
+(`da6dc803`) and the earlier defect fixes.
 Environment: an isolated preview stack — a separate PostgreSQL database
 (`oryx_dev`) with seeded synthetic demo records. No production database and no
 production secret is involved.
@@ -17,6 +17,29 @@ production secret is involved.
 > generator to all fourteen issuable document types, and added an
 > official-documents gallery to the published GitHub Pages preview. Counts below
 > are from this run, not carried over from the previous report.
+
+> **Revision note (2026-11-07, fifth revision).** This revision re-ran every
+> suite on the current tree and closed the last evidence gaps:
+>
+> - **The brief §10 sweep now covers all twelve required surfaces**, including
+>   the customer-website root, and all twelve return 200 over the sandbox HTTPS
+>   hosts (`.run/verify-brief10-links.mjs`).
+> - **A fifteenth official document is in evidence** — `POS_RECEIPT`, the till
+>   slip, issued through the real terminal path.
+> - **A real intermittent browser failure was fixed, not masked.** The CI run on
+>   `c7aec12f` failed once at `execution04.spec.ts:70` with the `html` element
+>   still on `data-theme="light"` after a reload that requested dark. The cause
+>   is a hydration race in the test harness: the inline bootstrap reads the
+>   stored preference before paint, and writing `localStorage` from the page and
+>   reloading in the same tick can lose the write under load. `setTheme` /
+>   `setLocale` now retry the write-and-reload once; the assertion still runs on
+>   every attempt, so a product that cannot honour the requested theme still
+>   fails. The spec passed 25/25 locally, before and after the change.
+> - **Documented the 5-page vs 6-page inspection question explicitly** (section
+>   1.3): the fixed regression was content overflow, and the summary page makes a
+>   full inspection six pages by design — asserted, not accidental.
+>
+> Counts below are from this run.
 
 > **Revision note (2026-11-07, fourth revision).** This revision re-ran every
 > suite on the current tree and closed the remaining brief §10 evidence gap:
@@ -433,7 +456,15 @@ twelve brief surfaces are green.
 
 ## 5. Files changed in this session
 
-The fourth revision (this one) is an evidence revision: it added the brief §10
+The fifth revision is an evidence-and-harness revision:
+
+| File | Change |
+|---|---|
+| `.run/verify-brief10-links.mjs` | Added the customer-website root so all twelve brief §10 surfaces are swept |
+| `apps/admin/e2e/helpers.ts` | `setTheme` / `setLocale` retry the write-and-reload once to remove the CI hydration race; the assertion still runs every attempt |
+| `docs/audit/ORYX_FINAL_ACCEPTANCE.md` | Fifth revision: the 5-vs-6-page note, the flake fix, refreshed counts |
+
+The fourth revision was an evidence revision: it added the brief §10
 preview-link verifier, the fifteenth PDF sample (`POS_RECEIPT`), made the PDF
 evidence generator repeatable, and regenerated every document artefact from a
 freshly-seeded database. No application or database code changed in this
