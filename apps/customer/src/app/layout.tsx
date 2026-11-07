@@ -8,7 +8,7 @@ import { SiteFooter, SiteHeader } from '@/components/site-chrome';
 export const metadata: Metadata = {
   title: 'ORYX — Automotive Services',
   description:
-    'ORYX automotive customer platform: book inspections and maintenance, track your garage and pay securely with trusted Bahrain providers.',
+    'ORYX automotive customer platform: book inspections and maintenance at ORYX service centres, track your garage and pay securely.',
   robots: { index: true, follow: true },
 };
 

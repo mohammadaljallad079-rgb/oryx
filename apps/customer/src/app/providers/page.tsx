@@ -10,7 +10,9 @@ import { LoadingPanel, PageHeader, StatePanel, Toolbar } from '@/components/prem
 import { Icon } from '@/components/icons';
 
 /**
- * Provider directory: approved providers only, served by the public API.
+ * ORYX service-centre directory: approved centres only, served by the public
+ * API. The customer sees ORYX services, not an independent third-party
+ * provider directory.
  *
  * The category filter reads `useSearchParams`, which forces a client-side
  * bail-out during prerender, so the interactive part sits behind Suspense.
