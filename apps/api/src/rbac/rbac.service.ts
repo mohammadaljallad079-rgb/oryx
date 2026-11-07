@@ -335,6 +335,7 @@ export class RbacService {
             roleNameEn: m.role.nameEn,
             roleNameAr: m.role.nameAr,
             branchIds: m.branches.map((b) => b.branchId),
+            isActive: m.isActive,
           },
         ],
       })),

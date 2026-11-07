@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import type { InvitationDto, RoleDto, UserDto } from '@oryx/shared';
+import type { BranchDto, InvitationDto, RoleDto, UserDto } from '@oryx/shared';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -38,6 +38,7 @@ function UsersInner() {
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserDto | null>(null);
+  const [manageUser, setManageUser] = useState<UserDto | null>(null);
 
   const users = useAsync(
     () => (scopeCompanyId ? api.listUsers(scopeCompanyId) : Promise.resolve(null)),
@@ -60,6 +61,7 @@ function UsersInner() {
   }
 
   const canInvite = can('company.user.invite') || can('platform.user.manage');
+  const canManage = can('company.user.update') || can('platform.user.manage');
 
   return (
     <div className="flex flex-col gap-4" data-testid="users-page">
@@ -135,9 +137,17 @@ function UsersInner() {
                       <StatusBadge status={u.status} label={userStatusLabel(u.status, t)} />
                     </td>
                     <td>
-                      <Button size="sm" onClick={() => setSelectedUser(u)} data-testid={`view-perms-${u.email}`}>
-                        {t('users.effective')}
-                      </Button>
+                      <div className="flex flex-wrap gap-1">
+                        <Button size="sm" onClick={() => setSelectedUser(u)} data-testid={`view-perms-${u.email}`}>
+                          {t('users.effective')}
+                        </Button>
+                        {canManage ? (
+                          <Button size="sm" variant="ghost" onClick={() => setManageUser(u)} data-testid={`manage-access-${u.email}`}>
+                            <Icon name="edit" size={14} />
+                            {t('users.manageAccess')}
+                          </Button>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -209,6 +219,13 @@ function UsersInner() {
         companyId={scopeCompanyId}
         onClose={() => setSelectedUser(null)}
       />
+
+      <ManageAccessModal
+        user={manageUser}
+        companyId={scopeCompanyId}
+        onClose={() => setManageUser(null)}
+        onSaved={users.reload}
+      />
     </div>
   );
 }
@@ -241,6 +258,164 @@ function invitationStatusLabel(status: string, t: (k: string) => string): string
     default:
       return status;
   }
+}
+
+function ManageAccessModal({
+  user,
+  companyId,
+  onClose,
+  onSaved,
+}: {
+  user: UserDto | null;
+  companyId: string;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const { t, locale } = useUi();
+  const { can } = useAuth();
+  const [roles, setRoles] = useState<RoleDto[]>([]);
+  const [branches, setBranches] = useState<BranchDto[]>([]);
+  const [delegable, setDelegable] = useState<string[]>([]);
+  const [roleId, setRoleId] = useState('');
+  const [branchIds, setBranchIds] = useState<string[]>([]);
+  const [isActive, setIsActive] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const membership = user?.memberships[0];
+
+  useEffect(() => {
+    if (!user) return;
+    setError(null);
+    setRoleId(membership?.roleId ?? '');
+    setBranchIds(membership?.branchIds ?? []);
+    setIsActive(membership?.isActive ?? true);
+    void (async () => {
+      try {
+        const [r, b, d] = await Promise.all([
+          api.listRoles(companyId),
+          api.listBranches(companyId, { pageSize: 100 }),
+          api.delegablePermissions(companyId).catch(() => ({ companyId, permissions: [] })),
+        ]);
+        setRoles(r);
+        setBranches(b.items);
+        setDelegable(d.permissions);
+      } catch {
+        setRoles([]);
+        setBranches([]);
+      }
+    })();
+    // The membership is the subject; reloading on every render would reset edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, companyId]);
+
+  // Only roles whose permissions are within the delegable set may be offered,
+  // matching the invitation rule. A company administrator can never grant a
+  // permission it does not hold.
+  const assignableRoles = roles.filter(
+    (r) => r.isSystem || r.permissions.every((p) => delegable.includes(p)),
+  );
+
+  const canManage = can('company.user.update') || can('platform.user.manage');
+
+  async function submit() {
+    if (!user) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.updateMembership(companyId, user.id, {
+        roleId: roleId || undefined,
+        branchIds,
+        isActive,
+      });
+      await onSaved();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const toggleBranch = (id: string) =>
+    setBranchIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  return (
+    <Modal
+      open={Boolean(user)}
+      title={user ? `${t('users.manageAccess')} — ${user.email}` : t('users.manageAccess')}
+      onClose={onClose}
+      footer={
+        canManage ? (
+          <>
+            <Button onClick={onClose}>{t('common.cancel')}</Button>
+            <Button variant="primary" disabled={busy} onClick={submit} data-testid="membership-save">
+              {busy ? t('common.loading') : t('common.save')}
+            </Button>
+          </>
+        ) : (
+          <Button onClick={onClose}>{t('common.close')}</Button>
+        )
+      }
+    >
+      {error ? <ErrorBanner message={error} /> : null}
+      <div className="flex flex-col gap-3">
+        <Field label={t('users.role')} required>
+          <select
+            className="oryx-select"
+            value={roleId}
+            disabled={!canManage}
+            onChange={(e) => setRoleId(e.target.value)}
+            data-testid="membership-role"
+          >
+            <option value="">—</option>
+            {assignableRoles.map((r) => (
+              <option key={r.id} value={r.id}>
+                {locale === 'ar' ? r.nameAr : r.nameEn}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label={t('users.branchScope')} hint={t('users.branchScopeHint')}>
+          <div className="flex flex-wrap gap-2" data-testid="membership-branches">
+            {branches.length === 0 ? (
+              <span className="oryx-faint text-[12px]">—</span>
+            ) : (
+              branches.map((b) => (
+                <label
+                  key={b.id}
+                  className="flex items-center gap-2 rounded-lg border border-[var(--border)] px-2 py-1 text-[12px]"
+                >
+                  <input
+                    type="checkbox"
+                    disabled={!canManage}
+                    checked={branchIds.includes(b.id)}
+                    onChange={() => toggleBranch(b.id)}
+                    data-testid={`membership-branch-${b.code}`}
+                  />
+                  {locale === 'ar' ? b.nameAr : b.nameEn}
+                </label>
+              ))
+            )}
+          </div>
+        </Field>
+
+        <Field label={t('common.status')}>
+          <label className="flex items-center gap-2 text-[12.5px]">
+            <input
+              type="checkbox"
+              disabled={!canManage}
+              checked={isActive}
+              onChange={(e) => setIsActive(e.target.checked)}
+              data-testid="membership-active"
+            />
+            {isActive ? t('common.active') : t('common.inactive')}
+          </label>
+        </Field>
+      </div>
+    </Modal>
+  );
 }
 
 function InviteModal({

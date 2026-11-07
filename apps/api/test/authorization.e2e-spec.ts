@@ -760,6 +760,89 @@ describe('ORYX API authorization (e2e)', () => {
       expect(res.body.effective).toContain('erp.dashboard.read');
       expect(res.body.effective).not.toContain('company.user.invite');
     });
+
+    it('changes a membership role, branch scope and active state', async () => {
+      const roles = await companyCall<Array<{ id: string; code: string }>>(
+        ctx.base,
+        authzTenantId,
+        `/companies/${authzTenantId}/roles`,
+        { token: companyToken },
+      );
+      const staffRole = roles.body.find((r) => r.code === 'staff_viewer')!;
+      const managerRole = roles.body.find((r) => r.code === 'branch_manager')!;
+
+      const email = `${FIXTURE_PREFIX.toLowerCase()}-membership@oryx.test`;
+      const invite = await companyCall<{ inviteToken: string }>(
+        ctx.base,
+        authzTenantId,
+        `/companies/${authzTenantId}/users/invitations`,
+        {
+          method: 'POST',
+          token: companyToken,
+          body: { email, fullNameEn: 'Membership Target', fullNameAr: 'هدف العضوية', roleId: staffRole.id },
+        },
+      );
+      const accepted = await call<{ accessToken: string }>(ctx.base, '/auth/accept-invitation', {
+        method: 'POST',
+        body: {
+          token: invite.body.inviteToken,
+          fullNameEn: 'Membership Target',
+          fullNameAr: 'هدف العضوية',
+          password: 'A-strong-password-2026',
+        },
+      });
+      expect(accepted.status).toBe(200);
+
+      const users = await companyCall<{ items: Array<{ id: string; email: string; memberships: Array<{ roleId: string; branchIds: string[]; isActive?: boolean }> }> }>(
+        ctx.base,
+        authzTenantId,
+        `/companies/${authzTenantId}/users`,
+        { token: companyToken },
+      );
+      const target = users.body.items.find((u) => u.email === email)!;
+      expect(target).toBeDefined();
+      // A freshly accepted membership is active and lists its role.
+      expect(target.memberships[0].isActive).toBe(true);
+      expect(target.memberships[0].roleId).toBe(staffRole.id);
+
+      const branches = await call<{ items: Array<{ id: string }> }>(
+        ctx.base,
+        `/companies/${authzTenantId}/branches`,
+        { token: superToken },
+      );
+      const branchId = branches.body.items[0]?.id;
+      const branchIds = branchId ? [branchId] : [];
+
+      const updated = await companyCall(
+        ctx.base,
+        authzTenantId,
+        `/companies/${authzTenantId}/users/${target.id}/membership`,
+        { method: 'PATCH', token: companyToken, body: { roleId: managerRole.id, branchIds, isActive: false } },
+      );
+      expect(updated.status).toBe(200);
+
+      const after = await ctx.prisma.membership.findUniqueOrThrow({
+        where: { userId_companyId: { userId: target.id, companyId: authzTenantId } },
+        include: { branches: true },
+      });
+      expect(after.roleId).toBe(managerRole.id);
+      expect(after.isActive).toBe(false);
+      expect(after.branches.map((b) => b.branchId)).toEqual(branchIds);
+
+      // Deactivating the membership must invalidate the user's live sessions.
+      const revoked = await ctx.prisma.refreshToken.count({ where: { userId: target.id, revokedAt: null } });
+      expect(revoked).toBe(0);
+
+      // The listing reflects the new state, so the admin console can render it.
+      const relisted = await companyCall<{ items: Array<{ email: string; memberships: Array<{ isActive?: boolean }> }> }>(
+        ctx.base,
+        authzTenantId,
+        `/companies/${authzTenantId}/users`,
+        { token: companyToken },
+      );
+      const reread = relisted.body.items.find((u) => u.email === email)!;
+      expect(reread.memberships[0].isActive).toBe(false);
+    });
   });
 
   // ------------------------------------------------------- cross-tenant access

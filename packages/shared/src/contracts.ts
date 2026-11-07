@@ -57,6 +57,8 @@ export interface MembershipSummary {
   roleNameEn: string;
   roleNameAr: string;
   branchIds: string[];
+  /** Whether this membership is currently active; a deactivated one grants nothing. */
+  isActive?: boolean;
 }
 
 export interface LoginResponse {
