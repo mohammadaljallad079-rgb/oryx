@@ -3,7 +3,7 @@
 Read **docs/ORYX_MASTER_REFERENCE.md**, **docs/architecture/ARCHITECTURE.md** and
 **docs/architecture/PERMISSION_MATRIX.md** before writing code.
 
-## Current state (Execution 01, 01.1, 02, 03, 04 and 05 complete)
+## Current state (Executions 01–20 complete)
 
 Execution 01 delivered the working Super Admin foundation, Execution 01.1
 hardened it (secure session transport, TOTP MFA, approved photography and
@@ -12,10 +12,15 @@ added HR and payroll, CRM, operations and automotive services, Execution 04
 added the customer platform, the automotive marketplace, the shared booking
 engine, payments, notifications and the ORYX customer mobile application, and
 Execution 05 added the External Integrations Center and platform-completion
-work. It is **not** a mock: a NestJS API, a Next.js admin app, a Next.js
-customer site, an Expo/React Native mobile app and a PostgreSQL database run
-locally and are covered by 445 automated tests (93 shared unit, 218 API
-integration, 120 browser, 14 mobile).
+work. Later executions added the vehicle inspection engine, official documents
+with QR verification, the tenant tax module and the POS terminal. It is **not**
+a mock: a NestJS API, a Next.js admin app, a Next.js customer site, an
+Expo/React Native mobile app and a PostgreSQL database run locally.
+
+Current automated coverage (2026-11-07, re-run on the working tree): **231**
+shared unit, **685** API integration (37 suites), **20** API unit, **224**
+admin browser, **206** mobile, **31** mobile-ERP. See
+`docs/audit/ORYX_FINAL_ACCEPTANCE.md` for the authoritative, dated matrix.
 
 Security baseline (do not regress):
 - The refresh token lives in an HttpOnly cookie scoped to `/api/v1/auth`. It is
@@ -995,3 +1000,34 @@ so nothing else needs changing.
   modules.
 - Never modify or delete pre-existing project code without auditing it first.
 - Do not commit production credentials, tokens or secret keys.
+
+### Cold-sandbox recovery gotchas
+
+- **The sandbox is recycled between sessions.** A restart drops PostgreSQL,
+  nginx and every Node service while leaving the source, the built `dist/`,
+  `.next/`, and the seeded cluster under `.run/pgdata` intact. Recover with
+  `bash .run/start-stack.sh`; it reinstalls PostgreSQL 17 if the package is
+  gone, starts the cluster, then the API, admin, customer, mobile-web and the
+  two preview proxies. Do not re-run migrations or the seed — the demo data
+  survives.
+- **`pnpm` is installed through corepack and disappears with the image.**
+  `command -v pnpm` failing is expected; the start script writes a shim at
+  `$HOME/.local/bin/pnpm`. Add `$HOME/.local/bin` to `PATH` before any `pnpm`
+  call.
+- **Playwright browsers are lost with the image too.** A run that dies with
+  `Executable doesn't exist … headless_shell` needs
+  `pnpm --filter @oryx/admin exec playwright install chromium` again.
+- **PyMuPDF is not in the image.** The PDF validation step
+  (`.run/render-pdf-samples.py`) needs `pip install pymupdf` first.
+- **`restart-customer.sh` kills every `next-server`, including admin's.** The
+  customer restart helper matches `next-server` globally, so after using it the
+  admin proxy returns `502 … upstream 3000 unavailable`. Restart admin with
+  `bash .run/restart-app.sh admin` (which matches by working directory).
+- **The customer app on `:3002` can be left holding a static-export build.**
+  If `/login` renders the "design preview" banner (it does not reach the API),
+  the `.next` tree is the GitHub-Pages export. Rebuild it with the live config:
+  `env -u ORYX_STATIC_EXPORT -u NEXT_PUBLIC_ORYX_STATIC_EXPORT -u ORYX_BASE_PATH NEXT_PUBLIC_API_BASE_URL=/api pnpm --filter @oryx/customer build`,
+  then `bash .run/restart-customer.sh`.
+- **Never leave the admin app on `:3000` down after touching the customer
+  app.** Both preview hosts share the same ingress; a dead upstream turns every
+  admin capture into a `502` screenshot.
