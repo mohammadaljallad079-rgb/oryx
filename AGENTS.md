@@ -1031,10 +1031,12 @@ so nothing else needs changing.
   `pnpm --filter @oryx/admin exec playwright install chromium` again.
 - **PyMuPDF is not in the image.** The PDF validation step
   (`.run/render-pdf-samples.py`) needs `pip install pymupdf` first.
-- **`restart-customer.sh` kills every `next-server`, including admin's.** The
-  customer restart helper matches `next-server` globally, so after using it the
-  admin proxy returns `502 … upstream 3000 unavailable`. Restart admin with
-  `bash .run/restart-app.sh admin` (which matches by working directory).
+- **`restart-customer.sh` matches `next-server` by working directory.** The
+  admin and customer apps share the process name, so an earlier version killed
+  every `next-server` and left the admin proxy returning `502 … upstream 3000
+  unavailable`. It now reads `/proc/<pid>/cwd` and only stops the customer
+  server; the admin server survives. If admin is down for any reason, restart it
+  with `bash .run/restart-app.sh admin` (also cwd-matched).
 - **The customer app on `:3002` can be left holding a static-export build.**
   If `/login` renders the "design preview" banner (it does not reach the API),
   the `.next` tree is the GitHub-Pages export. Rebuild it with the live config:

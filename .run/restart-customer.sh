@@ -15,7 +15,10 @@ ROOT=/workspace/project/oryx
 port_open() { (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null && exec 3>&- && return 0; return 1; }
 
 for pid in $(pgrep -f "next-server" 2>/dev/null); do
-  kill -9 "$pid" 2>/dev/null || true
+  # Match by working directory so the admin server (also a `next-server`) is
+  # never caught by a customer restart. The two apps share the process name.
+  [ "$(readlink "/proc/$pid/cwd" 2>/dev/null)" = "$ROOT/apps/customer" ] \
+    && kill -9 "$pid" 2>/dev/null || true
 done
 for pid in $(pgrep -f "next start -p $PORT" 2>/dev/null); do
   kill -9 "$pid" 2>/dev/null || true
