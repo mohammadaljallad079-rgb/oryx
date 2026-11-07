@@ -2,11 +2,13 @@
 
 Acceptance date: 2026-11-06 (revised 2026-11-07, eighth revision).
 Branch: `feature/execution-07-premium-web` (PR #7, **open and Draft**).
-Branch tip: `034d9e41`. Code tree under test: `2194fb24` (customer-restart
-script fix); the commits after it (`7b4e71ed`, `034d9e41`) change only
-documentation (this report and `AGENTS.md`), so the verified code is unchanged.
-`2194fb24` sits on `c34819dc` (report), `7969b6e1` (the journal-editor CI flake
-fix), `51f88d04`/`c034742e` (eighth-revision report and evidence refresh) and
+Branch tip: this report is the last commit on the branch, so naming its own SHA
+is self-referential; the SHA is whatever `git rev-parse HEAD` returns on
+`feature/execution-07-premium-web`. Code tree under test: `2194fb24`
+(customer-restart script fix). Every commit after it changes only documentation
+(this report and `AGENTS.md`), so the verified code is unchanged. `2194fb24`
+sits on `c34819dc` (report), `7969b6e1` (the journal-editor CI flake fix),
+`51f88d04`/`c034742e` (eighth-revision report and evidence refresh) and
 `de940631` (`feat(automotive): registration-card OCR extraction for vehicle
 documents`). That chain sits on the tenant-tax / POS-terminal work (`c7aec12f`),
 the POS-receipt document work (`da6dc803`) and the earlier defect fixes. The
