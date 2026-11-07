@@ -189,6 +189,20 @@ async function main() {
   const warehouse = await firstId('/inventory/warehouses');
   const product = await firstId('/inventory/products');
   const supplier = await firstId('/purchasing/suppliers');
+
+  // The sample document flows consume real stock (invoices, POS sales, returns
+  // restock), so repeated runs drain the demo product and a later run fails with
+  // `inventory.insufficient_stock`. Top the product up through the same
+  // adjustment path the UI uses, so the generator is repeatable without a reseed.
+  const topUp = await api('/inventory/adjustments', {
+    method: 'POST',
+    body: {
+      warehouseId: warehouse.id,
+      reason: 'Evidence sample stock top-up · تعبئة مخزون أدلة',
+      lines: [{ productId: product.id, quantityDelta: 500 * 10000 }],
+    },
+  });
+  await api(`/inventory/adjustments/${topUp.id}/post`, { method: 'POST' });
   const accounts = await api('/accounting/accounts?pageSize=200');
   const accountRows = Array.isArray(accounts) ? accounts : accounts.items ?? [];
   const byCode = (code) => accountRows.find((a) => a.code === code);
@@ -371,6 +385,38 @@ async function main() {
     },
   });
   await save('journal-entry.pdf', await issueFinancial('JOURNAL_ENTRY', journal.id));
+
+  // --- POS receipt (the till slip) ----------------------------------------
+  // A POS receipt is issued from a settled POS sale, so the sample is created
+  // the way the terminal does it: open a cashier session, record the sale, then
+  // issue the receipt against the sale id.
+  const branch = await firstId(`/companies/${companyId}/branches`);
+  // A failed earlier run can leave a session open (the branch allows only one),
+  // so reuse it rather than opening a second one, which the API refuses.
+  const sessions = await api('/sales/cashier-sessions');
+  const openSession = (sessions.items ?? []).find((s) => s.status === 'OPEN' && s.branchId === branch.id);
+  const session = openSession ?? (await api('/sales/cashier-sessions', {
+    method: 'POST',
+    body: { branchId: branch.id, openingFloatMinor: 100000 },
+  }));
+  const posSale = await api('/sales/pos-sales', {
+    method: 'POST',
+    body: {
+      branchId: branch.id,
+      cashierSessionId: session.id,
+      warehouseId: warehouse.id,
+      customerId: customer.id,
+      paymentMethod: 'CASH',
+      lines: [
+        { productId: product.id, description: product.nameEn ?? 'Spare part', quantity: 2 * 10000, unitPriceMinor: 45000, taxPercentBp: 1000, discountPercentBp: 500 },
+      ],
+    },
+  });
+  await save('pos-receipt.pdf', await issueFinancial('POS_RECEIPT', posSale.id));
+  await api(`/sales/cashier-sessions/${session.id}/close`, {
+    method: 'POST',
+    body: { countedCashMinor: 0 },
+  }).catch(() => {});
 
   writeFileSync(resolve(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2));
   console.log(`\n${manifest.documents.length} documents written; manifest updated.`);

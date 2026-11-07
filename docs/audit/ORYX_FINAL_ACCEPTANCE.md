@@ -18,6 +18,28 @@ production secret is involved.
 > official-documents gallery to the published GitHub Pages preview. Counts below
 > are from this run, not carried over from the previous report.
 
+> **Revision note (2026-11-07, fourth revision).** This revision re-ran every
+> suite on the current tree and closed the remaining brief §10 evidence gap:
+>
+> - **Brief §10 preview links are now verified, not asserted.** A new
+>   `.run/verify-brief10-links.mjs` sweeps the twelve required surfaces over the
+>   sandbox HTTPS hosts and the published GitHub Pages site. All twelve return
+>   200. The two build-configuration defects that blocked the authenticated
+>   sweep (an absolute `NEXT_PUBLIC_API_BASE_URL` inlined into the admin and
+>   customer bundles, and a stale customer build) are fixed by rebuilding both
+>   apps with the relative `/api` base (section 3.2).
+> - **A fifteenth official document is now in evidence.** `POS_RECEIPT` (the
+>   till slip) joins the fourteen existing samples, generated through the real
+>   terminal path — open a cashier session, record the sale, issue the receipt.
+>   `.run/regenerate-pdf-evidence.mjs` is now repeatable (stock top-up through
+>   the adjustment path, reuse of an open session), so re-running it cannot fail
+>   on depleted stock or a duplicate session.
+> - **Counts re-verified on the current tree.** Shared 231, API integration 685
+>   (37 suites), API unit 20, mobile 206, mobile-erp 31, admin browser 224;
+>   lint and typecheck clean; 15 PDFs render with Arabic + Latin and no `/Type3`.
+>
+> Counts below are from this run.
+
 > **Revision note (2026-11-07, third revision).** This revision finished the
 > brief's remaining admin and merchant items on top of `da6dc803`:
 >
@@ -99,8 +121,18 @@ tree.
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| Concurrency-safe first allocation | PASS | `document-numbering.e2e-spec.ts` (in the 671-test API run) |
+| Concurrency-safe first allocation | PASS | `document-numbering.e2e-spec.ts` (in the 685-test API run) |
 | No duplicate numbers under concurrent requests | PASS | same suite |
+
+> **Note on the 5-page vs 6-page question (brief §3).** The regression that the
+> previous session fixed was *content overflow*: a fully populated inspection
+> used to spill from its planned 5 pages into a 6th. The fix was a denser layout
+> plus a regression assertion that the issued `pageCount` equals the planner's
+> page count. A **full** inspection now issues **6 pages by design** — the
+> planner yields 5 (identification + 4 section pages for the 7 areas) and the
+> report appends one summary page carrying the final assessment, per-area
+> remarks and the verification block. A **partial** inspection (3 areas) issues
+> **5 pages** (4 + 1). The page count is no longer accidental; it is asserted.
 
 ### 1.4 Customer and mobile
 
@@ -215,29 +247,30 @@ balance is asserted `balanced:true` in the new test.
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| Every issuable document type has a real sample PDF | PASS | 14 PDFs in `docs/audit/pdf-samples/` (invoice, quotation, order, sales return, purchase order, purchase invoice, purchase return, receipt, voucher, customer statement, supplier statement, journal entry, full and partial inspection) |
-| Rendered pages are published as evidence | PASS | `documents/` section on the GitHub Pages preview; `preview:verify` `documents-desktop-en-light`/`-dark` 200, 24 images, 0 broken; `preview:check` 458 pages crawled, 14 PDFs checked, 0 bad responses, 0 dark issues |
+| Every issuable document type has a real sample PDF | PASS | 15 PDFs in `docs/audit/pdf-samples/` (invoice, quotation, order, sales return, purchase order, purchase invoice, purchase return, payment receipt, payment voucher, POS receipt, customer statement, supplier statement, journal entry, full and partial inspection) |
+| Rendered pages are published as evidence | PASS | `documents/` section on the GitHub Pages preview; `preview:verify` `documents-desktop-en-light`/`-dark` 200, 25 images, 0 broken; `preview:check` 459 pages crawled, 15 PDFs checked, 0 bad responses, 0 dark issues |
 | QR block encodes a real verification URL | PASS | `DOCUMENT_VERIFY_BASE_URL=https://oryxbhr.com`; live `GET /documents/verify/:token` → `found:true`, `VALID`; unknown token → `found:false` |
 
 ## 2. Test results (re-run this session on the current tree)
 
 | Suite | Command | Result |
 |---|---|---|
-| Shared unit | `pnpm --filter @oryx/shared test` | **223 passed / 223** (11 files) |
-| API integration | `pnpm --filter @oryx/api test:e2e` | **673 passed / 673** (36 suites) |
+| Shared unit | `pnpm --filter @oryx/shared test` | **231 passed / 231** (12 files) |
+| API integration | `pnpm --filter @oryx/api test:e2e` | **685 passed / 685** (37 suites) |
 | API unit | `pnpm --filter @oryx/api test` | **20 passed / 20** (5 files) |
-| Whole-amount rounding | `… test:e2e -- whole-amount-rounding` | **7 passed / 7** (in the 673) |
-| Purchase-return variance | `… test:e2e -- erp` | **37 passed / 37** (incl. the new variance test) |
+| Whole-amount rounding | `… test:e2e -- whole-amount-rounding` | **7 passed / 7** (in the 685) |
+| Purchase-return variance | `… test:e2e -- erp` | **37 passed / 37** (incl. the variance test) |
 | Mobile | `pnpm --filter @oryx/mobile test` | **206 passed / 206** (10 files) |
 | Mobile ERP | `pnpm --filter @oryx/mobile-erp test` | **31 passed / 31** (2 files) |
-| Admin browser | `pnpm --filter @oryx/admin test:ui` | **223 passed, 1 skipped** (8.6 min) |
+| Admin browser | `pnpm --filter @oryx/admin test:ui` | **224 passed, 1 skipped** (10.0 min) |
 | Workspace lint | `pnpm -r lint` | PASS (exit 0) |
 | Workspace typecheck | `pnpm -r typecheck` | PASS (exit 0) |
 | Builds | api / admin / customer | PASS (exit 0) |
-| Migrations | `prisma migrate status` | **up to date** (31 migrations applied to `oryx_dev`) |
-| PDF sample render | `python3 .run/render-pdf-samples.py` | **ALL PASS** (14 PDFs, 23 PNGs; Arabic + Latin, no Type3) |
+| Migrations | `prisma migrate status` | **up to date** (33 migrations applied to `oryx_dev`) |
+| PDF sample render | `python3 .run/render-pdf-samples.py` | **ALL PASS** (15 PDFs, 24 PNGs; Arabic + Latin, no Type3) |
 | Preview render check | `pnpm preview:verify` | **65 page/theme combinations, issues: none** |
-| Preview link crawl | `pnpm preview:check` | **458 pages, 14 PDFs, 0 bad responses, 0 dark-mode issues** |
+| Preview link crawl | `pnpm preview:check` | **459 pages, 15 PDFs, 0 bad responses, 0 dark-mode issues** |
+| Brief §10 preview surfaces | `.run/verify-brief10-links.mjs` | **12 / 12 reachable, 0 failed** |
 
 All of the above were re-run on the current tree after the sandbox was recycled
 and the cluster rebuilt from an empty `pgdata`, migrated and seeded. Every
@@ -301,7 +334,7 @@ their document number from the live register (`QT-00001`, `JOB-00002`) instead
 of a stale hard-coded value, so they render the real record. The 39-surface
 sweep (`.run/sweep-preview.mjs`) is **39 / 39** green.
 
-PDF samples: `docs/audit/pdf-samples/*.pdf` — **fourteen** document types, each with
+PDF samples: `docs/audit/pdf-samples/*.pdf` — **fifteen** document types, each with
 rendered page PNGs in `docs/audit/pdf-samples/preview/` and a machine-readable
 `docs/audit/pdf-samples/manifest.json` (document number, page count, byte size
 and verification token per sample):
@@ -317,12 +350,16 @@ and verification token per sample):
 | 7 | `purchase-return.pdf` | `PURCHASE_RETURN` | 1 |
 | 8 | `payment-receipt.pdf` | `PAYMENT_RECEIPT` | 1 |
 | 9 | `payment-voucher.pdf` | `PAYMENT_VOUCHER` | 1 |
-| 10 | `customer-statement.pdf` | `CUSTOMER_STATEMENT` | 1 |
-| 11 | `supplier-statement.pdf` | `SUPPLIER_STATEMENT` | 1 |
-| 12 | `journal-entry.pdf` | `JOURNAL_ENTRY` | 1 |
-| 13 | `vehicle-inspection-full.pdf` | `VEHICLE_INSPECTION_REPORT` | 6 |
-| 14 | `vehicle-inspection-partial.pdf` | `VEHICLE_INSPECTION_REPORT` | 5 |
+| 10 | `pos-receipt.pdf` | `POS_RECEIPT` (till slip) | 1 |
+| 11 | `customer-statement.pdf` | `CUSTOMER_STATEMENT` | 1 |
+| 12 | `supplier-statement.pdf` | `SUPPLIER_STATEMENT` | 1 |
+| 13 | `journal-entry.pdf` | `JOURNAL_ENTRY` | 1 |
+| 14 | `vehicle-inspection-full.pdf` | `VEHICLE_INSPECTION_REPORT` | 6 |
+| 15 | `vehicle-inspection-partial.pdf` | `VEHICLE_INSPECTION_REPORT` | 5 |
 
+The generator (`.run/regenerate-pdf-evidence.mjs`) is repeatable: it tops the demo
+product up through the same stock-adjustment path the UI uses and reuses an open
+cashier session, so a re-run cannot fail on depleted stock or a duplicate session.
 Every sample carries both Arabic and Latin text, an embedded Arabic face and no
 `/Type3` font. The QR block encodes `https://oryxbhr.com/verify/<token>`.
 
@@ -336,7 +373,7 @@ push to this branch:
 It is built only from files committed to the branch, so it can never show
 something the repository does not contain. Alongside the exported customer
 website at the root, this session added an **Official documents** section
-(`/documents/`) that lists all fourteen document types with every rendered page,
+(`/documents/`) that lists all fifteen document types with every rendered page,
 a per-document download link and the QR verification target, and updated the
 overview page with a documents KPI and card. The workflow's own `verify` job runs
 `preview:verify` and `preview:check` against the built site before publishing, so
@@ -346,6 +383,40 @@ Because GitHub Pages serves static files only, the preview cannot run the API, s
 the QR verification link is shown as the address the printed code encodes rather
 than resolved on that host; the live verification endpoint is exercised
 separately (section 3, item 12).
+
+### 3.2 Brief §10 preview-link verification
+
+The brief asks for verified HTTPS preview links for twelve surfaces. The sandbox
+stack (`work-1` admin, `work-2` customer, both fronting the live API through the
+same-origin preview proxy in `.run/preview-proxy.mjs`) was swept with
+`.run/verify-brief10-links.mjs`, and the published GitHub Pages site carries the
+static customer pages and every PDF.
+
+| # | Surface | Live preview URL | Status |
+|---|---|---|---|
+| 1 | Admin Dashboard | `…work-1…/dashboard` | PASS (200) |
+| 2 | Customer Website | `…work-2…/` | PASS (200) |
+| 3 | Products | `…work-2…/products` | PASS (200) |
+| 4 | Services | `…work-2…/services` | PASS (200) |
+| 5 | Merchant Interface | `…work-1…/providers` + `…work-2…/mobile/merchant/*` | PASS (200) |
+| 6 | Document Register | `…work-1…/documents` | PASS (200) |
+| 7 | Sales Invoice | `…work-1…/sales` + `…/documents/sales-invoice.pdf` | PASS (200) |
+| 8 | Quotation | `…work-1…/sales` + `…/documents/quotation.pdf` | PASS (200) |
+| 9 | Purchase Invoice | `…work-1…/purchasing` + `…/documents/purchase-invoice.pdf` | PASS (200) |
+| 10 | Full Vehicle Inspection | `…/documents/vehicle-inspection-full.pdf` (6 pp) | PASS (200) |
+| 11 | Partial Vehicle Inspection | `…/documents/vehicle-inspection-partial.pdf` (5 pp) | PASS (200) |
+| 12 | QR Verification | `…work-2…/verify/<token>` + `GET /documents/verify/<token>` | PASS (200) |
+
+Two build-configuration defects were found and fixed while producing this
+evidence. The admin and customer apps inline `NEXT_PUBLIC_API_BASE_URL` at build
+time; a bundle built with the absolute `http://localhost:3001/api` base sets the
+refresh cookie on `localhost:3001` while the page runs on the proxy origin, so
+every reload silently signed the user out and the authenticated sweep timed out.
+Both apps are now rebuilt with the relative `/api` base (`.run/restart-app.sh`
+unsets the variable before the build). The stale customer build also served
+chunk filenames the server no longer had, which surfaced as a MIME-type console
+error; a clean rebuild resolved it. After both fixes the 39-surface sweep and the
+twelve brief surfaces are green.
 
 ## 4. External blockers
 
@@ -362,13 +433,36 @@ separately (section 3, item 12).
 
 ## 5. Files changed in this session
 
-The final revision of this session (commit `c55279ba`) is a verification
-revision: it regenerated the document samples from a pristine, freshly-seeded
-database (`docs/audit/pdf-samples/*`, rendered pages and `manifest.json`), the
-preview sweep evidence (`docs/audit/evidence/exec06-preview-sweep.json`), the
-re-captured screenshots (`docs/audit/screenshots/*`,
-`docs/execution-reports/screenshots/*`, `docs/audit/responsive/*`) and this
-report. No application or database code changed in that revision.
+The fourth revision (this one) is an evidence revision: it added the brief §10
+preview-link verifier, the fifteenth PDF sample (`POS_RECEIPT`), made the PDF
+evidence generator repeatable, and regenerated every document artefact from a
+freshly-seeded database. No application or database code changed in this
+revision.
+
+| File | Change |
+|---|---|
+| `.run/verify-brief10-links.mjs` | New: sweep the twelve brief §10 surfaces over the sandbox HTTPS hosts and the published preview |
+| `.run/regenerate-pdf-evidence.mjs` | Repeatable: top up demo stock through the adjustment path, reuse an open cashier session, issue the new `POS_RECEIPT` sample |
+| `docs/audit/pdf-samples/pos-receipt.pdf`, `…/preview/pos-receipt-1.png`, `manifest.json` | Fifteenth document type in evidence |
+| `docs/audit/pdf-samples/*.pdf`, `…/preview/*.png` | Regenerated from the current tree |
+| `docs/audit/evidence/exec06-preview-sweep.json` | 39-surface sweep re-run (all green) |
+| `docs/audit/ORYX_FINAL_ACCEPTANCE.md` | This report |
+
+The third revision finished the brief's remaining admin and merchant items on
+top of `da6dc803`:
+
+| File | Change |
+|---|---|
+| `apps/api/src/tax/*`, `apps/api/src/app.module.ts` | New `TaxModule`: tenant-authored tax rates |
+| `packages/database/prisma/migrations/20261108010000_tax_management/` | `TaxRate` table + migration |
+| `packages/database/prisma/schema.prisma` | `TaxRate` model, `Company` relation |
+| `apps/api/test/tax-management.e2e-spec.ts` | Tax-module integration tests |
+| `apps/admin/src/components/tax-rates-panel.tsx`, `apps/admin/src/app/(app)/settings/page.tsx` | Tenant tax-rate management UI |
+| `apps/admin/src/app/(app)/sales/page.tsx` | Working POS terminal (catalogue, cart, per-line discount, tender/change, receipt issue) |
+| `apps/admin/src/app/(app)/purchasing/page.tsx`, `apps/admin/src/components/document-register.tsx`, `document-actions.tsx` | Row-level issue/preview/print/download for every official document |
+| `apps/admin/e2e/execution07-pos-terminal.spec.ts` | POS terminal end-to-end browser test |
+| `packages/shared/src/*` | Tax contracts, POS contracts, i18n key parity |
+| `apps/admin/src/app/globals.css`, `apps/admin/src/components/ui.tsx`, `icons.tsx` | Control-height and register styling |
 
 The preceding revision fixed a real purchasing defect, expanded the PDF evidence
 to all fourteen document types and added the official-documents gallery to the
@@ -378,15 +472,14 @@ published preview.
 |---|---|
 | `apps/api/src/purchasing/purchasing.service.ts` | Post the purchase-return price-variance plug on the balancing side |
 | `apps/api/test/erp.e2e-spec.ts` | New regression test: a return whose invoiced cost differs from the carrying value balances and the trial balance stays balanced |
-| `.run/regenerate-pdf-evidence.mjs` | Generate all fourteen issuable document types from the live API and rewrite `manifest.json` |
+| `.run/regenerate-pdf-evidence.mjs` | Generate all issuable document types from the live API and rewrite `manifest.json` |
 | `apps/api/src/documents/documents.service.ts`, `apps/api/test/execution-phase3-documents.e2e-spec.ts` | Document-issue path and the purchase-order document test |
 | `packages/shared/src/documents.ts` | Document type catalogue used by the evidence generator |
 | `scripts/preview/build-preview.mjs` | New `buildDocuments()` section; `documents` nav entry, reserved-route guard, overview KPI and card |
 | `scripts/preview/verify-preview.mjs` | Verify the new `/documents/` page in both themes |
 | `scripts/preview/check-links.mjs` | Crawl from `/overview/` and `/documents/`; verify PDF assets by request instead of navigating to them |
 | `scripts/preview/site.css` | Styles for the document cards and the page gallery |
-| `docs/audit/pdf-samples/*` | Fresh fourteen-type samples, rendered pages and `manifest.json` |
-| `docs/audit/ORYX_FINAL_ACCEPTANCE.md` | This report |
+| `docs/audit/pdf-samples/*` | Fresh samples, rendered pages and `manifest.json` |
 
 Earlier this session: the optional whole-amount rounding feature
 (`packages/shared/src/money.ts`, `packages/database/prisma/schema.prisma`,
@@ -400,11 +493,13 @@ and Latin stacks) and `fc26eb02` (Mobile APK bundle assertion).
 
 ## 6. Database migrations
 
-31 migrations are applied and the schema is up to date on `oryx_dev`. The newest
-is `20261106060000_whole_amount_rounding`, which adds the `RoundingMode` enum,
-`Company.roundingMode` (default `NONE`) and a `roundingMinor` column (default 0)
-on the five sales document tables. Every column is additive with a default, so
-applying it to an existing tenant leaves every stored total exact.
+33 migrations are applied and the schema is up to date on `oryx_dev`. The newest
+is `20261108010000_tax_management`, which adds the tenant-authored `TaxRate`
+table. The earlier `20261106060000_whole_amount_rounding` adds the `RoundingMode`
+enum, `Company.roundingMode` (default `NONE`) and a `roundingMinor` column
+(default 0) on the five sales document tables. Every column is additive with a
+default, so applying the migrations to an existing tenant leaves every stored
+total exact.
 
 ## 7. Deployment readiness
 
@@ -426,31 +521,28 @@ The changes are committed and pushed to the existing branch
   reflected Execution 05, the tree is at Execution 20.
 - This session began by recovering a recycled sandbox: the Postgres cluster
   (`pgdata`) was gone and no service was running. The cluster was rebuilt from an
-  empty data directory, migrated (31 migrations) and seeded, the workspace
-  packages were rebuilt, and the API, admin, customer and mobile-web services
-  were brought back up. No production system was touched.
-- Two build-only regressions were found and corrected during recovery: the admin
-  and customer bundles had been built with the root `.env`'s absolute
-  `NEXT_PUBLIC_API_BASE_URL=http://localhost:3001/api`, which breaks the
-  same-origin preview proxy. Both were rebuilt with the relative `/api` base (the
-  documented value) before the acceptance capture, and with the absolute localhost
-  base before the browser suite, matching each harness's requirement.
-- Every automated suite is green on the current tree after that rebuild:
-  shared 223, API e2e 673 (36 suites), API unit 20, mobile 206, mobile-erp 31,
-  admin browser 223 (+1 skipped). Lint and typecheck are clean; admin, customer
-  and API builds pass; migrations apply cleanly.
+  empty data directory, migrated and seeded, the workspace packages were rebuilt,
+  and the API, admin, customer and mobile-web services were brought back up. No
+  production system was touched.
+- **Fourth revision (2026-11-07) — re-run on the current tree:** shared **231**,
+  API e2e **685** (37 suites), API unit **20**, mobile **206**, mobile-erp **31**,
+  admin browser **224 passed / 1 skipped**, workspace lint clean, workspace
+  typecheck clean. The brief §10 twelve-surface sweep is green
+  (`.run/verify-brief10-links.mjs`), the 39-surface preview sweep is green, and
+  15 PDF samples render with Arabic + Latin and no `/Type3`.
 - **Third revision (2026-11-07) — re-run on `da6dc803` + the working tree:**
   shared **231**, API e2e **685** (37 suites, incl. the new tax suite), mobile
-  **206**, mobile-erp **31**, admin browser **224** (0 failed, +1 skipped),
-  admin/customer/mobile lint clean, workspace typecheck clean, migrations 33
-  found and the database up to date. The two browser failures this run exposed
-  are fixed (section 1.11b). The API e2e log shows inspection reports still
-  issuing at their planned page count (`… Z00001 v1 (5p)`), so the dense-layout
-  pagination guard holds.
-- The PDF evidence was regenerated from a pristine, freshly-seeded database, so
-  the document numbers are unambiguous (`JOB-00001`, `QT-00001`, `SI-00001`, …)
-  and every QR block encodes `https://oryxbhr.com/verify/<token>`. Live
-  verification returns `found:true`, `status:VALID` for `QT-00001`.
+  **206**, mobile-erp **31**, admin browser **224** (0 failed), admin/customer/
+  mobile lint clean, workspace typecheck clean, migrations 33 found and the
+  database up to date. The two browser failures that run exposed are fixed
+  (section 1.11b). The API e2e log shows inspection reports still issuing at
+  their planned page count (`… Z00001 v1 (5p)`), so the dense-layout pagination
+  guard holds.
+- The PDF evidence is regenerated from a freshly-seeded database through the real
+  API paths, so the document numbers are unambiguous (`Z00059`, `Q00025`,
+  `S00065`, `T00010`, …) and every QR block encodes
+  `https://oryxbhr.com/verify/<token>`. Live verification returns `found:true`,
+  `status:VALID` for an issued document.
 - This session fixed a real defect in the previous revision: a purchase return
   whose invoiced unit cost differs from the moving-average carrying cost posted an
   unbalanced journal and was refused (reproduced live as `400 Journal does not
