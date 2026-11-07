@@ -13,8 +13,35 @@
  */
 
 :root {
-  --oryx-font-sans: 'Segoe UI', 'Noto Sans Arabic', Tahoma, system-ui, -apple-system,
-    'Helvetica Neue', Arial, sans-serif;
+  /*
+   * The official ORYX type stack.
+   *
+   * English is Verdana; Arabic is Arial. The Arabic face is selected by the
+   * document direction, so an English page never asks for a face it does not
+   * need. `Codec Pro` is the owner's preferred Arabic face but no licensed
+   * Arabic build is available, so Arial is used, which the brief allows.
+   *
+   * These are *preferences*: a client without Verdana or Arial falls through to
+   * the system sans, which is why a bundled Arabic face sits in the stack ahead
+   * of the generic family — Arabic glyphs must resolve even on a machine with
+   * neither Verdana nor Arial.
+   */
+  --oryx-font-sans: Verdana, 'Segoe UI', 'Noto Sans Arabic', Arial, system-ui, -apple-system,
+    'Helvetica Neue', sans-serif;
+
+  /* The official brand colours. */
+  --brand-navy: #0f2b48;
+  --brand-gray: #64748b;
+  /* The primary action ramp. Navy is the ORYX primary, per the brand brief; the
+   * dark theme lifts it and adds a hairline edge so a navy button still reads
+   * against the deep-navy page. */
+  --primary: #0f2b48;
+  --primary-hover: #143a5e;
+  --primary-border: color-mix(in srgb, var(--brand-navy) 70%, #000000);
+  --on-primary: #ffffff;
+  /* Secondary controls and labels. */
+  --secondary: #64748b;
+  --secondary-hover: #556376;
 
   /* Dark theme (default) — matches the approved reference. */
   --bg: #00162b;
@@ -108,13 +135,31 @@
    * rich navy panel in the light one. Both values are opaque, so the banner
    * never depends on a photograph and needs no scrim.
    */
-  --hero-field: linear-gradient(135deg, #0c4271 0%, #052440 46%, #000912 100%);
+  --hero-field: linear-gradient(135deg, #1b4670 0%, #0f2b48 46%, #00101f 100%);
   --hero-bloom: radial-gradient(760px 320px at 50% -30%, rgba(212, 175, 55, 0.22), transparent 68%),
     radial-gradient(520px 260px at 82% 118%, rgba(74, 168, 255, 0.14), transparent 70%);
   --hero-border: rgba(212, 175, 55, 0.28);
   /* Ambient wash behind the shell. */
   --ambient-wash: radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.09), transparent 62%),
     radial-gradient(900px 460px at 6% 4%, rgba(74, 168, 255, 0.06), transparent 58%);
+  /*
+   * The navigation rail. The brand brief asks for "navy navigation", so the
+   * rail is a navy surface in *both* themes rather than an ivory one on the
+   * light theme: the identity is a navy rail with a white/gold lockup, exactly
+   * as the approved dark reference renders it. The values are the official
+   * brand navy (#0f2b48) and its darker stop; the light theme deepens the field
+   * below so the rail separates from the ivory page.
+   */
+  --nav-bg: linear-gradient(180deg, #12314f 0%, #0f2b48 55%, #0a1f36 100%);
+  --nav-solid: #0f2b48;
+  --nav-border: rgba(212, 175, 55, 0.18);
+  --nav-text: #c9d6e4;
+  --nav-text-strong: #ffffff;
+  --nav-text-faint: #9db1c9;
+  --nav-hover: rgba(255, 255, 255, 0.07);
+  --nav-active: rgba(212, 175, 55, 0.22);
+  --nav-active-border: rgba(212, 175, 55, 0.55);
+  --nav-danger: #ff9d9d;
   --header-h: 68px;
   --sidebar-w: 268px;
   /*
@@ -161,6 +206,14 @@
   --gold-hover: #6f5510;
   --gold-soft: #d9b447;
   --gold-deep: #a9821c;
+  /* On the ivory page the navy primary is already high-contrast, so the ramp
+   * only needs a pressed step: navy deepens toward black rather than lightening. */
+  --primary: #0f2b48;
+  --primary-hover: #0a1f36;
+  --primary-border: #081a2c;
+  --on-primary: #ffffff;
+  --secondary: #64748b;
+  --secondary-hover: #4d5a6b;
   /*
    * The metallic gold fill ramp, mirroring the approved customer theme. Dark
    * warm ink (`--on-gold`) reads on both stops; the accent `--gold` above is
@@ -226,10 +279,28 @@
    * "on-dark" colourway here, exactly as the sidebar does. The field is
    * therefore identical in both themes, and the banner carries its own
    * contrast instead of inheriting the ivory page. */
-  --hero-field: linear-gradient(135deg, #0c4271 0%, #052440 46%, #000912 100%);
+  --hero-field: linear-gradient(135deg, #1b4670 0%, #0f2b48 46%, #00101f 100%);
   --hero-bloom: radial-gradient(760px 320px at 50% -30%, rgba(212, 175, 55, 0.26), transparent 68%),
     radial-gradient(520px 260px at 82% 118%, rgba(74, 168, 255, 0.12), transparent 70%);
   --hero-border: rgba(212, 175, 55, 0.32);
+  /*
+   * Navy navigation in the light theme too. The rail is the one surface that
+   * stays navy on the ivory page: it carries the white/gold lockup and the gold
+   * active marker, which is the approved identity rather than a light-chrome
+   * sidebar. Deepened a step from the dark rail so it separates from the ivory
+   * field rather than blending toward it. Every ink pair is measured against
+   * `#0f2b48` and clears WCAG AA with room to spare.
+   */
+  --nav-bg: linear-gradient(180deg, #12314f 0%, #0f2b48 55%, #081a2c 100%);
+  --nav-solid: #0f2b48;
+  --nav-border: rgba(212, 175, 55, 0.22);
+  --nav-text: #c9d6e4;
+  --nav-text-strong: #ffffff;
+  --nav-text-faint: #9db1c9;
+  --nav-hover: rgba(255, 255, 255, 0.08);
+  --nav-active: rgba(232, 199, 102, 0.24);
+  --nav-active-border: rgba(232, 199, 102, 0.6);
+  --nav-danger: #ff9d9d;
   /* A warm gold bloom rather than the dark theme's blue one, so the ivory field
    * does not pick up a cold cast. */
   --ambient-wash: radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.16), transparent 62%),
@@ -338,14 +409,27 @@ body::before {
 }
 
 .oryx-btn--primary {
-  background: linear-gradient(180deg, var(--gold-fill-from), var(--gold-fill-to));
-  border-color: var(--gold-deep);
-  color: var(--on-gold);
+  background: var(--primary);
+  border-color: var(--primary-border);
+  color: var(--on-primary);
 }
 
 .oryx-btn--primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, var(--gold-fill-hover-from), var(--gold-fill-hover-to));
-  border-color: var(--gold-deep);
+  background: var(--primary-hover);
+  border-color: var(--primary-border);
+}
+
+/* The secondary action: a gray control, distinct from the navy primary and the
+ * transparent ghost. */
+.oryx-btn--secondary {
+  background: var(--secondary);
+  border-color: var(--secondary-hover);
+  color: #fff;
+}
+
+.oryx-btn--secondary:hover:not(:disabled) {
+  background: var(--secondary-hover);
+  border-color: var(--secondary-hover);
 }
 
 .oryx-btn--ghost {
@@ -677,8 +761,9 @@ body::before {
 
 .oryx-sidebar {
   grid-area: sidebar;
-  background: color-mix(in srgb, var(--bg-deep) 92%, transparent);
-  border-inline-end: 1px solid var(--border);
+  background: var(--nav-bg);
+  border-inline-end: 1px solid var(--nav-border);
+  color: var(--nav-text);
   padding: 16px 12px 28px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -709,7 +794,7 @@ body::before {
   gap: 8px;
   margin-bottom: 8px;
   padding: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--nav-border);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -745,7 +830,7 @@ body::before {
 
 /* The active marker stays visible in the collapsed rail via the icon colour. */
 .oryx-shell[data-nav='collapsed'] .oryx-nav-item[aria-current='page'] {
-  background: var(--tint-active);
+  background: var(--nav-active);
 }
 
 /* Sign-out sits at the bottom of the rail. `margin-top: auto` pushes it down
@@ -758,23 +843,23 @@ body::before {
 .oryx-sidebar__footer {
   margin-top: auto;
   padding-top: 12px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--nav-border);
   position: sticky;
   bottom: 0;
   /* Opaque, so nav items scrolling underneath cannot bleed through. */
-  background: color-mix(in srgb, var(--bg-deep) 96%, transparent);
+  background: var(--nav-solid);
 }
 
 .oryx-nav-item--logout {
   width: 100%;
   cursor: pointer;
   background: none;
-  color: var(--danger);
+  color: var(--nav-danger);
 }
 
 .oryx-nav-item--logout:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger) 14%, transparent);
-  color: var(--danger);
+  background: color-mix(in srgb, var(--nav-danger) 16%, transparent);
+  color: var(--nav-danger);
 }
 
 .oryx-nav-item--logout:disabled {
@@ -799,7 +884,7 @@ body::before {
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text-faint);
+  color: var(--nav-text-faint);
 }
 
 .oryx-nav-item {
@@ -809,7 +894,7 @@ body::before {
   padding: 9px 12px;
   margin-bottom: 2px;
   border-radius: 10px;
-  color: var(--text-muted);
+  color: var(--nav-text);
   text-decoration: none;
   font-size: 13.5px;
   font-weight: 600;
@@ -818,22 +903,20 @@ body::before {
 }
 
 .oryx-nav-item:hover {
-  background: var(--surface-raised);
-  color: var(--text);
+  background: var(--nav-hover);
+  color: var(--nav-text-strong);
 }
 
 /* The active item is marked by a gold wash that fades out, so the marker reads
- * on the rail without painting an opaque block. The wash is the named
- * decorative step, so the light theme tunes it with every other gold surface
- * instead of this rule carrying its own percentage. */
+ * on the navy rail without painting an opaque block. */
 .oryx-nav-item[aria-current='page'] {
-  background: linear-gradient(90deg, var(--tint-glow), transparent);
-  color: var(--text);
-  border-color: var(--border-strong);
+  background: linear-gradient(90deg, var(--nav-active), transparent);
+  color: var(--nav-text-strong);
+  border-color: var(--nav-active-border);
 }
 
 :root[data-dir='rtl'] .oryx-nav-item[aria-current='page'] {
-  background: linear-gradient(270deg, var(--tint-glow), transparent);
+  background: linear-gradient(270deg, var(--nav-active), transparent);
 }
 
 .oryx-nav-item__dot {
@@ -936,6 +1019,19 @@ body::before {
 }
 
 :root[data-theme='light'] .oryx-hero .oryx-brand-logo__on-light {
+  display: none;
+}
+
+/*
+ * The navigation rail is navy in both themes (see the `--nav-*` tokens), so its
+ * lockup always uses the on-dark colourway too. Without this the light theme
+ * would swap in the navy-ink lockup and print a dark mark on a dark rail.
+ */
+:root[data-theme='light'] .oryx-sidebar .oryx-brand-logo__on-dark {
+  display: block;
+}
+
+:root[data-theme='light'] .oryx-sidebar .oryx-brand-logo__on-light {
   display: none;
 }
 
@@ -1253,7 +1349,13 @@ body::before {
 .oryx-diagram__tools {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
+}
+
+/* Pushes the undo/redo/clear group to the trailing edge of the toolbar. */
+.oryx-diagram__spacer {
+  flex: 1 1 auto;
 }
 
 .oryx-paint-tool {
@@ -1311,7 +1413,7 @@ body::before {
 }
 
 .oryx-diagram__canvas--body {
-  aspect-ratio: 1000 / 400;
+  aspect-ratio: 1000 / 420;
 }
 
 .oryx-diagram__svg {
@@ -1334,6 +1436,13 @@ body::before {
 
 .oryx-diagram__panel {
   stroke: var(--border-soft);
+  stroke-width: 2;
+  fill: none;
+}
+
+/* A panel seam and a chassis rail read as the same technical line. */
+.oryx-diagram__seam {
+  stroke: color-mix(in srgb, var(--text) 30%, transparent);
   stroke-width: 2;
   fill: none;
 }
@@ -1392,74 +1501,55 @@ body::before {
 .oryx-chassis {
   position: relative;
   width: 100%;
-  max-width: 320px;
+  max-width: 340px;
   margin: 0 auto;
-  aspect-ratio: 400 / 700;
+  aspect-ratio: 420 / 720;
   border: 1px solid var(--border-soft);
   border-radius: 12px;
   background: var(--surface-raised);
+  padding: 6px;
 }
 
-.oryx-chassis__body {
-  fill: color-mix(in srgb, var(--text) 8%, transparent);
+.oryx-chassis__outline {
+  fill: color-mix(in srgb, var(--text) 7%, transparent);
   stroke: var(--border-strong);
   stroke-width: 3;
 }
 
-.oryx-chassis__cabin {
-  fill: color-mix(in srgb, var(--info) 14%, transparent);
+/* A chassis zone is filled by its condition; the marker colours are fixed
+ * technical indicators, so they do not follow the theme. */
+.oryx-chassis-zone path {
   stroke: var(--border-soft);
-  stroke-width: 2;
+  stroke-width: 1.5;
+  transition: fill 0.12s ease;
 }
 
-.oryx-chassis__axle {
-  fill: color-mix(in srgb, var(--text-inverse) 45%, transparent);
+.oryx-chassis-zone:hover path {
+  stroke: var(--border-strong);
 }
 
-.oryx-chassis-region {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  padding: 4px 8px;
-  border: 1px solid var(--border-soft);
-  border-radius: 9px;
-  background: var(--surface);
-  color: var(--text-muted);
-  font-size: 10.5px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
+.oryx-chassis-zone__num {
+  font-size: 26px;
+  font-weight: 800;
+  fill: color-mix(in srgb, var(--text) 55%, transparent);
+  text-anchor: middle;
+  dominant-baseline: middle;
+  pointer-events: none;
+  user-select: none;
 }
 
-.oryx-chassis-region__dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 1px solid var(--border-soft);
-  background: transparent;
+.oryx-chassis-zone.is-ok .oryx-chassis-zone__num,
+.oryx-chassis-zone.is-damage .oryx-chassis-zone__num {
+  fill: #fff;
 }
 
-.oryx-chassis-region.is-ok {
-  border-color: var(--success);
-  color: var(--success);
+.oryx-chassis-zone:focus-visible {
+  outline: none;
 }
 
-.oryx-chassis-region.is-ok .oryx-chassis-region__dot {
-  background: var(--success);
-  border-color: var(--success);
-}
-
-.oryx-chassis-region.is-damage {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-.oryx-chassis-region.is-damage .oryx-chassis-region__dot {
-  background: var(--danger);
-  border-color: var(--danger);
+.oryx-chassis-zone:focus-visible path {
+  stroke: var(--gold);
+  stroke-width: 3;
 }
 
 /* The accessible control list mirrors the diagram, so a region can be set with

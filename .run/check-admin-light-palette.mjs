@@ -48,6 +48,11 @@ const L = {
   danger: '#b3261e',
   info: '#1d5fa8',
   navy: '#00162b',
+  navText: '#c9d6e4',
+  navStrong: '#ffffff',
+  navFaint: '#9db1c9',
+  navDanger: '#ff9d9d',
+  navDeep: '#081a2c',
   scrim: '#0b1a2a',
 };
 
@@ -87,6 +92,14 @@ const CHECKS = [
   ['PHOTO-BACKED SURFACES (ink over a navy scrim)'],
   ['white tile title on scrim', L.onMedia, L.scrim, 4.5],
   ['gold tile eyebrow on scrim', L.onMediaAccent, L.scrim, 3],
+
+  ['NAVIGATION RAIL (navy in both themes)'],
+  ['nav text on navy rail', L.navText, L.navy, 4.5],
+  ['nav strong on navy rail', L.navStrong, L.navy, 4.5],
+  ['nav group label on navy rail', L.navFaint, L.navy, 4.5],
+  ['nav logout on navy rail', L.navDanger, L.navy, 4.5],
+  ['nav text on deeper rail stop', L.navText, L.navDeep, 4.5],
+  ['nav group label on deeper rail stop', L.navFaint, L.navDeep, 4.5],
 
   ['NON-TEXT UI'],
   ['card border on ivory page', L.text, L.bg, 1.2],

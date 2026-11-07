@@ -413,6 +413,10 @@ function SectionEditor({
             remove: t('inspection.removeMarker'),
             empty: t('inspection.paintHint'),
             condition: t('inspection.condition'),
+            undo: t('inspection.undo'),
+            redo: t('inspection.redo'),
+            clear: t('inspection.clearMarkers'),
+            clearConfirm: t('inspection.clearMarkersConfirm'),
           }}
         />
       ) : null}

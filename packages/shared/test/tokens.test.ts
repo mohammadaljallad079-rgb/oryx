@@ -415,4 +415,30 @@ describe('the admin control plane shares the one theme contract', () => {
     // The accent gold darkens on hover rather than lightening.
     expect(light['--gold-hover']).toBe(LIGHT_THEME.goldHover);
   });
+
+  it('keeps the navigation rail navy in both themes', () => {
+    // The brief asks for "navy navigation" in the light theme, and the approved
+    // dark reference already renders a navy rail. The rail is therefore the one
+    // surface that does not follow the page field: it must stay navy on ivory,
+    // carrying the on-dark lockup and the gold active marker. This guards the
+    // regression where the light theme painted an ivory sidebar.
+    const dark = readThemeBlock(ADMIN_CSS, 'dark');
+    const light = readThemeBlock(ADMIN_CSS, 'light');
+    for (const [name, block] of [
+      ['dark', dark],
+      ['light', light],
+    ] as const) {
+      expect(block['--nav-bg'], `${name} rail background`).toContain('linear-gradient');
+      // The rail ink must be a light neutral, not the page's dark charcoal.
+      expect(block['--nav-text']).not.toBe(block['--text']);
+      expect(block['--nav-text-strong']).toBe('#ffffff');
+      expect(block['--nav-text-faint']).toBeDefined();
+    }
+    // The light rail must not resolve to the ivory page field or its surface.
+    expect(light['--nav-bg']).not.toContain(LIGHT_THEME.background);
+    expect(light['--nav-bg']).not.toContain(LIGHT_THEME.surface);
+    // And the rail is a single navy field in both themes.
+    expect(dark['--nav-solid']).toBe('#0f2b48');
+    expect(light['--nav-solid']).toBe('#0f2b48');
+  });
 });

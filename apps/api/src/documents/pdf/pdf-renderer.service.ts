@@ -125,23 +125,23 @@ export function countPdfPages(pdf: Buffer): number {
 /**
  * Shared print CSS.
  *
- * The palette is the approved ORYX identity: deep navy and gold. `@page` carries
- * the A4 size and the running margin box; each template supplies its own header
- * and footer because the footer differs per document.
+ * The palette is the approved ORYX identity: navy #0F2B48 and gold. `@page`
+ * carries the A4 size and the running margin box; each template supplies its own
+ * header and footer because the footer differs per document.
  */
 export const BASE_PRINT_CSS = `
   :root{
-    --navy:#0b2545;
-    --navy-soft:#13315c;
+    --navy:#0F2B48;
+    --navy-soft:#1c3f66;
     --gold:#c9a227;
     --gold-soft:#e6cf7a;
     --ink:#111827;
     --muted:#5b6472;
     --line:#d7dce3;
     --line-strong:#9aa4b2;
-    --ok:#15803d;
-    --warn:#b45309;
-    --bad:#b91c1c;
+    --ok:#1f9d55;
+    --warn:#e08a1e;
+    --bad:#d92d20;
   }
   /* The page *margins* are set by the renderer, not here: the footer is a
      Chromium footer template that is painted inside the bottom margin, and a

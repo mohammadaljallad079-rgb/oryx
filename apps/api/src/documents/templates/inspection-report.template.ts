@@ -1,5 +1,17 @@
 import {
+  BODY_GLASS_PATHS,
+  BODY_PANELS,
+  BODY_SEAM_PATHS,
+  BODY_SILHOUETTE,
+  BODY_VIEWBOX,
+  BODY_WHEELS,
+  CHASSIS_OUTLINE,
   CHASSIS_REGIONS,
+  CHASSIS_STRUCTURE_PATHS,
+  CHASSIS_VIEWBOX,
+  CHASSIS_ZONES,
+  CHASSIS_ZONE_COLORS,
+  INSPECTION_MARKER_COLORS,
   PAINT_CONDITIONS,
   inspectionResultsFor,
   inspectionSectionSpec,
@@ -190,8 +202,10 @@ function itemsSection(section: InspectionReportSection): string {
  *
  * Markers carry normalised coordinates, so the diagram is drawn from the same
  * numbers the inspector placed on screen and a marker lands on the same panel at
- * any page size. The diagram is a top view and is not mirrored in RTL — the
- * coordinates are physical, not textual.
+ * any page size. The drawing itself comes from `@oryx/shared/inspection-diagram`
+ * — the exact geometry the admin editor renders — so the printed report and the
+ * form can never show two different vehicles. The diagram is a side elevation
+ * and is not mirrored in RTL: the coordinates are physical, not textual.
  */
 function paintDiagram(section: InspectionReportSection): string {
   const legend = PAINT_CONDITIONS.map(
@@ -224,7 +238,8 @@ function paintDiagram(section: InspectionReportSection): string {
             <tbody>${section.markers
               .map((m, i) => {
                 const spec = PAINT_CONDITIONS.find((c) => c.key === m.condition);
-                return `<tr><td class="num">${i + 1}</td><td>${esc(m.panelKey ?? '—')}</td><td>${esc(spec?.labelAr ?? '')} / ${esc(spec?.labelEn ?? '')}</td><td>${esc(m.note ?? '')}</td></tr>`;
+                const panel = BODY_PANELS.find((p) => p.key === m.panelKey);
+                return `<tr><td class="num">${i + 1}</td><td>${esc(panel ? `${panel.labelAr} / ${panel.labelEn}` : (m.panelKey ?? '—'))}</td><td>${esc(spec?.labelAr ?? '')} / ${esc(spec?.labelEn ?? '')}</td><td>${esc(m.note ?? '')}</td></tr>`;
               })
               .join('')}</tbody>
           </table>`
@@ -234,30 +249,48 @@ function paintDiagram(section: InspectionReportSection): string {
 }
 
 /**
- * A schematic top view of a vehicle.
+ * The vehicle side elevation, from the shared geometry.
  *
  * Drawn as inline SVG rather than an image so it stays crisp at print
- * resolution, carries no external reference, and cannot fail to load. It is a
- * neutral technical drawing, not a brand mark.
+ * resolution, carries no external reference, and cannot fail to load. It is the
+ * same path data the admin editor renders.
  */
 function bodyPlanSvg(): string {
+  const panels = BODY_PANELS.map((p) => `<path class="bp-panel" d="${p.d}"/>`).join('');
+  const glass = BODY_GLASS_PATHS.map((d) => `<path class="bp-glass" d="${d}"/>`).join('');
+  const seams = BODY_SEAM_PATHS.map((d) => `<path class="bp-seam" d="${d}"/>`).join('');
+  const wheels = BODY_WHEELS.map(
+    (w) =>
+      `<circle class="bp-wheel" cx="${w.cx}" cy="${w.cy}" r="${w.r}"/>` +
+      `<circle class="bp-rim" cx="${w.cx}" cy="${w.cy}" r="${(w.r * 0.45).toFixed(1)}"/>`,
+  ).join('');
   return `
-  <svg class="bodyplan" viewBox="0 0 200 360" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <rect x="6" y="6" width="188" height="348" rx="26" fill="#eef2f8" stroke="#9aa4b2" stroke-width="1.5"/>
-    <path d="M40 74 Q100 40 160 74 L166 150 L34 150 Z" fill="#dfe7f2" stroke="#9aa4b2" stroke-width="1.2"/>
-    <rect x="34" y="150" width="132" height="120" rx="8" fill="#dfe7f2" stroke="#9aa4b2" stroke-width="1.2"/>
-    <path d="M40 270 Q100 306 160 270 L166 300 Q100 336 34 300 Z" fill="#dfe7f2" stroke="#9aa4b2" stroke-width="1.2"/>
-    <line x1="100" y1="44" x2="100" y2="330" stroke="#9aa4b2" stroke-width="0.8" stroke-dasharray="5 4"/>
-    <line x1="20" y1="152" x2="180" y2="152" stroke="#9aa4b2" stroke-width="0.8" stroke-dasharray="5 4"/>
-    <line x1="20" y1="270" x2="180" y2="270" stroke="#9aa4b2" stroke-width="0.8" stroke-dasharray="5 4"/>
-    <text x="100" y="26" text-anchor="middle" font-size="11" fill="#5b6472">FRONT</text>
-    <text x="100" y="352" text-anchor="middle" font-size="11" fill="#5b6472">REAR</text>
+  <svg class="bodyplan" viewBox="0 0 ${BODY_VIEWBOX.width} ${BODY_VIEWBOX.height}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path class="bp-body" d="${BODY_SILHOUETTE}"/>
+    ${glass}
+    ${panels}
+    ${wheels}
+    ${seams}
   </svg>`;
 }
 
-/** The eight-region chassis safety diagram. */
+/** The eight-region chassis safety diagram, from the shared geometry. */
 function chassisDiagram(section: InspectionReportSection): string {
   const byKey = new Map(section.chassisRegions.map((r) => [r.regionKey, r]));
+
+  const zones = CHASSIS_ZONES.map((zone, idx) => {
+    const region = CHASSIS_REGIONS.find((r) => r.key === zone.key);
+    const state = byKey.get(zone.key)?.condition ?? 'UNSET';
+    const fill = CHASSIS_ZONE_COLORS[state as 'OK' | 'DAMAGE' | 'UNSET'] ?? 'transparent';
+    return (
+      `<g class="cz cz-${state.toLowerCase()}">` +
+      `<path d="${zone.d}" fill="${fill}"/>` +
+      `<text x="${zone.labelX}" y="${zone.labelY}" class="cz-num">${idx + 1}</text>` +
+      `<title>${esc(region?.labelEn ?? zone.key)}: ${esc(state)}</title>` +
+      `</g>`
+    );
+  }).join('');
+
   const chips = CHASSIS_REGIONS.map((region) => {
     const row = byKey.get(region.key);
     const state = row?.condition ?? 'UNSET';
@@ -278,15 +311,27 @@ function chassisDiagram(section: InspectionReportSection): string {
   return `
   <div class="chassis-block avoid-break">
     <div class="diagram-title">مخطط فحص الهيكل السفلي · Chassis Safety Diagram</div>
-    <div class="chassis-grid">${chips}</div>
+    <div class="chassis-wrap">
+      <svg class="chassisplan" viewBox="0 0 ${CHASSIS_VIEWBOX.width} ${CHASSIS_VIEWBOX.height}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path class="cp-outline" d="${CHASSIS_OUTLINE}"/>
+        ${CHASSIS_STRUCTURE_PATHS.map((d) => `<path class="cp-seam" d="${d}"/>`).join('')}
+        ${zones}
+      </svg>
+      <div class="chassis-grid">${chips}</div>
+    </div>
     <div class="chassis-summary ${damaged.length ? 'chassis-summary-bad' : 'chassis-summary-ok'}">
       ${
         damaged.length
-          ? `مناطق متضررة / Damaged regions: ${damaged.map((d) => esc(d.labelAr)).join('، ')}`
+          ? `مناطق متضررة / Damaged regions: ${damaged.map((d) => esc(chassisRegionLabel(d.regionKey))).join('، ')}`
           : 'لم يتم تسجيل أي أضرار في الهيكل السفلي · No chassis damage recorded'
       }
     </div>
   </div>`;
+}
+
+/** The Arabic label of a chassis region, or its key if the catalogue changed. */
+function chassisRegionLabel(key: string): string {
+  return CHASSIS_REGIONS.find((r) => r.key === key)?.labelAr ?? key;
 }
 
 /** The free-form computer-unit fault table. */
@@ -482,23 +527,37 @@ export const INSPECTION_REPORT_CSS = `
   .diagram-title{ font-size:10pt; font-weight:700; color:var(--navy); margin-bottom:6px;
     border-inline-start:4px solid var(--gold); padding-inline-start:7px; }
   .diagram-wrap{ display:flex; gap:12px; align-items:flex-start; }
-  .diagram{ position:relative; width:190px; flex:0 0 190px; }
+  .diagram{ position:relative; width:300px; flex:0 0 300px; }
   .bodyplan{ width:100%; height:auto; display:block; }
+  /* The body elevation is the shared geometry; these styles only colour it. */
+  .bp-body{ fill:#eef2f8; stroke:#5b6472; stroke-width:3; }
+  .bp-glass{ fill:#d6e2f0; stroke:#5b6472; stroke-width:2; }
+  .bp-panel{ fill:none; stroke:#9aa4b2; stroke-width:1.6; }
+  .bp-seam{ fill:none; stroke:#9aa4b2; stroke-width:2; }
+  .bp-wheel{ fill:#3c4653; stroke:#5b6472; stroke-width:2; }
+  .bp-rim{ fill:#8b95a3; }
   .marker{ position:absolute; width:13px; height:13px; border-radius:50%; transform:translate(-50%,-50%);
     display:flex; align-items:center; justify-content:center; font-size:8pt; font-weight:700; color:#fff;
     border:1.5px solid #fff; box-shadow:0 0 0 .5px rgba(0,0,0,.4); }
-  .m-green{ background:#15803d; }
-  .m-orange{ background:#b45309; }
-  .m-red{ background:#b91c1c; }
+  .m-green{ background:#1f9d55; }
+  .m-orange{ background:#e08a1e; }
+  .m-red{ background:#d92d20; }
   .legend{ flex:1 1 auto; display:flex; flex-direction:column; gap:4px; }
   .legend-item{ font-size:8.5pt; color:var(--ink); display:flex; align-items:center; gap:6px; }
   .legend-dot{ width:13px; height:13px; border-radius:50%; display:inline-flex; align-items:center;
     justify-content:center; font-size:8pt; color:#fff; font-weight:700; }
-  .ld-green{ background:#15803d; } .ld-orange{ background:#b45309; } .ld-red{ background:#b91c1c; }
+  .ld-green{ background:#1f9d55; } .ld-orange{ background:#e08a1e; } .ld-red{ background:#d92d20; }
   .marker-table{ margin-top:8px; border:1px solid var(--line); }
   .marker-table th,.marker-table td{ border-bottom:1px solid var(--line); padding:3px 7px; font-size:8pt; text-align:start; }
   .marker-table thead th{ background:#eef2f8; color:var(--navy); }
-  .chassis-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+  .chassis-wrap{ display:flex; gap:12px; align-items:flex-start; }
+  .chassisplan{ width:210px; flex:0 0 210px; height:auto; }
+  .cp-outline{ fill:#f2f5f9; stroke:#5b6472; stroke-width:3; }
+  .cp-seam{ fill:none; stroke:#9aa4b2; stroke-width:1.4; }
+  .cz path{ stroke:#9aa4b2; stroke-width:1.2; }
+  .cz-num{ font-size:26px; font-weight:800; fill:#7a8494; text-anchor:middle; dominant-baseline:middle; }
+  .cz-ok .cz-num,.cz-damage .cz-num{ fill:#fff; }
+  .chassis-grid{ flex:1 1 auto; display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
   .ch-region{ border:1px solid var(--line); border-radius:5px; padding:6px 7px; background:#f7f9fc; }
   .ch-region-head{ display:flex; justify-content:space-between; align-items:center; }
   .ch-region-ar{ font-size:9pt; font-weight:700; color:var(--navy); }

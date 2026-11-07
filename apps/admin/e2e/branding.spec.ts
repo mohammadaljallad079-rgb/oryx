@@ -71,7 +71,9 @@ test.describe('branding and direction', () => {
     expect(english).not.toMatch(/[\u0600-\u06FF]/);
   });
 
-  test('the official brand lockup is used and swaps colourway by theme', async ({ page }) => {
+  test('the sidebar lockup keeps the on-dark colourway on the navy rail in both themes', async ({
+    page,
+  }) => {
     await setLocale(page, 'ar');
     await setTheme(page, 'dark');
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
@@ -99,8 +101,24 @@ test.describe('branding and direction', () => {
     await setTheme(page, 'light');
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
 
-    await expect(onLight).toBeVisible();
-    await expect(onDark).toBeHidden();
+    // The navigation rail is navy in *both* themes (the brief asks for "navy
+    // navigation"), so the sidebar keeps the on-dark lockup on ivory too. The
+    // theme swap must not print the navy-ink lockup on the navy rail.
+    await expect(onDark).toBeVisible();
+    await expect(onLight).toBeHidden();
+
+    // And the rail must actually paint a navy field, not the ivory page colour,
+    // so the light-theme navigation cannot silently revert to a light sidebar.
+    const railBg = await shell.evaluate((el) => getComputedStyle(el).backgroundImage);
+    expect(railBg).toContain('gradient');
+    const navText = await shell.locator('.oryx-nav-item').first().evaluate(
+      (el) => getComputedStyle(el).color,
+    );
+    // A light ink on the navy rail: red and green stay high, blue is not low.
+    const [r, g, b] = navText.match(/\d+/g)!.map(Number);
+    expect(r).toBeGreaterThan(150);
+    expect(g).toBeGreaterThan(150);
+    expect(b).toBeGreaterThan(150);
   });
 
   test('the dashboard banner carries no vehicle image and centres the ORYX mark', async ({ page }) => {

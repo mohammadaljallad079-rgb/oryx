@@ -36,7 +36,7 @@
   --radius-sm: 9px;
   --shadow-sm: 0 1px 2px rgba(34, 32, 29, 0.06), 0 1px 3px rgba(34, 32, 29, 0.05);
   --shadow-md: 0 6px 18px rgba(34, 32, 29, 0.09);
-  --font: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, 'Noto Sans Arabic', sans-serif;
+  --font: Verdana, 'Segoe UI', 'Noto Sans Arabic', Arial, system-ui, -apple-system, 'Helvetica Neue', sans-serif;
   --mono: 'SFMono-Regular', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
   --measure: 78ch;
 }
@@ -574,12 +574,12 @@ figcaption strong {
   display: inline-block;
   padding: 13px 26px;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--gold-fill-from), var(--gold-fill-to));
-  color: var(--on-gold);
+  background: var(--band);
+  color: #ffffff;
   font-weight: 700;
   font-size: 15px;
   text-decoration: none;
-  border: 1px solid var(--gold);
+  border: 1px solid var(--band);
 }
 
 .cta__button:hover {

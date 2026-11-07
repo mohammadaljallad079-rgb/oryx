@@ -14,8 +14,25 @@
  */
 
 :root {
-  --oryx-font-sans: 'Segoe UI', 'Noto Sans Arabic', Tahoma, system-ui, -apple-system,
-    'Helvetica Neue', Arial, sans-serif;
+  /*
+   * The official ORYX type stack, kept identical to the admin app so the two
+   * surfaces cannot drift: English is Verdana, Arabic is Arial, and a bundled
+   * Arabic face sits ahead of the generic family so Arabic glyphs still resolve
+   * on a client with neither.
+   */
+  --oryx-font-sans: Verdana, 'Segoe UI', 'Noto Sans Arabic', Arial, system-ui, -apple-system,
+    'Helvetica Neue', sans-serif;
+
+  /* The official brand colours and the primary action ramp. Navy is the ORYX
+   * primary; gold is the accent. */
+  --brand-navy: #0f2b48;
+  --brand-gray: #64748b;
+  --primary: #0f2b48;
+  --primary-hover: #143a5e;
+  --primary-border: color-mix(in srgb, var(--brand-navy) 70%, #000000);
+  --on-primary: #ffffff;
+  --secondary: #64748b;
+  --secondary-hover: #556376;
 
   /* Dark theme (default). */
   --bg: #00162b;
@@ -239,6 +256,12 @@
   --text-faint: #6b6459;
   --text-inverse: #241f14;
   --navy: #00162b;
+  --primary: #0f2b48;
+  --primary-hover: #0a1f36;
+  --primary-border: #081a2c;
+  --on-primary: #ffffff;
+  --secondary: #64748b;
+  --secondary-hover: #4d5a6b;
   /* Accent text and hairlines: the one light-theme gold, deep enough to read on
    * every ivory surface including the deepest (`bg-deep`, 5.0:1). Kept equal to
    * `LIGHT_THEME.gold` so the admin and customer themes cannot drift. */
@@ -519,8 +542,8 @@ a {
   padding: 0 14px;
   border: 0;
   border-radius: 999px;
-  background: linear-gradient(145deg, var(--gold-fill-from), var(--gold-fill-to));
-  color: var(--on-gold);
+  background: var(--primary);
+  color: var(--on-primary);
   font: inherit;
   font-size: 12.5px;
   font-weight: 700;
@@ -969,13 +992,25 @@ a {
 }
 
 .oryx-btn-primary {
-  background: linear-gradient(145deg, var(--gold-fill-from), var(--gold-fill-to));
-  border-color: transparent;
-  color: var(--on-gold);
+  background: var(--primary);
+  border-color: var(--primary-border);
+  color: var(--on-primary);
 }
 
 .oryx-btn-primary:hover:not(:disabled) {
-  background: linear-gradient(145deg, var(--gold-fill-hover-from), var(--gold-fill-hover-to));
+  background: var(--primary-hover);
+  border-color: var(--primary-border);
+}
+
+.oryx-btn-secondary {
+  background: var(--secondary);
+  border-color: var(--secondary-hover);
+  color: #fff;
+}
+
+.oryx-btn-secondary:hover:not(:disabled) {
+  background: var(--secondary-hover);
+  border-color: var(--secondary-hover);
 }
 
 .oryx-btn-ghost {
@@ -1547,8 +1582,8 @@ a {
   place-items: center;
   border-radius: 10px;
   font-weight: 800;
-  color: var(--text-inverse);
-  background: linear-gradient(180deg, var(--gold-fill-from), var(--gold-fill-to));
+  color: var(--on-primary);
+  background: var(--primary);
 }
 
 .oryx-step__text {

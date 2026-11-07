@@ -49,7 +49,7 @@ export class QrService {
       type: 'image/png',
       margin: 1,
       width: 320,
-      color: { dark: '#0b2545ff', light: '#ffffffff' },
+      color: { dark: '#0F2B48ff', light: '#ffffffff' },
     });
   }
 }

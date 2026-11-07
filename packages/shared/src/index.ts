@@ -8,6 +8,7 @@ export * from './scheduling';
 export * from './service-categories';
 export * from './vehicle-catalog';
 export * from './inspection';
+export * from './inspection-diagram';
 export * from './geo';
 export * from './tokens';
 export * from './authorization';

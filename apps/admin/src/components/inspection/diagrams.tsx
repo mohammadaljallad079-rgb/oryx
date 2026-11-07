@@ -1,23 +1,46 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  BODY_DIAGRAM_ID,
+  BODY_GLASS_PATHS,
+  BODY_PANELS,
+  BODY_SEAM_PATHS,
+  BODY_SILHOUETTE,
+  BODY_VIEWBOX,
+  BODY_WHEELS,
+  CHASSIS_DIAGRAM_ID,
+  CHASSIS_OUTLINE,
   CHASSIS_REGIONS,
+  CHASSIS_STRUCTURE_PATHS,
+  CHASSIS_VIEWBOX,
+  CHASSIS_ZONE_COLORS,
+  CHASSIS_ZONES,
+  INSPECTION_MARKER_COLORS,
   PAINT_CONDITIONS,
+  bodyPanelAt,
   paintConditionSpec,
   type ChassisRegionKey,
   type PaintCondition,
-  type PaintConditionSpec,
 } from '@oryx/shared';
 import { Icon } from '@/components/icons';
 
 /**
  * The two interactive inspection diagrams.
  *
- * Both store positions as normalised coordinates (0–1) rather than pixels, so a
- * marker placed on a phone sits on the same panel on a tablet and reopens at the
- * exact position it was saved at. Both are controlled components: the parent
- * owns the value and persists it, so there is one source of truth.
+ * Both drawings come from `@oryx/shared/inspection-diagram`, the same geometry
+ * the official PDF template renders. That is the invariant that matters: a
+ * marker the inspector places on screen lands on the same panel of the same
+ * drawing in the printed report, because there is only one drawing.
+ *
+ * Positions are stored as normalised coordinates (0–1 of the drawing's viewBox)
+ * rather than pixels, so a marker placed on a phone sits on the same panel on a
+ * tablet and reopens at the exact position it was saved at, whatever the zoom,
+ * the window size or the text direction.
+ *
+ * Both are controlled components: the parent owns the value and persists it, so
+ * there is one source of truth. Undo/redo is kept here, next to the edits it
+ * reverses, because the parent never needs to know a drag happened in steps.
  *
  * Pointer events are used throughout, which covers mouse, pen and touch with one
  * code path — an inspector may be working on a tablet in the workshop.
@@ -26,15 +49,11 @@ import { Icon } from '@/components/icons';
 const clamp01 = (v: number) => (Number.isNaN(v) ? 0 : Math.min(1, Math.max(0, v)));
 
 /**
- * The marker colours come from the shared condition spec, so the diagram, the
- * legend and the printed report cannot drift apart.
+ * The marker colours are the fixed technical inspection indicators, shared with
+ * the PDF. They deliberately do not follow the theme: a green paint dot must
+ * read green on a light form, a dark form and the printed page alike.
  */
-const COLOR_TOKEN: Record<PaintConditionSpec['color'], string> = {
-  green: 'var(--success)',
-  orange: 'var(--warning)',
-  red: 'var(--danger)',
-};
-const conditionColor = (key: PaintCondition) => COLOR_TOKEN[paintConditionSpec(key).color];
+const conditionColor = (key: PaintCondition) => INSPECTION_MARKER_COLORS[paintConditionSpec(key).color];
 
 export interface PaintMarker {
   id?: string;
@@ -48,13 +67,82 @@ export interface PaintMarker {
 const markerKey = (m: PaintMarker, i: number) => m.id ?? `local-${i}`;
 
 /**
- * The body-panels diagnostic scheme.
+ * A small undo/redo history over an immutable list value.
  *
- * Pick a condition, then tap the panel. The marker appears at that exact point
- * and can be dragged, re-coloured or deleted. The diagram is a drawn side
- * elevation, not a photograph, because a photograph would not let the report
- * place a marker on a named panel.
+ * A drag emits a stream of intermediate positions, so the caller commits a
+ * transaction once at the end rather than on every pointer move; otherwise a
+ * single drag would fill the history and undo would walk back pixel by pixel.
  */
+function useHistory<T>(value: T, apply: (next: T) => void) {
+  const past = useRef<T[]>([]);
+  const future = useRef<T[]>([]);
+  const [, bump] = useState(0);
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
+  const commit = useCallback(
+    (next: T) => {
+      past.current = [...past.current, valueRef.current];
+      future.current = [];
+      apply(next);
+      bump((n) => n + 1);
+    },
+    [apply],
+  );
+
+  /** Snapshot the value before a multi-step gesture (a drag). */
+  const begin = useCallback(() => valueRef.current, []);
+  const end = useCallback((before: T) => {
+    if (before === valueRef.current) return;
+    past.current = [...past.current, before];
+    future.current = [];
+    bump((n) => n + 1);
+  }, []);
+
+  const undo = useCallback(() => {
+    const prev = past.current.pop();
+    if (prev === undefined) return;
+    future.current = [valueRef.current, ...future.current];
+    apply(prev);
+    bump((n) => n + 1);
+  }, [apply]);
+
+  const redo = useCallback(() => {
+    const [next, ...rest] = future.current;
+    if (next === undefined) return;
+    future.current = rest;
+    past.current = [...past.current, valueRef.current];
+    apply(next);
+    bump((n) => n + 1);
+  }, [apply]);
+
+  return { commit, begin, end, undo, redo, canUndo: past.current.length > 0, canRedo: future.current.length > 0 };
+}
+
+/** The drawn vehicle elevation, shared with the printed report. */
+function BodyArt() {
+  return (
+    <svg viewBox={`0 0 ${BODY_VIEWBOX.width} ${BODY_VIEWBOX.height}`} className="oryx-diagram__svg" aria-hidden="true">
+      <path className="oryx-diagram__body" d={BODY_SILHOUETTE} />
+      {BODY_GLASS_PATHS.map((d) => (
+        <path key={d} className="oryx-diagram__glass" d={d} />
+      ))}
+      {BODY_PANELS.map((p) => (
+        <path key={p.key} className="oryx-diagram__panel" d={p.d} />
+      ))}
+      {BODY_WHEELS.map((w) => (
+        <g key={`${w.cx}-${w.cy}`}>
+          <circle className="oryx-diagram__wheel" cx={w.cx} cy={w.cy} r={w.r} />
+          <circle className="oryx-diagram__rim" cx={w.cx} cy={w.cy} r={w.r * 0.45} />
+        </g>
+      ))}
+      {BODY_SEAM_PATHS.map((d) => (
+        <path key={d} className="oryx-diagram__seam" d={d} />
+      ))}
+    </svg>
+  );
+}
+
 export function BodyDiagram({
   value,
   onChange,
@@ -64,15 +152,24 @@ export function BodyDiagram({
   value: PaintMarker[];
   onChange: (next: PaintMarker[]) => void;
   disabled?: boolean;
-  labels: { tools: string; selected: string; remove: string; empty: string; condition: string };
+  labels: {
+    tools: string;
+    selected: string;
+    remove: string;
+    empty: string;
+    condition: string;
+    undo: string;
+    redo: string;
+    clear: string;
+    clearConfirm: string;
+  };
 }) {
   const [tool, setTool] = useState<PaintCondition>('PAINT');
   const [selected, setSelected] = useState<number | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
-  // The drag handler lives outside React's render cycle, so it reads the latest
-  // value from a ref instead of a stale closure.
   const valueRef = useRef(value);
   valueRef.current = value;
+  const { commit, begin, end, undo, redo, canUndo, canRedo } = useHistory(value, onChange);
 
   const pointFrom = (clientX: number, clientY: number) => {
     const box = boxRef.current?.getBoundingClientRect();
@@ -83,9 +180,10 @@ export function BodyDiagram({
   const addAt = (clientX: number, clientY: number) => {
     if (disabled) return;
     const { x, y } = pointFrom(clientX, clientY);
-    const next = [...valueRef.current, { condition: tool, x, y }];
+    const panel = bodyPanelAt(x, y);
+    const next = [...valueRef.current, { condition: tool, x, y, panelKey: panel?.key ?? null }];
+    commit(next);
     setSelected(next.length - 1);
-    onChange(next);
   };
 
   const startDrag = (index: number) => (e: React.PointerEvent) => {
@@ -93,13 +191,16 @@ export function BodyDiagram({
     e.stopPropagation();
     e.preventDefault();
     setSelected(index);
+    const before = begin();
     const onMove = (ev: PointerEvent) => {
       const { x, y } = pointFrom(ev.clientX, ev.clientY);
-      onChange(valueRef.current.map((m, i) => (i === index ? { ...m, x, y } : m)));
+      const panel = bodyPanelAt(x, y);
+      onChange(valueRef.current.map((m, i) => (i === index ? { ...m, x, y, panelKey: panel?.key ?? null } : m)));
     };
     const onUp = () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
+      end(before);
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
@@ -107,17 +208,24 @@ export function BodyDiagram({
 
   const setSelectedCondition = (condition: PaintCondition) => {
     if (selected === null) return;
-    onChange(value.map((m, i) => (i === selected ? { ...m, condition } : m)));
+    commit(value.map((m, i) => (i === selected ? { ...m, condition } : m)));
   };
 
   const removeSelected = () => {
     if (selected === null) return;
-    onChange(value.filter((_, i) => i !== selected));
+    commit(value.filter((_, i) => i !== selected));
+    setSelected(null);
+  };
+
+  const clearAll = () => {
+    if (disabled || value.length === 0) return;
+    if (!window.confirm(labels.clearConfirm)) return;
+    commit([]);
     setSelected(null);
   };
 
   return (
-    <div className="oryx-diagram" data-testid="paint-diagram">
+    <div className="oryx-diagram" data-testid="paint-diagram" data-diagram-id={BODY_DIAGRAM_ID}>
       <div className="oryx-diagram__tools" role="group" aria-label={labels.tools}>
         {PAINT_CONDITIONS.map((c) => (
           <button
@@ -136,6 +244,43 @@ export function BodyDiagram({
             <span className="oryx-paint-tool__label-rtl">{c.labelAr}</span>
           </button>
         ))}
+        <span className="oryx-diagram__spacer" />
+        <button
+          type="button"
+          className="oryx-btn oryx-btn--sm oryx-btn--ghost"
+          onClick={undo}
+          disabled={disabled || !canUndo}
+          aria-label={labels.undo}
+          title={labels.undo}
+          data-testid="paint-undo"
+        >
+          <Icon name="chevronsLeft" size={14} />
+          {labels.undo}
+        </button>
+        <button
+          type="button"
+          className="oryx-btn oryx-btn--sm oryx-btn--ghost"
+          onClick={redo}
+          disabled={disabled || !canRedo}
+          aria-label={labels.redo}
+          title={labels.redo}
+          data-testid="paint-redo"
+        >
+          <Icon name="chevronsRight" size={14} />
+          {labels.redo}
+        </button>
+        <button
+          type="button"
+          className="oryx-btn oryx-btn--sm oryx-btn--ghost"
+          onClick={clearAll}
+          disabled={disabled || value.length === 0}
+          aria-label={labels.clear}
+          title={labels.clear}
+          data-testid="paint-clear"
+        >
+          <Icon name="close" size={14} />
+          {labels.clear}
+        </button>
       </div>
 
       <div
@@ -146,22 +291,7 @@ export function BodyDiagram({
         role="application"
         aria-label="Vehicle body diagram"
       >
-        <svg viewBox="0 0 1000 400" className="oryx-diagram__svg" aria-hidden="true">
-          {/* Side elevation of a saloon: the panels the report names. */}
-          <path
-            className="oryx-diagram__body"
-            d="M50 300 L50 250 Q50 232 70 225 L180 210 Q240 200 290 160 Q330 130 400 128 L640 128 Q700 130 740 165 L840 205 Q940 215 950 240 L950 300 Q950 320 930 320 L70 320 Q50 320 50 300 Z"
-          />
-          <path className="oryx-diagram__glass" d="M310 165 Q345 140 400 138 L500 138 L500 205 L300 205 Q300 180 310 165 Z" />
-          <path className="oryx-diagram__glass" d="M520 138 L640 138 Q690 142 720 170 L730 205 L520 205 Z" />
-          <path className="oryx-diagram__panel" d="M300 210 L500 210 M520 210 L735 210" />
-          <circle className="oryx-diagram__wheel" cx="230" cy="318" r="58" />
-          <circle className="oryx-diagram__wheel" cx="760" cy="318" r="58" />
-          <circle className="oryx-diagram__rim" cx="230" cy="318" r="30" />
-          <circle className="oryx-diagram__rim" cx="760" cy="318" r="30" />
-          <path className="oryx-diagram__panel" d="M120 232 L120 318 M300 232 L300 318 M500 232 L500 318 M735 232 L735 318 M870 232 L870 318" />
-        </svg>
-
+        <BodyArt />
         {value.map((m, i) => (
           <button
             key={markerKey(m, i)}
@@ -174,6 +304,7 @@ export function BodyDiagram({
             aria-label={`${m.condition} at ${(m.x * 100).toFixed(0)}%, ${(m.y * 100).toFixed(0)}%`}
             data-testid={`paint-marker-${i}`}
             data-condition={m.condition}
+            data-panel={m.panelKey ?? ''}
           >
             {paintConditionSpec(m.condition).cross ? '✕' : ''}
           </button>
@@ -199,7 +330,13 @@ export function BodyDiagram({
                 </option>
               ))}
             </select>
-            <button type="button" className="oryx-btn oryx-btn--sm oryx-btn--ghost" onClick={removeSelected} disabled={disabled} data-testid="paint-marker-remove">
+            <button
+              type="button"
+              className="oryx-btn oryx-btn--sm oryx-btn--ghost"
+              onClick={removeSelected}
+              disabled={disabled}
+              data-testid="paint-marker-remove"
+            >
               <Icon name="close" size={14} />
               {labels.remove}
             </button>
@@ -216,7 +353,7 @@ export interface ChassisRegionValue {
   note?: string | null;
 }
 
-/** Top view of the vehicle with the eight assessed regions. */
+/** Plan view of the underbody with the eight assessed zones, drawn from shared geometry. */
 export function ChassisDiagram({
   value,
   onChange,
@@ -229,7 +366,7 @@ export function ChassisDiagram({
   labels: { ok: string; damage: string; clear: string };
 }) {
   const [tool, setTool] = useState<'OK' | 'DAMAGE'>('OK');
-  const byKey = new Map(value.map((r) => [r.regionKey, r]));
+  const byKey = useMemo(() => new Map(value.map((r) => [r.regionKey, r])), [value]);
 
   const apply = (regionKey: ChassisRegionKey, condition: 'UNSET' | 'OK' | 'DAMAGE') => {
     if (disabled) return;
@@ -240,13 +377,13 @@ export function ChassisDiagram({
     onChange(next);
   };
 
-  const regionClass = (key: ChassisRegionKey) => {
+  const regionFill = (key: ChassisRegionKey) => {
     const c = byKey.get(key)?.condition ?? 'UNSET';
-    return `oryx-chassis-region is-${c.toLowerCase()}`;
+    return CHASSIS_ZONE_COLORS[c] ?? undefined;
   };
 
   return (
-    <div className="oryx-diagram" data-testid="chassis-diagram">
+    <div className="oryx-diagram" data-testid="chassis-diagram" data-diagram-id={CHASSIS_DIAGRAM_ID}>
       <div className="oryx-diagram__tools" role="group">
         <button
           type="button"
@@ -256,7 +393,7 @@ export function ChassisDiagram({
           disabled={disabled}
           data-testid="chassis-tool-OK"
         >
-          <span className="oryx-paint-tool__dot" style={{ background: 'var(--success)' }} />
+          <span className="oryx-paint-tool__dot" style={{ background: INSPECTION_MARKER_COLORS.green }} />
           <span className="oryx-paint-tool__label">{labels.ok}</span>
         </button>
         <button
@@ -267,38 +404,46 @@ export function ChassisDiagram({
           disabled={disabled}
           data-testid="chassis-tool-DAMAGE"
         >
-          <span className="oryx-paint-tool__dot" style={{ background: 'var(--danger)' }} />
+          <span className="oryx-paint-tool__dot" style={{ background: INSPECTION_MARKER_COLORS.red }} />
           <span className="oryx-paint-tool__label">{labels.damage}</span>
         </button>
       </div>
 
       <div className="oryx-chassis" data-testid="chassis-canvas">
-        <svg viewBox="0 0 400 700" className="oryx-diagram__svg" aria-hidden="true">
-          <rect className="oryx-chassis__body" x="78" y="34" width="244" height="632" rx="66" />
-          <rect className="oryx-chassis__cabin" x="104" y="186" width="192" height="298" rx="34" />
-          <path className="oryx-diagram__panel" d="M104 196 L296 196 M104 474 L296 474" />
-          <rect className="oryx-chassis__axle" x="60" y="120" width="30" height="70" rx="12" />
-          <rect className="oryx-chassis__axle" x="310" y="120" width="30" height="70" rx="12" />
-          <rect className="oryx-chassis__axle" x="60" y="500" width="30" height="70" rx="12" />
-          <rect className="oryx-chassis__axle" x="310" y="500" width="30" height="70" rx="12" />
+        <svg viewBox={`0 0 ${CHASSIS_VIEWBOX.width} ${CHASSIS_VIEWBOX.height}`} className="oryx-diagram__svg">
+          <path className="oryx-chassis__outline" d={CHASSIS_OUTLINE} />
+          {CHASSIS_STRUCTURE_PATHS.map((d) => (
+            <path key={d} className="oryx-diagram__seam" d={d} />
+          ))}
+          {CHASSIS_ZONES.map((z, idx) => {
+            const condition = byKey.get(z.key)?.condition ?? 'UNSET';
+            const spec = CHASSIS_REGIONS.find((r) => r.key === z.key);
+            return (
+              <g
+                key={z.key}
+                className={`oryx-chassis-zone is-${condition.toLowerCase()}`}
+                data-testid={`chassis-region-${z.key}`}
+                data-condition={condition}
+                role="button"
+                tabIndex={disabled ? -1 : 0}
+                aria-label={`${spec?.labelEn ?? z.key}: ${condition}`}
+                onClick={() => apply(z.key as ChassisRegionKey, tool)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    apply(z.key as ChassisRegionKey, tool);
+                  }
+                }}
+                style={{ cursor: disabled ? 'default' : 'pointer' }}
+              >
+                <path d={z.d} fill={regionFill(z.key as ChassisRegionKey) ?? 'transparent'} />
+                <text x={z.labelX} y={z.labelY} className="oryx-chassis-zone__num">
+                  {idx + 1}
+                </text>
+              </g>
+            );
+          })}
         </svg>
-
-        {CHASSIS_REGIONS.map((r) => (
-          <button
-            key={r.key}
-            type="button"
-            className={regionClass(r.key)}
-            style={{ left: `${r.x * 100}%`, top: `${r.y * 100}%` }}
-            onClick={() => apply(r.key, tool)}
-            disabled={disabled}
-            data-testid={`chassis-region-${r.key}`}
-            data-condition={byKey.get(r.key)?.condition ?? 'UNSET'}
-            aria-label={`${r.labelEn}: ${byKey.get(r.key)?.condition ?? 'UNSET'}`}
-          >
-            <span className="oryx-chassis-region__dot" />
-            <span className="oryx-chassis-region__label">{r.labelEn}</span>
-          </button>
-        ))}
       </div>
 
       <div className="oryx-chassis-list" data-testid="chassis-controls">
