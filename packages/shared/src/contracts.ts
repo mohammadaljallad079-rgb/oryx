@@ -1205,7 +1205,10 @@ export interface AttendanceDto {
   employeeId: string;
   employeeCode: string | null;
   employeeNameEn: string | null;
+  employeeNameAr: string | null;
   workDate: string;
+  checkInAt: string | null;
+  checkOutAt: string | null;
   workedMinutes: number;
   overtimeMinutes: number;
   status: string;

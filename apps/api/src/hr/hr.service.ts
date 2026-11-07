@@ -1037,6 +1037,8 @@ function toAttendanceDto(a: {
   workedMinutes: number;
   overtimeMinutes: number;
   status: string;
+  checkInAt: Date | null;
+  checkOutAt: Date | null;
   employee?: { code: string; fullNameEn: string; fullNameAr: string } | null;
 }) {
   return {
@@ -1046,6 +1048,8 @@ function toAttendanceDto(a: {
     employeeNameEn: a.employee?.fullNameEn ?? null,
     employeeNameAr: a.employee?.fullNameAr ?? null,
     workDate: a.workDate.toISOString(),
+    checkInAt: a.checkInAt ? a.checkInAt.toISOString() : null,
+    checkOutAt: a.checkOutAt ? a.checkOutAt.toISOString() : null,
     workedMinutes: a.workedMinutes,
     overtimeMinutes: a.overtimeMinutes,
     status: a.status,

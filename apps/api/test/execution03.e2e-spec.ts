@@ -158,6 +158,15 @@ describe('ORYX Execution 03 (e2e)', () => {
       });
       expect(att.status).toBe(201);
 
+      // The attendance list must expose the clock times the admin console
+      // renders; without them the screen can only show a worked-minute count.
+      const attendanceList = await erp<{ items: Array<{ employeeId: string; checkInAt: string | null; checkOutAt: string | null }> }>(
+        '/hr/attendance',
+      );
+      const recorded = attendanceList.body.items.find((r) => r.employeeId === employeeId);
+      expect(recorded?.checkInAt).toBe('2026-04-02T08:00:00.000Z');
+      expect(recorded?.checkOutAt).toBe('2026-04-02T17:00:00.000Z');
+
       const period = await erp<{ id: string }>('/hr/payroll-periods', {
         method: 'POST',
         body: { code: '2026-04', nameEn: 'April 2026', nameAr: 'أبريل 2026', startDate: '2026-04-01', endDate: '2026-04-30' },
