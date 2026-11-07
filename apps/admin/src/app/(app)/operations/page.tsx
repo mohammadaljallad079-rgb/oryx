@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -100,12 +100,19 @@ function ProjectsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const list = useAsync(() => api.operationsProjects(), []);
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<ProjectDto | null>(null);
+
+  const setStatus = async (row: ProjectDto, status: string) => {
+    await api.updateOperationsProject(row.id, { status });
+    await list.reload();
+  };
+
   return (
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.operations.projects')}</p>
         {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-project">
+          <Button variant="primary" size="sm" onClick={() => { setEditing(null); setOpen(true); }} data-testid="new-project">
             <Icon name="plus" size={16} />
             {t('erp.operations.newProject')}
           </Button>
@@ -122,6 +129,7 @@ function ProjectsTab({ canManage }: { canManage: boolean }) {
               <th>{t('common.name')}</th>
               <th>{t('erp.operations.tasksCount')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -131,37 +139,103 @@ function ProjectsTab({ canManage }: { canManage: boolean }) {
                 <td className="font-semibold">{p.nameEn}</td>
                 <td className="tabular-nums text-[12.5px]">{p.taskCount ?? 0}</td>
                 <td><StatusBadge status={p.status} label={p.status} /></td>
+                <td>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {canManage ? (
+                      <>
+                        <Button size="sm" variant="ghost" aria-label={`${t('common.edit')} ${p.code}`} onClick={() => { setEditing(p); setOpen(true); }} data-testid={`project-edit-${p.code}`}>
+                          <Icon name="edit" size={14} />
+                        </Button>
+                        <select
+                          className="oryx-select"
+                          value={p.status}
+                          onChange={(ev) => void setStatus(p, ev.target.value)}
+                          aria-label={`${t('erp.operations.projectStatus')} ${p.code}`}
+                          data-testid={`project-status-${p.code}`}
+                        >
+                          {['PLANNED', 'ACTIVE', 'ON_HOLD', 'COMPLETED', 'CANCELLED'].map((s) => (
+                            <option key={s} value={s}>{t(`erp.operations.projectStatusValue.${s}` as const)}</option>
+                          ))}
+                        </select>
+                      </>
+                    ) : null}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
-      <CreateProjectModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <ProjectModal
+        open={open}
+        project={editing}
+        onClose={() => { setOpen(false); setEditing(null); }}
+        onSaved={list.reload}
+      />
     </Card>
   );
 }
 
-function CreateProjectModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => Promise<void> }) {
+function ProjectModal({
+  open,
+  project,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  project: ProjectDto | null;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '' });
+  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', startDate: '', endDate: '', description: '' });
+
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setForm({
+      code: project?.code ?? '',
+      nameEn: project?.nameEn ?? '',
+      nameAr: project?.nameAr ?? '',
+      startDate: project?.startDate?.slice(0, 10) ?? '',
+      endDate: project?.endDate?.slice(0, 10) ?? '',
+      description: '',
+    });
+  }, [open, project]);
+
   const submit = async () => {
     setBusy(true); setError(null);
     try {
-      await api.createOperationsProject(form);
-      await onCreated();
+      const body = {
+        nameEn: form.nameEn,
+        nameAr: form.nameAr,
+        startDate: form.startDate || undefined,
+        endDate: form.endDate || undefined,
+        description: form.description || undefined,
+      };
+      if (project) {
+        await api.updateOperationsProject(project.id, body);
+      } else {
+        await api.createOperationsProject({ ...body, code: form.code });
+      }
+      await onSaved();
       onClose();
     } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); } finally { setBusy(false); }
   };
+
   return (
-    <Modal open={open} title={t('erp.operations.newProject')} onClose={onClose}
-      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy} onClick={submit} data-testid="save-project">{busy ? t('common.loading') : t('common.save')}</Button></>}>
+    <Modal open={open} title={project ? t('erp.operations.editProject') : t('erp.operations.newProject')} onClose={onClose}
+      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || !form.nameEn || !form.nameAr || (!project && !form.code)} onClick={submit} data-testid="save-project">{busy ? t('common.loading') : t('common.save')}</Button></>}>
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('common.code')} required><input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="project-code" /></Field>
+        <Field label={t('common.code')} required><input className="oryx-input" value={form.code} disabled={Boolean(project)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="project-code" /></Field>
+        <Field label={t('erp.operations.startDate')}><input type="date" className="oryx-input" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} data-testid="project-start-date" /></Field>
         <Field label={`${t('common.name')} (EN)`} required><input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="project-name-en" /></Field>
         <Field label={`${t('common.name')} (AR)`} required><input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="project-name-ar" /></Field>
+        <Field label={t('erp.operations.endDate')}><input type="date" className="oryx-input" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} data-testid="project-end-date" /></Field>
+        <Field label={t('erp.operations.description')}><input className="oryx-input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} data-testid="project-description" /></Field>
       </div>
     </Modal>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -97,7 +97,13 @@ function LeadsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<LeadDto | null>(null);
   const list = useAsync(() => api.crmLeads({ search: search || undefined }), [search]);
+
+  const setStatus = async (row: LeadDto, status: string) => {
+    await api.updateLead(row.id, { status });
+    await list.reload();
+  };
 
   return (
     <Card>
@@ -107,7 +113,7 @@ function LeadsTab({ canManage }: { canManage: boolean }) {
           <input className="oryx-input" value={search} onChange={(e) => setSearch(e.target.value)} data-testid="lead-search" />
         </label>
         {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-lead">
+          <Button variant="primary" size="sm" onClick={() => { setEditing(null); setOpen(true); }} data-testid="new-lead">
             <Icon name="plus" size={16} />
             {t('erp.crm.newLead')}
           </Button>
@@ -127,6 +133,7 @@ function LeadsTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.crm.contact')}</th>
               <th>{t('erp.crm.estimatedValue')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -140,36 +147,93 @@ function LeadsTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{l.contactName ?? l.email ?? l.phone ?? '—'}</td>
                 <td className="tabular-nums text-[12.5px]">{money(l.estimatedValueMinor, l.currency)}</td>
                 <td><StatusBadge status={l.status} label={l.status} /></td>
+                <td>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {canManage ? (
+                      <>
+                        <Button size="sm" variant="ghost" aria-label={`${t('common.edit')} ${l.code}`} onClick={() => { setEditing(l); setOpen(true); }} data-testid={`lead-edit-${l.code}`}>
+                          <Icon name="edit" size={14} />
+                        </Button>
+                        <select
+                          className="oryx-select"
+                          value={l.status}
+                          onChange={(ev) => void setStatus(l, ev.target.value)}
+                          aria-label={`${t('erp.crm.leadStatus')} ${l.code}`}
+                          data-testid={`lead-status-${l.code}`}
+                        >
+                          {['NEW', 'CONTACTED', 'QUALIFIED', 'CONVERTED', 'LOST'].map((s) => (
+                            <option key={s} value={s}>{t(`erp.crm.leadStatusValue.${s}` as const)}</option>
+                          ))}
+                        </select>
+                      </>
+                    ) : null}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
-      <CreateLeadModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <LeadModal
+        open={open}
+        lead={editing}
+        onClose={() => { setOpen(false); setEditing(null); }}
+        onSaved={list.reload}
+      />
     </Card>
   );
 }
 
-function CreateLeadModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => Promise<void> }) {
+function LeadModal({
+  open,
+  lead,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  lead: LeadDto | null;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', contactName: '', email: '', phone: '', estimatedValue: '0.00' });
+  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', contactName: '', email: '', phone: '', estimatedValue: '0.00', notes: '' });
+
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setForm({
+      code: lead?.code ?? '',
+      nameEn: lead?.nameEn ?? '',
+      nameAr: lead?.nameAr ?? '',
+      contactName: lead?.contactName ?? '',
+      email: lead?.email ?? '',
+      phone: lead?.phone ?? '',
+      estimatedValue: lead ? String(lead.estimatedValueMinor / 100) : '0.00',
+      notes: '',
+    });
+  }, [open, lead]);
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.createLead({
-        code: form.code,
+      const body = {
         nameEn: form.nameEn,
         nameAr: form.nameAr,
         contactName: form.contactName || undefined,
         email: form.email || undefined,
         phone: form.phone || undefined,
         estimatedValueMinor: toMinorInput(form.estimatedValue),
-      });
-      await onCreated();
+        notes: form.notes || undefined,
+      };
+      if (lead) {
+        await api.updateLead(lead.id, body);
+      } else {
+        await api.createLead({ ...body, code: form.code });
+      }
+      await onSaved();
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
@@ -181,22 +245,29 @@ function CreateLeadModal({ open, onClose, onCreated }: { open: boolean; onClose:
   return (
     <Modal
       open={open}
-      title={t('erp.crm.newLead')}
+      title={lead ? t('erp.crm.editLead') : t('erp.crm.newLead')}
       onClose={onClose}
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy} onClick={submit} data-testid="save-lead">{busy ? t('common.loading') : t('common.save')}</Button>
+          <Button
+            variant="primary"
+            disabled={busy || !form.nameEn || !form.nameAr || (!lead && !form.code)}
+            onClick={submit}
+            data-testid="save-lead"
+          >
+            {busy ? t('common.loading') : t('common.save')}
+          </Button>
         </>
       }
     >
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="lead-code" />
+          <input className="oryx-input" value={form.code} disabled={Boolean(lead)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="lead-code" />
         </Field>
         <Field label={t('erp.crm.contact')}>
-          <input className="oryx-input" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
+          <input className="oryx-input" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} data-testid="lead-contact" />
         </Field>
         <Field label={`${t('common.name')} (EN)`} required>
           <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="lead-name-en" />
@@ -205,10 +276,16 @@ function CreateLeadModal({ open, onClose, onCreated }: { open: boolean; onClose:
           <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="lead-name-ar" />
         </Field>
         <Field label={t('erp.crm.estimatedValue')}>
-          <input className="oryx-input" value={form.estimatedValue} onChange={(e) => setForm({ ...form, estimatedValue: e.target.value })} />
+          <input className="oryx-input" value={form.estimatedValue} onChange={(e) => setForm({ ...form, estimatedValue: e.target.value })} data-testid="lead-estimated-value" />
         </Field>
         <Field label={t('erp.sales.phone')}>
-          <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} data-testid="lead-phone" />
+        </Field>
+        <Field label={t('common.email')}>
+          <input className="oryx-input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="lead-email" />
+        </Field>
+        <Field label={t('common.notes')}>
+          <input className="oryx-input" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} data-testid="lead-notes" />
         </Field>
       </div>
     </Modal>

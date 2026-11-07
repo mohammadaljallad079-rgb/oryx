@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -87,9 +87,15 @@ export default function AccountingPage() {
 function AccountsTab({ canManage }: { canManage: boolean }) {
   const { t, locale } = useUi();
   const [search, setSearch] = useState('');
-  const [createOpen, setCreateOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<ErpAccountDto | null>(null);
 
   const list = useAsync(() => api.accountingAccounts({ search: search || undefined }), [search]);
+
+  const setStatus = async (row: ErpAccountDto, next: boolean) => {
+    await api.updateAccount(row.id, { isActive: next });
+    await list.reload();
+  };
 
   return (
     <Card>
@@ -109,7 +115,7 @@ function AccountsTab({ canManage }: { canManage: boolean }) {
           {t('common.refresh')}
         </Button>
         {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)} data-testid="new-account">
+          <Button variant="primary" size="sm" onClick={() => { setEditing(null); setOpen(true); }} data-testid="new-account">
             <Icon name="plus" size={16} />
             {t('erp.accounting.newAccount')}
           </Button>
@@ -140,6 +146,7 @@ function AccountsTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.accounting.normalBalance')}</th>
               <th>{t('erp.accounting.systemRole')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -157,25 +164,52 @@ function AccountsTab({ canManage }: { canManage: boolean }) {
                     {a.isActive ? t('common.active') : t('common.inactive')}
                   </Badge>
                 </td>
+                <td>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {canManage ? (
+                      <>
+                        <Button size="sm" variant="ghost" aria-label={`${t('common.edit')} ${a.code}`} onClick={() => { setEditing(a); setOpen(true); }} data-testid={`account-edit-${a.code}`}>
+                          <Icon name="edit" size={14} />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          aria-label={`${a.isActive ? t('common.deactivate') : t('common.reactivate')} ${a.code}`}
+                          onClick={() => void setStatus(a, !a.isActive)}
+                          data-testid={`account-toggle-${a.code}`}
+                        >
+                          <Icon name={a.isActive ? 'close' : 'check'} size={14} />
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
 
-      <CreateAccountModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={list.reload} />
+      <AccountModal
+        open={open}
+        account={editing}
+        onClose={() => { setOpen(false); setEditing(null); }}
+        onSaved={list.reload}
+      />
     </Card>
   );
 }
 
-function CreateAccountModal({
+function AccountModal({
   open,
+  account,
   onClose,
-  onCreated,
+  onSaved,
 }: {
   open: boolean;
+  account: ErpAccountDto | null;
   onClose: () => void;
-  onCreated: () => Promise<void>;
+  onSaved: () => Promise<void>;
 }) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
@@ -188,14 +222,29 @@ function CreateAccountModal({
     normalBalance: 'DEBIT',
   });
 
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setForm({
+      code: account?.code ?? '',
+      nameEn: account?.nameEn ?? '',
+      nameAr: account?.nameAr ?? '',
+      type: account?.type ?? 'ASSET',
+      normalBalance: account?.normalBalance ?? 'DEBIT',
+    });
+  }, [open, account]);
+
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.createAccount(form);
-      await onCreated();
+      if (account) {
+        await api.updateAccount(account.id, { nameEn: form.nameEn, nameAr: form.nameAr });
+      } else {
+        await api.createAccount(form);
+      }
+      await onSaved();
       onClose();
-      setForm({ code: '', nameEn: '', nameAr: '', type: 'ASSET', normalBalance: 'DEBIT' });
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
@@ -206,12 +255,17 @@ function CreateAccountModal({
   return (
     <Modal
       open={open}
-      title={t('erp.accounting.newAccount')}
+      title={account ? t('erp.accounting.editAccount') : t('erp.accounting.newAccount')}
       onClose={onClose}
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy} onClick={submit} data-testid="save-account">
+          <Button
+            variant="primary"
+            disabled={busy || !form.nameEn || !form.nameAr || (!account && !form.code)}
+            onClick={submit}
+            data-testid="save-account"
+          >
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </>
@@ -220,10 +274,10 @@ function CreateAccountModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="account-code" />
+          <input className="oryx-input" value={form.code} disabled={Boolean(account)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="account-code" />
         </Field>
         <Field label={t('erp.accounting.type')} required>
-          <select className="oryx-select" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+          <select className="oryx-select" value={form.type} disabled={Boolean(account)} onChange={(e) => setForm({ ...form, type: e.target.value })} data-testid="account-type">
             {['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'].map((x) => (
               <option key={x} value={x}>
                 {x}
@@ -238,7 +292,7 @@ function CreateAccountModal({
           <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="account-name-ar" />
         </Field>
         <Field label={t('erp.accounting.normalBalance')}>
-          <select className="oryx-select" value={form.normalBalance} onChange={(e) => setForm({ ...form, normalBalance: e.target.value })}>
+          <select className="oryx-select" value={form.normalBalance} disabled={Boolean(account)} onChange={(e) => setForm({ ...form, normalBalance: e.target.value })} data-testid="account-normal-balance">
             <option value="DEBIT">DEBIT</option>
             <option value="CREDIT">CREDIT</option>
           </select>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -105,8 +105,14 @@ function EmployeesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<EmployeeDto | null>(null);
   const list = useAsync(() => api.hrEmployees({ search: search || undefined }), [search]);
   const departments = useAsync(() => api.hrDepartments(), []);
+
+  const setStatus = async (row: EmployeeDto, status: string) => {
+    await api.updateEmployee(row.id, { status });
+    await list.reload();
+  };
 
   return (
     <Card>
@@ -116,7 +122,7 @@ function EmployeesTab({ canManage }: { canManage: boolean }) {
           <input className="oryx-input" value={search} onChange={(e) => setSearch(e.target.value)} data-testid="employee-search" />
         </label>
         {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-employee">
+          <Button variant="primary" size="sm" onClick={() => { setEditing(null); setOpen(true); }} data-testid="new-employee">
             <Icon name="plus" size={16} />
             {t('erp.hr.newEmployee')}
           </Button>
@@ -137,6 +143,7 @@ function EmployeesTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.hr.jobTitle')}</th>
               <th>{t('erp.hr.hireDate')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -151,45 +158,107 @@ function EmployeesTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{e.jobTitleNameEn ?? '—'}</td>
                 <td className="text-[12.5px]">{e.hireDate.slice(0, 10)}</td>
                 <td><StatusBadge status={e.status} label={e.status} /></td>
+                <td>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {canManage ? (
+                      <>
+                        <Button size="sm" variant="ghost" aria-label={`${t('common.edit')} ${e.code}`} onClick={() => { setEditing(e); setOpen(true); }} data-testid={`employee-edit-${e.code}`}>
+                          <Icon name="edit" size={14} />
+                        </Button>
+                        <select
+                          className="oryx-select"
+                          value={e.status}
+                          onChange={(ev) => void setStatus(e, ev.target.value)}
+                          aria-label={`${t('erp.hr.employeeStatus')} ${e.code}`}
+                          data-testid={`employee-status-${e.code}`}
+                        >
+                          {['ACTIVE', 'ON_LEAVE', 'SUSPENDED', 'TERMINATED'].map((s) => (
+                            <option key={s} value={s}>{t(`erp.hr.employeeStatusValue.${s}` as const)}</option>
+                          ))}
+                        </select>
+                      </>
+                    ) : null}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
-      <CreateEmployeeModal open={open} departments={departments.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <EmployeeModal
+        open={open}
+        employee={editing}
+        departments={departments.data?.items ?? []}
+        onClose={() => { setOpen(false); setEditing(null); }}
+        onSaved={list.reload}
+      />
     </Card>
   );
 }
 
-function CreateEmployeeModal({
+function EmployeeModal({
   open,
+  employee,
   departments,
   onClose,
-  onCreated,
+  onSaved,
 }: {
   open: boolean;
+  employee: EmployeeDto | null;
   departments: Array<{ id: string; nameEn: string }>;
   onClose: () => void;
-  onCreated: () => Promise<void>;
+  onSaved: () => Promise<void>;
 }) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: '', fullNameEn: '', fullNameAr: '', email: '', departmentId: '', hireDate: new Date().toISOString().slice(0, 10) });
+  const [form, setForm] = useState({
+    code: '',
+    fullNameEn: '',
+    fullNameAr: '',
+    email: '',
+    phone: '',
+    departmentId: '',
+    hireDate: new Date().toISOString().slice(0, 10),
+    addressLine: '',
+    notes: '',
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setForm({
+      code: employee?.code ?? '',
+      fullNameEn: employee?.fullNameEn ?? '',
+      fullNameAr: employee?.fullNameAr ?? '',
+      email: employee?.email ?? '',
+      phone: employee?.phone ?? '',
+      departmentId: employee?.departmentId ?? '',
+      hireDate: employee?.hireDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+      addressLine: '',
+      notes: '',
+    });
+  }, [open, employee]);
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.createEmployee({
-        code: form.code,
+      const body = {
         fullNameEn: form.fullNameEn,
         fullNameAr: form.fullNameAr,
         email: form.email || undefined,
+        phone: form.phone || undefined,
         departmentId: form.departmentId || undefined,
-        hireDate: form.hireDate,
-      });
-      await onCreated();
+        addressLine: form.addressLine || undefined,
+        notes: form.notes || undefined,
+      };
+      if (employee) {
+        await api.updateEmployee(employee.id, body);
+      } else {
+        await api.createEmployee({ ...body, code: form.code, hireDate: form.hireDate });
+      }
+      await onSaved();
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
@@ -201,22 +270,29 @@ function CreateEmployeeModal({
   return (
     <Modal
       open={open}
-      title={t('erp.hr.newEmployee')}
+      title={employee ? t('erp.hr.editEmployee') : t('erp.hr.newEmployee')}
       onClose={onClose}
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy} onClick={submit} data-testid="save-employee">{busy ? t('common.loading') : t('common.save')}</Button>
+          <Button
+            variant="primary"
+            disabled={busy || !form.fullNameEn || !form.fullNameAr || (!employee && !form.code)}
+            onClick={submit}
+            data-testid="save-employee"
+          >
+            {busy ? t('common.loading') : t('common.save')}
+          </Button>
         </>
       }
     >
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="employee-code" />
+          <input className="oryx-input" value={form.code} disabled={Boolean(employee)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="employee-code" />
         </Field>
         <Field label={t('erp.hr.department')}>
-          <select className="oryx-select" value={form.departmentId} onChange={(e) => setForm({ ...form, departmentId: e.target.value })}>
+          <select className="oryx-select" value={form.departmentId} onChange={(e) => setForm({ ...form, departmentId: e.target.value })} data-testid="employee-department">
             <option value="">—</option>
             {departments.map((d) => <option key={d.id} value={d.id}>{d.nameEn}</option>)}
           </select>
@@ -227,11 +303,22 @@ function CreateEmployeeModal({
         <Field label={`${t('common.name')} (AR)`} required>
           <input className="oryx-input" value={form.fullNameAr} onChange={(e) => setForm({ ...form, fullNameAr: e.target.value })} data-testid="employee-name-ar" />
         </Field>
-        <Field label={t('erp.sales.phone')}>
-          <input className="oryx-input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <Field label={t('common.email')}>
+          <input className="oryx-input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="employee-email" />
         </Field>
-        <Field label={t('erp.hr.hireDate')} required>
-          <input type="date" className="oryx-input" value={form.hireDate} onChange={(e) => setForm({ ...form, hireDate: e.target.value })} />
+        <Field label={t('erp.sales.phone')}>
+          <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} data-testid="employee-phone" />
+        </Field>
+        {!employee ? (
+          <Field label={t('erp.hr.hireDate')} required>
+            <input type="date" className="oryx-input" value={form.hireDate} onChange={(e) => setForm({ ...form, hireDate: e.target.value })} data-testid="employee-hire-date" />
+          </Field>
+        ) : null}
+        <Field label={t('common.address')}>
+          <input className="oryx-input" value={form.addressLine} onChange={(e) => setForm({ ...form, addressLine: e.target.value })} data-testid="employee-address" />
+        </Field>
+        <Field label={t('common.notes')}>
+          <input className="oryx-input" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} data-testid="employee-notes" />
         </Field>
       </div>
     </Modal>

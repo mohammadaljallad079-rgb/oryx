@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -107,7 +107,14 @@ function SuppliersTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<SupplierDto | null>(null);
   const list = useAsync(() => api.suppliers({ search: search || undefined }), [search]);
+
+  const setStatus = async (row: SupplierDto, next: boolean) => {
+    if (!window.confirm(t('erp.sales.statusChangeConfirm'))) return;
+    await api.updateSupplier(row.id, { isActive: next });
+    await list.reload();
+  };
 
   return (
     <Card>
@@ -117,7 +124,7 @@ function SuppliersTab({ canManage }: { canManage: boolean }) {
           <input className="oryx-input" value={search} onChange={(e) => setSearch(e.target.value)} data-testid="supplier-search" />
         </label>
         {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-supplier">
+          <Button variant="primary" size="sm" onClick={() => { setEditing(null); setOpen(true); }} data-testid="new-supplier">
             <Icon name="plus" size={16} />
             {t('erp.purchasing.newSupplier')}
           </Button>
@@ -135,6 +142,7 @@ function SuppliersTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.sales.phone')}</th>
               <th>{t('erp.sales.paymentTerms')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -148,33 +156,105 @@ function SuppliersTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{s.phone ?? '—'}</td>
                 <td className="text-[12.5px]">{s.paymentTermsDays}</td>
                 <td><Badge tone={s.isActive ? 'success' : 'neutral'}>{s.isActive ? t('common.active') : t('common.inactive')}</Badge></td>
+                <td>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {canManage ? (
+                      <>
+                        <Button size="sm" variant="ghost" aria-label={`${t('common.edit')} ${s.code}`} onClick={() => { setEditing(s); setOpen(true); }} data-testid={`supplier-edit-${s.code}`}>
+                          <Icon name="edit" size={14} />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          aria-label={`${s.isActive ? t('common.deactivate') : t('common.reactivate')} ${s.code}`}
+                          onClick={() => void setStatus(s, !s.isActive)}
+                          data-testid={`supplier-toggle-${s.code}`}
+                        >
+                          <Icon name={s.isActive ? 'close' : 'check'} size={14} />
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
-      <SupplierModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <SupplierModal
+        open={open}
+        supplier={editing}
+        onClose={() => { setOpen(false); setEditing(null); }}
+        onCreated={list.reload}
+      />
     </Card>
   );
 }
 
-function SupplierModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => Promise<void> }) {
+function SupplierModal({
+  open,
+  supplier,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  supplier: SupplierDto | null;
+  onClose: () => void;
+  onCreated: () => Promise<void>;
+}) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', phone: '', paymentTermsDays: '30' });
+  const [form, setForm] = useState({
+    code: '',
+    nameEn: '',
+    nameAr: '',
+    phone: '',
+    email: '',
+    taxNumber: '',
+    addressLine: '',
+    city: '',
+    paymentTermsDays: '30',
+    notes: '',
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setForm({
+      code: supplier?.code ?? '',
+      nameEn: supplier?.nameEn ?? '',
+      nameAr: supplier?.nameAr ?? '',
+      phone: supplier?.phone ?? '',
+      email: supplier?.email ?? '',
+      taxNumber: supplier?.taxNumber ?? '',
+      addressLine: supplier?.addressLine ?? '',
+      city: supplier?.city ?? '',
+      paymentTermsDays: String(supplier?.paymentTermsDays ?? 30),
+      notes: supplier?.notes ?? '',
+    });
+  }, [open, supplier]);
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.createSupplier({
-        code: form.code,
+      const body = {
         nameEn: form.nameEn,
         nameAr: form.nameAr,
         phone: form.phone || undefined,
+        email: form.email || undefined,
+        taxNumber: form.taxNumber || undefined,
+        addressLine: form.addressLine || undefined,
+        city: form.city || undefined,
         paymentTermsDays: Number(form.paymentTermsDays) || 0,
-      });
+        notes: form.notes || undefined,
+      };
+      if (supplier) {
+        await api.updateSupplier(supplier.id, body);
+      } else {
+        await api.createSupplier({ ...body, code: form.code });
+      }
       await onCreated();
       onClose();
     } catch (e) {
@@ -187,12 +267,17 @@ function SupplierModal({ open, onClose, onCreated }: { open: boolean; onClose: (
   return (
     <Modal
       open={open}
-      title={t('erp.purchasing.newSupplier')}
+      title={supplier ? t('erp.purchasing.editSupplier') : t('erp.purchasing.newSupplier')}
       onClose={onClose}
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy} onClick={submit} data-testid="save-supplier">
+          <Button
+            variant="primary"
+            disabled={busy || !form.nameEn || !form.nameAr || (!supplier && !form.code)}
+            onClick={submit}
+            data-testid="save-supplier"
+          >
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </>
@@ -201,10 +286,10 @@ function SupplierModal({ open, onClose, onCreated }: { open: boolean; onClose: (
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="supplier-code" />
+          <input className="oryx-input" value={form.code} disabled={Boolean(supplier)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="supplier-code" />
         </Field>
         <Field label={t('erp.sales.phone')}>
-          <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} data-testid="supplier-phone" />
         </Field>
         <Field label={`${t('common.name')} (EN)`} required>
           <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="supplier-name-en" />
@@ -212,8 +297,23 @@ function SupplierModal({ open, onClose, onCreated }: { open: boolean; onClose: (
         <Field label={`${t('common.name')} (AR)`} required>
           <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="supplier-name-ar" />
         </Field>
+        <Field label={t('common.email')}>
+          <input className="oryx-input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="supplier-email" />
+        </Field>
+        <Field label={t('erp.sales.taxNumber')}>
+          <input className="oryx-input" value={form.taxNumber} onChange={(e) => setForm({ ...form, taxNumber: e.target.value })} data-testid="supplier-tax-number" />
+        </Field>
+        <Field label={t('common.address')}>
+          <input className="oryx-input" value={form.addressLine} onChange={(e) => setForm({ ...form, addressLine: e.target.value })} data-testid="supplier-address" />
+        </Field>
+        <Field label={t('common.city')}>
+          <input className="oryx-input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} data-testid="supplier-city" />
+        </Field>
         <Field label={t('erp.sales.paymentTerms')}>
-          <input className="oryx-input" value={form.paymentTermsDays} onChange={(e) => setForm({ ...form, paymentTermsDays: e.target.value })} />
+          <input className="oryx-input" value={form.paymentTermsDays} onChange={(e) => setForm({ ...form, paymentTermsDays: e.target.value })} data-testid="supplier-payment-terms" />
+        </Field>
+        <Field label={t('common.notes')}>
+          <input className="oryx-input" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} data-testid="supplier-notes" />
         </Field>
       </div>
     </Modal>

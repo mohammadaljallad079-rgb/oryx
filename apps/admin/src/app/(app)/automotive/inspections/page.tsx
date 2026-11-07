@@ -314,9 +314,15 @@ function VehiclesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<VehicleDto | null>(null);
   const [documentsFor, setDocumentsFor] = useState<VehicleDto | null>(null);
   const list = useAsync(() => api.vehicles({ search: search || undefined }), [search]);
   const customers = useAsync(() => api.salesCustomers(), []);
+
+  const setStatus = async (row: VehicleDto, status: string) => {
+    await api.updateVehicle(row.id, { status });
+    await list.reload();
+  };
 
   return (
     <Card>
@@ -326,7 +332,7 @@ function VehiclesTab({ canManage }: { canManage: boolean }) {
           <input className="oryx-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('erp.automotive.vinOrPlate')} data-testid="vehicle-search" />
         </label>
         {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-vehicle">
+          <Button variant="primary" size="sm" onClick={() => { setEditing(null); setOpen(true); }} data-testid="new-vehicle">
             <Icon name="plus" size={16} />
             {t('erp.automotive.newVehicle')}
           </Button>
@@ -360,29 +366,48 @@ function VehiclesTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px]">{v.mileage.toLocaleString()}</td>
                 <td><StatusBadge status={v.status} label={v.status} /></td>
                 <td>
-                  <Button size="sm" onClick={() => setDocumentsFor(v)} data-testid={`vehicle-documents-${v.vin}`}>
-                    <Icon name="folder" size={15} />
-                    {t('erp.automotive.documents')}
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <Button size="sm" onClick={() => setDocumentsFor(v)} data-testid={`vehicle-documents-${v.vin}`}>
+                      <Icon name="folder" size={15} />
+                      {t('erp.automotive.documents')}
+                    </Button>
+                    {canManage ? (
+                      <>
+                        <Button size="sm" variant="ghost" aria-label={`${t('common.edit')} ${v.vin}`} onClick={() => { setEditing(v); setOpen(true); }} data-testid={`vehicle-edit-${v.vin}`}>
+                          <Icon name="edit" size={14} />
+                        </Button>
+                        <select
+                          className="oryx-select"
+                          value={v.status}
+                          onChange={(ev) => void setStatus(v, ev.target.value)}
+                          aria-label={`${t('erp.automotive.vehicleStatus')} ${v.vin}`}
+                          data-testid={`vehicle-status-${v.vin}`}
+                        >
+                          {['ACTIVE', 'INACTIVE', 'SOLD'].map((s) => (
+                            <option key={s} value={s}>{t(`erp.automotive.vehicleStatusValue.${s}` as const)}</option>
+                          ))}
+                        </select>
+                      </>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
-      <CreateVehicleModal open={open} customers={customers.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <CreateVehicleModal
+        open={open}
+        vehicle={editing}
+        customers={customers.data?.items ?? []}
+        onClose={() => { setOpen(false); setEditing(null); }}
+        onSaved={list.reload}
+      />
       <VehicleDocumentsModal vehicle={documentsFor} canManage={canManage} onClose={() => setDocumentsFor(null)} />
     </Card>
   );
 }
 
-/**
- * Vehicle papers — registration card, insurance, permits.
- *
- * A scan is optional. When one is supplied it is sent as multipart, re-encoded
- * by the shared media store and referenced by asset id, so a document never
- * carries a client-chosen path.
- */
 function VehicleDocumentsModal({
   vehicle,
   canManage,
@@ -551,56 +576,91 @@ function VehicleDocumentsModal({
 
 function CreateVehicleModal({
   open,
+  vehicle,
   customers,
   onClose,
-  onCreated,
+  onSaved,
 }: {
   open: boolean;
+  vehicle: VehicleDto | null;
   customers: Array<{ id: string; code: string; nameEn: string }>;
   onClose: () => void;
-  onCreated: () => Promise<void>;
+  onSaved: () => Promise<void>;
 }) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ customerId: '', vin: '', plateNumber: '', make: '', model: '', modelYear: '2024', mileage: '0' });
+  const [form, setForm] = useState({ customerId: '', vin: '', plateNumber: '', make: '', model: '', modelYear: '2024', mileage: '0', color: '', registrationExpiresAt: '' });
+
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setForm({
+      customerId: vehicle?.customerId ?? '',
+      vin: vehicle?.vin ?? '',
+      plateNumber: vehicle?.plateNumber ?? '',
+      make: vehicle?.make ?? '',
+      model: vehicle?.model ?? '',
+      modelYear: String(vehicle?.modelYear ?? 2024),
+      mileage: String(vehicle?.mileage ?? 0),
+      color: vehicle?.color ?? '',
+      registrationExpiresAt: vehicle?.registrationExpiresAt?.slice(0, 10) ?? '',
+    });
+  }, [open, vehicle]);
 
   const submit = async () => {
     setBusy(true); setError(null);
     try {
-      await api.createVehicle({
-        customerId: form.customerId,
-        vin: form.vin,
-        plateNumber: form.plateNumber || undefined,
-        make: form.make,
-        model: form.model,
-        modelYear: Number(form.modelYear),
-        mileage: Number(form.mileage) || 0,
-      });
-      await onCreated();
+      if (vehicle) {
+        await api.updateVehicle(vehicle.id, {
+          plateNumber: form.plateNumber || undefined,
+          make: form.make,
+          model: form.model,
+          modelYear: Number(form.modelYear),
+          color: form.color || undefined,
+          registrationExpiresAt: form.registrationExpiresAt || undefined,
+        });
+      } else {
+        await api.createVehicle({
+          customerId: form.customerId,
+          vin: form.vin,
+          plateNumber: form.plateNumber || undefined,
+          make: form.make,
+          model: form.model,
+          modelYear: Number(form.modelYear),
+          mileage: Number(form.mileage) || 0,
+          color: form.color || undefined,
+          registrationExpiresAt: form.registrationExpiresAt || undefined,
+        });
+      }
+      await onSaved();
       onClose();
     } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); } finally { setBusy(false); }
   };
 
   return (
-    <Modal open={open} title={t('erp.automotive.newVehicle')} onClose={onClose}
-      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || !form.customerId} onClick={submit} data-testid="save-vehicle">{busy ? t('common.loading') : t('common.save')}</Button></>}>
+    <Modal open={open} title={vehicle ? t('erp.automotive.editVehicle') : t('erp.automotive.newVehicle')} onClose={onClose}
+      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || (!vehicle && !form.customerId) || !form.vin || !form.make || !form.model} onClick={submit} data-testid="save-vehicle">{busy ? t('common.loading') : t('common.save')}</Button></>}>
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.sales.customer')} required>
-          <select className="oryx-select" value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })} data-testid="vehicle-customer">
+          <select className="oryx-select" value={form.customerId} disabled={Boolean(vehicle)} onChange={(e) => setForm({ ...form, customerId: e.target.value })} data-testid="vehicle-customer">
             <option value="">—</option>
             {customers.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.nameEn}</option>)}
           </select>
         </Field>
         <Field label={t('erp.automotive.vin')} required hint={t('erp.automotive.vinHint')}>
-          <input className="oryx-input" value={form.vin} onChange={(e) => setForm({ ...form, vin: e.target.value.toUpperCase() })} maxLength={17} data-testid="vehicle-vin" />
+          <input className="oryx-input" value={form.vin} disabled={Boolean(vehicle)} onChange={(e) => setForm({ ...form, vin: e.target.value.toUpperCase() })} maxLength={17} data-testid="vehicle-vin" />
         </Field>
         <Field label={t('erp.automotive.make')} required><input className="oryx-input" value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} data-testid="vehicle-make" /></Field>
         <Field label={t('erp.automotive.model')} required><input className="oryx-input" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} data-testid="vehicle-model" /></Field>
         <Field label={t('erp.automotive.modelYear')} required><input className="oryx-input" value={form.modelYear} onChange={(e) => setForm({ ...form, modelYear: e.target.value })} data-testid="vehicle-year" /></Field>
-        <Field label={t('erp.automotive.plate')}><input className="oryx-input" value={form.plateNumber} onChange={(e) => setForm({ ...form, plateNumber: e.target.value })} /></Field>
-        <Field label={t('erp.automotive.mileage')}><input className="oryx-input" value={form.mileage} onChange={(e) => setForm({ ...form, mileage: e.target.value })} /></Field>
+        <Field label={t('erp.automotive.plate')}><input className="oryx-input" value={form.plateNumber} onChange={(e) => setForm({ ...form, plateNumber: e.target.value })} data-testid="vehicle-plate" /></Field>
+        {!vehicle ? (
+          <Field label={t('erp.automotive.mileage')}><input className="oryx-input" value={form.mileage} onChange={(e) => setForm({ ...form, mileage: e.target.value })} data-testid="vehicle-mileage" /></Field>
+        ) : null}
+        <Field label={t('erp.automotive.color')}><input className="oryx-input" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} data-testid="vehicle-color" /></Field>
+        <Field label={t('erp.automotive.registrationExpiresAt')}><input type="date" className="oryx-input" value={form.registrationExpiresAt} onChange={(e) => setForm({ ...form, registrationExpiresAt: e.target.value })} data-testid="vehicle-registration-expires" /></Field>
       </div>
     </Modal>
   );
