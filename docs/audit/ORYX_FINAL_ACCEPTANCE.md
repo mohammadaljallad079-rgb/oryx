@@ -384,10 +384,16 @@ re-run; both are green (see section 3).
 
 On the OCR commit `de940631` all three workflows are green: `CI` (Typecheck and
 build, Browser acceptance tests, Unit and API integration tests), `Design
-preview` (GitHub Pages build and publish) and `Mobile APK`. The evidence commit
-`ecc7d3fd` re-runs the same three; the local suites in section 2 are the
-authoritative per-suite result and were re-run on this tree after the cluster
-was rebuilt from an empty `pgdata`.
+preview` (GitHub Pages build and publish) and `Mobile APK`.
+
+The evidence/screenshot commits then exposed one browser flake that a warm local
+API had hidden: `erp.spec.ts › the journal editor refuses to post an unbalanced
+entry` read the chart-of-accounts `<select>` options immediately after the modal
+opened, and against a cold CI API the select was still empty, so
+`accountOptions[1]` was `undefined`. The test now polls for at least three
+options before reading them (`7969b6e1`). It is a test-side race only — the
+product path is unchanged — and the spec passes locally in isolation
+(9 passed). The tip `7969b6e1` re-runs all three workflows.
 
 ### 2.2 Defects fixed in the previous session (preserved)
 
