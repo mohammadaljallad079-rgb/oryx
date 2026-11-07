@@ -2,13 +2,15 @@
 
 Acceptance date: 2026-11-06 (revised 2026-11-07, eighth revision).
 Branch: `feature/execution-07-premium-web` (PR #7, **open and Draft**).
-Local HEAD at acceptance: `c034742e` (evidence/screenshot refresh), on top of
-`51f88d04` (eighth-revision report) and `de940631` (`feat(automotive):
-registration-card OCR extraction for vehicle documents`), which sits on top of
-the tenant-tax / POS-terminal work (`c7aec12f`), the POS-receipt document work
-(`da6dc803`) and the earlier defect fixes. The seventh revision added
-registration-card OCR extraction (brief §5) and corrected the integration
-catalogue count; the eighth re-ran every suite and the evidence on that tree.
+Local HEAD at acceptance: `2194fb24` (customer-restart script fix), on top of
+`c34819dc` (report), `7969b6e1` (the journal-editor CI flake fix),
+`51f88d04`/`c034742e` (eighth-revision report and evidence refresh) and
+`de940631` (`feat(automotive): registration-card OCR extraction for vehicle
+documents`). That chain sits on the tenant-tax / POS-terminal work (`c7aec12f`),
+the POS-receipt document work (`da6dc803`) and the earlier defect fixes. The
+seventh revision added registration-card OCR extraction (brief §5) and corrected
+the integration catalogue count; the eighth re-ran every suite and the evidence
+on that tree; the tip fixes the customer-restart helper.
 Environment: an isolated preview stack — a separate PostgreSQL database
 (`oryx_dev`) with seeded synthetic demo records. No production database and no
 production secret is involved.
