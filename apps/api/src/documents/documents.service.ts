@@ -1166,6 +1166,65 @@ export class DocumentsService {
       };
     }
 
+    if (type === 'POS_RECEIPT') {
+      // The till receipt. It is a settled sale, so the counterparty may be the
+      // lazily-created walk-in customer; the printed slip is the customer's only
+      // copy, hence a document rather than only a POS row.
+      const sale = await this.prisma.posSale.findFirst({
+        where: { id: sourceId, companyId },
+        include: { lines: true, customer: true },
+      });
+      if (!sale) return null;
+      return {
+        documentNumber: sale.receiptNumber,
+        sourceType: 'PosSale',
+        sourceId: sale.id,
+        payload: {
+          kind: 'FINANCIAL',
+          titleEn: spec.labelEn,
+          titleAr: spec.labelAr,
+          documentNumber: sale.receiptNumber,
+          documentDate: sale.createdAt.toISOString(),
+          dueDate: null,
+          status: sale.status,
+          counterparty: sale.customer
+            ? counterparty(sale.customer)
+            : {
+                nameEn: 'Walk-in',
+                nameAr: 'عميل نقدي',
+                code: '—',
+                taxNumber: null,
+                email: null,
+                phone: null,
+                addressLine: null,
+                city: null,
+              },
+          lines: sale.lines.map((l) => ({
+            description: l.description,
+            sku: null,
+            quantity: l.quantity,
+            unitPriceMinor: l.unitPriceMinor,
+            discountMinor: 0,
+            taxMinor: l.taxMinor,
+            lineTotalMinor: l.lineTotalMinor,
+          })),
+          subtotalMinor: sale.subtotalMinor,
+          discountMinor: sale.discountMinor,
+          taxMinor: sale.taxMinor,
+          roundingMinor: sale.roundingMinor,
+          totalMinor: sale.totalMinor,
+          paidMinor: sale.paidMinor,
+          balanceMinor: sale.totalMinor - sale.paidMinor,
+          currency: sale.currency || (await currencyOf()),
+          // The receipt is short by design — a cashier hands it over at the
+          // counter. The payment method is stated in the notes rather than in a
+          // separate payment block, which pushed the signature strip onto a
+          // second page whose only content was the signatures.
+          notes: `${sale.paymentMethod} · ${sale.receiptNumber}`,
+        },
+      };
+    }
+
     if (type === 'PURCHASE_RETURN') {
       // A purchase return is the mirror of a sales return: it is rendered from
       // the return record, which is what reduces what the company owes.

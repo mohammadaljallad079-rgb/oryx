@@ -7,6 +7,7 @@ import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { minorToInput, money, toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { DocumentActions } from '@/components/document-actions';
 import {
   Badge,
   Button,
@@ -400,18 +401,26 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(o.totalMinor, o.currency)}</td>
                 <td><StatusBadge status={o.status} label={o.status} /></td>
                 <td>
-                  {canManage && o.status === 'DRAFT' ? (
-                    <Button
-                      size="sm"
-                      data-testid={`approve-order-${o.orderNumber}`}
-                      onClick={async () => {
-                        await api.approvePurchaseOrder(o.id);
-                        await list.reload();
-                      }}
-                    >
-                      {t('erp.purchasing.approve')}
-                    </Button>
-                  ) : null}
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {canManage && o.status === 'DRAFT' ? (
+                      <Button
+                        size="sm"
+                        data-testid={`approve-order-${o.orderNumber}`}
+                        onClick={async () => {
+                          await api.approvePurchaseOrder(o.id);
+                          await list.reload();
+                        }}
+                      >
+                        {t('erp.purchasing.approve')}
+                      </Button>
+                    ) : null}
+                    <DocumentActions
+                      sourceType="PurchaseOrder"
+                      sourceId={o.id}
+                      type="PURCHASE_ORDER"
+                      permissions={['erp.purchasing.read']}
+                    />
+                  </div>
                 </td>
               </tr>
             ))}
@@ -614,6 +623,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.sales.total')}</th>
               <th>{t('erp.sales.outstanding')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -625,6 +635,14 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(i.totalMinor, i.currency)}</td>
                 <td className="tabular-nums text-[12.5px]">{money(i.outstandingMinor ?? 0, i.currency)}</td>
                 <td><StatusBadge status={i.status} label={i.status} /></td>
+                <td>
+                  <DocumentActions
+                    sourceType="SupplierInvoice"
+                    sourceId={i.id}
+                    type="PURCHASE_INVOICE"
+                    permissions={['erp.purchasing.read']}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -751,6 +769,7 @@ function ReturnsTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.purchasing.supplier')}</th>
               <th>{t('erp.sales.total')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -761,6 +780,14 @@ function ReturnsTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{r.supplierNameEn}</td>
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(r.totalMinor, r.currency)}</td>
                 <td><StatusBadge status={r.status} label={r.status} /></td>
+                <td>
+                  <DocumentActions
+                    sourceType="PurchaseReturn"
+                    sourceId={r.id}
+                    type="PURCHASE_RETURN"
+                    permissions={['erp.purchasing.read']}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>

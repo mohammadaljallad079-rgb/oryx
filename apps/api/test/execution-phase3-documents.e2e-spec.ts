@@ -1093,6 +1093,81 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
       expect(bytes.toString('latin1')).toContain('/Type0');
     });
 
+    it('issues a POS receipt from the settled sale record, not from the invoice it created', async () => {
+      // A cashier sale creates a paid sales invoice; the receipt the customer is
+      // handed carries the till's own reference. Issuing it must read the POS
+      // sale, so the printed number is the receipt number, not the invoice's.
+      const branch = await prisma.branch.create({
+        data: { companyId, code: `${PREFIX}-BR-POS`, nameEn: 'POS Branch', nameAr: 'فرع النقاط' },
+      });
+      const session = await prisma.cashierSession.create({
+        data: {
+          companyId,
+          branchId: branch.id,
+          sessionNumber: `${PREFIX}-CS-1`,
+          status: 'OPEN',
+          openedById: 'system',
+          openingFloatMinor: 0,
+        },
+      });
+      const sale = await prisma.posSale.create({
+        data: {
+          companyId,
+          branchId: branch.id,
+          cashierSessionId: session.id,
+          receiptNumber: `${PREFIX}-POS-1`,
+          customerId,
+          status: 'COMPLETED',
+          subtotalMinor: 20_000,
+          discountMinor: 1_000,
+          taxMinor: 2_850,
+          totalMinor: 21_850,
+          paidMinor: 25_000,
+          changeMinor: 3_150,
+          paymentMethod: 'CASH',
+          currency: 'BHD',
+          createdById: 'system',
+          lines: {
+            create: [
+              {
+                description: 'Oil change',
+                quantity: 1,
+                unitPriceMinor: 20_000,
+                taxPercentBp: 1500,
+                taxMinor: 2_850,
+                lineTotalMinor: 21_850,
+              },
+            ],
+          },
+        },
+      });
+
+      const res = await companyCall<{ id: string; type: string; documentNumber: string; pageCount: number }>(
+        ctx.base,
+        companyId,
+        '/documents/issue',
+        { method: 'POST', token: issuerToken, body: { type: 'POS_RECEIPT', sourceId: sale.id } },
+      );
+      expect(res.status === 201 ? '' : JSON.stringify(res.body)).toBe('');
+      expect(res.body.type).toBe('POS_RECEIPT');
+      expect(res.body.documentNumber).toBe(`${PREFIX}-POS-1`);
+      expect(res.body.pageCount).toBe(1);
+
+      const pdf = await fetch(`${ctx.base}/api/v1/documents/${res.body.id}/file`, {
+        headers: { Authorization: `Bearer ${issuerToken}`, 'x-oryx-company-id': companyId },
+      });
+      expect(pdf.status).toBe(200);
+      const bytes = Buffer.from(await pdf.arrayBuffer());
+      expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      expect(bytes.toString('latin1')).toContain('/Type0');
+
+      // Clean up the branch-scoped fixtures so later suites are unaffected.
+      await prisma.posSaleLine.deleteMany({ where: { posSaleId: sale.id } });
+      await prisma.posSale.deleteMany({ where: { id: sale.id } });
+      await prisma.cashierSession.deleteMany({ where: { id: session.id } });
+      await prisma.branch.deleteMany({ where: { id: branch.id } });
+    });
+
     it('refuses an unknown document type', async () => {
       const res = await companyCall(ctx.base, companyId, '/documents/issue', {
         method: 'POST',
@@ -1121,6 +1196,7 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
       expect(res.status).toBe(200);
       expect(res.body.documents.some((d) => d.type === 'SALES_INVOICE')).toBe(true);
       expect(res.body.documents.some((d) => d.type === 'VEHICLE_INSPECTION_REPORT')).toBe(true);
+      expect(res.body.documents.some((d) => d.type === 'POS_RECEIPT')).toBe(true);
     });
   });
 

@@ -31,6 +31,8 @@ export type DocumentSourceType =
   | 'CreditNote'
   | 'SupplierInvoice'
   | 'PurchaseOrder'
+  | 'PurchaseReturn'
+  | 'PosSale'
   | 'Payment'
   | 'Customer'
   | 'Supplier'
@@ -43,7 +45,10 @@ export type IssuableDocumentType =
   | 'SALES_ORDER'
   | 'SALES_RETURN'
   | 'PURCHASE_INVOICE'
+  | 'PURCHASE_ORDER'
+  | 'PURCHASE_RETURN'
   | 'PAYMENT_RECEIPT'
+  | 'POS_RECEIPT'
   | 'CUSTOMER_STATEMENT'
   | 'SUPPLIER_STATEMENT'
   | 'JOURNAL_ENTRY';
@@ -54,7 +59,10 @@ const TYPE_LABEL_KEY: Record<IssuableDocumentType, string> = {
   SALES_ORDER: 'documents.type.SALES_ORDER',
   SALES_RETURN: 'documents.type.SALES_RETURN',
   PURCHASE_INVOICE: 'documents.type.PURCHASE_INVOICE',
+  PURCHASE_ORDER: 'documents.type.PURCHASE_ORDER',
+  PURCHASE_RETURN: 'documents.type.PURCHASE_RETURN',
   PAYMENT_RECEIPT: 'documents.type.PAYMENT_RECEIPT',
+  POS_RECEIPT: 'documents.type.POS_RECEIPT',
   CUSTOMER_STATEMENT: 'documents.type.CUSTOMER_STATEMENT',
   SUPPLIER_STATEMENT: 'documents.type.SUPPLIER_STATEMENT',
   JOURNAL_ENTRY: 'documents.type.JOURNAL_ENTRY',

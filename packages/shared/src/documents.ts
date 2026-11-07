@@ -32,6 +32,7 @@ export const OFFICIAL_DOCUMENT_TYPES = [
   'PURCHASE_RETURN',
   'PAYMENT_RECEIPT',
   'PAYMENT_VOUCHER',
+  'POS_RECEIPT',
   'QUOTATION',
   'CUSTOMER_STATEMENT',
   'SUPPLIER_STATEMENT',
@@ -126,6 +127,17 @@ export const OFFICIAL_DOCUMENTS: readonly OfficialDocumentSpec[] = [
     shareable: true,
   },
   {
+    // The cashier receipt printed at the point of sale. It is a settled sale, so
+    // it is issued from the POS sale record rather than from the sales invoice
+    // it created, and it carries the till's own reference.
+    type: 'POS_RECEIPT',
+    labelEn: 'POS Receipt',
+    labelAr: 'إيصال نقطة بيع',
+    permission: 'erp.sales.read',
+    verifiable: true,
+    shareable: true,
+  },
+  {
     type: 'QUOTATION',
     labelEn: 'Quotation',
     labelAr: 'عرض سعر',
@@ -186,6 +198,9 @@ export const ISSUABLE_FINANCIAL_TYPES = [
   'PURCHASE_RETURN',
   'PAYMENT_RECEIPT',
   'PAYMENT_VOUCHER',
+  // The POS receipt is issued from the settled sale record, not from the sales
+  // invoice the sale created.
+  'POS_RECEIPT',
   // A statement is rendered from the party it reports on over the company's
   // current fiscal period; a journal entry is rendered from the entry itself.
   'CUSTOMER_STATEMENT',

@@ -1130,6 +1130,7 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
                 <th>{t('erp.sales.paid')}</th>
                 <th>{t('erp.sales.change')}</th>
                 <th>{t('erp.sales.method')}</th>
+                <th>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -1141,6 +1142,14 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
                   <td className="tabular-nums text-[12.5px]">{money(p.paidMinor)}</td>
                   <td className="tabular-nums text-[12.5px]">{money(p.changeMinor)}</td>
                   <td><Badge tone="info">{p.paymentMethod}</Badge></td>
+                  <td>
+                    <DocumentActions
+                      sourceType="PosSale"
+                      sourceId={p.id}
+                      type="POS_RECEIPT"
+                      permissions={['erp.sales.read']}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>

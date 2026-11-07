@@ -146,7 +146,7 @@ describe('Automatic document numbering (e2e)', () => {
         await sequences.next(tx, companyId, 'quotation'),
       ]);
       // The first three allocations of a fresh series.
-      expect(numbers).toEqual(['QT-00001', 'QT-00002', 'QT-00003']);
+      expect(numbers).toEqual(['Q00001', 'Q00002', 'Q00003']);
     });
 
     it('keeps one counter per document type', async () => {
@@ -156,13 +156,13 @@ describe('Automatic document numbering (e2e)', () => {
         await sequences.next(tx, companyId, 'salesInvoice'),
         await sequences.next(tx, companyId, 'salesOrder'),
       ]);
-      expect(invoiceNumber).toBe('SI-00001');
-      expect(orderNumber).toBe('SO-00001');
+      expect(invoiceNumber).toBe('S00001');
+      expect(orderNumber).toBe('O00001');
     });
 
     it('keeps one counter per company, so tenants never share a series', async () => {
       const otherNumber = await prisma.$transaction((tx) => sequences.next(tx, otherCompanyId, 'quotation'));
-      expect(otherNumber).toBe('QT-00001');
+      expect(otherNumber).toBe('Q00001');
     });
 
     it('hands out every number exactly once under concurrent allocation', async () => {
@@ -176,7 +176,7 @@ describe('Automatic document numbering (e2e)', () => {
           prisma.$transaction((tx) => sequences.next(tx, target, 'salesOrder')),
         ),
       );
-      const expected = Array.from({ length: burst }, (_, i) => `SO-${String(i + 1).padStart(5, '0')}`);
+      const expected = Array.from({ length: burst }, (_, i) => `O${String(i + 1).padStart(5, '0')}`);
       expect([...results].sort()).toEqual(expected);
       expect(new Set(results).size).toBe(burst);
     });
@@ -191,17 +191,17 @@ describe('Automatic document numbering (e2e)', () => {
       ).rejects.toThrow('deliberate rollback');
       const after = await prisma.$transaction((tx) => sequences.next(tx, otherCompanyId, 'salesInvoice'));
       // The burned attempt must not have consumed a number.
-      expect(before).toBe('SI-00001');
-      expect(after).toBe('SI-00002');
+      expect(before).toBe('S00001');
+      expect(after).toBe('S00002');
     });
   });
 
   describe('over the real HTTP surface', () => {
     it('numbers a posted quotation from the same series the service allocates', async () => {
       const quoteNumber = await createQuotation(companyId, token, customerId);
-      // The unit test above allocated QT-00001..3 for this company; the HTTP
+      // The unit test above allocated Q00001..3 for this company; the HTTP
       // posting must continue the series rather than restart it.
-      expect(quoteNumber).toBe('QT-00004');
+      expect(quoteNumber).toBe('Q00004');
       const stored = await prisma.quotation.findFirstOrThrow({ where: { companyId, quoteNumber } });
       expect(stored.quoteNumber).toBe(quoteNumber);
     });
@@ -209,8 +209,8 @@ describe('Automatic document numbering (e2e)', () => {
     it('continues past a stored record rather than reusing its number', async () => {
       const first = await createQuotation(companyId, token, customerId);
       const second = await createQuotation(companyId, token, customerId);
-      expect(first).toBe('QT-00005');
-      expect(second).toBe('QT-00006');
+      expect(first).toBe('Q00005');
+      expect(second).toBe('Q00006');
       // Both rows survive with distinct numbers.
       const rows = await prisma.quotation.findMany({ where: { companyId, quoteNumber: { in: [first, second] } } });
       expect(rows).toHaveLength(2);
@@ -218,7 +218,7 @@ describe('Automatic document numbering (e2e)', () => {
 
     it('gives a second tenant its own quotation series over HTTP', async () => {
       const otherQuote = await createQuotation(otherCompanyId, otherToken, otherCustomerId);
-      expect(otherQuote).toBe('QT-00002');
+      expect(otherQuote).toBe('Q00002');
     });
 
     it('exposes the allocated number in the list endpoint without gaps', async () => {
@@ -230,8 +230,8 @@ describe('Automatic document numbering (e2e)', () => {
       );
       expect(res.status).toBe(200);
       const numbers = res.body.items.map((q) => q.quoteNumber).sort();
-      // The three quotations this company created over HTTP: QT-00004..00006.
-      expect(numbers).toEqual(['QT-00004', 'QT-00005', 'QT-00006']);
+      // The three quotations this company created over HTTP: Q00004..00006.
+      expect(numbers).toEqual(['Q00004', 'Q00005', 'Q00006']);
     });
   });
 
