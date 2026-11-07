@@ -326,11 +326,13 @@ re-run; both are green (see section 3).
 
 ### 2.1 CI workflows
 
-On the current tip `f9643922` all three workflows are green: `CI` (Typecheck and
-build, Browser acceptance tests, Unit and API integration tests), `Design
-preview` (GitHub Pages build and publish) and `Mobile APK`. The local suites in
-section 2 are the authoritative per-suite result and were re-run on this tree
-after the cluster was rebuilt from an empty `pgdata`.
+The last fully-green CI run was on `4142eee2` (the theme-switch flake fix): the
+`CI` workflow (Typecheck and build, Browser acceptance tests, Unit and API
+integration tests) and the `Design preview` workflow both passed. A later run on
+the evidence-only commit `63c8d1c9` was also green. The documentation-only
+commits after that re-trigger CI; the local suites in section 2 are the
+authoritative per-suite result and were re-run on this tree after the cluster was
+rebuilt from an empty `pgdata`.
 
 ### 2.2 Defects fixed in the previous session (preserved)
 
@@ -480,7 +482,21 @@ twelve brief surfaces are green.
 
 ## 5. Files changed in this session
 
-The fifth revision is an evidence-and-harness revision:
+The sixth revision is an evidence-and-documentation revision; no application or
+database code changed:
+
+| File | Change |
+|---|---|
+| `docs/audit/ORYX_FINAL_ACCEPTANCE.md` | Sixth revision: live customer preview, current document numbers, refreshed CI note |
+| `AGENTS.md` | Refreshed coverage counts and added cold-sandbox recovery gotchas |
+
+The live customer preview on `work-2` was rebuilt with the live configuration
+(it had been left holding the GitHub-Pages static export, so `/login` showed the
+design-preview banner). The twelve acceptance surfaces were re-captured
+(`.run/capture-final-evidence.mjs`, 12/12) and now report the live register
+numbers `Q00027` and `Z00064`.
+
+The fifth revision was an evidence-and-harness revision:
 
 | File | Change |
 |---|---|
