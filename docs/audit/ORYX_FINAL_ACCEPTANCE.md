@@ -326,13 +326,13 @@ re-run; both are green (see section 3).
 
 ### 2.1 CI workflows
 
-The last fully-green CI run was on `4142eee2` (the theme-switch flake fix): the
-`CI` workflow (Typecheck and build, Browser acceptance tests, Unit and API
-integration tests) and the `Design preview` workflow both passed. A later run on
-the evidence-only commit `63c8d1c9` was also green. The documentation-only
-commits after that re-trigger CI; the local suites in section 2 are the
-authoritative per-suite result and were re-run on this tree after the cluster was
-rebuilt from an empty `pgdata`.
+On the current tip `666512f8` both workflows are green: `CI` (Typecheck and
+build, Browser acceptance tests, Unit and API integration tests) and
+`Design preview` (GitHub Pages build and publish). The theme-switch flake fix
+(`4142eee2`) was the first commit to hold green across all three CI jobs; every
+documentation-only commit after it re-ran green. The local suites in section 2
+are the authoritative per-suite result and were re-run on this tree after the
+cluster was rebuilt from an empty `pgdata`.
 
 ### 2.2 Defects fixed in the previous session (preserved)
 
