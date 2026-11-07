@@ -1029,6 +1029,11 @@ so nothing else needs changing.
 - **Playwright browsers are lost with the image too.** A run that dies with
   `Executable doesn't exist … headless_shell` needs
   `pnpm --filter @oryx/admin exec playwright install chromium` again.
+- **The browser suite needs `DATABASE_URL` in the shell.** Its global setup
+  calls `scripts/reset-seed-mfa.mjs`, which refuses to run unless
+  `DATABASE_URL` points at a development/test database. A bare shell has no
+  `.env`, so the suite aborts with "Refusing to reset MFA" before any test
+  runs. Source the file first: `set -a && . ./.env && set +a`.
 - **PyMuPDF is not in the image.** The PDF validation step
   (`.run/render-pdf-samples.py`) needs `pip install pymupdf` first.
 - **`restart-customer.sh` matches `next-server` by working directory.** The
