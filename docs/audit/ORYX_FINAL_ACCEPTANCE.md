@@ -294,6 +294,7 @@ balance is asserted `balanced:true` in the new test.
 | Preview render check | `pnpm preview:verify` | **65 page/theme combinations, issues: none** |
 | Preview link crawl | `pnpm preview:check` | **459 pages, 15 PDFs, 0 bad responses, 0 dark-mode issues** |
 | Brief §10 preview surfaces | `.run/verify-brief10-links.mjs` | **12 / 12 reachable, 0 failed** |
+| CI (`ci.yml`) on `4142eee2` | GitHub Actions | **all three jobs green** (typecheck+build, unit+API, browser 12m38s) |
 
 All of the above were re-run on the current tree after the sandbox was recycled
 and the cluster rebuilt from an empty `pgdata`, migrated and seeded. Every
