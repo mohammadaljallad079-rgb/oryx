@@ -547,7 +547,11 @@ export class PurchasingService {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-    const where = { companyId, ...(query.status ? { status: query.status as never } : {}) };
+    const where = {
+      companyId,
+      ...(query.status ? { status: query.status as never } : {}),
+      ...(query.supplierId ? { supplierId: query.supplierId } : {}),
+    };
     const [rows, total] = await Promise.all([
       this.prisma.supplierInvoice.findMany({
         where,

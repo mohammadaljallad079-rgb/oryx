@@ -241,6 +241,25 @@ function AccountModal({
     });
   }, [open, account]);
 
+  // A new account is numbered automatically: whenever the type changes, ask the
+  // API for the next free code in that type's block. The field stays editable,
+  // so an operator may still type their own code.
+  useEffect(() => {
+    if (!open || account) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { code } = await api.nextAccountCode({ type: form.type });
+        if (!cancelled) setForm((f) => ({ ...f, code }));
+      } catch {
+        /* leave the field for manual entry if the suggestion fails */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, account, form.type]);
+
   const submit = async () => {
     setBusy(true);
     setError(null);
@@ -313,10 +332,13 @@ function AccountModal({
 
 function JournalsTab({ canPost }: { canPost: boolean }) {
   const { t } = useUi();
+  const { can } = useAuth();
   const [page, setPage] = useState(1);
   const [postOpen, setPostOpen] = useState(false);
+  const [reversing, setReversing] = useState<JournalEntryDto | null>(null);
   const list = useAsync(() => api.journals({ page, pageSize: 15 }), [page]);
   const accounts = useAsync(() => api.accountingAccounts(), []);
+  const canReverse = can('erp.accounting.journal.reverse');
 
   return (
     <Card>
@@ -382,6 +404,16 @@ function JournalsTab({ canPost }: { canPost: boolean }) {
                       <span className="oryx-faint text-[11.5px]">
                         {j.lines.length} {t('erp.accounting.lines')}
                       </span>
+                      {canReverse && j.status === 'POSTED' ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setReversing(j)}
+                          data-testid={`journal-reverse-${j.entryNumber}`}
+                        >
+                          {t('erp.accounting.reverse')}
+                        </Button>
+                      ) : null}
                       <DocumentActions
                         sourceType="JournalEntry"
                         sourceId={j.id}
@@ -410,7 +442,81 @@ function JournalsTab({ canPost }: { canPost: boolean }) {
         onClose={() => setPostOpen(false)}
         onPosted={list.reload}
       />
+
+      {reversing ? (
+        <ReverseJournalModal
+          entry={reversing}
+          onClose={() => setReversing(null)}
+          onReversed={async () => {
+            await list.reload();
+          }}
+        />
+      ) : null}
     </Card>
+  );
+}
+
+/**
+ * Reverses a posted journal entry with a counter-entry.
+ *
+ * A posted entry is never edited or deleted: the correction is a new POSTED
+ * entry that mirrors the original. The dialog states that plainly and asks for
+ * a reason, which the API stores on the reversal.
+ */
+function ReverseJournalModal({
+  entry,
+  onClose,
+  onReversed,
+}: {
+  entry: JournalEntryDto;
+  onClose: () => void;
+  onReversed: () => Promise<void>;
+}) {
+  const { t } = useUi();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
+  const [reversalDate, setReversalDate] = useState(todayIso());
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.reverseJournal(entry.id, reason.trim() || undefined, new Date(reversalDate).toISOString());
+      await onReversed();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      open
+      title={`${t('erp.accounting.reverse')} ${entry.entryNumber}`}
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button variant="primary" disabled={busy || !reason.trim()} onClick={submit} data-testid="confirm-reverse-journal">
+            {busy ? t('common.loading') : t('erp.accounting.reverse')}
+          </Button>
+        </>
+      }
+    >
+      {error ? <ErrorBanner message={error} /> : null}
+      <p className="oryx-muted m-0 mb-3 text-[12.5px]">{t('erp.accounting.reverseHint')}</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label={t('common.date')} required>
+          <input type="date" className="oryx-input" value={reversalDate} onChange={(e) => setReversalDate(e.target.value)} data-testid="reverse-date" />
+        </Field>
+        <Field label={t('erp.accounting.reverseReason')} required>
+          <input className="oryx-input" value={reason} onChange={(e) => setReason(e.target.value)} data-testid="reverse-reason" />
+        </Field>
+      </div>
+    </Modal>
   );
 }
 
@@ -737,35 +843,95 @@ function PaymentModal({
   // defaults server-side to the signed-in operator, so it is never empty.
   const [receivedByName, setReceivedByName] = useState('');
   const [paidAt, setPaidAt] = useState(todayIso());
+  // Chosen invoice allocations, keyed by invoice id. An empty amount leaves the
+  // invoice open; the sum may never exceed the payment amount.
+  const [allocations, setAllocations] = useState<Record<string, string>>({});
+
+  const partyId = direction === 'RECEIPT' ? customerId : supplierId;
+
+  // The party's open invoices (posted or partially paid), loaded when a party
+  // is chosen so a receipt can be applied to exactly what it settles.
+  const openInvoices = useAsync<Array<{ id: string; number: string; outstandingMinor: number; currency: string; date: string }>>(
+    async () => {
+      if (!partyId) return [];
+      if (direction === 'RECEIPT') {
+        const res = await api.salesInvoices({ customerId: partyId, status: 'POSTED' });
+        const partial = await api.salesInvoices({ customerId: partyId, status: 'PARTIALLY_PAID' });
+        return [...res.items, ...partial.items]
+          .filter((i) => (i.outstandingMinor ?? 0) > 0)
+          .map((i) => ({
+            id: i.id,
+            number: i.invoiceNumber ?? i.id,
+            outstandingMinor: i.outstandingMinor ?? 0,
+            currency: i.currency,
+            date: (i.invoiceDate ?? '').slice(0, 10),
+          }));
+      }
+      const res = await api.supplierInvoices({ supplierId: partyId, status: 'POSTED' });
+      const partial = await api.supplierInvoices({ supplierId: partyId, status: 'PARTIALLY_PAID' });
+      return [...res.items, ...partial.items]
+        .filter((i) => (i.outstandingMinor ?? 0) > 0)
+        .map((i) => ({
+          id: i.id,
+          number: i.invoiceNumber ?? i.id,
+          outstandingMinor: i.outstandingMinor ?? 0,
+          currency: i.currency,
+          date: (i.invoiceDate ?? '').slice(0, 10),
+        }));
+    },
+    [partyId, direction],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    setAllocations({});
+    setAmount('');
+  }, [open, partyId]);
+
+  const amountMinor = toMinorInput(amount);
+  const allocatedMinor = Object.values(allocations).reduce((s, v) => s + toMinorInput(v), 0);
+  const overAllocated = allocatedMinor > amountMinor;
+  const partyOk = direction === 'RECEIPT' ? Boolean(customerId) : Boolean(supplierId);
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
+      const chosen = Object.entries(allocations)
+        .map(([id, value]) => ({ id, amountMinor: toMinorInput(value) }))
+        .filter((a) => a.amountMinor > 0);
       await api.recordPayment({
         direction,
         partyType: direction === 'RECEIPT' ? 'CUSTOMER' : 'SUPPLIER',
         ...(direction === 'RECEIPT' ? { customerId } : { supplierId }),
         method,
-        amountMinor: toMinorInput(amount),
+        amountMinor,
         reference: reference || undefined,
         notes: notes || undefined,
         receivedByName: receivedByName.trim() || undefined,
         paidAt: new Date(paidAt).toISOString(),
+        ...(chosen.length
+          ? {
+              allocations: chosen.map((a) =>
+                direction === 'RECEIPT'
+                  ? { target: 'SALES_INVOICE', salesInvoiceId: a.id, amountMinor: a.amountMinor }
+                  : { target: 'SUPPLIER_INVOICE', supplierInvoiceId: a.id, amountMinor: a.amountMinor },
+              ),
+            }
+          : {}),
       });
       await onCreated();
       onClose();
       setAmount('');
       setReference('');
       setNotes('');
+      setAllocations({});
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
       setBusy(false);
     }
   };
-
-  const partyOk = direction === 'RECEIPT' ? Boolean(customerId) : Boolean(supplierId);
 
   return (
     <Modal
@@ -775,7 +941,12 @@ function PaymentModal({
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy || !partyOk || !amount} onClick={submit} data-testid="save-payment">
+          <Button
+            variant="primary"
+            disabled={busy || !partyOk || !amount || overAllocated}
+            onClick={submit}
+            data-testid="save-payment"
+          >
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </>
@@ -851,6 +1022,47 @@ function PaymentModal({
           <input className="oryx-input" value={notes} onChange={(e) => setNotes(e.target.value)} data-testid="payment-notes" />
         </Field>
       </div>
+
+      {partyId ? (
+        <div className="mt-4" data-testid="payment-allocations">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="oryx-label m-0">{t('erp.accounting.allocateTo')}</span>
+            <span className={`text-[11.5px] tabular-nums ${overAllocated ? 'text-[var(--danger)]' : 'oryx-faint'}`}>
+              {t('erp.accounting.allocated')} {money(allocatedMinor)} / {money(amountMinor)}
+            </span>
+          </div>
+          {openInvoices.loading ? (
+            <Skeleton height={40} />
+          ) : (openInvoices.data?.length ?? 0) === 0 ? (
+            <p className="oryx-faint m-0 text-[12px]">{t('erp.accounting.noOpenInvoices')}</p>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {openInvoices.data!.map((inv) => (
+                <div key={inv.id} className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] px-3 py-1.5">
+                  <span className="text-[12.5px]">
+                    <span className="font-mono font-semibold">{inv.number}</span>
+                    <span className="oryx-faint"> · {inv.date}</span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="oryx-faint text-[11.5px] tabular-nums">{t('erp.sales.outstanding')} {money(inv.outstandingMinor, inv.currency)}</span>
+                    <input
+                      className="oryx-input w-28 tabular-nums"
+                      inputMode="decimal"
+                      placeholder="0"
+                      value={allocations[inv.id] ?? ''}
+                      onChange={(e) => setAllocations({ ...allocations, [inv.id]: e.target.value })}
+                      data-testid={`payment-allocate-${inv.number}`}
+                    />
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {overAllocated ? (
+            <p className="m-0 mt-2 text-[11.5px] text-[var(--danger)]">{t('erp.accounting.overAllocated')}</p>
+          ) : null}
+        </div>
+      ) : null}
     </Modal>
   );
 }

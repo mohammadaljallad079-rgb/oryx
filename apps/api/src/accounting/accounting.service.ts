@@ -163,6 +163,54 @@ export class AccountingService {
     return toAccountDto(account);
   }
 
+  /**
+   * Suggest the next account code for a type.
+   *
+   * Codes are structured as a type block of 1000s: assets 1000–1999,
+   * liabilities 2000–2999, equity 3000–3999, revenue 4000–4999 and expenses
+   * 5000–5999. The suggestion is the highest existing code in the block, plus
+   * 10, so a chart keeps room to insert between accounts. A child account
+   * inherits the parent's block and gets the next sub-code at its level.
+   */
+  async nextAccountCode(type: string, parentId: string | undefined, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const ranges: Record<string, [number, number]> = {
+      ASSET: [1000, 1999],
+      LIABILITY: [2000, 2999],
+      EQUITY: [3000, 3999],
+      REVENUE: [4000, 4999],
+      EXPENSE: [5000, 5999],
+    };
+    const [lo, hi] = ranges[type] ?? [1000, 1999];
+
+    if (parentId) {
+      const parent = await this.prisma.account.findFirst({ where: { id: parentId, companyId } });
+      if (parent) {
+        // A child's code extends its parent's: parent 1200 yields 1201, 1202 …
+        const children = await this.prisma.account.findMany({
+          where: { companyId, parentId },
+          select: { code: true },
+        });
+        const numeric = children
+          .map((c) => Number(c.code))
+          .filter((n) => Number.isFinite(n));
+        const base = Number(parent.code);
+        const next = numeric.length ? Math.max(...numeric) + 1 : (Number.isFinite(base) ? base + 1 : 1001);
+        return { code: String(next) };
+      }
+    }
+
+    const accounts = await this.prisma.account.findMany({
+      where: { companyId },
+      select: { code: true },
+    });
+    const inRange = accounts
+      .map((a) => Number(a.code))
+      .filter((n) => Number.isFinite(n) && n >= lo && n <= hi);
+    const next = inRange.length ? Math.min(Math.max(...inRange) + 10, hi) : lo;
+    return { code: String(next) };
+  }
+
   async updateAccount(id: string, dto: UpdateAccountDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const account = await this.prisma.account.findFirst({ where: { id, companyId } });

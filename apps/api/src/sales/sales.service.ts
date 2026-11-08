@@ -511,6 +511,7 @@ export class SalesService {
       companyId,
       ...(query.status ? { status: query.status as never } : {}),
       ...(query.branchId ? { branchId: query.branchId } : {}),
+      ...(query.customerId ? { customerId: query.customerId } : {}),
     };
     const [rows, total] = await Promise.all([
       this.prisma.salesInvoice.findMany({

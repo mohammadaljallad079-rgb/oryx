@@ -82,6 +82,16 @@ export class UpdateAccountDto {
   systemRole?: string;
 }
 
+/** The account type a suggested code is being generated for. */
+export class NextAccountCodeQueryDto {
+  @IsIn(ACCOUNT_TYPES)
+  type!: (typeof ACCOUNT_TYPES)[number];
+
+  @IsOptional()
+  @IsString()
+  parentId?: string;
+}
+
 export class ListQueryDto {
   @IsOptional()
   @Type(() => Number)

@@ -20,12 +20,13 @@ import {
 } from '@/components/ui';
 import type {
   AccountingReportDto,
+  AgingRowDto,
   InventoryReportDto,
   PurchasingReportDto,
   SalesReportDto,
 } from '@oryx/shared';
 
-type Tab = 'accounting' | 'sales' | 'purchasing' | 'inventory';
+type Tab = 'accounting' | 'sales' | 'purchasing' | 'inventory' | 'aging';
 
 export default function ReportsPage() {
   const { t } = useUi();
@@ -39,12 +40,15 @@ export default function ReportsPage() {
   const sales = useAsync<SalesReportDto>(() => api.reportSales(params), [from, to]);
   const purchasing = useAsync<PurchasingReportDto>(() => api.reportPurchasing(params), [from, to]);
   const inventory = useAsync<InventoryReportDto>(() => api.reportInventory(params), [from, to]);
+  const receivables = useAsync<AgingRowDto[]>(() => api.receivablesAging(), []);
+  const payables = useAsync<AgingRowDto[]>(() => api.payablesAging(), []);
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'sales', label: t('erp.reports.sales') },
     { key: 'purchasing', label: t('erp.reports.purchasing') },
     { key: 'inventory', label: t('erp.reports.inventory') },
     { key: 'accounting', label: t('erp.reports.accounting') },
+    { key: 'aging', label: t('erp.reports.aging') },
   ];
 
   const reloadAll = () => {
@@ -52,6 +56,8 @@ export default function ReportsPage() {
     void purchasing.reload();
     void inventory.reload();
     void accounting.reload();
+    void receivables.reload();
+    void payables.reload();
   };
 
   return (
@@ -344,12 +350,91 @@ export default function ReportsPage() {
         </Card>
       ) : null}
 
+      {tab === 'aging' ? (
+        <Card>
+          <div className="border-b border-[var(--border)] p-4">
+            <p className="oryx-panel-title m-0 mb-3">{t('erp.reports.receivablesAging')}</p>
+            <AgingTable
+              rows={receivables.data}
+              loading={receivables.loading}
+              error={receivables.error}
+              onRetry={receivables.reload}
+              partyLabel={t('erp.sales.customer')}
+            />
+          </div>
+          <div className="p-4">
+            <p className="oryx-panel-title m-0 mb-3">{t('erp.reports.payablesAging')}</p>
+            <AgingTable
+              rows={payables.data}
+              loading={payables.loading}
+              error={payables.error}
+              onRetry={payables.reload}
+              partyLabel={t('erp.purchasing.supplier')}
+            />
+          </div>
+        </Card>
+      ) : null}
+
       <span className="hidden">
         <Field label="hidden">
           <input className="oryx-input" readOnly />
         </Field>
       </span>
     </div>
+  );
+}
+
+/** Outstanding balances grouped by how far past due they are. */
+function AgingTable({
+  rows,
+  loading,
+  error,
+  onRetry,
+  partyLabel,
+}: {
+  rows: AgingRowDto[] | null;
+  loading: boolean;
+  error: string | null;
+  onRetry: () => Promise<void>;
+  partyLabel: string;
+}) {
+  const { t } = useUi();
+  if (error) return <ErrorBanner message={error} onRetry={onRetry} />;
+  if (loading) return <Skeleton height={160} />;
+  if (!rows || rows.length === 0) return <p className="oryx-muted m-0 text-[12.5px]">{t('common.empty')}</p>;
+  const total = rows.reduce((s, r) => s + r.outstandingMinor, 0);
+  return (
+    <>
+      <p className="oryx-faint m-0 mb-2 text-[12px]">
+        {t('erp.reports.outstandingTotal')}: <span className="tabular-nums font-semibold">{money(total)}</span>
+      </p>
+      <TableShell>
+        <thead>
+          <tr>
+            <th>{t('erp.sales.invoiceNumber')}</th>
+            <th>{partyLabel}</th>
+            <th>{t('common.date')}</th>
+            <th>{t('erp.sales.dueDate')}</th>
+            <th>{t('erp.reports.daysOverdue')}</th>
+            <th>{t('erp.sales.outstanding')}</th>
+            <th>{t('erp.reports.bucket')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id} data-testid={`aging-row-${r.invoiceNumber}`}>
+              <td className="font-mono text-[12px]">{r.invoiceNumber}</td>
+              <td className="text-[12.5px]">{r.customerNameEn ?? r.supplierNameEn ?? '—'}</td>
+              <td className="text-[12.5px]">{r.invoiceDate.slice(0, 10)}</td>
+              <td className="text-[12.5px]">{r.dueDate ? r.dueDate.slice(0, 10) : '—'}</td>
+              <td className="tabular-nums text-[12.5px]">{r.daysOverdue > 0 ? r.daysOverdue : 0}</td>
+              <td className="tabular-nums text-[12.5px] font-semibold">{money(r.outstandingMinor)}</td>
+              <td><Badge tone={r.bucket === 'CURRENT' ? 'success' : 'warning'}>{t(`erp.reports.bucket.${r.bucket}`)}</Badge></td>
+            </tr>
+          ))}
+        </tbody>
+      </TableShell>
+    </>
   );
 }
 

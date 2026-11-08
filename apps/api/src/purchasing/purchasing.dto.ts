@@ -41,6 +41,12 @@ export class ListQueryDto {
   @IsOptional()
   @IsString()
   branchId?: string;
+
+  /** Restrict a list to one supplier, so a payment form can show that
+   *  supplier's open invoices without paging the whole register. */
+  @IsOptional()
+  @IsString()
+  supplierId?: string;
 }
 
 export class CreateSupplierDto {

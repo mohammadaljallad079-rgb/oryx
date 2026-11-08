@@ -15,6 +15,7 @@ import {
   CreateJournalDto,
   LedgerQueryDto,
   ListQueryDto,
+  NextAccountCodeQueryDto,
   RecordPaymentDto,
   ReverseJournalDto,
   SetPeriodStatusDto,
@@ -50,6 +51,13 @@ export class AccountingController {
   @ApiOperation({ summary: 'Create an account' })
   createAccount(@Body() dto: CreateAccountDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.accounting.createAccount(dto, p, actorFrom(p, req));
+  }
+
+  @Get('accounts/next-code')
+  @RequireAnyPermission('erp.accounting.read', 'erp.accounting.coa.manage')
+  @ApiOperation({ summary: 'Suggest the next account code for a type' })
+  nextAccountCode(@Query() query: NextAccountCodeQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.accounting.nextAccountCode(query.type, query.parentId, p);
   }
 
   @Patch('accounts/:id')

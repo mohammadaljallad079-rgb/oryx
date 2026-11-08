@@ -182,6 +182,28 @@ describe('ORYX ERP core (e2e)', () => {
       });
       expect(dup.status).toBe(409);
     });
+
+    it('suggests the next account code inside the type block', async () => {
+      // The seeded chart already holds 1000–1500 for assets, so the next free
+      // asset code is one decade past the highest, not 1001.
+      const asset = await erp<{ code: string }>('/accounting/accounts/next-code?type=ASSET');
+      expect(asset.status).toBe(200);
+      expect(Number(asset.body.code)).toBeGreaterThanOrEqual(1000);
+      expect(Number(asset.body.code)).toBeLessThan(2000);
+
+      const expense = await erp<{ code: string }>('/accounting/accounts/next-code?type=EXPENSE');
+      expect(expense.status).toBe(200);
+      expect(Number(expense.body.code)).toBeGreaterThanOrEqual(5000);
+      expect(Number(expense.body.code)).toBeLessThan(6000);
+
+      // A code suggested for a fresh type must not collide with the chart.
+      const existing = await erp<{ items: Array<{ code: string }> }>('/accounting/accounts');
+      const codes = new Set(existing.body.items.map((a) => a.code));
+      expect(codes.has(expense.body.code)).toBe(false);
+
+      const bad = await erp('/accounting/accounts/next-code?type=NOPE');
+      expect(bad.status).toBe(400);
+    });
   });
 
   describe('accounting — double-entry posting', () => {
@@ -645,6 +667,67 @@ describe('ORYX ERP core (e2e)', () => {
       });
       expect(res.status).toBe(403);
       expect(res.body.code).toBe('sales.credit_limit_exceeded');
+    });
+  });
+
+  describe('reports — aging and open-invoice filters', () => {
+    // A customer that always has an open invoice, so the filter and the aging
+    // report have deterministic data regardless of test order.
+    let openCustomerId: string;
+
+    beforeAll(async () => {
+      const created = await erp<{ id: string }>('/sales/customers', {
+        method: 'POST',
+        body: { code: 'C-AGING', nameEn: 'Aging Co.', nameAr: 'شركة الأعمار' },
+      });
+      openCustomerId = created.body.id;
+
+      // Issued well in the past so it lands in an overdue bucket.
+      const invoice = await erp('/sales/invoices', {
+        method: 'POST',
+        body: {
+          customerId: openCustomerId,
+          invoiceDate: '2026-01-05',
+          dueDate: '2026-02-05',
+          warehouseId,
+          issueStock: false,
+          lines: [{ description: 'Consulting', quantity: 10000, unitPriceMinor: 50000, taxPercentBp: 0 }],
+        },
+      });
+      expect(invoice.status).toBe(201);
+    });
+
+    it('filters sales invoices by customer', async () => {
+      const mine = await erp<{ items: Array<{ customerId: string }> }>(
+        `/sales/invoices?customerId=${openCustomerId}`,
+      );
+      expect(mine.status).toBe(200);
+      expect(mine.body.items.length).toBeGreaterThanOrEqual(1);
+      expect(mine.body.items.every((i) => i.customerId === openCustomerId)).toBe(true);
+
+      // The seeded WIDGET invoice belongs to another customer and must be absent.
+      const others = await erp<{ items: Array<{ customerId: string }> }>('/sales/invoices');
+      expect(others.body.items.length).toBeGreaterThanOrEqual(mine.body.items.length);
+    });
+
+    it('lists the open receivable with an aging bucket', async () => {
+      const res = await erp<Array<{ invoiceNumber: string; outstandingMinor: number; bucket: string; daysOverdue: number }>>(
+        '/accounting/receivables-aging',
+      );
+      expect(res.status).toBe(200);
+      const row = res.body.find((r) => r.outstandingMinor > 0);
+      expect(row).toBeTruthy();
+      expect(['CURRENT', '1_30', '31_60', '61_90', '90_PLUS']).toContain(row!.bucket);
+      expect(typeof row!.daysOverdue).toBe('number');
+    });
+
+    it('exposes outstandingMinor on a filtered open invoice', async () => {
+      const res = await erp<{ items: Array<{ outstandingMinor?: number; status: string }> }>(
+        `/sales/invoices?customerId=${openCustomerId}&status=POSTED`,
+      );
+      expect(res.status).toBe(200);
+      const open = res.body.items.find((i) => (i.outstandingMinor ?? 0) > 0);
+      expect(open).toBeTruthy();
     });
   });
 

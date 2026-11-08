@@ -298,6 +298,7 @@ export default function CompaniesPage() {
       />
 
       <EditCompanyModal
+        key={editTarget?.id ?? 'closed'}
         company={editTarget}
         onClose={() => setEditTarget(null)}
         onSaved={async () => {
@@ -307,6 +308,56 @@ export default function CompaniesPage() {
       />
     </div>
   );
+}
+
+type CompanyFormState = {
+  nameEn: string;
+  nameAr: string;
+  legalNameEn: string;
+  industry: string;
+  countryCode: string;
+  currency: string;
+  functionalCurrency: string;
+  taxPercent: string;
+  roundingMode: string;
+  documentLocale: string;
+  taxNumber: string;
+  notes: string;
+};
+
+/** Builds the editable form state from a company, or sensible defaults. */
+function seedForm(company: CompanyDto | null): CompanyFormState {
+  if (!company) {
+    return {
+      nameEn: '',
+      nameAr: '',
+      legalNameEn: '',
+      industry: '',
+      countryCode: '',
+      currency: 'BHD',
+      functionalCurrency: '',
+      taxPercent: '0',
+      roundingMode: 'NONE',
+      documentLocale: 'en',
+      taxNumber: '',
+      notes: '',
+    };
+  }
+  // The tax rate is stored in basis points and edited as a percentage.
+  return {
+    nameEn: company.nameEn,
+    nameAr: company.nameAr,
+    legalNameEn: company.legalNameEn ?? '',
+    industry: company.industry ?? '',
+    countryCode: company.countryCode ?? '',
+    currency: company.currency,
+    functionalCurrency: company.functionalCurrency ?? '',
+    taxPercent: String(company.defaultTaxRateBp / 100),
+    roundingMode: company.roundingMode,
+    documentLocale: company.documentLocale,
+    taxNumber: company.taxNumber ?? '',
+    notes: company.notes ?? '',
+  };
 }
 
 function statusLabel(status: string, t: (k: string) => string): string {
@@ -536,41 +587,11 @@ function EditCompanyModal({
   const { t, locale } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    nameEn: '',
-    nameAr: '',
-    legalNameEn: '',
-    industry: '',
-    countryCode: '',
-    currency: 'BHD',
-    functionalCurrency: '',
-    taxPercent: '0',
-    roundingMode: 'NONE',
-    documentLocale: 'en',
-    taxNumber: '',
-    notes: '',
-  });
-
-  // Re-seed whenever a different company is opened. The tax rate is stored in
-  // basis points and edited as a percentage, so the conversion lives here.
-  useEffect(() => {
-    if (!company) return;
-    setForm({
-      nameEn: company.nameEn,
-      nameAr: company.nameAr,
-      legalNameEn: company.legalNameEn ?? '',
-      industry: company.industry ?? '',
-      countryCode: company.countryCode ?? '',
-      currency: company.currency,
-      functionalCurrency: company.functionalCurrency ?? '',
-      taxPercent: String(company.defaultTaxRateBp / 100),
-      roundingMode: company.roundingMode,
-      documentLocale: company.documentLocale,
-      taxNumber: company.taxNumber ?? '',
-      notes: company.notes ?? '',
-    });
-    setError(null);
-  }, [company]);
+  // The caller remounts this modal per company (`key={company.id}`), so the
+  // form is seeded synchronously from props. Seeding in an effect instead left
+  // a window where a value typed straight after opening was overwritten by the
+  // late effect, which could leave the Save button permanently disabled.
+  const [form, setForm] = useState(() => seedForm(company));
 
   async function submit() {
     if (!company) return;

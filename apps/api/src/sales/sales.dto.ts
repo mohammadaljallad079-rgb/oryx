@@ -92,6 +92,12 @@ export class ListQueryDto {
   @IsOptional()
   @IsString()
   branchId?: string;
+
+  /** Restrict a list to one customer, so a payment form can show that
+   *  customer's open invoices without paging the whole register. */
+  @IsOptional()
+  @IsString()
+  customerId?: string;
 }
 
 export class CreateCustomerDto {

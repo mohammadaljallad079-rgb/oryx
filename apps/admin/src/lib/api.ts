@@ -750,6 +750,8 @@ export const api = {
     request<Paginated<ErpAccountDto>>(`/accounting/accounts?${toQuery(params)}`),
   createAccount: (body: Record<string, unknown>) =>
     request<ErpAccountDto>('/accounting/accounts', { method: 'POST', body }),
+  nextAccountCode: (params: { type: string; parentId?: string }) =>
+    request<{ code: string }>(`/accounting/accounts/next-code?${toQuery(params)}`),
   updateAccount: (id: string, body: Record<string, unknown>) =>
     request<ErpAccountDto>(`/accounting/accounts/${id}`, { method: 'PATCH', body }),
   seedStandardChart: () =>
@@ -767,10 +769,10 @@ export const api = {
     request<Paginated<JournalEntryDto>>(`/accounting/journals?${toQuery(params)}`),
   createJournal: (body: Record<string, unknown>) =>
     request<{ id: string; entryNumber: string }>('/accounting/journals', { method: 'POST', body }),
-  reverseJournal: (id: string, reason?: string) =>
+  reverseJournal: (id: string, reason?: string, reversalDate?: string) =>
     request<{ entryNumber: string }>(`/accounting/journals/${id}/reverse`, {
       method: 'POST',
-      body: { reason },
+      body: { reason, reversalDate },
     }),
   generalLedger: (params: { accountId?: string; from?: string; to?: string; companyId?: string } = {}) =>
     request<{ accounts: LedgerAccountDto[] }>(`/accounting/general-ledger?${toQuery(params)}`),
@@ -872,7 +874,7 @@ export const api = {
     request<Paginated<SalesDocumentDto>>(`/sales/orders?${toQuery(params)}`),
   createSalesOrder: (body: Record<string, unknown>) =>
     request<SalesDocumentDto>('/sales/orders', { method: 'POST', body }),
-  salesInvoices: (params: { companyId?: string; status?: string; page?: number } = {}) =>
+  salesInvoices: (params: { companyId?: string; status?: string; customerId?: string; page?: number; pageSize?: number } = {}) =>
     request<Paginated<SalesDocumentDto>>(`/sales/invoices?${toQuery(params)}`),
   getSalesInvoice: (id: string) => request<SalesDocumentDto>(`/sales/invoices/${id}`),
   createSalesInvoice: (body: Record<string, unknown>) =>
@@ -920,7 +922,7 @@ export const api = {
     request<Paginated<PurchaseDocumentDto>>(`/purchasing/receipts?${toQuery(params)}`),
   createGoodsReceipt: (body: Record<string, unknown>) =>
     request<PurchaseDocumentDto>('/purchasing/receipts', { method: 'POST', body }),
-  supplierInvoices: (params: { companyId?: string; status?: string } = {}) =>
+  supplierInvoices: (params: { companyId?: string; status?: string; supplierId?: string } = {}) =>
     request<Paginated<PurchaseDocumentDto>>(`/purchasing/supplier-invoices?${toQuery(params)}`),
   createSupplierInvoice: (body: Record<string, unknown>) =>
     request<PurchaseDocumentDto>('/purchasing/supplier-invoices', { method: 'POST', body }),
