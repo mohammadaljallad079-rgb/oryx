@@ -405,7 +405,9 @@ production deployment always talks to the vendor.
 | Purchase-return variance | `… test:e2e -- erp` | **37 passed / 37** (incl. the variance test) |
 | Mobile | `pnpm --filter @oryx/mobile test` | **206 passed / 206** (10 files) |
 | Mobile ERP | `pnpm --filter @oryx/mobile-erp test` | **31 passed / 31** (2 files) |
-| Literal live checks | `node .run/verify-mandate-6.mjs` | **49 checks, 0 failed** |
+| Literal live checks (mandate §5) | `node .run/verify-mandate-6.mjs` | **49 checks, 0 failed** |
+| Literal live checks (brief §5 points 1–6) | `node .run/verify-brief5-6.mjs` | **27 checks, 0 failed** |
+| Official-layout row comparison | `node .run/verify-official-layout.mjs` | **22/22 reference tokens present** |
 | Workspace lint | `pnpm -r lint` | PASS (exit 0) |
 | Workspace typecheck | `pnpm -r typecheck` | PASS (exit 0) |
 | Builds | shared / database / api / admin / customer | **all 5 PASS (exit 0)** |
@@ -576,6 +578,33 @@ error; a clean rebuild resolved it. After both fixes the 39-surface sweep and th
 twelve brief surfaces are green.
 
 ## 4. External blockers
+
+| # | Blocker | Impact | Status |
+|---|---|---|---|
+| 1 | **Reference PDF PII in public history** — the owner's design reference (`oryx 22.pdf`) contains a real customer's name, phone and address. A commit on this branch (`f8962e33`) swept the local `.run/pdf-compare/` scratch — including two side-by-side images that embed the reference — into version control, and this repository is **public**. | The reference page renders and side-by-sides are publicly readable via the `f8962e33` blob. | **Contained, not fully remediated.** The files are deleted and git-ignored from the tip (`36fd3f52`), so they are absent from the current tree. Removing the blob from history requires a history rewrite (force-push), which the mandate forbids. Owner decision required: (a) accept the current containment, (b) authorize a `git filter-repo` + force-push on the branch, or (c) make the repository private. |
+| 2 | Live payment gateway (BenefitPay / card-online) | Online card collection cannot be exercised end to end | Needs merchant credentials + a sandbox account from the acquirer. The adapter exists and correctly reports itself unconfigured; `CASH` and `CARD_TERMINAL` are fully implemented. |
+| 3 | Map basemap and driver GPS tracking | Live map tiles and driver positions cannot be shown | Needs a map provider key (Google Maps / Mapbox) and a telematics feed. |
+| 4 | Production AI provider | AI features cannot run against a live model | Needs a provider API key and a chosen model. |
+| 5 | Android visual acceptance | Splash and Homepage not visually accepted | No real Android device or emulator in this environment. The Expo web export and the mobile unit suite (206 tests) pass; a device/emulator run remains outstanding. |
+| 6 | Pixel-exact PDF overlay | The reference is a re-export at a different size and with different fonts; a pixel diff is not meaningful | Structural (row-for-row) comparison used instead; see §1.10. |
+
+### 4.1 Owner reference-PII remediation options
+
+The blob is reachable at
+`https://github.com/mohammadaljallad079-rgb/oryx/blob/f8962e33/.run/pdf-compare/cmp-invoice.png`
+for anyone with the commit SHA. Because the branch is not merged into the base
+and no tag points at it, the exposure is limited to the PR #7 branch history.
+Options, in order of preference:
+
+1. **Authorize a branch history rewrite.** `git filter-repo --path .run/pdf-compare
+   --invert-paths` on `feature/execution-07-premium-web`, then a force-push. This
+   removes the blob from the branch. It rewrites the branch the mandate says to
+   preserve, so it needs explicit authorization.
+2. **Keep the repository private** until the branch is cleaned.
+3. **Accept the containment** — the tip is clean and the mandate forbids a
+   force-push; the exposure is a single historical commit on an open Draft PR.
+
+### 4.2 Remaining non-blocking dependencies
 
 | Blocker | Impact | What is needed |
 |---|---|---|
