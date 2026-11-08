@@ -449,15 +449,16 @@ production deployment always talks to the vendor.
 ## 2. Test results (re-run this session on the current tree)
 
 > The counts below are from the 2026-11-08 run on the current tree (mandate
-> points 1–6, tenth revision), re-measured in full this session rather than
+> points 1–6, eleventh revision), re-measured in full this session rather than
 > carried over from an earlier revision.
 
 | Suite | Command | Result |
 |---|---|---|
 | Shared unit | `pnpm --filter @oryx/shared test` | **231 passed / 231** (12 files) |
 | API integration | `pnpm --filter @oryx/api test:e2e` | **694 passed / 694** (38 suites) |
-| API unit | `pnpm --filter @oryx/api test` | **52 passed / 52** (7 files) |
-| Document unit | `… test -- documents` | **40 passed / 40** (6 files) |
+| API unit | `pnpm --filter @oryx/api test` | **57 passed / 57** (8 files) |
+| Customer unit | `pnpm --filter @oryx/customer test` | **79 passed / 79** (3 files) |
+| Document unit | `… test -- documents` | **54 passed / 54** (7 files) |
 | Document e2e | `… test:e2e -- documents` | **41 passed / 41** |
 | Merchant documents | `… test:e2e -- execution10-merchant-documents` | **8 passed / 8** |
 | Registration-card OCR | `… test:e2e -- vehicle-ocr` | **8 passed / 8** (in the 694) |
@@ -467,6 +468,7 @@ production deployment always talks to the vendor.
 | Mobile ERP | `pnpm --filter @oryx/mobile-erp test` | **31 passed / 31** (2 files) |
 | Literal live checks (mandate §5) | `node .run/verify-mandate-6.mjs` | **49 checks, 0 failed** |
 | Literal live checks (brief §5 points 1–6) | `node .run/verify-brief5-6.mjs` | **27 checks, 0 failed** |
+| Printed-QR origin | `node .run/verify-qr-in-pdf.mjs` | **2 / 2 PASS** (real PDF decoded, session-less open) |
 | Official-layout row comparison | `node .run/verify-official-layout.mjs` | **20/20 reference tokens present, exit 0** (real PDF, asserted) |
 | Workspace lint | `pnpm -r lint` | PASS (exit 0) |
 | Workspace typecheck | `pnpm -r typecheck` | PASS (exit 0) |

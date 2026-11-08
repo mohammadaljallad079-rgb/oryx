@@ -409,6 +409,26 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   cookie without a matching `x-oryx-csrf` header. The refresh branch above it
   echoes the cookie; the login branch must too.
 
+### Official-document QR gotchas
+
+- **A printed QR code is not testable through the API alone.** `verificationUrl`
+  falls back to `http://localhost:3000`, and that fallback is reachable from the
+  build host, so every API test passes while a real printed invoice encodes a
+  dead URL. The only way to catch it is to decode the QR image *inside the
+  generated PDF*. `DOCUMENT_VERIFY_BASE_URL` must be set in every environment
+  (`.env.example`, `deploy/env/production.env.example`, and the deployed env);
+  production now refuses to issue without it. Verify with
+  `.run/verify-qr-in-pdf.mjs`, which decodes the printed code and opens the
+  decoded URL in a session-less browser context.
+- **The verification page namespaces its keys under `verify.`.** The outcome
+  key template must be `` `verify.${outcome}Title` ``, not `` `${outcome}Title` ``;
+  without the prefix the page renders the raw key. `apps/customer/test/i18n-status.test.ts`
+  guards both the strings and the template.
+- **`NEXT_PUBLIC_*` is inlined at build time.** The customer app needs
+  `NEXT_PUBLIC_API_BASE_URL=/api` at build time (a gitignored `.env.local`
+  locally; the deployed env in production). An absolute value baked into the
+  bundle makes the verify page unable to reach the API from a phone.
+
 ### Whole-amount rounding gotchas
 
 - **`NONE` is the default and must stay exact.** `roundMinor` in
