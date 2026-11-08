@@ -1,15 +1,48 @@
 # ORYX Auto Services — Final Acceptance
 
-Acceptance date: 2026-11-06 (revised 2026-11-08, thirteenth revision).
+Acceptance date: 2026-11-06 (revised 2026-11-08, fourteenth revision).
 Branch: `feature/execution-07-premium-web` (PR #7, **open and Draft**).
-Branch tip: `f9f9c92c` (`feat(admin): complete accounting gaps and fix company
-edit modal`), which is what `git rev-parse HEAD` returns on
-`feature/execution-07-premium-web` and what `git ls-remote origin` reports for
-the branch. This is the last commit; this report and `AGENTS.md` are updated on
-top of it. Code tree under test: `f9f9c92c`.
+Branch tip: `354cc7bd` (`docs(acceptance): record the accounting completion,
+modal fix and green CI`); the code tree under test is `f9f9c92c`
+(`feat(admin): complete accounting gaps and fix company edit modal`), which
+`354cc7bd` sits directly on top of. Both commits are on
+`feature/execution-07-premium-web` and `git ls-remote origin` reports `354cc7bd`
+as the branch head.
 Environment: an isolated preview stack — a separate PostgreSQL database
 (`oryx_dev`) with seeded synthetic demo records. No production database and no
 production secret is involved.
+
+> **Revision note (2026-11-08, fourteenth revision — independent re-verification).**
+> A new session re-ran the full suite from a cold sandbox and re-checked the
+> claims in this report against the live code and services rather than trusting
+> the earlier text. No code changed; every number below was reproduced on this
+> environment and the CI run for `354cc7bd` is green.
+>
+> - **Suites re-run and reproduced:** shared **231 / 231**; API e2e
+>   **698 / 698** across 38 suites; API unit **57 / 57**; customer **79 / 79**;
+>   mobile **206 / 206**; mobile-erp **31 / 31**; `pnpm -r lint` clean;
+>   `pnpm -r typecheck` clean.
+> - **Page-count invariant re-checked.** The generated full inspection is
+>   **6 pages** (the planner's 5 plus one summary page) and the partial is
+>   **5 pages**; the regression test
+>   (`execution-phase3-documents.e2e-spec.ts`, "renders exactly the planned
+>   pages when every section carries a full checklist") asserts the issued
+>   `pageCount` equals the planner's count, so the fixed defect was *content
+>   overflow*, not the page total. See the note under section 1.3.
+> - **Official-document layout re-verified against the live API.** A freshly
+>   issued tax invoice reproduced all 20 reference rows
+>   (`{"invoice":"S00537","bytes":203542,"tokens":"20/20","missing":[]}`). The
+>   static sample in `docs/audit/pdf-samples/` is seeded with a demo issuer
+>   whose city is `Riyadh` and which carries no website, so the sample omits the
+>   `www.oryxbhr.com` footer line and the `Contact No.`/`TRN` rows that the
+>   template emits only when the issuer supplies them — a data difference, not a
+>   template gap.
+> - **QR verification re-checked anonymously.** `GET
+>   /documents/verify/:token` returns `200` with `found:true` and the document
+>   number for a real token, with no session.
+> - **Preview links re-established.** The sandbox restart had dropped the
+>   preview proxies; `bash .run/start-stack.sh` brought them back and every
+>   work-1/work-2 URL answers `200` again (section 3.2).
 
 > **Revision note (2026-11-08, thirteenth revision — accounting completion and a
 > real modal defect).** This session closed the remaining accounting UI gaps
