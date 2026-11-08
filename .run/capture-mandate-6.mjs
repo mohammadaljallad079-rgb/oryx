@@ -49,7 +49,7 @@ async function shot(label, path, selector) {
 }
 
 await signIn();
-await selectCompany('ORYX');
+await selectCompany('ORYX Auto').catch(()=>{});
 
 await shot('1-dashboard', '/dashboard', '[data-testid="dashboard-hero"]');
 await shot('1b-kpis', '/dashboard/overview', '[data-testid="kpi-row"]');

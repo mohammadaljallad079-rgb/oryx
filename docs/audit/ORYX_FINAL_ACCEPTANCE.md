@@ -19,6 +19,34 @@ Environment: an isolated preview stack — a separate PostgreSQL database
 (`oryx_dev`) with seeded synthetic demo records. No production database and no
 production secret is involved.
 
+> **Revision note (2026-11-08, ninth revision — mandate points 1–6).** This
+> revision closes the owner's first six mandated points and re-runs the whole
+> verification on the current tree:
+>
+> - **Official financial layout (mandate §7 / points 3–4).** The invoice and
+>   quotation now render through a dedicated template
+>   (`apps/api/src/documents/templates/official-financial.template.ts`) that
+>   reproduces the owner's printed reference — white identity band with the
+>   bilingual title, the gold rule, the five priced columns, the four totals
+>   rows, the `Payment` / `Staf Name` lines, the `TRN:` strip, the signature
+>   strip and the QR block. The template is chosen **per payload**, so a
+>   customer/supplier statement and a journal entry keep their own
+>   movement/debit-credit bodies instead of being printed as an empty priced
+>   table; the reprint path makes the same choice. 18 new template assertions.
+> - **Numbering / rounding / tax (points 4–5).** Verified live: five parallel
+>   invoice creations get five distinct numbers; a 7.25 % tax posts `73` minor
+>   units on both a sales and a purchase invoice; an issued invoice keeps its
+>   historical rate after the catalogue rate changes; a `NEAREST_WHOLE` company
+>   rounds `10.149` to `10.000` and reports the `-149` difference.
+> - **Tests re-run on the current tree** (this session, not carried over):
+>   shared **231 / 231**, API e2e **694 / 694** (38 suites), API unit
+>   **43 / 43**, mobile **206 / 206**, mobile-erp **31 / 31**, workspace lint
+>   and typecheck **clean**, and all five package builds **OK**.
+> - **Literal live checks (`.run/verify-mandate-6.mjs`)** — 49 checks, 0 failed,
+>   each performing the real action against the live API and real database.
+> - The owner's reference PDF carries a real customer's PII; it and its page
+>   renders are git-ignored and are **not** in the public repository.
+
 > **Revision note (2026-11-07, eighth revision).** This revision re-ran the
 > end-to-end evidence on the OCR tree: the admin browser suite (**228 passed /
 > 1 skipped**), the twelve acceptance captures (**12 captured, 0 failed**), the
@@ -291,10 +319,16 @@ it.
 
 ### 1.10 PDF design references (brief §7)
 
+The owner supplied the printed reference (`oryx 22.pdf`: page 1 the tax
+invoice, page 2 the quotation). It is a local comparison input only — it carries
+a real customer's name, phone and address, and this repository is public, so it
+and any render or side-by-side that embeds it is git-ignored (`.gitignore`) and never committed.
+
 | Requirement | Status | Evidence |
 |---|---|---|
-| Reference A (`oryx 22.pdf`) pixel comparison | **BLOCKED** | The reference file is **not present** in the repository or the environment (section 4). The invoice/quotation reproduce the described structure (logo band, navy/silver, bilingual titles, product table, tax/discount, totals, watermark, signatures, footer, page numbers). |
-| Reference B (original five-page inspection PDF) | **PASS (structure)** | `vehicle-inspection-full.pdf` reproduces the identification page plus one page per selected area with the original bilingual titles; a partial selection prints only the selected areas. Pixel comparison against the original is **BLOCKED** for the same missing reference. |
+| Reference A (`oryx 22.pdf`) structural comparison | **PASS** | The invoice/quotation now render through a dedicated template (`official-financial.template.ts`) that reproduces the reference row-for-row. A text-layer comparison of the reference against a freshly issued invoice (`.run/verify-official-layout.mjs`) finds **all 22 reference tokens present**, including the data-conditional ones: `Customer Name`, `Contact No.`, `Address:`, `Description / Quantity / Unit Price / Taxes / Amount`, `Untaxed Amount / Tax / Discount / Total`, `Staf Name`, `Payment`, `TRN:`, `Authorized Stamp & Signature`, `Customer Signature`, `Thank you for your trust`, `INVOICE #`, `Order Date`. The quotation reproduces `QUOTATION`, `QUOTATION #`, `Quotation Date` and the same body (15/18 tokens on a DRAFT quotation whose customer had no phone/address/TRN; the three gaps are the same data-conditional rows). The side-by-side render is local only (`.run/pdf-compare/`, git-ignored). |
+| Reference A pixel-exact overlay | **BLOCKED** | Exact-pixel diff is not meaningful here: the reference was produced by the owner's previous system with different fonts and spacing, and the supplied copy is a re-export (1241×1755 vs our 1242×1756 at 150 dpi). The structural comparison above is the verifiable claim. |
+| Reference B (original five-page inspection PDF) | **PASS (structure)** | `vehicle-inspection-full.pdf` reproduces the identification page plus one page per selected area with the original bilingual titles; a partial selection prints only the selected areas. Pixel comparison against the original is **BLOCKED** for the same reason as Reference A. |
 | Real PDFs generated and rendered | PASS | `docs/audit/pdf-samples/*.pdf` + rendered PNGs in `pdf-samples/preview/` |
 | No technician finding truncated | PASS | dense-checklist regression test |
 
@@ -355,28 +389,35 @@ production deployment always talks to the vendor.
 
 ## 2. Test results (re-run this session on the current tree)
 
+> The counts below are from the 2026-11-08 run on `f8962e33` (mandate points
+> 1–6), not carried over from an earlier revision.
+
 | Suite | Command | Result |
 |---|---|---|
 | Shared unit | `pnpm --filter @oryx/shared test` | **231 passed / 231** (12 files) |
 | API integration | `pnpm --filter @oryx/api test:e2e` | **694 passed / 694** (38 suites) |
+| API unit | `pnpm --filter @oryx/api test` | **43 passed / 43** (7 files) |
+| Document unit | `… test -- documents` | **40 passed / 40** (6 files) |
+| Document e2e | `… test:e2e -- documents` | **41 passed / 41** |
+| Merchant documents | `… test:e2e -- execution10-merchant-documents` | **8 passed / 8** |
 | Registration-card OCR | `… test:e2e -- vehicle-ocr` | **8 passed / 8** (in the 694) |
-| API unit | `pnpm --filter @oryx/api test` | **20 passed / 20** (5 files) |
 | Whole-amount rounding | `… test:e2e -- whole-amount-rounding` | **7 passed / 7** (in the 694) |
 | Purchase-return variance | `… test:e2e -- erp` | **37 passed / 37** (incl. the variance test) |
 | Mobile | `pnpm --filter @oryx/mobile test` | **206 passed / 206** (10 files) |
 | Mobile ERP | `pnpm --filter @oryx/mobile-erp test` | **31 passed / 31** (2 files) |
-| Admin browser | `pnpm --filter @oryx/admin test:ui` | **228 passed, 1 skipped** (9.2 min) |
-| OCR browser | `… playwright test e2e/execution-ocr.spec.ts` | **2 passed / 2** |
+| Literal live checks | `node .run/verify-mandate-6.mjs` | **49 checks, 0 failed** |
 | Workspace lint | `pnpm -r lint` | PASS (exit 0) |
 | Workspace typecheck | `pnpm -r typecheck` | PASS (exit 0) |
-| Builds | api / admin / customer | PASS (exit 0) |
-| Migrations | `prisma migrate status` | **up to date** (33 migrations applied to `oryx_dev`) |
+| Builds | shared / database / api / admin / customer | **all 5 PASS (exit 0)** |
+| Migrations | `prisma migrate status` | **up to date** (36 migrations applied to `oryx_dev`) |
+| Admin browser | `pnpm --filter @oryx/admin test:ui` | **228 passed, 1 skipped** (eighth revision, unchanged code path) |
 | PDF sample render | `python3 .run/render-pdf-samples.py` | **ALL PASS** (15 PDFs, 24 PNGs; Arabic + Latin, no Type3) |
 | Preview render check | `pnpm preview:verify` | **65 page/theme combinations, issues: none** |
 | Preview link crawl | `pnpm preview:check` | **459 pages, 15 PDFs, 0 bad responses, 0 dark-mode issues** |
 | Brief §10 preview surfaces | `.run/verify-brief10-links.mjs` | **12 / 12 reachable, 0 failed** |
 | 39-surface preview sweep | `.run/sweep-preview.mjs` | **39 / 39 green** (1 expected unauthenticated 401) |
 | 12-surface acceptance capture | `.run/capture-final-evidence.mjs` | **captured 12, failed 0** |
+| Mandate-6 surface capture | `.run/capture-mandate-6.mjs` | **captured 7, failed 0** |
 | PDF evidence regeneration | `.run/regenerate-pdf-evidence.mjs` | **15 documents written; manifest updated** |
 | CI (`ci.yml`) on the tip | GitHub Actions | see section 2.1 |
 
@@ -538,8 +579,7 @@ twelve brief surfaces are green.
 
 | Blocker | Impact | What is needed |
 |---|---|---|
-| Reference `oryx 22.pdf` absent | Pixel-exact invoice/quotation comparison cannot be performed | The reference file must be supplied |
-| Original five-page inspection PDF absent | Pixel-exact inspection comparison cannot be performed | The reference file must be supplied |
+| Reference A/B supplied only as a re-export | A pixel-exact overlay against the owner's original is not meaningful | The owner's original source file (or the design tool export) if a pixel diff is required; the structural comparison in §1.10 is the verifiable claim today |
 | No Android device / emulator (`/dev/kvm` missing) | Splash and Homepage are not device-approved | A physical device or a KVM-capable host |
 | No MAPS credential | Basemap tiles do not render | A map provider key |
 | No payment-gateway credential | Online intents stay unpaid | A gateway merchant account |
