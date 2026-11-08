@@ -1075,6 +1075,43 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     'erp.sales.total': 'Total',
     'erp.sales.rounding': 'Rounding',
     'erp.sales.discount': 'Discount %',
+    // The document form mirrors the printed official document, so its sections
+    // and columns carry the same names the PDF prints.
+    'erp.sales.form.documentInfo': 'Document information',
+    'erp.sales.form.customerInfo': 'Customer information',
+    'erp.sales.form.customerHint': 'Choose a customer to mirror the printed details.',
+    'erp.sales.form.items': 'Items',
+    'erp.sales.form.summary': 'Summary',
+    'erp.sales.form.documentNumber': 'Document no.',
+    'erp.sales.form.autoNumber': 'Assigned automatically',
+    'erp.sales.form.autoNumberHint': 'Numbered on save, exactly as the document prints it.',
+    'erp.sales.form.amount': 'Amount',
+    'erp.sales.form.contactNo': 'Contact No.',
+    'erp.sales.form.trn': 'TRN',
+    'erp.sales.form.companyTrn': 'Company TRN',
+    'erp.sales.form.address': 'Address:',
+    'erp.sales.form.mirrorHint': 'These details print on the document. Edit them on the customer record.',
+    // The form mirrors the reference document's own wording, including its
+    // spellings, so an operator reads the same labels the PDF prints.
+    'erp.sales.form.customerName': 'Customer Name',
+    'erp.sales.form.orderDate': 'Order Date',
+    'erp.sales.form.quotationDate': 'Quotation Date',
+    'erp.sales.form.expirationDate': 'Expiration Date',
+    'erp.sales.form.staffName': 'Staf Name',
+    'erp.sales.form.payment': 'Payment',
+    'erp.sales.form.paymentAtAccount': 'Payment at Account',
+    'erp.sales.form.taxes': 'Taxes',
+    // The item table's column headings exactly as the document prints them.
+    'erp.sales.form.description': 'Description',
+    'erp.sales.form.quantity': 'Quantity',
+    'erp.sales.form.unitPrice': 'Unit Price',
+    // The printed totals block's own wording, so the summary reads exactly as
+    // the document does. The template prints the tax rate beside "Tax" only when
+    // every line shares one rate, so the form uses the bare fallback label.
+    'erp.sales.form.untaxedAmount': 'Untaxed Amount',
+    'erp.sales.form.tax': 'Tax',
+    'erp.sales.form.discount': 'Discount',
+    'erp.sales.form.total': 'Total',
     'erp.sales.pos.searchPlaceholder': 'Scan a barcode or search by name, SKU or barcode',
     'erp.sales.pos.scan': 'Scan barcode',
     'erp.sales.pos.cart': 'Cart',
@@ -2598,6 +2635,43 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     'erp.sales.total': 'الإجمالي',
     'erp.sales.rounding': 'التقريب',
     'erp.sales.discount': 'الخصم %',
+    // The document form mirrors the printed official document, so its sections
+    // and columns carry the same names the PDF prints.
+    'erp.sales.form.documentInfo': 'بيانات المستند',
+    'erp.sales.form.customerInfo': 'بيانات العميل',
+    'erp.sales.form.customerHint': 'اختر عميلاً لتظهر بياناته كما تُطبع على المستند.',
+    'erp.sales.form.items': 'البنود',
+    'erp.sales.form.summary': 'الملخص',
+    'erp.sales.form.documentNumber': 'رقم المستند',
+    'erp.sales.form.autoNumber': 'يُرقَّم تلقائياً',
+    'erp.sales.form.autoNumberHint': 'يُرقَّم عند الحفظ كما يظهر مطبوعاً على المستند.',
+    'erp.sales.form.amount': 'المبلغ',
+    'erp.sales.form.contactNo': 'رقم التواصل',
+    'erp.sales.form.trn': 'الرقم الضريبي',
+    'erp.sales.form.companyTrn': 'الرقم الضريبي للشركة',
+    'erp.sales.form.address': 'العنوان',
+    'erp.sales.form.mirrorHint': 'تُطبع هذه البيانات على المستند. عدّلها من ملف العميل.',
+    // The form mirrors the reference document's own wording, including its
+    // spellings, so an operator reads the same labels the PDF prints.
+    'erp.sales.form.customerName': 'اسم العميل',
+    'erp.sales.form.orderDate': 'تاريخ الطلب',
+    'erp.sales.form.quotationDate': 'تاريخ العرض',
+    'erp.sales.form.expirationDate': 'تاريخ الانتهاء',
+    'erp.sales.form.staffName': 'اسم الموظف',
+    'erp.sales.form.payment': 'الدفع',
+    'erp.sales.form.paymentAtAccount': 'الدفع على الحساب',
+    'erp.sales.form.taxes': 'الضرائب',
+    // The item table's column headings exactly as the document prints them.
+    'erp.sales.form.description': 'الوصف',
+    'erp.sales.form.quantity': 'الكمية',
+    'erp.sales.form.unitPrice': 'سعر الوحدة',
+    // The printed totals block's own wording, so the summary reads exactly as
+    // the document does. The template prints the tax rate beside "Tax" only when
+    // every line shares one rate, so the form uses the bare fallback label.
+    'erp.sales.form.untaxedAmount': 'المبلغ قبل الضريبة',
+    'erp.sales.form.tax': 'الضريبة',
+    'erp.sales.form.discount': 'الخصم',
+    'erp.sales.form.total': 'الإجمالي',
     'erp.sales.pos.searchPlaceholder': 'امسح الباركود أو ابحث بالاسم أو رمز الصنف أو الباركود',
     'erp.sales.pos.scan': 'مسح الباركود',
     'erp.sales.pos.cart': 'سلة البيع',

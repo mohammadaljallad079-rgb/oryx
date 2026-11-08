@@ -120,8 +120,12 @@ export function Modal({
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
-  /** `full` widens the dialog for a workspace such as the POS terminal. */
-  size?: 'default' | 'full';
+  /**
+   * `full` widens the dialog for a workspace such as the POS terminal and
+   * `document` for the invoice/quotation form, which lays out two information
+   * panels and a five-column item table to mirror the printed page.
+   */
+  size?: 'default' | 'full' | 'document';
 }) {
   useEffect(() => {
     if (!open) return;
@@ -136,7 +140,9 @@ export function Modal({
   return (
     <div className="oryx-modal-backdrop" role="dialog" aria-modal="true" aria-label={title} onClick={onClose}>
       <div
-        className={`oryx-modal ${size === 'full' ? 'oryx-modal--full' : ''}`}
+        className={`oryx-modal ${
+          size === 'full' ? 'oryx-modal--full' : size === 'document' ? 'oryx-modal--document' : ''
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">

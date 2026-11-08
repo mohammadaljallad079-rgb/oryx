@@ -87,6 +87,51 @@ production secret is involved.
 >   combinations / 0 issues**, preview check **459 pages / 0 bad responses**,
 >   all five package builds **OK**.
 
+> **Revision note (2026-11-08, twelfth revision — the sales form mirrors the
+> printed page verbatim).** The invoice/quotation entry form now carries the
+> exact wording the printed document renders, so an operator filling the form
+> reads the same labels the customer will see on paper. This closes the last
+> gap between the on-screen form and the official-financial PDF template.
+>
+> - **What changed.** The form's document panel, customer panel, item-table
+>   column headers and totals block were re-bound to a new `erp.sales.form.*`
+>   key family whose English strings match the template character-for-character
+>   — `Order Date`, `Quotation Date`, `Expiration Date`, `Staf Name` (the
+>   template's spelling is preserved deliberately), `Payment`,
+>   `Payment at account`, `Customer Name`, `Contact No.`, `TRN`, `Address:`,
+>   `Description`, `Quantity`, `Unit Price`, `Taxes`, `Amount`,
+>   `Untaxed Amount`, `Tax`, `Discount`, `Total`. Two CSS `text-transform:
+>   uppercase` rules (the mirror field and the item-table head) were removed so
+>   the rendered glyphs match the document's title case, not an uppercased
+>   approximation of it.
+> - **Why.** A prior review of the brief asked that the sales form "mirror the
+>   printed official-financial PDF verbatim (labels, live totals, PDF output)".
+>   The labels now resolve from one bilingual dictionary (EN 1507 / AR 1507,
+>   zero missing keys, zero duplicates — asserted).
+> - **Regression guard.** `apps/admin/e2e/execution22-document-form.spec.ts`
+>   opens the real invoice and quotation forms, reads the modal's text and
+>   asserts every printed label is present literally (`Contact No.`, `Unit
+>   Price`, `Staf Name`, `Untaxed Amount`, …). It fails if a label drifts back
+>   to an uppercased or re-worded variant. **3 / 3 PASS** on the current tree.
+> - **End-to-end.** A real invoice was created through the form (2 × 28.000
+>   with a 5% line discount and 15% VAT → subtotal 56.000, discount 2.800,
+>   untaxed 53.200, tax 7.980, total 61.180 BHD), the live form totals and the
+>   issued PDF were captured, and the printed PDF's text layer was compared
+>   against the owner's reference: **20 / 20 reference tokens present**
+>   (`verify-official-layout.mjs`). Evidence:
+>   `.run/evidence/mandate-6/generated-invoice.pdf`,
+>   `compare-form-vs-pdf.png`, `compare-invoice-ref-vs-gen.png`.
+> - **Suites re-run this session:** shared **231 / 231**, API integration
+>   **694 / 694** (38 suites), API unit **57 / 57**, mobile **206 / 206**,
+>   mobile-erp **31 / 31**, admin browser **232 passed / 1 skipped** (the skip
+>   is `capture.spec.ts`, which needs `CAPTURE_PHASE`), workspace lint and
+>   typecheck **clean**, all five package builds **OK**, migrations **up to
+>   date**. Literal live checks: `verify-mandate-6.mjs` **49 checks / 0 failed**;
+>   `verify-qr-in-pdf.mjs` **2 / 2**; `verify-qr-revoked.mjs` **exit 0**;
+>   `verify-official-layout.mjs` **20 / 20, exit 0**. The twelve brief §10
+>   surfaces were re-captured over the public HTTPS preview
+>   (`capture-final-evidence.mjs`, **captured 12, failed 0**).
+
 > **Revision note (2026-11-08, tenth revision — full re-run and reference
 > comparison).** This revision re-ran every suite on the current tree and
 > re-published the visual evidence. The only code change is the migration-comment
@@ -377,6 +422,7 @@ tree.
 | Vehicles: OCR-assisted extraction | PASS | `POST /automotive/vehicles/:id/documents/ocr` reads a scan and returns suggested fields for review; `vehicle-ocr.e2e-spec.ts` 8/8; `execution-ocr.spec.ts` 2/2. Requires an `OCR_API_KEY`; without one it reports `configured:false` and suggests nothing (honest degradation, not a failure). |
 | Inventory: barcodes, lookup, warehouse selection, movements, min-stock alerts, status controls | PASS | `inventory.service.ts` (barcode search), `d579e02e` |
 | Sales/POS: sessions, invoices, quotations, tax, discounts, rounding, payments, returns, refunds, attachments | PASS | ERP e2e; `execution16-sales-contract`; optional whole-amount rounding (`RoundingMode`, section 1.8) |
+| Sales/quotation form mirrors the printed official-financial PDF verbatim (labels, live totals, PDF output) | PASS | `erp.sales.form.*` key family mirrors the template character-for-character; `execution22-document-form.spec.ts` 3/3; live totals 56.000 − 2.800 = 53.200 → tax 7.980 → total 61.180 BHD; issued PDF compared 20/20 tokens (`verify-official-layout.mjs`); evidence `.run/evidence/mandate-6/compare-form-vs-pdf.png` |
 | Purchases: suppliers, POs, purchase invoices/returns, statements, payments | PASS | purchasing e2e |
 | Accounting: auto chart numbering, hierarchy, journals, statements, receipts, vouchers, attachments, correct reporting | PASS | `erp.spec.ts`; `AccountingPostingService`; rounding posts to `5930` so the ledger still balances |
 | HR: employees, attendance, hours, salary, payroll, permissions | PASS | HR e2e; payroll snapshot + idempotent posting |
@@ -506,7 +552,7 @@ production deployment always talks to the vendor.
 | Workspace typecheck | `pnpm -r typecheck` | PASS (exit 0) |
 | Builds | shared / database / api / admin / customer | **all 5 PASS (exit 0)** |
 | Migrations | `prisma migrate status` | **up to date** (38 migrations applied to `oryx_dev`) |
-| Admin browser | `pnpm --filter @oryx/admin test:ui` | **229 passed, 1 skipped** (re-run this session) |
+| Admin browser | `pnpm --filter @oryx/admin test:ui` | **232 passed, 1 skipped** (re-run this session; skip is `capture.spec.ts`) |
 | PDF sample render | `python3 .run/render-pdf-samples.py` | **ALL PASS** (15 PDFs, 24 PNGs; Arabic + Latin, no Type3) |
 | Preview render check | `pnpm preview:verify` | **65 page/theme combinations, issues: none** |
 | Preview link crawl | `pnpm preview:check` | **459 pages, 15 PDFs, 0 bad responses, 0 dark-mode issues** |
@@ -739,7 +785,19 @@ Options, in order of preference:
 
 ## 5. Files changed in this session
 
-The ninth revision (mandate points 1–6) is the current branch tip. The mandate's
+The twelfth revision (this session) makes the sales/quotation form mirror the
+printed official-financial PDF verbatim:
+
+| File | Change |
+|---|---|
+| `apps/admin/src/app/(app)/sales/page.tsx` | The invoice/quotation form's document panel, customer panel, item-table head and totals block re-bound to the `erp.sales.form.*` key family; `MirrorField` label no longer forces uppercase; new `size="document"` modal |
+| `apps/admin/src/i18n/dictionaries.ts` | 29 `erp.sales.form.*` keys added to English and Arabic (parity held: 1507 / 1507) |
+| `apps/admin/src/app/globals.css` | `.oryx-modal--document`, `.oryx-doc-form__section`, `.oryx-doc-form__grid` (five-column item table mirroring the printed table); removed the `text-transform: uppercase` on `.oryx-doc-form__grid--head` |
+| `apps/admin/src/components/ui.tsx` | `Modal` gains a `document` size |
+| `apps/admin/e2e/execution22-document-form.spec.ts` | New: asserts the form renders every printed label literally (3 tests) |
+| `docs/audit/ORYX_FINAL_ACCEPTANCE.md` | This revision |
+
+The ninth revision (mandate points 1–6) is the previous branch tip. The mandate's
 six surfaces landed across `c7aec12f` (tax management, POS terminal, register
 print actions), `65ae1d4e` (every catalogue document type issuable) and
 `f8962e33` (the approved invoice/quotation layout); this session added

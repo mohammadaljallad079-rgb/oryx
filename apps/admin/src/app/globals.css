@@ -358,6 +358,62 @@ body::before {
 }
 
 /*
+ * The invoice/quotation form is laid out like the printed page it produces: a
+ * two-panel information band, a five-column item table and a right-aligned
+ * summary. It needs more room than a plain form so those blocks keep the
+ * proportions the document prints with.
+ */
+.oryx-modal--document {
+  width: min(1080px, 100%);
+}
+
+.oryx-doc-form__section {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-raised);
+}
+
+.oryx-doc-form__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+/* The mirror of the printed five-column table (Description, Quantity, Unit
+   Price, Taxes, Amount) plus the per-line discount input that feeds the printed
+   "Discount" totals row and a narrow row-action column. Description leads and
+   the numeric columns stay close to equal, exactly as the document lays them out. */
+.oryx-doc-form__grid {
+  display: grid;
+  grid-template-columns: 3.2fr 0.7fr 1fr 0.9fr 0.8fr 1fr 32px;
+  gap: 8px;
+  align-items: center;
+}
+
+.oryx-doc-form__grid--head {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  padding: 0 2px;
+}
+
+@media (max-width: 720px) {
+  .oryx-doc-form__grid,
+  .oryx-doc-form__grid--head {
+    grid-template-columns: 1fr;
+  }
+  .oryx-doc-form__grid--head {
+    display: none;
+  }
+}
+
+/*
  * A product tile in the POS grid. The media box keeps a fixed aspect so a row
  * of tiles lines up whether or not each product has a photograph, and the whole
  * tile is the hit target so a mis-aimed tap still adds the product.

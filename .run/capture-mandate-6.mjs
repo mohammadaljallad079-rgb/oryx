@@ -59,6 +59,42 @@ await shot('4-documents-register', '/documents', '[data-testid="document-registe
 await shot('5-sales-invoices', '/sales', '[data-testid="sales-page"]');
 await shot('6-inventory-products', '/inventory', 'table');
 
+/**
+ * The invoice entry form is the on-screen mirror of the printed page, so it is
+ * captured directly: the modal must render the printed labels literally (an
+ * uppercased or re-worded variant fails the check).
+ */
+async function shotForm(label, locale) {
+  const entry = { label, ok: false };
+  // The form is bilingual, so the literal-label check is per locale: the Arabic
+  // form must render the Arabic wording, not the English one.
+  const expect = locale === 'ar'
+    ? { contact: 'رقم التواصل', price: 'سعر الوحدة' }
+    : { contact: 'Contact No.', price: 'Unit Price' };
+  try {
+    await page.evaluate((l) => localStorage.setItem('oryx.locale', l), locale);
+    await page.goto(`${ADMIN}/sales`, { waitUntil: 'networkidle', timeout: 90000 });
+    await page.waitForTimeout(2000);
+    await page.getByTestId('new-invoice').click();
+    await page.locator('.oryx-modal').first().waitFor({ timeout: 20000 });
+    await page.waitForTimeout(800);
+    const text = (await page.evaluate(() => document.querySelector('.oryx-modal')?.innerText ?? ''))
+      .replace(/\s+/g, ' ')
+      .trim();
+    entry.chars = text.length;
+    entry.text = text.slice(0, 300);
+    entry.hasContact = text.includes(expect.contact);
+    entry.hasPrice = text.includes(expect.price);
+    entry.dir = await page.evaluate(() => document.querySelector('.oryx-modal')?.closest('[dir]')?.getAttribute('dir') ?? document.documentElement.dir ?? '');
+    await page.screenshot({ path: `${OUT}/${label}.png`, fullPage: false });
+    entry.ok = entry.hasContact && entry.hasPrice;
+  } catch (e) { entry.error = String(e).slice(0, 160); }
+  results.push(entry);
+  console.log(`${entry.ok ? 'OK ' : 'BAD'}  ${label}  chars=${entry.chars ?? 0}  dir=${entry.dir ?? ''}  ${entry.error ?? ''}`);
+}
+await shotForm('7-invoice-form-en', 'en');
+await shotForm('7b-invoice-form-ar', 'ar');
+
 console.log(`\n${results.filter(r=>r.ok).length}/${results.length} captured`);
 await browser.close();
 process.exit(results.every(r=>r.ok) ? 0 : 1);

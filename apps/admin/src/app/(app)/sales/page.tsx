@@ -1988,72 +1988,68 @@ function CloseSessionModal({
 // --------------------------------------------------------- shared line editor
 
 /**
- * Price the draft lines with the same algorithm the server uses.
- *
- * The form shows a live subtotal, discount, tax and total so an operator can
- * see the figure the invoice will post before saving it. Reusing the shared
- * integer helpers keeps the preview identical to `computeDocumentTotals` on the
- * API — the browser never sends a total, only the lines.
+ * Price one draft line exactly the way the API prices it, so the figure the
+ * form shows is the figure the document prints.
  */
-function computeDraftTotals(lines: LineDraft[], roundingMode: RoundingMode, scale: number) {
-  const priced = lines.map((l) => {
-    const quantity = toQuantityInput(l.quantity);
-    const unitPriceMinor = toMinorInput(l.unitPrice);
-    const discountPercentBp = Math.round((Number(l.discountPercent) || 0) * 100);
-    const taxPercentBp = Math.round((Number(l.taxPercent) || 0) * 100);
-    const lineSubtotalMinor = lineAmountMinor(quantity, unitPriceMinor);
-    const discountMinor = basisPointsOfMinor(lineSubtotalMinor, discountPercentBp);
-    const net = lineSubtotalMinor - discountMinor;
-    const taxMinor = basisPointsOfMinor(net, taxPercentBp);
-    return { lineSubtotalMinor, discountMinor, taxMinor, lineTotalMinor: net + taxMinor };
-  });
+function priceDraftLine(line: LineDraft, currency?: string) {
+  const quantity = toQuantityInput(line.quantity);
+  const unitPriceMinor = toMinorInput(line.unitPrice, currency);
+  const discountPercentBp = Math.round((Number(line.discountPercent) || 0) * 100);
+  const taxPercentBp = Math.round((Number(line.taxPercent) || 0) * 100);
+  const lineSubtotalMinor = lineAmountMinor(quantity, unitPriceMinor);
+  const discountMinor = basisPointsOfMinor(lineSubtotalMinor, discountPercentBp);
+  const net = lineSubtotalMinor - discountMinor;
+  const taxMinor = basisPointsOfMinor(net, taxPercentBp);
+  return { lineSubtotalMinor, discountMinor, taxMinor, lineTotalMinor: net + taxMinor };
+}
+
+function computeDraftTotals(
+  lines: LineDraft[],
+  roundingMode: RoundingMode,
+  scale: number,
+  currency?: string,
+) {
+  const priced = lines.map((l) => priceDraftLine(l, currency));
   const subtotalMinor = sumMinor(priced.map((l) => l.lineSubtotalMinor));
   const discountMinor = sumMinor(priced.map((l) => l.discountMinor));
   const taxMinor = sumMinor(priced.map((l) => l.taxMinor));
   const exactTotal = sumMinor(priced.map((l) => l.lineTotalMinor));
   const { rounded: totalMinor, adjustment: roundingMinor } = roundMinor(exactTotal, roundingMode, scale);
-  return { subtotalMinor, discountMinor, taxMinor, roundingMinor, totalMinor };
+  return { subtotalMinor, discountMinor, taxMinor, roundingMinor, totalMinor, priced };
 }
 
+/**
+ * The line table, laid out to mirror the printed document.
+ *
+ * The columns follow the paper exactly — Description, Quantity, Unit Price,
+ * Discount, Taxes and Amount — and the live Amount column recomputes the line
+ * the way the API will, so the operator reads the same figure the PDF prints.
+ */
 function LineEditor({
   lines,
   setLines,
   products,
   taxOptions,
   testIdPrefix,
+  currency,
+  roundingMode,
 }: {
   lines: LineDraft[];
   setLines: (lines: LineDraft[]) => void;
   products: Array<{ id: string; sku: string; nameEn: string; salesPriceMinor: number; taxRateBp: number }>;
   taxOptions: SearchableOption[];
   testIdPrefix: string;
+  /** The tenant currency, so the live Amount column matches the document's scale. */
+  currency?: string;
+  /** The tenant's whole-amount rounding, so the summary matches the printed total. */
+  roundingMode: RoundingMode;
 }) {
   const { t } = useUi();
-  const { companyId } = useAuth();
-  const [roundingMode, setRoundingMode] = useState<RoundingMode>('NONE');
-  const [currencyScale, setScale] = useState(2);
-
-  useEffect(() => {
-    if (!companyId) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const company = await api.getCompany(companyId);
-        if (cancelled) return;
-        setRoundingMode(company.roundingMode ?? 'NONE');
-        setScale(currencyScaleOf(company.currency));
-      } catch {
-        /* keep the defaults */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [companyId]);
+  const scale = currencyScaleOf(currency ?? 'BHD');
 
   const totals = useMemo(
-    () => computeDraftTotals(lines, roundingMode, currencyScale),
-    [lines, roundingMode, currencyScale],
+    () => computeDraftTotals(lines, roundingMode, scale, currency),
+    [lines, roundingMode, scale, currency],
   );
 
   const update = (i: number, patch: Partial<LineDraft>) => {
@@ -2064,117 +2060,156 @@ function LineEditor({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="hidden grid-cols-12 gap-2 text-[11.5px] font-semibold text-[var(--muted)] sm:grid">
-        <span className="col-span-3">{t('erp.inventory.product')}</span>
-        <span className="col-span-3">{t('erp.accounting.description')}</span>
-        <span className="col-span-1">{t('erp.inventory.quantity')}</span>
-        <span className="col-span-2">{t('erp.sales.unitPrice')}</span>
-        <span className="col-span-1">{t('erp.sales.discount')}</span>
-        <span className="col-span-1">{t('erp.sales.tax')}</span>
-        <span className="col-span-1" />
+      <div className="oryx-doc-form__grid oryx-doc-form__grid--head">
+        <span>{t('erp.sales.form.description')}</span>
+        <span className="text-center">{t('erp.sales.form.quantity')}</span>
+        <span className="text-end">{t('erp.sales.form.unitPrice')}</span>
+        <span className="text-center">{t('erp.sales.discount')}</span>
+        <span className="text-center">{t('erp.sales.form.taxes')}</span>
+        <span className="text-end">{t('erp.sales.form.amount')}</span>
+        <span />
       </div>
       {lines.map((line, i) => (
-        <div key={i} className="grid grid-cols-12 gap-2">
-          <select
-            className="oryx-select col-span-3"
-            value={line.productId}
-            onChange={(e) => {
-              const product = products.find((p) => p.id === e.target.value);
-              // A product carries its own rate; if it is not in the saved tax
-              // list, keep the numeric value and clear the selection rather than
-              // silently switching the line to a different tax.
-              const matched = product
-                ? taxOptions.find((o) => o.value === String(product.taxRateBp))
-                : undefined;
-              update(i, {
-                productId: e.target.value,
-                description: product ? product.nameEn : line.description,
-                unitPrice: product ? minorToInput(product.salesPriceMinor) : line.unitPrice,
-                taxPercent: product ? String(product.taxRateBp / 100) : line.taxPercent,
-                taxId: product ? (matched ? matched.value : '') : line.taxId,
-              });
-            }}
-            data-testid={`${testIdPrefix}-product-${i}`}
-          >
-            <option value="">{t('erp.inventory.product')}</option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.sku} — {p.nameEn}
-              </option>
-            ))}
-          </select>
+        <div key={i} className="oryx-doc-form__grid">
+          <div className="flex flex-col gap-1">
+            <select
+              className="oryx-select"
+              value={line.productId}
+              onChange={(e) => {
+                const product = products.find((p) => p.id === e.target.value);
+                // A product carries its own rate; if it is not in the saved tax
+                // list, keep the numeric value and clear the selection rather than
+                // silently switching the line to a different tax.
+                const matched = product
+                  ? taxOptions.find((o) => o.value === String(product.taxRateBp))
+                  : undefined;
+                update(i, {
+                  productId: e.target.value,
+                  description: product ? product.nameEn : line.description,
+                  unitPrice: product
+                    ? minorToInput(product.salesPriceMinor, currency ?? 'BHD')
+                    : line.unitPrice,
+                  taxPercent: product ? String(product.taxRateBp / 100) : line.taxPercent,
+                  taxId: product ? (matched ? matched.value : '') : line.taxId,
+                });
+              }}
+              data-testid={`${testIdPrefix}-product-${i}`}
+            >
+              <option value="">{t('erp.inventory.product')}</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.sku} — {p.nameEn}
+                </option>
+              ))}
+            </select>
+            <input
+              className="oryx-input"
+              placeholder={t('erp.sales.form.description')}
+              value={line.description}
+              onChange={(e) => update(i, { description: e.target.value })}
+              data-testid={`${testIdPrefix}-description-${i}`}
+            />
+          </div>
           <input
-            className="oryx-input col-span-3"
-            placeholder={t('erp.accounting.description')}
-            value={line.description}
-            onChange={(e) => update(i, { description: e.target.value })}
-            data-testid={`${testIdPrefix}-description-${i}`}
-          />
-          <input
-            className="oryx-input col-span-1"
-            placeholder={t('erp.inventory.quantity')}
+            className="oryx-input text-center"
+            placeholder="1"
             value={line.quantity}
             onChange={(e) => update(i, { quantity: e.target.value })}
             data-testid={`${testIdPrefix}-quantity-${i}`}
           />
           <input
-            className="oryx-input col-span-2"
-            placeholder={t('erp.sales.unitPrice')}
+            className="oryx-input text-end"
+            placeholder="0.000"
             value={line.unitPrice}
             onChange={(e) => update(i, { unitPrice: e.target.value })}
             data-testid={`${testIdPrefix}-price-${i}`}
           />
           <input
-            className="oryx-input col-span-1"
-            placeholder={t('erp.sales.discount')}
+            className="oryx-input text-center"
+            placeholder="%"
             value={line.discountPercent}
             onChange={(e) => update(i, { discountPercent: e.target.value })}
             data-testid={`${testIdPrefix}-discount-${i}`}
           />
-          <div className="col-span-1">
-            <SearchableSelect
-              value={line.taxId || null}
-              options={taxOptions}
-              onChange={(v) => {
-                const chosen = taxOptions.find((o) => o.value === v);
-                update(i, { taxId: v ?? '', taxPercent: chosen ? chosen.label.replace(/[^\d.]/g, '') : line.taxPercent });
-              }}
-              placeholder="%"
-              emptyLabel={t('common.none')}
-              testId={`${testIdPrefix}-tax-${i}`}
-            />
-          </div>
-          <Button size="sm" variant="ghost" className="col-span-1" disabled={lines.length <= 1} onClick={() => setLines(lines.filter((_, idx) => idx !== i))}>
+          <SearchableSelect
+            value={line.taxId || null}
+            options={taxOptions}
+            onChange={(v) => {
+              const chosen = taxOptions.find((o) => o.value === v);
+              update(i, {
+                taxId: v ?? '',
+                taxPercent: chosen ? chosen.label.replace(/[^\d.]/g, '') : line.taxPercent,
+              });
+            }}
+            placeholder="%"
+            emptyLabel={t('common.none')}
+            testId={`${testIdPrefix}-tax-${i}`}
+          />
+          <span
+            className="text-end tabular-nums text-[12.5px] font-semibold"
+            data-testid={`${testIdPrefix}-line-amount-${i}`}
+          >
+            {money(totals.priced[i]?.lineTotalMinor ?? 0, currency)}
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={lines.length <= 1}
+            onClick={() => setLines(lines.filter((_, idx) => idx !== i))}
+            aria-label={t('common.delete')}
+          >
             <Icon name="close" size={14} />
           </Button>
         </div>
       ))}
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <Button size="sm" onClick={() => setLines([...lines, emptyLine()])} data-testid={`${testIdPrefix}-add`}>
           <Icon name="plus" size={14} />
           {t('erp.accounting.addLine')}
         </Button>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-[12.5px]" data-testid={`${testIdPrefix}-totals`}>
-          <dt className="oryx-muted">{t('erp.sales.untaxedAmount')}</dt>
-          <dd className="m-0 text-end tabular-nums font-semibold">{money(totals.subtotalMinor)}</dd>
-          <dt className="oryx-muted">{t('erp.sales.discount')}</dt>
-          <dd className="m-0 text-end tabular-nums font-semibold">{money(totals.discountMinor)}</dd>
-          <dt className="oryx-muted">{t('erp.sales.tax')}</dt>
-          <dd className="m-0 text-end tabular-nums font-semibold">{money(totals.taxMinor)}</dd>
+          <dt className="oryx-muted">{t('erp.sales.form.untaxedAmount')}</dt>
+          <dd className="m-0 text-end tabular-nums font-semibold">{money(totals.subtotalMinor, currency)}</dd>
+          <dt className="oryx-muted">{t('erp.sales.form.tax')}</dt>
+          <dd className="m-0 text-end tabular-nums font-semibold">{money(totals.taxMinor, currency)}</dd>
+          <dt className="oryx-muted">{t('erp.sales.form.discount')}</dt>
+          <dd className="m-0 text-end tabular-nums font-semibold">{money(totals.discountMinor, currency)}</dd>
           {totals.roundingMinor !== 0 ? (
             <>
               <dt className="oryx-muted">{t('erp.sales.rounding')}</dt>
-              <dd className="m-0 text-end tabular-nums font-semibold">{money(totals.roundingMinor)}</dd>
+              <dd className="m-0 text-end tabular-nums font-semibold">{money(totals.roundingMinor, currency)}</dd>
             </>
           ) : null}
-          <dt className="font-semibold text-[var(--text)]">{t('erp.sales.total')}</dt>
-          <dd className="m-0 text-end tabular-nums text-[13.5px] font-bold text-[var(--text)]">{money(totals.totalMinor)}</dd>
+          <dt className="font-semibold text-[var(--text)]">{t('erp.sales.form.total')}</dt>
+          <dd className="m-0 text-end tabular-nums text-[13.5px] font-bold text-[var(--text)]">
+            {money(totals.totalMinor, currency)}
+          </dd>
         </dl>
       </div>
     </div>
   );
 }
 
+/** One labelled read-only value in the document/customer panel. */
+function MirrorField({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[10.5px] font-bold tracking-wide text-[var(--muted)]">{label}</span>
+      <span className="text-[12.5px] font-semibold text-[var(--text)]">{value && value.trim() ? value : '—'}</span>
+    </div>
+  );
+}
+
+/**
+ * The create-document form, laid out to mirror the printed page.
+ *
+ * The fields are grouped the way the document is printed — a document-
+ * information panel, a customer-information panel, the item table and a
+ * summary — so an operator filling the form reads the same structure the paper
+ * carries. Each field maps to a value the PDF actually renders; the operational
+ * fields the paper does not print (warehouse, restock, notes) sit in the
+ * summary, keeping the mirrored part an exact reflection of the document.
+ */
 function DocumentModal({
   open,
   title,
@@ -2223,8 +2258,14 @@ function DocumentModal({
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
 }) {
   const { t } = useUi();
+  const { companyId } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [company, setCompany] = useState<{
+    currency: string;
+    roundingMode: RoundingMode;
+    taxNumber: string | null;
+  } | null>(null);
   const [customerId, setCustomerId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
   const [restock, setRestock] = useState(true);
@@ -2240,7 +2281,33 @@ function DocumentModal({
   useEffect(() => {
     if (!open) return;
     setDocumentDate(new Date().toISOString().slice(0, 10));
-  }, [open]);
+    if (!companyId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const c = await api.getCompany(companyId);
+        if (cancelled) return;
+        setCompany({
+          currency: c.currency,
+          roundingMode: c.roundingMode ?? 'NONE',
+          taxNumber: c.taxNumber ?? null,
+        });
+      } catch {
+        /* the form still works without the company summary */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, companyId]);
+
+  const currency = company?.currency;
+  const selected = customers.find((c) => c.id === customerId) ?? null;
+  const customerOptions: SearchableOption[] = customers.map((c) => ({
+    value: c.id,
+    label: `${c.code} — ${c.nameEn || c.nameAr}`,
+    hint: c.phone ?? undefined,
+  }));
 
   const submit = async () => {
     setBusy(true);
@@ -2261,7 +2328,7 @@ function DocumentModal({
           productId: l.productId || undefined,
           description: l.description || 'Item',
           quantity: toQuantityInput(l.quantity),
-          unitPriceMinor: toMinorInput(l.unitPrice),
+          unitPriceMinor: toMinorInput(l.unitPrice, currency),
           discountPercentBp: Math.round((Number(l.discountPercent) || 0) * 100),
           taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
         })),
@@ -2282,10 +2349,14 @@ function DocumentModal({
     }
   };
 
+  const dateLabel =
+    dueDateField === 'validUntil' ? t('erp.sales.form.quotationDate') : t('erp.sales.form.orderDate');
+
   return (
     <Modal
       open={open}
       title={title}
+      size="document"
       onClose={onClose}
       footer={
         <>
@@ -2297,115 +2368,178 @@ function DocumentModal({
       }
     >
       {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('erp.sales.customer')} required>
-          <select className="oryx-select" value={customerId} onChange={(e) => setCustomerId(e.target.value)} data-testid={`${testIdPrefix}-customer`}>
-            <option value="">—</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.code} — {c.nameEn}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label={t('erp.sales.documentDate')}>
-          <input
-            type="date"
-            className="oryx-input"
-            value={documentDate}
-            onChange={(e) => setDocumentDate(e.target.value)}
-            data-testid={`${testIdPrefix}-document-date`}
-          />
-        </Field>
-        {showWarehouse ? (
-          <Field label={t('erp.inventory.warehouse')}>
-            <select className="oryx-select" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} data-testid={`${testIdPrefix}-warehouse`}>
-              <option value="">—</option>
-              {warehouses.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.code} — {w.nameEn}
-                </option>
-              ))}
-            </select>
-          </Field>
-        ) : null}
-        {dueDateField ? (
-          <Field label={dueDateField === 'dueDate' ? t('erp.sales.dueDate') : t('erp.sales.validUntil')}>
-            <input
-              type="date"
-              className="oryx-input"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              data-testid={`${testIdPrefix}-due-date`}
-            />
-          </Field>
-        ) : null}
-        {settlement ? (
-          <Field label={t('erp.sales.paymentMethod')}>
-            <select
-              className="oryx-select"
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
-              data-testid={`${testIdPrefix}-payment-method`}
-            >
-              {(['CASH', 'CARD', 'BANK_TRANSFER', 'WALLET', 'CHEQUE', 'OTHER'] as const).map((m) => (
-                <option key={m} value={m}>
-                  {t(`erp.sales.payment.${m}`)}
-                </option>
-              ))}
-            </select>
-          </Field>
-        ) : null}
-        {settlement ? (
-          <Field label={t('erp.sales.salesperson')}>
-            <input
-              className="oryx-input"
-              value={salespersonName}
-              onChange={(e) => setSalespersonName(e.target.value)}
-              data-testid={`${testIdPrefix}-salesperson`}
-            />
-          </Field>
-        ) : null}
-        {settlement && paymentMethod === 'BANK_TRANSFER' ? (
-          <Field label={t('erp.sales.paymentReference')}>
-            <input
-              className="oryx-input"
-              value={paymentReference}
-              onChange={(e) => setPaymentReference(e.target.value)}
-              data-testid={`${testIdPrefix}-payment-reference`}
-            />
-          </Field>
-        ) : null}
-        {showRestock ? (
-          <Field label={t('erp.sales.restock')}>
-            <select className="oryx-select" value={restock ? 'yes' : 'no'} onChange={(e) => setRestock(e.target.value === 'yes')}>
-              <option value="yes">{t('common.yes')}</option>
-              <option value="no">{t('common.no')}</option>
-            </select>
-          </Field>
-        ) : null}
-        {reasonField ? (
-          <Field label={t('erp.sales.creditNoteReason')} hint={t('erp.sales.creditNoteReasonHint')}>
-            <input
-              className="oryx-input"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              data-testid={`${testIdPrefix}-reason`}
-            />
-          </Field>
-        ) : null}
-        <Field label={t('common.notes')}>
-          <input
-            className="oryx-input"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            data-testid={`${testIdPrefix}-notes`}
-          />
-        </Field>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <section className="oryx-doc-form__section" data-testid={`${testIdPrefix}-document-info`}>
+          <div className="oryx-doc-form__section-head">
+            <span>{t('erp.sales.form.documentInfo')}</span>
+            <span className="font-mono text-[11px] font-semibold text-[var(--muted)]">
+              {t('erp.sales.form.autoNumber')}
+            </span>
+          </div>
+          <div className="grid gap-3 p-3 sm:grid-cols-2">
+            <Field label={t('erp.sales.form.documentNumber')} hint={t('erp.sales.form.autoNumberHint')}>
+              <input className="oryx-input" value="—" readOnly disabled data-testid={`${testIdPrefix}-number`} />
+            </Field>
+            <Field label={dateLabel}>
+              <input
+                type="date"
+                className="oryx-input"
+                value={documentDate}
+                onChange={(e) => setDocumentDate(e.target.value)}
+                data-testid={`${testIdPrefix}-document-date`}
+              />
+            </Field>
+            {dueDateField ? (
+              <Field label={t('erp.sales.form.expirationDate')}>
+                <input
+                  type="date"
+                  className="oryx-input"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  data-testid={`${testIdPrefix}-due-date`}
+                />
+              </Field>
+            ) : null}
+            {settlement ? (
+              <Field label={t('erp.sales.form.payment')}>
+                <select
+                  className="oryx-select"
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  data-testid={`${testIdPrefix}-payment-method`}
+                >
+                  {(['CASH', 'CARD', 'BANK_TRANSFER', 'WALLET', 'CHEQUE', 'OTHER'] as const).map((m) => (
+                    <option key={m} value={m}>
+                      {t(`erp.sales.payment.${m}`)}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ) : null}
+            {settlement ? (
+              <Field label={t('erp.sales.form.staffName')}>
+                <input
+                  className="oryx-input"
+                  value={salespersonName}
+                  onChange={(e) => setSalespersonName(e.target.value)}
+                  data-testid={`${testIdPrefix}-salesperson`}
+                />
+              </Field>
+            ) : null}
+            {settlement && paymentMethod === 'BANK_TRANSFER' ? (
+              <Field label={t('erp.sales.form.paymentAtAccount')}>
+                <input
+                  className="oryx-input"
+                  value={paymentReference}
+                  onChange={(e) => setPaymentReference(e.target.value)}
+                  data-testid={`${testIdPrefix}-payment-reference`}
+                />
+              </Field>
+            ) : null}
+            <MirrorField label={t('erp.sales.form.companyTrn')} value={company?.taxNumber ?? null} />
+          </div>
+        </section>
+
+        <section className="oryx-doc-form__section" data-testid={`${testIdPrefix}-customer-info`}>
+          <div className="oryx-doc-form__section-head">
+            <span>{t('erp.sales.form.customerInfo')}</span>
+          </div>
+          <div className="grid gap-3 p-3 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <Field label={t('erp.sales.form.customerName')} hint={t('erp.sales.form.customerHint')} required>
+                <SearchableSelect
+                  value={customerId || null}
+                  options={customerOptions}
+                  onChange={(v) => setCustomerId(v ?? '')}
+                  placeholder={t('common.select')}
+                  testId={`${testIdPrefix}-customer`}
+                />
+              </Field>
+            </div>
+            <MirrorField label={t('erp.sales.form.contactNo')} value={selected?.phone ?? null} />
+            <MirrorField label={t('erp.sales.form.trn')} value={selected?.taxNumber ?? null} />
+            <div className="sm:col-span-2">
+              <MirrorField
+                label={t('erp.sales.form.address')}
+                value={selected ? [selected.addressLine, selected.city].filter(Boolean).join(', ') : null}
+              />
+            </div>
+          </div>
+        </section>
       </div>
-      <div className="mt-4">
-        <LineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} testIdPrefix={testIdPrefix} />
-      </div>
+
+      <section className="oryx-doc-form__section mt-3" data-testid={`${testIdPrefix}-items`}>
+        <div className="oryx-doc-form__section-head">
+          <span>{t('erp.sales.form.items')}</span>
+        </div>
+        <div className="p-3">
+          <LineEditor
+            lines={lines}
+            setLines={setLines}
+            products={products}
+            taxOptions={taxOptions}
+            testIdPrefix={testIdPrefix}
+            currency={currency}
+            roundingMode={company?.roundingMode ?? 'NONE'}
+          />
+        </div>
+      </section>
+
+      <section className="oryx-doc-form__section mt-3" data-testid={`${testIdPrefix}-summary`}>
+        <div className="oryx-doc-form__section-head">
+          <span>{t('erp.sales.form.summary')}</span>
+        </div>
+        <div className="grid gap-3 p-3 sm:grid-cols-2">
+          {showWarehouse ? (
+            <Field label={t('erp.inventory.warehouse')}>
+              <select
+                className="oryx-select"
+                value={warehouseId}
+                onChange={(e) => setWarehouseId(e.target.value)}
+                data-testid={`${testIdPrefix}-warehouse`}
+              >
+                <option value="">—</option>
+                {warehouses.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.code} — {w.nameEn}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
+          {showRestock ? (
+            <Field label={t('erp.sales.restock')}>
+              <select
+                className="oryx-select"
+                value={restock ? 'yes' : 'no'}
+                onChange={(e) => setRestock(e.target.value === 'yes')}
+              >
+                <option value="yes">{t('common.yes')}</option>
+                <option value="no">{t('common.no')}</option>
+              </select>
+            </Field>
+          ) : null}
+          {reasonField ? (
+            <Field label={t('erp.sales.creditNoteReason')} hint={t('erp.sales.creditNoteReasonHint')}>
+              <input
+                className="oryx-input"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                data-testid={`${testIdPrefix}-reason`}
+              />
+            </Field>
+          ) : null}
+          <Field label={t('common.notes')}>
+            <input
+              className="oryx-input"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              data-testid={`${testIdPrefix}-notes`}
+            />
+          </Field>
+        </div>
+      </section>
     </Modal>
   );
 }
