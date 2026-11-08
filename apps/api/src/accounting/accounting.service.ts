@@ -750,7 +750,7 @@ export class AccountingService {
           amountMinor: dto.amountMinor,
           reference: dto.reference ?? null,
           notes: dto.notes ?? null,
-          staffName: dto.staffName?.trim() || null,
+          staffName: await this.context.resolveActorName(actor.userId),
           paidAt,
           idempotencyKey: dto.idempotencyKey ?? null,
           createdById: actor.userId,

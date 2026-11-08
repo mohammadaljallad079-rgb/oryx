@@ -28,7 +28,6 @@ import {
   sumMinor,
   type CashierSessionDto,
   type CustomerDto,
-  type EmployeeDto,
   type PosSaleDto,
   type SalesDocumentDto,
   type WarehouseDto,
@@ -73,14 +72,6 @@ function customerOptions(customers: CustomerDto[]): SearchableOption[] {
 
 function productOptions(products: Array<{ id: string; sku: string; nameEn: string }>): SearchableOption[] {
   return products.map((p) => ({ value: p.id, label: p.nameEn, hint: p.sku }));
-}
-
-function staffOptions(employees: EmployeeDto[], locale: 'ar' | 'en'): SearchableOption[] {
-  return employees.map((e) => ({
-    value: e.fullNameEn,
-    label: locale === 'ar' ? e.fullNameAr : e.fullNameEn,
-    hint: e.code,
-  }));
 }
 
 /** A short unique code for an inline-created record ("C-3F9A2B"). */
@@ -271,7 +262,6 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
-  const employees = useAsync(() => api.hrEmployees({ page: 1 }), []);
 
   return (
     <Card>
@@ -335,7 +325,6 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         title={t('erp.sales.newInvoice')}
         customers={customers.data?.items ?? []}
         products={products.data?.items ?? []}
-        employees={employees.data?.items ?? []}
         canCreate={canManage}
         reloadCustomers={customers.reload}
         reloadProducts={products.reload}
@@ -377,7 +366,6 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
-  const employees = useAsync(() => api.hrEmployees({ page: 1 }), []);
 
   return (
     <Card>
@@ -424,7 +412,6 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
         title={t('erp.sales.newOrder')}
         customers={customers.data?.items ?? []}
         products={products.data?.items ?? []}
-        employees={employees.data?.items ?? []}
         canCreate={canManage}
         reloadCustomers={customers.reload}
         reloadProducts={products.reload}
@@ -451,7 +438,6 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
-  const employees = useAsync(() => api.hrEmployees({ page: 1 }), []);
 
   return (
     <Card>
@@ -514,7 +500,6 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
         title={t('erp.sales.newQuotation')}
         customers={customers.data?.items ?? []}
         products={products.data?.items ?? []}
-        employees={employees.data?.items ?? []}
         canCreate={canManage}
         reloadCustomers={customers.reload}
         reloadProducts={products.reload}
@@ -539,7 +524,6 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
-  const employees = useAsync(() => api.hrEmployees({ page: 1 }), []);
 
   return (
     <Card>
@@ -588,7 +572,6 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
         title={t('erp.sales.newCreditNote')}
         customers={customers.data?.items ?? []}
         products={products.data?.items ?? []}
-        employees={employees.data?.items ?? []}
         canCreate={canManage}
         reloadCustomers={customers.reload}
         reloadProducts={products.reload}
@@ -1065,7 +1048,6 @@ function DocumentModal({
   customers,
   products,
   warehouses,
-  employees,
   showWarehouse,
   showRestock,
   testIdPrefix,
@@ -1081,7 +1063,6 @@ function DocumentModal({
   customers: CustomerDto[];
   products: Array<{ id: string; sku: string; nameEn: string; salesPriceMinor: number; taxRateBp: number }>;
   warehouses: WarehouseDto[];
-  employees: EmployeeDto[];
   showWarehouse?: boolean;
   showRestock?: boolean;
   testIdPrefix: string;
@@ -1095,11 +1076,14 @@ function DocumentModal({
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
 }) {
   const { t, locale } = useUi();
+  const { user } = useAuth();
+  // The approved form prints the operator who prepared the document, so the
+  // name is taken from the signed-in account and never chosen by hand.
+  const currentUserName = user ? (locale === 'ar' ? user.fullNameAr : user.fullNameEn) : '—';
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [customerId, setCustomerId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
-  const [staffName, setStaffName] = useState('');
   const [restock, setRestock] = useState(true);
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
 
@@ -1166,12 +1150,10 @@ function DocumentModal({
       };
       if (showWarehouse) payload.warehouseId = warehouseId || undefined;
       if (showRestock) payload.restockInventory = restock;
-      if (staffName.trim()) payload.staffName = staffName.trim();
       await onSubmit(payload);
       onClose();
       setLines([emptyLine()]);
       setCustomerId('');
-      setStaffName('');
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
@@ -1208,15 +1190,10 @@ function DocumentModal({
             onChange={setCustomerId}
           />
         </Field>
-        <Field label={t('erp.sales.employee')}>
-          <SearchableSelect
-            value={staffName}
-            options={staffOptions(employees, locale)}
-            emptyLabel="—"
-            searchPlaceholder={t('erp.sales.selectEmployee')}
-            testId={`${testIdPrefix}-staff`}
-            onChange={setStaffName}
-          />
+        <Field label={t('erp.sales.preparedBy')}>
+          <div className="oryx-input flex items-center text-[13px]" data-testid={`${testIdPrefix}-staff`}>
+            {currentUserName}
+          </div>
         </Field>
         {showWarehouse ? (
           <Field label={t('erp.inventory.warehouse')}>

@@ -79,6 +79,21 @@ export class ErpContextService {
   }
 
   /**
+   * The display name a document prints as its operator: the account that
+   * created it. The approved form always shows the user who prepared the
+   * document, so this is captured from the request principal and never chosen
+   * by hand.
+   */
+  async resolveActorName(userId: string | null | undefined): Promise<string | null> {
+    if (!userId) return null;
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { fullNameEn: true, fullNameAr: true, email: true },
+    });
+    return user?.fullNameEn ?? user?.fullNameAr ?? user?.email ?? null;
+  }
+
+  /**
    * Assert that `branchId` belongs to `companyId` and is inside the principal's
    * branch scope. An empty `scope` means company-wide access.
    */
