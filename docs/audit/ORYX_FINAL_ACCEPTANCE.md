@@ -618,7 +618,35 @@ Options, in order of preference:
 
 ## 5. Files changed in this session
 
-The seventh revision adds registration-card OCR extraction (brief §5):
+The ninth revision (mandate points 1–6) is the current branch tip. The mandate's
+six surfaces landed across `c7aec12f` (tax management, POS terminal, register
+print actions), `65ae1d4e` (every catalogue document type issuable) and
+`f8962e33` (the approved invoice/quotation layout); this session added
+`36fd3f52` (keep the owner reference PDF and its renders out of the tree) and
+`ae9154fa` (this report). Files touched:
+
+| File | Change |
+|---|---|
+| `apps/api/src/documents/templates/official-financial.template.ts` | New: the official invoice/quotation layout (white identity band, bilingual title, gold rule, five priced columns, four totals rows, `Payment`/`Staf Name` lines, `TRN:` strip, signature strip, QR block) |
+| `apps/api/src/documents/templates/official-financial.template.spec.ts` | New: 18 template assertions |
+| `apps/api/src/documents/documents.service.ts` | Per-payload template selection (`referenceLayout`) on issue and reprint; official margins |
+| `apps/api/src/documents/documents.module.ts` | Template wiring |
+| `apps/admin/src/app/(app)/dashboard/page.tsx` | Hero banner without the vehicle image, centred `BrandLogo`, theme-neutral background |
+| `apps/admin/src/components/ui.tsx` | `StatCard` / `StatGrid` compact sizing |
+| `apps/admin/src/components/brand-logo.tsx` | `-on-dark` / `-on-light` colourways and the light-theme swap rules |
+| `apps/admin/src/app/globals.css` | `.oryx-hero`, `.oryx-stat-grid` (190–192 px cards) |
+| `apps/admin/src/app/(app)/settings/page.tsx` | Searchable company selector, currency, tax and document defaults |
+| `apps/admin/src/components/tax-rates-panel.tsx` | Tenant tax-rate panel |
+| `apps/admin/src/app/(app)/documents/page.tsx`, `apps/admin/src/components/document-register.tsx` | Document register with search, filters and row actions |
+| `apps/admin/src/app/(app)/sales/page.tsx` | Sales invoices and the POS terminal |
+| `apps/admin/src/app/(app)/inventory/page.tsx` | Product barcodes, warehouse selection, stock movements, reorder alerts |
+| `.run/verify-mandate-6.mjs` | New: 49 literal live checks over mandate points 1–6 |
+| `.run/verify-brief5-6.mjs` | New: 27 literal live checks over brief §5 points 1–6 |
+| `.run/verify-official-layout.mjs` | New: proves all 22 reference rows render, including the data-conditional ones |
+| `.gitignore` | Keep the owner reference PDF and any render that embeds it out of the public tree |
+| `docs/audit/ORYX_FINAL_ACCEPTANCE.md` | This revision |
+
+The eighth revision adds registration-card OCR extraction (brief §5):
 
 | File | Change |
 |---|---|
