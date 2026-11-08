@@ -30,6 +30,7 @@ interface PrintModel {
   titleEn: string;
   titleAr: string;
   party: { name: string; taxNumber: string | null };
+  staffName: string;
   company: { taxNumber: string | null; crNumber: string | null };
   lines: Array<{ description: string; quantity: string; unitPrice: string; amount: string }>;
   totals: { untaxedAmount: string; taxAmount: string; discount: string; total: string };
@@ -199,9 +200,10 @@ describe('print model and document attachments (e2e)', () => {
         customerId,
         invoiceDate: '2026-05-02',
         warehouseId,
+        staffName: 'Hussain Alhaddad',
         lines: [
-          { productId, description: 'Oil (Havoline 5w20)', quantity: 10000, unitPriceMinor: 750, taxPercentBp: 1000 },
-          { productId, description: 'Oil filter Mazda - orginal', quantity: 10000, unitPriceMinor: 200, taxPercentBp: 1000 },
+          { productId, description: 'Oil (Havoline 5w20)', quantity: 10000, unitPriceMinor: 7500, taxPercentBp: 1000 },
+          { productId, description: 'Oil filter Mazda - orginal', quantity: 10000, unitPriceMinor: 2000, taxPercentBp: 1000 },
         ],
       },
     });
@@ -241,12 +243,14 @@ describe('print model and document attachments (e2e)', () => {
       // The seller's registration number the navy band prints comes from the company.
       expect(res.body.company.taxNumber).toBe('300000000000003');
       expect(res.body.company.crNumber).toBe('9000000009');
+      // The staff name chosen on the form is what the printed form shows.
+      expect(res.body.staffName).toBe('Hussain Alhaddad');
       expect(res.body.lines).toHaveLength(2);
       expect(res.body.lines[0].description).toBe('Oil (Havoline 5w20)');
-      // 7.50 + 2.00 = 9.50 net, 10% VAT = 0.95, total 10.45
-      expect(res.body.totals.untaxedAmount).toBe('9.50 SAR');
-      expect(res.body.totals.total).toBe('10.45 SAR');
-      expect(res.body.amountInWords).toContain('Saudi Riyal');
+      // 7.500 + 2.000 = 9.500 net, 10% VAT = 0.950, total 10.450 (BHD, 3 dp)
+      expect(res.body.totals.untaxedAmount).toBe('9.500 BHD');
+      expect(res.body.totals.total).toBe('10.450 BHD');
+      expect(res.body.amountInWords).toContain('Bahraini Dinar');
     });
 
     it('renders a receipt voucher', async () => {
@@ -255,7 +259,9 @@ describe('print model and document attachments (e2e)', () => {
       expect(res.body.kind).toBe('RECEIPT');
       expect(res.body.documentNumber).toMatch(/^PMT-/);
       expect(res.body.party.name).toBe('Al Haddad Trading');
-      expect(res.body.totals.total).toBe('10.00 SAR');
+      expect(res.body.totals.total).toBe('1.000 BHD');
+      // No staff name was set, so it falls back to the creator rather than blank.
+      expect(res.body.staffName.length).toBeGreaterThan(0);
     });
 
     it('refuses an unknown document id without a 500', async () => {

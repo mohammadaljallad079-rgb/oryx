@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { tileImageUrl, type DashboardResponse } from '@oryx/shared';
+import { DEFAULT_CURRENCY, tileImageUrl, type DashboardResponse } from '@oryx/shared';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -46,7 +46,7 @@ export default function DashboardPage() {
   const k = data?.kpis;
   const currency = new Intl.NumberFormat(locale === 'ar' ? 'ar-SA' : 'en-US', {
     style: 'currency',
-    currency: k?.currency ?? 'SAR',
+    currency: k?.currency ?? DEFAULT_CURRENCY,
     maximumFractionDigits: 0,
   });
 

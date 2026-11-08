@@ -12,6 +12,7 @@ import { VehicleService } from './vehicle.service';
 import {
   CreateChecklistItemDto,
   CreateInspectionBookingDto,
+  CreateInspectionIntakeDto,
   CreateInspectionServiceDto,
   CreateVehicleDto,
   DecideReportDto,
@@ -132,6 +133,30 @@ export class VehicleController {
   @ApiOperation({ summary: 'Book an inspection' })
   book(@Body() dto: CreateInspectionBookingDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.vehicles.createInspectionBooking(dto, p, actorFrom(p, req));
+  }
+
+  @Post('inspections')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.inspection.booking.manage')
+  @ApiOperation({ summary: 'Create an inspection from the intake form (draft or scheduled)' })
+  createInspection(@Body() dto: CreateInspectionIntakeDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.vehicles.createInspectionIntake(dto, p, actorFrom(p, req));
+  }
+
+  @Get('inspections/:id')
+  @RequireModule('automotive_inspections')
+  @RequireAnyPermission('erp.inspection.read', 'erp.inspection.booking.manage')
+  @ApiOperation({ summary: 'Inspection intake detail' })
+  inspection(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.vehicles.getInspectionIntake(id, p);
+  }
+
+  @Patch('inspections/:id')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.inspection.booking.manage')
+  @ApiOperation({ summary: 'Update a draft inspection' })
+  updateInspection(@Param('id') id: string, @Body() dto: UpdateInspectionBookingDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.vehicles.updateInspectionIntake(id, dto, p, actorFrom(p, req));
   }
 
   @Patch('inspection-bookings/:id')

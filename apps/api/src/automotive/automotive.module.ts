@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ErpCommonModule } from '../common/erp-common.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { SalesModule } from '../sales/sales.module';
+import { VehicleCardController } from './vehicle-card.controller';
+import { VehicleCardOcrService } from './vehicle-card-ocr.service';
 import { VehicleController } from './vehicle.controller';
 import { WorkshopController } from './workshop.controller';
 import { VehicleService } from './vehicle.service';
@@ -14,8 +16,8 @@ import { WorkshopService } from './workshop.service';
  */
 @Module({
   imports: [ErpCommonModule, InventoryModule, SalesModule],
-  controllers: [VehicleController, WorkshopController],
-  providers: [VehicleService, WorkshopService],
+  controllers: [VehicleController, WorkshopController, VehicleCardController],
+  providers: [VehicleService, WorkshopService, VehicleCardOcrService],
   exports: [VehicleService, WorkshopService],
 })
 export class AutomotiveModule {}

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { allocateMinor, fromMinor, sumMinor, toMinor } from '@oryx/shared';
+import { DEFAULT_CURRENCY, allocateMinor, fromMinor, sumMinor, toMinor } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccountingPostingService, SYSTEM_ROLES, type SystemRole } from '../common/accounting-posting.service';
@@ -73,7 +73,7 @@ export class AccountingService {
   // ------------------------------------------------------------------ accounts
 
   /** Seed the standard chart of accounts for a company that has none. */
-  async seedStandardChart(companyId: string, currency = 'SAR', actorUserId?: string) {
+  async seedStandardChart(companyId: string, currency = DEFAULT_CURRENCY, actorUserId?: string) {
     // Upsert by code rather than bailing out when the chart is non-empty: a
     // company whose chart predates a new system account (for example the
     // rounding gain/loss account) is completed without disturbing custom
@@ -171,7 +171,7 @@ export class AccountingService {
         level,
         isPostable: dto.isPostable ?? true,
         systemRole: dto.systemRole ?? null,
-        currency: dto.currency ?? 'SAR',
+        currency: dto.currency ?? DEFAULT_CURRENCY,
       },
     });
     await this.audit.record({
@@ -750,6 +750,7 @@ export class AccountingService {
           amountMinor: dto.amountMinor,
           reference: dto.reference ?? null,
           notes: dto.notes ?? null,
+          staffName: dto.staffName?.trim() || null,
           paidAt,
           idempotencyKey: dto.idempotencyKey ?? null,
           createdById: actor.userId,

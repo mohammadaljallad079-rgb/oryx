@@ -256,6 +256,16 @@ body::before {
   box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18);
 }
 
+/* A field the card reader could not read confidently; the human must check it. */
+.oryx-input--attention {
+  border-color: color-mix(in srgb, var(--warning) 60%, var(--border));
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface-raised));
+}
+
+.oryx-attention {
+  color: var(--warning);
+}
+
 .oryx-input::placeholder,
 .oryx-textarea::placeholder {
   color: var(--text-faint);

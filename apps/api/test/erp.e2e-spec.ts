@@ -602,6 +602,55 @@ describe('ORYX ERP core (e2e)', () => {
       expect(closed.body.expectedCashMinor).toBe(31500);
       expect(closed.body.varianceMinor).toBe(-1500);
     });
+
+    it('applies a line discount and tax exactly once to a POS sale', async () => {
+      // A fresh session so the earlier close/variance expectations stay intact.
+      const session = await erp<{ id: string }>('/sales/cashier-sessions', {
+        method: 'POST',
+        body: { branchId, warehouseId, openingFloatMinor: 0 },
+      });
+      expect(session.status).toBe(201);
+
+      // 2 × 100.00 = 200.00 gross, less 10% = 180.00 net, plus 15% = 207.00.
+      const sale = await erp<{
+        subtotalMinor: number;
+        discountMinor: number;
+        taxMinor: number;
+        totalMinor: number;
+        lines: Array<{ discountMinor: number; lineTotalMinor: number }>;
+      }>('/sales/pos-sales', {
+        method: 'POST',
+        body: {
+          branchId,
+          cashierSessionId: session.body.id,
+          warehouseId,
+          paymentMethod: 'CASH',
+          paidMinor: 20700,
+          lines: [
+            {
+              productId,
+              description: 'Widget',
+              quantity: 20000,
+              unitPriceMinor: 10000,
+              discountPercentBp: 1000,
+              taxPercentBp: 1500,
+            },
+          ],
+        },
+      });
+      expect(sale.status).toBe(201);
+      expect(sale.body.subtotalMinor).toBe(20000);
+      expect(sale.body.discountMinor).toBe(2000);
+      expect(sale.body.taxMinor).toBe(2700);
+      expect(sale.body.totalMinor).toBe(20700);
+      expect(sale.body.lines[0].discountMinor).toBe(2000);
+      expect(sale.body.lines[0].lineTotalMinor).toBe(20700);
+
+      await erp(`/sales/cashier-sessions/${session.body.id}/close`, {
+        method: 'POST',
+        body: { countedCashMinor: 20700 },
+      });
+    });
   });
 
   // ----------------------------------------------------------------- purchasing

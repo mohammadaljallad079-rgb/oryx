@@ -12,6 +12,8 @@
  * so a total shown in the UI is byte-identical to the total that was posted.
  */
 
+import { DEFAULT_CURRENCY, currencyScale } from './currency';
+
 /** Number of decimal places a quantity may carry (1/10000 of a unit). */
 export const QUANTITY_SCALE = 4;
 const QUANTITY_FACTOR = 10n ** BigInt(QUANTITY_SCALE);
@@ -194,9 +196,9 @@ export function isBalanced(amounts: number[]): boolean {
 /** Format minor units for display with a currency code. */
 export function formatMinor(
   minor: number,
-  currency = 'SAR',
+  currency = DEFAULT_CURRENCY,
   locale: 'ar' | 'en' = 'en',
-  scale = 2,
+  scale = currencyScale(currency),
 ): string {
   const major = toMajor(minor, scale);
   try {

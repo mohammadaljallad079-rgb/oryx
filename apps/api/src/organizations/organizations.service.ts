@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { checkLimit, type PlanLimits } from '@oryx/shared';
+import { DEFAULT_CURRENCY, checkLimit, type PlanLimits } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { EntitlementService } from '../common/entitlement.service';
 import { AuditService } from '../common/audit.service';
@@ -132,7 +132,7 @@ export class OrganizationsService {
           status: 'ACTIVE',
           industry: dto.industry ?? null,
           countryCode: dto.countryCode ?? 'SA',
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? DEFAULT_CURRENCY,
           parentCompanyId: dto.parentCompanyId ?? null,
           notes: dto.notes ?? null,
         },

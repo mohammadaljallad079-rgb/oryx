@@ -10,12 +10,15 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  DEFAULT_CURRENCY,
+  currencyScale,
   resolveEffectivePermissions,
   type LoginResponse,
   type MembershipSummary,
   type SessionUser,
 } from '@oryx/shared';
 import { api, ApiError, restoreSession, tokenStore } from './api';
+import { setActiveCurrency } from './erp-format';
 
 interface AuthState {
   user: SessionUser | null;
@@ -26,12 +29,18 @@ interface AuthState {
   companyId: string | null;
   branchId: string | null;
   supportSessionCompanyId: string | null;
+  /** The active company's base currency (ISO code). */
+  currency: string;
   ready: boolean;
 }
 
 interface AuthContextValue extends AuthState {
   isAuthenticated: boolean;
   isPlatform: boolean;
+  /** Decimal places for the active currency (BHD = 3). */
+  currencyScale: number;
+  /** Persist a new base currency for the active company (Settings). */
+  setCurrency: (currency: string) => Promise<void>;
   can: (permission: string) => boolean;
   canAny: (...permissions: string[]) => boolean;
   hasModule: (moduleKey: string) => boolean;
@@ -58,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     companyId: null,
     branchId: null,
     supportSessionCompanyId: null,
+    currency: DEFAULT_CURRENCY,
     ready: false,
   });
 
@@ -99,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         companyId: me.context.companyId ?? p.companyId,
         branchId: me.context.branchId ?? p.branchId,
         supportSessionCompanyId: me.context.supportSessionCompanyId,
+        currency: me.context.currency ?? DEFAULT_CURRENCY,
       }));
     } catch {
       tokenStore.clear();
@@ -117,6 +128,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setState((p) => ({ ...p, user: null, permissions: [], memberships: [], ready: true }));
     });
   }, []);
+  // Keep the shared money formatter in step with the active currency so every
+  // `money(minor)` call renders in the tenant's base currency.
+  useEffect(() => {
+    setActiveCurrency(state.currency);
+  }, [state.currency]);
 
   /**
    * Keep tabs in step.
@@ -156,6 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         companyId: firstCompany,
         branchId: null,
         supportSessionCompanyId: null,
+        currency: DEFAULT_CURRENCY,
       });
     },
     [],
@@ -208,6 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       companyId: null,
       branchId: null,
       supportSessionCompanyId: null,
+      currency: DEFAULT_CURRENCY,
     });
   }, []);
 
@@ -218,6 +236,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void loadSession();
     },
     [loadSession],
+  );
+
+  const setCurrency = useCallback(
+    async (currency: string) => {
+      if (!state.companyId) throw new Error('No company context to update.');
+      await api.updateCompany(state.companyId, { currency });
+      setState((p) => ({ ...p, currency }));
+    },
+    [state.companyId],
   );
 
   const updatePreferences = useCallback(
@@ -262,6 +289,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       can,
       canAny,
       hasModule,
+      currencyScale: currencyScale(state.currency),
+      setCurrency,
       login,
       completeMfaLogin,
       logout,
@@ -275,6 +304,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       can,
       canAny,
       hasModule,
+      setCurrency,
       login,
       completeMfaLogin,
       logout,

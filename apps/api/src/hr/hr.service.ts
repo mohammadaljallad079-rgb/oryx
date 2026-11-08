@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { fromMinor, sumMinor } from '@oryx/shared';
+import { DEFAULT_CURRENCY, fromMinor, sumMinor } from '@oryx/shared';
 import type { Prisma } from '@oryx/database';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
@@ -249,7 +249,7 @@ export class HrService {
         startDate: new Date(dto.startDate),
         endDate: dto.endDate ? new Date(dto.endDate) : null,
         baseSalaryMinor: dto.baseSalaryMinor,
-        currency: dto.currency ?? 'SAR',
+        currency: dto.currency ?? DEFAULT_CURRENCY,
         probationDays: dto.probationDays ?? 0,
         notes: dto.notes ?? null,
       },
@@ -575,7 +575,7 @@ export class HrService {
           employeeId: dto.employeeId,
           effectiveFrom: new Date(dto.effectiveFrom),
           basicMinor: dto.basicMinor,
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? DEFAULT_CURRENCY,
           notes: dto.notes ?? null,
           components: {
             create: dto.components.map((c, i) => ({
@@ -665,7 +665,7 @@ export class HrService {
     const result = await this.posting.withTransaction(async (tx) => {
       const runNumber = await this.sequences.next(tx, companyId, 'payrollRun');
       const run = await tx.payrollRun.create({
-        data: { companyId, periodId: period.id, runNumber, status: 'DRAFT', currency: 'SAR', createdById: actor.userId, notes: dto.notes ?? null },
+        data: { companyId, periodId: period.id, runNumber, status: 'DRAFT', currency: DEFAULT_CURRENCY, createdById: actor.userId, notes: dto.notes ?? null },
       });
 
       let gross = 0;

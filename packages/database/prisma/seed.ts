@@ -17,9 +17,12 @@
 
 import { PrismaClient, type Prisma } from '@prisma/client';
 import * as argon2 from 'argon2';
-import { MODULES, PERMISSIONS, lineAmountMinor } from '@oryx/shared';
+import { MODULES, PERMISSIONS, lineAmountMinor, DEFAULT_CURRENCY } from '@oryx/shared';
 
 const prisma = new PrismaClient();
+
+/** The platform's base currency, used for every seeded tenant and plan. */
+const BASE_CURRENCY = DEFAULT_CURRENCY;
 
 const DEMO_MARKER = 'SEED_DEMO_DATA';
 
@@ -199,6 +202,7 @@ async function seedPlans() {
         descriptionAr: plan.descriptionAr,
         monthlyPrice: plan.monthlyPrice,
         annualPrice: plan.annualPrice,
+        currency: BASE_CURRENCY,
         trialDays: plan.trialDays,
         maxCompanies: plan.maxCompanies,
         maxBranches: plan.maxBranches,
@@ -214,6 +218,7 @@ async function seedPlans() {
         descriptionAr: plan.descriptionAr,
         monthlyPrice: plan.monthlyPrice,
         annualPrice: plan.annualPrice,
+        currency: BASE_CURRENCY,
         trialDays: plan.trialDays,
         maxCompanies: plan.maxCompanies,
         maxBranches: plan.maxBranches,
@@ -508,6 +513,9 @@ async function seedCompanies(superAdminId: string) {
         type: spec.type,
         industry: spec.industry,
         status: 'ACTIVE',
+        // The platform base currency is the Bahraini Dinar; re-seeding keeps the
+        // demo tenants aligned with it rather than leaving a stale currency.
+        currency: BASE_CURRENCY,
         notes,
         ...printMeta(spec),
       },
@@ -519,8 +527,8 @@ async function seedCompanies(superAdminId: string) {
         type: spec.type,
         industry: spec.industry,
         status: 'ACTIVE',
-        countryCode: 'SA',
-        currency: 'SAR',
+        countryCode: 'BH',
+        currency: BASE_CURRENCY,
         notes,
         ...printMeta(spec),
       },

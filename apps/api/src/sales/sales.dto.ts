@@ -244,6 +244,11 @@ export class CreateQuotationDto {
   @MaxLength(400)
   notes?: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  staffName?: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
@@ -294,6 +299,11 @@ export class CreateSalesOrderDto {
   @IsString()
   @MaxLength(400)
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  staffName?: string;
 
   @IsArray()
   @ArrayMinSize(1)
@@ -346,6 +356,11 @@ export class CreateInvoiceDto {
   notes?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  staffName?: string;
+
+  @IsOptional()
   @IsBoolean()
   post?: boolean;
 
@@ -392,6 +407,11 @@ export class CreateCreditNoteDto {
   @IsString()
   @MaxLength(300)
   reason?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  staffName?: string;
 
   @IsOptional()
   @IsString()
@@ -455,6 +475,12 @@ export class PosSaleLineDto {
   @IsInt()
   @Min(0)
   unitPriceMinor!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  discountPercentBp?: number;
 
   @IsOptional()
   @Type(() => Number)

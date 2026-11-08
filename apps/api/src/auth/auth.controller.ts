@@ -15,7 +15,7 @@ import { Throttle } from '@nestjs/throttler';
 import * as argon2 from 'argon2';
 import { createHash } from 'node:crypto';
 import type { Response } from 'express';
-import { isMfaChallenge } from '@oryx/shared';
+import { DEFAULT_CURRENCY, isMfaChallenge } from '@oryx/shared';
 import { AuthService } from './auth.service';
 import { MfaEnrollmentService } from './mfa-enrollment.service';
 import { CookieService } from './cookie.service';
@@ -256,6 +256,10 @@ export class AuthController {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: principal.userId } });
     const memberships = await this.auth.loadMemberships(user.id);
     const mfaStatus = await this.mfa.status(user.id);
+    const companyId = principal.company?.companyId ?? principal.activeCompanyId ?? null;
+    const company = companyId
+      ? await this.prisma.company.findUnique({ where: { id: companyId }, select: { currency: true } })
+      : null;
     return {
       user: {
         id: user.id,
@@ -271,10 +275,11 @@ export class AuthController {
       permissions: principal.grantedPermissions,
       mfa: mfaStatus,
       context: {
-        companyId: principal.company?.companyId ?? principal.activeCompanyId ?? null,
+        companyId,
         branchId: principal.activeBranchId ?? null,
         licensedModules: principal.company?.licensedModuleKeys ?? [],
         supportSessionCompanyId: principal.supportSessionCompanyId ?? null,
+        currency: company?.currency ?? DEFAULT_CURRENCY,
       },
     };
   }

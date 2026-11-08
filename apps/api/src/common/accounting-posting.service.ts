@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { isBalanced, sumMinor } from '@oryx/shared';
+import { DEFAULT_CURRENCY, isBalanced, sumMinor } from '@oryx/shared';
 import type { JournalSourceType, Prisma } from '@oryx/database';
 import { PrismaService } from './prisma.service';
 import { DocumentSequenceService, type Tx } from './document-sequence.service';
@@ -193,7 +193,7 @@ export class AccountingPostingService {
         sourceType: input.sourceType,
         sourceId: input.sourceId ?? null,
         memo: input.memo ?? null,
-        currency: input.currency ?? 'SAR',
+        currency: input.currency ?? DEFAULT_CURRENCY,
         totalDebitMinor,
         totalCreditMinor,
         postedAt: new Date(),

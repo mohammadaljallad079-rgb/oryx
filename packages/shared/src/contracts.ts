@@ -1220,7 +1220,7 @@ export interface VehicleDto {
   customerCode: string | null;
   customerNameEn: string | null;
   customerNameAr: string | null;
-  vin: string;
+  vin: string | null;
   plateNumber: string | null;
   make: string;
   model: string;
@@ -1241,6 +1241,9 @@ export interface InspectionServiceDto {
   durationMinutes: number;
 }
 
+/** The report sections a vehicle inspection can cover. */
+export type InspectionType = 'PAINT' | 'CHASSIS' | 'COMPREHENSIVE';
+
 export interface InspectionBookingDto {
   id: string;
   bookingNumber: string;
@@ -1248,15 +1251,24 @@ export interface InspectionBookingDto {
   vin: string | null;
   make: string | null;
   model: string | null;
+  modelYear: number | null;
+  color: string | null;
   plateNumber: string | null;
   customerId: string;
-  serviceId: string;
+  customerCode: string | null;
+  customerNameEn: string | null;
+  customerNameAr: string | null;
+  contactNo: string | null;
+  serviceId: string | null;
   serviceNameEn: string | null;
   serviceNameAr: string | null;
   status: string;
   scheduledAt: string;
+  createdAt: string;
   inspectorUserId: string | null;
   odometer: number | null;
+  inspectionTypes: InspectionType[];
+  notes: string | null;
   reportStatus: string | null;
   invoiceId: string | null;
   findingCount?: number;

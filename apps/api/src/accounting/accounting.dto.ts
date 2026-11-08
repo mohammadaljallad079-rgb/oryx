@@ -230,6 +230,11 @@ export class RecordPaymentDto {
   @MaxLength(300)
   notes?: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  staffName?: string;
+
   @IsISO8601()
   paidAt!: string;
 

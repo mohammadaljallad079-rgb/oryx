@@ -738,7 +738,7 @@ function toJobCardDto(j: {
   odometer: number | null;
   complaint: string | null;
   invoiceId: string | null;
-  vehicle?: { vin: string; make: string; model: string; plateNumber: string | null } | null;
+  vehicle?: { vin: string | null; make: string; model: string; plateNumber: string | null } | null;
   _count?: { labour: number; estimates: number; reservations: number };
   createdAt: Date;
 }) {

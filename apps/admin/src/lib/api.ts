@@ -340,6 +340,7 @@ export const api = {
         branchId: string | null;
         licensedModules: string[];
         supportSessionCompanyId: string | null;
+        currency: string;
       };
     }>('/auth/me'),
   context: () => request<ContextResponse>('/auth/context'),
@@ -865,12 +866,37 @@ export const api = {
     request<Paginated<InspectionServiceDto>>(`/automotive/inspection-services?${toQuery(params)}`),
   createInspectionService: (body: Record<string, unknown>) =>
     request<InspectionServiceDto>('/automotive/inspection-services', { method: 'POST', body }),
-  inspectionBookings: (params: { companyId?: string; status?: string; page?: number } = {}) =>
+  inspectionBookings: (params: { companyId?: string; status?: string; search?: string; customerId?: string; vehicleId?: string; page?: number } = {}) =>
     request<Paginated<InspectionBookingDto>>(`/automotive/inspection-bookings?${toQuery(params)}`),
   createInspectionBooking: (body: Record<string, unknown>) =>
     request<InspectionBookingDto>('/automotive/inspection-bookings', { method: 'POST', body }),
   updateInspectionBooking: (id: string, body: Record<string, unknown>) =>
     request<InspectionBookingDto>(`/automotive/inspection-bookings/${id}`, { method: 'PATCH', body }),
+  createInspection: (body: Record<string, unknown>) =>
+    request<InspectionBookingDto>('/automotive/inspections', { method: 'POST', body }),
+  inspectionIntake: (id: string) =>
+    request<{
+      booking: InspectionBookingDto;
+      vehicle: Record<string, unknown>;
+      customer: Record<string, unknown>;
+      findings: Array<Record<string, unknown>>;
+      report: Record<string, unknown> | null;
+    }>(`/automotive/inspections/${id}`),
+  updateInspection: (id: string, body: Record<string, unknown>) =>
+    request<InspectionBookingDto>(`/automotive/inspections/${id}`, { method: 'PATCH', body }),
+  /**
+   * Read a registration-card photo. The bytes go up as multipart so the same
+   * `request` helper can attach the bearer token and tenant headers.
+   */
+  readVehicleCard: (image: File) => {
+    const form = new FormData();
+    form.append('image', image);
+    return request<{
+      fields: { plateNumber: string | null; make: string | null; model: string | null; modelYear: number | null; color: string | null; vin: string | null };
+      uncertain: string[];
+      rawText: string;
+    }>('/automotive/vehicle-card/read', { method: 'POST', body: form });
+  },
   recordInspectionFindings: (id: string, findings: Array<Record<string, unknown>>) =>
     request<Record<string, unknown>>(`/automotive/inspection-bookings/${id}/findings`, { method: 'POST', body: { findings } }),
   inspectionReport: (id: string) => request<Record<string, unknown>>(`/automotive/inspection-bookings/${id}/report`),

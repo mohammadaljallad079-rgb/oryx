@@ -13,6 +13,7 @@ import type { RequestPrincipal } from '../auth/auth.decorators';
 import type {
   CreateChecklistItemDto,
   CreateInspectionBookingDto,
+  CreateInspectionIntakeDto,
   CreateInspectionServiceDto,
   CreateVehicleDto,
   DecideReportDto,
@@ -28,6 +29,24 @@ import type {
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+
+/** Relations every inspection booking is returned with. */
+const BOOKING_INCLUDE = {
+  vehicle: { select: { vin: true, make: true, model: true, modelYear: true, color: true, plateNumber: true } },
+  customer: { select: { code: true, nameEn: true, nameAr: true, phone: true } },
+  service: { select: { nameEn: true, nameAr: true } },
+  report: true,
+  _count: { select: { findings: true } },
+} as const;
+
+/** Canonical report sections, in the order the report presents them. */
+const INSPECTION_TYPE_ORDER = ['PAINT', 'CHASSIS', 'COMPREHENSIVE'] as const;
+
+/** De-duplicate and order the selected inspection types. */
+function normalizeInspectionTypes(types: readonly string[]): string[] {
+  const set = new Set(types.map((t) => t.toUpperCase()));
+  return INSPECTION_TYPE_ORDER.filter((t) => set.has(t));
+}
 
 /**
  * VIN validation.
@@ -98,12 +117,14 @@ export class VehicleService {
 
   async createVehicle(dto: CreateVehicleDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const vin = dto.vin.trim().toUpperCase();
-    if (!VIN_PATTERN.test(vin)) {
+    const vin = dto.vin ? dto.vin.trim().toUpperCase() : null;
+    if (vin && !VIN_PATTERN.test(vin)) {
       throw badRequest(ERROR_CODES.VEHICLE_VIN_INVALID, 'The VIN must be 11–17 characters and must not contain I, O or Q.');
     }
-    const dup = await this.prisma.vehicle.findUnique({ where: { companyId_vin: { companyId, vin } } });
-    if (dup) throw conflict(ERROR_CODES.VEHICLE_VIN_EXISTS, `A vehicle with VIN ${vin} already exists.`);
+    if (vin) {
+      const dup = await this.prisma.vehicle.findUnique({ where: { companyId_vin: { companyId, vin } } });
+      if (dup) throw conflict(ERROR_CODES.VEHICLE_VIN_EXISTS, `A vehicle with VIN ${vin} already exists.`);
+    }
     await this.assertCustomer(companyId, dto.customerId);
 
     const vehicle = await this.posting.withTransaction(async (tx) => {
@@ -128,7 +149,7 @@ export class VehicleService {
       return created;
     });
 
-    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.vehicle_created', targetType: 'VEHICLE', targetId: vehicle.id, summary: `Registered vehicle ${vehicle.make} ${vehicle.model} (${vin})` });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.vehicle_created', targetType: 'VEHICLE', targetId: vehicle.id, summary: `Registered vehicle ${vehicle.make} ${vehicle.model}${vin ? ` (${vin})` : ''}` });
     return toVehicleDto(vehicle);
   }
 
@@ -229,12 +250,178 @@ export class VehicleService {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-    const where = { companyId, ...(query.status ? { status: query.status as never } : {}), ...(query.vehicleId ? { vehicleId: query.vehicleId } : {}) };
+    const where = {
+      companyId,
+      ...(query.status ? { status: query.status as never } : {}),
+      ...(query.vehicleId ? { vehicleId: query.vehicleId } : {}),
+      ...(query.customerId ? { customerId: query.customerId } : {}),
+      ...(query.search
+        ? {
+            OR: [
+              { bookingNumber: { contains: query.search, mode: 'insensitive' as const } },
+              { vehicle: { vin: { contains: query.search, mode: 'insensitive' as const } } },
+              { vehicle: { plateNumber: { contains: query.search, mode: 'insensitive' as const } } },
+              { vehicle: { make: { contains: query.search, mode: 'insensitive' as const } } },
+              { vehicle: { model: { contains: query.search, mode: 'insensitive' as const } } },
+              { customer: { nameEn: { contains: query.search, mode: 'insensitive' as const } } },
+              { customer: { nameAr: { contains: query.search } } },
+              { customer: { phone: { contains: query.search } } },
+              { customer: { code: { contains: query.search, mode: 'insensitive' as const } } },
+            ],
+          }
+        : {}),
+    };
     const [rows, total] = await Promise.all([
-      this.prisma.inspectionBooking.findMany({ where, orderBy: { scheduledAt: 'desc' }, skip: (page - 1) * pageSize, take: pageSize, include: { vehicle: { select: { vin: true, make: true, model: true, plateNumber: true } }, service: { select: { nameEn: true, nameAr: true } }, report: true, _count: { select: { findings: true } } } }),
+      this.prisma.inspectionBooking.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          vehicle: { select: { vin: true, make: true, model: true, modelYear: true, color: true, plateNumber: true } },
+          customer: { select: { code: true, nameEn: true, nameAr: true, phone: true } },
+          service: { select: { nameEn: true, nameAr: true } },
+          report: true,
+          _count: { select: { findings: true } },
+        },
+      }),
       this.prisma.inspectionBooking.count({ where }),
     ]);
     return { items: rows.map(toInspectionBookingDto), total, page, pageSize };
+  }
+
+  /**
+   * Create an inspection from the intake form.
+   *
+   * The vehicle and customer must belong to the caller's company (enforced by
+   * `assertVehicle`/`assertCustomer`), so a cross-tenant pair is rejected. The
+   * inspection starts as DRAFT when `saveDraft` is set, otherwise it is
+   * scheduled for the requested time.
+   */
+  async createInspectionIntake(dto: CreateInspectionIntakeDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
+    if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
+    const vehicle = await this.assertVehicle(companyId, dto.vehicleId);
+    await this.assertCustomer(companyId, dto.customerId);
+    if (vehicle.customerId !== dto.customerId) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'The selected vehicle does not belong to the selected customer.');
+    }
+    if (dto.serviceId) {
+      const service = await this.prisma.inspectionService.findFirst({ where: { id: dto.serviceId, companyId } });
+      if (!service) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection service not found.');
+    }
+    const inspectionTypes = normalizeInspectionTypes(dto.inspectionTypes);
+    if (inspectionTypes.length === 0) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Select at least one inspection type.');
+    }
+
+    const booking = await this.posting.withTransaction(async (tx) => {
+      const bookingNumber = await this.sequences.next(tx, companyId, 'inspectionBooking');
+      return tx.inspectionBooking.create({
+        data: {
+          companyId,
+          bookingNumber,
+          vehicleId: dto.vehicleId,
+          customerId: dto.customerId,
+          serviceId: dto.serviceId ?? null,
+          branchId: dto.branchId ?? null,
+          scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : new Date(),
+          status: dto.saveDraft ? 'DRAFT' : 'SCHEDULED',
+          inspectorUserId: dto.inspectorUserId ?? null,
+          odometer: dto.odometer ?? null,
+          inspectionTypes,
+          notes: dto.notes ?? null,
+          createdById: actor.userId,
+        },
+        include: BOOKING_INCLUDE,
+      });
+    });
+    // The inspection's own odometer reading is a point-in-time snapshot. It only
+    // ever advances the vehicle's stored mileage; it never rewrites history.
+    if (dto.odometer && dto.odometer > 0) {
+      await this.posting.withTransaction(async (tx) => {
+        await tx.vehicleMileageRecord.create({ data: { companyId, vehicleId: dto.vehicleId, mileage: dto.odometer!, source: 'INSPECTION' } });
+        await tx.vehicle.updateMany({ where: { id: dto.vehicleId, companyId, mileage: { lt: dto.odometer! } }, data: { mileage: dto.odometer! } });
+      });
+    }
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'automotive.inspection_created',
+      targetType: 'INSPECTION_BOOKING',
+      targetId: booking.id,
+      summary: `Created inspection ${booking.bookingNumber} (${inspectionTypes.join('+')})`,
+    });
+    return toInspectionBookingDto(booking);
+  }
+
+  /** Re-open a saved inspection, with everything the intake screen needs. */
+  async getInspectionIntake(id: string, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const booking = await this.prisma.inspectionBooking.findFirst({
+      where: { id, companyId },
+      include: {
+        ...BOOKING_INCLUDE,
+        vehicle: true,
+        customer: { select: { id: true, code: true, nameEn: true, nameAr: true, phone: true } },
+        findings: { orderBy: { createdAt: 'asc' } },
+      },
+    });
+    if (!booking) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection not found.');
+    return {
+      booking: toInspectionBookingDto(booking as never),
+      vehicle: booking.vehicle,
+      customer: booking.customer,
+      findings: booking.findings,
+      report: booking.report,
+    };
+  }
+
+  /**
+   * Edit a saved inspection.
+   *
+   * An approved report is immutable; everything else — including a draft that is
+   * being completed — can be re-saved. The customer/vehicle pairing is fixed
+   * once the inspection exists.
+   */
+  async updateInspectionIntake(id: string, dto: UpdateInspectionBookingDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const booking = await this.prisma.inspectionBooking.findFirst({ where: { id, companyId }, include: { report: true } });
+    if (!booking) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection not found.');
+    if (booking.report?.status === 'APPROVED') {
+      throw badRequest(ERROR_CODES.INSPECTION_ALREADY_APPROVED, 'An approved inspection cannot be edited.');
+    }
+    if (dto.status === 'COMPLETED') {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'An inspection is completed by approving its report.');
+    }
+    const updated = await this.prisma.inspectionBooking.update({
+      where: { id },
+      data: {
+        ...(dto.status !== undefined ? { status: dto.status as never } : {}),
+        ...(dto.inspectorUserId !== undefined ? { inspectorUserId: dto.inspectorUserId } : {}),
+        ...(dto.scheduledAt !== undefined ? { scheduledAt: new Date(dto.scheduledAt) } : {}),
+        ...(dto.odometer !== undefined ? { odometer: dto.odometer } : {}),
+        ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+        ...(dto.inspectionTypes !== undefined ? { inspectionTypes: normalizeInspectionTypes(dto.inspectionTypes) } : {}),
+      },
+      include: BOOKING_INCLUDE,
+    });
+    // Advancing the odometer records a new mileage point; history is untouched.
+    if (dto.odometer && dto.odometer > 0 && (!booking.odometer || dto.odometer > booking.odometer)) {
+      await this.posting.withTransaction(async (tx) => {
+        await tx.vehicleMileageRecord.create({ data: { companyId, vehicleId: booking.vehicleId, mileage: dto.odometer!, source: 'INSPECTION' } });
+        await tx.vehicle.updateMany({ where: { id: booking.vehicleId, companyId, mileage: { lt: dto.odometer! } }, data: { mileage: dto.odometer! } });
+      });
+    }
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'automotive.inspection_updated',
+      targetType: 'INSPECTION_BOOKING',
+      targetId: id,
+      summary: `Updated inspection ${updated.bookingNumber}`,
+    });
+    return toInspectionBookingDto(updated);
   }
 
   async createInspectionBooking(dto: CreateInspectionBookingDto, principal: RequestPrincipal, actor: ActorContext) {
@@ -261,7 +448,7 @@ export class VehicleService {
           notes: dto.notes ?? null,
           createdById: actor.userId,
         },
-        include: { vehicle: { select: { vin: true, make: true, model: true, plateNumber: true } }, service: { select: { nameEn: true, nameAr: true } }, report: true, _count: { select: { findings: true } } },
+        include: BOOKING_INCLUDE,
       });
     });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.inspection_booked', targetType: 'INSPECTION_BOOKING', targetId: booking.id, summary: `Booked inspection ${booking.bookingNumber}` });
@@ -280,8 +467,9 @@ export class VehicleService {
         ...(dto.scheduledAt !== undefined ? { scheduledAt: new Date(dto.scheduledAt) } : {}),
         ...(dto.odometer !== undefined ? { odometer: dto.odometer } : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+        ...(dto.inspectionTypes !== undefined ? { inspectionTypes: normalizeInspectionTypes(dto.inspectionTypes) } : {}),
       },
-      include: { vehicle: { select: { vin: true, make: true, model: true, plateNumber: true } }, service: { select: { nameEn: true, nameAr: true } }, report: true, _count: { select: { findings: true } } },
+      include: BOOKING_INCLUDE,
     });
     // A recorded odometer reading also advances the vehicle mileage.
     if (dto.odometer && dto.odometer >= booking.odometer!) {
@@ -398,6 +586,7 @@ export class VehicleService {
       if (!booking) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection booking not found.');
       if (booking.report?.status !== 'APPROVED') throw forbidden(ERROR_CODES.INSPECTION_NOT_COMPLETE, 'Only an approved inspection can be invoiced.');
       if (booking.report.invoiceId) throw badRequest(ERROR_CODES.DOCUMENT_ALREADY_POSTED, 'This inspection has already been invoiced.');
+      if (!booking.service) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'This inspection has no priced service to invoice.');
 
       const invoice = await this.sales.issueInvoice(tx, {
         companyId,
@@ -462,7 +651,7 @@ export class VehicleService {
 function toVehicleDto(v: {
   id: string;
   customerId: string;
-  vin: string;
+  vin: string | null;
   plateNumber: string | null;
   make: string;
   model: string;
@@ -500,13 +689,16 @@ function toInspectionBookingDto(b: {
   bookingNumber: string;
   vehicleId: string;
   customerId: string;
-  serviceId: string;
+  serviceId: string | null;
   status: string;
   scheduledAt: Date;
   inspectorUserId: string | null;
   odometer: number | null;
+  inspectionTypes: string[];
   notes: string | null;
-  vehicle?: { vin: string; make: string; model: string; plateNumber: string | null } | null;
+  createdAt: Date;
+  vehicle?: { vin: string | null; make: string; model: string; modelYear?: number; color?: string | null; plateNumber: string | null } | null;
+  customer?: { code: string; nameEn: string; nameAr: string; phone: string | null } | null;
   service?: { nameEn: string; nameAr: string } | null;
   report?: { status: string; invoiceId: string | null } | null;
   _count?: { findings: number };
@@ -518,15 +710,23 @@ function toInspectionBookingDto(b: {
     vin: b.vehicle?.vin ?? null,
     make: b.vehicle?.make ?? null,
     model: b.vehicle?.model ?? null,
+    modelYear: b.vehicle?.modelYear ?? null,
+    color: b.vehicle?.color ?? null,
     plateNumber: b.vehicle?.plateNumber ?? null,
     customerId: b.customerId,
+    customerCode: b.customer?.code ?? null,
+    customerNameEn: b.customer?.nameEn ?? null,
+    customerNameAr: b.customer?.nameAr ?? null,
+    contactNo: b.customer?.phone ?? null,
     serviceId: b.serviceId,
     serviceNameEn: b.service?.nameEn ?? null,
     serviceNameAr: b.service?.nameAr ?? null,
     status: b.status,
     scheduledAt: b.scheduledAt.toISOString(),
+    createdAt: b.createdAt.toISOString(),
     inspectorUserId: b.inspectorUserId,
     odometer: b.odometer,
+    inspectionTypes: b.inspectionTypes ?? [],
     notes: b.notes,
     reportStatus: b.report?.status ?? null,
     invoiceId: b.report?.invoiceId ?? null,

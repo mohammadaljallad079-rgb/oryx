@@ -3,7 +3,7 @@
 import { PermissionGate } from '@/components/permission-gate';
 import { useEffect, useState } from 'react';
 import type { PlanDto } from '@oryx/shared';
-import { MODULES } from '@oryx/shared';
+import { DEFAULT_CURRENCY, MODULES } from '@oryx/shared';
 import { api } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
@@ -195,7 +195,7 @@ function PlanEditor({
     descriptionAr: '',
     monthlyPrice: 0,
     annualPrice: 0,
-    currency: 'SAR',
+    currency: DEFAULT_CURRENCY,
     trialDays: 14,
     maxCompanies: 1,
     maxBranches: 1,
@@ -240,7 +240,7 @@ function PlanEditor({
         descriptionAr: '',
         monthlyPrice: 0,
         annualPrice: 0,
-        currency: 'SAR',
+        currency: DEFAULT_CURRENCY,
         trialDays: 14,
         maxCompanies: 1,
         maxBranches: 1,

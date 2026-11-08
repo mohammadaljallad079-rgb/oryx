@@ -82,7 +82,16 @@ export class PrintService {
     }
   }
 
-  private async staffName(userId: string | null | undefined): Promise<string> {
+  /**
+   * The staff name the printed form shows: the operator chosen when the
+   * document was created, falling back to the account that created it. A
+   * document created before the field existed still prints a name.
+   */
+  private async staffName(
+    stored: string | null | undefined,
+    userId: string | null | undefined,
+  ): Promise<string> {
+    if (stored && stored.trim()) return stored.trim();
     if (!userId) return '—';
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     return user?.fullNameEn ?? user?.email ?? '—';
@@ -142,7 +151,7 @@ export class PrintService {
       issueDateValue: formatDate(invoice.invoiceDate),
       secondaryDateLabel: spec.secondaryLabel ?? null,
       secondaryDateValue: invoice.dueDate ? formatDate(invoice.dueDate) : null,
-      staffName: await this.staffName(invoice.createdById),
+      staffName: await this.staffName(invoice.staffName, invoice.createdById),
       paymentLabel: payment ? 'Payment' : null,
       paymentValue: payment ? payment.method.replace(/_/g, ' ') : null,
       reference: invoice.notes,
@@ -178,7 +187,7 @@ export class PrintService {
       issueDateValue: formatDate(quote.issueDate),
       secondaryDateLabel: spec.secondaryLabel ?? null,
       secondaryDateValue: quote.validUntil ? formatDate(quote.validUntil) : null,
-      staffName: await this.staffName(quote.createdById),
+      staffName: await this.staffName(quote.staffName, quote.createdById),
       paymentLabel: null,
       paymentValue: null,
       reference: quote.notes,
@@ -223,7 +232,7 @@ export class PrintService {
       issueDateValue: formatDate(order.orderDate),
       secondaryDateLabel: null,
       secondaryDateValue: null,
-      staffName: await this.staffName(order.createdById),
+      staffName: await this.staffName(order.staffName, order.createdById),
       paymentLabel: null,
       paymentValue: null,
       reference: order.notes,
@@ -268,7 +277,7 @@ export class PrintService {
       issueDateValue: formatDate(note.issueDate),
       secondaryDateLabel: null,
       secondaryDateValue: null,
-      staffName: await this.staffName(note.createdById),
+      staffName: await this.staffName(note.staffName, note.createdById),
       paymentLabel: null,
       paymentValue: null,
       reference: note.reason,
@@ -342,7 +351,7 @@ export class PrintService {
       issueDateValue: formatDate(payment.paidAt),
       secondaryDateLabel: null,
       secondaryDateValue: null,
-      staffName: await this.staffName(payment.createdById),
+      staffName: await this.staffName(payment.staffName, payment.createdById),
       paymentLabel: 'Payment Method',
       paymentValue: payment.method.replace(/_/g, ' '),
       reference: payment.reference,
