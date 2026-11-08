@@ -245,6 +245,32 @@ export const Icons = {
       <circle cx="16.5" cy="14.5" r="1.2" />
     </Base>
   ),
+  print: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M6 9V3h12v6" />
+      <path d="M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" />
+      <rect x="6" y="14" width="12" height="8" rx="1" />
+      <path d="M18 12h.01" />
+    </Base>
+  ),
+  download: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M12 3v12" />
+      <path d="M7 11l5 5 5-5" />
+      <path d="M4 19h16" />
+    </Base>
+  ),
+  paperclip: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M20 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.6 1.6 0 0 1-2.3-2.3l7.8-7.8" />
+    </Base>
+  ),
+  eye: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </Base>
+  ),
 } as const;
 
 export type IconName = keyof typeof Icons;

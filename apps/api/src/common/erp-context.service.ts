@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { DEFAULT_CURRENCY } from '@oryx/shared';
 import { PrismaService } from './prisma.service';
 import { forbidden, ERROR_CODES, badRequest } from './errors';
 import type { RequestPrincipal } from '../auth/auth.decorators';
@@ -61,6 +62,35 @@ export class ErpContextService {
     const exists = await this.prisma.company.findUnique({ where: { id: companyId } });
     if (!exists) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Unknown company context.');
     return { companyId, branchIds: [] };
+  }
+
+  /**
+   * The tenant's base currency, resolved from the company record.
+   *
+   * Documents must carry the company's own currency rather than a hard-coded
+   * one, so changing the currency in Settings takes effect on the next document.
+   */
+  async resolveCompanyCurrency(companyId: string): Promise<string> {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { currency: true },
+    });
+    return company?.currency ?? DEFAULT_CURRENCY;
+  }
+
+  /**
+   * The display name a document prints as its operator: the account that
+   * created it. The approved form always shows the user who prepared the
+   * document, so this is captured from the request principal and never chosen
+   * by hand.
+   */
+  async resolveActorName(userId: string | null | undefined): Promise<string | null> {
+    if (!userId) return null;
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { fullNameEn: true, fullNameAr: true, email: true },
+    });
+    return user?.fullNameEn ?? user?.fullNameAr ?? user?.email ?? null;
   }
 
   /**

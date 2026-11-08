@@ -1,6 +1,6 @@
 'use client';
 
-import { fromQuantity, fromMinor } from '@oryx/shared';
+import { DEFAULT_CURRENCY, currencyScale, fromMinor, fromQuantity } from '@oryx/shared';
 
 /**
  * Display helpers for the ERP pages.
@@ -8,10 +8,26 @@ import { fromQuantity, fromMinor } from '@oryx/shared';
  * The API returns integer minor units and 10^4-scaled quantities, so every
  * figure is formatted from those integers — the UI never re-derives a total from
  * floats, which keeps what is shown identical to what was posted.
+ *
+ * The active currency is the base currency of the selected company (BHD by
+ * default). It is pushed here by the app shell whenever the company context or
+ * the Settings currency changes, so a page that calls `money(minor)` renders in
+ * the tenant's own currency without threading the code through every call site.
  */
-export function money(minor: number | null | undefined, currency = 'SAR'): string {
+let activeCurrency = DEFAULT_CURRENCY;
+
+/** Set the currency used by `money`/`toMinorInput` when no explicit code is given. */
+export function setActiveCurrency(code: string | null | undefined): void {
+  activeCurrency = code && code.trim() ? code.trim().toUpperCase() : DEFAULT_CURRENCY;
+}
+
+export function getActiveCurrency(): string {
+  return activeCurrency;
+}
+
+export function money(minor: number | null | undefined, currency = activeCurrency): string {
   if (minor === null || minor === undefined) return '—';
-  return `${fromMinor(minor)} ${currency}`;
+  return `${fromMinor(minor, currencyScale(currency))} ${currency}`;
 }
 
 export function qty(scaled: number | null | undefined): string {
@@ -20,15 +36,22 @@ export function qty(scaled: number | null | undefined): string {
   return fromQuantity(scaled).replace(/\.?0+$/, '') || '0';
 }
 
-/** Convert a decimal input ("12.50") to minor units for the API. */
-export function toMinorInput(value: string): number {
+/** Convert decimal input ("12.500") to minor units for the API. */
+export function toMinorInput(value: string, currency = activeCurrency): number {
   const trimmed = value.trim();
   if (trimmed === '' || Number.isNaN(Number(trimmed))) return 0;
+  const scale = currencyScale(currency);
   const [whole, fraction = ''] = trimmed.split('.');
-  const padded = fraction.padEnd(2, '0').slice(0, 2);
+  const padded = fraction.padEnd(scale, '0').slice(0, scale);
   const sign = whole.startsWith('-') ? -1 : 1;
   const absWhole = Math.abs(Number(whole || '0'));
-  return sign * (absWhole * 100 + Number(padded || '0'));
+  return sign * (absWhole * 10 ** scale + Number(padded || '0'));
+}
+
+/** Render integer minor units as a decimal string for a money input field. */
+export function toMoneyInput(minor: number | null | undefined, currency = activeCurrency): string {
+  if (minor === null || minor === undefined) return '';
+  return fromMinor(minor, currencyScale(currency));
 }
 
 /** Convert a decimal quantity to 10^4-scaled units for the API. */

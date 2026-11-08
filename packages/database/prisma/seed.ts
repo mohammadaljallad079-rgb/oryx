@@ -17,9 +17,12 @@
 
 import { PrismaClient, type Prisma } from '@prisma/client';
 import * as argon2 from 'argon2';
-import { MODULES, PERMISSIONS, lineAmountMinor } from '@oryx/shared';
+import { MODULES, PERMISSIONS, lineAmountMinor, DEFAULT_CURRENCY } from '@oryx/shared';
 
 const prisma = new PrismaClient();
+
+/** The platform's base currency, used for every seeded tenant and plan. */
+const BASE_CURRENCY = DEFAULT_CURRENCY;
 
 const DEMO_MARKER = 'SEED_DEMO_DATA';
 
@@ -46,6 +49,7 @@ const STANDARD_CHART: Array<{
   { code: '5900', nameEn: 'Cash over / short', nameAr: 'فروق الصندوق', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: 'CASH_OVER_SHORT' },
   { code: '5910', nameEn: 'Inventory adjustment', nameAr: 'تسوية المخزون', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: 'STOCK_ADJUSTMENT' },
   { code: '5920', nameEn: 'Purchase price variance', nameAr: 'فروق أسعار الشراء', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: 'PURCHASE_PRICE_VARIANCE' },
+  { code: '5930', nameEn: 'Rounding gain / loss', nameAr: 'أرباح وخسائر التقريب', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: 'ROUNDING_GAIN_LOSS' },
   { code: '6000', nameEn: 'Salaries and wages expense', nameAr: 'مصروف الرواتب والأجور', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: 'SALARIES_EXPENSE' },
   { code: '2200', nameEn: 'Salaries payable', nameAr: 'الرواتب المستحقة الدفع', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: 'WAGES_PAYABLE' },
   { code: '2210', nameEn: 'Payroll deductions payable', nameAr: 'استقطاعات الرواتب المستحقة', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: 'PAYROLL_DEDUCTIONS' },
@@ -198,6 +202,7 @@ async function seedPlans() {
         descriptionAr: plan.descriptionAr,
         monthlyPrice: plan.monthlyPrice,
         annualPrice: plan.annualPrice,
+        currency: BASE_CURRENCY,
         trialDays: plan.trialDays,
         maxCompanies: plan.maxCompanies,
         maxBranches: plan.maxBranches,
@@ -213,6 +218,7 @@ async function seedPlans() {
         descriptionAr: plan.descriptionAr,
         monthlyPrice: plan.monthlyPrice,
         annualPrice: plan.annualPrice,
+        currency: BASE_CURRENCY,
         trialDays: plan.trialDays,
         maxCompanies: plan.maxCompanies,
         maxBranches: plan.maxBranches,
@@ -393,6 +399,16 @@ interface CompanySpec {
   parentCode?: string;
   demo?: boolean;
   branches: Array<{ code: string; nameEn: string; nameAr: string; city: string }>;
+  /** Print metadata carried on issued documents. */
+  legalNameEn?: string;
+  taxNumber?: string;
+  crNumber?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  addressLine?: string;
+  printNoteEn?: string;
+  printNoteAr?: string;
 }
 
 const COMPANIES: CompanySpec[] = [
@@ -411,6 +427,15 @@ const COMPANIES: CompanySpec[] = [
     type: 'INTERNAL',
     industry: 'Automotive Services',
     parentCode: 'ORYX-HOLDING',
+    legalNameEn: 'ORYX Auto Services Ltd.',
+    taxNumber: '310000000000003',
+    crNumber: '1010000003',
+    phone: '+966 11 000 0003',
+    email: 'info@oryx-auto.local',
+    website: 'www.oryx-auto.local',
+    addressLine: 'King Fahd Road, Al Olaya District, Riyadh 12211',
+    printNoteEn: 'Goods sold are not refundable after 14 days. Warranty terms apply.',
+    printNoteAr: 'لا يمكن إرجاع البضاعة بعد 14 يوماً. تسري شروط الضمان.',
     branches: [
       { code: 'RUH-01', nameEn: 'Riyadh North Workshop', nameAr: 'ورشة شمال الرياض', city: 'Riyadh' },
       { code: 'JED-01', nameEn: 'Jeddah Inspection Center', nameAr: 'مركز فحص جدة', city: 'Jeddah' },
@@ -461,9 +486,23 @@ const COMPANIES: CompanySpec[] = [
   },
 ];
 
+/** Print metadata for a company, defaulting the contact bar from the code. */
+function printMeta(spec: CompanySpec) {
+  return {
+    legalNameEn: spec.legalNameEn ?? `${spec.nameEn} Ltd.`,
+    taxNumber: spec.taxNumber ?? null,
+    crNumber: spec.crNumber ?? null,
+    phone: spec.phone ?? null,
+    email: spec.email ?? null,
+    website: spec.website ?? null,
+    addressLine: spec.addressLine ?? null,
+    printNoteEn: spec.printNoteEn ?? null,
+    printNoteAr: spec.printNoteAr ?? null,
+  };
+}
+
 async function seedCompanies(superAdminId: string) {
   const idByCode = new Map<string, string>();
-
   for (const spec of COMPANIES) {
     const notes = spec.demo ? `${DEMO_MARKER}: synthetic tenant for dashboard demonstration` : null;
     const company = await prisma.company.upsert({
@@ -474,19 +513,24 @@ async function seedCompanies(superAdminId: string) {
         type: spec.type,
         industry: spec.industry,
         status: 'ACTIVE',
+        // The platform base currency is the Bahraini Dinar; re-seeding keeps the
+        // demo tenants aligned with it rather than leaving a stale currency.
+        currency: BASE_CURRENCY,
         notes,
+        ...printMeta(spec),
       },
       create: {
         code: spec.code,
         nameEn: spec.nameEn,
         nameAr: spec.nameAr,
-        legalNameEn: `${spec.nameEn} Ltd.`,
+        legalNameEn: spec.legalNameEn ?? `${spec.nameEn} Ltd.`,
         type: spec.type,
         industry: spec.industry,
         status: 'ACTIVE',
-        countryCode: 'SA',
-        currency: 'SAR',
+        countryCode: 'BH',
+        currency: BASE_CURRENCY,
         notes,
+        ...printMeta(spec),
       },
     });
     idByCode.set(spec.code, company.id);

@@ -351,6 +351,32 @@ test.describe('required screenshots', () => {
     }
   });
 
+  test('vehicle inspection intake (Phase 1)', async ({ page }) => {
+    await signIn(page, ENTERPRISE_ADMIN);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+
+    await setLocale(page, 'en');
+    await setTheme(page, 'dark');
+    await page.goto('/automotive/inspections/new');
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: `${OUT}/inspection-intake-en-dark.png`, fullPage: true });
+
+    await setLocale(page, 'ar');
+    await page.goto('/automotive/inspections/new');
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: `${OUT}/inspection-intake-ar-dark.png`, fullPage: true });
+
+    await setLocale(page, 'en');
+    await setTheme(page, 'light');
+    await page.goto('/automotive/inspections/new');
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: `${OUT}/inspection-intake-en-light.png`, fullPage: true });
+
+    await page.setViewportSize({ width: 420, height: 900 });
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${OUT}/inspection-intake-mobile-en-light.png`, fullPage: true });
+  });
+
   test('execution 05 external integrations center', async ({ page }) => {
     await signIn(page, SUPER_ADMIN);
     await setTheme(page, 'dark');

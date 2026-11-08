@@ -5,8 +5,10 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
-import { money, qty, toMinorInput, toQuantityInput } from '@/lib/erp-format';
+import { money, qty, toBasisPoints, toMinorInput, toMoneyInput, toQuantityInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { AttachmentsPanel, DocumentPrintActions } from '@/components/document-print';
+import { SearchableSelect, type SearchableOption } from '@/components/searchable-select';
 import {
   Badge,
   Button,
@@ -20,12 +22,15 @@ import {
   StatusBadge,
   TableShell,
 } from '@/components/ui';
-import type {
-  CashierSessionDto,
-  CustomerDto,
-  PosSaleDto,
-  SalesDocumentDto,
-  WarehouseDto,
+import {
+  basisPointsOfMinor,
+  lineAmountMinor,
+  sumMinor,
+  type CashierSessionDto,
+  type CustomerDto,
+  type PosSaleDto,
+  type SalesDocumentDto,
+  type WarehouseDto,
 } from '@oryx/shared';
 
 type Tab = 'invoices' | 'orders' | 'quotations' | 'credit-notes' | 'pos' | 'customers';
@@ -35,10 +40,44 @@ interface LineDraft {
   description: string;
   quantity: string;
   unitPrice: string;
+  discountPercent: string;
   taxPercent: string;
 }
 
-const emptyLine = (): LineDraft => ({ productId: '', description: '', quantity: '1', unitPrice: '0.00', taxPercent: '15' });
+const emptyLine = (): LineDraft => ({
+  productId: '',
+  description: '',
+  quantity: '1',
+  unitPrice: '0.00',
+  discountPercent: '0',
+  taxPercent: '15',
+});
+
+/**
+ * Line amount preview, computed exactly as the API prices it: quantity × price,
+ * minus the discount, plus the tax. Kept in integer minor units so the figure
+ * under the cursor matches the figure the server will store.
+ */
+function lineAmountPreview(line: LineDraft): string {
+  const gross = lineAmountMinor(toQuantityInput(line.quantity), toMinorInput(line.unitPrice));
+  const discount = basisPointsOfMinor(gross, toBasisPoints(line.discountPercent));
+  const net = gross - discount;
+  const tax = basisPointsOfMinor(net, toBasisPoints(line.taxPercent));
+  return money(net + tax);
+}
+
+function customerOptions(customers: CustomerDto[]): SearchableOption[] {
+  return customers.map((c) => ({ value: c.id, label: c.nameEn, hint: c.code }));
+}
+
+function productOptions(products: Array<{ id: string; sku: string; nameEn: string }>): SearchableOption[] {
+  return products.map((p) => ({ value: p.id, label: p.nameEn, hint: p.sku }));
+}
+
+/** A short unique code for an inline-created record ("C-3F9A2B"). */
+function autoCode(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+}
 
 export default function SalesPage() {
   const { t } = useUi();
@@ -218,6 +257,7 @@ function CustomerModal({ open, onClose, onCreated }: { open: boolean; onClose: (
 function InvoicesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
   const list = useAsync(() => api.salesInvoices({ page: 1 }), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
@@ -249,6 +289,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.sales.total')}</th>
               <th>{t('erp.sales.outstanding')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -260,6 +301,20 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(inv.totalMinor, inv.currency)}</td>
                 <td className="tabular-nums text-[12.5px]">{money(inv.outstandingMinor ?? 0, inv.currency)}</td>
                 <td><StatusBadge status={inv.status} label={inv.status} /></td>
+                <td>
+                  <div className="flex items-center gap-1.5">
+                    <DocumentPrintActions kind="SALES_INVOICE" id={inv.id} compact />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setDetail(inv)}
+                      title={t('attachments.title')}
+                      data-testid={`invoice-attach-open-${inv.invoiceNumber}`}
+                    >
+                      <Icon name="paperclip" size={15} />
+                    </Button>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -270,15 +325,34 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         title={t('erp.sales.newInvoice')}
         customers={customers.data?.items ?? []}
         products={products.data?.items ?? []}
+        canCreate={canManage}
+        reloadCustomers={customers.reload}
+        reloadProducts={products.reload}
         warehouses={warehouses.data?.items ?? []}
         showWarehouse
         testIdPrefix="invoice"
+        dateField="invoiceDate"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
-          await api.createSalesInvoice(payload);
+          await api.createSalesInvoice({ ...payload, post: true });
           await list.reload();
         }}
       />
+      <Modal
+        open={detail !== null}
+        title={`${t('erp.sales.invoiceNumber')} ${detail?.invoiceNumber ?? ''}`}
+        onClose={() => setDetail(null)}
+      >
+        {detail ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[13px] font-semibold">{detail.customerNameEn}</span>
+              <DocumentPrintActions kind="SALES_INVOICE" id={detail.id} />
+            </div>
+            <AttachmentsPanel entityType="SALES_INVOICE" entityId={detail.id} canManage={canManage} />
+          </div>
+        ) : null}
+      </Modal>
     </Card>
   );
 }
@@ -316,6 +390,7 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.sales.customer')}</th>
               <th>{t('erp.sales.total')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -326,6 +401,7 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{o.customerNameEn}</td>
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(o.totalMinor, o.currency)}</td>
                 <td><StatusBadge status={o.status} label={o.status} /></td>
+                <td><DocumentPrintActions kind="SALES_ORDER" id={o.id} compact /></td>
               </tr>
             ))}
           </tbody>
@@ -336,9 +412,13 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
         title={t('erp.sales.newOrder')}
         customers={customers.data?.items ?? []}
         products={products.data?.items ?? []}
+        canCreate={canManage}
+        reloadCustomers={customers.reload}
+        reloadProducts={products.reload}
         warehouses={warehouses.data?.items ?? []}
         showWarehouse
         testIdPrefix="order"
+        dateField="orderDate"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
           await api.createSalesOrder({ ...payload, confirm: true });
@@ -394,18 +474,21 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(q.totalMinor, q.currency)}</td>
                 <td><StatusBadge status={q.status} label={q.status} /></td>
                 <td>
-                  {canManage && q.status !== 'CONVERTED' ? (
-                    <Button
-                      size="sm"
-                      onClick={async () => {
-                        await api.convertQuotation(q.id, warehouses.data?.items[0]?.id);
-                        await list.reload();
-                      }}
-                      data-testid={`convert-quotation-${q.quoteNumber}`}
-                    >
-                      {t('erp.sales.convert')}
-                    </Button>
-                  ) : null}
+                  <div className="flex items-center gap-1.5">
+                    <DocumentPrintActions kind="QUOTATION" id={q.id} compact />
+                    {canManage && q.status !== 'CONVERTED' ? (
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          await api.convertQuotation(q.id, warehouses.data?.items[0]?.id);
+                          await list.reload();
+                        }}
+                        data-testid={`convert-quotation-${q.quoteNumber}`}
+                      >
+                        {t('erp.sales.convert')}
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -417,6 +500,9 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
         title={t('erp.sales.newQuotation')}
         customers={customers.data?.items ?? []}
         products={products.data?.items ?? []}
+        canCreate={canManage}
+        reloadCustomers={customers.reload}
+        reloadProducts={products.reload}
         warehouses={warehouses.data?.items ?? []}
         testIdPrefix="quotation"
         onClose={() => setOpen(false)}
@@ -463,6 +549,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.sales.total')}</th>
               <th>{t('erp.sales.restock')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -474,6 +561,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(n.totalMinor, n.currency)}</td>
                 <td className="text-[12.5px]">{(n as { restockInventory?: boolean }).restockInventory ? '✓' : '—'}</td>
                 <td><StatusBadge status={n.status} label={n.status} /></td>
+                <td><DocumentPrintActions kind="CREDIT_NOTE" id={n.id} compact /></td>
               </tr>
             ))}
           </tbody>
@@ -484,6 +572,9 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
         title={t('erp.sales.newCreditNote')}
         customers={customers.data?.items ?? []}
         products={products.data?.items ?? []}
+        canCreate={canManage}
+        reloadCustomers={customers.reload}
+        reloadProducts={products.reload}
         warehouses={warehouses.data?.items ?? []}
         showWarehouse
         showRestock
@@ -617,6 +708,8 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
         open={saleOpen}
         session={openSession ?? null}
         products={products.data?.items ?? []}
+        canCreate={canManage}
+        reloadProducts={products.reload}
         onClose={() => setSaleOpen(false)}
         onDone={async () => {
           await sales.reload();
@@ -640,12 +733,16 @@ function PosSaleModal({
   open,
   session,
   products,
+  canCreate,
+  reloadProducts,
   onClose,
   onDone,
 }: {
   open: boolean;
   session: CashierSessionDto | null;
   products: Array<{ id: string; sku: string; nameEn: string; salesPriceMinor: number; taxRateBp: number }>;
+  canCreate?: boolean;
+  reloadProducts?: () => Promise<void>;
   onClose: () => void;
   onDone: () => Promise<void>;
 }) {
@@ -655,11 +752,32 @@ function PosSaleModal({
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
   const [paid, setPaid] = useState('');
 
-  const total = lines.reduce((sum, l) => {
-    const net = toQuantityInput(l.quantity) * toMinorInput(l.unitPrice) / 10000;
-    const tax = net * (Number(l.taxPercent) || 0) / 100;
-    return sum + Math.round(net + tax);
-  }, 0);
+  const createProduct = async (query: string, index: number) => {
+    try {
+      const created = await api.createProduct({
+        sku: autoCode('P'),
+        nameEn: query,
+        nameAr: query,
+        salesPriceMinor: 0,
+      });
+      await reloadProducts?.();
+      setLines((prev) => prev.map((l, i) => (i === index ? { ...l, productId: created.id } : l)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    }
+  };
+
+  // Price each line exactly as the API does (integer minor units, one half-up
+  // rounding per step) so the total shown can never disagree with the total the
+  // server computes — a float preview could round one minor unit low and make
+  // the server reject the sale as underpaid.
+  const total = sumMinor(
+    lines.map((l) => {
+      const gross = lineAmountMinor(toQuantityInput(l.quantity), toMinorInput(l.unitPrice));
+      const net = gross - basisPointsOfMinor(gross, toBasisPoints(l.discountPercent));
+      return net + basisPointsOfMinor(net, toBasisPoints(l.taxPercent));
+    }),
+  );
 
   const submit = async () => {
     if (!session) return;
@@ -672,13 +790,27 @@ function PosSaleModal({
         warehouseId: session.warehouseId ?? undefined,
         paymentMethod: 'CASH',
         paidMinor: paid ? toMinorInput(paid) : total,
-        lines: lines.map((l) => ({
-          productId: l.productId || undefined,
-          description: l.description,
-          quantity: toQuantityInput(l.quantity),
-          unitPriceMinor: toMinorInput(l.unitPrice),
-          taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
-        })),
+        lines: lines.map((l) => {
+          // The API requires a non-empty description, so a line priced from the
+          // catalogue carries the product name (with the free-text note beneath
+          // it) exactly as the invoice editor does; a line with neither keeps a
+          // neutral placeholder rather than failing validation.
+          const product = products.find((p) => p.id === l.productId);
+          const note = l.description.trim();
+          const description = product
+            ? note
+              ? `${product.nameEn}\n${note}`
+              : product.nameEn
+            : note || 'Item';
+          return {
+            productId: l.productId || undefined,
+            description,
+            quantity: toQuantityInput(l.quantity),
+            unitPriceMinor: toMinorInput(l.unitPrice),
+            discountPercentBp: toBasisPoints(l.discountPercent),
+            taxPercentBp: toBasisPoints(l.taxPercent),
+          };
+        }),
       });
       await onDone();
       onClose();
@@ -706,10 +838,16 @@ function PosSaleModal({
       }
     >
       {error ? <ErrorBanner message={error} /> : null}
-      <LineEditor lines={lines} setLines={setLines} products={products} testIdPrefix="pos-line" />
+      <LineEditor
+        lines={lines}
+        setLines={setLines}
+        products={products}
+        testIdPrefix="pos-line"
+        onCreateProduct={canCreate && reloadProducts ? createProduct : undefined}
+      />
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.sales.paid')}>
-          <input className="oryx-input" value={paid} onChange={(e) => setPaid(e.target.value)} placeholder={String(total / 100)} data-testid="pos-paid" />
+          <input className="oryx-input" value={paid} onChange={(e) => setPaid(e.target.value)} placeholder={toMoneyInput(total)} data-testid="pos-paid" />
         </Field>
         <div className="flex items-end">
           <span className="oryx-muted text-[13px]">
@@ -783,11 +921,14 @@ function LineEditor({
   setLines,
   products,
   testIdPrefix,
+  onCreateProduct,
 }: {
   lines: LineDraft[];
   setLines: (lines: LineDraft[]) => void;
   products: Array<{ id: string; sku: string; nameEn: string; salesPriceMinor: number; taxRateBp: number }>;
   testIdPrefix: string;
+  /** Create a catalogue item from the query and select it on this line. */
+  onCreateProduct?: (query: string, index: number) => void | Promise<void>;
 }) {
   const { t } = useUi();
 
@@ -797,60 +938,98 @@ function LineEditor({
     setLines(next);
   };
 
+  // Columns: description (wide) | qty | unit price | discount % | tax % | amount | remove.
+  const cols = 'grid-cols-[minmax(0,1fr)_70px_100px_70px_70px_104px_32px]';
+
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2" dir="inherit">
+      <div className={`hidden ${cols} items-center gap-2 px-1 sm:grid`}>
+        <span className="oryx-label m-0">{t('erp.accounting.description')}</span>
+        <span className="oryx-label m-0 text-center">{t('erp.inventory.quantity')}</span>
+        <span className="oryx-label m-0 text-center">{t('erp.sales.unitPrice')}</span>
+        <span className="oryx-label m-0 text-center">{t('erp.sales.discount')}</span>
+        <span className="oryx-label m-0 text-center">{t('erp.sales.tax')}</span>
+        <span className="oryx-label m-0 text-center">{t('erp.sales.amount')}</span>
+        <span aria-hidden />
+      </div>
       {lines.map((line, i) => (
-        <div key={i} className="grid grid-cols-12 gap-2">
-          <select
-            className="oryx-select col-span-4"
-            value={line.productId}
-            onChange={(e) => {
-              const product = products.find((p) => p.id === e.target.value);
-              update(i, {
-                productId: e.target.value,
-                description: product ? product.nameEn : line.description,
-                unitPrice: product ? (product.salesPriceMinor / 100).toFixed(2) : line.unitPrice,
-                taxPercent: product ? String(product.taxRateBp / 100) : line.taxPercent,
-              });
-            }}
-            data-testid={`${testIdPrefix}-product-${i}`}
-          >
-            <option value="">{t('erp.inventory.product')}</option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.sku} — {p.nameEn}
-              </option>
-            ))}
-          </select>
+        <div key={i} className={`grid ${cols} items-center gap-2`} data-testid={`${testIdPrefix}-line-${i}`}>
+          <div className="flex min-w-0 flex-col gap-1">
+            <SearchableSelect
+              value={line.productId}
+              options={productOptions(products)}
+              emptyLabel={t('erp.inventory.product')}
+              searchPlaceholder={t('common.searchPlaceholder')}
+              testId={`${testIdPrefix}-product-${i}`}
+              allowCreate={onCreateProduct !== undefined}
+              createLabel={t('erp.inventory.createProduct')}
+              onCreate={(query) => onCreateProduct?.(query, i)}
+              onChange={(value) => {
+                const product = products.find((p) => p.id === value);
+                // Selecting a product fills the product field and its price/tax
+                // only. The description stays independent and editable, so a
+                // free-text note is never overwritten by the catalogue name.
+                update(i, {
+                  productId: value,
+                  unitPrice: product ? toMoneyInput(product.salesPriceMinor) : line.unitPrice,
+                  taxPercent: product ? String(product.taxRateBp / 100) : line.taxPercent,
+                });
+              }}
+            />
+            <input
+              className="oryx-input"
+              placeholder={t('erp.sales.lineDescription')}
+              value={line.description}
+              onChange={(e) => update(i, { description: e.target.value })}
+              data-testid={`${testIdPrefix}-description-${i}`}
+            />
+          </div>
           <input
-            className="oryx-input col-span-3"
-            placeholder={t('erp.accounting.description')}
-            value={line.description}
-            onChange={(e) => update(i, { description: e.target.value })}
-            data-testid={`${testIdPrefix}-description-${i}`}
-          />
-          <input
-            className="oryx-input col-span-1"
-            placeholder={t('erp.inventory.quantity')}
+            className="oryx-input text-center tabular-nums"
+            inputMode="decimal"
+            placeholder="1"
             value={line.quantity}
             onChange={(e) => update(i, { quantity: e.target.value })}
             data-testid={`${testIdPrefix}-quantity-${i}`}
           />
           <input
-            className="oryx-input col-span-2"
-            placeholder={t('erp.sales.unitPrice')}
+            className="oryx-input text-center tabular-nums"
+            inputMode="decimal"
+            placeholder="0.00"
             value={line.unitPrice}
             onChange={(e) => update(i, { unitPrice: e.target.value })}
             data-testid={`${testIdPrefix}-price-${i}`}
           />
           <input
-            className="oryx-input col-span-1"
-            placeholder="%"
+            className="oryx-input text-center tabular-nums"
+            inputMode="decimal"
+            placeholder="0"
+            value={line.discountPercent}
+            onChange={(e) => update(i, { discountPercent: e.target.value })}
+            data-testid={`${testIdPrefix}-discount-${i}`}
+          />
+          <input
+            className="oryx-input text-center tabular-nums"
+            inputMode="decimal"
+            placeholder="15"
             value={line.taxPercent}
             onChange={(e) => update(i, { taxPercent: e.target.value })}
             data-testid={`${testIdPrefix}-tax-${i}`}
           />
-          <Button size="sm" variant="ghost" className="col-span-1" disabled={lines.length <= 1} onClick={() => setLines(lines.filter((_, idx) => idx !== i))}>
+          <span
+            className="oryx-faint truncate text-center text-[12.5px] font-semibold tabular-nums"
+            data-testid={`${testIdPrefix}-amount-${i}`}
+          >
+            {lineAmountPreview(line)}
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={lines.length <= 1}
+            onClick={() => setLines(lines.filter((_, idx) => idx !== i))}
+            data-testid={`${testIdPrefix}-remove-${i}`}
+            title={t('common.delete')}
+          >
             <Icon name="close" size={14} />
           </Button>
         </div>
@@ -872,6 +1051,10 @@ function DocumentModal({
   showWarehouse,
   showRestock,
   testIdPrefix,
+  dateField = 'issueDate',
+  canCreate,
+  reloadCustomers,
+  reloadProducts,
   onClose,
   onSubmit,
 }: {
@@ -883,10 +1066,20 @@ function DocumentModal({
   showWarehouse?: boolean;
   showRestock?: boolean;
   testIdPrefix: string;
+  /** The single date property the target document DTO accepts. */
+  dateField?: 'issueDate' | 'invoiceDate' | 'orderDate';
+  /** Offer inline create rows for a customer or a product. */
+  canCreate?: boolean;
+  reloadCustomers?: () => Promise<void>;
+  reloadProducts?: () => Promise<void>;
   onClose: () => void;
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
+  const { user } = useAuth();
+  // The approved form prints the operator who prepared the document, so the
+  // name is taken from the signed-in account and never chosen by hand.
+  const currentUserName = user ? (locale === 'ar' ? user.fullNameAr : user.fullNameEn) : '—';
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [customerId, setCustomerId] = useState('');
@@ -894,25 +1087,70 @@ function DocumentModal({
   const [restock, setRestock] = useState(true);
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
 
+  const createCustomer = async (query: string) => {
+    try {
+      const created = await api.createCustomer({
+        code: autoCode('C'),
+        nameEn: query,
+        nameAr: query,
+      });
+      await reloadCustomers?.();
+      setCustomerId(created.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    }
+  };
+
+  const createProduct = async (query: string, index: number) => {
+    try {
+      const created = await api.createProduct({
+        sku: autoCode('P'),
+        nameEn: query,
+        nameAr: query,
+        salesPriceMinor: 0,
+      });
+      await reloadProducts?.();
+      setLines((prev) => prev.map((l, i) => (i === index ? { ...l, productId: created.id } : l)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    }
+  };
+
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await onSubmit({
+      // Each document DTO accepts exactly one date property and its own set of
+      // optional fields, so the payload is assembled per document rather than
+      // posting every field to every endpoint.
+      const payload: Record<string, unknown> = {
         customerId,
-        warehouseId: warehouseId || undefined,
-        issueDate: new Date().toISOString(),
-        invoiceDate: new Date().toISOString(),
-        orderDate: new Date().toISOString(),
-        restockInventory: showRestock ? restock : undefined,
-        lines: lines.map((l) => ({
-          productId: l.productId || undefined,
-          description: l.description || 'Item',
-          quantity: toQuantityInput(l.quantity),
-          unitPriceMinor: toMinorInput(l.unitPrice),
-          taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
-        })),
-      });
+        [dateField]: new Date().toISOString(),
+        // The printed line carries the product name on its first line and the
+        // free-text note beneath it, matching the approved form; the note field
+        // stays independent of the product selection. A line with neither keeps
+        // a neutral placeholder rather than printing empty.
+        lines: lines.map((l) => {
+          const product = products.find((p) => p.id === l.productId);
+          const note = l.description.trim();
+          const description = product
+            ? note
+              ? `${product.nameEn}\n${note}`
+              : product.nameEn
+            : note || 'Item';
+          return {
+            productId: l.productId || undefined,
+            description,
+            quantity: toQuantityInput(l.quantity),
+            unitPriceMinor: toMinorInput(l.unitPrice),
+            discountPercentBp: toBasisPoints(l.discountPercent),
+            taxPercentBp: toBasisPoints(l.taxPercent),
+          };
+        }),
+      };
+      if (showWarehouse) payload.warehouseId = warehouseId || undefined;
+      if (showRestock) payload.restockInventory = restock;
+      await onSubmit(payload);
       onClose();
       setLines([emptyLine()]);
       setCustomerId('');
@@ -940,14 +1178,22 @@ function DocumentModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.sales.customer')} required>
-          <select className="oryx-select" value={customerId} onChange={(e) => setCustomerId(e.target.value)} data-testid={`${testIdPrefix}-customer`}>
-            <option value="">—</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.code} — {c.nameEn}
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            value={customerId}
+            options={customerOptions(customers)}
+            emptyLabel="—"
+            searchPlaceholder={t('common.searchPlaceholder')}
+            testId={`${testIdPrefix}-customer`}
+            allowCreate={canCreate === true && reloadCustomers !== undefined}
+            createLabel={t('erp.sales.createCustomer')}
+            onCreate={createCustomer}
+            onChange={setCustomerId}
+          />
+        </Field>
+        <Field label={t('erp.sales.preparedBy')}>
+          <div className="oryx-input flex items-center text-[13px]" data-testid={`${testIdPrefix}-staff`}>
+            {currentUserName}
+          </div>
         </Field>
         {showWarehouse ? (
           <Field label={t('erp.inventory.warehouse')}>
@@ -971,7 +1217,13 @@ function DocumentModal({
         ) : null}
       </div>
       <div className="mt-4">
-        <LineEditor lines={lines} setLines={setLines} products={products} testIdPrefix={testIdPrefix} />
+        <LineEditor
+          lines={lines}
+          setLines={setLines}
+          products={products}
+          testIdPrefix={testIdPrefix}
+          onCreateProduct={canCreate === true && reloadProducts !== undefined ? createProduct : undefined}
+        />
       </div>
       <span className="hidden">{qty(0)}</span>
     </Modal>

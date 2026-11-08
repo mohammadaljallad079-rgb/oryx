@@ -341,7 +341,7 @@ function CreateJobCardModal({
   onCreated,
 }: {
   open: boolean;
-  vehicles: Array<{ id: string; vin: string; make: string; model: string }>;
+  vehicles: Array<{ id: string; vin: string | null; make: string; model: string; plateNumber?: string | null }>;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
@@ -371,7 +371,7 @@ function CreateJobCardModal({
         <Field label={t('erp.automotive.vehicle')} required>
           <select className="oryx-select" value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })} data-testid="job-vehicle">
             <option value="">—</option>
-            {vehicles.map((v) => <option key={v.id} value={v.id}>{v.vin} — {v.make} {v.model}</option>)}
+            {vehicles.map((v) => <option key={v.id} value={v.id}>{v.plateNumber ? `${v.plateNumber} · ` : ''}{v.vin ?? '—'} — {v.make} {v.model}</option>)}
           </select>
         </Field>
         <Field label={t('erp.automotive.odometer')}>

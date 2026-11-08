@@ -77,7 +77,7 @@ export class PurchasingService {
         city: dto.city ?? null,
         countryCode: dto.countryCode ?? 'SA',
         paymentTermsDays: dto.paymentTermsDays ?? 0,
-        currency: dto.currency ?? 'SAR',
+        currency: dto.currency ?? (await this.context.resolveCompanyCurrency(companyId)),
         notes: dto.notes ?? null,
       },
     });
@@ -231,7 +231,7 @@ export class PurchasingService {
           subtotalMinor: totals.subtotalMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
-          currency: 'SAR',
+          currency: await this.context.resolveCompanyCurrency(companyId),
           createdById: actor.userId,
           lines: {
             create: lineInputs.map((l, i) => ({
@@ -306,7 +306,7 @@ export class PurchasingService {
           subtotalMinor: totals.subtotalMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? (await this.context.resolveCompanyCurrency(companyId)),
           notes: dto.notes ?? null,
           approvedById: dto.approve ? actor.userId : null,
           approvedAt: dto.approve ? new Date() : null,
@@ -588,7 +588,7 @@ export class PurchasingService {
           subtotalMinor: totals.subtotalMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? (await this.context.resolveCompanyCurrency(companyId)),
           notes: dto.notes ?? null,
           createdById: actor.userId,
           lines: {
@@ -698,7 +698,7 @@ export class PurchasingService {
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
           reason: dto.reason ?? null,
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? (await this.context.resolveCompanyCurrency(companyId)),
           createdById: actor.userId,
           postedAt: new Date(),
           lines: {

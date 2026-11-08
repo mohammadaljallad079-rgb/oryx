@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { CURRENCIES, currencyScale } from '@oryx/shared';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -10,9 +11,11 @@ import { Badge, Button, Card, EmptyState, ErrorBanner, Field, SectionHeader, Ske
 
 export default function SettingsPage() {
   const { t, locale, theme, setLocale, setTheme } = useUi();
-  const { user, companyId, isPlatform, updatePreferences, refreshSession } = useAuth();
+  const { user, companyId, isPlatform, currency, setCurrency, updatePreferences, refreshSession } = useAuth();
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [currencyBusy, setCurrencyBusy] = useState(false);
+  const [currencySaved, setCurrencySaved] = useState(false);
   const [form, setForm] = useState({ fullNameEn: '', fullNameAr: '' });
 
   const entitlements = useAsync(
@@ -23,6 +26,17 @@ export default function SettingsPage() {
   useEffect(() => {
     if (user) setForm({ fullNameEn: user.fullNameEn, fullNameAr: user.fullNameAr });
   }, [user]);
+
+  async function saveCurrency(next: string) {
+    setCurrencyBusy(true);
+    setCurrencySaved(false);
+    try {
+      await setCurrency(next);
+      setCurrencySaved(true);
+    } finally {
+      setCurrencyBusy(false);
+    }
+  }
 
   async function saveProfile() {
     setBusy(true);
@@ -130,11 +144,43 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          <div className="mt-4">
+            <p className="oryx-label">{t('settings.currency')}</p>
+            <p className="oryx-muted m-0 mb-2 text-[11.5px]">{t('settings.currencyHint')}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                className="oryx-select"
+                value={currency}
+                disabled={!companyId || currencyBusy}
+                onChange={(e) => void saveCurrency(e.target.value)}
+                data-testid="settings-currency"
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code} — {locale === 'ar' ? c.symbolAr : c.symbolEn}
+                  </option>
+                ))}
+              </select>
+              <Badge tone="neutral">{currencyScale(currency)}</Badge>
+            </div>
+            {currencySaved ? (
+              <p
+                className="m-0 mt-2 flex items-center gap-2 text-[12px] font-semibold"
+                style={{ color: 'var(--success)' }}
+                data-testid="settings-currency-saved"
+              >
+                <Icon name="check" size={14} />
+                {t('settings.currencySaved')}
+              </p>
+            ) : null}
+          </div>
+
           <hr className="oryx-divider my-4" />
           <div className="flex flex-wrap gap-2">
             <Badge tone={isPlatform ? 'gold' : 'info'}>{isPlatform ? 'Super Admin' : 'Company user'}</Badge>
             <Badge tone="neutral">{locale.toUpperCase()}</Badge>
             <Badge tone="neutral">{theme}</Badge>
+            <Badge tone="gold">{currency}</Badge>
           </div>
         </Card>
       </div>

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { allocateMinor, fromMinor, sumMinor, toMinor } from '@oryx/shared';
+import { DEFAULT_CURRENCY, allocateMinor, fromMinor, sumMinor, toMinor } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccountingPostingService, SYSTEM_ROLES, type SystemRole } from '../common/accounting-posting.service';
@@ -47,6 +47,7 @@ const STANDARD_CHART: Array<{
   { code: '5900', nameEn: 'Cash over / short', nameAr: 'فروق الصندوق', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: SYSTEM_ROLES.CASH_OVER_SHORT },
   { code: '5910', nameEn: 'Inventory adjustment', nameAr: 'تسوية المخزون', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: SYSTEM_ROLES.STOCK_ADJUSTMENT },
   { code: '5920', nameEn: 'Purchase price variance', nameAr: 'فروق أسعار الشراء', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: SYSTEM_ROLES.PURCHASE_PRICE_VARIANCE },
+  { code: '5930', nameEn: 'Rounding gain / loss', nameAr: 'أرباح وخسائر التقريب', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: SYSTEM_ROLES.ROUNDING_GAIN_LOSS },
   { code: '6000', nameEn: 'Salaries and wages expense', nameAr: 'مصروف الرواتب والأجور', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: SYSTEM_ROLES.SALARIES_EXPENSE },
   { code: '2200', nameEn: 'Salaries payable', nameAr: 'الرواتب المستحقة الدفع', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: SYSTEM_ROLES.WAGES_PAYABLE },
   { code: '2210', nameEn: 'Payroll deductions payable', nameAr: 'استقطاعات الرواتب المستحقة', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: SYSTEM_ROLES.PAYROLL_DEDUCTIONS },
@@ -72,31 +73,55 @@ export class AccountingService {
   // ------------------------------------------------------------------ accounts
 
   /** Seed the standard chart of accounts for a company that has none. */
-  async seedStandardChart(companyId: string, currency = 'SAR', actorUserId?: string) {
-    const existing = await this.prisma.account.count({ where: { companyId } });
-    if (existing > 0) return { created: 0 };
-    await this.prisma.account.createMany({
-      data: STANDARD_CHART.map((a) => ({
+  async seedStandardChart(companyId: string, currency = DEFAULT_CURRENCY, actorUserId?: string) {
+    // Upsert by code rather than bailing out when the chart is non-empty: a
+    // company whose chart predates a new system account (for example the
+    // rounding gain/loss account) is completed without disturbing custom
+    // accounts or renaming anything.
+    const existing = await this.prisma.account.findMany({
+      where: { companyId },
+      select: { code: true, systemRole: true },
+    });
+    const byCode = new Map(existing.map((a) => [a.code, a]));
+    const missing = STANDARD_CHART.filter((a) => !byCode.has(a.code));
+    const roleBackfill = STANDARD_CHART.filter((a) => {
+      const row = byCode.get(a.code);
+      return row !== undefined && !row.systemRole && a.systemRole;
+    });
+
+    if (missing.length > 0) {
+      await this.prisma.account.createMany({
+        data: missing.map((a) => ({
+          companyId,
+          code: a.code,
+          nameEn: a.nameEn,
+          nameAr: a.nameAr,
+          type: a.type,
+          normalBalance: a.normalBalance,
+          isPostable: true,
+          isSystem: true,
+          systemRole: a.systemRole ?? null,
+          currency,
+        })),
+      });
+    }
+    for (const a of roleBackfill) {
+      await this.prisma.account.updateMany({
+        where: { companyId, code: a.code, systemRole: null },
+        data: { systemRole: a.systemRole ?? null },
+      });
+    }
+
+    if (missing.length > 0) {
+      await this.audit.record({
+        actorUserId: actorUserId ?? null,
         companyId,
-        code: a.code,
-        nameEn: a.nameEn,
-        nameAr: a.nameAr,
-        type: a.type,
-        normalBalance: a.normalBalance,
-        isPostable: true,
-        isSystem: true,
-        systemRole: a.systemRole ?? null,
-        currency,
-      })),
-    });
-    await this.audit.record({
-      actorUserId: actorUserId ?? null,
-      companyId,
-      action: 'accounting.chart_seeded',
-      targetType: 'ACCOUNT',
-      summary: `Seeded standard chart of accounts (${STANDARD_CHART.length} accounts)`,
-    });
-    return { created: STANDARD_CHART.length };
+        action: 'accounting.chart_seeded',
+        targetType: 'ACCOUNT',
+        summary: `Seeded standard chart of accounts (${missing.length} added, ${existing.length} present)`,
+      });
+    }
+    return { created: missing.length, updated: roleBackfill.length };
   }
 
   async listAccounts(query: ListQueryDto, principal: RequestPrincipal) {
@@ -146,7 +171,7 @@ export class AccountingService {
         level,
         isPostable: dto.isPostable ?? true,
         systemRole: dto.systemRole ?? null,
-        currency: dto.currency ?? 'SAR',
+        currency: dto.currency ?? DEFAULT_CURRENCY,
       },
     });
     await this.audit.record({
@@ -725,6 +750,7 @@ export class AccountingService {
           amountMinor: dto.amountMinor,
           reference: dto.reference ?? null,
           notes: dto.notes ?? null,
+          staffName: await this.context.resolveActorName(actor.userId),
           paidAt,
           idempotencyKey: dto.idempotencyKey ?? null,
           createdById: actor.userId,

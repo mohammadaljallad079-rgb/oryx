@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { isBalanced, sumMinor } from '@oryx/shared';
+import { DEFAULT_CURRENCY, isBalanced, sumMinor } from '@oryx/shared';
 import type { JournalSourceType, Prisma } from '@oryx/database';
 import { PrismaService } from './prisma.service';
 import { DocumentSequenceService, type Tx } from './document-sequence.service';
@@ -52,6 +52,7 @@ export const SYSTEM_ROLES = {
   CASH_OVER_SHORT: 'CASH_OVER_SHORT',
   STOCK_ADJUSTMENT: 'STOCK_ADJUSTMENT',
   PURCHASE_PRICE_VARIANCE: 'PURCHASE_PRICE_VARIANCE',
+  ROUNDING_GAIN_LOSS: 'ROUNDING_GAIN_LOSS',
   // Execution 03 — payroll
   SALARIES_EXPENSE: 'SALARIES_EXPENSE',
   WAGES_PAYABLE: 'WAGES_PAYABLE',
@@ -192,7 +193,7 @@ export class AccountingPostingService {
         sourceType: input.sourceType,
         sourceId: input.sourceId ?? null,
         memo: input.memo ?? null,
-        currency: input.currency ?? 'SAR',
+        currency: input.currency ?? DEFAULT_CURRENCY,
         totalDebitMinor,
         totalCreditMinor,
         postedAt: new Date(),

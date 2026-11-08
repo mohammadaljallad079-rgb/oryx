@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -112,8 +113,8 @@ function VehiclesTab({ canManage }: { canManage: boolean }) {
           </thead>
           <tbody>
             {list.data!.items.map((v: VehicleDto) => (
-              <tr key={v.id} data-testid={`vehicle-row-${v.vin}`}>
-                <td className="font-mono text-[11.5px]">{v.vin}</td>
+              <tr key={v.id} data-testid={`vehicle-row-${v.plateNumber ?? v.vin ?? v.id}`}>
+                <td className="font-mono text-[11.5px]">{v.vin ?? '—'}</td>
                 <td className="text-[12.5px]">{v.make} {v.model} ({v.modelYear})</td>
                 <td className="text-[12.5px]">{v.plateNumber ?? '—'}</td>
                 <td className="text-[12.5px]">{v.customerNameEn ?? '—'}</td>
@@ -200,10 +201,16 @@ function BookingsTab({ canBook, canApprove, canInvoice }: { canBook: boolean; ca
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.automotive.inspectionBookings')}</p>
         {canBook ? (
-          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-inspection-booking">
-            <Icon name="plus" size={16} />
-            {t('erp.automotive.newBooking')}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/automotive/inspections/new" className="oryx-btn oryx-btn--primary oryx-btn--sm" data-testid="new-inspection-intake">
+              <Icon name="plus" size={16} />
+              {t('erp.automotive.newInspection')}
+            </Link>
+            <Button size="sm" onClick={() => setOpen(true)} data-testid="new-inspection-booking">
+              <Icon name="plus" size={16} />
+              {t('erp.automotive.newBooking')}
+            </Button>
+          </div>
         ) : null}
       </div>
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
@@ -290,7 +297,7 @@ function CreateBookingModal({
   onCreated,
 }: {
   open: boolean;
-  vehicles: Array<{ id: string; vin: string; make: string; model: string }>;
+  vehicles: Array<{ id: string; vin: string | null; make: string; model: string; plateNumber?: string | null }>;
   services: Array<{ id: string; nameEn: string }>;
   onClose: () => void;
   onCreated: () => Promise<void>;
@@ -317,7 +324,7 @@ function CreateBookingModal({
         <Field label={t('erp.automotive.vehicle')} required>
           <select className="oryx-select" value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })} data-testid="booking-vehicle">
             <option value="">—</option>
-            {vehicles.map((v) => <option key={v.id} value={v.id}>{v.vin} — {v.make} {v.model}</option>)}
+            {vehicles.map((v) => <option key={v.id} value={v.id}>{v.plateNumber ? `${v.plateNumber} · ` : ''}{v.vin ?? '—'} — {v.make} {v.model}</option>)}
           </select>
         </Field>
         <Field label={t('erp.automotive.service')} required>

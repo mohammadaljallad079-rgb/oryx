@@ -22,3 +22,7 @@ tsconfig.build.tsbuildinfo
 apps/admin/test-results/
 apps/admin/playwright-report/
 .env.local
+
+# Attachment storage (runtime)
+storage/
+apps/api/storage/

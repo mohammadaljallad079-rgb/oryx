@@ -3,7 +3,8 @@
 Read **docs/ORYX_MASTER_REFERENCE.md**, **docs/architecture/ARCHITECTURE.md** and
 **docs/architecture/PERMISSION_MATRIX.md** before writing code.
 
-## Current state (Execution 01, 01.1, 02, 03, 04 and 05 complete)
+## Current state (Execution 01, 01.1, 02, 03, 04, 05 and the Vehicle
+Inspection Phase 1 complete)
 
 Execution 01 delivered the working Super Admin foundation, Execution 01.1
 hardened it (secure session transport, TOTP MFA, approved photography and
@@ -73,6 +74,16 @@ Security baseline (do not regress):
   connection-test path with append-only check history, audit logging by key and
   never by value, and a customer capabilities endpoint that advertises only
   operational providers) plus platform-completion work.
+- **Vehicle Inspection Phase 1 (implemented and tested):** the inspection intake
+  screen (`/automotive/inspections/new`) that registers a vehicle from a photo of
+  its Bahraini registration card — `POST /automotive/vehicle-card/read` runs
+  tesseract.js (Arabic + English) through a lazily created worker pool and a pure
+  `parseRegistrationCard`, returning suggested fields, the fields it could not
+  read and the raw text — plus manual entry, existing-vehicle selection,
+  inspection types (PAINT/CHASSIS/COMPREHENSIVE), scheduled time, odometer and
+  notes. `POST /automotive/inspections` creates the intake without a catalog
+  service; a DRAFT can be re-opened and re-saved, and the odometer advances the
+  vehicle's mileage without rewriting history.
 - **Scaffolded only:** nothing. Every ERP module catalog entry is implemented and
   DB-backed across Executions 01–05.
 - **Missing assets:** the official ORYX logo and the approved dashboard
@@ -185,6 +196,14 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `STANDARD_CHART` in `apps/api/src/accounting/accounting.service.ts` and in
   `packages/database/prisma/seed.ts` in step, or a new system role will be
   missing in one path.
+- **A POS line must carry a non-empty description.** `PosSaleLineDto` requires
+  it, so the POS editor resolves the description from the chosen product exactly
+  as the invoice editor does; sending the raw (often empty) free-text note makes
+  every catalogue-priced sale fail with a `400`. The editor also sends
+  `discountPercentBp`, which the service maps to the line's `discountMinor`.
+  Price a POS line with the shared money helpers, never float arithmetic, or the
+  previewed total can round one minor unit below the server's and be rejected as
+  underpaid.
 
 ### Execution 03 gotchas
 
@@ -300,6 +319,62 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   set the refresh cookie, and `CsrfGuard` rejects any unsafe method carrying that
   cookie without a matching `x-oryx-csrf` header. The refresh branch above it
   echoes the cookie; the login branch must too.
+
+### Print and attachments gotchas
+
+- **The print layout is fixed by the approved PDF, not by the screen.** The
+  reference forms are `oryx 22 (1).pdf` (page 1 = invoice, page 2 = quotation).
+  `apps/admin/src/lib/print-document.ts` positions every run by absolute point
+  coordinates taken from that PDF, and the assets in `print-assets.ts` are its
+  own vectors. When a form and a screen disagree, change the screen, never the
+  form. To re-check fidelity, render the model with Playwright, then diff text
+  anchors against the reference with PyMuPDF — they should land within ~1pt.
+- **A positioned parent re-bases an absolute child.** `.notes-text` is
+  `position:absolute` inside `.notes`, which is itself positioned, so its `top`
+  is measured from the notes box, not the page. Getting this wrong sent the
+  warranty line ~500pt below the box and off the sheet — the classic
+  "Internal Server Error on preview" symptom was a template that rendered
+  off-page, not a crashing endpoint.
+- **`URL.revokeObjectURL` must be deferred.** Revoking (or removing the anchor)
+  synchronously after `a.click()` cancels the download in Chromium. Defer both.
+- **Stacked modals must close only the top one.** The admin `Modal` in
+  `ui.tsx` keeps an open-modal stack; each instance listens on `window`, so
+  without the stack a single Escape (or backdrop click) closed the preview and
+  the attachments modal beneath it. The completion signal in tests is
+  `.oryx-modal` count 0, not the trigger.
+- **The print route kind is upper-case.** `GET /print/:kind/:id` takes
+  `SALES_INVOICE`, `RECEIPT`, `QUOTATION`, `SALES_ORDER`, `CREDIT_NOTE` — a
+  lower-case kind is a 404 "Unknown document kind", not a 500.
+- **Attachment storage is runtime, never committed.** The API writes to
+  `ATTACHMENT_STORAGE_DIR` (default `apps/api/storage/attachments`); `storage/`
+  and `apps/api/storage/` are gitignored. `ATTACHMENT_MIME_TYPES` accepts PDF,
+  JPEG and PNG only.
+
+### Vehicle inspection intake (Phase 1) gotchas
+
+- **The card reader only suggests; a human confirms.** `POST
+  /automotive/vehicle-card/read` returns `fields`, `uncertain` (the keys it
+  could not read) and `rawText`, and writes nothing. `parseRegistrationCard` in
+  `apps/api/src/automotive/vehicle-card-ocr.service.ts` is a pure function over
+  the OCR text; keep it pure so it stays unit-testable without the engine.
+- **The OCR engine loads lazily and its worker pool is torn down.** tesseract.js
+  is imported dynamically inside `VehicleCardOcrService` and the pool is closed
+  in `onModuleDestroy`, so the API does not pay for it at boot and does not leak
+  workers between test runs. Trained data (`eng.traineddata`, `ara.traineddata`)
+  lives in `apps/api/`.
+- **An inspection from the report form needs no catalog service.** `serviceId`
+  is nullable and the intake path is driven by `inspectionTypes`
+  (PAINT/CHASSIS/COMPREHENSIVE). Only `POST /automotive/inspection-bookings`
+  still requires a service.
+- **A VIN is optional but validated when present.** 11–17 alphanumerics with no
+  I/O/Q. A card scan that cannot read a VIN must still create the vehicle.
+- **The intake screen is `/automotive/inspections/new`, reached from the
+  bookings tab.** `inspections/page.tsx` links to it; the older
+  `new-inspection-booking` modal still exists for the catalog-service flow.
+- **The intake e2e spec mutates the seeded tenant.** `inspection-intake.spec.ts`
+  (admin) creates a vehicle marked with `plateNumber: 'PHASE1-E2E'` and removes
+  it, its bookings, findings and mileage rows through Prisma in
+  `beforeAll`/`afterAll`. Keep that marker unique or cleanup will miss it.
 
 ### Mobile gotchas
 

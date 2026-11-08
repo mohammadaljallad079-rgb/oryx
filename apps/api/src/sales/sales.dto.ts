@@ -213,8 +213,22 @@ export class CreateQuotationDto {
   @IsString()
   branchId?: string;
 
+  /** Accepted for payload compatibility; a quotation is not warehouse-backed. */
+  @IsOptional()
+  @IsString()
+  warehouseId?: string;
+
   @IsISO8601()
   issueDate!: string;
+
+  /** Alias tolerated so a generic document form can post one payload shape. */
+  @IsOptional()
+  @IsISO8601()
+  invoiceDate?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  orderDate?: string;
 
   @IsOptional()
   @IsISO8601()
@@ -262,6 +276,15 @@ export class CreateSalesOrderDto {
   @IsISO8601()
   orderDate!: string;
 
+  /** Aliases tolerated so a generic document form can post one payload shape. */
+  @IsOptional()
+  @IsISO8601()
+  issueDate?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  invoiceDate?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(3)
@@ -298,6 +321,15 @@ export class CreateInvoiceDto {
 
   @IsISO8601()
   invoiceDate!: string;
+
+  /** Aliases tolerated so a generic document form can post one payload shape. */
+  @IsOptional()
+  @IsISO8601()
+  issueDate?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  orderDate?: string;
 
   @IsOptional()
   @IsISO8601()
@@ -346,6 +378,15 @@ export class CreateCreditNoteDto {
 
   @IsISO8601()
   issueDate!: string;
+
+  /** Aliases tolerated so a generic document form can post one payload shape. */
+  @IsOptional()
+  @IsISO8601()
+  invoiceDate?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  orderDate?: string;
 
   @IsOptional()
   @IsString()
@@ -414,6 +455,12 @@ export class PosSaleLineDto {
   @IsInt()
   @Min(0)
   unitPriceMinor!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  discountPercentBp?: number;
 
   @IsOptional()
   @Type(() => Number)

@@ -29,8 +29,8 @@ export class ListQueryDto {
 
 export class CreateVehicleDto {
   @IsString() customerId!: string;
-  /** VIN/chassis number: 11–17 alphanumeric characters, no I/O/Q. */
-  @IsString() @MinLength(11) @MaxLength(17) vin!: string;
+  /** VIN/chassis number: 11–17 alphanumeric characters, no I/O/Q. Optional. */
+  @IsOptional() @IsString() @MinLength(11) @MaxLength(17) vin?: string;
   @IsOptional() @IsString() @MaxLength(20) plateNumber?: string;
   @IsString() @MinLength(1) @MaxLength(80) make!: string;
   @IsString() @MinLength(1) @MaxLength(80) model!: string;
@@ -95,11 +95,34 @@ export class CreateInspectionBookingDto {
 }
 
 export class UpdateInspectionBookingDto {
-  @IsOptional() @IsIn(['REQUESTED', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']) status?: string;
+  @IsOptional() @IsIn(['DRAFT', 'REQUESTED', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']) status?: string;
   @IsOptional() @IsString() inspectorUserId?: string;
   @IsOptional() @IsISO8601() scheduledAt?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) odometer?: number;
   @IsOptional() @IsString() @MaxLength(1000) notes?: string;
+  @IsOptional() @IsArray() @IsIn(['PAINT', 'CHASSIS', 'COMPREHENSIVE'], { each: true }) inspectionTypes?: string[];
+}
+
+/**
+ * Create an inspection directly from the intake form.
+ *
+ * Unlike {@link CreateInspectionBookingDto} this does not require a catalog
+ * service: the report is driven by the selected inspection *types*, and the
+ * vehicle may be brand new (created inline) or an existing record.
+ */
+export class CreateInspectionIntakeDto {
+  @IsString() customerId!: string;
+  @IsString() vehicleId!: string;
+  @IsOptional() @IsString() branchId?: string;
+  @IsOptional() @IsString() serviceId?: string;
+  @IsOptional() @IsISO8601() scheduledAt?: string;
+  @IsOptional() @IsString() inspectorUserId?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) odometer?: number;
+  @IsOptional() @IsString() @MaxLength(1000) notes?: string;
+  /** Selected report sections. At least one is required. */
+  @IsArray() @ArrayMinSize(1) @IsIn(['PAINT', 'CHASSIS', 'COMPREHENSIVE'], { each: true }) inspectionTypes!: string[];
+  /** Save as an editable draft rather than scheduling it. */
+  @IsOptional() @IsBoolean() saveDraft?: boolean;
 }
 
 export class InspectionFindingDto {

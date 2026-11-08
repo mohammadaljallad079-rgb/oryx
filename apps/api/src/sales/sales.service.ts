@@ -120,7 +120,7 @@ export class SalesService {
         countryCode: dto.countryCode ?? 'SA',
         creditLimitMinor: dto.creditLimitMinor ?? 0,
         paymentTermsDays: dto.paymentTermsDays ?? 0,
-        currency: dto.currency ?? 'SAR',
+        currency: dto.currency ?? (await this.context.resolveCompanyCurrency(companyId)),
         notes: dto.notes ?? null,
       },
     });
@@ -207,8 +207,9 @@ export class SalesService {
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? (await this.context.resolveCompanyCurrency(companyId)),
           notes: dto.notes ?? null,
+          staffName: await this.context.resolveActorName(actor.userId),
           createdById: actor.userId,
           lines: { create: buildSimpleLineRows(totals, dto.lines) },
         },
@@ -323,8 +324,9 @@ export class SalesService {
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? (await this.context.resolveCompanyCurrency(companyId)),
           notes: dto.notes ?? null,
+          staffName: await this.context.resolveActorName(actor.userId),
           createdById: actor.userId,
           lines: { create: buildSimpleLineRows(totals, dto.lines) },
         },
@@ -395,7 +397,7 @@ export class SalesService {
       let customerId = dto.customerId ?? null;
       let orderId: string | null = null;
       let warehouseId = dto.warehouseId ?? null;
-      let currency = dto.currency ?? 'SAR';
+      let currency = dto.currency ?? (await this.context.resolveCompanyCurrency(companyId));
       let lineInputs: Array<PricedLineInput & { productId: string | null; description: string }>;
 
       if (dto.orderId) {
@@ -470,6 +472,7 @@ export class SalesService {
           totalMinor: totals.totalMinor,
           currency,
           notes: dto.notes ?? null,
+          staffName: await this.context.resolveActorName(actor.userId),
           createdById: actor.userId,
           lines: { create: buildLineRows(totals, lineInputs) },
         },
@@ -630,7 +633,7 @@ export class SalesService {
         discountMinor: totals.discountMinor,
         taxMinor: totals.taxMinor,
         totalMinor: totals.totalMinor,
-        currency: input.currency ?? 'SAR',
+        currency: input.currency ?? (await this.context.resolveCompanyCurrency(input.companyId)),
         notes: input.notes ?? null,
         createdById: input.actorUserId,
         lines: { create: buildLineRows(totals, input.lines) },
@@ -642,7 +645,7 @@ export class SalesService {
       branchId: input.branchId ?? null,
       customerId: input.customerId,
       warehouseId: input.warehouseId ?? null,
-      currency: input.currency ?? 'SAR',
+      currency: input.currency ?? (await this.context.resolveCompanyCurrency(input.companyId)),
       lines: input.lines,
       entryDate: input.entryDate,
       sourceType: input.sourceType,
@@ -705,8 +708,9 @@ export class SalesService {
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
           reason: dto.reason ?? null,
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? (await this.context.resolveCompanyCurrency(companyId)),
           restockInventory: dto.restockInventory ?? false,
+          staffName: await this.context.resolveActorName(actor.userId),
           createdById: actor.userId,
           postedAt: new Date(),
           lines: {
@@ -952,6 +956,7 @@ export class SalesService {
   async createPosSale(dto: CreatePosSaleDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
+    const currency = await this.context.resolveCompanyCurrency(companyId);
 
     const result = await this.posting.withTransaction(async (tx) => {
       const session = await tx.cashierSession.findFirst({
@@ -968,7 +973,7 @@ export class SalesService {
         description: l.description,
         quantity: l.quantity,
         unitPriceMinor: l.unitPriceMinor,
-        discountPercentBp: 0,
+        discountPercentBp: l.discountPercentBp ?? 0,
         taxPercentBp: l.taxPercentBp ?? 0,
       }));
       const totals = computeDocumentTotals(lineInputs);
@@ -995,7 +1000,7 @@ export class SalesService {
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
-          currency: 'SAR',
+          currency,
           notes: `POS sale in session ${session.sessionNumber}`,
           createdById: actor.userId,
           lines: { create: buildLineRows(totals, lineInputs) },
@@ -1008,7 +1013,7 @@ export class SalesService {
         branchId: dto.branchId,
         customerId,
         warehouseId,
-        currency: 'SAR',
+        currency,
         lines: lineInputs,
         entryDate: invoiceDate,
         sourceType: 'POS_SALE',
@@ -1040,7 +1045,7 @@ export class SalesService {
           paidMinor,
           changeMinor,
           paymentMethod: dto.paymentMethod,
-          currency: 'SAR',
+          currency,
           salesInvoiceId: invoice.id,
           journalEntryId: posted.journalEntryId ?? null,
           createdById: actor.userId,
@@ -1050,6 +1055,7 @@ export class SalesService {
               description: lineInputs[i].description,
               quantity: l.quantity,
               unitPriceMinor: l.unitPriceMinor,
+              discountMinor: l.discountMinor,
               taxPercentBp: l.taxPercentBp,
               taxMinor: l.taxMinor,
               lineTotalMinor: l.lineTotalMinor,
