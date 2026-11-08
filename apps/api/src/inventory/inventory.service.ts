@@ -292,6 +292,7 @@ export class InventoryService {
     const pageSize = Math.min(query.pageSize ?? 200, 500);
     const where = {
       companyId,
+      ...(query.category ? { category: query.category } : {}),
       ...(query.search
         ? {
             OR: [
@@ -323,6 +324,7 @@ export class InventoryService {
         type: dto.type ?? 'PRODUCT',
         unit: dto.unit ?? 'unit',
         barcode: dto.barcode ?? null,
+        category: dto.category?.trim() ? dto.category.trim() : null,
         salesPriceMinor: dto.salesPriceMinor ?? 0,
         costPriceMinor: dto.costPriceMinor ?? 0,
         taxRateBp: dto.taxRateBp ?? 0,
@@ -356,6 +358,7 @@ export class InventoryService {
         ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
         ...(dto.unit !== undefined ? { unit: dto.unit } : {}),
         ...(dto.barcode !== undefined ? { barcode: dto.barcode } : {}),
+        ...(dto.category !== undefined ? { category: dto.category.trim() ? dto.category.trim() : null } : {}),
         ...(dto.salesPriceMinor !== undefined ? { salesPriceMinor: dto.salesPriceMinor } : {}),
         ...(dto.costPriceMinor !== undefined ? { costPriceMinor: dto.costPriceMinor } : {}),
         ...(dto.taxRateBp !== undefined ? { taxRateBp: dto.taxRateBp } : {}),
@@ -721,6 +724,7 @@ export class InventoryService {
     const where = {
       companyId,
       isActive: true,
+      ...(query.category ? { category: query.category } : {}),
       ...(query.search
         ? {
             OR: [
@@ -764,6 +768,7 @@ export class InventoryService {
         nameAr: p.nameAr,
         barcode: p.barcode,
         unit: p.unit,
+        category: p.category,
         salesPriceMinor: p.salesPriceMinor,
         taxRateBp: p.taxRateBp,
         trackStock: p.trackStock,
@@ -775,6 +780,24 @@ export class InventoryService {
       };
     });
     return { items, total: items.length };
+  }
+
+  /**
+   * The distinct merchandise groupings the till offers as chips.
+   *
+   * Derived from the company's active products so the chips always match what
+   * the grid can actually show; a category with no active product is not a
+   * useful filter.
+   */
+  async posCategories(principal: RequestPrincipal, companyIdQuery?: string) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, companyIdQuery);
+    const rows = await this.prisma.product.findMany({
+      where: { companyId, isActive: true, category: { not: null } },
+      distinct: ['category'],
+      select: { category: true },
+      orderBy: { category: 'asc' },
+    });
+    return { items: rows.map((r) => r.category).filter((c): c is string => Boolean(c)) };
   }
 
   private async assertWarehouse(companyId: string, warehouseId: string) {
@@ -818,6 +841,7 @@ function toProductDto(p: {
   type: string;
   unit: string;
   barcode: string | null;
+  category: string | null;
   salesPriceMinor: number;
   costPriceMinor: number;
   taxRateBp: number;
@@ -837,6 +861,7 @@ function toProductDto(p: {
     type: p.type,
     unit: p.unit,
     barcode: p.barcode,
+    category: p.category,
     salesPriceMinor: p.salesPriceMinor,
     costPriceMinor: p.costPriceMinor,
     taxRateBp: p.taxRateBp,

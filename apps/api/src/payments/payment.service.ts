@@ -828,26 +828,26 @@ export class PaymentService {
   private async nextIntentNumber(companyId: string): Promise<string> {
     const count = await this.prisma.paymentIntent.count({ where: { companyId } });
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const candidate = `PI-${String(count + 1 + attempt).padStart(6, '0')}`;
+      const candidate = `I${String(count + 1 + attempt).padStart(6, '0')}`;
       const clash = await this.prisma.paymentIntent.findFirst({
         where: { companyId, intentNumber: candidate },
         select: { id: true },
       });
       if (!clash) return candidate;
     }
-    return `PI-${Date.now().toString(36).toUpperCase()}`;
+    return `I${Date.now().toString(36).toUpperCase()}`;
   }
 
   private async nextRefundNumber(companyId: string): Promise<string> {
     const count = await this.prisma.refund.count({ where: { companyId } });
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const candidate = `RF-${String(count + 1 + attempt).padStart(6, '0')}`;
+      const candidate = `F${String(count + 1 + attempt).padStart(6, '0')}`;
       const clash = await this.prisma.refund.findFirst({
         where: { companyId, refundNumber: candidate },
         select: { id: true },
       });
       if (!clash) return candidate;
     }
-    return `RF-${Date.now().toString(36).toUpperCase()}`;
+    return `F${Date.now().toString(36).toUpperCase()}`;
   }
 }

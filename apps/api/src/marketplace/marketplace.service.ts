@@ -1720,40 +1720,40 @@ export class MarketplaceService {
   private async nextApplicationCode(): Promise<string> {
     const count = await this.prisma.marketplaceApplication.count();
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const candidate = `APP-${String(count + 1 + attempt).padStart(5, '0')}`;
+      const candidate = `A${String(count + 1 + attempt).padStart(5, '0')}`;
       const clash = await this.prisma.marketplaceApplication.findFirst({
         where: { code: candidate },
         select: { id: true },
       });
       if (!clash) return candidate;
     }
-    return `APP-${Date.now().toString(36).toUpperCase()}`;
+    return `A${Date.now().toString(36).toUpperCase()}`;
   }
 
   private async nextRequestNumber(companyId: string): Promise<string> {
     const count = await this.prisma.serviceRequest.count({ where: { companyId } });
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const candidate = `SR-${String(count + 1 + attempt).padStart(6, '0')}`;
+      const candidate = `E${String(count + 1 + attempt).padStart(6, '0')}`;
       const clash = await this.prisma.serviceRequest.findFirst({
         where: { companyId, requestNumber: candidate },
         select: { id: true },
       });
       if (!clash) return candidate;
     }
-    return `SR-${Date.now().toString(36).toUpperCase()}`;
+    return `E${Date.now().toString(36).toUpperCase()}`;
   }
 
   private async nextDisputeCode(): Promise<string> {
     const count = await this.prisma.marketplaceDispute.count();
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const candidate = `DSP-${String(count + 1 + attempt).padStart(5, '0')}`;
+      const candidate = `D${String(count + 1 + attempt).padStart(5, '0')}`;
       const clash = await this.prisma.marketplaceDispute.findFirst({
         where: { code: candidate },
         select: { id: true },
       });
       if (!clash) return candidate;
     }
-    return `DSP-${Date.now().toString(36).toUpperCase()}`;
+    return `D${Date.now().toString(36).toUpperCase()}`;
   }
 
   /** Currency scale for a provider's settlement currency. */

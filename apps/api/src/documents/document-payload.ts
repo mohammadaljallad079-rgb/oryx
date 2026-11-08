@@ -139,6 +139,12 @@ export interface FinancialDocumentLine {
   discountMinor: number;
   taxMinor: number;
   lineTotalMinor: number;
+  /**
+   * The line's tax rate in basis points, printed as the "VAT 10%" cell the
+   * official template shows against each line. Read from the saved line so the
+   * document states the rate that was actually charged.
+   */
+  taxPercentBp?: number | null;
 }
 
 export interface FinancialDocumentPayload {
@@ -170,6 +176,19 @@ export interface FinancialDocumentPayload {
   balanceMinor: number;
   currency: string;
   notes: string | null;
+  /**
+   * The settlement method shown on the printed invoice ("Payment" line) and the
+   * salesperson credited as "Staf Name". Both are captured on the document at
+   * creation, so a reprint always shows the same figures.
+   */
+  paymentMethod?: string | null;
+  salespersonName?: string | null;
+  /**
+   * The rate applied to the document's tax line, in basis points, taken from the
+   * lines. Printed as "Tax 10%" above the totals, so the document states the
+   * rate it actually charged rather than a hard-coded one.
+   */
+  taxRateBp?: number | null;
   /** Payment-specific fields, present only for a receipt or voucher. */
   payment?: {
     method: string;

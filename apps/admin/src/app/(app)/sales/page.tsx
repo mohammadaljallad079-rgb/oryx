@@ -69,6 +69,22 @@ const emptyLine = (): LineDraft => ({
 /** The payment methods a POS sale may be settled with. */
 type PosPaymentMethod = 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'WALLET';
 
+/** The tender buttons the till offers, in the order a cashier expects them. */
+const POS_PAYMENT_METHODS: PosPaymentMethod[] = ['CASH', 'CARD', 'BANK_TRANSFER', 'WALLET'];
+
+/**
+ * Round a cash tender up to the next convenience denomination.
+ *
+ * A cashier taking notes rarely has the exact change, so the "round cash" button
+ * lifts the tender to the next `10^(scale-1)` minor unit (0.100 BD for a
+ * three-decimal currency, 0.10 for a two-decimal one). It only ever raises the
+ * figure, so the change shown can never go negative from this button.
+ */
+function roundCashUp(minor: number, scale: number): number {
+  const step = Math.max(1, 10 ** (scale - 1));
+  return Math.ceil(minor / step) * step;
+}
+
 /** One line of the POS cart, held in integer minor units and basis points. */
 interface CartLine {
   key: string;
@@ -275,6 +291,12 @@ function CustomersTab({ canManage }: { canManage: boolean }) {
                         {c.isActive ? t('common.deactivate') : t('common.reactivate')}
                       </Button>
                     ) : null}
+                    <DocumentActions
+                      sourceType="Customer"
+                      sourceId={c.id}
+                      type="CUSTOMER_STATEMENT"
+                      permissions={['erp.sales.read', 'erp.accounting.read']}
+                    />
                   </div>
                 </td>
               </tr>
@@ -842,6 +864,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         warehouses={warehouses.data?.items ?? []}
         taxOptions={taxOptions}
         showWarehouse
+        dueDateField="dueDate"
         testIdPrefix="invoice"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
@@ -1011,6 +1034,7 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
         taxOptions={taxOptions}
+        dueDateField="validUntil"
         testIdPrefix="quotation"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
@@ -1092,6 +1116,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
         taxOptions={taxOptions}
         showWarehouse
         showRestock
+        reasonField
         testIdPrefix="credit-note"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
@@ -1309,6 +1334,7 @@ function PosSaleModal({
   const { t, locale } = useUi();
   const { companyId } = useAuth();
   const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('');
   const debouncedSearch = useDebounced(search, 250);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [customerId, setCustomerId] = useState('');
@@ -1321,9 +1347,15 @@ function PosSaleModal({
   const scanRef = useRef<HTMLInputElement>(null);
 
   const catalog = useAsync(
-    () => api.posCatalog({ companyId: companyId ?? undefined, search: debouncedSearch || undefined }),
-    [companyId, debouncedSearch],
+    () =>
+      api.posCatalog({
+        companyId: companyId ?? undefined,
+        search: debouncedSearch || undefined,
+        category: category || undefined,
+      }),
+    [companyId, debouncedSearch, category],
   );
+  const categories = useAsync(() => api.posCategories(companyId ?? undefined), [companyId]);
 
   useEffect(() => {
     if (!open) return;
@@ -1519,6 +1551,30 @@ function PosSaleModal({
 
           {catalog.error ? <ErrorBanner message={catalog.error} onRetry={catalog.reload} /> : null}
 
+          {(categories.data?.items.length ?? 0) > 0 ? (
+            <div className="flex flex-wrap gap-2" data-testid="pos-categories">
+              <button
+                type="button"
+                onClick={() => setCategory('')}
+                className={`oryx-chip ${category === '' ? 'oryx-chip--active' : ''}`}
+                data-testid="pos-category-all"
+              >
+                {t('erp.sales.pos.allCategories')}
+              </button>
+              {categories.data!.items.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCategory(c)}
+                  className={`oryx-chip ${category === c ? 'oryx-chip--active' : ''}`}
+                  data-testid={`pos-category-${c}`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
           {catalog.loading ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
               {Array.from({ length: 8 }).map((_, i) => (
@@ -1631,20 +1687,29 @@ function PosSaleModal({
             />
           </dl>
 
+          <div className="flex flex-col gap-2">
+            <span className="oryx-label">{t('erp.sales.pos.payment')}</span>
+            <div
+              className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+              role="group"
+              aria-label={t('erp.sales.pos.payment')}
+            >
+              {POS_PAYMENT_METHODS.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setPaymentMethod(m)}
+                  aria-pressed={paymentMethod === m}
+                  className={`oryx-pay-method ${paymentMethod === m ? 'oryx-pay-method--active' : ''}`}
+                  data-testid={`pos-pay-${m}`}
+                >
+                  {t(`erp.sales.payment.${m}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid gap-2 sm:grid-cols-2">
-            <Field label={t('erp.sales.pos.payment')}>
-              <select
-                className="oryx-select"
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as PosPaymentMethod)}
-                data-testid="pos-payment-method"
-              >
-                <option value="CASH">{t('erp.sales.payment.CASH')}</option>
-                <option value="CARD">{t('erp.sales.payment.CARD')}</option>
-                <option value="BANK_TRANSFER">{t('erp.sales.payment.BANK_TRANSFER')}</option>
-                <option value="WALLET">{t('erp.sales.payment.WALLET')}</option>
-              </select>
-            </Field>
             <Field label={t('erp.sales.pos.paid')}>
               <input
                 className="oryx-input text-end"
@@ -1655,6 +1720,26 @@ function PosSaleModal({
                 data-testid="pos-paid"
               />
             </Field>
+            <div className="flex items-end gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setPaid(fromMinor(totals.totalMinor, currencyScale))}
+                data-testid="pos-paid-exact"
+              >
+                {t('erp.sales.pos.exact')}
+              </Button>
+              {paymentMethod === 'CASH' ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setPaid(fromMinor(roundCashUp(totals.totalMinor, currencyScale), currencyScale))}
+                  data-testid="pos-paid-round"
+                >
+                  {t('erp.sales.pos.roundCash')}
+                </Button>
+              ) : null}
+            </div>
           </div>
           <p className="oryx-muted m-0 flex items-center justify-between text-[12.5px]" data-testid="pos-change">
             <span>{t('erp.sales.pos.change')}</span>
@@ -1708,6 +1793,11 @@ function PosProductTile({ product, onAdd }: { product: PosProductDto; onAdd: () 
         </span>
         <span className="oryx-faint font-mono text-[10.5px]">{product.sku}</span>
         <span className="oryx-pos-tile__price tabular-nums">{money(product.salesPriceMinor)}</span>
+        <span className="oryx-pos-tile__stock" data-testid={`pos-stock-${product.sku}`}>
+          {product.trackStock
+            ? `${t('erp.sales.pos.available')}: ${qty(product.onHand)}`
+            : t('erp.sales.pos.service')}
+        </span>
       </span>
     </button>
   );
@@ -1978,6 +2068,8 @@ function DocumentModal({
   taxOptions,
   showWarehouse,
   showRestock,
+  reasonField,
+  dueDateField,
   testIdPrefix,
   onClose,
   onSubmit,
@@ -1990,6 +2082,19 @@ function DocumentModal({
   taxOptions: SearchableOption[];
   showWarehouse?: boolean;
   showRestock?: boolean;
+  /**
+   * Whether the printed document renders a free-text reason (a credit note
+   * prints one where an invoice prints notes). The field is only offered where
+   * the template actually prints it.
+   */
+  reasonField?: boolean;
+  /**
+   * Which date field the printed template renders beyond the document date:
+   * an invoice prints a due date, a quotation a validity date, an order none.
+   * The field is only offered where the template actually prints it, so the
+   * form never collects data the document would drop.
+   */
+  dueDateField?: 'dueDate' | 'validUntil';
   testIdPrefix: string;
   onClose: () => void;
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
@@ -2000,6 +2105,9 @@ function DocumentModal({
   const [customerId, setCustomerId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
   const [restock, setRestock] = useState(true);
+  const [dueDate, setDueDate] = useState('');
+  const [notes, setNotes] = useState('');
+  const [reason, setReason] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
 
   const submit = async () => {
@@ -2010,6 +2118,9 @@ function DocumentModal({
         customerId,
         warehouseId: warehouseId || undefined,
         documentDate: new Date().toISOString(),
+        ...(dueDateField && dueDate ? { [dueDateField]: new Date(dueDate).toISOString() } : {}),
+        ...(reasonField && reason.trim() ? { reason: reason.trim() } : {}),
+        ...(notes.trim() ? { notes: notes.trim() } : {}),
         restockInventory: showRestock ? restock : undefined,
         lines: lines.map((l) => ({
           productId: l.productId || undefined,
@@ -2023,6 +2134,9 @@ function DocumentModal({
       onClose();
       setLines([emptyLine()]);
       setCustomerId('');
+      setDueDate('');
+      setNotes('');
+      setReason('');
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
@@ -2068,6 +2182,17 @@ function DocumentModal({
             </select>
           </Field>
         ) : null}
+        {dueDateField ? (
+          <Field label={dueDateField === 'dueDate' ? t('erp.sales.dueDate') : t('erp.sales.validUntil')}>
+            <input
+              type="date"
+              className="oryx-input"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              data-testid={`${testIdPrefix}-due-date`}
+            />
+          </Field>
+        ) : null}
         {showRestock ? (
           <Field label={t('erp.sales.restock')}>
             <select className="oryx-select" value={restock ? 'yes' : 'no'} onChange={(e) => setRestock(e.target.value === 'yes')}>
@@ -2076,6 +2201,24 @@ function DocumentModal({
             </select>
           </Field>
         ) : null}
+        {reasonField ? (
+          <Field label={t('erp.sales.creditNoteReason')} hint={t('erp.sales.creditNoteReasonHint')}>
+            <input
+              className="oryx-input"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              data-testid={`${testIdPrefix}-reason`}
+            />
+          </Field>
+        ) : null}
+        <Field label={t('common.notes')}>
+          <input
+            className="oryx-input"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            data-testid={`${testIdPrefix}-notes`}
+          />
+        </Field>
       </div>
       <div className="mt-4">
         <LineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} testIdPrefix={testIdPrefix} />

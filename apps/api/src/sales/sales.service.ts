@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { fromQuantity, sumMinor, type RoundingMode } from '@oryx/shared';
+import type { PaymentMethod } from '@oryx/database';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccountingPostingService, SYSTEM_ROLES } from '../common/accounting-posting.service';
@@ -625,6 +626,8 @@ export class SalesService {
           roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
           currency,
+          paymentMethod: (dto.paymentMethod as PaymentMethod | undefined) ?? 'CASH',
+          salespersonName: dto.salespersonName ?? null,
           notes: dto.notes ?? null,
           createdById: actor.userId,
           lines: { create: buildLineRows(totals, lineInputs) },

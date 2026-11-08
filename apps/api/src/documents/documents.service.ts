@@ -15,15 +15,17 @@ import {
 } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
+import { DocumentSequenceService } from '../common/document-sequence.service';
 import { ErpContextService, type RequestLike } from '../common/erp-context.service';
 import { conflict, ERROR_CODES, notFound } from '../common/errors';
 import type { ActorContext } from '../organizations/organizations.service';
 import type { RequestPrincipal } from '../auth/auth.decorators';
 import { DocumentStorageService } from './document-storage.service';
-import { PdfRendererService } from './pdf/pdf-renderer.service';
+import { PdfRendererService, OFFICIAL_PDF_MARGINS } from './pdf/pdf-renderer.service';
 import { QrService } from './pdf/qr.service';
 import { renderInspectionReportHtml } from './templates/report-html';
-import { footerTemplate } from './templates/chrome';
+import { renderOfficialFinancialHtml } from './templates/official-financial.template';
+import { footerTemplate, officialFooterTemplate } from './templates/chrome';
 import { renderFinancialDocumentHtml } from './templates/financial-document.template';
 import type {
   DocumentIssuer,
@@ -59,6 +61,7 @@ export class DocumentsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly context: ErpContextService,
+    private readonly sequences: DocumentSequenceService,
     private readonly storage: DocumentStorageService,
     private readonly renderer: PdfRendererService,
     private readonly qr: QrService,
@@ -152,6 +155,13 @@ export class DocumentsService {
     const issuer = await this.issuerFor(companyId);
     const payload = source.payload;
 
+    // Only an invoice/quotation/order/return is laid out like the printed
+    // reference. A statement and a journal entry are different documents with
+    // their own bodies (movement rows, debit/credit columns), so they keep the
+    // general financial template — routing them here would print an empty
+    // priced table where their real content belongs.
+    const referenceLayout = !payload.statement && !payload.journal;
+
     return this.issue({
       companyId,
       type,
@@ -162,15 +172,25 @@ export class DocumentsService {
       issuer,
       actor,
       req,
+      layout: referenceLayout ? 'official' : 'report',
       render: (verification) =>
-        renderFinancialDocumentHtml({
-          issuer,
-          payload,
-          documentNumber: source.documentNumber,
-          issuedAt: new Date(),
-          verification,
-          baseCss: '',
-        }),
+        referenceLayout
+          ? renderOfficialFinancialHtml({
+              issuer,
+              payload,
+              documentNumber: source.documentNumber,
+              issuedAt: new Date(),
+              verification,
+              baseCss: '',
+            })
+          : renderFinancialDocumentHtml({
+              issuer,
+              payload,
+              documentNumber: source.documentNumber,
+              issuedAt: new Date(),
+              verification,
+              baseCss: '',
+            }),
     });
   }
 
@@ -191,8 +211,16 @@ export class DocumentsService {
     actor: ActorContext;
     req?: RequestLike;
     render: (verification: DocumentVerification) => string;
+    /**
+     * Which page furniture to paint. `official` is the measured invoice/
+     * quotation layout with its own margins and contact footer; `report` is the
+     * framed report layout. The body HTML is produced by the caller's `render`,
+     * but the footer and margins must agree with it.
+     */
+    layout?: 'official' | 'report';
   }) {
     const spec = officialDocumentSpec(args.type);
+    const layout = args.layout ?? 'report';
 
     const prior = await this.prisma.officialDocument.findFirst({
       where: {
@@ -220,13 +248,19 @@ export class DocumentsService {
 
     // The footer is a Chromium page template, so the page counter is real on
     // every page and the footer cannot push content onto a blank page.
-    const footerHtml = footerTemplate({
-      issuer: args.issuer,
-      titleEn: spec.labelEn,
-      titleAr: spec.labelAr,
-      documentNumber: args.documentNumber,
+    const footerHtml =
+      layout === 'official'
+        ? officialFooterTemplate(args.issuer)
+        : footerTemplate({
+            issuer: args.issuer,
+            titleEn: spec.labelEn,
+            titleAr: spec.labelAr,
+            documentNumber: args.documentNumber,
+          });
+    const { pdf, pageCount } = await this.renderer.render(html, {
+      footerHtml,
+      margins: layout === 'official' ? OFFICIAL_PDF_MARGINS : undefined,
     });
-    const { pdf, pageCount } = await this.renderer.render(html, { footerHtml });
 
     const documentId = newDocumentId();
     const storageKey = this.storage.keyFor(args.companyId, documentId, version);
@@ -295,6 +329,102 @@ export class DocumentsService {
 
     this.logger.log(`Issued ${args.type} ${args.documentNumber} v${version} (${pageCount}p)`);
     return this.toDto(created);
+  }
+
+  /**
+   * Maintenance: re-render an already-issued document from its stored payload.
+   *
+   * Used only by the numbering-normalisation script, which must give a legacy
+   * document a single-letter number and therefore cannot keep the copy that was
+   * rendered under the old one. The payload snapshot is untouched — the amounts,
+   * lines and inspection findings are exactly what was issued — so this rebuilds
+   * the same document, it does not re-issue the record.
+   *
+   * `renumber` is explicit: without it the document keeps its number and only
+   * its bytes are rebuilt. A renumber also rewrites the number inside the
+   * payload, because the header and footer read it from there.
+   */
+  async rerenderForMaintenance(
+    documentId: string,
+    options: { renumber?: string } = {},
+  ): Promise<{ documentNumber: string; pageCount: number; byteSize: number }> {
+    const row = await this.prisma.officialDocument.findUnique({ where: { id: documentId } });
+    if (!row) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Document not found.');
+
+    const documentNumber = options.renumber ?? row.documentNumber;
+    const issuer = await this.issuerFor(row.companyId);
+    const spec = officialDocumentSpec(row.type);
+    const verification: DocumentVerification = {
+      token: row.verificationToken,
+      url: this.qr.verificationUrl(row.verificationToken),
+      qrDataUri: await this.qr.dataUri(this.qr.verificationUrl(row.verificationToken)),
+    };
+
+    const payload = row.payload as unknown as DocumentPayload;
+    const baseCss = await this.renderer.baseStyles();
+    // A reprint must use the same layout the original issue chose, or a
+    // renumbered statement would come back as an invoice-shaped page.
+    const referenceLayout =
+      payload.kind === 'FINANCIAL' && !payload.statement && !payload.journal;
+    const bodyHtml =
+      payload.kind === 'INSPECTION_REPORT'
+        ? renderInspectionReportHtml({
+            issuer,
+            payload: { ...payload, jobNumber: documentNumber },
+            documentNumber,
+            issuedAt: row.issuedAt,
+            version: row.version,
+            verification,
+            baseCss: '',
+          })
+        : referenceLayout
+          ? renderOfficialFinancialHtml({
+              issuer,
+              payload: { ...payload, documentNumber },
+              documentNumber,
+              issuedAt: row.issuedAt,
+              verification,
+              baseCss: '',
+            })
+          : renderFinancialDocumentHtml({
+              issuer,
+              payload: { ...payload, documentNumber },
+              documentNumber,
+              issuedAt: row.issuedAt,
+              verification,
+              baseCss: '',
+            });
+    const html = bodyHtml.includes('@font-face')
+      ? bodyHtml
+      : bodyHtml.replace('<style>', `<style>${baseCss}\n`);
+    const footerHtml = referenceLayout
+      ? officialFooterTemplate(issuer)
+      : footerTemplate({
+          issuer,
+          titleEn: spec.labelEn,
+          titleAr: spec.labelAr,
+          documentNumber,
+        });
+    const { pdf, pageCount } = await this.renderer.render(html, {
+      footerHtml,
+      margins: referenceLayout ? OFFICIAL_PDF_MARGINS : undefined,
+    });
+
+    const storageKey = this.storage.keyFor(row.companyId, row.id, row.version);
+    await this.storage.write(storageKey, pdf);
+    await this.prisma.officialDocument.update({
+      where: { id: row.id },
+      data: {
+        documentNumber,
+        payload: (payload.kind === 'INSPECTION_REPORT'
+          ? { ...payload, jobNumber: documentNumber }
+          : { ...payload, documentNumber }) as never,
+        storageKey,
+        byteSize: pdf.byteLength,
+        pageCount,
+      },
+    });
+    return { documentNumber, pageCount, byteSize: pdf.byteLength };
   }
 
   // ------------------------------------------------------------------ reading
@@ -583,11 +713,56 @@ export class DocumentsService {
 
   // ------------------------------------------------------------------ helpers
 
+  /**
+   * The SKU of every product referenced by a set of document lines.
+   *
+   * The printed line table carries a "رمز المنتج · SKU" cell under the
+   * description. It was hard-coded to null for every document, so a printed
+   * invoice never showed the SKU the operator picked. Lines reference a product
+   * by id, so the SKUs are resolved in one company-scoped query and attached by
+   * line.
+   */
+  private async skuMap(
+    companyId: string,
+    productIds: Array<string | null | undefined>,
+  ): Promise<Map<string, string>> {
+    const ids = [...new Set(productIds.filter((id): id is string => Boolean(id)))];
+    if (ids.length === 0) return new Map();
+    const products = await this.prisma.product.findMany({
+      where: { companyId, id: { in: ids } },
+      select: { id: true, sku: true },
+    });
+    return new Map(products.map((p) => [p.id, p.sku]));
+  }
+
+  /**
+   * The display name of the user who created a record.
+   *
+   * The printed invoice credits a "Staf Name"; when the invoice carries no
+   * explicit salesperson this is the operator who raised it, so the document
+   * names a real person instead of leaving the field blank.
+   */
+  private async userDisplayName(userId: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { fullNameEn: true, fullNameAr: true, email: true },
+    });
+    return user?.fullNameEn ?? user?.fullNameAr ?? user?.email ?? null;
+  }
+
   /** The issuer identity for a company, with its branding logo inlined. */
   private async issuerFor(companyId: string): Promise<DocumentIssuer> {
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
-      include: { branding: { include: { logoAsset: true } } },
+      include: {
+        branding: { include: { logoAsset: true } },
+        branches: {
+          where: { isActive: true },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          select: { addressLine: true, city: true, phone: true },
+        },
+      },
     });
     if (!company) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Company not found.');
 
@@ -601,6 +776,13 @@ export class DocumentsService {
     // approved design, not a per-tenant preference.
     logoDataUri ??= await this.brandLogoDataUri();
 
+    // The document footer prints the issuer's contact details (see
+    // `footerTemplate`), so they must come from a real record. The branding
+    // panel owns the support phone/email/website; the physical address lives on
+    // the company's first active branch, which is where an operator enters it.
+    // Falling back to the branch phone keeps a tenant that only filled the
+    // branch record from printing an empty footer.
+    const branch = company.branches[0];
     return {
       companyId,
       nameEn: company.branding?.nameEn ?? company.nameEn,
@@ -608,7 +790,12 @@ export class DocumentsService {
       code: company.code,
       legalNameEn: company.legalNameEn,
       taxNumber: company.taxNumber,
+      addressLine: branch?.addressLine ?? null,
+      city: branch?.city ?? null,
       countryCode: company.countryCode,
+      phone: company.branding?.supportPhone ?? branch?.phone ?? null,
+      email: company.branding?.supportEmail ?? null,
+      websiteUrl: company.branding?.websiteUrl ?? null,
       currency: company.currency,
       logoDataUri,
       primaryColor: company.branding?.primaryColor ?? null,
@@ -874,6 +1061,14 @@ export class DocumentsService {
           include: { lines: { orderBy: { sortOrder: 'asc' } }, customer: true },
         });
         if (!invoice) return null;
+        const skus = await this.skuMap(companyId, invoice.lines.map((l) => l.productId));
+        // The printed "Staf Name" is the salesperson recorded on the invoice, or
+        // failing that the operator who created it. Resolving the creator's name
+        // here keeps the document truthful without asking the form for a value it
+        // already knows.
+        const salespersonName =
+          invoice.salespersonName ?? (await this.userDisplayName(invoice.createdById));
+        const taxRateBp = invoice.lines.find((l) => l.taxPercentBp > 0)?.taxPercentBp ?? null;
         return {
           documentNumber: invoice.invoiceNumber,
           sourceType: 'SalesInvoice',
@@ -889,12 +1084,13 @@ export class DocumentsService {
             counterparty: counterparty(invoice.customer),
             lines: invoice.lines.map((l) => ({
               description: l.description,
-              sku: null,
+              sku: l.productId ? skus.get(l.productId) ?? null : null,
               quantity: l.quantity,
               unitPriceMinor: l.unitPriceMinor,
               discountMinor: l.discountMinor,
               taxMinor: l.taxMinor,
               lineTotalMinor: l.lineTotalMinor,
+              taxPercentBp: l.taxPercentBp,
             })),
             subtotalMinor: invoice.subtotalMinor,
             discountMinor: invoice.discountMinor,
@@ -905,6 +1101,9 @@ export class DocumentsService {
             balanceMinor: invoice.totalMinor - invoice.amountPaidMinor,
             currency: invoice.currency || (await currencyOf()),
             notes: invoice.notes,
+            paymentMethod: invoice.paymentMethod,
+            salespersonName,
+            taxRateBp,
           },
         };
       }
@@ -915,6 +1114,7 @@ export class DocumentsService {
           include: { lines: true, customer: true },
         });
         if (!quotation) return null;
+        const qSkus = await this.skuMap(companyId, quotation.lines.map((l) => l.productId));
         return {
           documentNumber: quotation.quoteNumber,
           sourceType: 'Quotation',
@@ -928,7 +1128,7 @@ export class DocumentsService {
             dueDate: quotation.validUntil?.toISOString() ?? null,
             status: quotation.status,
             counterparty: counterparty(quotation.customer),
-            lines: quotation.lines.map((l) => percentLine(l)),
+            lines: quotation.lines.map((l) => percentLine(l, qSkus)),
             subtotalMinor: quotation.subtotalMinor,
             discountMinor: quotation.discountMinor,
             taxMinor: quotation.taxMinor,
@@ -948,6 +1148,7 @@ export class DocumentsService {
           include: { lines: true, customer: true },
         });
         if (!order) return null;
+        const oSkus = await this.skuMap(companyId, order.lines.map((l) => l.productId));
         return {
           documentNumber: order.orderNumber,
           sourceType: 'SalesOrder',
@@ -961,7 +1162,7 @@ export class DocumentsService {
             dueDate: null,
             status: order.status,
             counterparty: counterparty(order.customer),
-            lines: order.lines.map((l) => percentLine(l)),
+            lines: order.lines.map((l) => percentLine(l, oSkus)),
             subtotalMinor: order.subtotalMinor,
             discountMinor: order.discountMinor,
             taxMinor: order.taxMinor,
@@ -984,14 +1185,16 @@ export class DocumentsService {
           include: { lines: { orderBy: { sortOrder: 'asc' } }, customer: true },
         });
         if (!creditNote) return null;
+        const cnSkus = await this.skuMap(companyId, creditNote.lines.map((l) => l.productId));
         const lines = creditNote.lines.map((l) => ({
           description: l.description,
-          sku: null,
+          sku: l.productId ? cnSkus.get(l.productId) ?? null : null,
           quantity: l.quantity,
           unitPriceMinor: l.unitPriceMinor,
           discountMinor: 0,
           taxMinor: basisPointsOfMinor(lineAmountMinor(l.quantity, l.unitPriceMinor), l.taxPercentBp),
           lineTotalMinor: l.lineTotalMinor,
+          taxPercentBp: l.taxPercentBp,
         }));
         return {
           documentNumber: creditNote.creditNoteNumber,
@@ -1027,6 +1230,7 @@ export class DocumentsService {
         include: { lines: { orderBy: { sortOrder: 'asc' } }, supplier: true },
       });
       if (!order) return null;
+      const poSkus = await this.skuMap(companyId, order.lines.map((l) => l.productId));
       return {
         documentNumber: order.orderNumber,
         sourceType: 'PurchaseOrder',
@@ -1044,12 +1248,13 @@ export class DocumentsService {
             const gross = lineAmountMinor(l.quantity, l.unitCostMinor);
             return {
               description: l.description,
-              sku: null,
+              sku: l.productId ? poSkus.get(l.productId) ?? null : null,
               quantity: l.quantity,
               unitPriceMinor: l.unitCostMinor,
               discountMinor: 0,
               taxMinor: basisPointsOfMinor(gross, l.taxPercentBp),
               lineTotalMinor: l.lineTotalMinor,
+              taxPercentBp: l.taxPercentBp,
             };
           }),
           subtotalMinor: order.subtotalMinor,
@@ -1070,6 +1275,7 @@ export class DocumentsService {
         include: { lines: { orderBy: { sortOrder: 'asc' } }, supplier: true },
       });
       if (!invoice) return null;
+      const siSkus = await this.skuMap(companyId, invoice.lines.map((l) => l.productId));
       return {
         documentNumber: invoice.invoiceNumber,
         sourceType: 'SupplierInvoice',
@@ -1087,12 +1293,13 @@ export class DocumentsService {
             const gross = lineAmountMinor(l.quantity, l.unitCostMinor);
             return {
               description: l.description,
-              sku: null,
+              sku: l.productId ? siSkus.get(l.productId) ?? null : null,
               quantity: l.quantity,
               unitPriceMinor: l.unitCostMinor,
               discountMinor: 0,
               taxMinor: basisPointsOfMinor(gross, l.taxPercentBp),
               lineTotalMinor: l.lineTotalMinor,
+              taxPercentBp: l.taxPercentBp,
             };
           }),
           subtotalMinor: invoice.subtotalMinor,
@@ -1110,9 +1317,13 @@ export class DocumentsService {
     if (type === 'PAYMENT_RECEIPT' || type === 'PAYMENT_VOUCHER') {
       const payment = await this.prisma.payment.findFirst({
         where: { id: sourceId, companyId },
-        include: { customer: true },
+        include: { customer: true, supplier: true },
       });
       if (!payment) return null;
+      // A receipt collects from a customer, a voucher pays a supplier. The party
+      // is whichever relation the payment carries; a voucher that printed
+      // "Walk-in" misrepresented the counterparty it was paying.
+      const party = payment.customer ?? payment.supplier;
       return {
         documentNumber: payment.paymentNumber,
         sourceType: 'Payment',
@@ -1125,8 +1336,8 @@ export class DocumentsService {
           documentDate: payment.paidAt.toISOString(),
           dueDate: null,
           status: payment.journalEntryId ? 'POSTED' : 'RECORDED',
-          counterparty: payment.customer
-            ? counterparty(payment.customer)
+          counterparty: party
+            ? counterparty(party)
             : {
                 nameEn: 'Walk-in',
                 nameAr: 'عميل نقدي',
@@ -1159,7 +1370,7 @@ export class DocumentsService {
           payment: {
             method: payment.method,
             reference: payment.reference,
-            receivedByName: null,
+            receivedByName: payment.receivedByName,
             paidAt: payment.paidAt.toISOString(),
           },
         },
@@ -1175,6 +1386,7 @@ export class DocumentsService {
         include: { lines: true, customer: true },
       });
       if (!sale) return null;
+      const posSkus = await this.skuMap(companyId, sale.lines.map((l) => l.productId));
       return {
         documentNumber: sale.receiptNumber,
         sourceType: 'PosSale',
@@ -1201,7 +1413,7 @@ export class DocumentsService {
               },
           lines: sale.lines.map((l) => ({
             description: l.description,
-            sku: null,
+            sku: l.productId ? posSkus.get(l.productId) ?? null : null,
             quantity: l.quantity,
             unitPriceMinor: l.unitPriceMinor,
             discountMinor: 0,
@@ -1233,6 +1445,7 @@ export class DocumentsService {
         include: { lines: { orderBy: { sortOrder: 'asc' } }, supplier: true },
       });
       if (!ret) return null;
+      const prSkus = await this.skuMap(companyId, ret.lines.map((l) => l.productId));
       return {
         documentNumber: ret.returnNumber,
         sourceType: 'PurchaseReturn',
@@ -1250,12 +1463,13 @@ export class DocumentsService {
             const gross = lineAmountMinor(l.quantity, l.unitCostMinor);
             return {
               description: l.description,
-              sku: null,
+              sku: l.productId ? prSkus.get(l.productId) ?? null : null,
               quantity: l.quantity,
               unitPriceMinor: l.unitCostMinor,
               discountMinor: 0,
               taxMinor: basisPointsOfMinor(gross, l.taxPercentBp),
               lineTotalMinor: l.lineTotalMinor,
+              taxPercentBp: l.taxPercentBp,
             };
           }),
           subtotalMinor: ret.subtotalMinor,
@@ -1328,17 +1542,22 @@ export class DocumentsService {
       const totalCreditMinor = payments.reduce((sum, p) => sum + p.amountMinor, 0);
       const openingBalanceMinor = 0;
       const closingBalanceMinor = totalDebitMinor - totalCreditMinor;
-      const code = party.code;
+      // A statement is a numbered official document like any other, so it takes
+      // the next single-letter sequence number rather than embedding the party
+      // code and a date. The period it covers is printed in its own field.
+      const statementNumber = await this.prisma.$transaction((tx) =>
+        this.sequences.next(tx, companyId, isCustomer ? 'customerStatement' : 'supplierStatement'),
+      );
 
       return {
-        documentNumber: `${isCustomer ? 'CS' : 'SS'}-${code}-${to.toISOString().slice(0, 10)}`,
+        documentNumber: statementNumber,
         sourceType: isCustomer ? 'Customer' : 'Supplier',
         sourceId: party.id,
         payload: {
           kind: 'FINANCIAL',
           titleEn: spec.labelEn,
           titleAr: spec.labelAr,
-          documentNumber: `${isCustomer ? 'CS' : 'SS'}-${code}-${to.toISOString().slice(0, 10)}`,
+          documentNumber: statementNumber,
           documentDate: to.toISOString(),
           dueDate: null,
           status: 'ISSUED',
@@ -1537,23 +1756,25 @@ function newDocumentId(): string {
  */
 function percentLine(l: {
   description: string;
+  productId?: string | null;
   quantity: number;
   unitPriceMinor: number;
   discountPercentBp: number;
   taxPercentBp: number;
   lineTotalMinor: number;
-}) {
+}, skus: Map<string, string> = new Map()) {
   const gross = lineAmountMinor(l.quantity, l.unitPriceMinor);
   const discount = basisPointsOfMinor(gross, l.discountPercentBp);
   const tax = basisPointsOfMinor(gross - discount, l.taxPercentBp);
   return {
     description: l.description,
-    sku: null,
+    sku: l.productId ? skus.get(l.productId) ?? null : null,
     quantity: l.quantity,
     unitPriceMinor: l.unitPriceMinor,
     discountMinor: discount,
     taxMinor: tax,
     lineTotalMinor: l.lineTotalMinor,
+    taxPercentBp: l.taxPercentBp,
   };
 }
 

@@ -48,6 +48,7 @@ export type IssuableDocumentType =
   | 'PURCHASE_ORDER'
   | 'PURCHASE_RETURN'
   | 'PAYMENT_RECEIPT'
+  | 'PAYMENT_VOUCHER'
   | 'POS_RECEIPT'
   | 'CUSTOMER_STATEMENT'
   | 'SUPPLIER_STATEMENT'
@@ -62,6 +63,7 @@ const TYPE_LABEL_KEY: Record<IssuableDocumentType, string> = {
   PURCHASE_ORDER: 'documents.type.PURCHASE_ORDER',
   PURCHASE_RETURN: 'documents.type.PURCHASE_RETURN',
   PAYMENT_RECEIPT: 'documents.type.PAYMENT_RECEIPT',
+  PAYMENT_VOUCHER: 'documents.type.PAYMENT_VOUCHER',
   POS_RECEIPT: 'documents.type.POS_RECEIPT',
   CUSTOMER_STATEMENT: 'documents.type.CUSTOMER_STATEMENT',
   SUPPLIER_STATEMENT: 'documents.type.SUPPLIER_STATEMENT',

@@ -23,22 +23,32 @@ export class PdfRendererService implements OnModuleDestroy {
   constructor(private readonly fonts: DocumentFontService) {}
 
   private async browser(): Promise<Browser> {
-    if (!this.browserPromise) {
-      this.browserPromise = (async () => {
-        // Imported lazily so the API can boot (and unit tests can run) without
-        // the browser binary present; only a PDF request needs it.
-        const { chromium } = await import('playwright');
-        const browser = await chromium.launch({
-          args: ['--no-sandbox', '--disable-dev-shm-usage', '--font-render-hinting=none'],
-        });
-        this.logger.log('PDF renderer browser started');
-        return browser;
-      })().catch((error) => {
-        // Reset so a later request retries instead of reusing a rejected promise.
-        this.browserPromise = null;
-        throw error;
-      });
+    if (this.browserPromise) {
+      // A browser that has crashed or been closed still resolves the cached
+      // promise, so every later render would fail with "browser has been
+      // closed". Re-check liveness and relaunch rather than reuse a corpse.
+      const existing = await this.browserPromise.catch(() => null);
+      if (existing && existing.isConnected()) return existing;
+      this.browserPromise = null;
     }
+    this.browserPromise = (async () => {
+      // Imported lazily so the API can boot (and unit tests can run) without
+      // the browser binary present; only a PDF request needs it.
+      const { chromium } = await import('playwright');
+      const browser = await chromium.launch({
+        args: ['--no-sandbox', '--disable-dev-shm-usage', '--font-render-hinting=none'],
+      });
+      // A launch that later dies must not leave a stale promise behind.
+      browser.on('disconnected', () => {
+        this.browserPromise = null;
+      });
+      this.logger.log('PDF renderer browser started');
+      return browser;
+    })().catch((error) => {
+      // Reset so a later request retries instead of reusing a rejected promise.
+      this.browserPromise = null;
+      throw error;
+    });
     return this.browserPromise;
   }
 
@@ -62,7 +72,7 @@ export class PdfRendererService implements OnModuleDestroy {
    */
   async render(
     html: string,
-    options: { footerHtml?: string } = {},
+    options: { footerHtml?: string; margins?: PdfMargins } = {},
   ): Promise<{ pdf: Buffer; pageCount: number }> {
     const browser = await this.browser();
     const context = await browser.newContext({ viewport: { width: 1240, height: 1754 } });
@@ -81,6 +91,10 @@ export class PdfRendererService implements OnModuleDestroy {
       // never consumes content height and the real page counter is available.
       // Chromium only substitutes `.pageNumber`/`.totalPages` when the template
       // sets a font size, and margins must be non-zero for the band to show.
+      //
+      // The margins are a parameter because the official financial layout was
+      // measured against a printed reference with tighter edges than the report;
+      // a single fixed margin would make one of the two documents drift.
       const footerHtml = options.footerHtml;
       const pdf = await page.pdf({
         format: 'A4',
@@ -89,7 +103,7 @@ export class PdfRendererService implements OnModuleDestroy {
         displayHeaderFooter: Boolean(footerHtml),
         headerTemplate: '<span></span>',
         footerTemplate: footerHtml ?? '<span></span>',
-        margin: { top: '12mm', right: '12mm', bottom: '20mm', left: '12mm' },
+        margin: options.margins ?? DEFAULT_PDF_MARGINS,
       });
 
       const buffer = Buffer.from(pdf);
@@ -104,6 +118,44 @@ export class PdfRendererService implements OnModuleDestroy {
     return `${await this.fonts.fontFaceCss()}\n${BASE_PRINT_CSS}`;
   }
 }
+
+/**
+ * Page margins for a generated PDF, in Chromium's CSS length units.
+ */
+export interface PdfMargins {
+  top: string;
+  right: string;
+  bottom: string;
+  left: string;
+}
+
+/**
+ * The default margins: a comfortable frame for a multi-page report.
+ *
+ * The footer is painted inside the bottom margin, so it is deeper than the other
+ * three sides.
+ */
+export const DEFAULT_PDF_MARGINS: PdfMargins = {
+  top: '12mm',
+  right: '12mm',
+  bottom: '20mm',
+  left: '12mm',
+};
+
+/**
+ * Margins for the official financial layout.
+ *
+ * Measured from the approved printed invoice: the content starts close to the
+ * top edge (the identity band sits ~4mm down) and the footer sits in the bottom
+ * margin. Wider than the default so the printed table lines up with the
+ * reference document.
+ */
+export const OFFICIAL_PDF_MARGINS: PdfMargins = {
+  top: '4mm',
+  right: '4mm',
+  bottom: '14mm',
+  left: '4mm',
+};
 
 /**
  * Counts pages by reading the PDF page tree.

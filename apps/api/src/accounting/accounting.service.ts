@@ -715,6 +715,13 @@ export class AccountingService {
       }
 
       const paymentNumber = await this.sequences.next(tx, companyId, 'payment');
+      // The printed slip names who took the money. Fall back to the operator's
+      // own name so the "Received By" line is never blank, and let an explicit
+      // value win when the caller names someone else.
+      const receivedByName =
+        dto.receivedByName?.trim() ||
+        (await tx.user.findUnique({ where: { id: actor.userId }, select: { fullNameEn: true } }))?.fullNameEn ||
+        null;
       const payment = await tx.payment.create({
         data: {
           companyId,
@@ -728,6 +735,7 @@ export class AccountingService {
           amountMinor: dto.amountMinor,
           reference: dto.reference ?? null,
           notes: dto.notes ?? null,
+          receivedByName,
           paidAt,
           idempotencyKey: dto.idempotencyKey ?? null,
           createdById: actor.userId,
@@ -922,6 +930,7 @@ function toPaymentDto(p: {
   currency: string;
   reference: string | null;
   notes: string | null;
+  receivedByName: string | null;
   paidAt: Date;
   journalEntryId: string | null;
   customer?: { nameEn: string; nameAr: string } | null;
@@ -949,6 +958,7 @@ function toPaymentDto(p: {
     currency: p.currency,
     reference: p.reference,
     notes: p.notes,
+    receivedByName: p.receivedByName,
     paidAt: p.paidAt.toISOString(),
     journalEntryId: p.journalEntryId,
     allocations: p.allocations.map((a) => ({

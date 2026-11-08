@@ -796,7 +796,7 @@ export const api = {
     request<WarehouseDto>('/inventory/warehouses', { method: 'POST', body }),
   updateWarehouse: (id: string, body: Record<string, unknown>) =>
     request<WarehouseDto>(`/inventory/warehouses/${id}`, { method: 'PATCH', body }),
-  products: (params: { companyId?: string; search?: string } = {}) =>
+  products: (params: { companyId?: string; search?: string; category?: string } = {}) =>
     request<Paginated<ProductDto>>(`/inventory/products?${toQuery(params)}`),
   createProduct: (body: Record<string, unknown>) =>
     request<ProductDto>('/inventory/products', { method: 'POST', body }),
@@ -843,8 +843,10 @@ export const api = {
    * The POS product grid: active products with their lead image and on-hand
    * position. `search` matches a scanned barcode as well as a name or SKU.
    */
-  posCatalog: (params: { companyId?: string; search?: string } = {}) =>
+  posCatalog: (params: { companyId?: string; search?: string; category?: string } = {}) =>
     request<{ items: PosProductDto[]; total: number }>(`/inventory/pos-catalog?${toQuery(params)}`),
+  posCategories: (companyId?: string) =>
+    request<{ items: string[] }>(`/inventory/pos-categories${companyId ? `?companyId=${companyId}` : ''}`),
 
   // ------------------------------------------------------------ sales (E02)
   salesCustomers: (params: { companyId?: string; search?: string } = {}) =>

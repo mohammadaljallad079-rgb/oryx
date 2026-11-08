@@ -1125,18 +1125,21 @@ export class BookingService {
     companyId: string,
     bookingType: 'INSPECTION' | 'MAINTENANCE' | 'PROVIDER_SERVICE',
   ): Promise<string> {
+    // One leading letter, then digits, as every other document number on the
+    // platform. The three booking types keep independent counters, so the
+    // letters only have to be distinct within their own sequence.
     const prefix =
-      bookingType === 'INSPECTION' ? 'BK-I' : bookingType === 'MAINTENANCE' ? 'BK-M' : 'BK-P';
+      bookingType === 'INSPECTION' ? 'H' : bookingType === 'MAINTENANCE' ? 'M' : 'V';
     const count = await this.prisma.bookingSlot.count({ where: { companyId, bookingType } });
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const candidate = `${prefix}-${String(count + 1 + attempt).padStart(6, '0')}`;
+      const candidate = `${prefix}${String(count + 1 + attempt).padStart(6, '0')}`;
       const clash = await this.prisma.bookingSlot.findFirst({
         where: { companyId, reference: candidate },
         select: { id: true },
       });
       if (!clash) return candidate;
     }
-    return `${prefix}-${Date.now().toString(36).toUpperCase()}`;
+    return `${prefix}${Date.now().toString(36).toUpperCase()}`;
   }
 
   /** Prisma reports a unique-constraint failure as P2002. */

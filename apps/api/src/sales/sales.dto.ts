@@ -400,6 +400,20 @@ export class CreateInvoiceDto extends SalesDocumentDateDto {
   @MaxLength(3)
   currency?: string;
 
+  /**
+   * How the invoice is settled. The official template prints a "Payment" line,
+   * so the method is captured with the document.
+   */
+  @IsOptional()
+  @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER'])
+  paymentMethod?: string;
+
+  /** The salesperson credited on the printed invoice ("Staf Name"). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  salespersonName?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(400)

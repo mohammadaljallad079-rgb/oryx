@@ -38,6 +38,11 @@ export class ListQueryDto {
   @IsOptional()
   @IsString()
   branchId?: string;
+
+  /** Exact merchandise grouping, used by the point-of-sale category chips. */
+  @IsOptional()
+  @IsString()
+  category?: string;
 }
 
 export class CreateWarehouseDto {
@@ -122,6 +127,11 @@ export class CreateProductDto {
   barcode?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  category?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)
@@ -190,6 +200,11 @@ export class UpdateProductDto {
   @IsString()
   @MaxLength(60)
   barcode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  category?: string;
 
   @IsOptional()
   @Type(() => Number)

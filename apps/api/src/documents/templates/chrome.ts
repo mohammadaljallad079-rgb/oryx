@@ -158,6 +158,40 @@ export function signatureBlock(
 }
 
 /**
+ * The contact footer for the official financial layout.
+ *
+ * Reproduces the printed reference: a hairline rule, then the phone, email and
+ * website on one line with the page counter, and the registered address beneath.
+ * Like `footerTemplate` it is a Chromium page template, so it lives inside the
+ * bottom margin and cannot push content onto a blank page.
+ */
+export function officialFooterTemplate(issuer: DocumentIssuer): string {
+  const base = [
+    'font-family:Arial,Helvetica,sans-serif',
+    'color:#475569',
+    '-webkit-print-color-adjust:exact',
+  ].join(';');
+  const contact: string[] = [];
+  if (issuer.phone) contact.push(`☎ ${esc(issuer.phone)}`);
+  if (issuer.email) contact.push(`✉ ${esc(issuer.email)}`);
+  if (issuer.websiteUrl) contact.push(esc(issuer.websiteUrl));
+  const address = [issuer.addressLine, issuer.city].filter(Boolean).join(' · ');
+  const taxLine = issuer.taxNumber ? ` | CR / VAT: ${esc(issuer.taxNumber)}` : '';
+  return `
+<div style="${base};width:100%;padding:0 4mm;box-sizing:border-box;">
+  <div style="border-top:0.75px solid #94a3b8;padding-top:4px;display:flex;justify-content:space-between;align-items:baseline;font-size:7pt;font-weight:700;">
+    <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+    <span>${contact.join(' &nbsp;·&nbsp; ')}</span>
+  </div>
+  ${
+    address || taxLine
+      ? `<div style="margin-top:2px;text-align:center;font-size:6.5pt;color:#64748b;">${esc(address)}${taxLine}</div>`
+      : ''
+  }
+</div>`;
+}
+
+/**
  * The running footer, rendered by Chromium as a page *footer template*.
  *
  * A footer in the normal flow sits after the content, so a document that only

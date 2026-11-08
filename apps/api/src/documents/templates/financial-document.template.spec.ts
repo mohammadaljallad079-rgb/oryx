@@ -98,3 +98,48 @@ describe('financial document template — line quantity', () => {
     expect(quantityCell(render(200_000))).toBe('20');
   });
 });
+
+/**
+ * The "المستلم / Received By" line.
+ *
+ * The receipt and payment voucher carry a received-by line in both the document
+ * info table and the signature strip. The field used to be hard-coded to null,
+ * so a stored name never reached the printed page. These lock in that a stored
+ * name is printed in both places and that an absent name is omitted rather than
+ * printed as an empty row.
+ */
+describe('financial document template — received by', () => {
+  function renderPayment(receivedByName: string | null): string {
+    const payload = payloadWithQuantity(10_000);
+    return renderFinancialDocumentHtml({
+      issuer,
+      payload: {
+        ...payload,
+        titleEn: 'Payment Receipt',
+        titleAr: 'سند قبض',
+        payment: {
+          method: 'CASH',
+          reference: 'REF-1',
+          receivedByName,
+          paidAt: '2026-01-01T00:00:00.000Z',
+        },
+      },
+      documentNumber: 'Y-1',
+      issuedAt: new Date('2026-01-01T00:00:00Z'),
+      verification: null,
+      baseCss: '',
+    });
+  }
+
+  it('prints the stored name in the info table and the signature strip', () => {
+    const html = renderPayment('Fatima Al-Zahra');
+    const occurrences = html.split('Fatima Al-Zahra').length - 1;
+    expect(occurrences).toBe(2);
+    expect(html).toContain('المستلم / Received By');
+  });
+
+  it('omits the info row when no name is stored', () => {
+    const html = renderPayment(null);
+    expect(html).not.toContain('المستلم / Received By');
+  });
+});

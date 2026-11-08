@@ -7,6 +7,7 @@ import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput, todayIso } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { DocumentActions } from '@/components/document-actions';
 import {
   Badge,
   Button,
@@ -23,15 +24,18 @@ import {
 } from '@/components/ui';
 import type {
   BalanceSheetDto,
+  CustomerDto,
   ErpAccountDto,
   FiscalYearDto,
   IncomeStatementDto,
   JournalEntryDto,
   LedgerAccountDto,
+  PaymentDto,
+  SupplierDto,
   TrialBalanceDto,
 } from '@oryx/shared';
 
-type Tab = 'accounts' | 'journals' | 'periods' | 'statements' | 'ledger';
+type Tab = 'accounts' | 'journals' | 'periods' | 'payments' | 'statements' | 'ledger';
 
 export default function AccountingPage() {
   const { t } = useUi();
@@ -40,11 +44,13 @@ export default function AccountingPage() {
 
   const canManageCoa = can('erp.accounting.coa.manage');
   const canPost = can('erp.accounting.journal.post');
+  const canPay = can('erp.accounting.payment.manage');
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'accounts', label: t('erp.accounting.accounts') },
     { key: 'journals', label: t('erp.accounting.journals') },
     { key: 'periods', label: t('erp.accounting.periods') },
+    { key: 'payments', label: t('erp.accounting.payments') },
     { key: 'statements', label: t('erp.accounting.statements') },
     { key: 'ledger', label: t('erp.accounting.ledger') },
   ];
@@ -76,6 +82,7 @@ export default function AccountingPage() {
       {tab === 'accounts' ? <AccountsTab canManage={canManageCoa} /> : null}
       {tab === 'journals' ? <JournalsTab canPost={canPost} /> : null}
       {tab === 'periods' ? <PeriodsTab canManage={canManageCoa} /> : null}
+      {tab === 'payments' ? <PaymentsTab canPay={canPay} /> : null}
       {tab === 'statements' ? <StatementsTab /> : null}
       {tab === 'ledger' ? <LedgerTab /> : null}
     </div>
@@ -371,9 +378,17 @@ function JournalsTab({ canPost }: { canPost: boolean }) {
                     <StatusBadge status={j.status} label={j.status} />
                   </td>
                   <td>
-                    <span className="oryx-faint text-[11.5px]">
-                      {j.lines.length} {t('erp.accounting.lines')}
-                    </span>
+                    <div className="flex flex-wrap items-center justify-end gap-1">
+                      <span className="oryx-faint text-[11.5px]">
+                        {j.lines.length} {t('erp.accounting.lines')}
+                      </span>
+                      <DocumentActions
+                        sourceType="JournalEntry"
+                        sourceId={j.id}
+                        type="JOURNAL_ENTRY"
+                        permissions={['erp.accounting.read']}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -601,6 +616,242 @@ function PeriodsTab({ canManage }: { canManage: boolean }) {
         </div>
       )}
     </Card>
+  );
+}
+
+// ------------------------------------------------------- receipts & payments
+
+/**
+ * Receipts and payment vouchers (سندات القبض والصرف).
+ *
+ * A receipt collects money from a customer, a voucher pays a supplier. Both are
+ * financial documents, so the row offers the same preview/print/download cell as
+ * an invoice — the printed slip is issued from the stored payment record rather
+ * than recomposed in the browser.
+ */
+function PaymentsTab({ canPay }: { canPay: boolean }) {
+  const { t, locale } = useUi();
+  const [page, setPage] = useState(1);
+  const [open, setOpen] = useState(false);
+  const list = useAsync(() => api.payments({ page }), [page]);
+  const customers = useAsync(() => api.salesCustomers(), []);
+  const suppliers = useAsync(() => api.suppliers(), []);
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
+        <p className="oryx-panel-title m-0">{t('erp.accounting.payments')}</p>
+        {canPay ? (
+          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-payment">
+            <Icon name="plus" size={16} />
+            {t('erp.accounting.newPayment')}
+          </Button>
+        ) : null}
+      </div>
+      {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
+      {list.loading ? (
+        <div className="flex flex-col gap-3 p-4">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} height={34} />)}</div>
+      ) : (list.data?.items.length ?? 0) === 0 ? (
+        <EmptyState title={t('common.empty')} hint={t('erp.accounting.emptyPayments')} />
+      ) : (
+        <TableShell>
+          <thead>
+            <tr>
+              <th>{t('erp.accounting.paymentNumber')}</th>
+              <th>{t('erp.accounting.direction')}</th>
+              <th>{t('erp.accounting.party')}</th>
+              <th>{t('erp.accounting.method')}</th>
+              <th>{t('erp.payments.amount')}</th>
+              <th>{t('common.date')}</th>
+              <th>{t('common.actions')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.data!.items.map((p: PaymentDto) => (
+              <tr key={p.id} data-testid={`payment-row-${p.paymentNumber}`}>
+                <td className="font-mono text-[12px]">{p.paymentNumber}</td>
+                <td><StatusBadge status={p.direction} label={t(`erp.accounting.${p.direction === 'RECEIPT' ? 'receipt' : 'voucher'}`)} /></td>
+                <td className="text-[12.5px]">{locale === 'ar' ? p.partyNameAr ?? p.partyNameEn : p.partyNameEn}</td>
+                <td className="text-[12.5px]">{p.method}</td>
+                <td className="tabular-nums text-[12.5px] font-semibold">{money(p.amountMinor, p.currency)}</td>
+                <td className="text-[12.5px]">{p.paidAt?.slice(0, 10)}</td>
+                <td>
+                  <DocumentActions
+                    sourceType="Payment"
+                    sourceId={p.id}
+                    type={p.direction === 'RECEIPT' ? 'PAYMENT_RECEIPT' : 'PAYMENT_VOUCHER'}
+                    permissions={['erp.accounting.read', 'erp.accounting.payment.manage']}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </TableShell>
+      )}
+      {list.data && list.data.total > list.data.pageSize ? (
+        <Pagination
+          page={page}
+          pageSize={list.data.pageSize}
+          total={list.data.total}
+          onPage={setPage}
+          labels={{ previous: t('common.previous'), next: t('common.next'), page: t('common.page'), of: t('common.of') }}
+        />
+      ) : null}
+      <PaymentModal
+        open={open}
+        customers={customers.data?.items ?? []}
+        suppliers={suppliers.data?.items ?? []}
+        onClose={() => setOpen(false)}
+        onCreated={async () => {
+          await list.reload();
+        }}
+      />
+    </Card>
+  );
+}
+
+function PaymentModal({
+  open,
+  customers,
+  suppliers,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  customers: CustomerDto[];
+  suppliers: SupplierDto[];
+  onClose: () => void;
+  onCreated: () => Promise<void>;
+}) {
+  const { t } = useUi();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [direction, setDirection] = useState<'RECEIPT' | 'PAYMENT'>('RECEIPT');
+  const [customerId, setCustomerId] = useState('');
+  const [supplierId, setSupplierId] = useState('');
+  const [method, setMethod] = useState('CASH');
+  const [amount, setAmount] = useState('');
+  const [reference, setReference] = useState('');
+  const [notes, setNotes] = useState('');
+  // The name the printed slip shows on its "Received By" line. Left blank it
+  // defaults server-side to the signed-in operator, so it is never empty.
+  const [receivedByName, setReceivedByName] = useState('');
+  const [paidAt, setPaidAt] = useState(todayIso());
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.recordPayment({
+        direction,
+        partyType: direction === 'RECEIPT' ? 'CUSTOMER' : 'SUPPLIER',
+        ...(direction === 'RECEIPT' ? { customerId } : { supplierId }),
+        method,
+        amountMinor: toMinorInput(amount),
+        reference: reference || undefined,
+        notes: notes || undefined,
+        receivedByName: receivedByName.trim() || undefined,
+        paidAt: new Date(paidAt).toISOString(),
+      });
+      await onCreated();
+      onClose();
+      setAmount('');
+      setReference('');
+      setNotes('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const partyOk = direction === 'RECEIPT' ? Boolean(customerId) : Boolean(supplierId);
+
+  return (
+    <Modal
+      open={open}
+      title={t('erp.accounting.newPayment')}
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button variant="primary" disabled={busy || !partyOk || !amount} onClick={submit} data-testid="save-payment">
+            {busy ? t('common.loading') : t('common.save')}
+          </Button>
+        </>
+      }
+    >
+      {error ? <ErrorBanner message={error} /> : null}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label={t('erp.accounting.direction')} required>
+          <select
+            className="oryx-select"
+            value={direction}
+            onChange={(e) => setDirection(e.target.value as 'RECEIPT' | 'PAYMENT')}
+            data-testid="payment-direction"
+          >
+            <option value="RECEIPT">{t('erp.accounting.receipt')}</option>
+            <option value="PAYMENT">{t('erp.accounting.voucher')}</option>
+          </select>
+        </Field>
+        <Field label={direction === 'RECEIPT' ? t('erp.sales.customer') : t('erp.purchasing.supplier')} required>
+          {direction === 'RECEIPT' ? (
+            <select className="oryx-select" value={customerId} onChange={(e) => setCustomerId(e.target.value)} data-testid="payment-customer">
+              <option value="">—</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code} — {c.nameEn}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select className="oryx-select" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} data-testid="payment-supplier">
+              <option value="">—</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.code} — {s.nameEn}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+        <Field label={t('erp.accounting.method')} required>
+          <select className="oryx-select" value={method} onChange={(e) => setMethod(e.target.value)} data-testid="payment-method">
+            {['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER'].map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={t('erp.payments.amount')} required>
+          <input
+            className="oryx-input tabular-nums"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            data-testid="payment-amount"
+          />
+        </Field>
+        <Field label={t('common.date')} required>
+          <input type="date" className="oryx-input" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} data-testid="payment-date" />
+        </Field>
+        <Field label={t('erp.payments.manualReference')}>
+          <input className="oryx-input" value={reference} onChange={(e) => setReference(e.target.value)} data-testid="payment-reference" />
+        </Field>
+        <Field label={t('erp.payments.receivedBy')} hint={t('erp.payments.receivedByHint')}>
+          <input
+            className="oryx-input"
+            value={receivedByName}
+            onChange={(e) => setReceivedByName(e.target.value)}
+            data-testid="payment-received-by"
+          />
+        </Field>
+        <Field label={t('common.notes')}>
+          <input className="oryx-input" value={notes} onChange={(e) => setNotes(e.target.value)} data-testid="payment-notes" />
+        </Field>
+      </div>
+    </Modal>
   );
 }
 

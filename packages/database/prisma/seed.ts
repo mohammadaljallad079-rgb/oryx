@@ -107,10 +107,10 @@ const STANDARD_CHART: Array<{
 
 /** Quantities are scaled by 10^4 (10000 = 1 unit). */
 const DEMO_PRODUCTS = [
-  { sku: 'OIL-5W30', nameEn: 'Engine oil 5W-30 (4L)', nameAr: 'زيت محرك 5W-30 (4 لتر)', unit: 'bottle', salesPriceMinor: 12500, costPriceMinor: 8800, reorderLevel: 200000, reorderQuantity: 500000, openingQuantity: 1200000 },
-  { sku: 'FILTER-AIR', nameEn: 'Air filter', nameAr: 'فلتر هواء', unit: 'piece', salesPriceMinor: 6500, costPriceMinor: 4000, reorderLevel: 100000, reorderQuantity: 300000, openingQuantity: 450000 },
-  { sku: 'BRAKE-PAD-F', nameEn: 'Front brake pad set', nameAr: 'طقم فحمات فرامل أمامية', unit: 'set', salesPriceMinor: 28000, costPriceMinor: 19000, reorderLevel: 80000, reorderQuantity: 200000, openingQuantity: 260000 },
-  { sku: 'SVC-INSPECT', nameEn: 'Vehicle inspection service', nameAr: 'خدمة فحص مركبة', unit: 'service', salesPriceMinor: 35000, costPriceMinor: 0, reorderLevel: 0, reorderQuantity: 0, openingQuantity: 0 },
+  { sku: 'OIL-5W30', nameEn: 'Engine oil 5W-30 (4L)', nameAr: 'زيت محرك 5W-30 (4 لتر)', unit: 'bottle', category: 'Oils & Fluids', salesPriceMinor: 12500, costPriceMinor: 8800, reorderLevel: 200000, reorderQuantity: 500000, openingQuantity: 1200000 },
+  { sku: 'FILTER-AIR', nameEn: 'Air filter', nameAr: 'فلتر هواء', unit: 'piece', category: 'Filters', salesPriceMinor: 6500, costPriceMinor: 4000, reorderLevel: 100000, reorderQuantity: 300000, openingQuantity: 450000 },
+  { sku: 'BRAKE-PAD-F', nameEn: 'Front brake pad set', nameAr: 'طقم فحمات فرامل أمامية', unit: 'set', category: 'Brakes', salesPriceMinor: 28000, costPriceMinor: 19000, reorderLevel: 80000, reorderQuantity: 200000, openingQuantity: 260000 },
+  { sku: 'SVC-INSPECT', nameEn: 'Vehicle inspection service', nameAr: 'خدمة فحص مركبة', unit: 'service', category: 'Services', salesPriceMinor: 35000, costPriceMinor: 0, reorderLevel: 0, reorderQuantity: 0, openingQuantity: 0 },
 ];
 
 const DEMO_CUSTOMERS = [
@@ -902,13 +902,16 @@ async function seedErpBaseline(idByCode: Map<string, string>, superAdminId: stri
     for (const p of DEMO_PRODUCTS) {
       await prisma.product.upsert({
         where: { companyId_sku: { companyId: company.id, sku: p.sku } },
-        update: {},
+        // Backfill the category so an existing demo tenant gains the POS chips
+        // on a re-seed without a manual data fix.
+        update: { category: p.category },
         create: {
           companyId: company.id,
           sku: p.sku,
           nameEn: p.nameEn,
           nameAr: p.nameAr,
           unit: p.unit,
+          category: p.category,
           salesPriceMinor: p.salesPriceMinor,
           costPriceMinor: p.costPriceMinor,
           taxRateBp: 1500,

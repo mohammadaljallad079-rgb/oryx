@@ -230,6 +230,16 @@ export class RecordPaymentDto {
   @MaxLength(300)
   notes?: string;
 
+  /**
+   * The name printed on the "المستلم / Received By" line. Optional: when it is
+   * absent the API records the operator's own name, so the printed receipt is
+   * never blank.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  receivedByName?: string;
+
   @IsISO8601()
   paidAt!: string;
 

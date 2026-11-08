@@ -181,6 +181,7 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
             <tr>
               <th>{t('erp.inventory.sku')}</th>
               <th>{t('common.name')}</th>
+              <th>{t('erp.inventory.category')}</th>
               <th>{t('erp.inventory.unit')}</th>
               <th>{t('erp.inventory.salesPrice')}</th>
               <th>{t('erp.inventory.costPrice')}</th>
@@ -197,6 +198,7 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
                   <span className="block font-semibold">{p.nameEn}</span>
                   <span className="oryx-faint block text-[11px]">{p.nameAr}</span>
                 </td>
+                <td className="text-[12.5px]">{p.category ?? '—'}</td>
                 <td className="text-[12.5px]">{p.unit}</td>
                 <td className="tabular-nums text-[12.5px]">{money(p.salesPriceMinor)}</td>
                 <td className="tabular-nums text-[12.5px]">{money(p.costPriceMinor)}</td>
@@ -286,7 +288,7 @@ function EditProductModal({
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15', isActive: true,
-    barcode: '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
+    barcode: '', category: '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
   });
 
   useEffect(() => {
@@ -301,6 +303,7 @@ function EditProductModal({
       taxRate: (product.taxRateBp / 100).toString(),
       isActive: product.isActive,
       barcode: product.barcode ?? '',
+      category: product.category ?? '',
       // The stored reorder level is scaled by 10^4; `qty` renders it back.
       reorderLevel: String(product.reorderLevel / 10_000),
       reorderQuantity: String(product.reorderQuantity / 10_000),
@@ -322,6 +325,7 @@ function EditProductModal({
         taxRateBp: Math.round(Number(form.taxRate) * 100),
         isActive: form.isActive,
         barcode: form.barcode,
+        category: form.category,
         reorderLevel: toQuantityInput(form.reorderLevel),
         reorderQuantity: toQuantityInput(form.reorderQuantity),
         trackStock: form.trackStock,
@@ -373,6 +377,9 @@ function EditProductModal({
         </Field>
         <Field label={t('erp.inventory.barcode')}>
           <input className="oryx-input" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} data-testid="edit-product-barcode" />
+        </Field>
+        <Field label={t('erp.inventory.category')}>
+          <input className="oryx-input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} data-testid="edit-product-category" />
         </Field>
         <Field label={t('erp.inventory.reorderLevel')}>
           <input className="oryx-input" value={form.reorderLevel} onChange={(e) => setForm({ ...form, reorderLevel: e.target.value })} data-testid="edit-product-reorder-level" />
@@ -573,7 +580,7 @@ function CreateProductModal({ open, onClose, onCreated }: { open: boolean; onClo
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
-    barcode: '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
+    barcode: '', category: '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
   });
 
   const submit = async () => {
@@ -589,6 +596,7 @@ function CreateProductModal({ open, onClose, onCreated }: { open: boolean; onClo
         costPriceMinor: toMinorInput(form.costPrice),
         taxRateBp: Math.round(Number(form.taxRate) * 100),
         barcode: form.barcode || undefined,
+        category: form.category || undefined,
         // The reorder level is stored scaled by 10^4, exactly like a quantity.
         reorderLevel: toQuantityInput(form.reorderLevel),
         reorderQuantity: toQuantityInput(form.reorderQuantity),
@@ -642,6 +650,9 @@ function CreateProductModal({ open, onClose, onCreated }: { open: boolean; onClo
         </Field>
         <Field label={t('erp.inventory.barcode')}>
           <input className="oryx-input" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} data-testid="product-barcode" />
+        </Field>
+        <Field label={t('erp.inventory.category')}>
+          <input className="oryx-input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} data-testid="product-category" />
         </Field>
         <Field label={t('erp.inventory.reorderLevel')}>
           <input className="oryx-input" value={form.reorderLevel} onChange={(e) => setForm({ ...form, reorderLevel: e.target.value })} data-testid="product-reorder-level" />

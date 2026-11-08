@@ -648,6 +648,8 @@ export interface PaymentDto {
   currency: string;
   reference: string | null;
   notes: string | null;
+  /** The name printed on the receipt/voucher "Received By" line. */
+  receivedByName: string | null;
   paidAt: string;
   journalEntryId: string | null;
   allocations: PaymentAllocationDto[];
@@ -674,6 +676,7 @@ export interface ProductDto {
   type: 'PRODUCT' | 'SERVICE';
   unit: string;
   barcode: string | null;
+  category: string | null;
   salesPriceMinor: number;
   costPriceMinor: number;
   taxRateBp: number;
@@ -792,6 +795,8 @@ export interface PosProductDto {
   nameAr: string;
   barcode: string | null;
   unit: string;
+  /** Merchandise grouping used by the till's category chips, or null. */
+  category: string | null;
   salesPriceMinor: number;
   taxRateBp: number;
   trackStock: boolean;

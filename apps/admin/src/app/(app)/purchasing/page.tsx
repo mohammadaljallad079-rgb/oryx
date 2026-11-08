@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
-import { minorToInput, money, toMinorInput, toQuantityInput } from '@/lib/erp-format';
+import { minorToInput, money, toMinorInput, toQuantityInput, todayIso } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import { DocumentActions } from '@/components/document-actions';
 import {
@@ -174,6 +174,12 @@ function SuppliersTab({ canManage }: { canManage: boolean }) {
                         </Button>
                       </>
                     ) : null}
+                    <DocumentActions
+                      sourceType="Supplier"
+                      sourceId={s.id}
+                      type="SUPPLIER_STATEMENT"
+                      permissions={['erp.purchasing.read', 'erp.accounting.read']}
+                    />
                   </div>
                 </td>
               </tr>
@@ -589,6 +595,8 @@ function PurchaseOrderModal({
   const [error, setError] = useState<string | null>(null);
   const [supplierId, setSupplierId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
+  const [expectedDate, setExpectedDate] = useState('');
+  const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
 
   const submit = async () => {
@@ -600,6 +608,8 @@ function PurchaseOrderModal({
         warehouseId: warehouseId || undefined,
         approve: true,
         orderDate: new Date().toISOString(),
+        ...(expectedDate ? { expectedDate: new Date(expectedDate).toISOString() } : {}),
+        ...(notes.trim() ? { notes: notes.trim() } : {}),
         lines: lines.map((l) => ({
           productId: l.productId || undefined,
           description: l.description || 'Item',
@@ -652,6 +662,23 @@ function PurchaseOrderModal({
               </option>
             ))}
           </select>
+        </Field>
+        <Field label={t('erp.purchasing.expectedDate')}>
+          <input
+            type="date"
+            className="oryx-input"
+            value={expectedDate}
+            onChange={(e) => setExpectedDate(e.target.value)}
+            data-testid="purchase-order-expected-date"
+          />
+        </Field>
+        <Field label={t('common.notes')}>
+          <input
+            className="oryx-input"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            data-testid="purchase-order-notes"
+          />
         </Field>
       </div>
       <div className="mt-4">
@@ -812,6 +839,8 @@ function SupplierInvoiceModal({
   const [error, setError] = useState<string | null>(null);
   const [supplierId, setSupplierId] = useState('');
   const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
 
   const submit = async () => {
@@ -822,6 +851,8 @@ function SupplierInvoiceModal({
         supplierId,
         supplierInvoiceNumber,
         invoiceDate: new Date().toISOString(),
+        ...(dueDate ? { dueDate: new Date(dueDate).toISOString() } : {}),
+        ...(notes.trim() ? { notes: notes.trim() } : {}),
         lines: lines.map((l) => ({
           productId: l.productId || undefined,
           description: l.description || 'Item',
@@ -873,6 +904,23 @@ function SupplierInvoiceModal({
             data-testid="supplier-invoice-number"
           />
         </Field>
+        <Field label={t('erp.sales.dueDate')}>
+          <input
+            type="date"
+            className="oryx-input"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            data-testid="supplier-invoice-due-date"
+          />
+        </Field>
+        <Field label={t('common.notes')}>
+          <input
+            className="oryx-input"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            data-testid="supplier-invoice-notes"
+          />
+        </Field>
       </div>
       <div className="mt-4">
         <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} testIdPrefix="supplier-invoice-line" costLabel={t('erp.inventory.unitCost')} />
@@ -884,13 +932,25 @@ function SupplierInvoiceModal({
 // ------------------------------------------------------------------- returns
 
 function ReturnsTab({ canManage }: { canManage: boolean }) {
+  const { companyId } = useAuth();
+  const taxOptions = useTaxOptions(companyId);
   const { t } = useUi();
+  const [open, setOpen] = useState(false);
   const list = useAsync(() => api.purchaseReturns(), []);
+  const suppliers = useAsync(() => api.suppliers(), []);
+  const products = useAsync(() => api.products(), []);
+  const warehouses = useAsync(() => api.warehouses(), []);
 
   return (
     <Card>
-      <div className="border-b border-[var(--border)] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.purchasing.returns')}</p>
+        {canManage ? (
+          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-purchase-return">
+            <Icon name="plus" size={16} />
+            {t('erp.purchasing.newReturn')}
+          </Button>
+        ) : null}
       </div>
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
       {list.loading ? <div className="p-4"><Skeleton height={120} /></div> : (list.data?.items.length ?? 0) === 0 ? (
@@ -928,8 +988,125 @@ function ReturnsTab({ canManage }: { canManage: boolean }) {
           </tbody>
         </TableShell>
       )}
-      <span className="hidden">{canManage ? '1' : '0'}</span>
+      <PurchaseReturnModal
+        open={open}
+        suppliers={suppliers.data?.items ?? []}
+        products={products.data?.items ?? []}
+        warehouses={warehouses.data?.items ?? []}
+        taxOptions={taxOptions}
+        onClose={() => setOpen(false)}
+        onCreated={list.reload}
+      />
     </Card>
+  );
+}
+
+function PurchaseReturnModal({
+  open,
+  suppliers,
+  products,
+  warehouses,
+  taxOptions,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  suppliers: SupplierDto[];
+  products: Array<{ id: string; sku: string; nameEn: string; costPriceMinor: number }>;
+  warehouses: WarehouseDto[];
+  taxOptions: SearchableOption[];
+  onClose: () => void;
+  onCreated: () => Promise<void>;
+}) {
+  const { t } = useUi();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [supplierId, setSupplierId] = useState('');
+  const [warehouseId, setWarehouseId] = useState('');
+  const [returnDate, setReturnDate] = useState(todayIso());
+  const [reason, setReason] = useState('');
+  const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.createPurchaseReturn({
+        supplierId,
+        warehouseId,
+        returnDate: new Date(returnDate).toISOString(),
+        ...(reason.trim() ? { reason: reason.trim() } : {}),
+        lines: lines.map((l) => ({
+          productId: l.productId,
+          description: l.description || 'Item',
+          quantity: Number(l.quantity) || 1,
+          unitCostMinor: toMinorInput(l.unitCost),
+          taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
+        })),
+      });
+      await onCreated();
+      onClose();
+      setReason('');
+      setLines([emptyLine()]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      title={t('erp.purchasing.newReturn')}
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            variant="primary"
+            disabled={busy || !supplierId || !warehouseId || lines.every((l) => !l.productId)}
+            onClick={submit}
+            data-testid="save-purchase-return"
+          >
+            {busy ? t('common.loading') : t('common.save')}
+          </Button>
+        </>
+      }
+    >
+      {error ? <ErrorBanner message={error} /> : null}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label={t('erp.purchasing.supplier')} required>
+          <select className="oryx-select" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} data-testid="purchase-return-supplier">
+            <option value="">—</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.code} — {s.nameEn}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={t('erp.inventory.warehouse')} required>
+          <select className="oryx-select" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} data-testid="purchase-return-warehouse">
+            <option value="">—</option>
+            {warehouses.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.code} — {w.nameEn}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={t('erp.purchasing.returnDate')} required>
+          <input type="date" className="oryx-input" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} data-testid="purchase-return-date" />
+        </Field>
+        <Field label={t('erp.purchasing.returnReason')} hint={t('erp.purchasing.returnReasonHint')}>
+          <input className="oryx-input" value={reason} onChange={(e) => setReason(e.target.value)} data-testid="purchase-return-reason" />
+        </Field>
+      </div>
+      <div className="mt-4">
+        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} testIdPrefix="purchase-return-line" costLabel={t('erp.inventory.unitCost')} />
+      </div>
+    </Modal>
   );
 }
 

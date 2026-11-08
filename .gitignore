@@ -51,6 +51,13 @@ apps/admin/playwright-report/
 # Scratch renders served locally for inspection; committed evidence lives in docs/audit/
 .run/evidence/
 
+# The owner-supplied design reference (the printed invoice/quotation and the
+# five-page inspection report) carries a real customer's name, phone and
+# address. It is a local comparison input, never a repository artefact: keep it
+# and its page renders out of the public tree.
+.run/pdf-compare/ref-*.png
+oryx 22*.pdf
+
 # Local QA scratch: ad-hoc Playwright scripts and their throwaway captures. The
 # curated evidence that a report cites is copied into docs/audit/.
 qa/

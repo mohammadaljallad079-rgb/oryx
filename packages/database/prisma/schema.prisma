@@ -1549,6 +1549,13 @@ model Payment {
   currency       String           @default("BHD")
   reference      String?
   notes          String?
+  /**
+   * Who took the money. The printed receipt/voucher carries a "المستلم /
+   * Received By" line, so the name is stored rather than left blank; it is the
+   * operator's own name unless the caller names someone else (a cashier may hand
+   * the slip to a named colleague).
+   */
+  receivedByName String?
   paidAt         DateTime
   journalEntryId String?
   idempotencyKey String?
@@ -1627,6 +1634,13 @@ model Product {
   type               ProductType @default(PRODUCT)
   unit               String      @default("unit")
   barcode            String?
+  /**
+   * Free-text merchandise grouping ("Oils", "Filters"). Optional, company-scoped
+   * by nature, and used by the point-of-sale to offer category chips; it is not a
+   * separate table because a till only needs to group and filter, not to manage a
+   * hierarchy.
+   */
+  category           String?
   salesPriceMinor    Int         @default(0)
   costPriceMinor     Int         @default(0)
   /**
@@ -1980,6 +1994,14 @@ model SalesInvoice {
   totalMinor      Int                @default(0)
   amountPaidMinor Int                @default(0)
   currency        String             @default("BHD")
+  /**
+   * How the invoice was settled. The printed invoice carries a "Payment" line
+   * (see the official template), so the method is captured on the document
+   * itself rather than only on the cash receipt that later settles it.
+   */
+  paymentMethod   PaymentMethod      @default(CASH)
+  /** The salesperson credited on the printed invoice. */
+  salespersonName String?
   notes           String?
   journalEntryId  String?
   createdById     String

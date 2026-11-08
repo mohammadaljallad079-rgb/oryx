@@ -58,6 +58,9 @@ export const DOCUMENT_SEQUENCE_KEYS = {
   customerRfq: { key: 'CUSTOMER_RFQ', prefix: 'Q' },
   customerReturn: { key: 'CUSTOMER_RETURN', prefix: 'U' },
   recoveryRequest: { key: 'RECOVERY_REQUEST', prefix: 'R' },
+  // Account statements are documents too, so they number like the rest.
+  customerStatement: { key: 'CUSTOMER_STATEMENT', prefix: 'G' },
+  supplierStatement: { key: 'SUPPLIER_STATEMENT', prefix: 'W' },
 } as const;
 
 export type DocumentSequenceName = keyof typeof DOCUMENT_SEQUENCE_KEYS;

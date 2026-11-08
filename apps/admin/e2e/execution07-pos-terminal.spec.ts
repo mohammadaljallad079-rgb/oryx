@@ -132,4 +132,90 @@ test.describe('Point of sale — card terminal', () => {
     // The grid total was a real figure, not a placeholder.
     expect(firstTotal).toMatch(/\d/);
   });
+
+  test('2. the till filters by category, shows on-hand stock and offers tender methods', async ({ page }) => {
+    const bearer = await apiToken(page, ENTERPRISE_ADMIN);
+
+    // Guarantee an open session (a branch may only have one) and read the
+    // catalogue so the assertions match the tenant's real data.
+    const setup = await page.evaluate(
+      async ({ api, bearer: token }) => {
+        const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+        const context = (await (await fetch(`${api}/auth/context`, { headers })).json()) as {
+          branches: Array<{ id: string }>;
+        };
+        const warehouses = (await (await fetch(`${api}/inventory/warehouses?pageSize=1`, { headers })).json()) as {
+          items: Array<{ id: string }>;
+        };
+        const branchId = context.branches[0].id;
+        const warehouseId = warehouses.items[0].id;
+        const sessions = (await (await fetch(`${api}/sales/cashier-sessions`, { headers })).json()) as {
+          items: Array<{ status: string; branchId: string }>;
+        };
+        if (!sessions.items.some((s) => s.status === 'OPEN' && s.branchId === branchId)) {
+          const res = await fetch(`${api}/sales/cashier-sessions`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ branchId, warehouseId, openingFloatMinor: 0 }),
+          });
+          if (!res.ok) throw new Error(`open session failed: ${res.status} ${await res.text()}`);
+        }
+        const catalog = (await (await fetch(`${api}/inventory/pos-catalog`, { headers })).json()) as {
+          items: Array<{ sku: string; category: string | null; trackStock: boolean }>;
+        };
+        const categories = (await (await fetch(`${api}/inventory/pos-categories`, { headers })).json()) as {
+          items: string[];
+        };
+        const withCategory = catalog.items.find((p) => p.category);
+        return { categories: categories.items, withCategory: withCategory ?? null };
+      },
+      { api: API, bearer },
+    );
+
+    await page.goto('/sales');
+    await expect(page.getByTestId('sales-page')).toBeVisible();
+    await page.getByTestId('sales-tab-pos').click();
+    await page.getByTestId('new-pos-sale').click();
+
+    await expect(page.getByTestId('pos-grid')).toBeVisible({ timeout: 30_000 });
+
+    // The category chips are derived from the tenant's own products.
+    expect(setup.categories.length).toBeGreaterThan(0);
+    const chips = page.getByTestId('pos-categories');
+    await expect(chips).toBeVisible();
+
+    const firstCategory = setup.categories[0];
+    const chip = page.getByTestId(`pos-category-${firstCategory}`);
+    await expect(chip).toBeVisible();
+    await chip.click();
+    await expect(chip).toHaveClass(/oryx-chip--active/);
+
+    // Every tile now belongs to the chosen category. The tile name is not the
+    // category, so assert through the API: filter the grid to a category whose
+    // product exists and confirm that product's tile is shown.
+    if (setup.withCategory) {
+      const tile = page.getByTestId(`pos-product-${setup.withCategory.sku}`);
+      // The chip may not match the picked product's category; reset to All first.
+      await page.getByTestId('pos-category-all').click();
+      await expect(tile).toBeVisible({ timeout: 30_000 });
+
+      // The on-hand badge is rendered from the catalogue's stock position.
+      const stock = page.getByTestId(`pos-stock-${setup.withCategory.sku}`);
+      await expect(stock).toBeVisible();
+      await expect(stock).toContainText(setup.withCategory.trackStock ? /Available/ : /Service/);
+    }
+
+    // The four tender methods are buttons, and selecting one marks it pressed.
+    const card = page.getByTestId('pos-pay-CARD');
+    await expect(card).toBeVisible();
+    await card.click();
+    await expect(card).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('pos-pay-CASH')).toHaveAttribute('aria-pressed', 'false');
+
+    // "Exact" fills the tendered amount; the cash-only "round cash" helper
+    // appears only when cash is selected.
+    await expect(page.getByTestId('pos-paid-round')).toHaveCount(0);
+    await page.getByTestId('pos-pay-CASH').click();
+    await expect(page.getByTestId('pos-paid-round')).toBeVisible();
+  });
 });

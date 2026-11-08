@@ -180,6 +180,13 @@ export class InventoryController {
     return this.inventory.posCatalog(query, p);
   }
 
+  @Get('pos-categories')
+  @RequireAnyPermission('erp.sales.pos.operate', 'erp.sales.pos.manage', 'erp.inventory.read')
+  @ApiOperation({ summary: 'Distinct merchandise categories for the POS chips' })
+  posCategories(@Query('companyId') companyId: string | undefined, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.inventory.posCategories(p, companyId);
+  }
+
   // ---------------------------------------------------------- product images
   /**
    * Product photography.
