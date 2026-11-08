@@ -36,4 +36,17 @@ const buf=Buffer.from(await (await fetch(`${BASE}/api/v1/documents/${iss.id}/fil
 const fs=await import('node:fs');
 fs.writeFileSync('/tmp/official-layout.pdf',buf);
 await fetch(`${BASE}/api/v1/companies/${companyId}`,{method:'PATCH',headers:H,body:JSON.stringify({taxNumber:origTrn})});
-console.log(JSON.stringify({customer:cid, invoice:si.invoiceNumber, issue:iss.documentNumber, issueId:iss.id, bytes:buf.length}));
+
+// 3. assert the reference rows are actually printed, not just requested
+const { execFileSync } = await import('node:child_process');
+const text = execFileSync('python3', ['-c',
+  'import pymupdf,sys;print(" ".join(p.get_text() for p in pymupdf.open("/tmp/official-layout.pdf")))'
+], { encoding: 'utf8' });
+const TOKENS = ['ORYX','INVOICE','Description','Quantity','Unit Price','Taxes','Amount',
+  'Total','Tax','Discount','Untaxed','Payment','Staf Name','TRN','Contact No','Address',
+  'Signature','Date','Villa 1455','37702020'];
+const missing = TOKENS.filter((t) => !text.toLowerCase().includes(t.toLowerCase()));
+console.log(JSON.stringify({customer:cid, invoice:si.invoiceNumber, issue:iss.documentNumber,
+  issueId:iss.id, bytes:buf.length, tokens:`${TOKENS.length-missing.length}/${TOKENS.length}`,
+  missing}, null, 0));
+if (missing.length) process.exit(1);

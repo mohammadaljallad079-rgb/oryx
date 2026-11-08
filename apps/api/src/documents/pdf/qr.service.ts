@@ -25,14 +25,22 @@ export class QrService {
    * The base must be configured for the deployment: a QR code embeds a URL that
    * a phone will open with no context, so a relative path or a localhost default
    * in production would produce a code that scans to nothing. The fallback is
-   * the local customer site, which is correct in development and obvious in a
-   * misconfigured deploy.
+   * the local customer site, which is correct in development. In production the
+   * fallback is refused outright — a QR that encodes `localhost` reaches a
+   * printed document and cannot be recalled, so a missing base must fail the
+   * issuance rather than emit a dead code.
    */
   verificationUrl(token: string): string {
-    const base =
-      process.env.DOCUMENT_VERIFY_BASE_URL ??
-      process.env.NEXT_PUBLIC_SITE_URL ??
-      'http://localhost:3000';
+    const configured = process.env.DOCUMENT_VERIFY_BASE_URL ?? process.env.NEXT_PUBLIC_SITE_URL;
+    if (!configured && process.env.NODE_ENV === 'production') {
+      this.logger.error(
+        'DOCUMENT_VERIFY_BASE_URL is not set: refusing to issue a document whose QR code would resolve to a developer machine.',
+      );
+      throw new Error(
+        'DOCUMENT_VERIFY_BASE_URL must be set in production; a QR code cannot embed a localhost URL.',
+      );
+    }
+    const base = configured ?? 'http://localhost:3000';
     return `${base.replace(/\/+$/, '')}/verify/${token}`;
   }
 

@@ -87,8 +87,10 @@ export default function VerifyPage() {
     }).format(date);
   };
 
-  const titleKey = `${outcome}Title`;
-  const bodyKey = `${outcome}Body`;
+  // The dictionary namespaces these under `verify.`; without the prefix a scan
+  // renders the raw key (`validTitle`) instead of the sentence.
+  const titleKey = `verify.${outcome}Title`;
+  const bodyKey = `verify.${outcome}Body`;
 
   return (
     <div className="oryx-container oryx-verify">

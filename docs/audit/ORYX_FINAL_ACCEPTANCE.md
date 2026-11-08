@@ -1,6 +1,6 @@
 # ORYX Auto Services — Final Acceptance
 
-Acceptance date: 2026-11-06 (revised 2026-11-07, eighth revision).
+Acceptance date: 2026-11-06 (revised 2026-11-08, eleventh revision).
 Branch: `feature/execution-07-premium-web` (PR #7, **open and Draft**).
 Branch tip: this report is the last commit on the branch, so naming its own SHA
 is self-referential; the SHA is whatever `git rev-parse HEAD` returns on
@@ -18,6 +18,43 @@ on that tree; the tip fixes the customer-restart helper.
 Environment: an isolated preview stack — a separate PostgreSQL database
 (`oryx_dev`) with seeded synthetic demo records. No production database and no
 production secret is involved.
+
+> **Revision note (2026-11-08, eleventh revision — printed-QR origin defect).**
+> This revision found and fixed a defect that only a decoded, printed artefact
+> could reveal: every QR code on every official document resolved to
+> `http://localhost:3000`, so a customer scanning a printed invoice reached a
+> dead host.
+>
+> - **Root cause.** `DOCUMENT_VERIFY_BASE_URL` was read by
+>   `QrService.verificationUrl` but was set nowhere — not in `.env`, not in
+>   `.env.example`, not in `deploy/env/production.env.example` — so the service
+>   always took its development fallback. The defect was invisible to the API
+>   tests because the fallback is a valid URL that the same machine can reach.
+> - **Evidence.** The QR image **printed inside the committed sample PDFs** was
+>   decoded with OpenCV. Before the fix all fifteen encoded
+>   `http://localhost:3000/verify/<token>`; after it all fifteen encode
+>   `https://oryxbhr.com/verify/<token>` (no `localhost`, no preview host).
+> - **Fix.** The base is now set in `.env.example` and
+>   `deploy/env/production.env.example`; production **refuses to issue** a
+>   document when the base is unset (a printed code cannot be recalled), logging
+>   the reason first. Guarded by `apps/api/src/documents/pdf/qr.service.spec.ts`
+>   (5 tests) so the guard cannot be removed silently.
+> - **Verification page.** Two further defects were fixed on the same path: the
+>   customer bundle had no `.env.local`, so `NEXT_PUBLIC_API_BASE_URL` inlined an
+>   absolute `http://localhost:3001/api` and the verify page could not reach the
+>   API from a phone; and the page built its dictionary keys without the `verify.`
+>   prefix, so a scan rendered the raw key `validTitle`. Both are fixed and
+>   guarded (`apps/customer/test/i18n-status.test.ts`, 52 tests).
+> - **End-to-end.** A real invoice and a real quotation were issued, their PDFs
+>   downloaded, the printed QR decoded, and the decoded URL opened in a fresh
+>   browser context carrying no session: `200`, document number shown, "Genuine
+>   document", no login. `node .run/verify-qr-in-pdf.mjs` → **2 / 2 PASS**.
+> - **Suites re-run this session:** shared **231 / 231**, API integration
+>   **694 / 694** (38 suites), API unit **57 / 57**, customer **79 / 79**,
+>   mobile **206 / 206**, mobile-erp **31 / 31**, admin browser **229 passed /
+>   1 skipped**, workspace lint and typecheck **clean**, preview verify **65
+>   combinations / 0 issues**, preview check **459 pages / 0 bad responses**,
+>   all five package builds **OK**.
 
 > **Revision note (2026-11-08, tenth revision — full re-run and reference
 > comparison).** This revision re-ran every suite on the current tree and
@@ -406,7 +443,8 @@ production deployment always talks to the vendor.
 |---|---|---|
 | Every issuable document type has a real sample PDF | PASS | 15 PDFs in `docs/audit/pdf-samples/` (invoice, quotation, order, sales return, purchase order, purchase invoice, purchase return, payment receipt, payment voucher, POS receipt, customer statement, supplier statement, journal entry, full and partial inspection) |
 | Rendered pages are published as evidence | PASS | `documents/` section on the GitHub Pages preview; `preview:verify` `documents-desktop-en-light`/`-dark` 200, 25 images, 0 broken; `preview:check` 459 pages crawled, 15 PDFs checked, 0 bad responses, 0 dark issues |
-| QR block encodes a real verification URL | PASS | `DOCUMENT_VERIFY_BASE_URL=https://oryxbhr.com`; live `GET /documents/verify/:token` → `found:true`, `VALID`; unknown token → `found:false` |
+| QR block encodes a real verification URL | PASS | `DOCUMENT_VERIFY_BASE_URL=https://oryxbhr.com`; the QR **printed inside every sample PDF** was decoded with OpenCV and resolves to `https://oryxbhr.com/verify/<token>` (15/15, no `localhost`, no preview host); opened in a fresh browser context with no session it returns `200`, shows the document number and "Genuine document", and demands no login |
+| A QR cannot encode a dead origin | PASS | `QrService.verificationUrl` refuses to issue in production when `DOCUMENT_VERIFY_BASE_URL` is unset, so a printed code can never resolve to `localhost`; guarded by `apps/api/src/documents/pdf/qr.service.spec.ts` (5 tests) |
 
 ## 2. Test results (re-run this session on the current tree)
 
@@ -429,7 +467,7 @@ production deployment always talks to the vendor.
 | Mobile ERP | `pnpm --filter @oryx/mobile-erp test` | **31 passed / 31** (2 files) |
 | Literal live checks (mandate §5) | `node .run/verify-mandate-6.mjs` | **49 checks, 0 failed** |
 | Literal live checks (brief §5 points 1–6) | `node .run/verify-brief5-6.mjs` | **27 checks, 0 failed** |
-| Official-layout row comparison | `node .run/verify-official-layout.mjs` | **22/22 reference tokens present** |
+| Official-layout row comparison | `node .run/verify-official-layout.mjs` | **20/20 reference tokens present, exit 0** (real PDF, asserted) |
 | Workspace lint | `pnpm -r lint` | PASS (exit 0) |
 | Workspace typecheck | `pnpm -r typecheck` | PASS (exit 0) |
 | Builds | shared / database / api / admin / customer | **all 5 PASS (exit 0)** |
@@ -514,6 +552,33 @@ their document number from the live register and the current PDF manifest
 (`Q00027`, `Z00064`), so they render the real record rather than a stale
 hard-coded value. The 39-surface sweep (`.run/sweep-preview.mjs`) is
 **39 / 39** green.
+
+Tenth-revision live re-check (this session, real HTTP against the running
+preview stack): `/dashboard`, `/companies`, `/settings`, `/documents`,
+`/sales`, `/purchasing`, `/providers`, `/inventory` on the admin host and
+`/`, `/products`, `/services` on the customer host each returned **200**;
+`GET /documents/verify/<token>` returned `found:true` with `status:"VALID"`
+for a live sample token and `found:false` for an unknown one. The new
+company **document-language** setting was exercised end to end through the
+admin modal (set `ar`, save, read back `ar`, restore `en`) and confirmed in
+both the API response (`documentLocale`) and the `Company` table.
+
+Machine-checked preview links (this session, `curl` over HTTPS):
+
+| Surface | URL | Status |
+|---|---|---|
+| Admin dashboard | `https://work-1-yumhfnmvqfdgaghd.prod-runtime.all-hands.dev/dashboard` | 200 |
+| Company settings | `…/settings` | 200 |
+| Companies | `…/companies` | 200 |
+| Document register | `…/documents` | 200 |
+| Sales | `…/sales` | 200 |
+| Purchasing | `…/purchasing` | 200 |
+| Merchant interface | `…/providers` | 200 |
+| Inventory | `…/inventory` | 200 |
+| Customer website | `https://work-2-yumhfnmvqfdgaghd.prod-runtime.all-hands.dev/` | 200 |
+| Customer products | `…/products` | 200 |
+| Customer services | `…/services` | 200 |
+| Evidence gallery | `…/evidence/index.html` | 200 (36 links, all 200) |
 
 PDF samples: `docs/audit/pdf-samples/*.pdf` — **fifteen** document types, each with
 rendered page PNGs in `docs/audit/pdf-samples/preview/` and a machine-readable

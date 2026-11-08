@@ -89,6 +89,33 @@ describe('customer status localisation', () => {
     }
   });
 
+  it('resolves every verification outcome title and body from the dictionary', () => {
+    // The page builds these as `verify.<outcome>Title` / `verify.<outcome>Body`.
+    // It once omitted the `verify.` prefix, so a scan rendered the raw key
+    // `validTitle` instead of a sentence. Every templated outcome — including
+    // the transport-failure `error` outcome — needs both strings.
+    const templated = ['valid', 'revoked', 'superseded', 'cancelled', 'error'];
+    for (const locale of ['ar', 'en'] as const) {
+      for (const outcome of templated) {
+        expect(dictionaries[locale][`verify.${outcome}Title`], `${locale} verify.${outcome}Title`).toBeTruthy();
+        expect(dictionaries[locale][`verify.${outcome}Body`], `${locale} verify.${outcome}Body`).toBeTruthy();
+      }
+      // `notfound` is rendered through an explicitly-cased key on the page.
+      expect(dictionaries[locale]['verify.notFoundTitle']).toBeTruthy();
+      expect(dictionaries[locale]['verify.notFoundBody']).toBeTruthy();
+    }
+  });
+
+  it('keeps the verification page namespacing its outcome keys under verify.', () => {
+    // Guards the defect at its source: the key template must carry the prefix.
+    const page = readFileSync(
+      join(__dirname, '..', 'src', 'app', 'verify', '[[...token]]', 'page.tsx'),
+      'utf8',
+    );
+    expect(page).toContain('`verify.${outcome}Title`');
+    expect(page).toContain('`verify.${outcome}Body`');
+  });
+
   it('never renders a status label as the raw enum', () => {
     for (const status of STATUSES) {
       expect(dictionaries.ar[`status.${status}`]).not.toBe(status);
