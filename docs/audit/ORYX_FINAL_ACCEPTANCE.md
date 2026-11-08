@@ -58,13 +58,28 @@ production secret is involved.
 >   customer and admin bundles fetch `/api` same-origin through a Next rewrite,
 >   but the client reads `NEXT_PUBLIC_API_BASE_URL`, which Next inlines at build
 >   time. A shell that has that variable exported (sourcing the repo `.env` does
->   this) outranks the app's `.env.local`, so the bundle baked an absolute
+>   this, and the root `.env` sets `http://localhost:3001/api`) outranks the
+>   app's `.env.local`, so the bundle baked an absolute
 >   `http://localhost:3001/api` and the verify page failed with a transport error
 >   from any origin other than the build host. Both `next.config.ts` files now
->   **refuse to build** with an absolute value, turning a silent, phone-only
->   breakage into a loud build failure. Verified: the build fails with the guard
->   message when the variable is set, and the rebuilt bundles contain no
->   `localhost:3001` reference.
+>   **refuse to build** when the value points at `localhost`, `127.0.0.1`, `::1`
+>   or a `*.prod-runtime.all-hands.dev` preview host; a real public origin (the
+>   container deployment passes `https://<host>/api`) is still accepted, so the
+>   guard turns a silent, device-only breakage into a loud build failure without
+>   blocking a legitimate deploy. Verified: the build fails with the guard message
+>   for a loopback value, succeeds for `https://api.example.com/api`, and the
+>   rebuilt preview bundles contain no `localhost:3001` reference.
+> - **The production bundle still carries the old defect.** Fetching the deployed
+>   `/_next/static/chunks/681-….js` from `oryxbhr.com` shows
+>   `let l = null != (n = a(7011).env.NEXT_PUBLIC_API_BASE_URL) ? n :
+>   "http://localhost:3001/api"` — the pre-fix default, with the build-time
+>   variable resolving to nothing at runtime. The production verify page therefore
+>   calls `http://localhost:3001/api/v1/documents/verify/<token>`
+>   (`net::ERR_FAILED`) and renders the raw keys `errorTitle` / `errorBody`.
+>   `https://api.oryxbhr.com/api/health` answers `200`, so the API is healthy; only
+>   the front-end bundle is stale. Rebuilding the customer image from this branch
+>   and redeploying fixes it. This is a deployment step, not a code change, and it
+>   is not performed here because the constraints forbid touching production.
 > - **Suites re-run this session:** shared **231 / 231**, API integration
 >   **694 / 694** (38 suites), API unit **57 / 57**, customer **79 / 79**,
 >   mobile **206 / 206**, mobile-erp **31 / 31**, admin browser **229 passed /

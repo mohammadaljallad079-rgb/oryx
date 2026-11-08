@@ -75,21 +75,30 @@ const nextConfig: NextConfig = {
             /\/$/,
             '',
           );
-          // The client bundle reads `NEXT_PUBLIC_API_BASE_URL` (default `/api`)
-          // and this rewrite owns `/api` on the server. If the build shell has
-          // that variable exported to an absolute origin, Next inlines the
-          // absolute value and the rewrite is bypassed, so the site calls that
-          // origin directly. Locally that is `localhost`, which a phone cannot
-          // reach, and behind the preview proxy it breaks the same-origin
-          // session cookie. Refuse the combination rather than ship a bundle
-          // whose API origin depends on the developer's shell.
+          // The client bundle reads `NEXT_PUBLIC_API_BASE_URL`. In the preview
+          // it must be the relative `/api`, which this rewrite then owns; in
+          // the container deployment it is an absolute public origin
+          // (`https://api.example.com/api`) and the rewrite is unused. What is
+          // never valid is a loopback or preview origin: a browser on another
+          // device cannot reach the build host's `localhost`, and a preview host
+          // is ephemeral. Sourcing the repo `.env` (which sets
+          // `http://localhost:3001/api`) exports that value, and an exported
+          // variable outranks `.env.local`, so refuse the build rather than ship
+          // a bundle whose API origin is unreachable from a phone.
           const inlined = process.env.NEXT_PUBLIC_API_BASE_URL;
-          if (inlined && inlined !== '/api' && !isStaticExport) {
+          const host = inlined && inlined.startsWith('http') ? new URL(inlined).hostname : null;
+          const unsafeHost =
+            host === 'localhost' ||
+            host === '127.0.0.1' ||
+            host === '[::1]' ||
+            host === '::1' ||
+            (host?.endsWith('.prod-runtime.all-hands.dev') ?? false);
+          if (inlined && inlined !== '/api' && unsafeHost && !isStaticExport) {
             throw new Error(
-              `NEXT_PUBLIC_API_BASE_URL must be unset or '/api' when building the ` +
-                `customer app (got '${inlined}'). It is inlined into the browser ` +
-                `bundle, so an absolute value defeats the same-origin /api rewrite ` +
-                `and makes the site unreachable from a phone. Unset it and rebuild.`,
+              `NEXT_PUBLIC_API_BASE_URL must not point at a local or preview host ` +
+                `when building the customer app (got '${inlined}'). It is inlined ` +
+                `into the browser bundle, so no phone or other device can reach it. ` +
+                `Use '/api' for the preview, or a real public origin for a deploy.`,
             );
           }
           return [{ source: '/api/:path*', destination: `${apiTarget}/api/:path*` }];

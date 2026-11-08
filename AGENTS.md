@@ -425,14 +425,15 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   without the prefix the page renders the raw key. `apps/customer/test/i18n-status.test.ts`
   guards both the strings and the template.
 - **`NEXT_PUBLIC_*` is inlined at build time.** The customer app needs
-  `NEXT_PUBLIC_API_BASE_URL=/api` at build time (a gitignored `.env.local`
-  locally; the deployed env in production). An absolute value baked into the
-  bundle makes the verify page unable to reach the API from a phone. A shell
-  that has this variable exported — which happens if you `source .env` before
-  building — **outranks the app's `.env.local`**, so both `apps/admin` and
-  `apps/customer` `next.config.ts` now **throw at build time** when the value is
-  absolute. If a build fails with that message, `unset NEXT_PUBLIC_API_BASE_URL`
-  and rebuild; do not "fix" it by setting the variable to an absolute origin.
+  `NEXT_PUBLIC_API_BASE_URL=/api` for the preview (a gitignored `.env.local`
+  locally) and an absolute public origin in the container deployment. A shell
+  that has the variable exported — which happens if you `source .env` before
+  building, and the root `.env` sets `http://localhost:3001/api` — **outranks the
+  app's `.env.local`**, so the bundle bakes a loopback origin no other device can
+  reach. Both `apps/admin` and `apps/customer` `next.config.ts` therefore **throw
+  at build time** when the value points at `localhost`, `127.0.0.1`, `::1` or a
+  `*.prod-runtime.all-hands.dev` preview host. A real public origin is allowed —
+  do not widen the check to reject it, or the container build breaks.
 
 ### Whole-amount rounding gotchas
 

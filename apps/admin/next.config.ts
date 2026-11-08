@@ -29,16 +29,26 @@ const nextConfig: NextConfig = {
    */
   async rewrites() {
     const apiTarget = (process.env.ORYX_API_INTERNAL ?? 'http://127.0.0.1:3001').replace(/\/$/, '');
-    // The client bundle reads `NEXT_PUBLIC_API_BASE_URL` (default `/api`) and
-    // this rewrite owns `/api` on the server. An absolute value in the build
-    // shell is inlined into the bundle, bypassing the rewrite and breaking the
-    // same-origin refresh cookie. Refuse it rather than depend on the shell.
+    // The client bundle reads `NEXT_PUBLIC_API_BASE_URL`. The preview uses the
+    // relative `/api` that this rewrite owns; the container deployment uses an
+    // absolute public origin (`https://api.example.com/api`). A loopback or
+    // preview origin is never valid — no other device can reach the build
+    // host's `localhost`, and a preview host is ephemeral — and sourcing the
+    // repo `.env` exports exactly such a value, which outranks `.env.local`.
     const inlined = process.env.NEXT_PUBLIC_API_BASE_URL;
-    if (inlined && inlined !== '/api') {
+    const host = inlined && inlined.startsWith('http') ? new URL(inlined).hostname : null;
+    const unsafeHost =
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host === '[::1]' ||
+      host === '::1' ||
+      (host?.endsWith('.prod-runtime.all-hands.dev') ?? false);
+    if (inlined && inlined !== '/api' && unsafeHost) {
       throw new Error(
-        `NEXT_PUBLIC_API_BASE_URL must be unset or '/api' when building the ` +
-          `admin app (got '${inlined}'). It is inlined into the browser bundle, ` +
-          `so an absolute value defeats the same-origin /api rewrite. Unset it and rebuild.`,
+        `NEXT_PUBLIC_API_BASE_URL must not point at a local or preview host when ` +
+          `building the admin app (got '${inlined}'). It is inlined into the browser ` +
+          `bundle, so no other device can reach it. Use '/api' for the preview, or a ` +
+          `real public origin for a deploy.`,
       );
     }
     return [{ source: '/api/:path*', destination: `${apiTarget}/api/:path*` }];
