@@ -49,6 +49,22 @@ production secret is involved.
 >   downloaded, the printed QR decoded, and the decoded URL opened in a fresh
 >   browser context carrying no session: `200`, document number shown, "Genuine
 >   document", no login. `node .run/verify-qr-in-pdf.mjs` → **2 / 2 PASS**.
+> - **Document statuses.** A real invoice was issued, revoked through the API,
+>   and its printed QR opened session-less: the page reports the withdrawal
+>   ("Withdrawn document"), not "valid" and not a raw key
+>   (`.run/verify-qr-revoked.mjs`, exit 0). A superseded copy stays downloadable
+>   and reports as superseded (`execution-phase3-documents.e2e-spec.ts`).
+> - **Build-env fragility (found and fixed while verifying the above).** The
+>   customer and admin bundles fetch `/api` same-origin through a Next rewrite,
+>   but the client reads `NEXT_PUBLIC_API_BASE_URL`, which Next inlines at build
+>   time. A shell that has that variable exported (sourcing the repo `.env` does
+>   this) outranks the app's `.env.local`, so the bundle baked an absolute
+>   `http://localhost:3001/api` and the verify page failed with a transport error
+>   from any origin other than the build host. Both `next.config.ts` files now
+>   **refuse to build** with an absolute value, turning a silent, phone-only
+>   breakage into a loud build failure. Verified: the build fails with the guard
+>   message when the variable is set, and the rebuilt bundles contain no
+>   `localhost:3001` reference.
 > - **Suites re-run this session:** shared **231 / 231**, API integration
 >   **694 / 694** (38 suites), API unit **57 / 57**, customer **79 / 79**,
 >   mobile **206 / 206**, mobile-erp **31 / 31**, admin browser **229 passed /
@@ -469,6 +485,7 @@ production deployment always talks to the vendor.
 | Literal live checks (mandate §5) | `node .run/verify-mandate-6.mjs` | **49 checks, 0 failed** |
 | Literal live checks (brief §5 points 1–6) | `node .run/verify-brief5-6.mjs` | **27 checks, 0 failed** |
 | Printed-QR origin | `node .run/verify-qr-in-pdf.mjs` | **2 / 2 PASS** (real PDF decoded, session-less open) |
+| Printed-QR revoked status | `node .run/verify-qr-revoked.mjs` | **exit 0** (real invoice revoked, page reports withdrawal) |
 | Official-layout row comparison | `node .run/verify-official-layout.mjs` | **20/20 reference tokens present, exit 0** (real PDF, asserted) |
 | Workspace lint | `pnpm -r lint` | PASS (exit 0) |
 | Workspace typecheck | `pnpm -r typecheck` | PASS (exit 0) |

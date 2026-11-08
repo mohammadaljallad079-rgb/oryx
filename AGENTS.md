@@ -427,7 +427,12 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 - **`NEXT_PUBLIC_*` is inlined at build time.** The customer app needs
   `NEXT_PUBLIC_API_BASE_URL=/api` at build time (a gitignored `.env.local`
   locally; the deployed env in production). An absolute value baked into the
-  bundle makes the verify page unable to reach the API from a phone.
+  bundle makes the verify page unable to reach the API from a phone. A shell
+  that has this variable exported — which happens if you `source .env` before
+  building — **outranks the app's `.env.local`**, so both `apps/admin` and
+  `apps/customer` `next.config.ts` now **throw at build time** when the value is
+  absolute. If a build fails with that message, `unset NEXT_PUBLIC_API_BASE_URL`
+  and rebuild; do not "fix" it by setting the variable to an absolute origin.
 
 ### Whole-amount rounding gotchas
 

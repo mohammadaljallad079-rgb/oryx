@@ -29,6 +29,18 @@ const nextConfig: NextConfig = {
    */
   async rewrites() {
     const apiTarget = (process.env.ORYX_API_INTERNAL ?? 'http://127.0.0.1:3001').replace(/\/$/, '');
+    // The client bundle reads `NEXT_PUBLIC_API_BASE_URL` (default `/api`) and
+    // this rewrite owns `/api` on the server. An absolute value in the build
+    // shell is inlined into the bundle, bypassing the rewrite and breaking the
+    // same-origin refresh cookie. Refuse it rather than depend on the shell.
+    const inlined = process.env.NEXT_PUBLIC_API_BASE_URL;
+    if (inlined && inlined !== '/api') {
+      throw new Error(
+        `NEXT_PUBLIC_API_BASE_URL must be unset or '/api' when building the ` +
+          `admin app (got '${inlined}'). It is inlined into the browser bundle, ` +
+          `so an absolute value defeats the same-origin /api rewrite. Unset it and rebuild.`,
+      );
+    }
     return [{ source: '/api/:path*', destination: `${apiTarget}/api/:path*` }];
   },
   async headers() {
