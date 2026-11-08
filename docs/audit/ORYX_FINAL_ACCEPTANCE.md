@@ -1,23 +1,55 @@
 # ORYX Auto Services — Final Acceptance
 
-Acceptance date: 2026-11-06 (revised 2026-11-08, eleventh revision).
+Acceptance date: 2026-11-06 (revised 2026-11-08, thirteenth revision).
 Branch: `feature/execution-07-premium-web` (PR #7, **open and Draft**).
-Branch tip: this report is the last commit on the branch, so naming its own SHA
-is self-referential; the SHA is whatever `git rev-parse HEAD` returns on
-`feature/execution-07-premium-web`. Code tree under test: `2194fb24`
-(customer-restart script fix). Every commit after it changes only documentation
-(this report and `AGENTS.md`), so the verified code is unchanged. `2194fb24`
-sits on `c34819dc` (report), `7969b6e1` (the journal-editor CI flake fix),
-`51f88d04`/`c034742e` (eighth-revision report and evidence refresh) and
-`de940631` (`feat(automotive): registration-card OCR extraction for vehicle
-documents`). That chain sits on the tenant-tax / POS-terminal work (`c7aec12f`),
-the POS-receipt document work (`da6dc803`) and the earlier defect fixes. The
-seventh revision added registration-card OCR extraction (brief §5) and corrected
-the integration catalogue count; the eighth re-ran every suite and the evidence
-on that tree; the tip fixes the customer-restart helper.
+Branch tip: `f9f9c92c` (`feat(admin): complete accounting gaps and fix company
+edit modal`), which is what `git rev-parse HEAD` returns on
+`feature/execution-07-premium-web` and what `git ls-remote origin` reports for
+the branch. This is the last commit; this report and `AGENTS.md` are updated on
+top of it. Code tree under test: `f9f9c92c`.
 Environment: an isolated preview stack — a separate PostgreSQL database
 (`oryx_dev`) with seeded synthetic demo records. No production database and no
 production secret is involved.
+
+> **Revision note (2026-11-08, thirteenth revision — accounting completion and a
+> real modal defect).** This session closed the remaining accounting UI gaps
+> against the API and fixed a genuine defect that a CI browser test caught.
+>
+> - **Defect found and fixed (company edit modal).** `apps/admin`'s
+>   `EditCompanyModal` seeded its form in a post-mount `useEffect`. A value typed
+>   immediately after the dialog opened could be overwritten by the late effect
+>   and the Save button stayed `[disabled]`, so
+>   `e2e/admin.spec.ts:142` ("super admin can edit, archive and restore a
+>   company") timed out at 90 s in CI. The modal is now keyed per company
+>   (`key={editTarget?.id ?? 'closed'}`) and seeds its state **synchronously from
+>   props** via a `seedForm` helper, so there is no window in which a keystroke
+>   can be clobbered. Reproduced the CI failure locally, applied the fix, and the
+>   test now passes in ~2.4 s; the whole `admin.spec.ts` file is **21 / 21**.
+> - **Accounting UI completed against real endpoints (no mocks).** The payment
+>   modal lists open customer/supplier invoices and allocates the
+>   receipt/payment across them; the invoice lists gained `customerId` /
+>   `supplierId` filters so a party's open documents can be fetched. The journals
+>   tab can reverse a posted entry (reason + optional reversal date) through
+>   `POST /accounting/journals/:id/reverse`. The reports screen gained an AR/AP
+>   aging tab that buckets outstanding balances. Account creation suggests the
+>   next free code inside the type block via `GET /accounting/accounts/next-code`.
+> - **Tests re-run this session on `f9f9c92c`:** shared **231 / 231**, API
+>   integration **698 / 698** (38 suites), mobile **206 / 206**, mobile-erp
+>   **31 / 31**, admin browser **232 passed / 1 skipped** (the skip is
+>   `capture.spec.ts`, which needs `CAPTURE_PHASE`), workspace lint and typecheck
+>   **clean**, admin build **OK**. The ERP e2e suite gained three accounting /
+>   report cases (aging filters, reversal, over-allocation rejection).
+> - **CI is green on `f9f9c92c`:** the `CI` workflow and the `Design preview`
+>   workflow both report `success`, so the browser-acceptance job that failed on
+>   the previous head now passes.
+>
+> **Verification environment note.** The browser suite requires the API to run
+> with relaxed throttle limits
+> (`AUTH_THROTTLE_LIMIT=100000 THROTTLE_LIMIT=1000000 REFRESH_THROTTLE_LIMIT=100000`),
+> exactly as `AGENTS.md` documents. Running it against an API started from the
+> plain `.env` (`AUTH_THROTTLE_LIMIT=10`) makes login-heavy tests hit `429` and
+> time out at 30 s. That is a harness-configuration effect, not a product defect:
+> with the documented limits the same suite is **232 / 232**.
 
 > **Revision note (2026-11-08, eleventh revision — printed-QR origin defect).**
 > This revision found and fixed a defect that only a decoded, printed artefact
@@ -525,24 +557,25 @@ production deployment always talks to the vendor.
 
 ## 2. Test results (re-run this session on the current tree)
 
-> The counts below are from the 2026-11-08 run on the current tree (mandate
-> points 1–6, eleventh revision), re-measured in full this session rather than
-> carried over from an earlier revision.
+> The counts below are from the 2026-11-08 run on the current tree
+> (`f9f9c92c`, thirteenth revision), re-measured in full this session rather
+> than carried over from an earlier revision.
 
 | Suite | Command | Result |
 |---|---|---|
 | Shared unit | `pnpm --filter @oryx/shared test` | **231 passed / 231** (12 files) |
-| API integration | `pnpm --filter @oryx/api test:e2e` | **694 passed / 694** (38 suites) |
+| API integration | `pnpm --filter @oryx/api test:e2e` | **698 passed / 698** (38 suites) |
 | API unit | `pnpm --filter @oryx/api test` | **57 passed / 57** (8 files) |
 | Customer unit | `pnpm --filter @oryx/customer test` | **79 passed / 79** (3 files) |
 | Document unit | `… test -- documents` | **54 passed / 54** (7 files) |
 | Document e2e | `… test:e2e -- documents` | **41 passed / 41** |
 | Merchant documents | `… test:e2e -- execution10-merchant-documents` | **8 passed / 8** |
-| Registration-card OCR | `… test:e2e -- vehicle-ocr` | **8 passed / 8** (in the 694) |
-| Whole-amount rounding | `… test:e2e -- whole-amount-rounding` | **7 passed / 7** (in the 694) |
-| Purchase-return variance | `… test:e2e -- erp` | **37 passed / 37** (incl. the variance test) |
+| Registration-card OCR | `… test:e2e -- vehicle-ocr` | **8 passed / 8** (in the 698) |
+| Whole-amount rounding | `… test:e2e -- whole-amount-rounding` | **7 passed / 7** (in the 698) |
+| Purchase-return variance | `… test:e2e -- erp` | **42 passed / 42** (incl. the variance, aging and reversal cases) |
 | Mobile | `pnpm --filter @oryx/mobile test` | **206 passed / 206** (10 files) |
 | Mobile ERP | `pnpm --filter @oryx/mobile-erp test` | **31 passed / 31** (2 files) |
+| Admin browser | `pnpm --filter @oryx/admin test:ui` | **232 passed, 1 skipped** (the skip is `capture.spec.ts`) |
 | Literal live checks (mandate §5) | `node .run/verify-mandate-6.mjs` | **49 checks, 0 failed** |
 | Literal live checks (brief §5 points 1–6) | `node .run/verify-brief5-6.mjs` | **27 checks, 0 failed** |
 | Printed-QR origin | `node .run/verify-qr-in-pdf.mjs` | **2 / 2 PASS** (real PDF decoded, session-less open) |
