@@ -79,7 +79,7 @@ jobs:
       - name: Build admin app
         run: pnpm --filter @oryx/admin build
         env:
-          NEXT_PUBLIC_API_BASE_URL: http://localhost:3001/api
+          NEXT_PUBLIC_API_BASE_URL: /api
 
       - name: Typecheck customer app
         run: pnpm --filter @oryx/customer typecheck
@@ -90,7 +90,7 @@ jobs:
       - name: Build customer app
         run: pnpm --filter @oryx/customer build
         env:
-          NEXT_PUBLIC_API_BASE_URL: http://localhost:3001/api
+          NEXT_PUBLIC_API_BASE_URL: /api
 
       - name: Typecheck mobile app
         run: pnpm --filter @oryx/mobile typecheck
@@ -238,7 +238,7 @@ jobs:
       SEED_SUPER_ADMIN_EMAIL: superadmin@oryx.local
       SEED_SUPER_ADMIN_PASSWORD: CiTestPassword!2026
       NODE_ENV: test
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:3001/api
+      NEXT_PUBLIC_API_BASE_URL: /api
       NEXT_PUBLIC_DEFAULT_LOCALE: ar
       NEXT_PUBLIC_DEFAULT_THEME: dark
       # The suites sign in many times; raise the ceilings so the limiter does not
