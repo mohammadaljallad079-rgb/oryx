@@ -800,6 +800,7 @@ export class DocumentsService {
       logoDataUri,
       primaryColor: company.branding?.primaryColor ?? null,
       accentColor: company.branding?.accentColor ?? null,
+      documentLocale: company.documentLocale,
     };
   }
 
@@ -1103,6 +1104,7 @@ export class DocumentsService {
             notes: invoice.notes,
             paymentMethod: invoice.paymentMethod,
             salespersonName,
+            paymentReference: invoice.paymentReference,
             taxRateBp,
           },
         };
@@ -1138,6 +1140,10 @@ export class DocumentsService {
             balanceMinor: quotation.totalMinor,
             currency: quotation.currency || (await currencyOf()),
             notes: quotation.notes,
+            paymentMethod: quotation.paymentMethod,
+            salespersonName:
+              quotation.salespersonName ?? (await this.userDisplayName(quotation.createdById)),
+            paymentReference: quotation.paymentReference,
           },
         };
       }
@@ -1172,6 +1178,9 @@ export class DocumentsService {
             balanceMinor: order.totalMinor,
             currency: order.currency || (await currencyOf()),
             notes: order.notes,
+            paymentMethod: order.paymentMethod,
+            salespersonName:
+              order.salespersonName ?? (await this.userDisplayName(order.createdById)),
           },
         };
       }

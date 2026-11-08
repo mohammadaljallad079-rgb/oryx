@@ -31,10 +31,15 @@ export function escMultiline(value: unknown): string {
  * Latin digits are used deliberately, even in the Arabic document: an invoice
  * total is read against a bank statement and a card receipt, and Arabic-Indic
  * digits would make the printed figure impossible to reconcile character by
- * character. The currency symbol is the Arabic one, so the document still reads
- * natively.
+ * character. The currency symbol follows the document language — an English
+ * document prints the Latin symbol ("BD"), an Arabic one the Arabic symbol
+ * ("د.ب") — so the printed amount reads natively in either direction.
  */
-export function money(minor: number | null | undefined, currency = 'BHD'): string {
+export function money(
+  minor: number | null | undefined,
+  currency = 'BHD',
+  locale: 'ar' | 'en' = 'ar',
+): string {
   const value = minor ?? 0;
   const scale = currency === 'BHD' || currency === 'KWD' || currency === 'OMR' ? 3 : 2;
   const major = toMajor(value, scale);
@@ -42,7 +47,7 @@ export function money(minor: number | null | undefined, currency = 'BHD'): strin
     minimumFractionDigits: scale,
     maximumFractionDigits: scale,
   });
-  return `${body} ${currencySymbol(currency, 'ar')}`;
+  return `${body} ${currencySymbol(currency, locale)}`;
 }
 
 /**

@@ -546,6 +546,7 @@ function EditCompanyModal({
     functionalCurrency: '',
     taxPercent: '0',
     roundingMode: 'NONE',
+    documentLocale: 'en',
     taxNumber: '',
     notes: '',
   });
@@ -564,6 +565,7 @@ function EditCompanyModal({
       functionalCurrency: company.functionalCurrency ?? '',
       taxPercent: String(company.defaultTaxRateBp / 100),
       roundingMode: company.roundingMode,
+      documentLocale: company.documentLocale,
       taxNumber: company.taxNumber ?? '',
       notes: company.notes ?? '',
     });
@@ -590,6 +592,7 @@ function EditCompanyModal({
         functionalCurrency: form.functionalCurrency,
         defaultTaxRateBp: Math.round(taxPercent * 100),
         roundingMode: form.roundingMode,
+        documentLocale: form.documentLocale,
         taxNumber: form.taxNumber || undefined,
         notes: form.notes || undefined,
       });
@@ -733,6 +736,17 @@ function EditCompanyModal({
             <option value="NONE">{t('companies.roundingNone')}</option>
             <option value="NEAREST_HALF">{t('companies.roundingHalf')}</option>
             <option value="NEAREST_WHOLE">{t('companies.roundingWhole')}</option>
+          </select>
+        </Field>
+        <Field label={t('companies.documentLocale')} hint={t('companies.documentLocaleHint')}>
+          <select
+            className="oryx-select"
+            value={form.documentLocale}
+            onChange={(e) => setForm({ ...form, documentLocale: e.target.value })}
+            data-testid="edit-company-document-locale"
+          >
+            <option value="en">{t('companies.documentLocaleEn')}</option>
+            <option value="ar">{t('companies.documentLocaleAr')}</option>
           </select>
         </Field>
       </div>

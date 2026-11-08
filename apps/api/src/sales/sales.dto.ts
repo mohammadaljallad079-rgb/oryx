@@ -323,6 +323,22 @@ export class CreateQuotationDto extends SalesDocumentDateDto {
   @MaxLength(3)
   currency?: string;
 
+  /** The settlement method and salesperson printed on the quotation document. */
+  @IsOptional()
+  @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER'])
+  paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  salespersonName?: string;
+
+  /** The bank/reference printed beneath "Payment at Account" on the quotation. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  paymentReference?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(400)
@@ -361,6 +377,16 @@ export class CreateSalesOrderDto extends SalesDocumentDateDto {
   @IsString()
   @MaxLength(3)
   currency?: string;
+
+  /** The settlement method and salesperson printed on the order document. */
+  @IsOptional()
+  @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER'])
+  paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  salespersonName?: string;
 
   @IsOptional()
   @IsString()
@@ -413,6 +439,12 @@ export class CreateInvoiceDto extends SalesDocumentDateDto {
   @IsString()
   @MaxLength(160)
   salespersonName?: string;
+
+  /** The bank/reference printed beneath "Payment at Account" on the invoice. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  paymentReference?: string;
 
   @IsOptional()
   @IsString()

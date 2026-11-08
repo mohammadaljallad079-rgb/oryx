@@ -13,8 +13,8 @@ import { Icon } from '@/components/icons';
  *
  * The list is read from the same `ServiceCategory` catalogue the control panel
  * edits, so a category can never appear here that an operator cannot manage.
- * Each card links into the catalogue and the provider directory filtered by
- * that category — both of which the API filters server-side.
+ * Each card links into the product catalogue and the ORYX service list filtered
+ * by that category — both of which the API filters server-side.
  */
 export default function CategoriesPage() {
   const { t, locale } = useUi();
@@ -71,10 +71,11 @@ export default function CategoriesPage() {
                   {t('nav.products')}
                 </Link>
                 <Link
-                  href={`/providers?category=${encodeURIComponent(category.key)}`}
+                  href={`/services?category=${encodeURIComponent(category.key)}`}
                   className="oryx-btn oryx-btn-sm"
                 >
-                  {t('nav.providers')}
+                  <Icon name="calendar" size={15} />
+                  {t('nav.services')}
                 </Link>
               </div>
             </Card>

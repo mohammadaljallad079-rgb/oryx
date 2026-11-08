@@ -44,8 +44,23 @@ function numberLabel(titleEn: string): string {
   return 'INVOICE';
 }
 
+/**
+ * The settlement reference the printed quotation carries.
+ *
+ * The reference quotation shows "Payment at Account" above a bank reference
+ * ("NBB0155NH15454475") where the invoice shows a plain method. It is a stored
+ * value on the document, so a reprint shows the same reference.
+ */
+function paymentReference(payload: FinancialDocumentPayload): string | null {
+  return payload.paymentReference ?? null;
+}
+
 /** The settlement-method label, printed as the reference's "Payment" line. */
 function paymentLabel(payload: FinancialDocumentPayload): string | null {
+  // The reference quotation prints "Payment at Account" with the bank reference
+  // beneath it, rather than naming the method. Reproduce that wording whenever a
+  // reference is stored, so the document reads exactly as the approved one does.
+  if (paymentReference(payload)) return 'Payment at Account';
   const raw = payload.paymentMethod ?? payload.payment?.method ?? null;
   if (!raw) return null;
   const map: Record<string, string> = {
@@ -57,6 +72,22 @@ function paymentLabel(payload: FinancialDocumentPayload): string | null {
     OTHER: 'Other',
   };
   return map[raw] ?? raw;
+}
+
+/**
+ * The bilingual document title exactly as the approved reference prints it.
+ *
+ * The reference names the page "فاتورة / INVOICE" and "تسعيرة / QUOTATION" — the
+ * short words, not the ERP's longer catalogue labels ("Tax Invoice"). The
+ * printed document is the artifact the owner signed off, so its words win over
+ * the menu label; the catalogue label stays for the register and the pickers.
+ */
+function documentTitle(payload: FinancialDocumentPayload): { ar: string; en: string } {
+  const t = payload.titleEn.toLowerCase();
+  if (t.includes('quotation')) return { ar: 'تسعيرة', en: 'QUOTATION' };
+  if (t.includes('credit') || t.includes('return')) return { ar: 'إشعار دائن', en: 'CREDIT NOTE' };
+  if (t.includes('order')) return { ar: 'طلب', en: 'ORDER' };
+  return { ar: 'فاتورة', en: 'INVOICE' };
 }
 
 /** "VAT 10%" from a line's basis-point rate, or an em dash when untaxed. */
@@ -107,10 +138,11 @@ function trnStrip(issuer: DocumentIssuer): string {
 
 /** The centred bilingual document title. */
 function titleBlock(payload: FinancialDocumentPayload): string {
+  const title = documentTitle(payload);
   return `
   <div class="of-title">
-    <div class="of-title-ar">${esc(payload.titleAr)}</div>
-    <div class="of-title-en">${esc(payload.titleEn)}</div>
+    <div class="of-title-ar">${esc(title.ar)}</div>
+    <div class="of-title-en">${esc(title.en)}</div>
   </div>`;
 }
 
@@ -121,6 +153,7 @@ function infoPanel(
   dateLabel: string,
 ): string {
   const payment = paymentLabel(payload);
+  const reference = paymentReference(payload);
   return `
   <div class="of-panel">
     <div class="of-panel-left">
@@ -152,6 +185,13 @@ function infoPanel(
           ? `<div class="of-field">
                <span class="of-field-label">Payment</span>
                <span class="of-field-value">${esc(payment)}</span>
+             </div>`
+          : ''
+      }
+      ${
+        reference
+          ? `<div class="of-field">
+               <span class="of-field-value num">${esc(reference)}</span>
              </div>`
           : ''
       }
@@ -192,7 +232,7 @@ function infoPanel(
 }
 
 /** The five-column priced table from the reference document. */
-function lineTable(payload: FinancialDocumentPayload): string {
+function lineTable(payload: FinancialDocumentPayload, locale: 'ar' | 'en'): string {
   const rows = payload.lines
     .map(
       (line) => `
@@ -202,9 +242,9 @@ function lineTable(payload: FinancialDocumentPayload): string {
           ${line.sku ? `<span class="of-line-sku num">${esc(line.sku)}</span>` : ''}
         </td>
         <td class="of-c-qty num">${esc(quantity(line.quantity))}</td>
-        <td class="of-c-price num">${esc(money(line.unitPriceMinor, payload.currency))}</td>
+        <td class="of-c-price num">${esc(money(line.unitPriceMinor, payload.currency, locale))}</td>
         <td class="of-c-tax">${esc(taxLabel(line.taxPercentBp))}</td>
-        <td class="of-c-amt num">${esc(money(line.lineTotalMinor, payload.currency))}</td>
+        <td class="of-c-amt num">${esc(money(line.lineTotalMinor, payload.currency, locale))}</td>
       </tr>`,
     )
     .join('');
@@ -224,20 +264,20 @@ function lineTable(payload: FinancialDocumentPayload): string {
 }
 
 /** The right-aligned totals block: untaxed amount, tax, discount, total. */
-function totalsBlock(payload: FinancialDocumentPayload): string {
+function totalsBlock(payload: FinancialDocumentPayload, locale: 'ar' | 'en'): string {
   const rate = documentTaxRate(payload);
   const rows: Array<[string, string]> = [
-    ['Untaxed Amount', money(payload.subtotalMinor, payload.currency)],
+    ['Untaxed Amount', money(payload.subtotalMinor, payload.currency, locale)],
   ];
-  rows.push([rate ? `Tax ${rate / 100}%` : 'Tax', money(payload.taxMinor, payload.currency)]);
-  rows.push(['Discount', money(payload.discountMinor, payload.currency)]);
+  rows.push([rate ? `Tax ${rate / 100}%` : 'Tax', money(payload.taxMinor, payload.currency, locale)]);
+  rows.push(['Discount', money(payload.discountMinor, payload.currency, locale)]);
   if (payload.roundingMinor) {
-    rows.push(['Rounding', money(payload.roundingMinor, payload.currency)]);
+    rows.push(['Rounding', money(payload.roundingMinor, payload.currency, locale)]);
   }
-  rows.push(['Total', money(payload.totalMinor, payload.currency)]);
+  rows.push(['Total', money(payload.totalMinor, payload.currency, locale)]);
   if (payload.paidMinor) {
-    rows.push(['Paid', money(payload.paidMinor, payload.currency)]);
-    rows.push(['Balance Due', money(payload.balanceMinor, payload.currency)]);
+    rows.push(['Paid', money(payload.paidMinor, payload.currency, locale)]);
+    rows.push(['Balance Due', money(payload.balanceMinor, payload.currency, locale)]);
   }
   return `
   <table class="of-totals">
@@ -257,12 +297,20 @@ export function renderOfficialFinancialHtml(input: OfficialFinancialRenderInput)
   const counterpartyName = payload.counterparty.nameEn || payload.counterparty.nameAr;
   const dateLabel = /quotation/i.test(payload.titleEn) ? 'Quotation Date' : 'Order Date';
   const numbered = { ...payload, documentNumber: input.documentNumber };
+  // The tenant's document language decides the reading direction. Arabic prints
+  // right-to-left (the identity band starts on the right, the description column
+  // leads on the right, the totals block sits at the left) and English the
+  // reverse. The CSS uses logical properties throughout, so the single `dir`
+  // attribute flips the whole page; both languages' labels are always present.
+  const docLocale: 'ar' | 'en' = input.issuer.documentLocale === 'ar' ? 'ar' : 'en';
+  const dir = docLocale === 'en' ? 'ltr' : 'rtl';
+  const lang = docLocale;
 
   return `<!doctype html>
-<html lang="en" dir="ltr">
+<html lang="${lang}" dir="${dir}">
 <head>
 <meta charset="utf-8">
-<title>${esc(input.documentNumber)} · ${esc(payload.titleEn)}</title>
+<title>${esc(input.documentNumber)} · ${esc(dir === 'ltr' ? payload.titleEn : payload.titleAr)}</title>
 <style>${input.baseCss}
 ${CHROME_CSS}
 ${OFFICIAL_FINANCIAL_CSS}
@@ -275,8 +323,8 @@ ${OFFICIAL_FINANCIAL_CSS}
   ${titleBlock(payload)}
   ${trnStrip(input.issuer)}
   ${infoPanel(numbered, counterpartyName, dateLabel)}
-  ${lineTable(payload)}
-  ${totalsBlock(payload)}
+  ${lineTable(payload, docLocale)}
+  ${totalsBlock(payload, docLocale)}
   ${
     payload.notes
       ? `<div class="of-notes avoid-break">
@@ -341,31 +389,35 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-table td{ font-size:9.5pt; color:#0f2b48; font-weight:700; padding:8px 7px;
     border-top:1px solid #cbd5e1; }
   .of-table tbody tr:nth-child(odd) td{ background:rgba(10,65,117,0.16); }
-  .of-c-desc{ width:42%; }
-  .of-c-qty{ width:9%; text-align:center !important; }
-  .of-c-price{ width:15%; text-align:end !important; }
-  .of-c-tax{ width:16%; text-align:start !important; }
-  .of-c-amt{ width:18%; text-align:end !important; }
+  /* Column proportions are measured from the approved reference invoice: the
+     description column is much wider than a naive split, and the four numeric
+     columns are close to equal. Matching them keeps every label and figure on
+     the same x-position the printed document uses. */
+  .of-c-desc{ width:57.5%; }
+  .of-c-qty{ width:9.5%; text-align:center !important; }
+  .of-c-price{ width:11.6%; text-align:end !important; }
+  .of-c-tax{ width:11%; text-align:start !important; }
+  .of-c-amt{ width:10.4%; text-align:end !important; }
   .of-line-name{ display:block; }
   .of-line-sku{ display:block; font-size:7.5pt; color:#64748b; font-weight:400; }
-  .of-totals{ width:52%; margin-inline-start:auto; margin-top:16px; }
+  .of-totals{ width:58.7%; margin-inline-start:auto; margin-top:12px; }
   .of-totals th{ font-size:9.5pt; font-weight:700; color:#0f2b48; text-align:start;
     padding:6px 9px; border-bottom:1px solid #cbd5e1; }
   .of-totals td{ font-size:9.5pt; font-weight:700; color:#0f2b48; text-align:end;
     padding:6px 9px; border-bottom:1px solid #cbd5e1; }
   .of-total-grand th,.of-total-grand td{ border-top:1.5px solid #0f2b48; border-bottom:none; }
-  .of-notes{ margin-top:16px; border:1px solid #94a3b8; padding:8px 10px; }
+  .of-notes{ margin-top:10px; border:1px solid #94a3b8; padding:6px 10px; }
   .of-notes-title{ font-size:9.5pt; font-weight:700; color:#0f2b48; margin-bottom:3px; }
   .of-notes-body{ font-size:9pt; color:#334155; }
-  .of-thanks{ margin-top:18px; text-align:center; }
+  .of-thanks{ margin-top:10px; text-align:center; }
   .of-thanks-ar{ font-size:9pt; font-weight:700; color:#05162b; }
   .of-thanks-en{ font-size:8.5pt; font-weight:700; color:#05162b; }
   /* The shared signature and verification blocks are sized down here so a
      one-page invoice stays on one page, as the printed reference does. */
-  .of-page .signatures{ margin-top:16px; gap:24px; }
-  .of-page .sig-line{ height:24px; }
+  .of-page .signatures{ margin-top:10px; gap:24px; }
+  .of-page .sig-line{ height:16px; }
   .of-page .sig-label-en{ text-transform:none; letter-spacing:0; color:#0f2b48; font-weight:700; }
   .of-page .sig-label-ar{ color:#0f2b48; font-weight:700; }
-  .of-page .verify{ margin-top:16px; }
+  .of-page .verify{ margin-top:8px; }
   .of-page .verify-qr img{ width:84px; height:84px; }
 `;

@@ -26,6 +26,12 @@ export interface DocumentIssuer {
   primaryColor?: string | null;
   accentColor?: string | null;
   currency: string;
+  /**
+   * The language the tenant's documents are written in, which decides the
+   * reading direction of the printed layout. `ar` flows right-to-left and `en`
+   * left-to-right; both languages' labels are always printed either way.
+   */
+  documentLocale?: 'ar' | 'en' | null;
 }
 
 /** The QR block printed on a verifiable document. */
@@ -183,6 +189,11 @@ export interface FinancialDocumentPayload {
    */
   paymentMethod?: string | null;
   salespersonName?: string | null;
+  /**
+   * The bank/reference printed beneath "Payment at Account" on the quotation.
+   * The approved reference quotation shows it, so it is carried on the document.
+   */
+  paymentReference?: string | null;
   /**
    * The rate applied to the document's tax line, in basis points, taken from the
    * lines. Printed as "Tax 10%" above the totals, so the document states the

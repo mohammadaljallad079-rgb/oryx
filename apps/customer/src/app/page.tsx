@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
 import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
 import {
@@ -10,49 +9,28 @@ import {
   categoryImage,
   mediaAlt,
   mediaUrl,
-  publicApi,
   resolveImage,
   SERVICE_CATEGORIES,
-  type ProviderSummary,
   type WebsiteCategory,
 } from '@/lib/api';
 import { useWebsiteContent } from '@/lib/use-website-content';
-import { Card, EmptyState, Stars } from '@/components/ui';
+import { Card } from '@/components/ui';
 import { Icon } from '@/components/icons';
 
 /**
  * Customer homepage.
  *
- * The provider strip is real data from the public marketplace endpoint, so the
- * page cannot advertise a provider that has not been approved. Photography and
- * headline copy come from the admin CMS when an administrator has authored
- * them, and fall back to the bundled design otherwise — a page never renders
- * empty because the CMS is unreachable.
+ * The service cards are the ORYX service catalogue itself — a customer books an
+ * ORYX service, not a third-party supplier — so the page never routes a visitor
+ * into a supplier directory. Photography and headline copy come from the admin
+ * CMS when an administrator has authored them, and fall back to the bundled
+ * design otherwise, so a page never renders empty because the CMS is
+ * unreachable.
  */
 export default function HomePage() {
   const { t, locale } = useUi();
   const { isAuthenticated } = useCustomerAuth();
   const { content } = useWebsiteContent(locale);
-  const [providers, setProviders] = useState<ProviderSummary[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    publicApi
-      .providers()
-      .then((res) => {
-        if (active) setProviders(res.items.slice(0, 3));
-      })
-      .catch(() => {
-        if (active) setProviders([]);
-      })
-      .finally(() => {
-        if (active) setLoaded(true);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   // Hero photography: the first active banner, else the first CMS category
   // image, else the bundled photograph, else the vector art. Every branch
@@ -94,15 +72,8 @@ export default function HomePage() {
     };
   });
 
-  const partnerImage = categoryImage(
-    content.categories.find((c) => c.key === 'maintenance')?.media ?? null,
-    'maintenance',
-    'wide',
-  );
-
   const stats = [
-    { value: `${providers.length || '—'}`, label: t('home.statProviders') },
-    { value: `${SERVICE_CATEGORIES.length}`, label: t('home.statCategories') },
+    { value: `${SERVICE_CATEGORIES.length}`, label: t('home.statServices') },
     { value: '24/7', label: t('home.statTracking') },
     { value: '100%', label: t('home.statSecure') },
   ];
@@ -148,7 +119,7 @@ export default function HomePage() {
               <Icon name="calendar" size={17} />
               {blockValue(content, 'home.cta.book', t('home.ctaBook'))}
             </Link>
-            <Link href="/providers" className="oryx-btn oryx-btn-lg">
+            <Link href="/services" className="oryx-btn oryx-btn-lg">
               {blockValue(content, 'home.cta.browse', t('home.ctaBrowse'))}
             </Link>
           </div>
@@ -177,7 +148,7 @@ export default function HomePage() {
           {categories.map((category) => (
             <Link
               key={category.key}
-              href={`/providers?category=${category.key}`}
+              href={`/services?category=${category.key}`}
               className="oryx-cat-card"
             >
               <span
@@ -190,7 +161,7 @@ export default function HomePage() {
                 <strong>{category.name}</strong>
                 <span className="oryx-muted oryx-cat-card__desc">{category.desc}</span>
                 <span className="oryx-cat-card__link">
-                  {t('providers.title')}
+                  {t('home.viewService')}
                   <Icon name="arrow" size={14} />
                 </span>
               </span>
@@ -239,70 +210,6 @@ export default function HomePage() {
             </Link>
           </div>
         )}
-      </section>
-
-      {/* -------------------------------------------------- providers */}
-      <section className="oryx-section">
-        <header className="oryx-section-head oryx-section-head--row">
-          <div>
-            <h2 className="oryx-section-title">{t('providers.title')}</h2>
-            <p className="oryx-muted">{t('home.providersSubtitle')}</p>
-          </div>
-          <Link href="/providers" className="oryx-link">
-            {t('common.all')}
-            <Icon name="arrow" size={14} />
-          </Link>
-        </header>
-        {loaded && providers.length === 0 ? (
-          <EmptyState message={t('providers.none')} />
-        ) : (
-          <div className="oryx-grid oryx-grid--cards">
-            {providers.map((provider) => (
-              <Card key={provider.id} className="oryx-provider-card">
-                <h3 className="oryx-card-title">
-                  {locale === 'ar' ? provider.nameAr : provider.nameEn}
-                </h3>
-                {typeof provider.averageRating === 'number' && (
-                  <p className="oryx-muted oryx-provider-card__rating">
-                    <Stars rating={provider.averageRating} /> {provider.averageRating} (
-                    {provider.reviewCount ?? 0})
-                  </p>
-                )}
-                <Link href={`/providers/${provider.id}`} className="oryx-btn oryx-btn-sm">
-                  {t('providers.services')}
-                </Link>
-              </Card>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* ---------------------------------------------------- partner */}
-      <section className="oryx-section">
-        <div className="oryx-partner">
-          <div className="oryx-partner__copy">
-            <h2 className="oryx-section-title">
-              {blockValue(content, 'home.partner.title', t('home.partnerTitle'))}
-            </h2>
-            <p className="oryx-muted">{blockValue(content, 'home.partner.body', t('home.partnerBody'))}</p>
-            <ul className="oryx-checklist">
-              {[t('home.partnerPoint1'), t('home.partnerPoint2'), t('home.partnerPoint3')].map(
-                (point) => (
-                  <li key={point}>
-                    <Icon name="check" size={15} />
-                    {point}
-                  </li>
-                ),
-              )}
-            </ul>
-            <Link href="/providers/apply" className="oryx-btn oryx-btn-primary">
-              {t('home.partnerCta')}
-            </Link>
-          </div>
-          <div className="oryx-partner__art" aria-hidden>
-            <span className="oryx-partner__art-img" style={{ backgroundImage: `url(${partnerImage})` }} />
-          </div>
-        </div>
       </section>
 
       {/* ------------------------------------------------------ trust */}

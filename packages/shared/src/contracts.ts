@@ -251,6 +251,8 @@ export interface CompanyDto {
   defaultTaxRateBp: number;
   /** Optional whole-amount cash rounding applied to document totals. */
   roundingMode: RoundingMode;
+  /** Language of issued documents; decides their printed reading direction. */
+  documentLocale: 'ar' | 'en';
   taxNumber: string | null;
   notes: string | null;
   parentCompanyId: string | null;

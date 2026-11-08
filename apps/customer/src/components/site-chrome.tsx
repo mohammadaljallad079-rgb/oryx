@@ -43,7 +43,6 @@ const PUBLIC_LINKS = [
   { href: '/categories', key: 'nav.categories' },
   { href: '/products', key: 'nav.products' },
   { href: '/services', key: 'nav.services' },
-  { href: '/providers', key: 'nav.providers' },
   { href: '/about', key: 'nav.about' },
   { href: '/contact', key: 'nav.contact' },
 ];
@@ -321,7 +320,6 @@ export function SiteFooter() {
         { href: '/categories', label: t('nav.categories') },
         { href: '/products', label: t('nav.products') },
         { href: '/services', label: t('nav.services') },
-        { href: '/providers', label: t('nav.providers') },
       ],
     },
     {
@@ -329,7 +327,6 @@ export function SiteFooter() {
       links: [
         { href: '/about', label: t('footer.about') },
         { href: '/#how', label: t('footer.howItWorks') },
-        { href: '/providers/apply', label: t('footer.becomeProvider') },
         { href: '/credits', label: t('footer.credits') },
       ],
     },

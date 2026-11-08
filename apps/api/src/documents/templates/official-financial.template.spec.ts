@@ -169,10 +169,64 @@ describe('official financial template — settlement and salesperson', () => {
   });
 });
 
+describe('official financial template — document direction', () => {
+  it('prints an English document left-to-right', () => {
+    const html = render({}, { ...issuer, documentLocale: 'en' });
+    expect(html).toContain('<html lang="en" dir="ltr">');
+  });
+
+  it('prints an Arabic document right-to-left', () => {
+    const html = render({}, { ...issuer, documentLocale: 'ar' });
+    expect(html).toContain('<html lang="ar" dir="rtl">');
+  });
+
+  it('defaults to left-to-right when the tenant has not chosen a language', () => {
+    const html = render({}, { ...issuer, documentLocale: null });
+    expect(html).toContain('dir="ltr"');
+  });
+
+  it('prints the Latin currency symbol on an English document', () => {
+    const html = render({}, { ...issuer, documentLocale: 'en' });
+    expect(html).toContain('BD');
+    expect(html).not.toContain('د.ب');
+  });
+
+  it('prints the Arabic currency symbol on an Arabic document', () => {
+    const html = render({}, { ...issuer, documentLocale: 'ar' });
+    expect(html).toContain('د.ب');
+  });
+});
+
+describe('official financial template — reference titles', () => {
+  it('names an invoice page "فاتورة / INVOICE", not the catalogue label', () => {
+    const html = render({ titleEn: 'Tax Invoice', titleAr: 'فاتورة ضريبية' });
+    expect(html).toContain('>INVOICE<');
+    expect(html).toContain('>فاتورة<');
+    expect(html).not.toContain('فاتورة ضريبية');
+  });
+
+  it('names a quotation page "تسعيرة / QUOTATION"', () => {
+    const html = render({ titleEn: 'Quotation', titleAr: 'عرض سعر' });
+    expect(html).toContain('>QUOTATION<');
+    expect(html).toContain('>تسعيرة<');
+  });
+});
+
+describe('official financial template — quotation payment reference', () => {
+  it('prints the bank reference beneath the payment line', () => {
+    const html = render({ titleEn: 'Quotation', paymentReference: 'NBB0155NH15454475' });
+    expect(html).toContain('NBB0155NH15454475');
+  });
+
+  it('omits the reference line when none is stored', () => {
+    expect(render({ paymentReference: null })).not.toContain('NBB0155NH15454475');
+  });
+});
+
 describe('official financial template — identity', () => {
   it('prints the bilingual title and the ORYX tagline', () => {
     const html = render();
-    expect(html).toContain('فاتورة ضريبية');
+    expect(html).toContain('>فاتورة<');
     expect(html).toContain('VEHICLE INSPECTION EXPERTS');
   });
 

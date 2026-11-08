@@ -358,6 +358,9 @@ export class SalesService {
           roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
           currency,
+          paymentMethod: (dto.paymentMethod as PaymentMethod | undefined) ?? 'CASH',
+          salespersonName: dto.salespersonName ?? null,
+          paymentReference: dto.paymentReference ?? null,
           notes: dto.notes ?? null,
           createdById: actor.userId,
           lines: { create: buildSimpleLineRows(totals, dto.lines) },
@@ -478,6 +481,8 @@ export class SalesService {
           roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
           currency,
+          paymentMethod: (dto.paymentMethod as PaymentMethod | undefined) ?? 'CASH',
+          salespersonName: dto.salespersonName ?? null,
           notes: dto.notes ?? null,
           createdById: actor.userId,
           lines: { create: buildSimpleLineRows(totals, dto.lines) },
@@ -628,6 +633,7 @@ export class SalesService {
           currency,
           paymentMethod: (dto.paymentMethod as PaymentMethod | undefined) ?? 'CASH',
           salespersonName: dto.salespersonName ?? null,
+          paymentReference: dto.paymentReference ?? null,
           notes: dto.notes ?? null,
           createdById: actor.userId,
           lines: { create: buildLineRows(totals, lineInputs) },
@@ -1429,6 +1435,9 @@ function toQuotationDto(q: {
   roundingMinor: number;
   totalMinor: number;
   currency: string;
+  paymentMethod: string;
+  salespersonName: string | null;
+  paymentReference: string | null;
   notes: string | null;
   convertedOrderId: string | null;
   customer: { nameEn: string; nameAr: string; code: string };
@@ -1449,6 +1458,9 @@ function toQuotationDto(q: {
     roundingMinor: q.roundingMinor,
     totalMinor: q.totalMinor,
     currency: q.currency,
+    paymentMethod: q.paymentMethod,
+    salespersonName: q.salespersonName,
+    paymentReference: q.paymentReference,
     notes: q.notes,
     convertedOrderId: q.convertedOrderId,
     lines: q.lines,
@@ -1467,6 +1479,8 @@ function toSalesOrderDto(o: {
   roundingMinor: number;
   totalMinor: number;
   currency: string;
+  paymentMethod: string;
+  salespersonName: string | null;
   notes: string | null;
   customer: { nameEn: string; nameAr: string; code: string };
   lines: Array<Record<string, unknown>>;
@@ -1485,6 +1499,8 @@ function toSalesOrderDto(o: {
     roundingMinor: o.roundingMinor,
     totalMinor: o.totalMinor,
     currency: o.currency,
+    paymentMethod: o.paymentMethod,
+    salespersonName: o.salespersonName,
     notes: o.notes,
     lines: o.lines,
   };
@@ -1505,6 +1521,9 @@ function toInvoiceDto(inv: {
   totalMinor: number;
   amountPaidMinor: number;
   currency: string;
+  paymentMethod: string;
+  salespersonName: string | null;
+  paymentReference: string | null;
   notes: string | null;
   journalEntryId: string | null;
   customer: { nameEn: string; nameAr: string; code: string };
@@ -1528,6 +1547,9 @@ function toInvoiceDto(inv: {
     amountPaidMinor: inv.amountPaidMinor,
     outstandingMinor: inv.totalMinor - inv.amountPaidMinor,
     currency: inv.currency,
+    paymentMethod: inv.paymentMethod,
+    salespersonName: inv.salespersonName,
+    paymentReference: inv.paymentReference,
     notes: inv.notes,
     journalEntryId: inv.journalEntryId,
     lines: inv.lines,

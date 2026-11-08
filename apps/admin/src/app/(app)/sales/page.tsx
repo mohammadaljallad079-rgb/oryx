@@ -865,6 +865,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         taxOptions={taxOptions}
         showWarehouse
         dueDateField="dueDate"
+        settlement
         testIdPrefix="invoice"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
@@ -1035,6 +1036,7 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
         warehouses={warehouses.data?.items ?? []}
         taxOptions={taxOptions}
         dueDateField="validUntil"
+        settlement
         testIdPrefix="quotation"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
@@ -1162,8 +1164,40 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
   const customers = useAsync(() => api.salesCustomers(), []);
   const [saleOpen, setSaleOpen] = useState(false);
   const [closeTarget, setCloseTarget] = useState<CashierSessionDto | null>(null);
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState<string | null>(null);
 
   const openSession = sessions.data?.items.find((s) => s.status === 'OPEN');
+
+  /**
+   * Opens the branch's cashier session.
+   *
+   * The API refuses a second open session per branch (`CASHIER_SESSION_ALREADY_OPEN`)
+   * and refuses a branch the operator is not scoped to. Both are real answers the
+   * cashier must see, so the failure is surfaced rather than swallowed: a silent
+   * no-op here reads as a broken button.
+   */
+  const startSession = async () => {
+    const branchId = branches.data?.branches[0]?.id;
+    if (!branchId) {
+      setOpenError(t('erp.sales.pos.noBranch'));
+      return;
+    }
+    setOpening(true);
+    setOpenError(null);
+    try {
+      await api.openCashierSession({
+        branchId,
+        warehouseId: warehouses.data?.items[0]?.id,
+        openingFloatMinor: 0,
+      });
+      await sessions.reload();
+    } catch (e) {
+      setOpenError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setOpening(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -1175,15 +1209,11 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
               variant="primary"
               size="sm"
               data-testid="open-session"
-              onClick={async () => {
-                const branchId = branches.data?.branches[0]?.id;
-                if (!branchId) return;
-                await api.openCashierSession({ branchId, warehouseId: warehouses.data?.items[0]?.id, openingFloatMinor: 0 });
-                await sessions.reload();
-              }}
+              disabled={opening}
+              onClick={() => void startSession()}
             >
               <Icon name="plus" size={16} />
-              {t('erp.sales.openSession')}
+              {opening ? t('common.loading') : t('erp.sales.openSession')}
             </Button>
           ) : null}
           {canOperate && openSession ? (
@@ -1193,6 +1223,11 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
             </Button>
           ) : null}
         </div>
+        {openError ? (
+          <div className="p-4">
+            <ErrorBanner message={openError} />
+          </div>
+        ) : null}
         {sessions.error ? <div className="p-4"><ErrorBanner message={sessions.error} onRetry={sessions.reload} /></div> : null}
         {sessions.loading ? <div className="p-4"><Skeleton height={100} /></div> : (sessions.data?.items.length ?? 0) === 0 ? (
           <EmptyState title={t('common.empty')} hint={t('erp.sales.emptySessions')} />
@@ -1952,6 +1987,34 @@ function CloseSessionModal({
 
 // --------------------------------------------------------- shared line editor
 
+/**
+ * Price the draft lines with the same algorithm the server uses.
+ *
+ * The form shows a live subtotal, discount, tax and total so an operator can
+ * see the figure the invoice will post before saving it. Reusing the shared
+ * integer helpers keeps the preview identical to `computeDocumentTotals` on the
+ * API — the browser never sends a total, only the lines.
+ */
+function computeDraftTotals(lines: LineDraft[], roundingMode: RoundingMode, scale: number) {
+  const priced = lines.map((l) => {
+    const quantity = toQuantityInput(l.quantity);
+    const unitPriceMinor = toMinorInput(l.unitPrice);
+    const discountPercentBp = Math.round((Number(l.discountPercent) || 0) * 100);
+    const taxPercentBp = Math.round((Number(l.taxPercent) || 0) * 100);
+    const lineSubtotalMinor = lineAmountMinor(quantity, unitPriceMinor);
+    const discountMinor = basisPointsOfMinor(lineSubtotalMinor, discountPercentBp);
+    const net = lineSubtotalMinor - discountMinor;
+    const taxMinor = basisPointsOfMinor(net, taxPercentBp);
+    return { lineSubtotalMinor, discountMinor, taxMinor, lineTotalMinor: net + taxMinor };
+  });
+  const subtotalMinor = sumMinor(priced.map((l) => l.lineSubtotalMinor));
+  const discountMinor = sumMinor(priced.map((l) => l.discountMinor));
+  const taxMinor = sumMinor(priced.map((l) => l.taxMinor));
+  const exactTotal = sumMinor(priced.map((l) => l.lineTotalMinor));
+  const { rounded: totalMinor, adjustment: roundingMinor } = roundMinor(exactTotal, roundingMode, scale);
+  return { subtotalMinor, discountMinor, taxMinor, roundingMinor, totalMinor };
+}
+
 function LineEditor({
   lines,
   setLines,
@@ -1966,6 +2029,32 @@ function LineEditor({
   testIdPrefix: string;
 }) {
   const { t } = useUi();
+  const { companyId } = useAuth();
+  const [roundingMode, setRoundingMode] = useState<RoundingMode>('NONE');
+  const [currencyScale, setScale] = useState(2);
+
+  useEffect(() => {
+    if (!companyId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const company = await api.getCompany(companyId);
+        if (cancelled) return;
+        setRoundingMode(company.roundingMode ?? 'NONE');
+        setScale(currencyScaleOf(company.currency));
+      } catch {
+        /* keep the defaults */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
+
+  const totals = useMemo(
+    () => computeDraftTotals(lines, roundingMode, currencyScale),
+    [lines, roundingMode, currencyScale],
+  );
 
   const update = (i: number, patch: Partial<LineDraft>) => {
     const next = [...lines];
@@ -1975,6 +2064,15 @@ function LineEditor({
 
   return (
     <div className="flex flex-col gap-2">
+      <div className="hidden grid-cols-12 gap-2 text-[11.5px] font-semibold text-[var(--muted)] sm:grid">
+        <span className="col-span-3">{t('erp.inventory.product')}</span>
+        <span className="col-span-3">{t('erp.accounting.description')}</span>
+        <span className="col-span-1">{t('erp.inventory.quantity')}</span>
+        <span className="col-span-2">{t('erp.sales.unitPrice')}</span>
+        <span className="col-span-1">{t('erp.sales.discount')}</span>
+        <span className="col-span-1">{t('erp.sales.tax')}</span>
+        <span className="col-span-1" />
+      </div>
       {lines.map((line, i) => (
         <div key={i} className="grid grid-cols-12 gap-2">
           <select
@@ -2051,10 +2149,28 @@ function LineEditor({
           </Button>
         </div>
       ))}
-      <Button size="sm" onClick={() => setLines([...lines, emptyLine()])} data-testid={`${testIdPrefix}-add`}>
-        <Icon name="plus" size={14} />
-        {t('erp.accounting.addLine')}
-      </Button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Button size="sm" onClick={() => setLines([...lines, emptyLine()])} data-testid={`${testIdPrefix}-add`}>
+          <Icon name="plus" size={14} />
+          {t('erp.accounting.addLine')}
+        </Button>
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-[12.5px]" data-testid={`${testIdPrefix}-totals`}>
+          <dt className="oryx-muted">{t('erp.sales.untaxedAmount')}</dt>
+          <dd className="m-0 text-end tabular-nums font-semibold">{money(totals.subtotalMinor)}</dd>
+          <dt className="oryx-muted">{t('erp.sales.discount')}</dt>
+          <dd className="m-0 text-end tabular-nums font-semibold">{money(totals.discountMinor)}</dd>
+          <dt className="oryx-muted">{t('erp.sales.tax')}</dt>
+          <dd className="m-0 text-end tabular-nums font-semibold">{money(totals.taxMinor)}</dd>
+          {totals.roundingMinor !== 0 ? (
+            <>
+              <dt className="oryx-muted">{t('erp.sales.rounding')}</dt>
+              <dd className="m-0 text-end tabular-nums font-semibold">{money(totals.roundingMinor)}</dd>
+            </>
+          ) : null}
+          <dt className="font-semibold text-[var(--text)]">{t('erp.sales.total')}</dt>
+          <dd className="m-0 text-end tabular-nums text-[13.5px] font-bold text-[var(--text)]">{money(totals.totalMinor)}</dd>
+        </dl>
+      </div>
     </div>
   );
 }
@@ -2070,6 +2186,7 @@ function DocumentModal({
   showRestock,
   reasonField,
   dueDateField,
+  settlement,
   testIdPrefix,
   onClose,
   onSubmit,
@@ -2095,6 +2212,12 @@ function DocumentModal({
    * form never collects data the document would drop.
    */
   dueDateField?: 'dueDate' | 'validUntil';
+  /**
+   * Whether the document is settled and therefore prints a Payment line. An
+   * invoice and a quotation both print the settlement method; a credit note and
+   * an order do not, so the field is only offered where the template renders it.
+   */
+  settlement?: boolean;
   testIdPrefix: string;
   onClose: () => void;
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
@@ -2105,10 +2228,19 @@ function DocumentModal({
   const [customerId, setCustomerId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
   const [restock, setRestock] = useState(true);
+  const [documentDate, setDocumentDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
   const [reason, setReason] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('CASH');
+  const [salespersonName, setSalespersonName] = useState('');
+  const [paymentReference, setPaymentReference] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
+
+  useEffect(() => {
+    if (!open) return;
+    setDocumentDate(new Date().toISOString().slice(0, 10));
+  }, [open]);
 
   const submit = async () => {
     setBusy(true);
@@ -2117,9 +2249,12 @@ function DocumentModal({
       await onSubmit({
         customerId,
         warehouseId: warehouseId || undefined,
-        documentDate: new Date().toISOString(),
+        documentDate: documentDate ? new Date(documentDate).toISOString() : new Date().toISOString(),
         ...(dueDateField && dueDate ? { [dueDateField]: new Date(dueDate).toISOString() } : {}),
         ...(reasonField && reason.trim() ? { reason: reason.trim() } : {}),
+        ...(settlement ? { paymentMethod } : {}),
+        ...(settlement && salespersonName.trim() ? { salespersonName: salespersonName.trim() } : {}),
+        ...(settlement && paymentReference.trim() ? { paymentReference: paymentReference.trim() } : {}),
         ...(notes.trim() ? { notes: notes.trim() } : {}),
         restockInventory: showRestock ? restock : undefined,
         lines: lines.map((l) => ({
@@ -2137,6 +2272,9 @@ function DocumentModal({
       setDueDate('');
       setNotes('');
       setReason('');
+      setSalespersonName('');
+      setPaymentReference('');
+      setPaymentMethod('CASH');
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
@@ -2170,6 +2308,15 @@ function DocumentModal({
             ))}
           </select>
         </Field>
+        <Field label={t('erp.sales.documentDate')}>
+          <input
+            type="date"
+            className="oryx-input"
+            value={documentDate}
+            onChange={(e) => setDocumentDate(e.target.value)}
+            data-testid={`${testIdPrefix}-document-date`}
+          />
+        </Field>
         {showWarehouse ? (
           <Field label={t('erp.inventory.warehouse')}>
             <select className="oryx-select" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} data-testid={`${testIdPrefix}-warehouse`}>
@@ -2190,6 +2337,42 @@ function DocumentModal({
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
               data-testid={`${testIdPrefix}-due-date`}
+            />
+          </Field>
+        ) : null}
+        {settlement ? (
+          <Field label={t('erp.sales.paymentMethod')}>
+            <select
+              className="oryx-select"
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              data-testid={`${testIdPrefix}-payment-method`}
+            >
+              {(['CASH', 'CARD', 'BANK_TRANSFER', 'WALLET', 'CHEQUE', 'OTHER'] as const).map((m) => (
+                <option key={m} value={m}>
+                  {t(`erp.sales.payment.${m}`)}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
+        {settlement ? (
+          <Field label={t('erp.sales.salesperson')}>
+            <input
+              className="oryx-input"
+              value={salespersonName}
+              onChange={(e) => setSalespersonName(e.target.value)}
+              data-testid={`${testIdPrefix}-salesperson`}
+            />
+          </Field>
+        ) : null}
+        {settlement && paymentMethod === 'BANK_TRANSFER' ? (
+          <Field label={t('erp.sales.paymentReference')}>
+            <input
+              className="oryx-input"
+              value={paymentReference}
+              onChange={(e) => setPaymentReference(e.target.value)}
+              data-testid={`${testIdPrefix}-payment-reference`}
             />
           </Field>
         ) : null}
@@ -2223,7 +2406,6 @@ function DocumentModal({
       <div className="mt-4">
         <LineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} testIdPrefix={testIdPrefix} />
       </div>
-      <span className="hidden">{qty(0)}</span>
     </Modal>
   );
 }

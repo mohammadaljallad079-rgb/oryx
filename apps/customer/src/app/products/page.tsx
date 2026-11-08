@@ -5,7 +5,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
-import { customerApi, publicApi, resolveImage, type CatalogCategory, type CatalogProduct, type CatalogStore } from '@/lib/api';
+import { customerApi, publicApi, resolveImage, type CatalogCategory, type CatalogProduct } from '@/lib/api';
 import { messageOf } from '@/lib/hooks';
 import { Card, Money, Alert } from '@/components/ui';
 import { LoadingPanel, PageHeader, StatePanel } from '@/components/premium';
@@ -14,8 +14,8 @@ import { Icon } from '@/components/icons';
 /**
  * The product catalogue.
  *
- * Everything on this page is real: the categories and stores come from the same
- * rows the control panel manages, and the products come from
+ * Everything on this page is real: the categories come from the same rows the
+ * control panel manages, and the products come from
  * `GET /customer/catalog/products`, which filters to active, priced items and
  * never exposes a cost price or a stock quantity.
  *
@@ -50,7 +50,6 @@ function ProductsCatalog() {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [total, setTotal] = useState(0);
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
-  const [stores, setStores] = useState<CatalogStore[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
@@ -84,7 +83,6 @@ function ProductsCatalog() {
   useEffect(() => {
     let active = true;
     publicApi.categories(locale).then((res) => active && setCategories(res.items)).catch(() => undefined);
-    publicApi.stores(locale).then((res) => active && setStores(res.items)).catch(() => undefined);
     return () => {
       active = false;
     };
@@ -159,35 +157,6 @@ function ProductsCatalog() {
             ))}
           </div>
 
-          {stores.length > 0 && (
-            <div className="oryx-catalog-group">
-              <p className="oryx-catalog-group__title">{t('products.store')}</p>
-              <Link
-                href={category ? `/products?category=${encodeURIComponent(category)}` : '/products'}
-                className="oryx-catalog-filter"
-                aria-current={!store ? 'page' : undefined}
-              >
-                {t('products.allStores')}
-              </Link>
-              {stores.map((item) => {
-                const href = `/products?${new URLSearchParams({
-                  ...(category ? { category } : {}),
-                  store: item.id,
-                }).toString()}`;
-                return (
-                  <Link
-                    key={item.id}
-                    href={href}
-                    className="oryx-catalog-filter"
-                    aria-current={store === item.id ? 'page' : undefined}
-                  >
-                    {locale === 'ar' ? item.nameAr : item.nameEn}
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-
           <label className="oryx-catalog-sort">
             <span className="oryx-catalog-group__title">{t('products.sort')}</span>
             <select
@@ -242,7 +211,7 @@ function ProductsCatalog() {
                     </Link>
                     <div className="oryx-product-card__body">
                       <p className="oryx-muted oryx-product-card__store">
-                        {product.store.name}
+                        {t('brand.tagline')}
                       </p>
                       <h2 className="oryx-card-title">
                         <Link href={`/products/${product.id}`}>{product.name}</Link>

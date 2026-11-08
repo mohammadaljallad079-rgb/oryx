@@ -19,9 +19,9 @@ const PUBLIC_KEYS = [
   'providers.none',
   'services.subtitle',
   'categories.subtitle',
-  'home.providersSubtitle',
   'home.ctaBrowse',
-  'home.statProviders',
+  'home.statServices',
+  'home.viewService',
   'about.subtitle',
 ];
 
@@ -54,6 +54,30 @@ describe('public services branding', () => {
     for (const line of publicCopy) {
       expect(/مزود/.test(line), `preview copy still says مزود: ${line.trim()}`).toBe(false);
       expect(/\bprovider(s)?\b/i.test(line), `preview copy still says provider: ${line.trim()}`).toBe(false);
+    }
+  });
+
+  /**
+   * The customer is never routed into a supplier directory. The navigation,
+   * footer and the public pages must not link to `/providers`, or a visitor
+   * would reach a list of suppliers that the customer experience is meant to
+   * hide. The merchant application screen is the only deliberate exception.
+   */
+  it('never links the customer chrome or public pages into a supplier directory', () => {
+    const files = [
+      ['components', 'site-chrome.tsx'],
+      ['app', 'page.tsx'],
+      ['app', 'services', 'page.tsx'],
+      ['app', 'categories', 'page.tsx'],
+      ['app', 'products', 'page.tsx'],
+      ['app', 'about', 'page.tsx'],
+    ] as const;
+    for (const parts of files) {
+      const source = readFileSync(join(__dirname, '..', 'src', ...parts), 'utf8');
+      expect(
+        /href=["'`]\/providers/.test(source) || /href=\{`\/providers/.test(source),
+        `${parts.join('/')} still links to /providers`,
+      ).toBe(false);
     }
   });
 });

@@ -40,7 +40,7 @@ export default function AboutPage() {
       </div>
 
       <section className="oryx-section oryx-about__cta">
-        <Link href="/providers" className="oryx-btn oryx-btn-primary">
+        <Link href="/services" className="oryx-btn oryx-btn-primary">
           {t('about.cta')}
           <Icon name="arrow" size={16} />
         </Link>

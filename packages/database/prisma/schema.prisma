@@ -462,6 +462,13 @@ model Company {
    */
   roundingMode       RoundingMode    @default(NONE)
   timezone           String          @default("Asia/Bahrain")
+  /**
+   * The language an issued document is written in, and therefore its reading
+   * direction: `ar` lays a printed invoice out right-to-left, `en` left-to-right.
+   * Both languages' labels are always printed; this only decides the flow, the
+   * leading column and which side the identity band starts on.
+   */
+  documentLocale     Locale          @default(en)
   taxNumber          String?
   parentCompanyId    String?
   notes              String?
@@ -1895,6 +1902,15 @@ model Quotation {
   roundingMinor    Int             @default(0)
   totalMinor       Int             @default(0)
   currency         String          @default("BHD")
+  /**
+   * How the quotation is settled. The approved printed quotation shows a
+   * "Payment" line, so the method is captured with the document.
+   */
+  paymentMethod    PaymentMethod   @default(CASH)
+  /** The salesperson credited on the printed quotation ("Staf Name"). */
+  salespersonName  String?
+  /** The bank/reference printed beneath "Payment at Account" on the quotation. */
+  paymentReference String?
   notes            String?
   convertedOrderId String?
   createdById      String
@@ -1943,6 +1959,9 @@ model SalesOrder {
   roundingMinor Int              @default(0)
   totalMinor    Int              @default(0)
   currency      String           @default("BHD")
+  /** The settlement method and salesperson printed on the order's document. */
+  paymentMethod PaymentMethod    @default(CASH)
+  salespersonName String?
   notes         String?
   createdById   String
   createdAt     DateTime         @default(now())
@@ -2002,6 +2021,8 @@ model SalesInvoice {
   paymentMethod   PaymentMethod      @default(CASH)
   /** The salesperson credited on the printed invoice. */
   salespersonName String?
+  /** The bank/reference printed beneath "Payment at Account" on the invoice. */
+  paymentReference String?
   notes           String?
   journalEntryId  String?
   createdById     String

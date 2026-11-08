@@ -19,6 +19,27 @@ Environment: an isolated preview stack — a separate PostgreSQL database
 (`oryx_dev`) with seeded synthetic demo records. No production database and no
 production secret is involved.
 
+> **Revision note (2026-11-08, tenth revision — full re-run and reference
+> comparison).** This revision re-ran every suite on the current tree and
+> re-published the visual evidence. The only code change is the migration-comment
+> correction noted below; the purpose was to confirm the mandate §5 work still
+> holds and to add a reference comparison image.
+>
+> - **Full re-run, current tree** (this session): shared **231 / 231**, API
+>   integration **694 / 694**, API unit **52 / 52**, mobile **206 / 206**,
+>   mobile-erp **31 / 31**, admin browser **229 passed / 1 skipped**, workspace
+>   lint and typecheck **clean**, and all five package builds **OK**.
+> - **Official-layout comparison.** The invoice and quotation were re-issued from
+>   the live engine and rendered beside the owner's approved reference at the same
+>   scale. The five priced columns land within ~4 pt of the reference (Description
+>   41.2 vs 37.5, Quantity 347.0 vs 350.7, Unit Price 403.7 vs 402.4, Taxes 461.8
+>   vs 465.5, Amount 526.7 vs 525.6). The reference page is published only with
+>   the customer's personal data masked (name, contact, address, staff name, bank
+>   reference and footer painted over).
+> - **Migration comment corrected.** `20261109010000_document_language_and_quote_payment`
+>   described the `documentLocale` default as `ar`; the SQL defaults to `en`, which
+>   is what the pre-existing render path already did. The comment now matches the SQL.
+
 > **Revision note (2026-11-08, ninth revision — mandate points 1–6).** This
 > revision closes the owner's first six mandated points and re-runs the whole
 > verification on the current tree:
@@ -389,14 +410,15 @@ production deployment always talks to the vendor.
 
 ## 2. Test results (re-run this session on the current tree)
 
-> The counts below are from the 2026-11-08 run on `f8962e33` (mandate points
-> 1–6), not carried over from an earlier revision.
+> The counts below are from the 2026-11-08 run on the current tree (mandate
+> points 1–6, tenth revision), re-measured in full this session rather than
+> carried over from an earlier revision.
 
 | Suite | Command | Result |
 |---|---|---|
 | Shared unit | `pnpm --filter @oryx/shared test` | **231 passed / 231** (12 files) |
 | API integration | `pnpm --filter @oryx/api test:e2e` | **694 passed / 694** (38 suites) |
-| API unit | `pnpm --filter @oryx/api test` | **43 passed / 43** (7 files) |
+| API unit | `pnpm --filter @oryx/api test` | **52 passed / 52** (7 files) |
 | Document unit | `… test -- documents` | **40 passed / 40** (6 files) |
 | Document e2e | `… test:e2e -- documents` | **41 passed / 41** |
 | Merchant documents | `… test:e2e -- execution10-merchant-documents` | **8 passed / 8** |
@@ -411,8 +433,8 @@ production deployment always talks to the vendor.
 | Workspace lint | `pnpm -r lint` | PASS (exit 0) |
 | Workspace typecheck | `pnpm -r typecheck` | PASS (exit 0) |
 | Builds | shared / database / api / admin / customer | **all 5 PASS (exit 0)** |
-| Migrations | `prisma migrate status` | **up to date** (36 migrations applied to `oryx_dev`) |
-| Admin browser | `pnpm --filter @oryx/admin test:ui` | **228 passed, 1 skipped** (eighth revision, unchanged code path) |
+| Migrations | `prisma migrate status` | **up to date** (38 migrations applied to `oryx_dev`) |
+| Admin browser | `pnpm --filter @oryx/admin test:ui` | **229 passed, 1 skipped** (re-run this session) |
 | PDF sample render | `python3 .run/render-pdf-samples.py` | **ALL PASS** (15 PDFs, 24 PNGs; Arabic + Latin, no Type3) |
 | Preview render check | `pnpm preview:verify` | **65 page/theme combinations, issues: none** |
 | Preview link crawl | `pnpm preview:check` | **459 pages, 15 PDFs, 0 bad responses, 0 dark-mode issues** |

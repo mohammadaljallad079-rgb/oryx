@@ -137,6 +137,15 @@ export class UpdateCompanyDto {
   @IsIn(['NONE', 'NEAREST_WHOLE', 'NEAREST_HALF'])
   roundingMode?: 'NONE' | 'NEAREST_WHOLE' | 'NEAREST_HALF';
 
+  /**
+   * The language an issued document is written in, which sets its reading
+   * direction: `ar` prints right-to-left, `en` left-to-right. Both languages'
+   * labels are always printed; this only chooses the flow.
+   */
+  @IsOptional()
+  @IsIn(['ar', 'en'])
+  documentLocale?: 'ar' | 'en';
+
   @IsOptional()
   @IsString()
   @MaxLength(40)
