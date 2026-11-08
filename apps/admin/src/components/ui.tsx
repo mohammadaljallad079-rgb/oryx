@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Icon } from './icons';
 
 export function Card({
@@ -99,6 +99,16 @@ export function Field({
   );
 }
 
+/**
+ * Ids of the modals currently open, oldest first.
+ *
+ * A preview opened from inside another modal renders as a second modal, and
+ * both listen on `window`. Without this stack a single Escape (or a click on
+ * the inner backdrop, which bubbles to the outer one) closes the whole stack
+ * instead of the one dialog the user is looking at.
+ */
+const openModals: symbol[] = [];
+
 export function Modal({
   open,
   title,
@@ -112,18 +122,40 @@ export function Modal({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  const idRef = useRef<symbol>(Symbol('oryx-modal'));
+  const id = idRef.current;
+
   useEffect(() => {
     if (!open) return;
+    openModals.push(id);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key !== 'Escape') return;
+      // Only the top-most modal reacts, so a nested preview closes alone.
+      if (openModals[openModals.length - 1] !== id) return;
+      e.stopPropagation();
+      onClose();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      window.removeEventListener('keydown', onKey, true);
+      const at = openModals.indexOf(id);
+      if (at !== -1) openModals.splice(at, 1);
+    };
+  }, [open, onClose, id]);
 
   if (!open) return null;
   return (
-    <div className="oryx-modal-backdrop" role="dialog" aria-modal="true" aria-label={title} onClick={onClose}>
+    <div
+      className="oryx-modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={(e) => {
+        // Keep the click from reaching an enclosing modal's backdrop.
+        e.stopPropagation();
+        onClose();
+      }}
+    >
       <div className="oryx-modal" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
           <h2 className="m-0 text-[16px] font-bold">{title}</h2>

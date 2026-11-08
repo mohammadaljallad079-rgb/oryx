@@ -7,6 +7,7 @@ import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput, todayIso } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { AttachmentsPanel, DocumentPrintActions } from '@/components/document-print';
 import {
   Badge,
   Button,
@@ -28,10 +29,11 @@ import type {
   IncomeStatementDto,
   JournalEntryDto,
   LedgerAccountDto,
+  PaymentDto,
   TrialBalanceDto,
 } from '@oryx/shared';
 
-type Tab = 'accounts' | 'journals' | 'periods' | 'statements' | 'ledger';
+type Tab = 'accounts' | 'journals' | 'periods' | 'statements' | 'ledger' | 'receipts';
 
 export default function AccountingPage() {
   const { t } = useUi();
@@ -40,10 +42,12 @@ export default function AccountingPage() {
 
   const canManageCoa = can('erp.accounting.coa.manage');
   const canPost = can('erp.accounting.journal.post');
+  const canManagePayments = can('erp.accounting.payment.manage');
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'accounts', label: t('erp.accounting.accounts') },
     { key: 'journals', label: t('erp.accounting.journals') },
+    { key: 'receipts', label: t('erp.accounting.receipts') },
     { key: 'periods', label: t('erp.accounting.periods') },
     { key: 'statements', label: t('erp.accounting.statements') },
     { key: 'ledger', label: t('erp.accounting.ledger') },
@@ -75,10 +79,92 @@ export default function AccountingPage() {
 
       {tab === 'accounts' ? <AccountsTab canManage={canManageCoa} /> : null}
       {tab === 'journals' ? <JournalsTab canPost={canPost} /> : null}
+      {tab === 'receipts' ? <ReceiptsTab canManage={canManagePayments} /> : null}
       {tab === 'periods' ? <PeriodsTab canManage={canManageCoa} /> : null}
       {tab === 'statements' ? <StatementsTab /> : null}
       {tab === 'ledger' ? <LedgerTab /> : null}
     </div>
+  );
+}
+
+// ------------------------------------------------------------------ receipts
+
+function ReceiptsTab({ canManage }: { canManage: boolean }) {
+  const { t } = useUi();
+  const [detail, setDetail] = useState<PaymentDto | null>(null);
+  const list = useAsync(() => api.payments({ page: 1 }), []);
+
+  const receipts = (list.data?.items ?? []).filter((p) => p.direction === 'RECEIPT');
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
+        <p className="oryx-panel-title m-0">{t('erp.accounting.receipts')}</p>
+        <Button size="sm" onClick={() => void list.reload()} data-testid="receipts-refresh">
+          <Icon name="search" size={15} />
+          {t('common.refresh')}
+        </Button>
+      </div>
+      {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
+      {list.loading ? (
+        <div className="flex flex-col gap-3 p-4">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} height={34} />)}</div>
+      ) : receipts.length === 0 ? (
+        <EmptyState title={t('common.empty')} hint={t('erp.accounting.emptyReceipts')} />
+      ) : (
+        <TableShell>
+          <thead>
+            <tr>
+              <th>{t('erp.sales.receiptNumber')}</th>
+              <th>{t('common.date')}</th>
+              <th>{t('erp.sales.customer')}</th>
+              <th>{t('erp.sales.method')}</th>
+              <th>{t('erp.sales.total')}</th>
+              <th>{t('common.actions')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {receipts.map((p) => (
+              <tr key={p.id} data-testid={`receipt-row-${p.paymentNumber}`}>
+                <td className="font-mono text-[12px]">{p.paymentNumber}</td>
+                <td className="text-[12.5px]">{p.paidAt?.slice(0, 10)}</td>
+                <td className="text-[12.5px]">{p.partyNameEn ?? '—'}</td>
+                <td className="text-[12.5px]">{p.method.replace(/_/g, ' ')}</td>
+                <td className="tabular-nums text-[12.5px] font-semibold">{money(p.amountMinor, p.currency)}</td>
+                <td>
+                  <div className="flex items-center gap-1.5">
+                    <DocumentPrintActions kind="RECEIPT" id={p.id} compact />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setDetail(p)}
+                      title={t('attachments.title')}
+                      data-testid={`receipt-attach-open-${p.paymentNumber}`}
+                    >
+                      <Icon name="paperclip" size={15} />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </TableShell>
+      )}
+      <Modal
+        open={detail !== null}
+        title={`${t('erp.sales.receiptNumber')} ${detail?.paymentNumber ?? ''}`}
+        onClose={() => setDetail(null)}
+      >
+        {detail ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[13px] font-semibold">{detail.partyNameEn ?? '—'}</span>
+              <DocumentPrintActions kind="RECEIPT" id={detail.id} />
+            </div>
+            <AttachmentsPanel entityType="PAYMENT" entityId={detail.id} canManage={canManage} />
+          </div>
+        ) : null}
+      </Modal>
+    </Card>
   );
 }
 

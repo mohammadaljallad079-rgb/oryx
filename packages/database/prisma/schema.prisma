@@ -184,6 +184,16 @@ model Company {
   currency        String        @default("SAR")
   timezone        String        @default("Asia/Riyadh")
   taxNumber       String?
+  // Print metadata. The approved invoice/quotation/receipt forms carry a
+  // company address block, a commercial-registration number and a contact bar;
+  // these are the fields the print model resolves them from.
+  phone           String?
+  email           String?
+  website         String?
+  addressLine     String?
+  crNumber        String?
+  printNoteEn     String?
+  printNoteAr     String?
   parentCompanyId String?
   notes           String?
   createdAt       DateTime      @default(now())

@@ -76,6 +76,9 @@ import type {
   ServiceRequestDto,
   ProviderSettlementDto,
   WarehouseDto,
+  PrintDocumentDto,
+  PrintDocumentKind,
+  AttachmentDto,
 } from '@oryx/shared';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api';
@@ -257,7 +260,10 @@ export async function restoreSession(): Promise<boolean> {
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? 'GET';
   const headers: Record<string, string> = {};
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  // A FormData body must keep the browser-generated multipart boundary, so the
+  // JSON content type is only applied to plain payloads.
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+  if (options.body !== undefined && !isFormData) headers['Content-Type'] = 'application/json';
   if (!options.anonymous) {
     const token = tokenStore.access;
     if (token) headers.Authorization = `Bearer ${token}`;
@@ -276,7 +282,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     method,
     headers,
     credentials: 'include',
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body: isFormData ? (options.body as FormData) : options.body !== undefined ? JSON.stringify(options.body) : undefined,
     cache: 'no-store',
   });
 
@@ -620,6 +626,48 @@ export const api = {
     request<Paginated<SalesDocumentDto>>(`/sales/credit-notes?${toQuery(params)}`),
   createCreditNote: (body: Record<string, unknown>) =>
     request<SalesDocumentDto>('/sales/credit-notes', { method: 'POST', body }),
+
+  // ------------------------------------------------------ print (documents)
+  printDocument: (kind: PrintDocumentKind, id: string) =>
+    request<PrintDocumentDto>(`/print/${kind}/${id}`),
+
+  // ----------------------------------------------------------- attachments
+  attachments: (entityType: string, entityId: string) =>
+    request<AttachmentDto[]>(`/attachments/${entityType}/${entityId}`),
+  uploadAttachment: (entityType: string, entityId: string, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return request<AttachmentDto>(`/attachments/${entityType}/${entityId}`, {
+      method: 'POST',
+      body: form,
+    });
+  },
+  deleteAttachment: (entityType: string, entityId: string, attachmentId: string) =>
+    request<{ deleted: true }>(`/attachments/${entityType}/${entityId}/${attachmentId}`, {
+      method: 'DELETE',
+    }),
+  attachmentDownloadUrl: (entityType: string, entityId: string, attachmentId: string) =>
+    `${API_BASE}/v1/attachments/${entityType}/${entityId}/${attachmentId}/download`,
+  /**
+   * Fetch an attachment as a blob so a preview can be shown without exposing the
+   * bearer token in a URL. The access token is read from the same in-memory
+   * store the request helper uses, and the tenant context headers ride along.
+   */
+  fetchAttachmentBlob: async (entityType: string, entityId: string, attachmentId: string): Promise<Blob> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    const branchId = tokenStore.branchId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    if (branchId) headers['x-oryx-branch-id'] = branchId;
+    const res = await fetch(
+      `${API_BASE}/v1/attachments/${entityType}/${entityId}/${attachmentId}/download`,
+      { headers, credentials: 'include', cache: 'no-store' },
+    );
+    if (!res.ok) throw new ApiError(res.status, 'attachment_fetch_failed', 'Could not load the attachment.');
+    return res.blob();
+  },
   cashierSessions: (params: { companyId?: string } = {}) =>
     request<Paginated<CashierSessionDto>>(`/sales/cashier-sessions?${toQuery(params)}`),
   openCashierSession: (body: Record<string, unknown>) =>
