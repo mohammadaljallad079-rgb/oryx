@@ -82,6 +82,8 @@ export interface DocumentActionsProps {
    * `GET /documents` rather than hiding behind a narrower single check.
    */
   permissions: string[];
+  /** Automatically issue (when needed) and open the stored PDF after a new invoice is saved. */
+  autoOpenOnMount?: boolean;
 }
 
 /**
@@ -96,7 +98,7 @@ function attachmentEntityFor(sourceType: DocumentSourceType): AttachmentEntityTy
   return null;
 }
 
-export function DocumentActions({ sourceType, sourceId, type, permissions }: DocumentActionsProps) {
+export function DocumentActions({ sourceType, sourceId, type, permissions, autoOpenOnMount = false }: DocumentActionsProps) {
   const { t, locale } = useUi();
   const { canAny } = useAuth();
 
@@ -190,8 +192,39 @@ export function DocumentActions({ sourceType, sourceId, type, permissions }: Doc
   }, [canRead, sourceId, sourceType, type, t]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!autoOpenOnMount) void load();
+  }, [load, autoOpenOnMount]);
+
+  // Open the official stored PDF for the newly-created invoice only.
+  const autoOpenStarted = useRef(false);
+  useEffect(() => {
+    if (!autoOpenOnMount || autoOpenStarted.current || !canRead || !sourceId) return;
+    autoOpenStarted.current = true;
+    let cancelled = false;
+    void (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const rows = await api.documentsForSource(sourceType, sourceId);
+        let current = rows.find((row) => row.type === type) ?? null;
+        if (!current) current = await api.issueFinancialDocument(type, sourceId);
+        if (cancelled) return;
+        setDocument(current);
+        if (!current.downloadable) return;
+        const url = await api.officialDocumentBlobUrl(current.id);
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        setPreview(url);
+      } catch (e) {
+        if (!cancelled) setError(e instanceof ApiError ? e.message : t('common.error'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [autoOpenOnMount, canRead, sourceId, sourceType, type, t]);
 
   const issue = async () => {
     setBusy(true);
