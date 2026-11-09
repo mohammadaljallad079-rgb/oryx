@@ -25,6 +25,7 @@ import type {
   PosSaleLineDto,
   SalesLineDto,
   UpdateCustomerDto,
+  UpdateInvoiceDto,
 } from './sales.dto';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -560,6 +561,138 @@ export class SalesService {
     });
     if (!invoice) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Sales invoice not found.');
     return toInvoiceDto(invoice);
+  }
+
+  /**
+   * Update a draft invoice only. Posted invoices are immutable: changing them
+   * would invalidate the posted journal, stock issue and any allocations.
+   */
+  async updateInvoice(id: string, dto: UpdateInvoiceDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const salespersonName = await this.resolveSalespersonName(dto.salespersonName, actor.userId);
+    const result = await this.posting.withTransaction(async (tx) => {
+      const current = await tx.salesInvoice.findFirst({
+        where: { id, companyId },
+        include: { lines: true, allocations: true },
+      });
+      if (!current) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Sales invoice not found.');
+      if (
+        current.status !== 'DRAFT' ||
+        current.journalEntryId ||
+        current.amountPaidMinor > 0 ||
+        current.allocations.length > 0
+      ) {
+        throw badRequest(
+          ERROR_CODES.DOCUMENT_ALREADY_POSTED,
+          'Only an unposted draft invoice without payments can be edited. Use a credit note to correct a posted invoice.',
+        );
+      }
+      const [officialDocument, attachment] = await Promise.all([
+        tx.officialDocument.findFirst({
+          where: { companyId, sourceType: 'SalesInvoice', sourceId: id, status: { notIn: ['CANCELLED', 'REVOKED'] } },
+          select: { id: true },
+        }),
+        tx.entityAttachment.findFirst({
+          where: { companyId, entityType: 'SALES_INVOICE', entityId: id },
+          select: { id: true },
+        }),
+      ]);
+      if (officialDocument || attachment) {
+        throw badRequest(
+          ERROR_CODES.DOCUMENT_ALREADY_POSTED,
+          'This draft has an issued document or attachments. Revoke/remove them before editing.',
+        );
+      }
+      await this.assertCustomerTx(tx, companyId, dto.customerId);
+      const lineInputs = dto.lines.map((line) => ({
+        productId: line.productId ?? null,
+        description: line.description,
+        quantity: line.quantity,
+        unitPriceMinor: line.unitPriceMinor,
+        discountPercentBp: line.discountPercentBp,
+        taxPercentBp: line.taxPercentBp,
+      }));
+      const rounding = await this.context.companyRoundingMode(companyId, tx);
+      const totals = computeDocumentTotals(lineInputs, rounding.mode, rounding.scale);
+      const invoiceDate = new Date(resolveDocumentDate(dto)!);
+      const dueDate = dto.dueDate ? new Date(dto.dueDate) : current.dueDate;
+      const updated = await tx.salesInvoice.update({
+        where: { id },
+        data: {
+          customerId: dto.customerId,
+          warehouseId: dto.warehouseId ?? current.warehouseId,
+          invoiceDate,
+          dueDate,
+          subtotalMinor: totals.subtotalMinor,
+          discountMinor: totals.discountMinor,
+          taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
+          totalMinor: totals.totalMinor,
+          paymentMethod: (dto.paymentMethod as PaymentMethod | undefined) ?? current.paymentMethod,
+          salespersonName,
+          paymentReference: dto.paymentReference ?? null,
+          notes: dto.notes ?? null,
+          lines: { deleteMany: {}, create: buildLineRows(totals, lineInputs) },
+        },
+        include: { customer: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
+      });
+      return toInvoiceDto(updated);
+    });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'sales.invoice_updated',
+      targetType: 'SALES_INVOICE',
+      targetId: id,
+      summary: `Updated draft sales invoice ${result.invoiceNumber}`,
+    });
+    return result;
+  }
+
+  /** Permanently remove a draft invoice only when nothing has been issued against it. */
+  async deleteInvoice(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const deleted = await this.posting.withTransaction(async (tx) => {
+      const invoice = await tx.salesInvoice.findFirst({
+        where: { id, companyId },
+        include: { allocations: true },
+      });
+      if (!invoice) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Sales invoice not found.');
+      if (
+        invoice.status !== 'DRAFT' ||
+        invoice.journalEntryId ||
+        invoice.amountPaidMinor > 0 ||
+        invoice.allocations.length > 0
+      ) {
+        throw badRequest(
+          ERROR_CODES.DOCUMENT_ALREADY_POSTED,
+          'Only an unposted draft invoice without payments can be permanently deleted. Posted invoices must be reversed with a credit note.',
+        );
+      }
+      const [officialDocument, attachment, comment, approval] = await Promise.all([
+        tx.officialDocument.findFirst({ where: { companyId, sourceType: 'SalesInvoice', sourceId: id }, select: { id: true } }),
+        tx.entityAttachment.findFirst({ where: { companyId, entityType: 'SALES_INVOICE', entityId: id }, select: { id: true } }),
+        tx.entityComment.findFirst({ where: { companyId, entityType: 'SALES_INVOICE', entityId: id }, select: { id: true } }),
+        tx.approvalRequest.findFirst({ where: { companyId, entityType: 'SALES_INVOICE', entityId: id }, select: { id: true } }),
+      ]);
+      if (officialDocument || attachment || comment || approval) {
+        throw badRequest(
+          ERROR_CODES.DOCUMENT_ALREADY_POSTED,
+          'This invoice has related official documents, attachments, comments or approvals and cannot be deleted.',
+        );
+      }
+      await tx.salesInvoice.delete({ where: { id } });
+      return invoice.invoiceNumber;
+    });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'sales.invoice_deleted',
+      targetType: 'SALES_INVOICE',
+      targetId: id,
+      summary: `Permanently deleted draft sales invoice ${deleted}`,
+    });
+    return { id, deleted: true };
   }
 
   /**
