@@ -616,6 +616,8 @@ export class SalesService {
       const totals = computeDocumentTotals(lineInputs, rounding.mode, rounding.scale);
       const invoiceDate = new Date(resolveDocumentDate(dto)!);
       const dueDate = dto.dueDate ? new Date(dto.dueDate) : current.dueDate;
+      const willPost = dto.post === true;
+      if (willPost) await this.assertCreditLimit(tx, companyId, dto.customerId, totals.totalMinor);
       const updated = await tx.salesInvoice.update({
         where: { id },
         data: {
@@ -636,7 +638,33 @@ export class SalesService {
         },
         include: { customer: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
       });
-      return toInvoiceDto(updated);
+      if (!willPost) return toInvoiceDto(updated);
+      const posted = await this.postSalesInvoice(tx, {
+        companyId,
+        branchId: current.branchId,
+        customerId: dto.customerId,
+        warehouseId: dto.warehouseId ?? current.warehouseId,
+        currency: current.currency,
+        lines: lineInputs,
+        entryDate: invoiceDate,
+        sourceType: 'SALES_INVOICE',
+        sourceId: id,
+        actorUserId: actor.userId,
+        issueStock: dto.issueStock ?? true,
+        roundingMode: rounding.mode,
+        roundingScale: rounding.scale,
+      });
+      if (current.orderId) {
+        const orderLines = await tx.salesOrderLine.findMany({ where: { orderId: current.orderId } });
+        for (const line of orderLines) {
+          await tx.salesOrderLine.update({
+            where: { id: line.id },
+            data: { quantityInvoiced: line.quantity },
+          });
+        }
+        await tx.salesOrder.update({ where: { id: current.orderId }, data: { status: 'INVOICED' } });
+      }
+      return posted;
     });
     await this.audit.record({
       actorUserId: actor.userId,
