@@ -2462,7 +2462,11 @@ function DocumentModal({
       // posting every field to every endpoint.
       const payload: Record<string, unknown> = {
         customerId,
-        ...(relatedInvoiceId ? { invoiceId: relatedInvoiceId } : {}),
+        ...(relatedInvoiceId ? {
+          invoiceId: relatedInvoiceId,
+          branchId: initialDocument?.branchId ?? undefined,
+          currency: initialDocument?.currency,
+        } : {}),
         ...(allowDraft ? { post } : {}),
         warehouseId: warehouseId || undefined,
         documentDate: documentDate ? new Date(documentDate).toISOString() : new Date().toISOString(),
