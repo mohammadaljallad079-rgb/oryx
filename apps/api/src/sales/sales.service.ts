@@ -1694,6 +1694,7 @@ function toSalesOrderDto(o: {
 function toInvoiceDto(inv: {
   id: string;
   invoiceNumber: string;
+  branchId: string | null;
   customerId: string;
   orderId: string | null;
   status: string;
@@ -1717,6 +1718,7 @@ function toInvoiceDto(inv: {
   return {
     id: inv.id,
     invoiceNumber: inv.invoiceNumber,
+    branchId: inv.branchId,
     customerId: inv.customerId,
     customerNameEn: inv.customer.nameEn,
     customerNameAr: inv.customer.nameAr,
