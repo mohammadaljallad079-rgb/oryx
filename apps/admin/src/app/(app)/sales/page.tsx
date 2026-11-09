@@ -246,6 +246,7 @@ function CustomersTab({ canManage }: { canManage: boolean }) {
         ) : null}
       </div>
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
+      {actionError ? <div className="p-4"><ErrorBanner message={actionError} /></div> : null}
       {list.loading ? (
         <div className="flex flex-col gap-3 p-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} height={34} />)}</div>
       ) : (list.data?.items.length ?? 0) === 0 ? (
@@ -816,6 +817,8 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
   const [autoPreviewId, setAutoPreviewId] = useState<string | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<SalesDocumentDto | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const list = useAsync(() => api.salesInvoices({ page: 1 }), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
@@ -827,7 +830,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.sales.invoices')}</p>
         {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-invoice">
+          <Button variant="primary" size="sm" onClick={() => { setEditingInvoice(null); setOpen(true); }} data-testid="new-invoice">
             <Icon name="plus" size={16} />
             {t('erp.sales.newInvoice')}
           </Button>
@@ -861,13 +864,38 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px]">{money(inv.outstandingMinor ?? 0, inv.currency)}</td>
                 <td><StatusBadge status={inv.status} label={inv.status} /></td>
                 <td>
-                  <DocumentActions
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {canManage && inv.status === 'DRAFT' ? (
+                      <>
+                        <Button size="sm" variant="ghost" onClick={() => { setEditingInvoice(inv); setOpen(true); }} data-testid={`edit-invoice-${inv.invoiceNumber}`}>
+                          <Icon name="edit" size={14} />
+                          {t('common.edit')}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            if (!window.confirm(t('common.confirm'))) return;
+                            setActionError(null);
+                            void api.deleteSalesInvoice(inv.id)
+                              .then(() => list.reload())
+                              .catch((e) => setActionError(e instanceof Error ? e.message : t('common.error')));
+                          }}
+                          data-testid={`delete-invoice-${inv.invoiceNumber}`}
+                        >
+                          <Icon name="trash" size={14} />
+                          {t('common.delete')}
+                        </Button>
+                      </>
+                    ) : null}
+                    <DocumentActions
                     sourceType="SalesInvoice"
                     sourceId={inv.id}
                     type="SALES_INVOICE"
                     permissions={['erp.sales.read', 'erp.accounting.read']}
                     autoOpenOnMount={autoPreviewId === inv.id}
                   />
+                  </div>
                 </td>
               </tr>
             ))}
@@ -876,7 +904,8 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
       )}
       <DocumentModal
         open={open}
-        title={t('erp.sales.newInvoice')}
+        title={editingInvoice ? t('common.edit') + ' — ' + t('erp.sales.invoiceNumber') + ' ' + editingInvoice.invoiceNumber : t('erp.sales.newInvoice')}
+        initialDocument={editingInvoice}
         customers={customers.data?.items ?? []}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
@@ -888,9 +917,14 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         dateField="invoiceDate"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
-          const created = await api.createSalesInvoice({ ...payload, post: true });
+          if (editingInvoice) {
+            await api.updateSalesInvoice(editingInvoice.id, payload);
+            setEditingInvoice(null);
+          } else {
+            const created = await api.createSalesInvoice({ ...payload, post: true });
+            setAutoPreviewId(created.id);
+          }
           await list.reload();
-          setAutoPreviewId(created.id);
         }}
       />
       <Modal
@@ -2252,6 +2286,7 @@ function MirrorField({ label, value }: { label: string; value: string | null | u
 function DocumentModal({
   open,
   title,
+  initialDocument,
   customers,
   products,
   warehouses,
@@ -2268,6 +2303,7 @@ function DocumentModal({
 }: {
   open: boolean;
   title: string;
+  initialDocument?: SalesDocumentDto | null;
   customers: CustomerDto[];
   products: Array<{ id: string; sku: string; nameEn: string; salesPriceMinor: number; taxRateBp: number }>;
   warehouses: WarehouseDto[];
@@ -2322,7 +2358,28 @@ function DocumentModal({
 
   useEffect(() => {
     if (!open) return;
-    setDocumentDate(new Date().toISOString().slice(0, 10));
+    setError(null);
+    setDocumentDate(initialDocument?.invoiceDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10));
+    setCustomerId(initialDocument?.customerId ?? '');
+    setWarehouseId(initialDocument?.warehouseId ?? '');
+    setDueDate(initialDocument?.dueDate?.slice(0, 10) ?? '');
+    setNotes(initialDocument?.notes ?? '');
+    setPaymentMethod(initialDocument?.paymentMethod ?? 'CASH');
+    setSalespersonName(initialDocument?.salespersonName ?? user?.fullNameEn ?? user?.fullNameAr ?? user?.email ?? '');
+    setPaymentReference(initialDocument?.paymentReference ?? '');
+    setLines(
+      initialDocument?.lines?.length
+        ? initialDocument.lines.map((line) => ({
+            productId: typeof line.productId === 'string' ? line.productId : '',
+            description: typeof line.description === 'string' ? line.description : '',
+            quantity: qty(Number(line.quantity ?? 0)),
+            unitPrice: minorToInput(Number(line.unitPriceMinor ?? 0), initialDocument.currency),
+            discountPercent: String(Number(line.discountPercentBp ?? 0) / 100),
+            taxId: '',
+            taxPercent: String(Number(line.taxPercentBp ?? 0) / 100),
+          }))
+        : [emptyLine()],
+    );
     // Default the printed "Staf Name" to the signed-in operator. The server
     // applies the same fallback, so an untouched field still prints a real name;
     // prefilling it here shows the operator what the document will say.
@@ -2345,7 +2402,7 @@ function DocumentModal({
     return () => {
       cancelled = true;
     };
-  }, [open, companyId]);
+  }, [open, companyId, initialDocument, user?.fullNameEn, user?.fullNameAr, user?.email]);
 
   const currency = company?.currency;
   const selected = customers.find((c) => c.id === customerId) ?? null;
