@@ -470,6 +470,13 @@ model Company {
    */
   documentLocale     Locale          @default(en)
   taxNumber          String?
+  phone              String?
+  email              String?
+  website            String?
+  addressLine        String?
+  crNumber           String?
+  printNoteEn        String?
+  printNoteAr        String?
   parentCompanyId    String?
   notes              String?
   createdAt          DateTime        @default(now())

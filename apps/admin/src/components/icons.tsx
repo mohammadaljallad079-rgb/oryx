@@ -378,6 +378,11 @@ export const Icons = {
       <path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8Z" />
     </Base>
   ),
+  paperclip: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M20 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.6 1.6 0 0 1-2.3-2.3l7.8-7.8" />
+    </Base>
+  ),
 } as const;
 
 export type IconName = keyof typeof Icons;

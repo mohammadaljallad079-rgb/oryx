@@ -322,6 +322,11 @@ export class CreateQuotationDto extends SalesDocumentDateDto {
 
   @IsOptional()
   @IsISO8601()
+  /** Accepted for generic document-form compatibility. */
+  @IsOptional()
+  @IsString()
+  warehouseId?: string;
+
   validUntil?: string;
 
   @IsOptional()

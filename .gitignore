@@ -71,3 +71,7 @@ apps/api/.media/
 
 # Local QA account credentials (a live test password; never committed).
 .run/qa-customer-creds.txt
+
+# Attachment storage (runtime)
+storage/
+apps/api/storage/

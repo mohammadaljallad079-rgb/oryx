@@ -16,6 +16,7 @@ import {
   type RoundingMode,
 } from '@oryx/shared';
 import { Icon } from '@/components/icons';
+import { AttachmentsPanel, DocumentPrintActions } from '@/components/document-print';
 import {
   Badge,
   Button,
@@ -799,6 +800,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
   const list = useAsync(() => api.salesInvoices({ page: 1 }), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
@@ -867,12 +869,28 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         dueDateField="dueDate"
         settlement
         testIdPrefix="invoice"
+        dateField="invoiceDate"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
-          await api.createSalesInvoice(payload);
+          await api.createSalesInvoice({ ...payload, post: true });
           await list.reload();
         }}
       />
+      <Modal
+        open={detail !== null}
+        title={`${t('erp.sales.invoiceNumber')} ${detail?.invoiceNumber ?? ''}`}
+        onClose={() => setDetail(null)}
+      >
+        {detail ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[13px] font-semibold">{detail.customerNameEn}</span>
+              <DocumentPrintActions kind="SALES_INVOICE" id={detail.id} />
+            </div>
+            <AttachmentsPanel entityType="SALES_INVOICE" entityId={detail.id} canManage={canManage} />
+          </div>
+        ) : null}
+      </Modal>
     </Card>
   );
 }
@@ -945,6 +963,7 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
         taxOptions={taxOptions}
         showWarehouse
         testIdPrefix="order"
+        dateField="orderDate"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
           await api.createSalesOrder({ ...payload, confirm: true });
@@ -2058,6 +2077,9 @@ function LineEditor({
     setLines(next);
   };
 
+  // Columns: description (wide) | qty | unit price | discount % | tax % | amount | remove.
+  const cols = 'grid-cols-[minmax(0,1fr)_70px_100px_70px_70px_104px_32px]';
+
   return (
     <div className="flex flex-col gap-2">
       <div className="oryx-doc-form__grid oryx-doc-form__grid--head">
@@ -2223,6 +2245,7 @@ function DocumentModal({
   dueDateField,
   settlement,
   testIdPrefix,
+  dateField = 'issueDate',
   onClose,
   onSubmit,
 }: {
@@ -2254,6 +2277,8 @@ function DocumentModal({
    */
   settlement?: boolean;
   testIdPrefix: string;
+  /** The single date property the target document DTO accepts. */
+  dateField?: 'issueDate' | 'invoiceDate' | 'orderDate';
   onClose: () => void;
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
 }) {
@@ -2313,7 +2338,10 @@ function DocumentModal({
     setBusy(true);
     setError(null);
     try {
-      await onSubmit({
+      // Each document DTO accepts exactly one date property and its own set of
+      // optional fields, so the payload is assembled per document rather than
+      // posting every field to every endpoint.
+      const payload: Record<string, unknown> = {
         customerId,
         warehouseId: warehouseId || undefined,
         documentDate: documentDate ? new Date(documentDate).toISOString() : new Date().toISOString(),
@@ -2332,7 +2360,9 @@ function DocumentModal({
           discountPercentBp: Math.round((Number(l.discountPercent) || 0) * 100),
           taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
         })),
-      });
+      };
+
+      await onSubmit(payload);
       onClose();
       setLines([emptyLine()]);
       setCustomerId('');
