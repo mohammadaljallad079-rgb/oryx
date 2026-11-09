@@ -896,7 +896,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                         onClick={() => setCreditNoteSource(inv)}
                         data-testid={`credit-note-from-invoice-${inv.invoiceNumber}`}
                       >
-                        <Icon name="file-minus" size={14} />
+                        <Icon name="scroll" size={14} />
                         {t('erp.sales.newCreditNote')}
                       </Button>
                     ) : null}
