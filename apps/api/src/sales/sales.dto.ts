@@ -482,6 +482,44 @@ export class CreateInvoiceDto extends SalesDocumentDateDto {
   lines?: SalesLineDto[];
 }
 
+export class UpdateInvoiceDto extends SalesDocumentDateDto {
+  @IsString()
+  customerId!: string;
+
+  @IsOptional()
+  @IsString()
+  warehouseId?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  dueDate?: string;
+
+  @IsOptional()
+  @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER'])
+  paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  salespersonName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  paymentReference?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  notes?: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => SalesLineDto)
+  lines!: SalesLineDto[];
+}
+
 export class CreateCreditNoteDto extends SalesDocumentDateDto {
   @IsString()
   customerId!: string;
