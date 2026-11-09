@@ -900,13 +900,15 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                         {t('erp.sales.newCreditNote')}
                       </Button>
                     ) : null}
-                    <DocumentActions
-                    sourceType="SalesInvoice"
-                    sourceId={inv.id}
-                    type="SALES_INVOICE"
-                    permissions={['erp.sales.read', 'erp.accounting.read']}
-                    autoOpenOnMount={autoPreviewId === inv.id}
-                  />
+                    {inv.status !== 'DRAFT' ? (
+                      <DocumentActions
+                        sourceType="SalesInvoice"
+                        sourceId={inv.id}
+                        type="SALES_INVOICE"
+                        permissions={['erp.sales.read', 'erp.accounting.read']}
+                        autoOpenOnMount={autoPreviewId === inv.id}
+                      />
+                    ) : null}
                   </div>
                 </td>
               </tr>
