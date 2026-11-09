@@ -400,7 +400,7 @@ function CustomerModal({
     });
   }, [open, customer]);
 
-  const submit = async () => {
+  const submit = async (post = true) => {
     setBusy(true);
     setError(null);
     try {
@@ -918,6 +918,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         open={open}
         title={editingInvoice ? t('common.edit') + ' — ' + t('erp.sales.invoiceNumber') + ' ' + editingInvoice.invoiceNumber : t('erp.sales.newInvoice')}
         initialDocument={editingInvoice}
+        allowDraft
         customers={customers.data?.items ?? []}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
@@ -2320,6 +2321,7 @@ function DocumentModal({
   title,
   initialDocument,
   relatedInvoiceId,
+  allowDraft,
   customers,
   products,
   warehouses,
@@ -2338,6 +2340,7 @@ function DocumentModal({
   title: string;
   initialDocument?: SalesDocumentDto | null;
   relatedInvoiceId?: string;
+  allowDraft?: boolean;
   customers: CustomerDto[];
   products: Array<{ id: string; sku: string; nameEn: string; salesPriceMinor: number; taxRateBp: number }>;
   warehouses: WarehouseDto[];
@@ -2369,7 +2372,7 @@ function DocumentModal({
   onClose: () => void;
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const { companyId, user } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -2456,6 +2459,7 @@ function DocumentModal({
       const payload: Record<string, unknown> = {
         customerId,
         ...(relatedInvoiceId ? { invoiceId: relatedInvoiceId } : {}),
+        ...(allowDraft ? { post } : {}),
         warehouseId: warehouseId || undefined,
         documentDate: documentDate ? new Date(documentDate).toISOString() : new Date().toISOString(),
         ...(dueDateField && dueDate ? { [dueDateField]: new Date(dueDate).toISOString() } : {}),
@@ -2504,7 +2508,12 @@ function DocumentModal({
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy || !customerId} onClick={submit} data-testid={`save-${testIdPrefix}`}>
+          {allowDraft ? (
+            <Button disabled={busy || !customerId} onClick={() => void submit(false)} data-testid={`save-draft-${testIdPrefix}`}>
+              {locale === 'ar' ? 'حفظ كمسودة' : 'Save draft'}
+            </Button>
+          ) : null}
+          <Button variant="primary" disabled={busy || !customerId} onClick={() => void submit(true)} data-testid={`save-${testIdPrefix}`}>
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </>
