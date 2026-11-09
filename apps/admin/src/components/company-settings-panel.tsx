@@ -26,7 +26,10 @@ import { Icon } from '@/components/icons';
 export function CompanySettingsPanel() {
   const { t, locale } = useUi();
   const { isPlatform, companyId, can } = useAuth();
-  const canEdit = can('company.settings.update') || can('company.update');
+  const canEdit =
+    can('platform.company.update') ||
+    can('company.settings.update') ||
+    can('company.update');
 
   const [search, setSearch] = useState('');
   const debounced = useDebounced(search);
