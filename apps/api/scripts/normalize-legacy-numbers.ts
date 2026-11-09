@@ -20,9 +20,11 @@
  *   - A statement embeds its party code and a date rather than a sequence, so it
  *     has no numeric part to keep; it is re-numbered from its own sequence.
  *
- * Usage (development/staging only):
- *   pnpm --filter @oryx/api exec tsx scripts/normalize-legacy-numbers.ts --dry-run
- *   pnpm --filter @oryx/api exec tsx scripts/normalize-legacy-numbers.ts --apply
+ * Usage (development/staging only). Run it through `ts-node`, not `tsx`:
+ * esbuild does not emit the decorator metadata Nest's DI reads, so a `tsx`
+ * run fails to build the application context before it reaches any row.
+ *   pnpm --filter @oryx/api exec ts-node --transpile-only scripts/normalize-legacy-numbers.ts --dry-run
+ *   pnpm --filter @oryx/api exec ts-node --transpile-only scripts/normalize-legacy-numbers.ts --apply
  */
 
 import { PrismaClient } from '@oryx/database';
