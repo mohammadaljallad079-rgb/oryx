@@ -932,10 +932,11 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         onSubmit={async (payload) => {
           if (editingInvoice) {
             await api.updateSalesInvoice(editingInvoice.id, payload);
+            if (payload.post !== false) setAutoPreviewId(editingInvoice.id);
             setEditingInvoice(null);
           } else {
-            const created = await api.createSalesInvoice({ ...payload, post: true });
-            setAutoPreviewId(created.id);
+            const created = await api.createSalesInvoice(payload);
+            if (payload.post !== false) setAutoPreviewId(created.id);
           }
           await list.reload();
         }}
@@ -2402,6 +2403,7 @@ function DocumentModal({
     setDueDate(initialDocument?.dueDate?.slice(0, 10) ?? '');
     setNotes(initialDocument?.notes ?? '');
     setPaymentMethod(initialDocument?.paymentMethod ?? 'CASH');
+    setRestock(!(initialDocument && reasonField));
     setSalespersonName(initialDocument?.salespersonName ?? user?.fullNameEn ?? user?.fullNameAr ?? user?.email ?? '');
     setPaymentReference(initialDocument?.paymentReference ?? '');
     setLines(
