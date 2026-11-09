@@ -886,6 +886,10 @@ export const api = {
   getSalesInvoice: (id: string) => request<SalesDocumentDto>(`/sales/invoices/${id}`),
   createSalesInvoice: (body: Record<string, unknown>) =>
     request<SalesDocumentDto>('/sales/invoices', { method: 'POST', body }),
+  updateSalesInvoice: (id: string, body: Record<string, unknown>) =>
+    request<SalesDocumentDto>(`/sales/invoices/${id}`, { method: 'POST', body }),
+  deleteSalesInvoice: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/sales/invoices/${id}`, { method: 'DELETE' }),
   creditNotes: (params: { companyId?: string } = {}) =>
     request<Paginated<SalesDocumentDto>>(`/sales/credit-notes?${toQuery(params)}`),
   createCreditNote: (body: Record<string, unknown>) =>

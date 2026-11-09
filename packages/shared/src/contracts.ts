@@ -909,6 +909,7 @@ export interface SalesDocumentDto {
   quoteNumber?: string;
   orderNumber?: string;
   invoiceNumber?: string;
+  branchId?: string | null;
   creditNoteNumber?: string;
   customerId: string;
   customerNameEn: string;
@@ -930,6 +931,10 @@ export interface SalesDocumentDto {
   currency: string;
   notes: string | null;
   journalEntryId?: string | null;
+  warehouseId?: string | null;
+  paymentMethod?: string;
+  salespersonName?: string | null;
+  paymentReference?: string | null;
   convertedOrderId?: string | null;
   orderId?: string | null;
   lines: Array<Record<string, unknown>>;
