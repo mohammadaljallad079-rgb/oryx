@@ -2272,7 +2272,7 @@ function DocumentModal({
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
 }) {
   const { t } = useUi();
-  const { companyId } = useAuth();
+  const { companyId, user } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [company, setCompany] = useState<{
@@ -2295,6 +2295,10 @@ function DocumentModal({
   useEffect(() => {
     if (!open) return;
     setDocumentDate(new Date().toISOString().slice(0, 10));
+    // Default the printed "Staf Name" to the signed-in operator. The server
+    // applies the same fallback, so an untouched field still prints a real name;
+    // prefilling it here shows the operator what the document will say.
+    setSalespersonName((prev) => prev || user?.fullNameEn || user?.fullNameAr || user?.email || '');
     if (!companyId) return;
     let cancelled = false;
     void (async () => {
