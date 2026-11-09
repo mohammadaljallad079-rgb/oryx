@@ -79,22 +79,3 @@ export interface PrintDocumentDto {
   currency: string;
 }
 
-/** Attachment metadata returned by the API. The stored value never leaves it. */
-export interface AttachmentDto {
-  id: string;
-  entityType: string;
-  entityId: string;
-  fileName: string;
-  mimeType: string | null;
-  sizeBytes: number;
-  uploadedById: string | null;
-  createdAt: string;
-}
-
-/** Document kinds an attachment may be linked to. */
-export const ATTACHMENT_ENTITY_TYPES = ['SALES_INVOICE', 'PAYMENT'] as const;
-export type AttachmentEntityType = (typeof ATTACHMENT_ENTITY_TYPES)[number];
-
-/** Accepted attachment MIME types: PDF, JPG, PNG and screenshots (png/jpeg). */
-export const ATTACHMENT_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png'] as const;
-export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;

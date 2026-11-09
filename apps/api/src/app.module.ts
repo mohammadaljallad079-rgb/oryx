@@ -27,7 +27,6 @@ import { CrmModule } from './crm/crm.module';
 import { OperationsModule } from './operations/operations.module';
 import { AutomotiveModule } from './automotive/automotive.module';
 import { DocumentsModule } from './documents/documents.module';
-import { AttachmentsModule } from './attachments/attachments.module';
 import { CustomerModule } from './customer/customer.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
@@ -87,7 +86,7 @@ import { AttachmentsModule } from './attachments/attachments.module';
     EcosystemModule,
     TaxModule,
     PrintModule,
-    AttachmentsModule,
+
   ],
   providers: [
     // Global rate limiting; sensitive auth routes override with @Throttle.
