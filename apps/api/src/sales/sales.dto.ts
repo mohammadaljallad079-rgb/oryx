@@ -521,6 +521,14 @@ export class UpdateInvoiceDto extends SalesDocumentDateDto {
   @MaxLength(400)
   notes?: string;
 
+  @IsOptional()
+  @IsBoolean()
+  post?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  issueStock?: boolean;
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
