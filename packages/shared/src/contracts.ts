@@ -909,6 +909,7 @@ export interface SalesDocumentDto {
   quoteNumber?: string;
   orderNumber?: string;
   invoiceNumber?: string;
+  branchId?: string | null;
   creditNoteNumber?: string;
   customerId: string;
   customerNameEn: string;
