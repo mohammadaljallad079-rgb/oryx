@@ -819,6 +819,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
   const [autoPreviewId, setAutoPreviewId] = useState<string | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<SalesDocumentDto | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [creditNoteSource, setCreditNoteSource] = useState<SalesDocumentDto | null>(null);
   const list = useAsync(() => api.salesInvoices({ page: 1 }), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
@@ -888,6 +889,17 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                         </Button>
                       </>
                     ) : null}
+                    {canManage && inv.status !== 'DRAFT' && inv.status !== 'VOID' ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setCreditNoteSource(inv)}
+                        data-testid={`credit-note-from-invoice-${inv.invoiceNumber}`}
+                      >
+                        <Icon name="file-minus" size={14} />
+                        {t('erp.sales.newCreditNote')}
+                      </Button>
+                    ) : null}
                     <DocumentActions
                     sourceType="SalesInvoice"
                     sourceId={inv.id}
@@ -924,6 +936,26 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
             const created = await api.createSalesInvoice({ ...payload, post: true });
             setAutoPreviewId(created.id);
           }
+          await list.reload();
+        }}
+      />
+      <DocumentModal
+        open={creditNoteSource !== null}
+        title={t('erp.sales.newCreditNote')}
+        initialDocument={creditNoteSource}
+        relatedInvoiceId={creditNoteSource?.id}
+        customers={customers.data?.items ?? []}
+        products={products.data?.items ?? []}
+        warehouses={warehouses.data?.items ?? []}
+        taxOptions={taxOptions}
+        showWarehouse
+        showRestock
+        reasonField
+        testIdPrefix="invoice-credit-note"
+        onClose={() => setCreditNoteSource(null)}
+        onSubmit={async (payload) => {
+          await api.createCreditNote(payload);
+          setCreditNoteSource(null);
           await list.reload();
         }}
       />
@@ -2287,6 +2319,7 @@ function DocumentModal({
   open,
   title,
   initialDocument,
+  relatedInvoiceId,
   customers,
   products,
   warehouses,
@@ -2304,6 +2337,7 @@ function DocumentModal({
   open: boolean;
   title: string;
   initialDocument?: SalesDocumentDto | null;
+  relatedInvoiceId?: string;
   customers: CustomerDto[];
   products: Array<{ id: string; sku: string; nameEn: string; salesPriceMinor: number; taxRateBp: number }>;
   warehouses: WarehouseDto[];
@@ -2421,6 +2455,7 @@ function DocumentModal({
       // posting every field to every endpoint.
       const payload: Record<string, unknown> = {
         customerId,
+        ...(relatedInvoiceId ? { invoiceId: relatedInvoiceId } : {}),
         warehouseId: warehouseId || undefined,
         documentDate: documentDate ? new Date(documentDate).toISOString() : new Date().toISOString(),
         ...(dueDateField && dueDate ? { [dueDateField]: new Date(dueDate).toISOString() } : {}),
