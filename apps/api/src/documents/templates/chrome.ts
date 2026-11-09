@@ -114,27 +114,17 @@ export function documentHeader(chrome: DocumentChrome): string {
 export function verificationBlock(
   verification: DocumentVerification | null | undefined,
 ): string {
-  if (!verification) return '';
+  if (!verification?.qrDataUri) return '';
+
   return `
-  <section class="verify avoid-break">
-    <div class="verify-qr">
-      <img src="${esc(verification.qrDataUri)}" alt="QR verification code">
-    </div>
-    <div class="verify-text">
-      <div class="verify-title">التحقق من صحة المستند</div>
-      <div class="verify-sub">Document authenticity verification</div>
-      <p class="verify-body">
-        امسح رمز الاستجابة السريعة أو افتح الرابط أدخل رمز التحقق للتأكد من أن هذا المستند
-        صادر رسميًا من النظام ولم يُعدّل.
-      </p>
-      <p class="verify-body ltr">
-        Scan the QR code or visit the address below and enter the verification code to confirm
-        this document was issued by the system and has not been altered.
-      </p>
-      <div class="verify-code num">${esc(verification.token)}</div>
-      <div class="verify-url ltr">${esc(verification.url)}</div>
-    </div>
-  </section>`;
+    <section class="verify avoid-break">
+      <div class="verify-qr">
+        <img
+          src="${esc(verification.qrDataUri)}"
+          alt="Document verification QR code"
+        >
+      </div>
+    </section>`;
 }
 
 /** The signature strip, used where a document is countersigned. */
