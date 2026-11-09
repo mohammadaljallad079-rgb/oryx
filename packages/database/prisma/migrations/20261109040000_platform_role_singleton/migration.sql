@@ -1,0 +1,13 @@
+-- At most one platform role per code.
+--
+-- A platform role has `companyId = NULL`, and Postgres treats NULL as distinct
+-- in a unique index, so `Role_companyId_code_key` never constrains two platform
+-- rows with the same code. A seeding path that keyed on a sentinel company id
+-- (`companyId: ''`) therefore created a second `platform_super_admin` row, and
+-- `findFirst` could resolve the emptier of the two — leaving the Super Admin
+-- with no company permissions.
+--
+-- This partial unique index is not expressible in the Prisma schema, so it is
+-- written by hand and must stay: it is what actually enforces one platform role
+-- per code.
+CREATE UNIQUE INDEX "Role_platform_code_key" ON "Role"("code") WHERE "companyId" IS NULL;

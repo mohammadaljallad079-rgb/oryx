@@ -13,8 +13,35 @@
  */
 
 :root {
-  --oryx-font-sans: 'Segoe UI', 'Noto Sans Arabic', Tahoma, system-ui, -apple-system,
-    'Helvetica Neue', Arial, sans-serif;
+  /*
+   * The official ORYX type stack.
+   *
+   * English is Verdana; Arabic is Arial. The Arabic face is selected by the
+   * document direction, so an English page never asks for a face it does not
+   * need. `Codec Pro` is the owner's preferred Arabic face but no licensed
+   * Arabic build is available, so Arial is used, which the brief allows.
+   *
+   * These are *preferences*: a client without Verdana or Arial falls through to
+   * the system sans, which is why a bundled Arabic face sits in the stack ahead
+   * of the generic family — Arabic glyphs must resolve even on a machine with
+   * neither Verdana nor Arial.
+   */
+  --oryx-font-sans: Verdana, 'Segoe UI', 'Noto Sans Arabic', Arial, system-ui, -apple-system,
+    'Helvetica Neue', sans-serif;
+
+  /* The official brand colours. */
+  --brand-navy: #0f2b48;
+  --brand-gray: #64748b;
+  /* The primary action ramp. Navy is the ORYX primary, per the brand brief; the
+   * dark theme lifts it and adds a hairline edge so a navy button still reads
+   * against the deep-navy page. */
+  --primary: #0f2b48;
+  --primary-hover: #143a5e;
+  --primary-border: color-mix(in srgb, var(--brand-navy) 70%, #000000);
+  --on-primary: #ffffff;
+  /* Secondary controls and labels. */
+  --secondary: #64748b;
+  --secondary-hover: #556376;
 
   /* Dark theme (default) — matches the approved reference. */
   --bg: #00162b;
@@ -33,6 +60,42 @@
   --gold: #d4af37;
   --gold-soft: #e8c766;
   --gold-deep: #a9861f;
+  /*
+   * The metallic gold button ramp. It is separate from the accent tokens
+   * because a fill has different constraints from text: the fill must stay
+   * bright enough that dark ink reads on it, while `--gold` has to be dark
+   * enough to read as text on the page field.
+   */
+  --gold-fill-from: #e8c766;
+  --gold-fill-to: #d4af37;
+  --gold-fill-hover-from: #d4af37;
+  --gold-fill-hover-to: #a9861f;
+  --on-gold: #00121f;
+  /* Gold used as *text* on a gold-tinted chip. In the dark theme the plain
+   * accent already clears 4.5:1 on every chip, so this reproduces it. */
+  --gold-on-tint: #d4af37;
+  /*
+   * The gold-tint ramp. Rules take a step by name instead of writing their own
+   * `color-mix(in srgb, var(--gold) N%, transparent)`, so a chip, a badge and the
+   * nav markers cannot resolve to four different golds.
+   *
+   * The dark percentages are exactly the ones the admin rules already used
+   * (badge 15%/40%, collapsed nav 18%, nav gradient 20%), so the approved dark
+   * render is byte-identical. The light block below tunes the same names, which
+   * is the point of a ramp: the theme changes the steps, not the rules.
+   */
+  --tint-wash: color-mix(in srgb, var(--gold) 6%, transparent);
+  --tint-fill: color-mix(in srgb, var(--gold) 15%, transparent);
+  --tint-focus: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tint-glow: color-mix(in srgb, var(--gold) 20%, transparent);
+  --tint-active: color-mix(in srgb, var(--gold) 18%, transparent);
+  --tint-line: color-mix(in srgb, var(--gold) 26%, transparent);
+  --tint-badge-line: color-mix(in srgb, var(--gold) 40%, transparent);
+  --tint-ring: color-mix(in srgb, var(--gold) 40%, transparent);
+  --tint-panel: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+  /* A hovered table row: subtle on navy, and re-tuned on ivory where the same
+   * lift would disappear into the page. */
+  --row-hover: color-mix(in srgb, var(--surface-raised) 70%, transparent);
   --success: #3ecf8e;
   --warning: #f0b429;
   --danger: #f2555a;
@@ -44,38 +107,204 @@
     rgba(0, 18, 34, 0.94) 100%
   );
   --shadow-card: 0 18px 40px -24px rgba(0, 0, 0, 0.85);
+  --shadow-tile: 0 24px 48px -26px rgba(0, 0, 0, 0.9);
+  --shadow-modal: 0 40px 80px -40px rgba(0, 0, 0, 0.9);
+  /* The focus ring and the modal backdrop are semantic, not literal: the light
+   * theme needs a softer ring and a lighter scrim than a navy page does. */
+  --focus-ring: rgba(212, 175, 55, 0.18);
+  --backdrop: rgba(0, 10, 20, 0.66);
+  /* The shade a company brand colour is mixed toward to derive its pressed and
+   * hover states. It is a token rather than a literal so the branded shell has
+   * no colour value that a theme switch cannot reach. */
+  --brand-shade: #000000;
+  /*
+   * Ink and chrome for photo-backed surfaces (module tiles, the dashboard hero).
+   * These sit on a navy scrim in both themes, so the values are intentionally
+   * identical in both token blocks rather than tracking the page palette.
+   */
+  --on-media: #ffffff;
+  --on-media-muted: rgba(233, 240, 248, 0.82);
+  --on-media-accent: #e8c766;
+  --on-media-shadow: rgba(0, 0, 0, 0.7);
+  --on-media-shadow-soft: rgba(0, 0, 0, 0.75);
+  --media-chip-bg: rgba(0, 15, 30, 0.55);
+  --media-chip-border: rgba(212, 175, 55, 0.5);
+  /*
+   * The dashboard banner field. A navy gradient with a warm gold bloom, so the
+   * centred white/gold lockup sits on a deep ground in the dark theme and on a
+   * rich navy panel in the light one. Both values are opaque, so the banner
+   * never depends on a photograph and needs no scrim.
+   */
+  --hero-field: linear-gradient(135deg, #1b4670 0%, #0f2b48 46%, #00101f 100%);
+  --hero-bloom: radial-gradient(760px 320px at 50% -30%, rgba(212, 175, 55, 0.22), transparent 68%),
+    radial-gradient(520px 260px at 82% 118%, rgba(74, 168, 255, 0.14), transparent 70%);
+  --hero-border: rgba(212, 175, 55, 0.28);
+  /* Ambient wash behind the shell. */
+  --ambient-wash: radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.09), transparent 62%),
+    radial-gradient(900px 460px at 6% 4%, rgba(74, 168, 255, 0.06), transparent 58%);
+  /*
+   * The navigation rail. The brand brief asks for "navy navigation", so the
+   * rail is a navy surface in *both* themes rather than an ivory one on the
+   * light theme: the identity is a navy rail with a white/gold lockup, exactly
+   * as the approved dark reference renders it. The values are the official
+   * brand navy (#0f2b48) and its darker stop; the light theme deepens the field
+   * below so the rail separates from the ivory page.
+   */
+  --nav-bg: linear-gradient(180deg, #12314f 0%, #0f2b48 55%, #0a1f36 100%);
+  --nav-solid: #0f2b48;
+  --nav-border: rgba(212, 175, 55, 0.18);
+  --nav-text: #c9d6e4;
+  --nav-text-strong: #ffffff;
+  --nav-text-faint: #9db1c9;
+  --nav-hover: rgba(255, 255, 255, 0.07);
+  --nav-active: rgba(212, 175, 55, 0.22);
+  --nav-active-border: rgba(212, 175, 55, 0.55);
+  --nav-danger: #ff9d9d;
   --header-h: 68px;
   --sidebar-w: 268px;
+  /*
+   * One height for every form control, so a select in the header, a filter bar
+   * and a modal all line up. The topbar previously carried an inline
+   * `height: 34`, which made its selects 4px shorter than the rest of the app.
+   */
+  --control-h: 38px;
 }
 
+/*
+ * Light theme — elegant ivory field, white and warm-neutral surfaces, deep
+ * charcoal type and a restrained metallic gold.
+ *
+ * These are the same values the approved customer site renders, so the control
+ * plane and the customer platform read as one product rather than two palettes.
+ * The previous admin light theme was a cold blue-grey ramp (`#f5f6f8` field,
+ * `#0d2338` navy type) that fought the ivory/gold identity everywhere else.
+ *
+ * Every foreground/background pair here is measured by
+ * `.run/check-admin-light-palette.mjs`, which asserts the WCAG 2.1 ratio and
+ * fails the build when a future edit breaks contrast.
+ */
 :root[data-theme='light'] {
-  --bg: #f5f6f8;
-  --bg-deep: #eceef2;
+  --bg: #f7f4ed;
+  --bg-deep: #efeae0;
   --surface: #ffffff;
-  --surface-raised: #f0f2f6;
-  --surface-hover: #e8ecf2;
-  --border: rgba(0, 22, 43, 0.12);
-  --border-soft: rgba(0, 22, 43, 0.08);
-  --border-strong: rgba(169, 134, 31, 0.55);
-  --text: #0d2338;
-  --text-muted: #5b6b7d;
-  --text-faint: #8794a3;
-  --text-inverse: #ffffff;
+  --surface-raised: #fbf9f4;
+  --surface-hover: #f4f0e8;
+  --border: rgba(36, 31, 20, 0.14);
+  --border-soft: rgba(36, 31, 20, 0.09);
+  --border-strong: rgba(125, 95, 16, 0.5);
+  --text: #22201d;
+  --text-muted: #5a544b;
+  --text-faint: #6b6459;
+  /* Warm charcoal, not white: the primary button sits on a light gold ramp and
+   * white ink would fall to ~2:1 on its top stop. */
+  --text-inverse: #241f14;
   --navy: #00162b;
-  --gold: #b8912a;
-  --gold-soft: #d4af37;
-  --gold-deep: #8f6f18;
-  --success: #1f9d63;
-  --warning: #b7791f;
-  --danger: #c53030;
-  --info: #2b6cb0;
+  /* Accent gold dark enough to read as text on the deepest ivory (5:1). The
+   * hover step darkens rather than lightens, because a lighter gold loses
+   * contrast on a light surface. */
+  --gold: #7d5f10;
+  --gold-hover: #6f5510;
+  --gold-soft: #d9b447;
+  --gold-deep: #a9821c;
+  /* On the ivory page the navy primary is already high-contrast, so the ramp
+   * only needs a pressed step: navy deepens toward black rather than lightening. */
+  --primary: #0f2b48;
+  --primary-hover: #0a1f36;
+  --primary-border: #081a2c;
+  --on-primary: #ffffff;
+  --secondary: #64748b;
+  --secondary-hover: #4d5a6b;
+  /*
+   * The metallic gold fill ramp, mirroring the approved customer theme. Dark
+   * warm ink (`--on-gold`) reads on both stops; the accent `--gold` above is
+   * darker because it is used as text, not as a fill.
+   */
+  --gold-fill-from: #e0c168;
+  --gold-fill-to: #c9a227;
+  --gold-fill-hover-from: #d4af37;
+  --gold-fill-hover-to: #b8912a;
+  --on-gold: #241f14;
+  /* Gold used as *text* on a gold-tinted chip. A 12% chip lifts the surface
+   * enough that the plain accent dips toward the AA floor, so chips use this
+   * slightly deeper gold instead — the same value the customer theme uses. */
+  --gold-on-tint: #7a5c10;
+  /*
+   * The gold-tint ramp, one step lighter than the dark ramp so a chip reads as a
+   * warm tint on a white card rather than a saturated block. The light
+   * percentages match `LIGHT_THEME`, so the control plane and the customer
+   * platform cannot drift apart.
+   */
+  --tint-wash: color-mix(in srgb, var(--gold) 6%, transparent);
+  --tint-fill: color-mix(in srgb, var(--gold) 12%, transparent);
+  --tint-focus: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tint-glow: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tint-active: color-mix(in srgb, var(--gold) 14%, var(--surface-raised));
+  --tint-line: color-mix(in srgb, var(--gold) 26%, transparent);
+  --tint-badge-line: color-mix(in srgb, var(--gold) 34%, transparent);
+  --tint-ring: color-mix(in srgb, var(--gold) 40%, transparent);
+  --tint-panel: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+  /* A warm lift, so a hovered row separates from the ivory field. */
+  --row-hover: color-mix(in srgb, var(--surface-raised) 85%, transparent);
+  --success: #1a7f4f;
+  --warning: #8a5a06;
+  --danger: #b3261e;
+  --info: #1d5fa8;
+  /* Photo tiles keep white ink over a navy scrim in both themes, so this ramp
+   * is deliberately theme-independent. */
   --tile-overlay: linear-gradient(
     180deg,
     rgba(0, 12, 24, 0.1) 0%,
     rgba(0, 22, 43, 0.62) 55%,
     rgba(0, 22, 43, 0.9) 100%
   );
-  --shadow-card: 0 16px 36px -26px rgba(0, 22, 43, 0.45);
+  --shadow-card: 0 16px 36px -26px rgba(58, 48, 30, 0.28);
+  /* See the dark block: a warm charcoal reads as a shade on ivory, whereas
+   * pure black makes a branded button look dirty. */
+  --brand-shade: #241f14;
+  --shadow-tile: 0 24px 48px -26px rgba(58, 48, 30, 0.35);
+  --shadow-modal: 0 40px 80px -40px rgba(58, 48, 30, 0.4);
+  --focus-ring: color-mix(in srgb, var(--gold) 20%, transparent);
+  --backdrop: rgba(26, 22, 14, 0.5);
+  /* Photo surfaces keep the dark-theme ink: the scrim behind them is navy in
+   * both themes, so white type over artwork stays correct on ivory too. */
+  --on-media: #ffffff;
+  --on-media-muted: rgba(233, 240, 248, 0.82);
+  --on-media-accent: #e8c766;
+  --on-media-shadow: rgba(0, 0, 0, 0.7);
+  --on-media-shadow-soft: rgba(0, 0, 0, 0.75);
+  --media-chip-bg: rgba(0, 15, 30, 0.55);
+  --media-chip-border: rgba(212, 175, 55, 0.5);
+  /* The dashboard banner is a navy panel in the light theme too: the ORYX
+   * lockup's on-light colourway is navy/gold ink, which needs the darker
+   * "on-dark" colourway here, exactly as the sidebar does. The field is
+   * therefore identical in both themes, and the banner carries its own
+   * contrast instead of inheriting the ivory page. */
+  --hero-field: linear-gradient(135deg, #1b4670 0%, #0f2b48 46%, #00101f 100%);
+  --hero-bloom: radial-gradient(760px 320px at 50% -30%, rgba(212, 175, 55, 0.26), transparent 68%),
+    radial-gradient(520px 260px at 82% 118%, rgba(74, 168, 255, 0.12), transparent 70%);
+  --hero-border: rgba(212, 175, 55, 0.32);
+  /*
+   * Navy navigation in the light theme too. The rail is the one surface that
+   * stays navy on the ivory page: it carries the white/gold lockup and the gold
+   * active marker, which is the approved identity rather than a light-chrome
+   * sidebar. Deepened a step from the dark rail so it separates from the ivory
+   * field rather than blending toward it. Every ink pair is measured against
+   * `#0f2b48` and clears WCAG AA with room to spare.
+   */
+  --nav-bg: linear-gradient(180deg, #12314f 0%, #0f2b48 55%, #081a2c 100%);
+  --nav-solid: #0f2b48;
+  --nav-border: rgba(212, 175, 55, 0.22);
+  --nav-text: #c9d6e4;
+  --nav-text-strong: #ffffff;
+  --nav-text-faint: #9db1c9;
+  --nav-hover: rgba(255, 255, 255, 0.08);
+  --nav-active: rgba(232, 199, 102, 0.24);
+  --nav-active-border: rgba(232, 199, 102, 0.6);
+  --nav-danger: #ff9d9d;
+  /* A warm gold bloom rather than the dark theme's blue one, so the ivory field
+   * does not pick up a cold cast. */
+  --ambient-wash: radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.16), transparent 62%),
+    radial-gradient(900px 460px at 6% 4%, rgba(125, 95, 16, 0.05), transparent 58%);
 }
 
 * {
@@ -105,15 +334,7 @@ body::before {
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background:
-    radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.09), transparent 62%),
-    radial-gradient(900px 460px at 6% 4%, rgba(74, 168, 255, 0.06), transparent 58%);
-}
-
-:root[data-theme='light'] body::before {
-  background:
-    radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.16), transparent 62%),
-    radial-gradient(900px 460px at 6% 4%, rgba(0, 22, 43, 0.05), transparent 58%);
+  background: var(--ambient-wash);
 }
 
 /* ------------------------------------------------------------- primitives */
@@ -127,6 +348,202 @@ body::before {
 
 .oryx-card--flat {
   box-shadow: none;
+}
+
+/* ------------------------------------------------------------- point of sale */
+
+/* A POS workspace is wider than a form dialog: the grid and the cart share it. */
+.oryx-modal--full {
+  width: min(1180px, 100%);
+}
+
+/*
+ * The invoice/quotation form is laid out like the printed page it produces: a
+ * two-panel information band, a five-column item table and a right-aligned
+ * summary. It needs more room than a plain form so those blocks keep the
+ * proportions the document prints with.
+ */
+.oryx-modal--document {
+  width: min(1080px, 100%);
+}
+
+.oryx-doc-form__section {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-raised);
+}
+
+.oryx-doc-form__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+/* The mirror of the printed five-column table (Description, Quantity, Unit
+   Price, Taxes, Amount) plus the per-line discount input that feeds the printed
+   "Discount" totals row and a narrow row-action column. Description leads and
+   the numeric columns stay close to equal, exactly as the document lays them out. */
+.oryx-doc-form__grid {
+  display: grid;
+  grid-template-columns: 3.2fr 0.7fr 1fr 0.9fr 0.8fr 1fr 32px;
+  gap: 8px;
+  align-items: center;
+}
+
+.oryx-doc-form__grid--head {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  padding: 0 2px;
+}
+
+@media (max-width: 720px) {
+  .oryx-doc-form__grid,
+  .oryx-doc-form__grid--head {
+    grid-template-columns: 1fr;
+  }
+  .oryx-doc-form__grid--head {
+    display: none;
+  }
+}
+
+/*
+ * A product tile in the POS grid. The media box keeps a fixed aspect so a row
+ * of tiles lines up whether or not each product has a photograph, and the whole
+ * tile is the hit target so a mis-aimed tap still adds the product.
+ */
+.oryx-pos-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 0;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.oryx-pos-tile:hover:not(:disabled) {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-card);
+  transform: translateY(-1px);
+}
+
+.oryx-pos-tile:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.oryx-pos-tile__media {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 3;
+  width: 100%;
+  overflow: hidden;
+  background: var(--surface-raised);
+}
+
+.oryx-pos-tile__media img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+.oryx-pos-tile__badge {
+  position: absolute;
+  inset-block-start: 6px;
+  inset-inline-start: 6px;
+}
+
+.oryx-pos-tile__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px 10px;
+}
+
+.oryx-pos-tile__name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.oryx-pos-tile__price {
+  margin-block-start: 3px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-strong, var(--text));
+}
+
+/* The on-hand figure under the price, so a cashier reads availability at a glance. */
+.oryx-pos-tile__stock {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+/*
+ * A category chip above the POS grid. The active chip uses the accent fill so
+ * the current filter is unmistakable on a busy till screen.
+ */
+.oryx-chip {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.oryx-chip:hover {
+  border-color: var(--gold);
+}
+
+.oryx-chip--active {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, var(--gold-fill-from), var(--gold-fill-to));
+  color: var(--on-gold);
+}
+
+/*
+ * A payment-method button in the POS cart. Selecting one highlights it; the
+ * cashier taps a method rather than opening a dropdown mid-sale.
+ */
+.oryx-pay-method {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 6px 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.oryx-pay-method:hover {
+  border-color: var(--gold);
+}
+
+.oryx-pay-method--active {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, var(--gold-fill-from), var(--gold-fill-to));
+  color: var(--on-gold);
 }
 
 .oryx-panel-title {
@@ -188,14 +605,27 @@ body::before {
 }
 
 .oryx-btn--primary {
-  background: linear-gradient(180deg, var(--gold-soft), var(--gold));
-  border-color: var(--gold-deep);
-  color: var(--text-inverse);
+  background: var(--primary);
+  border-color: var(--primary-border);
+  color: var(--on-primary);
 }
 
 .oryx-btn--primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, var(--gold), var(--gold-deep));
-  border-color: var(--gold-deep);
+  background: var(--primary-hover);
+  border-color: var(--primary-border);
+}
+
+/* The secondary action: a gray control, distinct from the navy primary and the
+ * transparent ghost. */
+.oryx-btn--secondary {
+  background: var(--secondary);
+  border-color: var(--secondary-hover);
+  color: #fff;
+}
+
+.oryx-btn--secondary:hover:not(:disabled) {
+  background: var(--secondary-hover);
+  border-color: var(--secondary-hover);
 }
 
 .oryx-btn--ghost {
@@ -209,7 +639,7 @@ body::before {
 }
 
 .oryx-btn--danger {
-  border-color: rgba(242, 85, 90, 0.5);
+  border-color: color-mix(in srgb, var(--danger) 50%, transparent);
   color: var(--danger);
 }
 
@@ -233,7 +663,7 @@ body::before {
 .oryx-select,
 .oryx-textarea {
   width: 100%;
-  min-height: 38px;
+  min-height: var(--control-h);
   padding: 8px 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
@@ -248,12 +678,24 @@ body::before {
   resize: vertical;
 }
 
+/*
+ * The dropdown panel for `SearchableSelect`. It floats over the field, so it
+ * needs its own raised surface and shadow; `--surface-raised` already flips with
+ * the theme, which keeps the panel legible in both light and dark.
+ */
+.oryx-popover {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.55);
+}
+
 .oryx-input:focus,
 .oryx-select:focus,
 .oryx-textarea:focus {
   outline: none;
   border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .oryx-input::placeholder,
@@ -307,9 +749,9 @@ body::before {
 }
 
 .oryx-badge--gold {
-  color: var(--gold);
-  background: color-mix(in srgb, var(--gold) 15%, transparent);
-  border-color: color-mix(in srgb, var(--gold) 40%, transparent);
+  color: var(--gold-on-tint);
+  background: var(--tint-fill);
+  border-color: var(--tint-badge-line);
 }
 
 .oryx-badge--neutral {
@@ -320,17 +762,37 @@ body::before {
 
 /* ------------------------------------------------------------------ tables */
 
-.oryx-table {
+/* Horizontal scroll container for every data table. `overscroll-behavior-x`
+ * stops a sideways swipe from triggering browser back/forward navigation on a
+ * touch device, and the focus ring makes the pan area reachable by keyboard. */
+.oryx-table-scroll {
   width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.oryx-table-scroll:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+}
+
+.oryx-table {
+  /* A table must not be squeezed to fit its card: squeezing is what clipped the
+   * rightmost columns at narrow widths. `max-content` lets it take the width its
+   * columns need and `min-width: 100%` keeps a narrow table filling the card;
+   * the scroll container above pans anything wider. */
+  width: max-content;
+  min-width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 13.5px;
+  font-size: 13px;
 }
 
 .oryx-table thead th {
   text-align: start;
-  padding: 11px 14px;
-  font-size: 11.5px;
+  padding: 7px 12px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -340,13 +802,13 @@ body::before {
 }
 
 .oryx-table tbody td {
-  padding: 12px 14px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border-soft);
   vertical-align: middle;
 }
 
 .oryx-table tbody tr:hover {
-  background: color-mix(in srgb, var(--surface-raised) 70%, transparent);
+  background: var(--row-hover);
 }
 
 /* ------------------------------------------------------------------- tiles */
@@ -359,11 +821,11 @@ body::before {
   position: relative;
   display: block;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: 14px;
   border: 1px solid var(--border);
-  min-height: 178px;
+  min-height: 142px;
   text-decoration: none;
-  color: #fff;
+  color: var(--on-media);
   isolation: isolate;
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
@@ -371,7 +833,7 @@ body::before {
 .oryx-tile:hover {
   transform: translateY(-3px);
   border-color: var(--border-strong);
-  box-shadow: 0 24px 48px -26px rgba(0, 0, 0, 0.9);
+  box-shadow: var(--shadow-tile);
 }
 
 .oryx-tile__media {
@@ -394,21 +856,21 @@ body::before {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: 6px;
-  min-height: 178px;
-  padding: 17px;
+  gap: 5px;
+  min-height: 142px;
+  padding: 13px;
 }
 
 .oryx-tile__icon {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 32px;
   margin-bottom: auto;
-  border-radius: 11px;
-  background: rgba(0, 15, 30, 0.55);
-  border: 1px solid rgba(212, 175, 55, 0.5);
-  color: var(--gold-soft);
+  border-radius: 9px;
+  background: var(--media-chip-bg);
+  border: 1px solid var(--media-chip-border);
+  color: var(--on-media-accent);
   backdrop-filter: blur(3px);
 }
 
@@ -416,14 +878,14 @@ body::before {
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.01em;
-  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
+  text-shadow: 0 1px 12px var(--on-media-shadow);
 }
 
 .oryx-tile__desc {
   font-size: 12.5px;
-  color: rgba(233, 240, 248, 0.82);
+  color: var(--on-media-muted);
   line-height: 1.5;
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.75);
+  text-shadow: 0 1px 10px var(--on-media-shadow-soft);
 }
 
 .oryx-tile--planned .oryx-tile__media {
@@ -495,8 +957,9 @@ body::before {
 
 .oryx-sidebar {
   grid-area: sidebar;
-  background: color-mix(in srgb, var(--bg-deep) 92%, transparent);
-  border-inline-end: 1px solid var(--border);
+  background: var(--nav-bg);
+  border-inline-end: 1px solid var(--nav-border);
+  color: var(--nav-text);
   padding: 16px 12px 28px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -527,7 +990,7 @@ body::before {
   gap: 8px;
   margin-bottom: 8px;
   padding: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--nav-border);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -563,7 +1026,7 @@ body::before {
 
 /* The active marker stays visible in the collapsed rail via the icon colour. */
 .oryx-shell[data-nav='collapsed'] .oryx-nav-item[aria-current='page'] {
-  background: color-mix(in srgb, var(--gold) 18%, transparent);
+  background: var(--nav-active);
 }
 
 /* Sign-out sits at the bottom of the rail. `margin-top: auto` pushes it down
@@ -576,23 +1039,23 @@ body::before {
 .oryx-sidebar__footer {
   margin-top: auto;
   padding-top: 12px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--nav-border);
   position: sticky;
   bottom: 0;
   /* Opaque, so nav items scrolling underneath cannot bleed through. */
-  background: color-mix(in srgb, var(--bg-deep) 96%, transparent);
+  background: var(--nav-solid);
 }
 
 .oryx-nav-item--logout {
   width: 100%;
   cursor: pointer;
   background: none;
-  color: var(--danger, #e5484d);
+  color: var(--nav-danger);
 }
 
 .oryx-nav-item--logout:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger, #e5484d) 14%, transparent);
-  color: var(--danger, #e5484d);
+  background: color-mix(in srgb, var(--nav-danger) 16%, transparent);
+  color: var(--nav-danger);
 }
 
 .oryx-nav-item--logout:disabled {
@@ -607,7 +1070,7 @@ body::before {
 
 .oryx-main {
   grid-area: main;
-  padding: 22px;
+  padding: 18px;
   min-width: 0;
 }
 
@@ -617,7 +1080,7 @@ body::before {
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text-faint);
+  color: var(--nav-text-faint);
 }
 
 .oryx-nav-item {
@@ -627,7 +1090,7 @@ body::before {
   padding: 9px 12px;
   margin-bottom: 2px;
   border-radius: 10px;
-  color: var(--text-muted);
+  color: var(--nav-text);
   text-decoration: none;
   font-size: 13.5px;
   font-weight: 600;
@@ -636,18 +1099,20 @@ body::before {
 }
 
 .oryx-nav-item:hover {
-  background: var(--surface-raised);
-  color: var(--text);
+  background: var(--nav-hover);
+  color: var(--nav-text-strong);
 }
 
+/* The active item is marked by a gold wash that fades out, so the marker reads
+ * on the navy rail without painting an opaque block. */
 .oryx-nav-item[aria-current='page'] {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 20%, transparent), transparent);
-  color: var(--text);
-  border-color: var(--border-strong);
+  background: linear-gradient(90deg, var(--nav-active), transparent);
+  color: var(--nav-text-strong);
+  border-color: var(--nav-active-border);
 }
 
 :root[data-dir='rtl'] .oryx-nav-item[aria-current='page'] {
-  background: linear-gradient(270deg, color-mix(in srgb, var(--gold) 20%, transparent), transparent);
+  background: linear-gradient(270deg, var(--nav-active), transparent);
 }
 
 .oryx-nav-item__dot {
@@ -664,7 +1129,7 @@ body::before {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(0, 10, 20, 0.66);
+  background: var(--backdrop);
   backdrop-filter: blur(3px);
   display: grid;
   place-items: center;
@@ -678,7 +1143,27 @@ body::before {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 18px;
-  box-shadow: 0 40px 80px -40px rgba(0, 0, 0, 0.9);
+  box-shadow: var(--shadow-modal);
+}
+
+/*
+ * A document preview needs the full width and height of the viewport: an A4
+ * page rendered into a 720px modal is illegible, and the point of a preview is
+ * to read the page before printing it. The frame holds the browser's own PDF
+ * viewer, so it inherits that viewer's toolbar and zoom.
+ */
+.oryx-doc-preview {
+  display: block;
+  width: 100%;
+  height: min(72vh, 900px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-raised);
+}
+
+/* A modal that holds a document preview widens to suit the page. */
+.oryx-modal:has(.oryx-doc-preview) {
+  width: min(1100px, 100%);
 }
 
 /* ----------------------------------------------------------- brand lockup */
@@ -719,10 +1204,671 @@ body::before {
   display: block;
 }
 
+/*
+ * The dashboard banner keeps its navy field in both themes, so it always uses
+ * the on-dark colourway. The theme rules above are deliberately overridden here
+ * rather than in the banner's own block, so the exception is visible next to
+ * the rule it defeats.
+ */
+:root[data-theme='light'] .oryx-hero .oryx-brand-logo__on-dark {
+  display: block;
+}
+
+:root[data-theme='light'] .oryx-hero .oryx-brand-logo__on-light {
+  display: none;
+}
+
+/*
+ * The navigation rail is navy in both themes (see the `--nav-*` tokens), so its
+ * lockup always uses the on-dark colourway too. Without this the light theme
+ * would swap in the navy-ink lockup and print a dark mark on a dark rail.
+ */
+:root[data-theme='light'] .oryx-sidebar .oryx-brand-logo__on-dark {
+  display: block;
+}
+
+:root[data-theme='light'] .oryx-sidebar .oryx-brand-logo__on-light {
+  display: none;
+}
+
+/* A tenant-uploaded logo is centred in the lockup slot; the packaged ORYX
+ * lockup is anchored to the reading edge instead. */
+.oryx-brand-logo--custom img {
+  object-position: center;
+}
+
+/*
+ * Tenant brand colours.
+ *
+ * Nothing here applies unless `BrandingProvider` has put real, validated colours
+ * on the shell, so a platform principal and a company with no stored branding
+ * render the approved palette byte for byte. The overrides are scoped to the
+ * shell rather than `:root` so switching tenant cannot leak a colour onto a
+ * screen that is showing the platform's own identity.
+ */
+.oryx-shell[data-branded='true'] .oryx-btn--primary {
+  background: var(--brand-primary);
+  border-color: color-mix(in srgb, var(--brand-primary) 78%, var(--brand-shade));
+  color: var(--brand-primary-foreground);
+}
+
+.oryx-shell[data-branded='true'] .oryx-btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brand-primary) 86%, var(--brand-shade));
+}
+
+.oryx-shell[data-branded='true'] .oryx-nav-item[aria-current='page'] {
+  background: color-mix(in srgb, var(--brand-primary) 16%, transparent);
+}
+
+/* A colour swatch in the branding editor, showing the value before it is saved. */
+.oryx-brand-preview {
+  display: inline-block;
+  height: 24px;
+  width: 24px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
 /* -------------------------------------------------------------------- misc */
 
-.oryx-kpi-value {
+/* ---------------------------------------------------------------- stat tiles
+ *
+ * One tile, one density. The label is small and uppercased, the value is the
+ * only large type, and the optional caption is a single faint line. The tile
+ * has a fixed compact height so a row of eight KPIs reads as one band rather
+ * than eight tall panels; the value never wraps and never changes the height.
+ */
+.oryx-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 46px;
+  padding: 6px 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  min-width: 0;
+}
+
+.oryx-stat-card__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  color: var(--gold);
+}
+
+.oryx-stat-card--gold .oryx-stat-card__icon {
+  color: var(--gold-soft);
+}
+
+.oryx-stat-card--success .oryx-stat-card__icon {
+  color: var(--success);
+}
+
+.oryx-stat-card--danger .oryx-stat-card__icon {
+  color: var(--danger);
+}
+
+.oryx-stat-card__body {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+/* The label sits above the value. At the compact card width a long label such
+ * as "Monthly recurring revenue" cannot fit on one line, and an ellipsis would
+ * silently hide the metric name, so it wraps to at most two lines instead. */
+.oryx-stat-card__label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  color: var(--text-muted);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.oryx-stat-card__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.oryx-stat-card--gold .oryx-stat-card__value {
+  color: var(--gold-soft);
+}
+
+.oryx-stat-card--success .oryx-stat-card__value {
+  color: var(--success);
+}
+
+.oryx-stat-card--danger .oryx-stat-card__value {
+  color: var(--danger);
+}
+
+.oryx-stat-card__sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-faint);
+  font-size: 10.5px;
+}
+
+/* KPI band.
+ *
+ * The tracks are sized, not stretched. `repeat(auto-fill, minmax(190px, 192px))`
+ * packs as many columns as fit and then caps each one at `--stat-card-max`, so a
+ * card holds a compact, constant 192px instead of inflating to a quarter of the
+ * dashboard. `justify-content: start` is what makes the cap visible: without it
+ * the leftover space is redistributed and the cards grow again — the defect this
+ * replaces, where a four-column `1fr` grid produced 278px cards at 1440 and
+ * 398px at 1920.
+ *
+ * `auto-fill` (not `auto-fit`) also means a short grid — the three-card report
+ * rows — keeps its card width and leaves the remaining tracks empty rather than
+ * stretching three cards across the panel.
+ *
+ * `grid-auto-rows: 1fr` makes a wrapped second row the same height as the
+ * first, so an odd card count (seven, five) does not leave a shorter trailing
+ * row under an even one.
+ */
+.oryx-stat-grid {
+  --stat-card-min: 190px;
+  --stat-card-max: 192px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--stat-card-min), var(--stat-card-max)));
+  grid-auto-rows: 1fr;
+  justify-content: start;
+  gap: 10px;
+}
+
+/* ================================================= inspection workspace (P2)
+ * The interactive inspection screens. The diagrams are drawn with SVG and
+ * positioned markers in normalised percentages, so the same markup works at any
+ * size and a marker lands on the same panel on a phone and a tablet. Colours
+ * come from the palette tokens, so the dark and light themes both work without
+ * a second set of rules.
+ */
+
+/* ------------------------------------------------------------ the rail */
+.oryx-rail-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.oryx-rail-item:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.oryx-rail-item.is-active {
+  border-color: var(--border-strong);
+  background: var(--tint-fill);
+  color: var(--gold-on-tint);
+}
+
+.oryx-rail-item.is-complete {
+  border-color: color-mix(in srgb, var(--success) 45%, transparent);
+}
+
+.oryx-rail-item__dot {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--border-soft);
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-inverse);
+}
+
+.oryx-rail-item.is-complete .oryx-rail-item__dot {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.oryx-rail-item__count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+/* ------------------------------------------------------- the checklist */
+.oryx-checklist {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.oryx-checklist__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.oryx-checklist__row:last-child {
+  border-bottom: 0;
+}
+
+.oryx-checklist__row:nth-child(even) {
+  background: var(--tint-wash);
+}
+
+.oryx-checklist__label {
+  font-size: 13px;
+  min-width: 0;
+}
+
+/* A failed item is visible at a glance while scrolling a long checklist. */
+.oryx-checklist__row[data-result='FAIL'] {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.oryx-result-btn {
+  min-width: 58px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.oryx-result-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.oryx-result-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.oryx-result-btn--pass.is-active {
+  background: color-mix(in srgb, var(--success) 22%, transparent);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.oryx-result-btn--fail.is-active {
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.oryx-result-btn--na.is-active {
+  background: var(--tint-fill);
+  border-color: var(--border-strong);
+  color: var(--gold-on-tint);
+}
+
+/* -------------------------------------------------------- the diagrams */
+.oryx-diagram {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.oryx-diagram__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Pushes the undo/redo/clear group to the trailing edge of the toolbar. */
+.oryx-diagram__spacer {
+  flex: 1 1 auto;
+}
+
+.oryx-paint-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.oryx-paint-tool:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.oryx-paint-tool.is-active {
+  border-color: var(--border-strong);
+  background: var(--tint-fill);
+  color: var(--gold-on-tint);
+}
+
+.oryx-paint-tool__dot {
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.oryx-paint-tool__label-rtl {
+  opacity: 0.6;
+  font-weight: 500;
+}
+
+/* The canvas is the positioned ancestor for every marker. `touch-action: none`
+ * stops the browser scrolling the page while a marker is dragged. */
+.oryx-diagram__canvas {
+  position: relative;
+  width: 100%;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.oryx-diagram__canvas--body {
+  aspect-ratio: 1000 / 420;
+}
+
+.oryx-diagram__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.oryx-diagram__body {
+  fill: color-mix(in srgb, var(--text) 8%, transparent);
+  stroke: var(--border-strong);
+  stroke-width: 3;
+}
+
+.oryx-diagram__glass {
+  fill: color-mix(in srgb, var(--info) 22%, transparent);
+  stroke: var(--border-soft);
+  stroke-width: 2;
+}
+
+.oryx-diagram__panel {
+  stroke: var(--border-soft);
+  stroke-width: 2;
+  fill: none;
+}
+
+/* A panel seam and a chassis rail read as the same technical line. */
+.oryx-diagram__seam {
+  stroke: color-mix(in srgb, var(--text) 30%, transparent);
+  stroke-width: 2;
+  fill: none;
+}
+
+.oryx-diagram__wheel {
+  fill: color-mix(in srgb, var(--text-inverse) 60%, transparent);
+  stroke: var(--border-soft);
+  stroke-width: 2;
+}
+
+.oryx-diagram__rim {
+  fill: color-mix(in srgb, var(--text) 22%, transparent);
+}
+
+.oryx-diagram__marker {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: grab;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+.oryx-diagram__marker.is-selected {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  z-index: 2;
+}
+
+.oryx-diagram__marker:active {
+  cursor: grabbing;
+}
+
+.oryx-diagram__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.oryx-diagram__selected {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---------------------------------------------------- the chassis view */
+.oryx-chassis {
+  position: relative;
+  width: 100%;
+  max-width: 340px;
+  margin: 0 auto;
+  aspect-ratio: 420 / 720;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  padding: 6px;
+}
+
+.oryx-chassis__outline {
+  fill: color-mix(in srgb, var(--text) 7%, transparent);
+  stroke: var(--border-strong);
+  stroke-width: 3;
+}
+
+/* A chassis zone is filled by its condition; the marker colours are fixed
+ * technical indicators, so they do not follow the theme. */
+.oryx-chassis-zone path {
+  stroke: var(--border-soft);
+  stroke-width: 1.5;
+  transition: fill 0.12s ease;
+}
+
+.oryx-chassis-zone:hover path {
+  stroke: var(--border-strong);
+}
+
+.oryx-chassis-zone__num {
   font-size: 26px;
+  font-weight: 800;
+  fill: color-mix(in srgb, var(--text) 55%, transparent);
+  text-anchor: middle;
+  dominant-baseline: middle;
+  pointer-events: none;
+  user-select: none;
+}
+
+.oryx-chassis-zone.is-ok .oryx-chassis-zone__num,
+.oryx-chassis-zone.is-damage .oryx-chassis-zone__num {
+  fill: #fff;
+}
+
+.oryx-chassis-zone:focus-visible {
+  outline: none;
+}
+
+.oryx-chassis-zone:focus-visible path {
+  stroke: var(--gold);
+  stroke-width: 3;
+}
+
+/* The accessible control list mirrors the diagram, so a region can be set with
+ * the keyboard and read by a screen reader. */
+.oryx-chassis-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.oryx-chassis-list__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 12.5px;
+}
+
+.oryx-chassis-list__row:last-child {
+  border-bottom: 0;
+}
+
+.oryx-chassis-list__name {
+  min-width: 0;
+}
+
+/* ------------------------------------------- inspection type picker */
+.oryx-job-type {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.oryx-job-type:hover {
+  background: var(--surface-hover);
+}
+
+.oryx-job-type.is-selected {
+  border-color: var(--border-strong);
+  background: var(--tint-fill);
+}
+
+.oryx-job-type input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+/* ----------------------------------------------------- diagnostics */
+.oryx-diagnostic-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--tint-wash);
+}
+
+/* ---------------------------------------------------- attachments */
+.oryx-attachment {
+  position: relative;
+  aspect-ratio: 1;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-raised);
+}
+
+.oryx-attachment__thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.oryx-attachment__file {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--text-faint);
+}
+
+.oryx-attachment__remove {
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 4px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  cursor: pointer;
+}
+
+/* Below 480px there is no room for a 190px floor, so the band becomes an
+ * explicit two-column split. Above it `auto-fill` is left to decide, which
+ * keeps the card at its compact width instead of stretching two columns across
+ * a 640px tablet. */
+@media (max-width: 479px) {
+  .oryx-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+}
+
+/* Legacy KPI classes are kept so a screen that has not been migrated still
+ * renders; they now match the tile above instead of the old 22px value. */
+.oryx-kpi-value {
+  font-size: 17px;
   font-weight: 800;
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
@@ -736,35 +1882,67 @@ body::before {
   white-space: nowrap;
 }
 
+/*
+ * The dashboard banner.
+ *
+ * The owner's brief is explicit: no vehicle image, the ORYX mark centred, and a
+ * background that reads correctly in both themes. The banner is therefore a
+ * pure CSS composition — a navy field with a soft gold bloom — rather than a
+ * raster. Nothing here depends on a photograph, so there is no asset to fall
+ * back to and no crop to keep aligned with the copy.
+ */
 .oryx-hero {
   position: relative;
   overflow: hidden;
   border-radius: 18px;
-  border: 1px solid var(--border);
-  min-height: 268px;
+  border: 1px solid var(--hero-border);
+  min-height: 224px;
   display: flex;
-  align-items: flex-end;
-  color: #fff;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--on-media);
+  background: var(--hero-field);
   isolation: isolate;
 }
 
-/* Banner copy sits over the darker left half of the artwork in LTR, and over
- * the mirrored right half in RTL, so the car is never hidden by text. */
+/* A faint gold sweep behind the lockup, drawn with a pseudo-element so the
+ * banner needs no image request and no scrim layer. */
+.oryx-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--hero-bloom);
+  pointer-events: none;
+}
+
 .oryx-hero__content {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  align-items: center;
+  gap: 10px;
   width: 100%;
-  padding: 26px;
+  max-width: 720px;
+  padding: 30px 26px;
 }
 
 .oryx-hero__logo {
-  align-self: flex-start;
+  align-self: center;
+  margin-bottom: 6px;
 }
 
-:root[data-dir='rtl'] .oryx-hero__logo {
-  align-self: flex-start;
+.oryx-hero__title {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.oryx-hero__body {
+  max-width: 56ch;
+  font-size: 13.5px;
+  color: var(--on-media-muted);
 }
 
 .oryx-hero__eyebrow {
@@ -772,49 +1950,7 @@ body::before {
   font-weight: 800;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--gold-soft);
-}
-
-.oryx-hero__media {
-  position: absolute;
-  inset: 0;
-  z-index: -2;
-  background-size: cover;
-  background-position: center;
-}
-
-/* The artwork carries its own light falloff on the copy side (left). In RTL the
- * copy moves to the right, so the whole image is mirrored rather than shifted:
- * shifting would crop the car away at handset widths, mirroring keeps the
- * composition intact and puts the darker half behind the text. */
-:root[data-dir='rtl'] .oryx-hero__media {
-  transform: scaleX(-1);
-}
-
-/* The artwork carries its own light falloff on the copy side, so this scrim is
- * deliberately light: it only needs to guarantee contrast for the headline and
- * must not bury the vehicle. Keep the car side almost clear. */
-.oryx-hero__scrim {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: linear-gradient(
-    100deg,
-    rgba(0, 15, 30, 0.62) 0%,
-    rgba(0, 18, 34, 0.34) 34%,
-    rgba(0, 22, 43, 0.08) 62%,
-    rgba(0, 22, 43, 0) 100%
-  );
-}
-
-:root[data-dir='rtl'] .oryx-hero__scrim {
-  background: linear-gradient(
-    260deg,
-    rgba(0, 15, 30, 0.62) 0%,
-    rgba(0, 18, 34, 0.34) 34%,
-    rgba(0, 22, 43, 0.08) 62%,
-    rgba(0, 22, 43, 0) 100%
-  );
+  color: var(--on-media-accent);
 }
 
 .oryx-focus-ring:focus-visible {
@@ -831,6 +1967,13 @@ body::before {
 }
 
 @media (max-width: 860px) {
+  /* The context selector wraps to two rows once the rail collapses, so the
+   * 68px desktop header would clip it. Grow the row here; the shell's grid
+   * track and the drawer's offset both read this token, so they follow. */
+  :root {
+    --header-h: 92px;
+  }
+
   .oryx-shell,
   :root[data-dir='rtl'] .oryx-shell {
     grid-template-columns: 1fr;
@@ -900,6 +2043,19 @@ body::before {
 
   .oryx-kpi-label {
     display: block;
+  }
+
+  /* A stat tile keeps its fixed height at 320px, so the label must be allowed to
+   * wrap onto a second line rather than overflow the tile. */
+  .oryx-stat-card {
+    align-items: flex-start;
+  }
+
+  .oryx-stat-card__label,
+  .oryx-stat-card__value,
+  .oryx-stat-card__sub {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   /* A long action label ("Enable two-factor authentication") cannot fit a

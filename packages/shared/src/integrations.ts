@@ -224,6 +224,52 @@ export const INTEGRATION_PROVIDERS: readonly IntegrationProviderDefinition[] = [
     activationRequirementEn: 'None — messages are stored and read back from the database.',
     activationRequirementAr: 'لا شيء — تُخزَّن الرسائل وتُقرأ من قاعدة البيانات.',
   },
+  {
+    key: 'SENSAGE_AI',
+    nameEn: 'SENSAGE AI vision',
+    nameAr: 'رؤية SENSAGE الذكية',
+    category: 'ANALYTICS',
+    descriptionEn:
+      'Photograph analysis for the SENSAGE inspection feature. Results are suggestions that a human reviews; they are never presented as a diagnosis.',
+    descriptionAr:
+      'تحليل الصور لميزة الفحص SENSAGE. النتائج اقتراحات يراجعها إنسان، ولا تُعرض أبداً كتشخيص.',
+    implementation: 'ADAPTER_ONLY',
+    configurable: true,
+    perCompany: true,
+    credentials: [
+      C('SENSAGE_AI_API_KEY', 'API key', 'مفتاح الواجهة', true),
+      C('SENSAGE_AI_BASE_URL', 'API base URL', 'عنوان الواجهة', false, false),
+      C('SENSAGE_AI_MODEL', 'Model name', 'اسم النموذج', false, false),
+    ],
+    activationRequirementEn:
+      'A vision-model API key from the chosen vendor and one verified analysis call. Until then the feature reports itself unconfigured and produces no result.',
+    activationRequirementAr:
+      'مفتاح واجهة لنموذج رؤية من المزود المختار، ونداء تحليل موثق واحد. قبل ذلك تُبلّغ الميزة عن نفسها كغير مهيّأة ولا تنتج نتيجة.',
+    docsUrl: 'https://platform.openai.com/docs/guides/vision',
+  },
+  {
+    key: 'REGISTRATION_OCR',
+    nameEn: 'Registration-card OCR',
+    nameAr: 'التعرف الضوئي على بطاقة التسجيل',
+    category: 'ANALYTICS',
+    descriptionEn:
+      'Reads a vehicle registration card or insurance paper and suggests its fields for an operator to review. A suggestion is never saved as a document without a human confirming it.',
+    descriptionAr:
+      'يقرأ بطاقة تسجيل المركبة أو وثيقة التأمين ويقترح حقولها ليراجعها الموظف. لا يُحفظ أي اقتراح كمستند دون تأكيد بشري.',
+    implementation: 'ADAPTER_ONLY',
+    configurable: true,
+    perCompany: true,
+    credentials: [
+      C('OCR_API_KEY', 'API key', 'مفتاح الواجهة', true),
+      C('OCR_BASE_URL', 'API base URL', 'عنوان الواجهة', false, false),
+      C('OCR_MODEL', 'Model name', 'اسم النموذج', false, false),
+    ],
+    activationRequirementEn:
+      'An OCR vendor API key and one verified extraction call. Until then the capture path stores the scan for manual entry and reports the feature as unconfigured.',
+    activationRequirementAr:
+      'مفتاح واجهة لمزود التعرف الضوئي ونداء استخراج موثق واحد. قبل ذلك يحفظ مسار الالتقاط الصورة للإدخال اليدوي ويُبلّغ عن الميزة كغير مهيّأة.',
+    docsUrl: 'https://platform.openai.com/docs/guides/vision',
+  },
 ];
 
 export const INTEGRATION_PROVIDER_BY_KEY: ReadonlyMap<string, IntegrationProviderDefinition> =

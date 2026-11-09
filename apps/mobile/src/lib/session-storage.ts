@@ -37,17 +37,3 @@ export async function deleteSecret(key: string): Promise<void> {
   await SecureStore.deleteItemAsync(key);
 }
 
-/**
- * Read the readable CSRF cookie the API sets alongside the customer session.
- *
- * A native build has no ambient cookie, so this returns `null` and the request
- * is unchanged. In a browser the API's `CsrfGuard` rejects an unsafe request
- * that presents the refresh cookie without a matching `x-oryx-csrf` header, and
- * the web export shares an origin with the customer website — so echoing the
- * cookie keeps the preview usable. Native builds never reach this branch.
- */
-export function readCsrfToken(): string | null {
-  if (!isWeb()) return null;
-  const match = globalThis.document?.cookie?.match(/(?:^|;\s*)oryx_ccsrf=([^;]+)/);
-  return match?.[1] ? decodeURIComponent(match[1]) : null;
-}

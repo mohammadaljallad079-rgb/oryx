@@ -25,7 +25,7 @@ export function PlannedModulePage({ moduleKey }: { moduleKey: string }) {
   const licensed = hasModule(moduleKey);
 
   return (
-    <div className="flex flex-col gap-5" data-testid={`planned-${moduleKey}`}>
+    <div className="flex flex-col gap-4" data-testid={`planned-${moduleKey}`}>
       <SectionHeader
         title={locale === 'ar' ? definition.nameAr : definition.nameEn}
         subtitle={locale === 'ar' ? definition.descriptionAr : definition.descriptionEn}

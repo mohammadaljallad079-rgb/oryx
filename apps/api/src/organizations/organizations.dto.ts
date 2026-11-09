@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -110,6 +111,40 @@ export class UpdateCompanyDto {
   @IsString()
   @MaxLength(3)
   currency?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(3)
+  functionalCurrency?: string;
+
+  /**
+   * Default tax rate in basis points (1500 = 15%). Bounded to 0–10000 so a
+   * mistyped percentage cannot be stored as 150000 basis points.
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(10000)
+  defaultTaxRateBp?: number;
+
+  /**
+   * Optional whole-amount cash rounding for issued documents. `NONE` keeps the
+   * exact total; the other modes snap it to the nearest whole or half unit and
+   * post the small difference to the rounding account.
+   */
+  @IsOptional()
+  @IsIn(['NONE', 'NEAREST_WHOLE', 'NEAREST_HALF'])
+  roundingMode?: 'NONE' | 'NEAREST_WHOLE' | 'NEAREST_HALF';
+
+  /**
+   * The language an issued document is written in, which sets its reading
+   * direction: `ar` prints right-to-left, `en` left-to-right. Both languages'
+   * labels are always printed; this only chooses the flow.
+   */
+  @IsOptional()
+  @IsIn(['ar', 'en'])
+  documentLocale?: 'ar' | 'en';
 
   @IsOptional()
   @IsString()

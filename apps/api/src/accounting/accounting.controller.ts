@@ -15,6 +15,7 @@ import {
   CreateJournalDto,
   LedgerQueryDto,
   ListQueryDto,
+  NextAccountCodeQueryDto,
   RecordPaymentDto,
   ReverseJournalDto,
   SetPeriodStatusDto,
@@ -52,6 +53,13 @@ export class AccountingController {
     return this.accounting.createAccount(dto, p, actorFrom(p, req));
   }
 
+  @Get('accounts/next-code')
+  @RequireAnyPermission('erp.accounting.read', 'erp.accounting.coa.manage')
+  @ApiOperation({ summary: 'Suggest the next account code for a type' })
+  nextAccountCode(@Query() query: NextAccountCodeQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.accounting.nextAccountCode(query.type, query.parentId, p);
+  }
+
   @Patch('accounts/:id')
   @RequirePermissions('erp.accounting.coa.manage')
   @ApiOperation({ summary: 'Update an account' })
@@ -69,7 +77,8 @@ export class AccountingController {
   @ApiOperation({ summary: 'Seed the standard chart of accounts when empty' })
   async seedChart(@CurrentPrincipal() p: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(p);
-    return this.accounting.seedStandardChart(companyId, 'SAR', p.userId);
+    const currency = await this.context.companyCurrency(companyId);
+    return this.accounting.seedStandardChart(companyId, currency, p.userId);
   }
 
   // ------------------------------------------------------------ fiscal years

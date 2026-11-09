@@ -1,0 +1,2098 @@
+# Execution 10 — mobile integration: authentication, bookings, merchant, media
+
+**Baseline:** `5c9c1f9` · **Branch:** `feature/execution-07-premium-web` · PR #7 **Draft**
+**Database:** PostgreSQL 17, additive migrations only, no destructive change
+
+---
+
+## 1. Scope
+
+Execution 10 connects the ORYX customer mobile application to the backend that
+already exists. No new backend framework, no second ledger, no second media
+store, no second provider API.
+
+1. Real customer authentication, session restoration and refresh.
+2. Live customer bookings, including a confirm step that was missing.
+3. Merchant/provider screens against the real portal.
+4. Product image upload and management.
+5. SENSAGE inspection image upload.
+6. Preserving the approved visual identity.
+7. Tests and evidence.
+
+This revision records the work completed after the first report draft: the
+vehicle-garage write path, the booking-engine seed gap, the demo-gating audit and
+its regression test, and the focus-reload fix.
+
+---
+
+## 2. Files changed in this revision
+
+| File | Change |
+| --- | --- |
+| `packages/database/prisma/seed.ts` | Seed bookable `BookingResource` rows and their `WorkingHours` |
+| `apps/mobile/src/app/vehicles/new.tsx` | Add-vehicle form persists through `POST /customer/vehicles` |
+| `apps/mobile/src/app/parts/index.tsx` | Demo rail gated to the offline demo, never a live session |
+| `apps/mobile/src/app/(tabs)/account.tsx` | Reload the garage and the order list on focus |
+| `apps/mobile/src/app/addresses.tsx` | Reload on focus |
+| `apps/mobile/src/lib/use-reload-on-focus.ts` | **New** — refetch a list when a screen regains focus |
+| `apps/mobile/test/demo-gating.test.ts` | **New** — every demo-reading screen must read the session |
+| `apps/mobile/test/live-endpoints.test.ts` | Vehicle-create and merchant-recovery route assertions |
+| `scripts/exec10-smoke.sh` | **New** — 31-check real HTTP smoke test |
+
+---
+
+## 3. Customer authentication
+
+The consumer identity plane was already implemented on the server
+(`apps/api/src/customer/customer-auth.*`). Execution 10 connects the app to it.
+
+`apps/mobile/src/lib/live-session.tsx` — the live customer session:
+
+- **`status`** is `restoring` → `guest` | `live`. A guest is a first-class state,
+  not an error; the whole catalogue is browsable without an account.
+- **The access token is memory-only.** It is never written to storage.
+- **The refresh token is the one long-lived secret** and lives in the device
+  keychain through `session-storage.ts` (`expo-secure-store`,
+  `WHEN_UNLOCKED_THIS_DEVICE_ONLY`).
+- **Restore** presents the stored refresh token to `POST /customer/auth/refresh`
+  and swaps it for a fresh access token. A rejected refresh clears the stored
+  secret and the app becomes a guest — an expired session degrades cleanly rather
+  than half-existing. A *network* failure is treated differently: the token is
+  kept and the run is guest, so a flaky connection does not sign the user out.
+- **`signIn` / `register` / `signOut`** wrap the real endpoints. Sign-out revokes
+  the presented refresh token on the server before clearing local state.
+
+Screens: `login.tsx` and `register.tsx` drive `signIn` / `register`.
+
+**Plane separation is enforced on the server and mirrored on the client.** A
+consumer access token carries `audience: customer`; a staff token carries the
+staff audience. Each is refused on the other plane. The client keeps the two
+tokens in separate slots (`setAccessToken` / `setStaffAccessToken`) so a merchant
+sign-in cannot clobber a customer session.
+
+---
+
+## 4. Live customer bookings
+
+The gap: `POST /customer/bookings` creates a slot in `HELD`, and a hold that is
+never confirmed expires and releases the slot. There was **no customer-facing
+confirm endpoint** — only staff routes — so a booking made from the app could
+never reach `CONFIRMED`.
+
+### Backend additions
+
+`apps/api/src/customer/booking.service.ts`:
+
+- `confirmCustomerBooking(accountId, slotId)` — transitions `HELD` → `CONFIRMED`,
+  scoped to the signed-in account, and refuses a hold past its expiry with
+  `BOOKING_HOLD_EXPIRED`.
+- `getCustomerBooking(accountId, id)` — reads one booking, scoped to the account,
+  with its resource. A foreign id is a **404**, not a leak.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/customer/bookings/:id` | read one of your own bookings |
+| `POST` | `/customer/bookings/:id/confirm` | confirm your own held booking |
+
+Ownership is enforced by `accountId` from the verified token, never from the URL.
+
+### The seed gap found and fixed
+
+Availability is generated from a `BookingResource` and its `WorkingHours`. The
+seed created **workshop bays** but no bookable resource, so a freshly seeded
+deployment offered **zero slots** — the mobile wizard showed an empty day and no
+error. The seed now creates two `BAY` resources per company, open 08:00–20:00
+every day, and the count is printed in the seed summary (`14 booking resources`).
+This is the difference between a live booking engine that appears broken and one
+that works.
+
+### Mobile additions
+
+- `lib/api.ts` — `BookingSummary` extended; `bookingsApi.get(id)` and
+  `bookingsApi.confirm(id)` added.
+- `lib/live-bookings.tsx` — `confirmBooking` wired into the live state.
+- `app/bookings/new.tsx` — the wizard confirms the held booking after create, so
+  a booking made in the app becomes `CONFIRMED` instead of expiring.
+- `app/bookings/[id].tsx` — reads the single booking and offers Confirm while the
+  status is `HELD`.
+
+**Available slots are never fabricated.** The wizard renders exactly what
+`GET /customer/bookings/availability` returns. Cancellation is offered only for a
+status the server would accept (`HELD`, `CONFIRMED`, `RESCHEDULED`).
+
+---
+
+## 5. Merchant functionality
+
+The provider portal (`apps/api/src/marketplace/provider-portal.controller.ts`) is
+a **staff** plane: the API resolves the provider from the signed-in account's
+membership through `ProviderUser`, never from the URL, and the routes are gated
+by `erp.provider_portal.manage` (Enterprise plan only). No duplicate provider API
+was built.
+
+- `lib/merchant-session.tsx` — merchant sign-in through staff `/auth/login`, then
+  the provider membership is resolved. A staff account with no provider link is
+  refused rather than let into a portal that would reject every call.
+- `app/merchant/services.tsx` — live service requests and listings from
+  `/provider/requests` and `/provider/listings`, with accept / decline / start /
+  complete and listing activate/deactivate. The recovery tab was moved off the
+  local demo records onto the same real request queue, filtered by category, so a
+  live merchant accepts a real job rather than a local one.
+- `app/merchant/products.tsx` — live: the company's real stock items with real
+  photographs through the media library.
+- `app/merchant/orders.tsx` — live: consumer orders for the provider's own
+  company (`/provider/orders`), with a status-machine advance.
+- `app/merchant/profile.tsx` — live: provider profile read and update.
+- `app/merchant/dashboard.tsx` — live: earnings summary and the request queue.
+
+**Tenant isolation is server-side.** The client sends no provider id, so a
+merchant cannot read or act on another provider's work.
+
+---
+
+## 6. Product image management
+
+`apps/api/src/inventory/product-image.service.ts` + routes on
+`inventory.controller.ts`:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/inventory/products/:productId/images` | list, primary first |
+| `POST` | `/inventory/products/:productId/images` | upload and attach |
+| `PATCH` | `/inventory/products/:productId/images/:imageId` | promote primary / edit alt text |
+| `DELETE` | `/inventory/products/:productId/images/:imageId` | remove, promote the next primary |
+
+Every method resolves the product through the principal's own company
+(`ErpContextService.resolveCompanyScope`), so a product id from another tenant is
+a 404, not a silent cross-tenant write.
+
+Bytes go through the shared `MediaStorageService.store`, which sniffs the real
+magic-byte type (a declared content-type is never trusted), rejects anything that
+is not JPEG / PNG / WebP / AVIF, enforces the size ceiling, re-encodes every byte
+to drop EXIF and any trailing payload, and derives the storage key from a UUID
+plus a content hash so the client never chooses a path.
+
+---
+
+## 7. SENSAGE image upload
+
+`apps/api/src/customer/customer-inspection.*` + migration
+`20261030220000_execution_10_customer_inspection_photos`:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/customer/inspection-photos` | the caller's own upload history |
+| `POST` | `/customer/inspection-photos` | upload a photograph |
+| `DELETE` | `/customer/inspection-photos/:id` | remove one you own |
+
+- **Ownership:** `accountId` comes from the verified token and scopes every read
+  and write. A `vehicleId` in the body is a *claim* — it is checked against the
+  account's own garage before the photo is linked.
+- **What is not stored:** there is no analysis result on the row. The app's
+  SENSAGE report is a demo, and writing a demo score into a table named as if it
+  were a diagnosis would make a placeholder look like a product finding.
+
+The mobile screen `app/sensage/new.tsx` uploads each captured photo immediately
+inside a live session, shows progress, reports a failure without losing the local
+shot, and lists the history. **Demo analysis is never presented as a real AI
+result** — the report is labelled as demo.
+
+---
+
+## 8. The vehicle garage now writes
+
+`app/vehicles/new.tsx` previously validated the form and returned to the garage
+without saving. Inside a live session it now posts to `POST /customer/vehicles`
+with the exact payload the DTO accepts (`vin`, `make`, `model`, `modelYear`, and
+optional `plateNumber`, `color`, `mileage`), then navigates back. The offline
+demo keeps its local, clearly-labelled action.
+
+Because the account tab is already mounted underneath, the new car would not
+appear without a refetch. `lib/use-reload-on-focus.ts` re-runs the garage and
+order loaders when the tab regains focus, so a write made on a pushed screen is
+visible on return. The same hook was applied to the address list.
+
+---
+
+## 9. The approved design is preserved
+
+- The Homepage was not redesigned. The dark navy and gold identity, the approved
+  black-SUV hero and the card layouts are untouched.
+- No random slider images were introduced.
+- The photographic Splash keeps a **2000 ms minimum** (`SPLASH_MIN_MS`), timed
+  from the photograph's `onLoad`.
+- No onboarding or startup screen was added.
+
+---
+
+## 10. Real HTTP test evidence
+
+### `scripts/exec10-smoke.sh` — 31 checks, 31 passing
+
+Run against `node dist/main.js` on the seeded PostgreSQL database.
+
+```
+== customer authentication ==
+  PASS register (201)          PASS login (200)
+  PASS me (200)                PASS login with wrong password refused (401)
+  PASS me without token refused (401)  PASS refresh with a bad token refused (401)
+  PASS logout (204)
+== vehicle garage ==
+  PASS create vehicle (201)    PASS list garage (200)
+  PASS new vehicle in the garage (True)  PASS vehicle history (200)
+  PASS foreign vehicle refused (404)
+== bookings ==
+  PASS availability (200)      PASS availability returned a slot
+  PASS create booking (201)    PASS confirm booking (200)
+  PASS booking detail (200)    PASS foreign booking refused (404)
+  PASS cancel booking (200)
+== consumer order plane ==
+  PASS order history / cart / favorites / homepage / catalogue (200)
+== media upload ==
+  PASS upload a real image (201)   PASS serve the stored bytes (200)
+  PASS upload history (200)
+  PASS non-image refused despite a lying content-type (400)
+  PASS unauthenticated upload refused (401)
+== provider portal isolation ==
+  PASS provider portal without a token refused (401)
+  PASS consumer token on the provider portal refused (401)
+```
+
+The double-booking constraint was verified separately with a pinned resource:
+the first hold returns **201**, the second hold of the same resource and instant
+returns **409 `booking.slot_unavailable`**.
+
+### `apps/api/test/execution10-mobile-integration.e2e-spec.ts`
+
+35 tests covering the booking lifecycle, media upload, the customer inspection
+photos and the provider portal, including the merchant that holds the permission
+but is not linked to a provider (**403**) and a consumer token on the provider
+portal (**401/403**).
+
+### Full suites
+
+```
+API e2e:    21 suites, 422 tests   all passing
+Shared:      9 files,  180 tests   all passing
+Mobile:      6 files,   86 tests   all passing
+```
+
+Mobile includes `demo-gating.test.ts`, which walks every screen file and fails if
+one reads the demo repository without also reading the session, and
+`live-endpoints.test.ts`, which pins the consumer plane and the exact route for
+the vehicle-create and merchant-recovery calls.
+
+Typecheck, lint and build pass for the API and the mobile app. The Android export
+(`expo export --platform android`) completes.
+
+---
+
+## 11. Security verification
+
+| Property | Verified by |
+| --- | --- |
+| Consumer token refused on staff routes, staff token refused on consumer routes | e2e, both directions |
+| Customer booking read / confirm / cancel scoped by token `accountId` | foreign id → 404 |
+| Merchant portal resolves the provider from membership, not the URL | not-linked account → 403 |
+| Provider portal licensed to the Enterprise plan only | plan-gated route tests |
+| Product images scoped to the principal's company | cross-tenant id → 404 |
+| SENSAGE photos scoped to the caller; vehicle claim checked against the garage | cross-account → refused |
+| Upload validates true MIME by magic bytes, not the declared type | lying content-type → 400 |
+| Upload enforces a size ceiling | oversize → refused |
+| Upload re-encodes to strip EXIF / GPS and any trailing payload | `MediaStorageService.store` |
+| Storage key is server-derived (UUID + content hash) | client never chooses a path |
+| The refresh token is the only long-lived secret; it lives in the keychain | `session-storage.ts` |
+| The access token is memory-only and never persisted | `live-session.tsx` |
+| A live session never renders a demo record | `demo-gating.test.ts` |
+
+---
+
+## 12. Remaining incomplete work
+
+| Item | State |
+| --- | --- |
+| **Device visual acceptance** | **Verified in a browser at an Android viewport, not on a device.** This container has no `/dev/kvm`, so no emulator can run; the app was instead rendered by its real Expo web export — the same component tree, theme, API client and live backend — in Chromium at 411×914 @2.6×. Sixteen screens were captured and machine-checked for image decode, RTL and overflow (section 15). The Splash and the design are **not** marked approved on a physical device. |
+| SENSAGE AI analysis | No provider is configured, so analysis stays labelled as demo. |
+| Merchant promotions screen | The portal exposes no promotions route; the screen states the limitation rather than showing demo offers. |
+| Merchant subscription plan screen | Managed by a company administrator on the staff plane; the live screen says so. |
+| APK | **Not built.** Per the brief, the flows must form a coherent testable build first. |
+
+Nothing above is presented as complete. Nothing presents demo data as live: a
+live session renders live figures without a demo banner, and a demo session
+renders the banner on every screen.
+
+---
+
+## 13. Final commit
+
+The Execution 10 feature commits precede this report; the report commit follows
+them on `feature/execution-07-premium-web`. PR #7 stays **Draft**; nothing is
+merged or deployed.
+
+---
+
+## 14. Continuation session — reschedule, searchable selectors, upload retry
+
+This section records the work completed in a later session on the same branch,
+which closed the last gaps Execution 10 left open. It is additive; nothing above
+was reverted.
+
+### Customer reschedule (was missing end to end)
+
+A customer could create, confirm and cancel a booking but could not move one.
+
+- **`apps/api/src/customer/booking.service.ts`** — `rescheduleCustomerBooking`.
+  It loads the slot scoped to `customerAccountId` (a foreign id is a 404, not a
+  leak), refuses a `CANCELLED`/`COMPLETED`/`NO_SHOW` booking with `BOOKING_STATE`,
+  re-runs `assertSlotBookable` with `excludeSlotId` so the booking does not
+  collide with itself, moves the row to `RESCHEDULED`, clears the hold, appends a
+  `RESCHEDULED` event and audits `booking.rescheduled_by_customer`. A unique
+  violation on the new time surfaces as `BOOKING_SLOT_UNAVAILABLE` (409).
+- **`apps/api/src/customer/booking.controller.ts`** — `POST /customer/bookings/:id/reschedule`
+  (and the `/api/bookings/:id/reschedule` alias), reading the account from the
+  verified token.
+- **`apps/mobile/src/lib/api.ts`** — `bookingsApi.reschedule(id, startsAt, durationMinutes)`.
+- **`apps/mobile/src/lib/live-bookings.tsx`** — `reschedule` in the live state.
+- **`apps/mobile/src/app/bookings/[id].tsx`** — a reschedule sheet that loads real
+  availability for the chosen day and posts the selected engine slot. A 409 is
+  shown as `slotUnavailable`, never as a generic failure.
+
+### Searchable selectors and a shared slot label
+
+- **`apps/mobile/src/lib/options.ts`** (new) — `filterOptions`, the pure matcher
+  behind a searchable select. It matches case-insensitively on the label, the
+  sublabel and the option's `keywords`, so an Arabic term finds an English label
+  without switching the app locale. It is unit-tested directly.
+- **`apps/mobile/src/components/ui.tsx`** — `Select` gained `searchable`,
+  `searchPlaceholder` and `emptyMessage`; the sheet filters as you type and says
+  "no results" rather than showing an empty list.
+- **`apps/mobile/src/app/vehicles/new.tsx`** and
+  **`apps/mobile/src/app/bookings/new.tsx`** — the make, model and year pickers
+  and the provider picker are searchable; the wizard also offers a change-provider
+  step and a provider directory search.
+- **`apps/mobile/src/lib/format.ts`** — `slotLabel(startsAt)`, the UTC `HH:MM`
+  label. Four copies of this formatting were collapsed into one, so the wizard,
+  the detail screen and the booking card cannot drift apart. It is unit-tested.
+
+### SENSAGE upload failure and retry
+
+- **`apps/mobile/src/app/sensage/new.tsx`** — a shot carries its own
+  `uploadState` (`pending` / `failed`). A failed upload no longer reads
+  "uploading" forever; it is marked failed and offers a retry that re-sends the
+  same photograph. `uploadFailedShort` was added in both locales.
+
+### Evidence in this session
+
+```
+API e2e:    25 suites, 481 tests   all passing   (real test DB, migrated + seeded)
+Shared:      9 files,  180 tests   all passing
+Mobile:      8 files,  117 tests   all passing
+Typecheck:   all packages clean
+Lint:        all packages clean
+Build:       shared, database and api clean; android export completes
+```
+
+The reschedule path was also exercised over real HTTP by
+`scripts/probe-customer-journey.mjs`, which registers a consumer, books, confirms,
+reschedules to a real engine slot and cancels — and shows a second account sees
+none of the first account's bookings.
+
+### Still open
+
+- **Android visual acceptance of the Splash and the Homepage is not claimed.** It
+  needs a device or emulator screenshot; neither the DOM nor the UI hierarchy is
+  evidence.
+- **Product photography is not universal.** The seed links the ORYX-AUTO
+  catalogue; a tenant created afterwards falls back to bundled category art until
+  an administrator uploads an asset.
+- **Merchant mobile parity on a device** has not been re-run.
+
+---
+
+## 15. Continuation session — visual acceptance, uploads and a full re-verification
+
+The environment was reset between sessions, so every result below was produced
+again from scratch: PostgreSQL 17 installed and seeded, the API built and run,
+the mobile web export rebuilt against the live API, and Chromium driven at an
+Android phone viewport.
+
+### 15.1 Why a browser and not an emulator
+
+`/dev/kvm` is absent and the CPU exposes neither `vmx` nor `svm`, so the
+x86_64 system image cannot boot and an arm64 image cannot run on an x86_64 host
+(`Avd's CPU Architecture 'arm64' is not supported by QEMU2`). The next-best
+evidence is the real application: `expo export --platform web` compiles the same
+React Native component tree, the same theme and the same API client, and
+`scripts/capture-exec10-visual.mjs` renders it at 411×914 @2.6× — the Pixel-class
+viewport in CSS pixels. This is a browser rendering of the app, **not** a device
+capture, and the report says so.
+
+### 15.2 Sixteen screens, machine-checked
+
+`node scripts/capture-exec10-visual.mjs` — result: **16 screens captured, 0
+problems**. The script fails on a horizontal overflow, a missing bottom tab bar,
+Arabic text that did not resolve to RTL, or an image that decoded to nothing.
+
+| Screen | File | Check |
+| --- | --- | --- |
+| Splash (AR) | `01-splash.png` | photographic scene painted |
+| Homepage (AR) | `02-homepage-ar.png` | 54 images, all decoded; RTL; tabs |
+| Homepage (EN) | `02-homepage-en.png` | 54 images, all decoded; tabs |
+| Parts catalogue (AR) | `03-catalog.png` | 50 images, all decoded; RTL |
+| Services (EN) | `04-services.png` | rendered |
+| Customer sign-in | `05-login.png` | live form present |
+| After live sign-in | `06-after-login.png` | refresh token stored |
+| Booking wizard | `07-booking-new.png` | real slots |
+| Booking history | `08-bookings.png` | the seeded booking is listed, live mode |
+| Booking detail | `08b-booking-detail.png` | owner's booking |
+| Merchant sign-in | `09-merchant-login.png` | staff plane |
+| Merchant dashboard | `10-merchant-dashboard.png` | provider name from the session |
+| Merchant services | `11-merchant-services.png` | provider's own listings |
+| Merchant products | `12-merchant-products.png` | 606-colour render, real data |
+| Merchant orders | `13-merchant-orders.png` | provider's own requests |
+| Merchant profile | `14-merchant-profile.png` | membership-resolved profile |
+
+Two defects were found and fixed while doing this, both in the harness rather
+than the product:
+
+1. **The web export was built against the wrong API base.** `api.ts` reads
+   `EXPO_PUBLIC_API_BASE_URL`; the export had been given `EXPO_PUBLIC_API_URL`,
+   so the app fell back to `http://localhost:3001/api` and every request was
+   blocked as a cross-origin call from `127.0.0.1:8091`. Rebuilding with the
+   correct variable made the live sign-in succeed.
+2. **The preview origin was not in the CORS allowlist.** The API allowed
+   `http://localhost:3000,http://localhost:3002` only, so the preflight for the
+   preview host returned no `Access-Control-Allow-Origin`. Running the API with
+   the preview origin appended made the preflight a `204`.
+
+Neither is a product defect — a native build calls the API directly and never
+issues a preflight — but both would have made the acceptance run look like a
+failure.
+
+### 15.3 The locale toggle is not a defect
+
+An earlier session saw an Arabic capture that differed from the English one only
+in the status-bar band, which looked like a broken RTL switch. Driving the real
+toggle shows the opposite:
+
+```
+before:      chip "ع"  arabicTexts 1   rtlTexts 1   stored "en"
+after tap 1: chip "EN" arabicTexts 94  rtlTexts 89  stored "ar"
+after tap 2: chip "ع"  arabicTexts 1   rtlTexts 1   stored "en"
+```
+
+One tap switches to Arabic and 89 of 94 Arabic text nodes compute to
+`direction: rtl`; the second tap returns to English. The earlier capture was a
+double-tap artefact in the harness, not an app fault.
+
+### 15.4 Real HTTP re-verification
+
+Run against the live API and the migrated, seeded database.
+
+```
+Customer journey (scripts + curl)
+  register                                  201
+  login                                     200  accessToken + refresh + csrf
+  me                                        200
+  availability (9 days out)                 200  23 real slots
+  create booking                            201
+  confirm                                   200  CONFIRMED
+  history                                   200  1 row
+  cancel                                    200  CANCELLED
+  bookings without a token                  401
+
+SENSAGE upload (/customer/inspection-photos)
+  128×128 PNG, valid                        201  stored as image/webp 128×128 4360 B
+  text file declared text/plain             400  media.type_not_allowed
+  tiny 1×1 PNG                              400  media.dimensions_invalid
+  no bearer token                           401
+  history lists it, delete removes it       200 → 0
+
+Ownership isolation
+  account B lists account A's photos         0 rows
+  account B deletes account A's photo        404
+  account A still has its own photo          1 row
+
+Product media (/cms/media, staff plane)
+  200×200 PNG as super admin                201  stored as image/webp 200×200
+```
+
+### 15.5 Suites, typecheck, lint, build
+
+```
+API e2e:     25 suites, 482 tests   all passing   (real test DB, migrated + seeded)
+Shared:       9 files,  180 tests   all passing
+Mobile:       8 files,  117 tests   all passing
+Typecheck:   all packages clean
+Lint:        all packages clean
+Build:       shared, database, api, admin and customer all clean
+React:       19.1.0 / react-dom 19.1.0, aligned across admin, customer,
+             mobile and mobile-erp (the hoisted-copy regression stays fixed)
+```
+
+### 15.6 Photography audit
+
+`docs/audit/execution-07-media-licenses.json` is the registry. Checked against
+the tree:
+
+- 12 entries: 10 shipping photographs and 2 explicitly withdrawn (a branded
+  Bentley showroom and a Jaguar showroom, both removed for showing marques ORYX
+  does not sell).
+- Licences: CC0 ×2, CC BY 4.0 ×2, CC BY-SA 4.0 ×5, CC BY-SA 3.0 ×3. All are
+  real, licensed photographs from Wikimedia Commons with a recorded source page,
+  licence URL and artist.
+- All 13 `PhotoKey` union values resolve to a real bundled image.
+- `assets.ts` requires 26 files, all 26 exist, and no file on disk is
+  unreferenced — there are no placeholder or orphan images.
+
+### 15.7 Still open
+
+- **Device visual acceptance is not claimed.** The evidence is a browser render
+  of the real app; a screenshot from a physical Android device is still needed
+  before the Splash and the Homepage are marked approved.
+- **Product photography is not universal.** The seed links the ORYX-AUTO
+  catalogue; a tenant created afterwards falls back to bundled category art
+  until an administrator uploads an asset.
+- **Merchant parity on a device** has not been re-run.
+
+---
+
+## 16. Continuation session — raw enum labels in the Arabic RTL UI
+
+### 16.1 The defect
+
+`StatusBadge` printed its `status` prop verbatim. Every caller passed the raw
+database enum, so an Arabic-first screen showed `HELD`, `NO_SHOW`, `IN_PROGRESS`
+and `INSPECTION` in English. The same class of defect existed in the mobile app:
+a screen rendered `{booking.status}` straight into a `<Badge>`.
+
+This is a presentation defect, not a data defect. The API contract is correct and
+was not changed.
+
+### 16.2 The customer fix
+
+- `apps/customer/src/i18n/dictionaries.ts` — added a `status.*` block for both
+  locales (52 statuses) and the booking-type labels. Both dictionaries now hold
+  **486 keys** and stay in step.
+- `apps/customer/src/components/ui.tsx` — `StatusBadge` resolves its label
+  through the dictionary via `useUi()`, and falls back to the raw status only
+  when no key exists. Exported `bookingTypeLabel`.
+- `apps/customer/src/app/(account)/bookings/page.tsx` and
+  `.../dashboard/page.tsx` — render `bookingTypeLabel(booking.bookingType)`
+  instead of the enum.
+- `apps/customer/src/app/(account)/rfqs/page.tsx` — the category field asked for
+  `services.category`, which did not exist, so it rendered the literal key. Added
+  `rfq.category` to both locales and pointed the page at it. This was a second,
+  independent leak of the same kind.
+
+### 16.3 The mobile fix
+
+`apps/mobile/src/lib/i18n.ts` gained a `statusLabel(locale, status)` helper and a
+status dictionary. Twelve screens were repointed: `cards.tsx`,
+`app/rfqs/[id].tsx`, `app/rfqs/index.tsx`, `app/wallet.tsx`,
+`app/merchant/dashboard.tsx`, `app/merchant/services.tsx`,
+`app/merchant/profile.tsx`, `app/returns/[id].tsx`, `app/returns/index.tsx`,
+`app/bookings/[id].tsx`, `app/recovery/[id].tsx` and `app/orders/[id].tsx`.
+
+An unknown status degrades to a readable word (`BRAND_NEW_STATE` →
+`brand new state`), never to an empty string or a raw enum.
+
+### 16.4 Regression tests
+
+- `apps/customer/test/i18n-status.test.ts` — **49 tests**. Asserts that both
+  locales hold the same key set, that every `t()` key in the source tree exists,
+  and that each status resolves to a different word per locale.
+- `apps/mobile/test/lib.test.ts` — **51 new tests** (139 → 194). Asserts every
+  status localises in both locales, that the two locales differ, that an unknown
+  status degrades, and — by reading the source tree — that no live screen still
+  renders one of the raw shapes the defect took (`text={order.status}`,
+  `text={booking.status}`, and so on).
+- `apps/customer/package.json` gained `vitest` and a `test` script; the customer
+  app previously had no unit-test runner.
+
+### 16.5 Evidence re-verified in this session
+
+```
+Customer guard:  node .run/check-customer-i18n.mjs
+                 ar keys=486 en keys=486 used=376 — OK, both locales in step
+Customer:         1 file,   49 tests   all passing
+Mobile:           9 files, 194 tests   all passing
+Shared:           9 files, 182 tests   all passing
+API e2e:         28 suites, 548 tests  all passing  (real DB, seeded)
+Admin Playwright: 199 passed, 1 skipped (200 tests, real API + real admin)
+Typecheck:       customer, mobile — clean
+Lint:            customer, mobile — clean
+Build:           customer — clean
+React:           19.1.0 / react-dom 19.1.0 unchanged across all four apps
+```
+
+Browser check on `http://localhost:3002/bookings`, signed in as the Visual QA
+customer: Arabic renders `فحص` and `قيد الحجز`; switching to English renders
+`Inspection` and `Held`. `/dashboard` renders `Inspection` / `Held` and no raw
+enum. `/orders` renders its empty state with no leakage.
+
+### 16.6 Environment notes (not code regressions)
+
+The sandbox recycled mid-session and removed three runtime dependencies while
+leaving the workspace intact. All three were restored, and the results above are
+from after restoration:
+
+- PostgreSQL 17 server package was reinstalled and the seeded cluster under
+  `.run/pgdata` was restarted; the seed survived (127 companies, 32 users, 25
+  customer accounts).
+- The API was restarted with the documented relaxed throttles
+  (`AUTH_THROTTLE_LIMIT` / `THROTTLE_LIMIT` / `REFRESH_THROTTLE_LIMIT`), because
+  the Playwright suite rotates sessions heavily and the default ceilings return
+  429.
+- Playwright's chromium headless shell was reinstalled
+  (`playwright install chromium`); its absence produced 200 tests failing in
+  3 ms with `Executable doesn't exist`, which is a missing browser, not a code
+  failure.
+
+`pnpm --filter @oryx/api test` reports "No tests found": `apps/api/jest.config.js`
+ignores `/test/`, and every API test is an `.e2e-spec.ts`. That is the
+pre-existing configuration from Execution 01, not a regression.
+
+### 16.7 Final commit
+
+`a161a49` — *fix(i18n): localise raw enum status labels across customer and
+mobile* — is the commit that carries the code and tests in this section. The
+commit that records this report follows it and changes documentation only.
+
+### 16.8 Still open
+
+- **Device visual acceptance is still not claimed.** A browser render is not a
+  physical Android device; the Splash and Homepage remain unapproved on device.
+- **No APK was published**, per the instruction not to ship one until the
+  integrated functionality is ready for a coherent testing release.
+
+## 17. Continuation session — KPI density, admin→public data flow and a broken-image defect
+
+This session resumed the governing instruction *"Website, Admin Dashboard &
+Visual Verification"*. It implemented directly in the existing code, produced
+before/after evidence, proved the admin→public data flow with real database
+rows, and ran the full technical verification.
+
+### 17.1 Admin KPI density
+
+The platform dashboard and the ERP module headers rendered oversized KPI cards
+and module tiles: nine 193px tiles in a single row at 1920px, one full-width
+tile at 375px, and 85px-tall statistic cards.
+
+`apps/admin/src/app/globals.css`:
+
+| Rule | Before | After |
+| --- | --- | --- |
+| `.oryx-stat-card` | `min-height: 58px`, `padding: 10px 12px`, `border-radius: 12px` | `min-height: 46px`, `padding: 6px 9px`, `border-radius: 10px` |
+| `.oryx-stat-card__icon` | `28×28px` | `22×22px` |
+| `.oryx-stat-card__label` | `10.5px`, `0.06em` | `9.5px`, `0.05em` |
+| `.oryx-stat-card__value` | `17px` | `15px` |
+| `.oryx-stat-grid` | `repeat(auto-fit, minmax(168px, 1fr))` | `repeat(4, minmax(0, 1fr))` |
+| `.oryx-stat-grid--wide` | `repeat(auto-fit, minmax(210px, 1fr))` | `repeat(4, minmax(0, 1fr))` |
+| `@media (max-width: 1024px)` | — | three columns |
+| `@media (max-width: 640px)` | — | two columns |
+| `.oryx-tile` | `min-height: 178px`, `border-radius: 16px` | `min-height: 142px`, `border-radius: 14px` |
+| `.oryx-tile__body` | `min-height: 178px`, `padding: 17px` | `min-height: 142px`, `padding: 13px` |
+| `.oryx-tile__icon` | `38×38px` | `32×32px` |
+
+`apps/admin/src/app/(app)/dashboard/page.tsx`: the module tile grid became
+`grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 [&>*]:min-w-0`, and the
+loading skeleton dropped from 186px to 142px so it matches the tile it stands in
+for.
+
+Measured in the running application (Chromium, `getComputedStyle` and
+`getBoundingClientRect`):
+
+| Context | Viewport | Columns | Card width | Card height |
+| --- | --- | --- | --- | --- |
+| Overview KPIs | 1920 | 4 | 398px | 72px |
+| Overview KPIs | 1440 | 4 | 278px | 72px |
+| Overview KPIs | 1280 | 4 | 238px | 72px |
+| Overview KPIs | 1024 | 3 | 247px | 72px |
+| Overview KPIs | 768 | 3 | 240px | 72px |
+| Overview KPIs | 430 | 2 | 195px | 72px |
+| Overview KPIs | 390 | 2 | 175px | 72px |
+| Overview KPIs | 375 | 2 | 168px | 72px |
+| CRM / HR / Reports / Operations KPIs | 1440 | 4 | 270px | 54px |
+
+The count is now capped at four and reduced to three, then two, as the viewport
+narrows; the tile itself is never compressed below the width that fits an Arabic
+metric label. The tall cards (72px) are the overview tiles that carry a
+secondary line; the ERP module cards (54px) carry one metric.
+
+A page that renders no KPI grid is not a defect: `/crm`, `/hr`, `/reports` and
+`/accounting` require a tenant company, and a platform principal has **no tenant
+scope** by design (see `docs/architecture/PERMISSION_MATRIX.md`). Signed in as
+`admin@oryx-auto.local` (Enterprise company administrator) every one of those
+pages renders its grid, which is what the table above records.
+
+### 17.2 The broken-image defect — the API serves origin-relative media
+
+The defect audit found 404s on the customer catalogue:
+
+```
+/products  404 http://localhost:3002/api/v1/cms/media/<id>/file?variant=card
+/categories 404 http://localhost:3002/api/v1/cms/media/<id>/file?variant=card
+```
+
+The API returns media as `/api/v1/cms/media/<id>/file` — a path relative to the
+**API** origin. The product, category, favourite and product-detail screens put
+that string straight into `<img src>` / `background-image`. Because the customer
+site is served from its own origin (port 3002), the browser asked the *website*
+for an API route and got a 404. The page still rendered, so the regression was
+invisible to a structural check: the photograph simply disappeared.
+
+Confirmed directly:
+
+```
+$ curl -o /dev/null -w '%{http_code}' http://localhost:3001/api/v1/cms/media/<id>/file?variant=card
+200   # image/webp, 77,612 bytes
+
+$ curl -o /dev/null -w '%{http_code}' http://localhost:3002/api/v1/cms/media/<id>/file?variant=card
+404   # text/html — the Next.js 404 page
+```
+
+The same defect existed in the admin product-image modal
+(`apps/admin/src/app/(app)/inventory/page.tsx`), which also rendered the raw
+relative path.
+
+**The fix.** One resolver per app, so the rule lives in exactly one place:
+
+- `apps/customer/src/lib/api.ts` — added `resolveImage(path)`. An absolute URL is
+  returned unchanged; a path beginning `/api/` is prefixed with the API origin;
+  anything else is a bundled site asset and keeps the base-path prefix that
+  `assetUrl` applies.
+- `apps/admin/src/lib/api.ts` — added `api.resolveImage(path)` with the same rule.
+
+Applied at every render site:
+
+| File | Site |
+| --- | --- |
+| `apps/customer/src/app/products/page.tsx` | product card image |
+| `apps/customer/src/app/products/[id]/page.tsx` | gallery and related items |
+| `apps/customer/src/app/categories/page.tsx` | category tile art |
+| `apps/customer/src/app/(account)/favorites/page.tsx` | favourite card image |
+| `apps/customer/src/app/page.tsx` | homepage hero banner path |
+| `apps/admin/src/app/(app)/inventory/page.tsx` | product-image modal thumbnail |
+
+Verified after the fix, in the browser:
+
+```
+/products   img srcs: [… "http://localhost:3001/api/v1/cms/media/<id>/file?variant=card" …]
+/categories backgrounds: ["url(\"http://localhost:3001/api/v1/cms/media/<id>/file?variant=card\")" …]
+```
+
+and the defect audit reports `broken=0` on every page:
+
+| Page | Images | Broken | Horizontal overflow |
+| --- | --- | --- | --- |
+| `/` | 4 | 0 | 0 |
+| `/categories` | 4 | 0 | 0 |
+| `/products` | 8 | 0 | 0 |
+| `/services` | 4 | 0 | 0 |
+| `/providers` | 4 | 0 | 0 |
+| `/about` | 4 | 0 | 0 |
+| `/contact` | 4 | 0 | 0 |
+| `/products` (390px) | 8 | 0 | 0 |
+
+Admin product-image modal, after the fix:
+
+```
+product images: [{"src":"http://localhost:3001/api/v1/cms/media/<id>/file?variant=card","ok":true}]
+```
+
+The remaining 401 on `/customer/auth/refresh` is the guest session probe: a
+visitor with no refresh cookie is correctly refused, and the protected account
+pages redirect to `/login`. It is not an error.
+
+A regression test guards the rule —
+`apps/customer/test/media-url.test.ts` (4 tests) asserts that an API media path
+goes to the API origin, that a bundled asset stays relative, that an absolute URL
+passes through, and that an absent image returns `null`.
+
+### 17.3 Admin → public data flow, with real database rows
+
+The customer website reads the same database the admin edits. Evidence:
+
+- `GET /api/v1/customer/catalog/categories` returns real `Category` rows with
+  real `mediaAssetId` values; the resolver turns each into a live
+  `cms/media/...` URL that returns `200 image/webp`.
+- `GET /api/v1/customer/catalog/providers` returns real `MarketplaceProvider`
+  rows (for example `Al Noor Parts`, `ORYX-HOLDING-P3`).
+- A suspend mutation without a company context returns **403**, which is the
+  correct authorization result, not a defect: a platform principal cannot mutate
+  tenant data outside a support session.
+- A QA customer was created through the real endpoint
+  (`POST /api/v1/customer/auth/register`), which returned a real access token and
+  set the refresh cookie. The account then signed in and reached `/dashboard`
+  with the ten expected account routes.
+
+### 17.4 Technical verification
+
+| Check | Command | Result |
+| --- | --- | --- |
+| API integration | `pnpm --filter @oryx/api test:e2e` | **28 suites, 548 tests passed** |
+| Customer unit | `pnpm --filter @oryx/customer test` | **53 tests passed** (49 + 4 new) |
+| Mobile unit | `pnpm --filter @oryx/mobile test` | **194 tests passed** |
+| Shared unit | `pnpm --filter @oryx/shared test` | **182 tests passed** |
+| Admin browser | `pnpm --filter @oryx/admin test:ui` | **199 passed, 1 skipped** |
+| Admin typecheck | `pnpm --filter @oryx/admin typecheck` | pass |
+| Admin lint | `pnpm --filter @oryx/admin lint` | pass |
+| Customer typecheck | `pnpm --filter @oryx/customer typecheck` | pass |
+| Customer lint | `pnpm --filter @oryx/customer lint` | pass |
+| Mobile typecheck | `pnpm --filter @oryx/mobile typecheck` | pass |
+| Mobile lint | `pnpm --filter @oryx/mobile lint` | pass |
+| API build | `pnpm --filter @oryx/api build` | pass |
+| Admin build | `pnpm --filter @oryx/admin build` | pass |
+| Customer build | `pnpm --filter @oryx/customer build` | pass |
+
+The API suite ran against the seeded PostgreSQL database
+(`oryx_dev` at `127.0.0.1:5432`) with the documented relaxed throttles. A test
+database that is unseeded reports connection and fixture errors, which are not
+code regressions; none were seen here.
+
+### 17.5 React version regression
+
+`react` and `react-dom` are `19.1.0` in `apps/admin`, `apps/customer` and
+`apps/mobile`, and the hoisted root resolves to `19.1.0`. All three builds
+prerender without the `Cannot read properties of null (reading 'useRef')`
+failure the hoisting rule warns about.
+
+### 17.6 Security verification
+
+- **No new surface.** The change is presentation-only: a URL is rewritten before
+  it reaches an `<img>`. No endpoint, DTO or query was added.
+- **Media access rules unchanged.** `GET /cms/media/:id/file` still applies its
+  own access rules; the resolver only changes which origin the browser asks, not
+  what the API will serve. An unauthenticated request still returns what the
+  endpoint decides.
+- **No credential is exposed.** The resolver returns a URL; it never reads a
+  token, and the customer session cookie stays scoped to `/api/v1/customer` on
+  the API origin.
+- **Guest isolation holds.** Protected customer pages redirect to `/login` when
+  the refresh probe returns 401; no tenant data is served to a guest.
+- **No secret was committed.** The QA account password lives in an ignored
+  scratch file (`.run/qa-customer-creds.txt`); `qa/` scratch captures are now
+  ignored, and only curated evidence under `docs/audit/` is tracked.
+
+### 17.7 Evidence
+
+Committed under `docs/audit/exec10/screenshots/`:
+
+| File | What it shows |
+| --- | --- |
+| `17-customer-products-images-after.png` | catalogue with uploaded photographs, 0 broken |
+| `18-customer-categories-images-after.png` | category tiles with CMS art, 0 broken |
+| `19-admin-inventory-images-after.png` | admin product-image modal, thumbnail decoded |
+| `20-admin-crm-kpi-after.png` | compact KPI band, 4 columns |
+| `21-admin-overview-kpi-after.png` | compact module tiles and KPI band |
+
+Before/after pairs for the KPI density change remain in the local QA capture set
+and are described by the measurements in §17.1.
+
+### 17.8 Final commit
+
+`994b9a1` — *fix(web): resolve API media on its own origin and compact the admin
+KPIs* — carries the code, the regression test and the evidence in this section.
+The commit that records this report changes documentation only.
+
+### 17.9 Still open
+
+- **Android visual acceptance of Splash and Homepage is still not claimed.** A
+  browser render is not a physical device; the report does not present one as
+  the other.
+- **No APK was published**, per the instruction not to ship one until the
+  integrated functionality is ready for a coherent testing release.
+- **PR #7 remains open and Draft.** Nothing was merged or deployed.
+
+---
+
+*Written by an AI agent (OpenHands) on behalf of the repository owner.*
+
+---
+
+## 18. Continuation session — the interactive vehicle inspection engine (Execution Phase 2)
+
+This section records the work done in this session. It does not repeat the
+Execution 09 or earlier Execution 10 work; it adds the structured vehicle
+inspection engine, its admin workspace and its test evidence.
+
+### 18.1 What was added
+
+The previous "automotive inspections" feature was a booking plus a free-text
+findings blob and a single approved/unapproved report flag. It could record that
+an inspection happened and that someone approved it, but it could not record
+*what was inspected*: there was no per-item result, no body-panel diagram, no
+chassis map, no fault-code list, and no way to prove a section had been assessed
+rather than skipped.
+
+Execution Phase 2 replaces that with a structured engine:
+
+- **Seven selectable inspection areas** — Paint & Body, Chassis & Undercarriage,
+  Interior, Exterior, Engine Compartment, Road Test, Computer Unit — declared
+  once in `packages/shared/src/inspection.ts`.
+- **A per-item checklist** for the four list-driven sections, with the result set
+  the section allows (`PASS_FAIL` or `PASS_FAIL_NA`). The catalogue carries the
+  report's own item counts: Interior 12, Exterior 6, Engine Compartment 13, Road
+  Test 13.
+- **Two interactive diagrams.** A side-elevation body diagram with four paint
+  conditions (paint / filler / change / sectioned) stored as normalised
+  coordinates, and a top-view chassis diagram with eight assessed regions.
+- **A computer-unit diagnostic list** — module, fault code, description,
+  observation, severity — added and removed one record at a time.
+- **An explicit "nothing to report"** flag for the diagram and diagnostic
+  sections, so an inspector can assert a clean result deliberately rather than by
+  leaving a section blank.
+- **Photographic attachments** through the existing `MediaStorageService`.
+- **A submit / review / approve workflow** with server-enforced state
+  transitions and a server-enforced completeness gate.
+
+### 18.2 Files changed
+
+**New — shared contract**
+
+| File | Purpose |
+| --- | --- |
+| `packages/shared/src/inspection.ts` | The section catalogue, item specs, result sets, paint conditions, chassis regions and the state helpers. The single source of truth for the API and the interface. |
+| `packages/shared/test/inspection.test.ts` | 9 tests asserting the catalogue's item counts, the section keys, the result sets and the state helpers. |
+
+**New — API**
+
+| File | Purpose |
+| --- | --- |
+| `apps/api/src/automotive/inspection.dto.ts` | Validated request bodies for every write. |
+| `apps/api/src/automotive/inspection.service.ts` | The engine: creation, section writes, diagrams, diagnostics, attachments, progress, submit, review, cancel. |
+| `apps/api/src/automotive/inspection.controller.ts` | 16 routes under `/api/v1/automotive/inspections`. |
+
+**New — admin interface**
+
+| File | Purpose |
+| --- | --- |
+| `apps/admin/src/app/(app)/automotive/inspections/[id]/page.tsx` | The workspace: identity card, progress rail, section editors, attachments panel and workflow panel. |
+| `apps/admin/src/components/inspection/diagrams.tsx` | The body diagram and the chassis diagram. |
+
+**New — database**
+
+| File | Purpose |
+| --- | --- |
+| `packages/database/prisma/migrations/20261104002318_execution_phase2_inspection_engine/` | The inspection tables. |
+| `packages/database/prisma/migrations/20261104002429_inspection_section_no_findings/` | Adds `InspectionSectionResult.noFindings`. |
+
+**New — tests**
+
+| File | Purpose |
+| --- | --- |
+| `apps/api/test/execution-phase2-inspection.e2e-spec.ts` | 36 API integration tests over real HTTP. |
+| `apps/admin/e2e/execution-phase2-inspection.spec.ts` | 8 browser tests driving the real interface against the real API. |
+
+**Modified**
+
+| File | Change |
+| --- | --- |
+| `packages/database/prisma/schema.prisma` | Nine inspection tables and their enums. |
+| `packages/shared/src/contracts.ts` | The inspection DTOs, including `InspectionSectionDto.noFindings` and `InspectionSessionDto.odometer`. |
+| `packages/shared/src/index.ts` | Re-exports the inspection catalogue. |
+| `apps/api/src/automotive/automotive.module.ts` | Registers the controller and service. |
+| `apps/api/src/common/document-sequence.service.ts` | Adds the `JOB` sequence for the inspection job number. |
+| `apps/api/src/sales/sales.dto.ts`, `apps/api/src/sales/sales.service.ts` | Customer names become independently optional (see §18.6). |
+| `apps/admin/src/app/(app)/automotive/inspections/page.tsx` | A fourth tab, "Inspection jobs", and the job-creation modal. |
+| `apps/admin/src/lib/api.ts` | 15 inspection client methods. |
+| `apps/admin/src/i18n/dictionaries.ts` | The inspection keys, English and Arabic. |
+| `apps/admin/src/app/globals.css` | The inspection workspace styles. |
+
+### 18.3 Backend endpoints
+
+All under `/api/v1/automotive/inspections`, all requiring the
+`automotive_inspections` module and a tenant-scoped principal.
+
+| Method | Path | Permission | Purpose |
+| --- | --- | --- | --- |
+| GET | `/` | `erp.inspection.read` | List jobs, paginated and searchable. |
+| POST | `/` | `erp.inspection.write` | Create a job for a customer's vehicle and a set of areas. |
+| GET | `/:id` | `erp.inspection.read` | The full workspace payload. |
+| PATCH | `/:id` | `erp.inspection.write` | Update the header fields. |
+| GET | `/:id/progress` | `erp.inspection.read` | Completion state per section and overall. |
+| PUT | `/:id/sections/:area` | `erp.inspection.write` | Replace a checklist section's results. |
+| PUT | `/:id/paint-markers` | `erp.inspection.write` | Replace the body-diagram marker set. |
+| PUT | `/:id/chassis-regions` | `erp.inspection.write` | Replace the chassis region assessments. |
+| POST | `/:id/diagnostics` | `erp.inspection.write` | Add a computer-unit fault record. |
+| DELETE | `/:id/diagnostics/:entryId` | `erp.inspection.write` | Remove one. |
+| POST | `/:id/attachments` | `erp.inspection.write` | Upload a photograph through the media pipeline. |
+| DELETE | `/:id/attachments/:attachmentId` | `erp.inspection.write` | Remove one. |
+| POST | `/:id/submit` | `erp.inspection.write` | Submit for review. |
+| POST | `/:id/review` | `erp.inspection.report.approve` | Approve or return for correction. |
+| POST | `/:id/cancel` | `erp.inspection.write` | Cancel a draft. |
+
+### 18.4 Server-enforced rules
+
+These are the invariants the tests exist to protect. Each is enforced in the
+service, not in the interface.
+
+1. **Only the selected areas exist.** Creating a job with no area, or with an
+   unknown area, is rejected. Writing to an area that was not selected is
+   rejected. This is what keeps a paint-only job from asking about the engine.
+2. **A section only accepts its own items and its own result set.** An item key
+   from another section is rejected; `N/A` is rejected on a `PASS_FAIL` section.
+3. **The vehicle must belong to the customer.** Creating a job against another
+   customer's vehicle is rejected.
+4. **Submission requires completeness.** Every item in every selected area must
+   carry a result. A diagram section must carry at least one marker or an explicit
+   "nothing to report". A diagnostic section must carry at least one fault or an
+   explicit "nothing to report".
+5. **An approved inspection is frozen.** Section writes and cancellation return
+   `409` once approved.
+6. **Approval needs its own permission.** An inspector with
+   `erp.inspection.write` but not `erp.inspection.report.approve` is refused with
+   `403`.
+7. **Tenant isolation.** Another tenant's inspection reads as `404`, and a write
+   against it is refused.
+8. **Coordinates are bounded.** A marker outside the diagram is rejected by
+   validation rather than silently clamped, so a bad client cannot store a marker
+   that the report cannot draw.
+
+### 18.5 Real HTTP test results
+
+**API integration** — `apps/api/test/execution-phase2-inspection.e2e-spec.ts`,
+36 tests, all passing, against a seeded PostgreSQL database over real HTTP with
+the real guards, the real Prisma client and the real media pipeline:
+
+| Group | Tests | Result |
+| --- | --- | --- |
+| creation and tenancy | 6 | 6 passed |
+| selected sections only | 4 | 4 passed |
+| progress and submission gating | 6 | 6 passed |
+| body diagram markers | 4 | 4 passed |
+| chassis regions | 2 | 2 passed |
+| computer-unit diagnostics | 2 | 2 passed |
+| attachments | 4 | 4 passed |
+| approval workflow | 6 | 6 passed |
+| customer name optionality | 2 | 2 passed |
+
+The attachment tests upload a real 96×96 PNG through a multipart request and
+assert the stored asset: the media service sniffs the type, decodes it with
+`sharp`, re-encodes it to WebP to strip EXIF, and the test asserts the normalised
+`image/webp` type and the `/api/v1/cms/media/…/file` route rather than the
+upload's own content type.
+
+**Full API regression** — 29 suites, **584 tests, all passing**. The suite count
+grew from 28 to 29 and the test count from 548 to 584 with this work.
+
+**Browser** — `apps/admin/e2e/execution-phase2-inspection.spec.ts`, 8 tests, all
+passing, driving the real interface against the real API:
+
+| Test | What it proves |
+| --- | --- |
+| creates a job from the list page and opens its workspace | The job is created through the interface, gets a `JOB-` number, and only the selected sections appear on the rail. |
+| records a checklist section and reports its progress | Answering every item flips the rail to complete and enables submit. |
+| refuses to submit a section that is only partly answered | A partially answered section keeps submit disabled. |
+| places a body-panel marker on the paint diagram and saves it | A marker is placed by pointer, saved, and unlocks submit. |
+| assesses the chassis regions on the safety diagram | Region assessment unlocks submit. |
+| records a computer-unit fault and can remove it again | A fault is added and removed through the interface. |
+| approves a submitted inspection and then freezes it | Approval succeeds and the checklist becomes read-only. |
+| renders the workspace in Arabic with RTL direction | The Arabic labels come from the shared catalogue and the layout is RTL. |
+
+**Full browser regression** — 208 tests, **207 passed, 1 skipped**. The suite
+grew from 200 to 208 with this work.
+
+**Shared package** — 10 files, **191 tests, all passing**, including the 9 new
+inspection-catalogue tests.
+
+### 18.6 A customer may be known by one name only
+
+While building the job-creation interface, the customer-name requirement was
+found to be a real obstacle: `CreateCustomerDto` required both `nameEn` and
+`nameAr` with a minimum length of two, so an administrator who knows a customer
+only in Arabic had to invent an English name to save them at all.
+
+Both names are now independently optional, with at least one required — enforced
+in the service, because a class-validator rule cannot express "one of these two".
+A missing name is stored as an empty string rather than `null`, so the many
+existing reads of `nameEn`/`nameAr` across sales, accounting and reports do not
+have to handle a null, and the interface falls back to whichever name exists. The
+audit summary falls back the same way.
+
+### 18.7 Security verification
+
+- **Authorization is server-side.** Every route carries `@RequireModule` and
+  `@RequirePermissions`; the interface hiding a control is not the control. The
+  test "refuses a reader without the write permission" and the test "refuses
+  approval from an inspector without the approval permission" prove the
+  distinction between write and approve.
+- **Tenant isolation is enforced on read and write.** The service resolves the
+  company scope from the principal and filters every query by it; another
+  tenant's job returns `404` rather than leaking its existence.
+- **Uploads are validated, not trusted.** The file type is sniffed from the
+  bytes, the image is decoded to prove it is not truncated, a minimum dimension is
+  enforced, the storage key is derived from a UUID rather than a client-supplied
+  path, and EXIF is stripped by re-encoding.
+- **No credential or token appears in the inspection payloads.** Attachments
+  return a media route and a caption, never a storage path.
+- **The lockout on a seeded account was an environment artefact**, not a defect:
+  earlier failed sign-ins with a shell-quoted password variable locked the account
+  for the configured cool-down. It was cleared, the run repeated, and the suite
+  passed. This is recorded so a future reader does not mistake it for an
+  authentication regression.
+
+### 18.8 Verification summary
+
+| Gate | Command | Result |
+| --- | --- | --- |
+| API integration | `jest --config jest-e2e.config.js --runInBand` | 29 suites, 584 passed |
+| New API suite | `jest … test/execution-phase2-inspection.e2e-spec.ts` | 36 passed |
+| Browser | `playwright test --project=desktop-dark` | 207 passed, 1 skipped |
+| New browser suite | `playwright test e2e/execution-phase2-inspection.spec.ts` | 8 passed |
+| Shared | `vitest run` | 191 passed |
+| Mobile | `vitest run` | 194 passed |
+| Typecheck | `tsc --noEmit` in api, admin, customer, mobile | 4 × exit 0 |
+| Lint | `eslint . --max-warnings=0` in admin, customer, mobile | 3 × exit 0 |
+| Build | `next build` in admin | exit 0, `/automotive/inspections/[id]` present |
+| React pin | mobile `lib.test.ts` | react and react-dom both `19.1.0` |
+
+### 18.9 Final commit
+
+`32b03ca` — *feat(automotive): add the structured vehicle inspection engine* —
+carries the engine, the workspace, the migrations and both new suites. The
+commit that records this section changes documentation only.
+
+### 18.10 Still open
+
+- **Android visual acceptance of Splash and Homepage is still not claimed.** The
+  browser suite drives a desktop Chromium render; a browser render is not a
+  physical device and this report does not present one as the other.
+- **The Execution 10 mobile work is unchanged by this section.** The customer
+  authentication, booking, merchant and media work described in §1–§17 remains as
+  reported there; this section adds the inspection engine only.
+- **No APK was published**, per the standing instruction.
+- **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.
+
+---
+
+## 19. Continuation session — official documents, PDF printing and QR verification (Execution Phase 3)
+
+This section records the work done in this session. It does not repeat the
+inspection engine of §18; it adds the document that an approved record produces,
+the register that lists it, the printed PDF and the public verification page.
+
+### 19.1 What was added
+
+An approved inspection had no output. An administrator could see that a job was
+approved, but could not hand the customer a document, and there was nothing a
+customer could scan to check that a paper report was genuine. Financial records
+had the same gap: a stored invoice could be viewed on screen but not printed as
+an official page.
+
+Execution Phase 3 closes that gap:
+
+1. **A document is issued from a source record.** The register refuses a
+   free-form document. An inspection report can only be issued for an
+   `APPROVED` session, and a financial document only from a stored invoice,
+   order or quotation — so a PDF can never carry figures that no row backs.
+2. **The PDF is really rendered.** A headless Chromium pass draws a
+   self-contained HTML template with the Noto Naskh Arabic and Noto Sans faces
+   embedded, so an Arabic report is not tofu. The bytes are re-encoded and
+   stored through the existing media pipeline.
+3. **The stored copy is served through an authorised route only**, inline with
+   `private, no-store`. A revoked document must not keep showing as valid from a
+   cache.
+4. **Every document carries a verification token.** `GET /documents/verify/:token`
+   is public and returns a projection with no amount and no contact detail; the
+   customer site renders it at `/verify`. A scan reports valid, withdrawn,
+   superseded or unknown — and a withdrawn document is reported *as withdrawn*,
+   never as absent, so a scan never accuses a genuine document of being fake.
+5. **Withdrawal is audited and terminal.** A reason is required, a withdrawn
+   document stays in the register, and the public page changes outcome
+   immediately.
+
+### 19.2 Files changed
+
+**New — shared contract**
+
+| File | Purpose |
+| --- | --- |
+| `packages/shared/src/documents.ts` | The document catalogue, the report composition planner, the stored and public status vocabularies and the helpers that keep them apart. |
+| `packages/shared/test/documents.test.ts` | 24 tests: catalogue shape, pagination over the section catalogue, the two status vocabularies, VIN masking and the absence of financial fields in the public projection. |
+
+**New — API**
+
+| File | Purpose |
+| --- | --- |
+| `apps/api/src/documents/documents.module.ts` | Registers the controller, the service, storage, fonts, renderer and QR. |
+| `apps/api/src/documents/documents.controller.ts` | 8 routes under `/api/v1/documents`. |
+| `apps/api/src/documents/documents.service.ts` | Issuing, listing, reading, downloading and withdrawing; the tenant and source checks. |
+| `apps/api/src/documents/document-payload.ts` | Builds the render payload from stored rows — the only place a figure reaches a PDF. |
+| `apps/api/src/documents/documents.dto.ts` | Validated request bodies. |
+| `apps/api/src/documents/document-storage.service.ts` | Stores and reads the rendered bytes under `DOCUMENT_STORAGE_ROOT`. |
+| `apps/api/src/documents/pdf/pdf-renderer.service.ts` | The headless-Chromium pass and the page count. |
+| `apps/api/src/documents/pdf/document-fonts.service.ts` | Embeds the four Noto faces. |
+| `apps/api/src/documents/pdf/qr.service.ts` | Renders the verification QR. |
+| `apps/api/src/documents/templates/*.ts` | The chrome, the inspection-report template and the financial-document template. |
+| `apps/api/assets/fonts/*.ttf` | The embedded Arabic and Latin faces. |
+
+**New — admin interface**
+
+| File | Purpose |
+| --- | --- |
+| `apps/admin/src/components/documents-panel.tsx` | The register: list, open, copy the verification link, withdraw with a reason. |
+| `apps/admin/src/app/(app)/documents/page.tsx` | The document register, reached from the sidebar. |
+
+**New — customer site**
+
+| File | Purpose |
+| --- | --- |
+| `apps/customer/src/app/verify/[[...token]]/page.tsx` | The public verification page. Works with no session. |
+
+**New — database**
+
+| File | Purpose |
+| --- | --- |
+| `packages/database/prisma/migrations/20261104162028_execution_phase3_official_documents/` | `OfficialDocument`, `OfficialDocumentEvent` and the `OfficialDocumentStatus` enum. |
+
+**New — tests**
+
+| File | Purpose |
+| --- | --- |
+| `apps/api/test/execution-phase3-documents.e2e-spec.ts` | 22 API integration tests over real HTTP. |
+| `apps/admin/e2e/execution-phase3-documents.spec.ts` | 6 browser tests driving the real interface against the real API. |
+
+**Modified**
+
+| File | Change |
+| --- | --- |
+| `packages/database/prisma/schema.prisma` | The document tables and the status enum. |
+| `packages/shared/src/index.ts` | Re-exports the document specification. |
+| `apps/api/src/app.module.ts` | Registers `DocumentsModule`. |
+| `apps/api/test/test-app.ts` | `cleanupFixtures` deletes document rows before their company. |
+| `apps/admin/src/lib/api.ts` | The document client methods and the `OfficialDocumentDto` type, which now uses the shared `OfficialDocumentStatus` rather than an inline union. |
+| `apps/admin/src/lib/navigation.ts` | The register route. |
+| `apps/admin/src/app/(app)/automotive/inspections/[id]/page.tsx` | The register and the issue action on an approved job; a locked notice otherwise. |
+| `apps/admin/src/i18n/dictionaries.ts` | The document keys, English and Arabic. |
+| `apps/customer/src/lib/api.ts` | `verifyDocument`, the public call. |
+| `apps/customer/src/i18n/dictionaries.ts` | The verification page keys, English and Arabic. |
+| `apps/customer/test/i18n-status.test.ts` | A guard that the four verification outcomes read distinctly in both locales. |
+| `.gitignore` | Generated PDFs and uploaded media are runtime data, not source. |
+
+### 19.3 Backend endpoints
+
+All under `/api/v1/documents`.
+
+| Method | Path | Permission | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/verify/:token` | **public** | The verification projection. No amount, no contact detail. |
+| `GET` | `/catalogue` | `erp.dashboard.read` | The issuable document types and their bilingual titles. |
+| `POST` | `/issue` | any of `erp.sales.read`, `erp.purchasing.read`, `erp.accounting.read`, `erp.inspection.read` | Issue a financial document from a source record. |
+| `POST` | `/inspections/:sessionId/issue` | `erp.inspection.read` + module `automotive_inspections` | Issue the report for an `APPROVED` inspection. |
+| `GET` | `?sourceType=&sourceId=` | any of the four read permissions | The register for one source record. |
+| `GET` | `/:id` | any of the four | One document with its append-only event trail. |
+| `GET` | `/:id/file` | any of the four | The stored PDF, inline, `private, no-store`. |
+| `POST` | `/:id/revoke` | any of the four | Withdraw a document; a reason is required. |
+
+### 19.4 Server-enforced rules
+
+Each of these is covered by an integration test, not only by the interface.
+
+- A report cannot be issued for a session that is not `APPROVED`.
+- A financial document can only be issued from a stored source record; a
+  nonexistent id is a 400, not an empty document.
+- Another tenant's document reads as 404, and another tenant's register for the
+  same source id is empty. Tenant isolation is the `companyId` on the row.
+- The public verification projection carries no amount and no contact detail —
+  asserted as an exact key set, so a field added later fails the test.
+- A withdrawn document verifies as `REVOKED`, not as "not found".
+- `GET /:id/file` sets `Cache-Control: private, no-store`.
+- The register and the public page use different status vocabularies, and the
+  types and the tests keep them apart.
+
+### 19.5 Real HTTP test results
+
+A live driver (`22/22`) exercised the running API over real HTTP against the
+seeded database: login, issue, list, read, download, verify anonymously, verify
+as withdrawn, and the cross-tenant refusals. The Playwright suite then drove the
+same paths through the browser.
+
+| Check | Result |
+| --- | --- |
+| API integration — `test/execution-phase3-documents.e2e-spec.ts` | 22 passed |
+| API integration — whole suite | 30 suites, 606 passed |
+| Browser — `e2e/execution-phase3-documents.spec.ts` | 6 passed |
+| Browser — whole suite | 213 passed, 1 skipped |
+| Shared — `vitest run` | 215 passed |
+| Customer — `vitest run` | 54 passed |
+| Mobile — `vitest run` | 194 passed |
+| Typecheck — api, admin, customer, mobile | 4 × exit 0 |
+| Lint — admin, customer, mobile | 3 × exit 0 |
+| Build — `nest build` / `next build` | exit 0 |
+
+### 19.6 Security verification
+
+- **The public route is the only unauthenticated one.** `verify/:token` is
+  marked `@Public()`; every other route requires a permission and a company
+  scope.
+- **The token is the only credential.** It is a random value, not a sequence,
+  and it exposes a projection rather than the document.
+- **No sealed value leaves the API.** The file route streams bytes through the
+  authorised path; nothing returns a storage path.
+- **Tenant isolation is tested** with a second company's principal.
+- **No credential is committed.** The test passwords are the same throwaway
+  strings the other suites use.
+- **Generated PDFs and media are not source.** Both are in `.gitignore`.
+
+### 19.7 A defect found and fixed in this session
+
+The register labelled an `ISSUED` document **"Valid"**. "Valid" is the *public*
+verification vocabulary; the stored lifecycle state is `ISSUED`. The two words
+had been conflated, and the Arabic labels for `REVOKED` and `CANCELLED` were the
+same string (`ملغى`), so an Arabic-speaking administrator could not tell a
+withdrawn document from a cancelled one.
+
+The fix keeps the vocabularies apart in one place:
+
+- `OFFICIAL_DOCUMENT_STATUSES` and `DOCUMENT_VERIFICATION_STATUSES` are separate
+  exports, and `verificationStatusFor` maps one to the other by type.
+- `documentStatusLabelKey` returns a dictionary key only for a stored status, so
+  an unrecognised value renders the neutral "unknown" label rather than a raw
+  enum.
+- The register now reads **Issued** / **صادر** and **Withdrawn** / **مسحوب**,
+  and the cancelled label stays **Cancelled** / **ملغى**.
+- Two guards lock it: a shared test that the two vocabularies do not overlap and
+  a customer test that the four verification outcomes read distinctly in both
+  locales. A browser test drives the Arabic register and asserts the withdrawn
+  label.
+
+### 19.8 Still open
+
+- **Android visual acceptance of Splash and Homepage is still not claimed.** The
+  browser suite drives a desktop Chromium render; a browser render is not a
+  physical device, and this report does not present one as the other.
+- **The merchant-facing document surfaces were not built in *this* phase.**
+  They were added afterwards, in `feat(documents): expose the merchant document
+  register` (`f41f5ae`), which is an ancestor of the current head: the mobile
+  `merchant/documents` screen, the four `/provider/documents*` routes and the
+  `execution10-merchant-documents.e2e-spec.ts` isolation suite (8 tests) all
+  exist and pass. The claim above is left here only as a record of the phase
+  boundary, not as the current state. See section 24.
+- **The wider catalogue is not issuable.** Statements, returns and journal
+  entries have a catalogue entry and a template but no issue path yet, and the
+  interface offers a button only for the types the API can render from a stored
+  record.
+- **No APK was published**, per the standing instruction.
+- **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.
+
+## 20. Continuation session — official-document design, numbering and the missing types (Execution Phase 3 corrections)
+
+This session carried out the Phase 3 final corrections: the exact document
+design, the automatic numbering audit, the watermark and branding, footer and
+pagination correctness, and the two missing document types (`SALES_RETURN`,
+`PURCHASE_INVOICE`).
+
+### 20.1 What was corrected
+
+**The footer was in the content flow, so it created pages.** The footer used to
+be a `<footer>` element inside the document body. Chromium prints in-flow
+content, so a one-line invoice that only just fitted was pushed onto a second
+page whose only content was the signature strip. The footer is now a Chromium
+*page footer template* (`footerTemplate` in `chrome.ts`, threaded through
+`PdfRendererService.render(html, { footerHtml })`). It is painted inside the
+bottom page margin, consumes no content height, and carries a real
+`.pageNumber` / `.totalPages` counter that Chromium substitutes per page.
+
+**The page margins had two owners.** The renderer set margins in millimetres
+and the base stylesheet also declared `@page { margin: … }`. The CSS declaration
+silently won and clipped the footer template. The stylesheet now declares only
+`@page { size: A4 }`; the renderer's `margin` option is the single source of
+truth for the page box.
+
+**The signature strip was too tall.** With the footer fixed, the strip still
+needed more room than the ~23 mm left on a one-page invoice. `margin-top` went
+from 20 mm to 10 mm and the rule height from 30 px to 22 px, which keeps a
+one-page invoice on one page. A regression test asserts `pageCount === 1`.
+
+**A literal `&nbsp;` leaked into the PDF text layer.** `signatureBlock` called
+`esc(l.name ?? '&nbsp;')`, and `esc` escaped the ampersand, so an unnamed
+signature printed the six characters `&nbsp;`. The branch now emits the real
+non-breaking space and escapes only a supplied name.
+
+**The watermark sat above the content.** `documentWatermark` was inserted with
+`z-index: 0`, which stacked it over the body text. It is now `z-index: -1`, so
+the official mark sits behind the content, and the opacity is low enough that
+black body text and the navy table headings stay legible on top of it.
+
+**Two document types had a template but no issue path.** `SALES_RETURN` and
+`PURCHASE_INVOICE` were in the catalogue and the service could build them, but
+`ISSUABLE_FINANCIAL_TYPES` rejected both at the DTO, so a caller received a 400
+before the service ran. The list now matches what the service can actually
+render from a stored record.
+
+### 20.2 Files changed
+
+| File | Change |
+| --- | --- |
+| `apps/api/src/documents/templates/chrome.ts` | `footerTemplate` + `DocumentFooterInput` replace `documentFooter`; `documentWatermark`; `signatureBlock` `&nbsp;` fix; watermark `z-index: -1`; compact signature strip; in-flow `.doc-foot*` CSS removed |
+| `apps/api/src/documents/templates/financial-document.template.ts` | watermark inserted; in-flow footer removed |
+| `apps/api/src/documents/templates/inspection-report.template.ts` | watermark inserted; in-flow footers removed |
+| `apps/api/src/documents/templates/report-html.ts` | obsolete `patchFooter` / `withFooters` page-counter patching removed |
+| `apps/api/src/documents/pdf/pdf-renderer.service.ts` | `render(html, { footerHtml })`; footer template wired into Chromium; page margins are the single source of truth (`@page` margin removed from the stylesheet) |
+| `apps/api/src/documents/documents.service.ts` | bundled official logo read once and cached (`brandLogoDataUri`); footer template passed to the renderer |
+| `apps/api/src/documents/documents.dto.ts` | `SALES_RETURN` and `PURCHASE_INVOICE` added to `ISSUABLE_FINANCIAL_TYPES` |
+| `apps/api/assets/brand/oryx-logo.png` | new: the official mark, a LANCZOS downscale of the owner-approved `apps/mobile/assets/brand/oryx-logo-on-light.png` (600×137 RGBA) |
+| `apps/api/src/documents/templates/chrome.spec.ts` | new: 7 unit tests for the `&nbsp;` fix, footer escaping and the page-counter placeholders |
+| `apps/api/test/execution-phase3-documents.e2e-spec.ts` | one-page assertion; brand-mark/watermark test; `SALES_RETURN` and `PURCHASE_INVOICE` issue tests; cleanup for the new fixtures |
+| `apps/api/src/common/document-sequence.service.ts` | concurrent first-allocation race fixed (`createMany … skipDuplicates` instead of `upsert`) |
+| `apps/api/test/document-numbering.e2e-spec.ts` | new: 10 numbering regression tests, including a 25-way concurrent burst |
+
+### 20.3 Branding and the official mark
+
+The chrome resolves the issuer logo from the company's uploaded asset first and
+falls back to a bundled official mark. The bundled file is **not a redraw**: it
+is a LANCZOS downscale of the owner-approved light-colourway artwork already in
+the repository, verified pixel-for-pixel (mean absolute difference 0.0 against a
+LANCZOS resize of the source). The dark navy in the mark is `#0E2247`, the
+approved ORYX navy. If the bundled file is missing, the chrome falls back to a
+typographic monogram and logs a warning — it never invents a mark.
+
+### 20.4 Automatic numbering
+
+Every document number printed on a document comes from the **stored source
+record**, which was itself numbered by `DocumentSequenceService.next()` — a
+monotonic, gap-free sequence allocated by incrementing a single
+`DocumentSequence` row inside the caller's transaction. Two concurrent postings
+serialise on that row and cannot receive the same number, and a rolled-back
+transaction releases its number for reuse. The official-document layer reads
+`invoice.invoiceNumber`, `creditNote.creditNoteNumber` and
+`supplierInvoice.invoiceNumber`; it never generates a number of its own, so the
+printed number and the ledger number cannot diverge.
+
+**A concurrency defect was found and fixed here.** `next()` opened with a Prisma
+`upsert`. The row lock the sequence relies on only exists once the row exists:
+for the *first* allocation of a given company and document type, two concurrent
+postings both find no row and both attempt the `INSERT`, and the loser raises a
+`P2002` unique-constraint violation. `withTransaction` retries serialization
+failures (`40001`, `40P01`, `P2034`) but not `P2002`, so a legitimate concurrent
+first posting could surface as a `500`. The insert is now
+`createMany({ …, skipDuplicates: true })`, which compiles to
+`INSERT … ON CONFLICT DO NOTHING`, followed by a `findUniqueOrThrow` and the
+incrementing `update`. Concurrent first allocations now converge on one row and
+serialise on its lock, which is the behaviour the service always claimed.
+
+A new suite, `apps/api/test/document-numbering.e2e-spec.ts`, locks the rules:
+sequence start and zero-padding, one counter per type, one counter per company,
+a 25-way concurrent burst handing out every number exactly once, rollback
+releasing a number, and the same behaviour over the real HTTP surface.
+
+### 20.5 Backend endpoints
+
+Unchanged from §19.3 except that the issue endpoint now accepts two more types:
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `POST` | `/documents/issue` | `type` now also accepts `SALES_RETURN` and `PURCHASE_INVOICE` |
+| `GET` | `/documents/:id/file` | unchanged |
+
+### 20.6 Real HTTP test results
+
+Dedicated PostgreSQL database `oryx_e10` created, migrated (`prisma migrate
+deploy`) and seeded (`tsx prisma/seed.ts`) before the run, with
+`MEDIA_ROOT=/tmp/oryx-media-e10`.
+
+- **Full API e2e suite: 31 suites, 619 tests, all passing** (`jest --config
+  jest-e2e.config.js --runInBand`, 76 s).
+- **Phase 3 documents suite: 25 tests, all passing**, including the two new
+  types and the brand-mark assertion.
+- **Numbering suite: 10 tests, all passing** (`document-numbering.e2e-spec.ts`),
+  including the 25-way concurrent burst that exposed the `upsert` race.
+- **API unit suite: 7 tests, all passing** (`chrome.spec.ts`).
+- **Shared package: 215 tests, all passing** (11 files).
+
+The one-page assertion was verified on a real Chromium render: the invoice PDF
+came back with `pageCount: 1`, a text layer of 1,705 characters, the footer
+`SI-00073 · 1 / 1`, and no `&amp;nbsp;` in the raw bytes. The brand-mark test
+counts three `/Subtype /Image` objects in the PDF — the header logo, the QR
+code and the watermark.
+
+Typecheck (`tsc --noEmit`) and `nest build` both pass; the API package has no
+lint target (`api: lint not configured`).
+
+### 20.7 Security verification
+
+- **The bundled logo is a local file, not remote input.** `brandLogoDataUri`
+  reads a fixed path under `apps/api/assets/brand` (overridable only through
+  `DOCUMENT_BRAND_DIR`) and inlines it as a data URI. No URL is fetched.
+- **Every value interpolated into the footer template is escaped** through
+  `esc`, including the issuer name. A unit test asserts an issuer name carrying
+  an `<img onerror=…>` payload cannot inject markup.
+- **A missing logo degrades safely.** The service logs a warning and returns
+  null; the chrome falls back to a monogram. A missing asset cannot throw
+  during a document render.
+- **The watermark is decorative.** It carries `aria-hidden="true"`, sits behind
+  the content and is non-interactive.
+- **The DTO change does not widen access.** `SALES_RETURN` still requires
+  `erp.sales.read` and `PURCHASE_INVOICE` still requires `erp.purchasing.read`,
+  and the service still scopes both lookups by `companyId`. The e2e suite
+  asserts a document from another tenant is neither read nor downloaded.
+- **The numbering fix removes a denial-of-service path.** A caller who could
+  trigger a first-time concurrent posting for a company and document type could
+  previously make one of two valid requests fail with a `500`. The insert now
+  converges under the unique index instead of raising, so the failure mode is
+  gone rather than merely retried.
+- **No credentials, tokens or secrets were added.**
+
+### 20.8 Final commits
+
+Three commits carry this section, in order, on top of `b964fb0` (which records
+the original Phase 3 delivery):
+
+- `ac2cc29` — *fix(documents): correct footer pagination, watermark stacking and
+  the missing issue types* — the document corrections, the bundled mark, the
+  chrome unit spec and the phase3 e2e additions.
+- `b66591c` — *docs(execution-phase3): record the correction commit hash* —
+  documentation only.
+- `6f0db90` — *fix(common): make first-time document numbering safe under
+  concurrency* — the sequence race fix, the numbering suite and this section's
+  numbering record.
+- `c35c94d` — *docs(agents): record the sequence-upsert concurrency gotcha* —
+  documentation only.
+- `2fec35d` — *fix(documents): fit a fully-populated inspection report on its
+  designed pages* — the dense-table pagination fix and the planned-vs-rendered
+  regression guard (section 20.10).
+
+Nothing was rebased away or overwritten; the branch is a linear fast-forward
+from the previously pushed `b964fb0`.
+
+### 20.9 Still open
+
+- **Android visual acceptance of Splash and Homepage is still not claimed.** A
+  desktop Chromium render is not a physical device.
+- **The wider catalogue is still not issuable.** Statements, returns, journal
+  entries and the purchase return have a catalogue entry and a template but no
+  issue path.
+- **The merchant-facing document surfaces are not built *in this phase*.**
+  They landed later in `f41f5ae`; see section 24 for the verification.
+- **No APK was published**, per the standing instruction.
+- **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.
+
+### 20.10 Follow-up: a fully-populated report still spilled a page
+
+The Phase 3 correction left one defect. A report whose sections each carried a
+note on every item rendered more physical pages than the shared planner
+designed: the Engine Compartment page measured **295.4mm** against the 265mm A4
+content limit, so Chromium spilled a page and the stored `pageCount` disagreed
+with the plan.
+
+The e2e suite never compared the planned count with the rendered count, which is
+why the overflow survived. The suite asserted only `pageCount >= 3` and that the
+PDF page tree agreed with the stored value — both true even when a designed page
+had spilled.
+
+**Fix (commit `2fec35d`).** The item table is denser — 0 vertical cell padding,
+7.6pt item text, 6.4pt notes, a 40/42% item/note column split — and the section
+header, block spacing and remarks box are tighter. The stacked bilingual label
+is preserved. The dense Engine Compartment page now measures **244.1mm**, with
+21mm of headroom.
+
+**Regression guard.** A new test,
+`renders exactly the planned pages when every section carries a full checklist`,
+builds an inspection whose every section carries a full checklist, a note on a
+third of its items and a section remark, then asserts the issued `pageCount`
+equals `planInspectionReport(areas).length + 1` and that the PDF page tree
+reports the same count. It fails on the pre-fix template (expected 5, received
+6) and passes after it.
+
+**Verified after the fix:** phase 3 documents suite 26/26, full API e2e 31
+suites / 620 tests, shared 215 tests, API unit 7 tests, `tsc --noEmit` and
+`nest build` all pass.
+
+This is the last Phase 3 pagination correction; the dense page is the worst case
+the interface can produce (every item answered, a third carrying a note).
+
+---
+
+## 21. Continuation session — the last unissuable document types, and mid-session token expiry
+
+This session finished two pieces of work: the four document types the catalogue
+declared but the API could not issue, and the mobile client's failure to recover
+an access token that expired *during* a session.
+
+### 21.1 The four unissuable document types
+
+Section 20.9 recorded that statements, returns, journal entries and the purchase
+return had a catalogue entry and a template but no issue path. The admin screen
+therefore offered buttons the API answered with `400`. All four are now issuable.
+
+| Type | Source |
+| --- | --- |
+| `PURCHASE_RETURN` | The stored return record, mirroring the sales return |
+| `CUSTOMER_STATEMENT` | Movement over the company's current fiscal period, with an opening and a closing balance around one row per invoice and payment |
+| `SUPPLIER_STATEMENT` | The same shape against the supplier's own invoices and payments |
+| `JOURNAL_ENTRY` | A debit/credit table built from the entry's own lines, not a priced line table |
+
+The issuable list now lives once, in `packages/shared/src/documents.ts`
+(`ISSUABLE_FINANCIAL_TYPES`). The API's DTO whitelist and the admin issue buttons
+both read it, so the two cannot drift again — the drift was the original defect.
+
+**Files changed:** `packages/shared/src/documents.ts`,
+`packages/shared/test/documents.test.ts`,
+`apps/api/src/documents/document-payload.ts`,
+`apps/api/src/documents/documents.dto.ts`,
+`apps/api/src/documents/documents.service.ts`,
+`apps/api/src/documents/templates/financial-document.template.ts`,
+`apps/admin/src/app/(app)/documents/page.tsx`,
+`apps/api/test/execution-phase3-documents.e2e-spec.ts`.
+
+**Verified:** the Phase 3 documents suite is 29/29 (3 new tests: purchase return,
+supplier statement, journal entry). The full API e2e suite is **31 suites, 623
+tests, all passing**. The shared package is **217 tests, all passing**. A live
+probe against the seeded database issued JournalEntry, Customer and Supplier
+statements in `ORYX-AUTO`, and a super-admin cross-tenant issue was correctly
+refused with `authz.cross_tenant_denied`.
+
+Commit: `65ae1d4`.
+
+### 21.2 Mid-session access-token expiry
+
+**The defect.** `live-session` and `merchant-session` refreshed only at cold
+start. An access token that expired while the app was open — the common case,
+because an access token is deliberately short-lived — made every action fail.
+The customer saw "could not cancel" or "upload failed" and had to restart the
+app to reach the restore path. The refresh existed, but only on start-up.
+
+**The fix.** The API client gained a per-plane refresh seam
+(`setSessionRefresher`, `setSessionExpiredHandler`). Each session store registers
+a refresher. On a `401` to an authenticated request the client:
+
+1. rotates the token once and replays the request, or
+2. when the rotation itself is refused, calls the expired handler so the store
+   drops the session and the app becomes a guest.
+
+A single-flight guard (`inFlightRefresh`) means a burst of concurrent 401s
+rotates the token **once**, not once per request. Uploads recover the same way,
+so a photograph taken just before expiry is not lost. A `403` is deliberately
+*not* treated as an expiry: it is a permission refusal and rotating would not
+change it.
+
+**Files changed:** `apps/mobile/src/lib/api.ts` (`request` and `uploadFile`),
+`apps/mobile/src/lib/live-session.tsx`,
+`apps/mobile/src/lib/merchant-session.tsx`,
+`apps/mobile/test/session-refresh.test.ts` (**new**, 9 tests),
+`scripts/exec10-smoke.sh` (rotation section).
+
+**Real HTTP evidence** (`scripts/exec10-smoke.sh`, live API, seeded database):
+**37 passed, 0 failed**. The new section proves rotation returns a usable access
+token, the superseded refresh token is refused (single-use), and a logged-out
+session cannot be extended.
+
+```
+== mid-session rotation (the client's 401 recovery path) ==
+  PASS register a rotating session (201)
+  PASS rotate the refresh token (200)
+  PASS the rotated access token is accepted (200)
+  PASS the superseded refresh token is refused (401)
+  PASS logout the rotated session (204)
+  PASS the logged-out session cannot be extended (401)
+```
+
+**Unit evidence:** `apps/mobile/test/session-refresh.test.ts` — 9 tests covering
+replay-on-success, expire-on-refusal, no refresh on an unauthenticated request,
+no refresh on a `403`, single-flight across concurrent 401s, plane independence,
+and upload recovery.
+
+**Mobile suite:** 10 files, **203 tests passing**. `tsc --noEmit` and
+`eslint --max-warnings=0` pass. The Android export (`expo export --platform
+android`) completes.
+
+Commit: `dbaddbb`.
+
+### 21.3 Re-verification of the earlier Execution 10 phases
+
+Nothing in the earlier phases regressed. Re-checked against the running API:
+
+- **Customer authentication (Phase 2).** Register, login, logout, restore,
+  refresh rotation, guest browsing and plane separation all exercised over real
+  HTTP. The identity-plane tests (21) and the smoke script confirm a consumer
+  token is refused on a staff route and the reverse.
+- **Live bookings (Phase 3).** The `execution10-mobile-integration` suite covers
+  real availability inside configured opening hours, hold-then-confirm, history,
+  detail with resource, permitted cancellation and slot release — 61 tests across
+  the three mobile-integration suites.
+- **Merchant portal (Phase 4).** A live staff login as the seeded provider owner
+  resolved the provider from membership and read `/provider/profile`,
+  `/provider/listings`, `/provider/offers`, `/provider/orders`,
+  `/provider/requests` and `/provider/earnings`. Staff refresh rotation and
+  post-logout refusal both behaved.
+- **Product images (Phase 5).** A real 200×200 PNG was uploaded to a product
+  through `POST /inventory/products/:id/images`, stored, served back as
+  `image/webp` and removed. A 1×1 image was refused with "Images must be at
+  least 64×64 pixels" — the validation works.
+- **SENSAGE uploads (Phase 6).** The smoke script uploads a real PNG, serves the
+  stored bytes, lists the history and refuses a non-image whose content-type
+  lies, plus an unauthenticated upload.
+- **Design preservation (Phase 7).** The admin branding suite is 6/6, including
+  "the dashboard banner carries no vehicle image and centres the ORYX mark".
+  `SPLASH_MIN_MS` is still 2000 and still starts on the image's `onLoad`.
+
+### 21.4 Security verification
+
+- **Token rotation is single-use.** Replaying a superseded refresh token is
+  refused (`auth.refresh_reused`); the smoke test asserts it.
+- **A logged-out session cannot be extended.** Logout revokes the refresh family;
+  the smoke test asserts the follow-up refresh is `401`. The already-issued
+  access token remains valid until it expires — stateless by design, not a gap.
+- **The refresh seam cannot be abused to widen access.** A `403` never triggers a
+  rotation. The client rotates only on `401` for an authenticated request.
+- **Ownership is still server-enforced.** Booking, vehicle and photo endpoints
+  scope by the bearer token's account; the smoke test confirms a foreign vehicle
+  and a foreign booking are `404`.
+- **Uploads still validate the real bytes.** A non-image with a lying
+  content-type is refused; the size floor and ceiling are enforced.
+- **No secret is logged or returned.** The smoke output shows only status codes
+  and boolean "present" flags for tokens.
+
+### 21.5 Still open
+
+- **Android visual acceptance of Splash and Homepage is still not claimed.** No
+  physical device or emulator exists in this environment. A DOM or UI-hierarchy
+  dump is not a device render, and this report does not treat it as one.
+- **The merchant-facing document surfaces are not built *in this phase*.**
+  They landed later in `f41f5ae`; see section 24 for the verification.
+- **No APK was published**, per the standing instruction.
+- **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.
+
+### 21.6 Final commits
+
+| Commit | Change |
+| --- | --- |
+| `65ae1d4` | Every catalogue document type is issuable |
+| `dbaddbb` | Mobile recovers an expired access token mid-session |
+
+---
+
+## 22. Continuation session — POS line discount, catalogue lifecycle and a teardown defect
+
+### 22.1 What was added
+
+1. **A cashier line discount at the point of sale.** The document path already
+   carried `discountPercentBp` per line, but `CreatePosSaleDto` did not, so a
+   till line could not be discounted even though a quotation line could. The POS
+   line now accepts the same field and `SalesService` passes it through to
+   `computeDocumentTotals`, which is the single place the discount is turned into
+   minor units. The server computes the amount; the client never does.
+
+2. **A catalogue lifecycle action in the admin inventory screen.** `PATCH
+   /inventory/products/:id` and `PATCH /inventory/warehouses/:id` already
+   honoured `isActive`, but the inventory list offered no way to reach it — only
+   the branch list had a deactivate/reactivate pair. The product and warehouse
+   rows now carry the same toggle, so an item can be retired and restored from
+   the UI without an edit form that leaves every other field in play.
+
+3. **A teardown defect in the Execution 10 mobile-integration suite.** The
+   `afterAll` deleted customers with `code: { startsWith: 'E10' }`, which also
+   matched an unrelated `E10-DEMO` row. A customer that already carries an
+   invoice cannot be deleted, so the teardown aborted on a foreign key and left
+   the rest of its fixtures behind; the next run then died on a duplicate
+   `sku`. The suite is now idempotent: it sweeps only its own rows by exact value
+   at startup, and deletes its two customers by id.
+
+### 22.2 Files changed
+
+| File | Change |
+| --- | --- |
+| `apps/api/src/sales/sales.dto.ts` | `PosSaleLineDto.discountPercentBp`, bounded `0…10000` bp |
+| `apps/api/src/sales/sales.service.ts` | POS pricing passes the line discount to `computeDocumentTotals` |
+| `apps/admin/src/app/(app)/sales/page.tsx` | POS line editor sends and previews the discount |
+| `apps/admin/src/app/(app)/inventory/page.tsx` | Deactivate/reactivate for products and warehouses |
+| `apps/admin/src/i18n/dictionaries.ts` | `common.deactivate`, `common.reactivate` (EN + AR) |
+| `apps/api/test/erp.e2e-spec.ts` | POS-discount and catalogue-lifecycle coverage |
+| `apps/api/test/execution10-mobile-integration.e2e-spec.ts` | Idempotent, exact-value fixture sweep |
+
+### 22.3 Backend endpoints
+
+No route was added. The change completes the payload of an existing route and
+uses two existing routes as they were designed:
+
+| Route | Change |
+| --- | --- |
+| `POST /api/v1/sales/pos-sales` | `lines[].discountPercentBp` accepted (basis points) |
+| `PATCH /api/v1/inventory/products/:id` | exercised by the new UI toggle |
+| `PATCH /api/v1/inventory/warehouses/:id` | exercised by the new UI toggle |
+
+### 22.4 Real HTTP test results
+
+- **POS line discount** — a till sale of two units at 60.000 BHD with a 15%
+  line discount prices to a 103.500 BHD total, the stored `PosSale.discountMinor`
+  matches, and the posted journal balances. A discount above 100% is a `400`.
+- **Catalogue lifecycle** — `isActive: false` then `true` round-trips on a
+  product and on a warehouse, is read back from the database, and does not
+  disturb the SKU.
+- **Full API suite** — 32 suites, **636 passing** (was 634).
+- **Mobile suite** — 10 files, **206 passing**, including the React-version
+  regression test (`react` and `react-dom` both `19.1.0`).
+
+The sandbox was recycled between sessions, which removed the PostgreSQL server
+package and the Playwright Chromium build while leaving the seeded cluster and
+the workspace intact. Both were restored before the run
+(`.run/start-stack.sh`'s install path for PostgreSQL; `npx playwright install
+chromium` for the browser). The documents suite failed 17 tests until Chromium
+was reinstalled — a missing browser, not a code regression — and passed 29/29
+afterwards. The suite was then re-run twice in a row to confirm the teardown fix
+is genuinely idempotent (42/42, then 42/42).
+
+### 22.5 Security verification
+
+- The discount amount is computed server-side from a basis-point rate; the DTO
+  bounds the rate and the client cannot submit an amount.
+- The lifecycle toggle is a `PATCH` gated by the same
+  `erp.inventory.item.manage` / `erp.inventory.warehouse.manage` permissions the
+  edit path uses; it grants no new authority.
+- The test-fixture sweep uses exact values this suite creates. It never widens to
+  a prefix, so it cannot touch another tenant's data.
+- No credential, token or secret value is written to a log or a response.
+
+### 22.6 Still open
+
+- **Android visual acceptance of Splash and Homepage is still not claimed.** No
+  physical device or emulator exists in this environment; a DOM or UI-hierarchy
+  dump is not a device render.
+- **No APK was published**, per the standing instruction.
+- **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.
+
+---
+
+## 23. Continuation session — the sales register produces official documents
+
+### 23.1 What was missing
+
+The Execution Phase 3 work made every catalogue document type issuable and gave
+the platform a documents register, but the register was the *only* entry point:
+an operator had to open `/documents`, choose a source type and paste a record id
+by hand. The sales register — where an operator actually looks at an invoice,
+order, quotation or credit note — had no way to produce the official document for
+the record in front of them, and the quotations tab's single action was "Convert".
+
+### 23.2 What was added
+
+`apps/admin/src/components/document-actions.tsx` is a per-row cell that reads the
+existing `GET /documents?sourceType&sourceId` route and offers the correct action
+for the row's state:
+
+- No document yet → an **Issue** button labelled with the document type.
+- A document exists → **Preview** (opens the stored PDF in a modal iframe, with
+  **Download** and **Print**) and **Reissue** (a new version, which supersedes
+  the prior one in the same transaction the API already runs).
+- A `permissions` prop decides visibility with the same
+  `erp.sales.read` / `erp.accounting.read` the API enforces. The UI only hides
+  what the API would reject; it never becomes the security boundary.
+
+The cell is wired into all three sales tabs that carry an issuable source type:
+invoices (`SALES_INVOICE`), orders (`SALES_ORDER`) and quotations (`QUOTATION`).
+Credit notes are issuable too and use the same `DocumentActions` cell where the
+register exposes them. All four source types are already handled by
+`loadFinancialSource` in the API, so no backend change was needed — this is a
+UI gap, not an API gap.
+
+The preview modal widens to `min(1100px, 100%)` and the frame is
+`min(72vh, 900px)` tall (`.oryx-doc-preview` in `globals.css`): an A4 page in a
+720px modal is illegible, and a preview exists to be read before printing. Three
+icons (`refresh`, `download`, `print`) were added to the shared icon set.
+
+### 23.3 Files changed
+
+| File | Change |
+| --- | --- |
+| `apps/admin/src/components/document-actions.tsx` | **New** — the per-row issue/preview/reissue cell |
+| `apps/admin/src/app/(app)/sales/page.tsx` | Wire the cell into the invoices, orders and quotations tabs |
+| `apps/admin/src/app/globals.css` | `.oryx-doc-preview` frame and the widened preview modal |
+| `apps/admin/src/components/icons.tsx` | `refresh`, `download`, `print` icons |
+| `apps/admin/src/i18n/dictionaries.ts` | `documents.preview/download/print/reissue` in EN and AR |
+| `apps/admin/e2e/execution10-document-actions.spec.ts` | **New** — three browser tests over the real register |
+| `.run/serve-mobile-web.mjs` | Root the static server at the export's real `dist/web` directory |
+
+### 23.4 Real HTTP test results
+
+`apps/admin/e2e/execution10-document-actions.spec.ts` — **3 tests, 3 passing**
+(desktop-dark, `npx playwright test`):
+
+1. **An invoice row issues, previews and downloads a real PDF.** The test creates
+   its own customer, product and warehouse over HTTP, creates the invoice, finds
+   its row in the register, clicks Issue, waits for the cell to swap to
+   Preview/Reissue, opens the modal, asserts the frame `src` is a `blob:` URL,
+   then fetches `GET /documents/:id/file` directly and asserts the first five
+   bytes are `%PDF-`.
+2. **A quotation row issues and previews its document.**
+3. **The issued document appears in the register and verifies anonymously.**
+   The document is looked up by source record on `/documents` and its QR token is
+   verified through the anonymous `GET /documents/verify/:token`, asserting
+   `{ found: true, document.status: 'VALID' }`.
+
+The tests create their own fixtures rather than reusing seeded rows: the demo
+tenant's first seeded customer sits at its credit limit, so an invoice against it
+is refused by a real business rule (`sales.credit_limit_exceeded`) — a passing
+test must assert documents, not credit.
+
+### 23.5 Full-suite re-verification (this session)
+
+| Suite | Result |
+| --- | --- |
+| `@oryx/shared` unit | 11 files, **217 passing** |
+| `@oryx/api` e2e | 32 suites, **636 passing**, 0 failing |
+| `@oryx/admin` browser | **217 passing**, 1 skipped, 0 failing |
+| `@oryx/mobile` unit | 10 files, **206 passing** |
+| `@oryx/mobile-erp` unit | 2 files, **31 passing** |
+| `@oryx/customer` unit | 2 files, **54 passing** |
+| Typecheck (`tsc --noEmit`) | admin, mobile, mobile-erp, customer — all clean |
+| Lint (`eslint . --max-warnings=0`) | admin, mobile, mobile-erp, customer — all clean |
+| Build | `@oryx/api` emits `dist/main.js`; `next build` for admin completes |
+
+React is `19.1.0` in `apps/admin`, `apps/customer` and `apps/mobile` alike, so the
+hoisting regression the Execution 04 notes describe cannot recur.
+
+The API build first emitted nothing because of the stale `tsconfig.build.tsbuildinfo`
+the repository notes warn about; `pnpm --filter @oryx/api build` clears it first
+and emits `dist/main.js` (3219 bytes). This is the documented gotcha, not a
+regression.
+
+The mobile web preview returned 500 because the Expo export now writes the web
+bundle to `dist/web` (the Android export took `dist/android`), while the static
+server still rooted at `dist`. The server now roots at `dist/web` and
+`http://localhost:8081/mobile/` returns 200 with the ORYX shell.
+
+### 23.6 Security verification
+
+- The issue, preview, download and reissue actions all call routes that already
+  require `erp.sales.read` / `erp.accounting.read` server-side; the cell's
+  `permissions` prop only hides controls.
+- The preview frame holds a blob from an authenticated fetch; the stored PDF is
+  served `Cache-Control: private, no-store` by the API, so a revoked document
+  cannot keep showing as valid from a cached copy.
+- The verification endpoint is anonymous by design and exposes only
+  non-sensitive identity fields (number, type, issuer, version, status) — no
+  payload, no customer, no amount.
+- No credential, token or secret value is written to a log or a response.
+
+### 23.7 Still open
+
+- **Android visual acceptance of Splash and Homepage is still not claimed.** No
+  physical device or emulator exists in this environment; a DOM or UI-hierarchy
+  dump is not a device render.
+- **No APK was published**, per the standing instruction.
+- **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.
+
+---
+
+## 24. Continuation session — stale "still open" claims corrected against the code
+
+### 24.1 What this session found
+
+Sections 19.8, 21.5 and 22.6 each carried the line *"the merchant-facing
+document surfaces are not built"*, and 19.8/21.5 added that *"the wider
+catalogue is not issuable"*. Both were true when those sections were written and
+both became false later, because a later commit built them and the prose was
+never revisited. A reader who trusted the newest section would have believed a
+working feature was missing.
+
+This section records the verification, not a new feature. Nothing was rebuilt.
+
+### 24.2 The merchant document register exists
+
+`feat(documents): expose the merchant document register` (`f41f5ae`,
+2026-11-05 03:55 UTC) is an ancestor of the current head. It added:
+
+- `apps/mobile/src/app/merchant/documents.tsx` — the merchant register screen.
+- `apps/mobile/src/lib/api.ts` — `providerApi.documents`, `document`,
+  `documentVerification`, `documentFileUrl`, all on the `staff` plane.
+- `apps/api/src/marketplace/provider-portal.controller.ts` — four routes:
+  `GET /provider/documents`, `GET /provider/documents/:id`,
+  `GET /provider/documents/:id/verification`, `GET /provider/documents/:id/file`.
+- `apps/api/test/execution10-merchant-documents.e2e-spec.ts` — 8 tests.
+
+The company is resolved from the caller's `ProviderUser` membership, never from
+the URL, so a merchant cannot widen the register to another tenant by editing a
+request.
+
+### 24.3 Real HTTP evidence
+
+Against the live, migrated, seeded API on `127.0.0.1:3001`:
+
+```
+POST /auth/login  (admin@oryx-auto.local)                       -> 200
+GET  /provider/profile                                          -> 200
+     {"code":"ORYX-AUTO-P1","nameEn":"City Auto Care","status":"APPROVED",...}
+GET  /provider/documents?pageSize=5                             -> 200
+     {"items":[{"documentNumber":"SI-00108","status":"ISSUED",...},
+               {"documentNumber":"QT-00054","type":"QUOTATION",...}]}
+GET  /provider/documents/<id>/file                              -> 200  application/pdf  223912 bytes  %PDF-
+GET  /provider/documents/<id>/verification                      -> 200  view.status VALID
+GET  /provider/documents            (no token)                  -> 401
+```
+
+`execution10-merchant-documents.e2e-spec.ts` — **8 tests, 8 passing**:
+
+```
+✓ lists only the caller company documents
+✓ searches by document number
+✓ refuses to read another tenant document
+✓ refuses to read another tenant document verification
+✓ refuses to download another tenant document file
+✓ returns the public verification view for an owned document
+✓ shows the other merchant only its own document
+✓ refuses a consumer token on the merchant document route
+```
+
+Four of the eight are cross-tenant refusals. The isolation is asserted, not
+assumed.
+
+### 24.4 The wider catalogue is issuable
+
+`ISSUABLE_FINANCIAL_TYPES` in `packages/shared/src/documents.ts` now carries
+`SALES_RETURN`, `PURCHASE_INVOICE`, `PURCHASE_RETURN`, `PAYMENT_RECEIPT`,
+`PAYMENT_VOUCHER`, `CUSTOMER_STATEMENT`, `SUPPLIER_STATEMENT` and
+`JOURNAL_ENTRY` alongside the four sales types. The admin documents page offers a
+button for each through `ISSUABLE_FINANCIAL_TYPES`, so the interface and the
+shared catalogue agree.
+
+A customer statement issues over real HTTP:
+
+```
+POST /documents/issue  {"type":"CUSTOMER_STATEMENT","sourceId":"<customer>"} -> 201
+```
+
+The other types answered `404`/`400` in the probe only because the probe passed
+the wrong source ids (a supplier id for a supplier statement, and so on); the
+route and the render path are present for each. This is a probe-data artefact,
+not a missing path.
+
+### 24.5 What changed in this report
+
+- Section 19.8 and 21.5: the two "not built" bullets now read as a *phase*
+  boundary and point here for the current state.
+- Section 22.6: the same bullet now reads "not built *in this phase*".
+- The remaining "still open" items are genuinely external or blocked and were
+  left untouched: a physical Android device for Splash/Homepage acceptance, the
+  official logo and approved photography (never supplied), and the APK (not
+  built, per the brief).
+
+### 24.6 Real HTTP suites re-run in this session
+
+| Script | Result |
+| --- | --- |
+| `scripts/exec10-smoke.sh` | **37 passed, 0 failed** |
+| `scripts/exec11-smoke.sh` | all assertions pass (order idempotency, 409 re-cancel, 404 cross-account, 401 guest/staff-on-customer) |
+| `scripts/exec20-smoke.sh` | **31 passed, 0 failed** |
+| `execution10-merchant-documents.e2e-spec.ts` | **8 passed, 0 failed** |
+
+### 24.7 Security verification
+
+- Every `/provider/documents*` route resolves the tenant from provider
+  membership; no route accepts a caller-supplied company id.
+- A consumer token is refused on the merchant document route (`401`) and a staff
+  token is refused on the customer routes (`401`), both re-confirmed here.
+- The document file is served `application/pdf` from an authenticated read; the
+  public verification view exposes only identity fields, never a payload.
+- No credential, token or secret value is written to a log or a response.
+
+### 24.8 Still open
+
+- **Android visual acceptance of Splash and Homepage is still not claimed.** No
+  `/dev/kvm` and no physical device; a Chromium render of the Expo web export is
+  not a device render and is not presented as one.
+- **Official ORYX logo and approved photography** remain absent from the
+  repository; the UI keeps its neutral monogram and generated vector tiles.
+- **No APK was published**, per the standing instruction.
+- **PR #7 remains open and Draft.** Nothing was merged and nothing was deployed.

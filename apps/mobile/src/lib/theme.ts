@@ -1,10 +1,14 @@
 /**
- * ORYX mobile design tokens.
+ * ORYX Marketplace design tokens.
  *
- * The same approved identity as the control plane and the customer website:
- * deep navy (#00162b family), layered navy panels, restrained gold accents and
- * hairline borders. Values mirror `apps/customer/src/app/globals.css` so the
- * three surfaces stay visually consistent.
+ * The approved identity: deep navy (#00162b family), layered navy panels,
+ * restrained metallic gold accents and hairline borders. Values mirror
+ * `apps/customer/src/app/globals.css` and `apps/admin` so the website, the
+ * control plane and the phone stay one product.
+ *
+ * Both themes derive from this file alone. A screen never hard-codes a colour:
+ * it reads a token, so a theme change cannot leave a component behind and the
+ * light theme cannot drift away from the approved dark one.
  */
 
 export type ThemeMode = 'dark' | 'light';
@@ -16,63 +20,90 @@ export interface Theme {
   surface: string;
   surfaceRaised: string;
   surfaceHover: string;
+  /** Translucent film laid over photography so text stays legible on it. */
+  scrim: string;
   border: string;
   borderSoft: string;
   borderStrong: string;
   text: string;
   textMuted: string;
   textFaint: string;
+  /** Ink that is legible on top of `gold`. */
+  onGold: string;
+  /** The search input's own surface, which is lighter than a card. */
+  search: string;
   navy: string;
   gold: string;
   goldSoft: string;
+  goldDeep: string;
   success: string;
   warning: string;
   danger: string;
   info: string;
+  /** Elevation shadow colour; weaker in dark mode where contrast carries depth. */
+  shadow: string;
 }
 
 const dark: Theme = {
   mode: 'dark',
-  bg: '#00162b',
-  bgDeep: '#000f1e',
-  surface: '#021f3a',
-  surfaceRaised: '#072a4a',
-  surfaceHover: '#0b3459',
-  border: 'rgba(212, 175, 55, 0.18)',
-  borderSoft: 'rgba(255, 255, 255, 0.08)',
-  borderStrong: 'rgba(212, 175, 55, 0.55)',
-  text: '#eef3f9',
-  textMuted: '#9fb3c8',
-  textFaint: '#6f8598',
+  // The owner's approved palette. Every value here is a token from the written
+  // specification, so a screen reads a name and never a literal.
+  bg: '#00162b',          // background — main screen
+  bgDeep: '#00101f',      // backgroundDeep — header and bottom bar
+  surface: '#061b32',     // card — dark cards
+  surfaceRaised: '#10263e', // surface — elevated surfaces
+  surfaceHover: '#16304c',
+  scrim: 'rgba(0, 16, 31, 0.62)',
+  border: '#30445b',      // border — subtle outlines
+  borderSoft: 'rgba(48, 68, 91, 0.55)',
+  borderStrong: '#c6a15b', // goldDark — borders and details
+  text: '#ffffff',        // white — headings
+  textMuted: '#b6bec9',   // mutedText — supporting text
+  textFaint: '#8995a7',   // inactive — inactive navigation
+  onGold: '#00162b',
   navy: '#00162b',
-  gold: '#d4af37',
-  goldSoft: '#e8c766',
+  gold: '#d7b878',        // gold — buttons and icons
+  goldSoft: '#f0c46c',    // goldBright — highlight
+  goldDeep: '#c6a15b',    // goldDark
+  search: '#1b3047',      // searchSurface — search input
   success: '#3ecf8e',
   warning: '#f0b429',
   danger: '#f2555a',
   info: '#4aa8ff',
+  shadow: 'rgba(0, 0, 0, 0.45)',
 };
 
+/**
+ * The light theme. The accent is `#7d5f10`, not the dark theme's `#d4af37`:
+ * the brighter gold measures 4.48:1 on the deepest ivory and fails WCAG AA,
+ * while this value clears it. Same finding as the customer website Phase E
+ * correction, so both surfaces share one accent value.
+ */
 const light: Theme = {
   mode: 'light',
-  bg: '#f5f6f8',
-  bgDeep: '#eceef2',
+  bg: '#f7f4ed',
+  bgDeep: '#efeae0',
   surface: '#ffffff',
-  surfaceRaised: '#f0f2f6',
-  surfaceHover: '#e8ecf2',
+  surfaceRaised: '#faf8f4',
+  surfaceHover: '#f1ece1',
+  scrim: 'rgba(0, 15, 30, 0.42)',
   border: 'rgba(0, 22, 43, 0.12)',
   borderSoft: 'rgba(0, 22, 43, 0.08)',
-  borderStrong: 'rgba(169, 134, 31, 0.55)',
-  text: '#0d2338',
-  textMuted: '#5b6b7d',
-  textFaint: '#8794a3',
+  borderStrong: 'rgba(125, 95, 16, 0.55)',
+  text: '#22201d',
+  textMuted: '#5b564d',
+  textFaint: '#8a8479',
+  onGold: '#221c07',
+  search: '#ece6da',
   navy: '#00162b',
-  gold: '#b8912a',
-  goldSoft: '#d4af37',
-  success: '#1f9d63',
-  warning: '#b7791f',
-  danger: '#c53030',
-  info: '#2b6cb0',
+  gold: '#7d5f10',
+  goldSoft: '#b8912a',
+  goldDeep: '#5c4509',
+  success: '#1f7a4d',
+  warning: '#8a5a09',
+  danger: '#a5232b',
+  info: '#1f5d94',
+  shadow: 'rgba(0, 22, 43, 0.12)',
 };
 
 export const themes: Record<ThemeMode, Theme> = { dark, light };
@@ -85,24 +116,69 @@ export const space = {
   lg: 16,
   xl: 24,
   xxl: 32,
+  xxxl: 48,
+} as const;
+
+/**
+ * The fixed brand palette.
+ *
+ * These values do not follow the theme. They belong to surfaces that are always
+ * navy regardless of the reader's choice — the platform splash, the launch
+ * screen that hands off from it, and any type sitting directly on photography —
+ * so the identity does not step colour when the theme changes.
+ */
+export const brand = {
+  navy: '#00162b',
+  navyDeep: '#000f1e',
+  gold: '#d4af37',
+  onNavy: '#ffffff',
+  onNavyMuted: '#c8d6e4',
+  onNavyStrong: '#e8eef5',
 } as const;
 
 export const radius = {
   sm: 8,
   md: 12,
   lg: 16,
+  xl: 22,
   pill: 999,
 } as const;
 
 export const typography = {
+  display: 30,
   title: 24,
   heading: 19,
+  subheading: 16,
   body: 15,
   label: 13,
   caption: 11,
 } as const;
 
-/** Status colours for bookings, payments and requests. */
+/** The navy ramp behind the splash, the hero and the merchant header. */
+export const gradients = {
+  navy: ['#00162b', '#032a4d', '#00111f'] as const,
+  navySoft: ['#021f3a', '#00162b'] as const,
+  gold: ['#e8c766', '#d4af37', '#a9861f'] as const,
+};
+
+/** Elevation presets; the shadow colour follows the theme. */
+export function elevation(theme: Theme, level: 0 | 1 | 2 | 3) {
+  const config = {
+    0: { radius: 0, opacity: 0, offset: 0 },
+    1: { radius: 6, opacity: 0.35, offset: 2 },
+    2: { radius: 14, opacity: 0.45, offset: 5 },
+    3: { radius: 24, opacity: 0.55, offset: 9 },
+  }[level];
+  return {
+    shadowColor: theme.shadow,
+    shadowOpacity: config.opacity,
+    shadowRadius: config.radius,
+    shadowOffset: { width: 0, height: config.offset },
+    elevation: level * 3,
+  };
+}
+
+/** Status colours for bookings, orders, recovery jobs and payments. */
 export function statusColor(theme: Theme, status: string): string {
   switch (status) {
     case 'CONFIRMED':
@@ -110,6 +186,9 @@ export function statusColor(theme: Theme, status: string): string {
     case 'SUCCEEDED':
     case 'APPROVED':
     case 'PAID':
+    case 'DELIVERED':
+    case 'ACTIVE':
+    case 'ARRIVED':
       return theme.success;
     case 'HELD':
     case 'PENDING':
@@ -117,12 +196,21 @@ export function statusColor(theme: Theme, status: string): string {
     case 'NEW':
     case 'ASSIGNED':
     case 'REQUIRES_ACTION':
+    case 'PREPARING':
+    case 'READY':
+    case 'OUT_FOR_DELIVERY':
+    case 'SHIPPED':
+    case 'SEARCHING':
+    case 'ACCEPTED':
+    case 'ANALYSING':
+    case 'EN_ROUTE':
       return theme.warning;
     case 'CANCELLED':
     case 'NO_SHOW':
     case 'FAILED':
     case 'REJECTED':
     case 'DISPUTED':
+    case 'OUT_OF_STOCK':
       return theme.danger;
     default:
       return theme.textMuted;

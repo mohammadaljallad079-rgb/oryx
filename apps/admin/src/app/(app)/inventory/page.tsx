@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
-import { money, qty, toMinorInput, toQuantityInput } from '@/lib/erp-format';
+import { minorToInput, money, qty, toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -22,6 +22,7 @@ import {
 } from '@/components/ui';
 import type {
   ProductDto,
+  ProductImageDto,
   ReorderAlertDto,
   StockAdjustmentDto,
   StockMovementDto,
@@ -54,7 +55,7 @@ export default function InventoryPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="inventory-page">
+    <div className="flex flex-col gap-4" data-testid="inventory-page">
       <SectionHeader
         title={t('nav.warehouses_inventory')}
         subtitle={t('erp.inventory.subtitle')}
@@ -149,6 +150,8 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<ProductDto | null>(null);
+  const [imagesFor, setImagesFor] = useState<ProductDto | null>(null);
   const list = useAsync(() => api.products({ search: search || undefined }), [search]);
 
   return (
@@ -178,11 +181,13 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
             <tr>
               <th>{t('erp.inventory.sku')}</th>
               <th>{t('common.name')}</th>
+              <th>{t('erp.inventory.category')}</th>
               <th>{t('erp.inventory.unit')}</th>
               <th>{t('erp.inventory.salesPrice')}</th>
               <th>{t('erp.inventory.costPrice')}</th>
               <th>{t('erp.inventory.taxRate')}</th>
               <th>{t('common.status')}</th>
+              {canManage ? <th>{t('common.actions')}</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -193,6 +198,7 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
                   <span className="block font-semibold">{p.nameEn}</span>
                   <span className="oryx-faint block text-[11px]">{p.nameAr}</span>
                 </td>
+                <td className="text-[12.5px]">{p.category ?? '—'}</td>
                 <td className="text-[12.5px]">{p.unit}</td>
                 <td className="tabular-nums text-[12.5px]">{money(p.salesPriceMinor)}</td>
                 <td className="tabular-nums text-[12.5px]">{money(p.costPriceMinor)}</td>
@@ -200,13 +206,371 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
                 <td>
                   <Badge tone={p.isActive ? 'success' : 'neutral'}>{p.isActive ? t('common.active') : t('common.inactive')}</Badge>
                 </td>
+                {canManage ? (
+                  <td>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => setEditing(p)} data-testid={`edit-product-${p.sku}`}>
+                        {t('common.edit')}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setImagesFor(p)} data-testid={`images-product-${p.sku}`}>
+                        <Icon name="eye" size={15} />
+                        {t('erp.inventory.images')}
+                      </Button>
+                      {p.isActive ? (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={async () => {
+                            await api.updateProduct(p.id, { isActive: false });
+                            await list.reload();
+                          }}
+                          data-testid={`deactivate-product-${p.sku}`}
+                        >
+                          {t('common.deactivate')}
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          onClick={async () => {
+                            await api.updateProduct(p.id, { isActive: true });
+                            await list.reload();
+                          }}
+                          data-testid={`reactivate-product-${p.sku}`}
+                        >
+                          {t('common.reactivate')}
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
       <CreateProductModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <EditProductModal
+        product={editing}
+        onClose={() => setEditing(null)}
+        onSaved={async () => {
+          setEditing(null);
+          await list.reload();
+        }}
+      />
+      <ProductImagesModal
+        product={imagesFor}
+        canManage={canManage}
+        onClose={() => setImagesFor(null)}
+      />
     </Card>
+  );
+}
+
+/**
+ * Edit an existing catalogue item.
+ *
+ * The SKU is immutable: it is the key inventory movements and invoices reference,
+ * so the API would reject a change and the field is shown read-only rather than
+ * offered and then refused.
+ */
+function EditProductModal({
+  product,
+  onClose,
+  onSaved,
+}: {
+  product: ProductDto | null;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const { t } = useUi();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15', isActive: true,
+    barcode: '', category: '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
+  });
+
+  useEffect(() => {
+    if (!product) return;
+    setError(null);
+    setForm({
+      nameEn: product.nameEn,
+      nameAr: product.nameAr,
+      unit: product.unit,
+      salesPrice: minorToInput(product.salesPriceMinor),
+      costPrice: minorToInput(product.costPriceMinor),
+      taxRate: (product.taxRateBp / 100).toString(),
+      isActive: product.isActive,
+      barcode: product.barcode ?? '',
+      category: product.category ?? '',
+      // The stored reorder level is scaled by 10^4; `qty` renders it back.
+      reorderLevel: String(product.reorderLevel / 10_000),
+      reorderQuantity: String(product.reorderQuantity / 10_000),
+      trackStock: product.trackStock,
+    });
+  }, [product]);
+
+  const submit = async () => {
+    if (!product) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.updateProduct(product.id, {
+        nameEn: form.nameEn,
+        nameAr: form.nameAr,
+        unit: form.unit,
+        salesPriceMinor: toMinorInput(form.salesPrice),
+        costPriceMinor: toMinorInput(form.costPrice),
+        taxRateBp: Math.round(Number(form.taxRate) * 100),
+        isActive: form.isActive,
+        barcode: form.barcode,
+        category: form.category,
+        reorderLevel: toQuantityInput(form.reorderLevel),
+        reorderQuantity: toQuantityInput(form.reorderQuantity),
+        trackStock: form.trackStock,
+      });
+      await onSaved();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={Boolean(product)}
+      title={`${t('common.edit')} — ${product?.sku ?? ''}`}
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button variant="primary" disabled={busy} onClick={submit} data-testid="save-product-edit">
+            {busy ? t('common.loading') : t('common.save')}
+          </Button>
+        </>
+      }
+    >
+      {error ? <ErrorBanner message={error} /> : null}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label={t('erp.inventory.sku')}>
+          <input className="oryx-input" value={product?.sku ?? ''} readOnly disabled />
+        </Field>
+        <Field label={t('erp.inventory.unit')}>
+          <input className="oryx-input" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} data-testid="edit-product-unit" />
+        </Field>
+        <Field label={`${t('common.name')} (EN)`} required>
+          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="edit-product-name-en" />
+        </Field>
+        <Field label={`${t('common.name')} (AR)`} required>
+          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="edit-product-name-ar" />
+        </Field>
+        <Field label={t('erp.inventory.salesPrice')}>
+          <input className="oryx-input" value={form.salesPrice} onChange={(e) => setForm({ ...form, salesPrice: e.target.value })} data-testid="edit-product-sales-price" />
+        </Field>
+        <Field label={t('erp.inventory.costPrice')}>
+          <input className="oryx-input" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: e.target.value })} />
+        </Field>
+        <Field label={t('erp.inventory.taxRate')}>
+          <input className="oryx-input" value={form.taxRate} onChange={(e) => setForm({ ...form, taxRate: e.target.value })} />
+        </Field>
+        <Field label={t('erp.inventory.barcode')}>
+          <input className="oryx-input" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} data-testid="edit-product-barcode" />
+        </Field>
+        <Field label={t('erp.inventory.category')}>
+          <input className="oryx-input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} data-testid="edit-product-category" />
+        </Field>
+        <Field label={t('erp.inventory.reorderLevel')}>
+          <input className="oryx-input" value={form.reorderLevel} onChange={(e) => setForm({ ...form, reorderLevel: e.target.value })} data-testid="edit-product-reorder-level" />
+        </Field>
+        <Field label={t('erp.inventory.reorderQuantity')}>
+          <input className="oryx-input" value={form.reorderQuantity} onChange={(e) => setForm({ ...form, reorderQuantity: e.target.value })} />
+        </Field>
+      </div>
+      <label className="mt-4 flex items-center gap-2 text-[12.5px] font-semibold">
+        <input
+          type="checkbox"
+          className="oryx-checkbox"
+          checked={form.trackStock}
+          onChange={(e) => setForm({ ...form, trackStock: e.target.checked })}
+          data-testid="edit-product-track-stock"
+        />
+        {t('erp.inventory.trackStock')}
+      </label>
+      <label className="mt-4 flex items-center gap-2 text-[12.5px] font-semibold">
+        <input
+          type="checkbox"
+          className="oryx-checkbox"
+          checked={form.isActive}
+          onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
+          data-testid="edit-product-active"
+        />
+        {t('common.active')}
+      </label>
+    </Modal>
+  );
+}
+
+/**
+ * Product photography.
+ *
+ * Uploads go to the shared media library through the API's authorized pipeline,
+ * which sniffs the real file type, enforces the size ceiling and re-encodes the
+ * bytes. This screen never writes a storage path — it only posts the file and
+ * renders the served URL the API returns.
+ */
+function ProductImagesModal({
+  product,
+  canManage,
+  onClose,
+}: {
+  product: ProductDto | null;
+  canManage: boolean;
+  onClose: () => void;
+}) {
+  const { t, locale } = useUi();
+  const [images, setImages] = useState<ProductImageDto[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [altEn, setAltEn] = useState('');
+  const [altAr, setAltAr] = useState('');
+
+  const load = useCallback(async () => {
+    if (!product) return;
+    setLoading(true);
+    setError(null);
+    try {
+      setImages(await api.productImages(product.id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setLoading(false);
+    }
+  }, [product, t]);
+
+  useEffect(() => {
+    if (product) void load();
+    else {
+      setImages([]);
+      setFile(null);
+      setAltEn('');
+      setAltAr('');
+    }
+  }, [product, load]);
+
+  async function upload() {
+    if (!product || !file) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      if (altEn) form.append('altEn', altEn);
+      if (altAr) form.append('altAr', altAr);
+      await api.uploadProductImage(product.id, form);
+      setFile(null);
+      setAltEn('');
+      setAltAr('');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function promote(imageId: string) {
+    if (!product) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.updateProductImage(product.id, imageId, { isPrimary: true });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(imageId: string) {
+    if (!product) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.deleteProductImage(product.id, imageId);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal open={Boolean(product)} title={`${t('erp.inventory.images')} — ${product?.sku ?? ''}`} onClose={onClose}>
+      {error ? <ErrorBanner message={error} /> : null}
+      {loading ? <Skeleton height={120} /> : images.length === 0 ? (
+        <p className="oryx-faint mb-3 text-[12.5px]">{t('erp.inventory.noImages')}</p>
+      ) : (
+        <div className="mb-4 grid gap-3 sm:grid-cols-3">
+          {images.map((img) => (
+            <figure key={img.id} className="overflow-hidden rounded-lg border border-[var(--border)]" data-testid={`product-image-${img.id}`}>
+              {img.url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={api.resolveImage(img.url) ?? ''} alt={locale === 'ar' ? img.altAr ?? '' : img.altEn ?? ''} className="h-28 w-full object-cover" />
+              ) : (
+                <div className="flex h-28 w-full items-center justify-center text-[11px] text-[var(--muted)]">{t('common.empty')}</div>
+              )}
+              <figcaption className="flex items-center justify-between gap-2 p-2">
+                {img.isPrimary ? <Badge tone="success">{t('erp.inventory.primary')}</Badge> : <span />}
+                {canManage ? (
+                  <div className="flex gap-1">
+                    {!img.isPrimary ? (
+                      <Button size="sm" variant="ghost" disabled={busy} onClick={() => void promote(img.id)} data-testid={`promote-image-${img.id}`}>
+                        {t('erp.inventory.makePrimary')}
+                      </Button>
+                    ) : null}
+                    <Button size="sm" variant="danger" disabled={busy} onClick={() => void remove(img.id)} data-testid={`delete-image-${img.id}`}>
+                      <Icon name="close" size={14} />
+                    </Button>
+                  </div>
+                ) : null}
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      )}
+      {canManage ? (
+        <div className="border-t border-[var(--border)] pt-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label={t('erp.inventory.file')}>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/avif"
+                className="oryx-input"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                data-testid="product-image-file"
+              />
+            </Field>
+            <Field label={`${t('common.name')} (EN)`}>
+              <input className="oryx-input" value={altEn} onChange={(e) => setAltEn(e.target.value)} data-testid="product-image-alt-en" />
+            </Field>
+            <Field label={`${t('common.name')} (AR)`}>
+              <input className="oryx-input" value={altAr} onChange={(e) => setAltAr(e.target.value)} data-testid="product-image-alt-ar" />
+            </Field>
+          </div>
+          <div className="mt-3 flex justify-end">
+            <Button variant="primary" size="sm" disabled={busy || !file} onClick={() => void upload()} data-testid="upload-product-image">
+              {busy ? t('common.loading') : t('erp.inventory.uploadImage')}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </Modal>
   );
 }
 
@@ -216,6 +580,7 @@ function CreateProductModal({ open, onClose, onCreated }: { open: boolean; onClo
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
+    barcode: '', category: '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
   });
 
   const submit = async () => {
@@ -230,6 +595,12 @@ function CreateProductModal({ open, onClose, onCreated }: { open: boolean; onClo
         salesPriceMinor: toMinorInput(form.salesPrice),
         costPriceMinor: toMinorInput(form.costPrice),
         taxRateBp: Math.round(Number(form.taxRate) * 100),
+        barcode: form.barcode || undefined,
+        category: form.category || undefined,
+        // The reorder level is stored scaled by 10^4, exactly like a quantity.
+        reorderLevel: toQuantityInput(form.reorderLevel),
+        reorderQuantity: toQuantityInput(form.reorderQuantity),
+        trackStock: form.trackStock,
       });
       await onCreated();
       onClose();
@@ -277,7 +648,29 @@ function CreateProductModal({ open, onClose, onCreated }: { open: boolean; onClo
         <Field label={t('erp.inventory.taxRate')}>
           <input className="oryx-input" value={form.taxRate} onChange={(e) => setForm({ ...form, taxRate: e.target.value })} />
         </Field>
+        <Field label={t('erp.inventory.barcode')}>
+          <input className="oryx-input" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} data-testid="product-barcode" />
+        </Field>
+        <Field label={t('erp.inventory.category')}>
+          <input className="oryx-input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} data-testid="product-category" />
+        </Field>
+        <Field label={t('erp.inventory.reorderLevel')}>
+          <input className="oryx-input" value={form.reorderLevel} onChange={(e) => setForm({ ...form, reorderLevel: e.target.value })} data-testid="product-reorder-level" />
+        </Field>
+        <Field label={t('erp.inventory.reorderQuantity')}>
+          <input className="oryx-input" value={form.reorderQuantity} onChange={(e) => setForm({ ...form, reorderQuantity: e.target.value })} />
+        </Field>
       </div>
+      <label className="mt-4 flex items-center gap-2 text-[12.5px] font-semibold">
+        <input
+          type="checkbox"
+          className="oryx-checkbox"
+          checked={form.trackStock}
+          onChange={(e) => setForm({ ...form, trackStock: e.target.checked })}
+          data-testid="product-track-stock"
+        />
+        {t('erp.inventory.trackStock')}
+      </label>
     </Modal>
   );
 }
@@ -309,6 +702,7 @@ function WarehousesTab({ canManage }: { canManage: boolean }) {
               <th>{t('common.name')}</th>
               <th>{t('erp.inventory.branch')}</th>
               <th>{t('common.status')}</th>
+              {canManage ? <th>{t('common.actions')}</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -318,6 +712,35 @@ function WarehousesTab({ canManage }: { canManage: boolean }) {
                 <td>{w.nameEn}</td>
                 <td className="text-[12.5px]">{w.branchNameEn ?? '—'}</td>
                 <td><Badge tone={w.isActive ? 'success' : 'neutral'}>{w.isActive ? t('common.active') : t('common.inactive')}</Badge></td>
+                {canManage ? (
+                  <td>
+                    {w.isActive ? (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={async () => {
+                          await api.updateWarehouse(w.id, { isActive: false });
+                          await list.reload();
+                        }}
+                        data-testid={`deactivate-warehouse-${w.code}`}
+                      >
+                        {t('common.deactivate')}
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={async () => {
+                          await api.updateWarehouse(w.id, { isActive: true });
+                          await list.reload();
+                        }}
+                        data-testid={`reactivate-warehouse-${w.code}`}
+                      >
+                        {t('common.reactivate')}
+                      </Button>
+                    )}
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>

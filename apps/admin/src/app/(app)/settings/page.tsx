@@ -7,13 +7,21 @@ import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
 import { Badge, Button, Card, EmptyState, ErrorBanner, Field, SectionHeader, Skeleton } from '@/components/ui';
+import { BrandingPanel } from '@/components/branding-panel';
+import { CompanySettingsPanel } from '@/components/company-settings-panel';
+import { TaxRatesPanel } from '@/components/tax-rates-panel';
 
 export default function SettingsPage() {
   const { t, locale, theme, setLocale, setTheme } = useUi();
-  const { user, companyId, isPlatform, updatePreferences, refreshSession } = useAuth();
+  const { user, companyId, isPlatform, can, updatePreferences, refreshSession } = useAuth();
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState({ fullNameEn: '', fullNameAr: '' });
+
+  // Writes need `company.settings.update`; a Super Admin holds the platform
+  // variant of that check through its own role. Rendering the editor without
+  // the permission would show controls that the API rejects with a 403.
+  const canEditBranding = can('company.settings.update');
 
   const entitlements = useAsync(
     () => (companyId ? api.entitlements(companyId) : Promise.resolve(null)),
@@ -37,7 +45,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-5" data-testid="settings-page">
+    <div className="flex flex-col gap-4" data-testid="settings-page">
       <SectionHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
 
       {saved ? (
@@ -55,7 +63,7 @@ export default function SettingsPage() {
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="p-5">
+        <Card className="p-4">
           <p className="oryx-panel-title m-0 mb-4">{t('settings.profile')}</p>
           <div className="grid gap-4">
             <Field label={t('auth.email')}>
@@ -85,7 +93,7 @@ export default function SettingsPage() {
           </div>
         </Card>
 
-        <Card className="p-5">
+        <Card className="p-4">
           <p className="oryx-panel-title m-0 mb-4">{t('settings.preferences')}</p>
 
           <div className="mb-4">
@@ -139,8 +147,30 @@ export default function SettingsPage() {
         </Card>
       </div>
 
+      {companyId && canEditBranding ? (
+        <Card className="p-4" data-testid="settings-branding">
+          <p className="oryx-panel-title m-0 mb-1">{t('branding.title')}</p>
+          <p className="oryx-muted m-0 mb-4 text-[12px]">{t('branding.subtitle')}</p>
+          <BrandingPanel companyId={companyId} />
+        </Card>
+      ) : null}
+
+      <Card className="p-4" data-testid="settings-company">
+        <p className="oryx-panel-title m-0 mb-1">{t('settings.company')}</p>
+        <p className="oryx-muted m-0 mb-4 text-[12px]">{t('settings.companyHint')}</p>
+        <CompanySettingsPanel />
+      </Card>
+
       {companyId ? (
-        <Card className="p-5" data-testid="settings-entitlements">
+        <Card className="p-4" data-testid="settings-taxes">
+          <p className="oryx-panel-title m-0 mb-1">{t('tax.title')}</p>
+          <p className="oryx-muted m-0 mb-4 text-[12px]">{t('tax.hint')}</p>
+          <TaxRatesPanel />
+        </Card>
+      ) : null}
+
+      {companyId ? (
+        <Card className="p-4" data-testid="settings-entitlements">
           <p className="oryx-panel-title m-0 mb-1">{t('subscriptions.licence')}</p>
           <p className="oryx-muted m-0 mb-4 text-[12px]">{t('dash.moduleAdoptionHint')}</p>
           {entitlements.loading ? (

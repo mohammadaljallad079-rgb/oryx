@@ -1,0 +1,54 @@
+[
+  {
+    "name": "06-not-found-light-customer-en",
+    "app": "customer",
+    "theme": "light",
+    "file": "docs/audit/exec07/phase-e-light/06-not-found-light-customer-en.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "ltr",
+      "bodyBg": "rgb(247, 244, 237)",
+      "bgVar": "#f7f4ed",
+      "status": "Page not found"
+    }
+  },
+  {
+    "name": "06-not-found-dark-customer-en",
+    "app": "customer",
+    "theme": "dark",
+    "file": "docs/audit/exec07/phase-e-light/06-not-found-dark-customer-en.png",
+    "resolved": {
+      "theme": "dark",
+      "dir": "ltr",
+      "bodyBg": "rgb(0, 22, 43)",
+      "bgVar": "#00162b",
+      "status": "Page not found"
+    }
+  },
+  {
+    "name": "06-not-found-light-admin-en",
+    "app": "admin",
+    "theme": "light",
+    "file": "docs/audit/exec07/phase-e-light/06-not-found-light-admin-en.png",
+    "resolved": {
+      "theme": "light",
+      "dir": "ltr",
+      "bodyBg": "rgb(247, 244, 237)",
+      "bgVar": "#f7f4ed",
+      "status": "Page not found"
+    }
+  },
+  {
+    "name": "06-not-found-dark-admin-en",
+    "app": "admin",
+    "theme": "dark",
+    "file": "docs/audit/exec07/phase-e-light/06-not-found-dark-admin-en.png",
+    "resolved": {
+      "theme": "dark",
+      "dir": "ltr",
+      "bodyBg": "rgb(0, 22, 43)",
+      "bgVar": "#00162b",
+      "status": "Page not found"
+    }
+  }
+]

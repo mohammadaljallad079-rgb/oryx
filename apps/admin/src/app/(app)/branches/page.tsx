@@ -8,6 +8,7 @@ import { errorMessageKey, useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
+import type { BranchDto } from '@oryx/shared';
 import {
   Badge,
   Button,
@@ -37,6 +38,7 @@ function BranchesInner() {
   const scopeCompanyId = queryCompanyId ?? companyId;
 
   const [open, setOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<BranchDto | null>(null);
   const [limit, setLimit] = useState<{ maxBranches: number; used: number } | null>(null);
 
   const list = useAsync(
@@ -57,10 +59,12 @@ function BranchesInner() {
   }, [scopeCompanyId]);
 
   const canCreate = can('company.branch.create') || can('platform.branch.manage');
+  const canEdit = can('company.branch.update') || can('platform.branch.manage');
+  const canDelete = can('company.branch.delete') || can('platform.branch.manage');
 
   if (!scopeCompanyId) {
     return (
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-4">
         <SectionHeader title={t('branches.title')} subtitle={t('branches.subtitle')} />
         <Card>
           <EmptyState title={t('common.selectCompany')} hint={t('context.company')} />
@@ -70,7 +74,7 @@ function BranchesInner() {
   }
 
   return (
-    <div className="flex flex-col gap-5" data-testid="branches-page">
+    <div className="flex flex-col gap-4" data-testid="branches-page">
       <SectionHeader
         title={t('branches.title')}
         subtitle={t('branches.subtitle')}
@@ -113,6 +117,7 @@ function BranchesInner() {
                 <th>{t('common.name')}</th>
                 <th>{t('common.code')}</th>
                 <th>{t('common.city')}</th>
+                <th>{t('branches.phone')}</th>
                 <th>{t('branches.usersAssigned')}</th>
                 <th>{t('common.status')}</th>
                 <th>{t('common.actions')}</th>
@@ -124,6 +129,7 @@ function BranchesInner() {
                   <td className="font-semibold">{locale === 'ar' ? b.nameAr : b.nameEn}</td>
                   <td className="font-mono text-[12px]">{b.code}</td>
                   <td>{b.city ?? '—'}</td>
+                  <td className="tabular-nums text-[12.5px]">{b.phone ?? '—'}</td>
                   <td className="tabular-nums">{b.userCount ?? 0}</td>
                   <td>
                     <Badge tone={b.isActive ? 'success' : 'neutral'}>
@@ -131,19 +137,44 @@ function BranchesInner() {
                     </Badge>
                   </td>
                   <td>
-                    {can('company.branch.delete') ? (
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        disabled={!b.isActive}
-                        onClick={async () => {
-                          await api.deleteBranch(b.id);
-                          await list.reload();
-                        }}
-                      >
-                        {t('branches.deactivate')}
-                      </Button>
-                    ) : null}
+                    <div className="flex flex-wrap gap-2">
+                      {canEdit ? (
+                        <Button
+                          size="sm"
+                          onClick={() => setEditTarget(b)}
+                          data-testid={`edit-branch-${b.code}`}
+                        >
+                          {t('branches.edit')}
+                        </Button>
+                      ) : null}
+                      {canDelete ? (
+                        b.isActive ? (
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={async () => {
+                              await api.deleteBranch(b.id);
+                              await list.reload();
+                            }}
+                            data-testid={`deactivate-branch-${b.code}`}
+                          >
+                            {t('branches.deactivate')}
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            onClick={async () => {
+                              await api.updateBranch(b.id, { isActive: true });
+                              await list.reload();
+                            }}
+                            data-testid={`reactivate-branch-${b.code}`}
+                          >
+                            {t('branches.reactivate')}
+                          </Button>
+                        )
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -168,7 +199,139 @@ function BranchesInner() {
         }}
         hasModule={hasModule('branch_management')}
       />
+
+      <EditBranchModal
+        branch={editTarget}
+        onClose={() => setEditTarget(null)}
+        onSaved={async () => {
+          setEditTarget(null);
+          await list.reload();
+        }}
+      />
     </div>
+  );
+}
+
+function EditBranchModal({
+  branch,
+  onClose,
+  onSaved,
+}: {
+  branch: BranchDto | null;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const { t } = useUi();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({ nameEn: '', nameAr: '', city: '', addressLine: '', phone: '' });
+
+  // Re-seed the form whenever a different branch is opened.
+  useEffect(() => {
+    if (!branch) return;
+    setForm({
+      nameEn: branch.nameEn,
+      nameAr: branch.nameAr,
+      city: branch.city ?? '',
+      addressLine: branch.addressLine ?? '',
+      phone: branch.phone ?? '',
+    });
+    setError(null);
+  }, [branch]);
+
+  async function submit() {
+    if (!branch) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.updateBranch(branch.id, {
+        nameEn: form.nameEn,
+        nameAr: form.nameAr,
+        city: form.city || undefined,
+        addressLine: form.addressLine || undefined,
+        phone: form.phone || undefined,
+      });
+      await onSaved();
+    } catch (err) {
+      const key = errorMessageKey(err);
+      setError(key === 'common.error' ? (err instanceof Error ? err.message : t('common.error')) : t(key));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal
+      open={Boolean(branch)}
+      title={t('branches.editTitle')}
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            variant="primary"
+            disabled={busy || !form.nameEn || !form.nameAr}
+            onClick={submit}
+            data-testid="save-branch"
+          >
+            {busy ? t('common.loading') : t('common.save')}
+          </Button>
+        </>
+      }
+    >
+      {error ? (
+        <p
+          className="mb-3 rounded-lg px-3 py-2 text-[12.5px] font-semibold"
+          style={{ color: 'var(--danger)', background: 'color-mix(in srgb, var(--danger) 12%, transparent)' }}
+          data-testid="edit-branch-error"
+          role="alert"
+        >
+          {error}
+        </p>
+      ) : null}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label={`${t('common.name')} (EN)`} required>
+          <input
+            className="oryx-input"
+            value={form.nameEn}
+            onChange={(e) => setForm({ ...form, nameEn: e.target.value })}
+            data-testid="edit-branch-name-en"
+          />
+        </Field>
+        <Field label={`${t('common.name')} (AR)`} required>
+          <input
+            className="oryx-input"
+            value={form.nameAr}
+            onChange={(e) => setForm({ ...form, nameAr: e.target.value })}
+            data-testid="edit-branch-name-ar"
+          />
+        </Field>
+        <Field label={t('common.city')}>
+          <input
+            className="oryx-input"
+            value={form.city}
+            onChange={(e) => setForm({ ...form, city: e.target.value })}
+            data-testid="edit-branch-city"
+          />
+        </Field>
+        <Field label={t('branches.phone')}>
+          <input
+            className="oryx-input"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            data-testid="edit-branch-phone"
+          />
+        </Field>
+        <Field label={t('branches.addressLine')}>
+          <input
+            className="oryx-input"
+            value={form.addressLine}
+            onChange={(e) => setForm({ ...form, addressLine: e.target.value })}
+            data-testid="edit-branch-address"
+          />
+        </Field>
+      </div>
+    </Modal>
   );
 }
 

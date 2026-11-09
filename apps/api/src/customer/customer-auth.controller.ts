@@ -31,7 +31,7 @@ import {
   CustomerResetPasswordDto,
   UpdateCustomerProfileDto,
 } from './customer.dto';
-import { ERROR_CODES, notFound } from '../common/errors';
+import { ERROR_CODES, unauthorized } from '../common/errors';
 import { CsrfExempt, CustomerPlane } from '../auth/auth.decorators';
 
 interface RequestLike {
@@ -152,7 +152,11 @@ export class CustomerAuthController {
   ) {
     const token = this.cookies.readCustomerRefreshToken(req as never) ?? dto.refreshToken;
     if (!token) {
-      throw notFound(ERROR_CODES.AUTH_TOKEN_INVALID, 'No refresh token was presented.');
+      // 401, not 404: the route exists, the caller simply has no session. The
+      // staff plane reports the same condition the same way, and a browser
+      // bootstrap that has no cookie must read this as "no session" rather
+      // than as a missing endpoint.
+      throw unauthorized(ERROR_CODES.AUTH_TOKEN_INVALID, 'No refresh token was presented.');
     }
     const session = await this.auth.refresh(token, meta(req));
     return this.complete(res, session, this.wantsBodyToken(req), this.cookies.readCustomerCsrfToken(req as never));

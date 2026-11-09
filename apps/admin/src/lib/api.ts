@@ -1,17 +1,29 @@
 import type {
   AccountingReportDto,
   AgingRowDto,
+  AiSuggestionDto,
   AppVersionDto,
+  AttachmentDto,
+  AttachmentEntityType,
   AuditLogDto,
   BalanceSheetDto,
   BranchDto,
   CashierSessionDto,
   CmsBannerDto,
+  CmsMediaAssetDto,
+  CmsMediaFolderDto,
   CmsPageDto,
   CompanyDto,
+  CompanyBrandingDto,
   ContextResponse,
+  CouponDto,
+  CouponValidationResponse,
   CustomerDto,
+  CustomerDetailDto,
+  CustomerAttachmentDto,
+  CustomerReturnDto,
   DashboardResponse,
+  EcosystemOverviewResponse,
   ErpAccountDto,
   FeatureFlagDto,
   FiscalYearDto,
@@ -25,14 +37,18 @@ import type {
   LoginResponse,
   LoginResult,
   ModuleDto,
+  NotificationDeliveryDto,
   Paginated,
   PaymentDto,
   PlanDto,
   PosSaleDto,
   ProductDto,
+  ProductImageDto,
   PurchaseDocumentDto,
   PurchasingReportDto,
+  RecoveryRequestDto,
   ReorderAlertDto,
+  PosProductDto,
   RequisitionDto,
   RoleDto,
   SalesDocumentDto,
@@ -64,10 +80,22 @@ import type {
   CrmDashboardDto,
   ProjectDto,
   ProjectTaskDto,
+  LeadSourceDto,
+  TaxRateDto,
   WorkOrderDto,
   WorkOrderChecklistItemDto,
   OperationsDashboardDto,
+  InspectionSessionDto,
+  InspectionSessionSummaryDto,
+  InspectionProgressDto,
+  InspectionBodyMarkerDto,
+  InspectionChassisRegionDto,
+  InspectionDiagnosticEntryDto,
+  InspectionAttachmentDto,
+  InspectionAreaKey,
   VehicleDto,
+  VehicleDocumentDto,
+  VehicleDocumentOcrResultDto,
   InspectionServiceDto,
   InspectionBookingDto,
   JobCardDto,
@@ -76,6 +104,10 @@ import type {
   ServiceRequestDto,
   ProviderSettlementDto,
   WarehouseDto,
+  OfficialDocumentType,
+  OfficialDocumentStatus,
+  PrintDocumentDto,
+  PrintDocumentKind,
 } from '@oryx/shared';
 
 /**
@@ -90,6 +122,9 @@ import type {
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api')
   .replace(/\/+$/, '')
   .replace(/\/v1$/, '');
+
+/** The API origin, without the `/api` suffix `API_BASE` carries. */
+const API_ORIGIN = API_BASE.replace(/\/api\/?$/, '');
 
 /**
  * Only non-secret UI preferences are persisted.
@@ -226,6 +261,11 @@ interface RequestOptions {
   anonymous?: boolean;
   /** Do not attempt a refresh-and-retry on 401. */
   noRetry?: boolean;
+  /**
+   * Send the body as-is (a `FormData` upload) instead of JSON-encoding it. The
+   * browser must set the multipart boundary itself, so no Content-Type is set.
+   */
+  raw?: boolean;
 }
 
 /**
@@ -321,7 +361,10 @@ export async function restoreSession(): Promise<RefreshOutcome> {
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? 'GET';
   const headers: Record<string, string> = {};
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+  if (options.body !== undefined && !options.raw && !isFormData) {
+    headers['Content-Type'] = 'application/json';
+  }
   if (!options.anonymous) {
     const token = tokenStore.access;
     if (token) headers.Authorization = `Bearer ${token}`;
@@ -340,7 +383,14 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     method,
     headers,
     credentials: 'include',
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body:
+      options.body === undefined
+        ? undefined
+        : options.raw
+          ? (options.body as BodyInit)
+          : isFormData
+            ? (options.body as FormData)
+            : JSON.stringify(options.body),
     cache: 'no-store',
   });
 
@@ -373,6 +423,40 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+/** One issued official document, as the API projects it. */
+export interface OfficialDocumentDto {
+  id: string;
+  type: OfficialDocumentType;
+  documentNumber: string;
+  status: OfficialDocumentStatus;
+  version: number;
+  verificationToken: string;
+  verificationUrl: string;
+  sourceType: string;
+  sourceId: string;
+  pageCount: number | null;
+  byteSize: number | null;
+  issuedAt: string;
+  issuerNameEn: string;
+  issuerNameAr: string;
+  issuerCode: string;
+  supersededAt: string | null;
+  revokedAt: string | null;
+  revokeReason: string | null;
+  downloadable: boolean;
+}
+
+/** A document plus its append-only event trail. */
+export interface OfficialDocumentDetailDto extends OfficialDocumentDto {
+  events: Array<{
+    id: string;
+    event: string;
+    detail: string | null;
+    actorId: string | null;
+    createdAt: string;
+  }>;
 }
 
 export const api = {
@@ -465,6 +549,38 @@ export const api = {
     request<CompanyDto>(`/companies/${id}`, { method: 'PATCH', body }),
   setCompanyStatus: (id: string, status: string, reason?: string) =>
     request<CompanyDto>(`/companies/${id}/status`, { method: 'PATCH', body: { status, reason } }),
+  /**
+   * Archive a company (soft delete).
+   *
+   * A tenant carries accounting, stock and payroll history, so it is never
+   * physically deleted — the row is moved to `ARCHIVED`, which hides it from the
+   * working lists while every linked record stays intact and the action stays in
+   * the audit trail. Restoring is the same call with `ACTIVE`.
+   */
+  archiveCompany: (id: string, reason?: string) =>
+    request<CompanyDto>(`/companies/${id}/status`, { method: 'PATCH', body: { status: 'ARCHIVED', reason } }),
+
+  // ---------------------------------------------------------------- branding
+  /**
+   * The resolved identity for a company.
+   *
+   * The API applies the platform default field by field, so a company that has
+   * set nothing still returns a complete identity rather than nulls.
+   */
+  getBranding: (companyId: string) =>
+    request<CompanyBrandingDto>(`/companies/${companyId}/branding`),
+  /**
+   * Update a company's identity.
+   *
+   * The tri-state is preserved on the wire: an omitted key leaves the stored
+   * value alone, an explicit `null` clears it back to the platform default, and
+   * a value sets it. `JSON.stringify` drops `undefined`, so an omitted key is
+   * genuinely absent from the body.
+   */
+  updateBranding: (companyId: string, body: Record<string, unknown>) =>
+    request<CompanyBrandingDto>(`/companies/${companyId}/branding`, { method: 'PATCH', body }),
+  resetBranding: (companyId: string) =>
+    request<CompanyBrandingDto>(`/companies/${companyId}/branding`, { method: 'DELETE' }),
 
   // ---------------------------------------------------------------- branches
   listBranches: (companyId: string, params: { page?: number; pageSize?: number; search?: string } = {}) =>
@@ -556,8 +672,19 @@ export const api = {
     }),
 
   // ------------------------------------------------------------------- audit
-  listAuditLogs: (params: { page?: number; pageSize?: number; companyId?: string; action?: string } = {}) =>
-    request<Paginated<AuditLogDto>>(`/audit-logs?${toQuery(params)}`),
+  listAuditLogs: (
+    params: {
+      page?: number;
+      pageSize?: number;
+      companyId?: string;
+      action?: string;
+      targetType?: string;
+      actorUserId?: string;
+      search?: string;
+      from?: string;
+      to?: string;
+    } = {},
+  ) => request<Paginated<AuditLogDto>>(`/audit-logs?${toQuery(params)}`),
 
   // --------------------------------------------------------------------- cms
   cmsPages: (locale?: string) => request<CmsPageDto[]>(`/cms/pages${locale ? `?locale=${locale}` : ''}`),
@@ -573,6 +700,44 @@ export const api = {
   upsertAppVersion: (body: Record<string, unknown>) =>
     request<Record<string, unknown>>('/cms/app-versions', { method: 'PUT', body }),
   serviceCategories: () => request<Array<Record<string, unknown>>>('/cms/service-categories'),
+
+  // ------------------------------------------------------------ media library
+  mediaFolders: () => request<CmsMediaFolderDto[]>('/cms/media/folders'),
+  upsertMediaFolder: (body: Record<string, unknown>) =>
+    request<CmsMediaFolderDto>('/cms/media/folders', { method: 'PUT', body }),
+  deleteMediaFolder: (id: string) =>
+    request<{ ok: boolean }>(`/cms/media/folders/${id}`, { method: 'DELETE' }),
+  mediaAssets: (params: { folderId?: string; search?: string; page?: number; pageSize?: number } = {}) =>
+    request<Paginated<CmsMediaAssetDto>>(`/cms/media?${toQuery(params)}`),
+  mediaAsset: (id: string) => request<CmsMediaAssetDto>(`/cms/media/${id}`),
+  /**
+   * Upload an image. Sent as multipart/form-data so the browser streams the
+   * file; `request` must not set a JSON content type here.
+   */
+  uploadMedia: (form: FormData) =>
+    request<CmsMediaAssetDto>('/cms/media', { method: 'POST', body: form, raw: true }),
+  updateMedia: (id: string, body: Record<string, unknown>) =>
+    request<CmsMediaAssetDto>(`/cms/media/${id}`, { method: 'PATCH', body }),
+  deleteMedia: (id: string) => request<{ ok: boolean }>(`/cms/media/${id}`, { method: 'DELETE' }),
+  /** The servable URL of an image variant (`card` by default). */
+  mediaFileUrl: (id: string, variant = 'card') => `${API_BASE}/v1/cms/media/${id}/file?variant=${variant}`,
+
+  /**
+   * Resolve an image path the API returned into a URL the browser can load.
+   *
+   * Inventory and CMS endpoints return media as `/api/v1/cms/media/<id>/file`,
+   * a path relative to the API origin. The admin app is served from its own
+   * origin, so rendering that path verbatim asks the admin host for an API
+   * route and 404s, and the thumbnail silently disappears. An absolute URL is
+   * returned unchanged.
+   */
+  resolveImage: (path: string | null | undefined): string | null => {
+    if (!path) return null;
+    if (/^https?:\/\//i.test(path)) return path;
+    if (path.startsWith('/api/')) return `${API_ORIGIN}${path}`;
+    return path;
+  },
+
   notificationTemplates: () => request<Array<Record<string, unknown>>>('/cms/notification-templates'),
   apiClients: () => request<Array<Record<string, unknown>>>('/cms/api-clients'),
   createApiClient: (body: Record<string, unknown>) =>
@@ -592,6 +757,8 @@ export const api = {
     request<Paginated<ErpAccountDto>>(`/accounting/accounts?${toQuery(params)}`),
   createAccount: (body: Record<string, unknown>) =>
     request<ErpAccountDto>('/accounting/accounts', { method: 'POST', body }),
+  nextAccountCode: (params: { type: string; parentId?: string }) =>
+    request<{ code: string }>(`/accounting/accounts/next-code?${toQuery(params)}`),
   updateAccount: (id: string, body: Record<string, unknown>) =>
     request<ErpAccountDto>(`/accounting/accounts/${id}`, { method: 'PATCH', body }),
   seedStandardChart: () =>
@@ -609,10 +776,10 @@ export const api = {
     request<Paginated<JournalEntryDto>>(`/accounting/journals?${toQuery(params)}`),
   createJournal: (body: Record<string, unknown>) =>
     request<{ id: string; entryNumber: string }>('/accounting/journals', { method: 'POST', body }),
-  reverseJournal: (id: string, reason?: string) =>
+  reverseJournal: (id: string, reason?: string, reversalDate?: string) =>
     request<{ entryNumber: string }>(`/accounting/journals/${id}/reverse`, {
       method: 'POST',
-      body: { reason },
+      body: { reason, reversalDate },
     }),
   generalLedger: (params: { accountId?: string; from?: string; to?: string; companyId?: string } = {}) =>
     request<{ accounts: LedgerAccountDto[] }>(`/accounting/general-ledger?${toQuery(params)}`),
@@ -638,12 +805,27 @@ export const api = {
     request<WarehouseDto>('/inventory/warehouses', { method: 'POST', body }),
   updateWarehouse: (id: string, body: Record<string, unknown>) =>
     request<WarehouseDto>(`/inventory/warehouses/${id}`, { method: 'PATCH', body }),
-  products: (params: { companyId?: string; search?: string } = {}) =>
+  products: (params: { companyId?: string; search?: string; category?: string } = {}) =>
     request<Paginated<ProductDto>>(`/inventory/products?${toQuery(params)}`),
   createProduct: (body: Record<string, unknown>) =>
     request<ProductDto>('/inventory/products', { method: 'POST', body }),
   updateProduct: (id: string, body: Record<string, unknown>) =>
     request<ProductDto>(`/inventory/products/${id}`, { method: 'PATCH', body }),
+  /**
+   * A product's photographs, primary first.
+   *
+   * The API resolves each `url` to a served media route; the client renders that
+   * value directly rather than composing a storage path.
+   */
+  productImages: (productId: string) =>
+    request<ProductImageDto[]>(`/inventory/products/${productId}/images`),
+  /** Upload a photograph. Multipart, so no JSON content type may be set. */
+  uploadProductImage: (productId: string, form: FormData) =>
+    request<ProductImageDto>(`/inventory/products/${productId}/images`, { method: 'POST', body: form, raw: true }),
+  updateProductImage: (productId: string, imageId: string, body: Record<string, unknown>) =>
+    request<ProductImageDto>(`/inventory/products/${productId}/images/${imageId}`, { method: 'PATCH', body }),
+  deleteProductImage: (productId: string, imageId: string) =>
+    request<{ removed: boolean }>(`/inventory/products/${productId}/images/${imageId}`, { method: 'DELETE' }),
   stockMovements: (params: { companyId?: string; page?: number } = {}) =>
     request<Paginated<StockMovementDto>>(`/inventory/movements?${toQuery(params)}`),
   recordStockMovement: (body: Record<string, unknown>) =>
@@ -666,14 +848,29 @@ export const api = {
     ),
   reorderAlerts: (companyId?: string) =>
     request<{ items: ReorderAlertDto[] }>(`/inventory/reorder-alerts${companyId ? `?companyId=${companyId}` : ''}`),
+  /**
+   * The POS product grid: active products with their lead image and on-hand
+   * position. `search` matches a scanned barcode as well as a name or SKU.
+   */
+  posCatalog: (params: { companyId?: string; search?: string; category?: string } = {}) =>
+    request<{ items: PosProductDto[]; total: number }>(`/inventory/pos-catalog?${toQuery(params)}`),
+  posCategories: (companyId?: string) =>
+    request<{ items: string[] }>(`/inventory/pos-categories${companyId ? `?companyId=${companyId}` : ''}`),
 
   // ------------------------------------------------------------ sales (E02)
   salesCustomers: (params: { companyId?: string; search?: string } = {}) =>
     request<Paginated<CustomerDto>>(`/sales/customers?${toQuery(params)}`),
+  customer: (id: string) => request<CustomerDetailDto>(`/sales/customers/${id}`),
   createCustomer: (body: Record<string, unknown>) =>
     request<CustomerDto>('/sales/customers', { method: 'POST', body }),
   updateCustomer: (id: string, body: Record<string, unknown>) =>
     request<CustomerDto>(`/sales/customers/${id}`, { method: 'POST', body }),
+  customerAttachments: (id: string) =>
+    request<Paginated<CustomerAttachmentDto>>(`/sales/customers/${id}/attachments`),
+  addCustomerAttachment: (id: string, body: Record<string, unknown>) =>
+    request<CustomerAttachmentDto>(`/sales/customers/${id}/attachments`, { method: 'POST', body }),
+  removeCustomerAttachment: (id: string, attachmentId: string) =>
+    request<{ removed: boolean }>(`/sales/customers/${id}/attachments/${attachmentId}`, { method: 'DELETE' }),
   quotations: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<SalesDocumentDto>>(`/sales/quotations?${toQuery(params)}`),
   createQuotation: (body: Record<string, unknown>) =>
@@ -684,15 +881,61 @@ export const api = {
     request<Paginated<SalesDocumentDto>>(`/sales/orders?${toQuery(params)}`),
   createSalesOrder: (body: Record<string, unknown>) =>
     request<SalesDocumentDto>('/sales/orders', { method: 'POST', body }),
-  salesInvoices: (params: { companyId?: string; status?: string; page?: number } = {}) =>
+  salesInvoices: (params: { companyId?: string; status?: string; customerId?: string; page?: number; pageSize?: number } = {}) =>
     request<Paginated<SalesDocumentDto>>(`/sales/invoices?${toQuery(params)}`),
   getSalesInvoice: (id: string) => request<SalesDocumentDto>(`/sales/invoices/${id}`),
   createSalesInvoice: (body: Record<string, unknown>) =>
     request<SalesDocumentDto>('/sales/invoices', { method: 'POST', body }),
+  updateSalesInvoice: (id: string, body: Record<string, unknown>) =>
+    request<SalesDocumentDto>(`/sales/invoices/${id}`, { method: 'POST', body }),
+  deleteSalesInvoice: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/sales/invoices/${id}`, { method: 'DELETE' }),
   creditNotes: (params: { companyId?: string } = {}) =>
     request<Paginated<SalesDocumentDto>>(`/sales/credit-notes?${toQuery(params)}`),
   createCreditNote: (body: Record<string, unknown>) =>
     request<SalesDocumentDto>('/sales/credit-notes', { method: 'POST', body }),
+
+  // ------------------------------------------------------ print (documents)
+  printDocument: (kind: PrintDocumentKind, id: string) =>
+    request<PrintDocumentDto>(`/print/${kind}/${id}`),
+
+  // ----------------------------------------------------------- attachments
+  attachments: (entityType: string, entityId: string) =>
+    request<AttachmentDto[]>(`/attachments/${entityType}/${entityId}`),
+  uploadAttachment: (entityType: string, entityId: string, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return request<AttachmentDto>(`/attachments/${entityType}/${entityId}`, {
+      method: 'POST',
+      body: form,
+    });
+  },
+  deleteAttachment: (entityType: string, entityId: string, attachmentId: string) =>
+    request<{ deleted: true }>(`/attachments/${entityType}/${entityId}/${attachmentId}`, {
+      method: 'DELETE',
+    }),
+  attachmentDownloadUrl: (entityType: string, entityId: string, attachmentId: string) =>
+    `${API_BASE}/v1/attachments/${entityType}/${entityId}/${attachmentId}/download`,
+  /**
+   * Fetch an attachment as a blob so a preview can be shown without exposing the
+   * bearer token in a URL. The access token is read from the same in-memory
+   * store the request helper uses, and the tenant context headers ride along.
+   */
+  fetchAttachmentBlob: async (entityType: string, entityId: string, attachmentId: string): Promise<Blob> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    const branchId = tokenStore.branchId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    if (branchId) headers['x-oryx-branch-id'] = branchId;
+    const res = await fetch(
+      `${API_BASE}/v1/attachments/${entityType}/${entityId}/${attachmentId}/download`,
+      { headers, credentials: 'include', cache: 'no-store' },
+    );
+    if (!res.ok) throw new ApiError(res.status, 'attachment_fetch_failed', 'Could not load the attachment.');
+    return res.blob();
+  },
   cashierSessions: (params: { companyId?: string } = {}) =>
     request<Paginated<CashierSessionDto>>(`/sales/cashier-sessions?${toQuery(params)}`),
   openCashierSession: (body: Record<string, unknown>) =>
@@ -732,7 +975,7 @@ export const api = {
     request<Paginated<PurchaseDocumentDto>>(`/purchasing/receipts?${toQuery(params)}`),
   createGoodsReceipt: (body: Record<string, unknown>) =>
     request<PurchaseDocumentDto>('/purchasing/receipts', { method: 'POST', body }),
-  supplierInvoices: (params: { companyId?: string; status?: string } = {}) =>
+  supplierInvoices: (params: { companyId?: string; status?: string; supplierId?: string } = {}) =>
     request<Paginated<PurchaseDocumentDto>>(`/purchasing/supplier-invoices?${toQuery(params)}`),
   createSupplierInvoice: (body: Record<string, unknown>) =>
     request<PurchaseDocumentDto>('/purchasing/supplier-invoices', { method: 'POST', body }),
@@ -807,8 +1050,17 @@ export const api = {
 
   // ------------------------------------------------------------ CRM (E03)
   crmLeadSources: (params: { companyId?: string } = {}) =>
-    request<Paginated<Record<string, unknown>>>(`/crm/lead-sources?${toQuery(params)}`),
-  createLeadSource: (body: Record<string, unknown>) => request<Record<string, unknown>>('/crm/lead-sources', { method: 'POST', body }),
+    request<Paginated<LeadSourceDto>>(`/crm/lead-sources?${toQuery(params)}`),
+  createLeadSource: (body: Record<string, unknown>) => request<LeadSourceDto>('/crm/lead-sources', { method: 'POST', body }),
+  // Tax management (§5 of the completion brief). A saved list the sales,
+  // purchasing and POS forms select from instead of a free-text percentage.
+  taxes: (params: { companyId?: string; scope?: string; search?: string; includeInactive?: string } = {}) =>
+    request<Paginated<TaxRateDto>>(`/tax?${toQuery(params)}`),
+  createTax: (body: Record<string, unknown>) => request<TaxRateDto>('/tax', { method: 'POST', body }),
+  updateTax: (id: string, body: Record<string, unknown>) => request<TaxRateDto>(`/tax/${id}`, { method: 'PATCH', body }),
+  setTaxActive: (id: string, isActive: boolean) =>
+    request<TaxRateDto>(`/tax/${id}/active`, { method: 'PATCH', body: { isActive } }),
+  deleteTax: (id: string) => request<{ deleted: boolean }>(`/tax/${id}`, { method: 'DELETE' }),
   crmLeads: (params: { companyId?: string; search?: string; status?: string; page?: number } = {}) =>
     request<Paginated<LeadDto>>(`/crm/leads?${toQuery(params)}`),
   createLead: (body: Record<string, unknown>) => request<LeadDto>('/crm/leads', { method: 'POST', body }),
@@ -886,6 +1138,14 @@ export const api = {
   updateVehicle: (id: string, body: Record<string, unknown>) => request<VehicleDto>(`/automotive/vehicles/${id}`, { method: 'PATCH', body }),
   recordMileage: (id: string, mileage: number) =>
     request<Record<string, unknown>>(`/automotive/vehicles/${id}/mileage`, { method: 'POST', body: { mileage } }),
+  vehicleDocuments: (id: string) =>
+    request<Paginated<VehicleDocumentDto>>(`/automotive/vehicles/${id}/documents`),
+  addVehicleDocument: (id: string, form: FormData) =>
+    request<VehicleDocumentDto>(`/automotive/vehicles/${id}/documents`, { method: 'POST', body: form, raw: true }),
+  extractVehicleDocument: (id: string, form: FormData) =>
+    request<VehicleDocumentOcrResultDto>(`/automotive/vehicles/${id}/documents/ocr`, { method: 'POST', body: form, raw: true }),
+  removeVehicleDocument: (id: string, documentId: string) =>
+    request<{ removed: boolean }>(`/automotive/vehicles/${id}/documents/${documentId}`, { method: 'DELETE' }),
   inspectionServices: (params: { companyId?: string } = {}) =>
     request<Paginated<InspectionServiceDto>>(`/automotive/inspection-services?${toQuery(params)}`),
   createInspectionService: (body: Record<string, unknown>) =>
@@ -905,6 +1165,112 @@ export const api = {
     request<Record<string, unknown>>(`/automotive/inspection-bookings/${id}/report/decide`, { method: 'POST', body: { decision } }),
   invoiceInspection: (id: string, body: Record<string, unknown> = {}) =>
     request<{ invoiceNumber: string; totalMinor: number }>(`/automotive/inspection-bookings/${id}/invoice`, { method: 'POST', body }),
+
+  // ---- official documents (Execution Phase 3) ----
+  issueInspectionDocument: (sessionId: string) =>
+    request<OfficialDocumentDto>(`/documents/inspections/${sessionId}/issue`, { method: 'POST', body: {} }),
+  issueFinancialDocument: (type: OfficialDocumentType, sourceId: string) =>
+    request<OfficialDocumentDto>('/documents/issue', { method: 'POST', body: { type, sourceId } }),
+  documentsForSource: (sourceType: string, sourceId: string) =>
+    request<OfficialDocumentDto[]>(
+      `/documents?sourceType=${encodeURIComponent(sourceType)}&sourceId=${encodeURIComponent(sourceId)}`,
+    ),
+  /**
+   * The tenant-wide document register.
+   *
+   * Distinct from `documentsForSource`: that lists the documents of one record,
+   * this lists every document the company has issued with server-side search,
+   * type and status filters and pagination. The API scopes the result to the
+   * caller's company, so no company id is sent.
+   */
+  documentsRegister: (params: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    type?: string;
+    status?: string;
+  } = {}) => request<Paginated<OfficialDocumentDto>>(`/documents/register?${toQuery(params)}`),
+  officialDocument: (id: string) => request<OfficialDocumentDetailDto>(`/documents/${id}`),
+  revokeOfficialDocument: (id: string, reason: string) =>
+    request<OfficialDocumentDto>(`/documents/${id}/revoke`, { method: 'POST', body: { reason } }),
+
+  /**
+   * The stored PDF as a blob URL.
+   *
+   * Fetched rather than linked because the route needs the bearer token and the
+   * company header; an `<a href>` would arrive unauthenticated. The caller owns
+   * the URL and must revoke it.
+   */
+  officialDocumentBlobUrl: async (id: string): Promise<string> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    const res = await fetch(`${API_BASE}/v1/documents/${id}/file`, { headers, credentials: 'include' });
+    if (!res.ok) throw new ApiError(res.status, 'document_download_failed', 'The document could not be opened.');
+    return URL.createObjectURL(await res.blob());
+  },
+
+
+  // ---- document attachment actions ----
+  removeAttachment: (entityType: AttachmentEntityType, entityId: string, attachmentId: string) =>
+    request<{ deleted: true }>(`/attachments/${entityType}/${entityId}/${attachmentId}`, {
+      method: 'DELETE',
+    }),
+
+  attachmentBlobUrl: async (
+    entityType: AttachmentEntityType,
+    entityId: string,
+    attachmentId: string,
+  ): Promise<string> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+
+    const res = await fetch(
+      `${API_BASE}/v1/attachments/${entityType}/${entityId}/${attachmentId}/download`,
+      { headers, credentials: 'include' },
+    );
+
+    if (!res.ok) {
+      throw new ApiError(res.status, 'attachment_download_failed', 'The attachment could not be opened.');
+    }
+
+    return URL.createObjectURL(await res.blob());
+  },
+
+  // ---- inspection engine (Execution Phase 2) ----
+  inspectionSessions: (params: { search?: string; status?: string; customerId?: string; vehicleId?: string; page?: number } = {}) =>
+    request<Paginated<InspectionSessionSummaryDto>>(`/automotive/inspections?${toQuery(params)}`),
+  inspectionSession: (id: string) => request<InspectionSessionDto>(`/automotive/inspections/${id}`),
+  createInspectionSession: (body: Record<string, unknown>) =>
+    request<InspectionSessionDto>('/automotive/inspections', { method: 'POST', body }),
+  updateInspectionSession: (id: string, body: Record<string, unknown>) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}`, { method: 'PATCH', body }),
+  inspectionProgress: (id: string) => request<InspectionProgressDto>(`/automotive/inspections/${id}/progress`),
+  saveInspectionSection: (id: string, area: InspectionAreaKey, body: Record<string, unknown>) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/sections/${area}`, { method: 'PUT', body }),
+  saveInspectionMarkers: (id: string, markers: Array<Partial<InspectionBodyMarkerDto>>) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/paint-markers`, { method: 'PUT', body: { markers } }),
+  saveInspectionChassis: (id: string, regions: Array<Partial<InspectionChassisRegionDto>>) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/chassis-regions`, { method: 'PUT', body: { regions } }),
+  addInspectionDiagnostic: (id: string, body: Record<string, unknown>) =>
+    request<InspectionDiagnosticEntryDto>(`/automotive/inspections/${id}/diagnostics`, { method: 'POST', body }),
+  removeInspectionDiagnostic: (id: string, entryId: string) =>
+    request<{ removed: boolean }>(`/automotive/inspections/${id}/diagnostics/${entryId}`, { method: 'DELETE' }),
+  uploadInspectionAttachment: (id: string, form: FormData) =>
+    request<InspectionAttachmentDto>(`/automotive/inspections/${id}/attachments`, { method: 'POST', body: form, raw: true }),
+  removeInspectionAttachment: (id: string, attachmentId: string) =>
+    request<{ removed: boolean }>(`/automotive/inspections/${id}/attachments/${attachmentId}`, { method: 'DELETE' }),
+  submitInspectionSession: (id: string) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/submit`, { method: 'POST', body: {} }),
+  reviewInspectionSession: (id: string, decision: 'APPROVE' | 'REJECT', notes?: string) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/review`, { method: 'POST', body: { decision, notes } }),
+  cancelInspectionSession: (id: string) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/cancel`, { method: 'POST', body: {} }),
   workshopBays: (params: { companyId?: string } = {}) =>
     request<Paginated<Record<string, unknown>>>(`/automotive/bays?${toQuery(params)}`),
   createWorkshopBay: (body: Record<string, unknown>) => request<Record<string, unknown>>('/automotive/bays', { method: 'POST', body }),
@@ -946,12 +1312,24 @@ export const api = {
     request<Paginated<Record<string, unknown>>>(
       `/automotive/compatible-parts?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year=${year}${companyId ? `&companyId=${companyId}` : ''}`,
     ),
-  marketplaceProviders: (params: { status?: string } = {}) =>
+  marketplaceProviders: (params: { status?: string; categoryKey?: string; lat?: number; lng?: number; radiusKm?: number } = {}) =>
     request<Paginated<MarketplaceProviderDto>>(`/automotive/providers?${toQuery(params)}`),
   createProvider: (body: Record<string, unknown>) =>
     request<MarketplaceProviderDto>('/automotive/providers', { method: 'POST', body }),
   decideProvider: (id: string, decision: 'APPROVED' | 'SUSPENDED' | 'REJECTED', note?: string) =>
     request<MarketplaceProviderDto>(`/automotive/providers/${id}/decide`, { method: 'POST', body: { decision, note } }),
+  /**
+   * Set or clear a provider's Auto Map coordinates (P3).
+   *
+   * Both values must be supplied together, or both omitted to clear the
+   * location. The API rejects half a coordinate rather than storing a point the
+   * map cannot place.
+   */
+  setProviderLocation: (id: string, location: { latitude: number | null; longitude: number | null }) =>
+    request<MarketplaceProviderDto>(`/marketplace/admin/providers/${id}/location`, {
+      method: 'POST',
+      body: location,
+    }),
   providerListings: (providerId: string) =>
     request<Paginated<Record<string, unknown>>>(`/automotive/providers/${providerId}/listings`),
   createProviderListing: (providerId: string, body: Record<string, unknown>) =>
@@ -1042,6 +1420,89 @@ export const api = {
     }),
   verifyIntegration: (key: string) =>
     request<IntegrationDetailResponse>(`/integrations/${key}/verify`, { method: 'POST', body: {} }),
+
+  // ------------------------------------- Execution 12: platform control panel
+  ecosystem: () => request<EcosystemOverviewResponse>('/platform/ecosystem'),
+
+  // --------------------------- Execution 20: planned ecosystem operations
+  /**
+   * Consumer order returns awaiting a staff decision (P4).
+   *
+   * The queue is scoped server-side to the active company, so an operator only
+   * ever sees their own tenant's returns.
+   */
+  ecosystemReturns: (status?: string) =>
+    request<CustomerReturnDto[]>(`/ecosystem/returns?${toQuery({ status })}`),
+  decideReturn: (id: string, decision: 'APPROVED' | 'REJECTED', note?: string) =>
+    request<CustomerReturnDto>(`/ecosystem/returns/${id}/decide`, { method: 'POST', body: { decision, note } }),
+  receiveReturn: (id: string) =>
+    request<CustomerReturnDto>(`/ecosystem/returns/${id}/receive`, { method: 'POST', body: {} }),
+  refundReturn: (id: string) =>
+    request<CustomerReturnDto>(`/ecosystem/returns/${id}/refund`, { method: 'POST', body: {} }),
+
+  /** Roadside recovery dispatch queue (P5). */
+  ecosystemRecovery: (status?: string) =>
+    request<RecoveryRequestDto[]>(`/ecosystem/recovery?${toQuery({ status })}`),
+  assignRecovery: (id: string, providerId: string) =>
+    request<RecoveryRequestDto>(`/ecosystem/recovery/${id}/assign`, { method: 'POST', body: { providerId } }),
+
+  /** SENSAGE AI suggestion review queue (P7). */
+  ecosystemSuggestions: (status?: string) =>
+    request<AiSuggestionDto[]>(`/ecosystem/sensage/suggestions?${toQuery({ status })}`),
+  reviewSuggestion: (id: string, decision: 'APPROVED' | 'REJECTED', note?: string) =>
+    request<AiSuggestionDto>(`/ecosystem/sensage/suggestions/${id}/review`, {
+      method: 'POST',
+      body: { decision, note },
+    }),
+  coupons: (params: { includeInactive?: boolean; companyId?: string } = {}) =>
+    request<{ items: CouponDto[] }>(`/coupons?${toQuery(params)}`),
+  coupon: (id: string) => request<CouponDto>(`/coupons/${id}`),
+  createCoupon: (body: Record<string, unknown>) =>
+    request<CouponDto>('/coupons', { method: 'POST', body }),
+  updateCoupon: (id: string, body: Record<string, unknown>) =>
+    request<CouponDto>(`/coupons/${id}`, { method: 'PATCH', body }),
+  deleteCoupon: (id: string) => request<{ deleted: boolean }>(`/coupons/${id}`, { method: 'DELETE' }),
+  validateCoupon: (body: { code: string; subtotalMinor: number; companyId?: string }) =>
+    request<CouponValidationResponse>('/coupons/validate', { method: 'POST', body }),
+  notificationDeliveries: (params: { companyId?: string; channel?: string; status?: string; page?: number; pageSize?: number } = {}) =>
+    request<Paginated<NotificationDeliveryDto>>(`/notifications/deliveries?${toQuery(params)}`),
+  notificationSummary: (companyId?: string) =>
+    request<{
+      byChannel: Array<{ key: string; count: number }>;
+      byStatus: Array<{ key: string; count: number }>;
+      templates: Array<{ id: string; key: string; channel: string; locale: string; subject: string | null; body: string; isActive: boolean }>;
+    }>(`/notifications/summary?${toQuery({ companyId })}`),
+  sendAnnouncement: (body: {
+    title: string;
+    body: string;
+    companyId?: string;
+    severity?: string;
+    userIds?: string[];
+    customerAccountIds?: string[];
+    allCustomers?: boolean;
+  }) =>
+    request<{ queued: number; recipients: string[]; customerRecipients: string[] }>(
+      '/notifications/announcements',
+      { method: 'POST', body },
+    ),
+  toggleNotificationTemplate: (id: string, active: boolean) =>
+    request<{ id: string; key: string; isActive: boolean }>(`/notifications/templates/${id}/toggle?active=${active}`, {
+      method: 'POST',
+      body: {},
+    }),
+  roleTemplates: (companyId?: string) =>
+    request<{
+      companyId: string;
+      templates: Array<{
+        code: string;
+        nameEn: string;
+        nameAr: string;
+        descriptionEn: string;
+        permissions: string[];
+        totalPermissions: number;
+        withheldPermissions: number;
+      }>;
+    }>(`/permissions/role-templates?${toQuery({ companyId })}`),
 };
 
 function toQuery(params: Record<string, unknown>): string {

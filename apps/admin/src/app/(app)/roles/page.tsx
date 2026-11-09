@@ -69,7 +69,7 @@ function RolesInner() {
 
   if (!scopeCompanyId) {
     return (
-      <div className="flex flex-col gap-5" data-testid="roles-page">
+      <div className="flex flex-col gap-4" data-testid="roles-page">
         <SectionHeader title={t('roles.title')} subtitle={t('roles.subtitle')} />
         <Card>
           <EmptyState title={t('common.selectCompany')} />
@@ -81,7 +81,7 @@ function RolesInner() {
   const canCreate = can('company.role.create') || can('platform.company.update');
 
   return (
-    <div className="flex flex-col gap-5" data-testid="roles-page">
+    <div className="flex flex-col gap-4" data-testid="roles-page">
       <SectionHeader
         title={t('roles.title')}
         subtitle={t('roles.subtitle')}
@@ -107,7 +107,7 @@ function RolesInner() {
         {roles.loading
           ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} height={170} />)
           : (roles.data ?? []).map((r) => (
-              <Card key={r.id} className="p-5" data-testid={`role-card-${r.code}`}>
+              <Card key={r.id} className="p-4" data-testid={`role-card-${r.code}`}>
                 <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <p className="oryx-panel-title m-0">{locale === 'ar' ? r.nameAr : r.nameEn}</p>
@@ -162,7 +162,7 @@ function RolesInner() {
             ))}
       </div>
 
-      <Card className="p-5" data-testid="permission-catalog">
+      <Card className="p-4" data-testid="permission-catalog">
         <p className="oryx-panel-title m-0 mb-1">Permission catalog</p>
         <p className="oryx-muted m-0 mb-4 text-[12px]">
           {locale === 'ar'

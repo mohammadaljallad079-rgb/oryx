@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Icon } from './icons';
 
 export function Card({
@@ -79,11 +79,13 @@ export function Button({
 export function Field({
   label,
   hint,
+  error,
   children,
   required,
 }: {
   label: string;
   hint?: string;
+  error?: string;
   children: ReactNode;
   required?: boolean;
 }) {
@@ -94,10 +96,26 @@ export function Field({
         {required ? <span className="oryx-gold"> *</span> : null}
       </span>
       {children}
-      {hint ? <span className="oryx-faint mt-1 block text-[11.5px]">{hint}</span> : null}
+      {error ? (
+        <span className="mt-1 block text-[11.5px] font-semibold" style={{ color: 'var(--danger)' }}>
+          {error}
+        </span>
+      ) : hint ? (
+        <span className="oryx-faint mt-1 block text-[11.5px]">{hint}</span>
+      ) : null}
     </label>
   );
 }
+
+/**
+ * Ids of the modals currently open, oldest first.
+ *
+ * A preview opened from inside another modal renders as a second modal, and
+ * both listen on `window`. Without this stack a single Escape (or a click on
+ * the inner backdrop, which bubbles to the outer one) closes the whole stack
+ * instead of the one dialog the user is looking at.
+ */
+const openModals: symbol[] = [];
 
 export function Modal({
   open,
@@ -105,26 +123,59 @@ export function Modal({
   onClose,
   children,
   footer,
+  size = 'default',
 }: {
   open: boolean;
   title: string;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  /**
+   * `full` widens the dialog for a workspace such as the POS terminal and
+   * `document` for the invoice/quotation form, which lays out two information
+   * panels and a five-column item table to mirror the printed page.
+   */
+  size?: 'default' | 'full' | 'document';
 }) {
+  const idRef = useRef<symbol>(Symbol('oryx-modal'));
+  const id = idRef.current;
+
   useEffect(() => {
     if (!open) return;
+    openModals.push(id);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key !== 'Escape') return;
+      // Only the top-most modal reacts, so a nested preview closes alone.
+      if (openModals[openModals.length - 1] !== id) return;
+      e.stopPropagation();
+      onClose();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      window.removeEventListener('keydown', onKey, true);
+      const at = openModals.indexOf(id);
+      if (at !== -1) openModals.splice(at, 1);
+    };
+  }, [open, onClose, id]);
 
   if (!open) return null;
   return (
-    <div className="oryx-modal-backdrop" role="dialog" aria-modal="true" aria-label={title} onClick={onClose}>
-      <div className="oryx-modal" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="oryx-modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
+    >
+      <div
+        className={`oryx-modal ${
+          size === 'full' ? 'oryx-modal--full' : size === 'document' ? 'oryx-modal--document' : ''
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
           <h2 className="m-0 text-[16px] font-bold">{title}</h2>
           <button
@@ -195,9 +246,20 @@ export function Skeleton({ height = 16, width = '100%' }: { height?: number; wid
   return <div className="oryx-skeleton" style={{ height, width }} />;
 }
 
-export function TableShell({ children }: { children: ReactNode }) {
+export function TableShell({ children, label }: { children: ReactNode; label?: string }) {
   return (
-    <div className="overflow-x-auto">
+    // The scroll container is the shell itself rather than a bare wrapper: it
+    // keeps the horizontal scrollbar inside the card and lets a narrow viewport
+    // pan the table instead of clipping its rightmost columns. `role="region"`
+    // plus a label keeps the scrollable area reachable by keyboard and
+    // announced by a screen reader.
+    <div
+      className="oryx-table-scroll"
+      data-testid="table-scroll"
+      role="region"
+      aria-label={label}
+      tabIndex={0}
+    >
       <table className="oryx-table">{children}</table>
     </div>
   );
@@ -245,4 +307,199 @@ export function StatusBadge({ status, label }: { status: string; label: string }
           ? 'danger'
           : 'neutral';
   return <Badge tone={tone}>{label}</Badge>;
+}
+
+/**
+ * The one KPI tile the admin uses.
+ *
+ * A KPI row previously had three separate markups — a padded `Card`, a raw
+ * flex row and an inline grid — with different paddings, icon sizes and label
+ * sizes, so the same metric looked different on every screen. This is the only
+ * tile now: one density, one label treatment, one value size.
+ *
+ * The tile is deliberately compact. The label sits above the value and the
+ * whole tile stays under a fixed minimum height, so a row of eight reads as one
+ * band rather than eight tall panels. `compact` drops the icon for dense grids.
+ */
+export function StatCard({
+  icon,
+  label,
+  value,
+  sub,
+  tone = 'default',
+  compact = false,
+  ...rest
+}: {
+  icon?: string;
+  label: string;
+  value: ReactNode;
+  sub?: ReactNode;
+  tone?: 'default' | 'gold' | 'success' | 'danger';
+  compact?: boolean;
+} & React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={`oryx-stat-card oryx-stat-card--${tone}`} {...rest}>
+      {icon && (
+        <span className="oryx-stat-card__icon" aria-hidden>
+          <Icon name={icon} size={compact ? 15 : 16} />
+        </span>
+      )}
+      <span className="oryx-stat-card__body">
+        <span className="oryx-stat-card__label">{label}</span>
+        <span className="oryx-stat-card__value">{value}</span>
+        {sub ? <span className="oryx-stat-card__sub">{sub}</span> : null}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * The KPI row.
+ *
+ * Columns are driven by a minimum tile width, not a fixed count, so a row of
+ * four on a wide screen becomes two on a tablet and one on a phone without a
+ * breakpoint per screen.
+ */
+export function StatGrid({
+  children,
+  className = '',
+  ...rest
+}: { children: ReactNode; className?: string } & React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={`oryx-stat-grid ${className}`} {...rest}>
+      {children}
+    </div>
+  );
+}
+
+export interface SearchableOption {
+  value: string;
+  label: string;
+  /** Optional secondary text shown under the label (a code, a phone number). */
+  hint?: string;
+  disabled?: boolean;
+}
+
+/**
+ * A filterable dropdown. Native `<select>` cannot be searched, and the
+ * catalogues it is used against (companies, customers, accounts) are paginated,
+ * so the options are supplied by the caller and filtered locally by label.
+ */
+export function SearchableSelect({
+  value,
+  options,
+  onChange,
+  placeholder,
+  emptyLabel,
+  disabled = false,
+  testId,
+  ariaLabel,
+}: {
+  value: string | null;
+  options: SearchableOption[];
+  onChange: (value: string | null) => void;
+  placeholder?: string;
+  /** Option shown for the "no selection" case; omit to make the field required. */
+  emptyLabel?: string;
+  disabled?: boolean;
+  testId?: string;
+  ariaLabel?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const selected = options.find((o) => o.value === value) ?? null;
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter(
+      (o) => o.label.toLowerCase().includes(q) || (o.hint ? o.hint.toLowerCase().includes(q) : false),
+    );
+  }, [options, query]);
+
+  const pick = (next: string | null) => {
+    onChange(next);
+    setOpen(false);
+    setQuery('');
+  };
+
+  return (
+    <div ref={rootRef} className="relative" data-testid={testId}>
+      <button
+        type="button"
+        className="oryx-input flex w-full items-center justify-between gap-2 text-start"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={ariaLabel}
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className={selected ? 'truncate' : 'oryx-faint truncate'}>
+          {selected ? selected.label : placeholder ?? ''}
+        </span>
+        <Icon name="chevronDown" size={14} />
+      </button>
+      {open ? (
+        <div
+          className="oryx-popover absolute z-30 mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-lg"
+          role="listbox"
+        >
+          <input
+            autoFocus
+            className="oryx-input mb-2"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={placeholder}
+            data-testid={testId ? `${testId}-search` : undefined}
+          />
+          <div className="max-h-56 overflow-y-auto">
+            {emptyLabel !== undefined ? (
+              <button
+                type="button"
+                className="block w-full rounded-lg px-3 py-2 text-start text-[12.5px] hover:bg-[var(--surface-2)]"
+                onClick={() => pick(null)}
+              >
+                {emptyLabel}
+              </button>
+            ) : null}
+            {filtered.length === 0 ? (
+              <p className="oryx-faint m-0 px-3 py-2 text-[12px]">—</p>
+            ) : (
+              filtered.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  role="option"
+                  aria-selected={o.value === value}
+                  disabled={o.disabled}
+                  className="block w-full rounded-lg px-3 py-2 text-start hover:bg-[var(--surface-2)] disabled:opacity-50"
+                  onClick={() => pick(o.value)}
+                >
+                  <span className="block text-[12.5px] font-semibold">{o.label}</span>
+                  {o.hint ? <span className="oryx-faint block text-[11px]">{o.hint}</span> : null}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 }

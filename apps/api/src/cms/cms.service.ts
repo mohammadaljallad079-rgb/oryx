@@ -91,6 +91,11 @@ export class CmsService {
     const existing = await this.prisma.cmsBanner.findFirst({
       where: { placement: dto.placement, locale: dto.locale, title: dto.title },
     });
+    // A newly created banner defaults to DRAFT (the column default). On update,
+    // `status` is only written when supplied, so toggling activation does not
+    // silently publish an unapproved slide. `publishedAt` is stamped the first
+    // time a banner reaches PUBLISHED.
+    const publishing = dto.status === 'PUBLISHED';
     const banner = existing
       ? await this.prisma.cmsBanner.update({
           where: { id: existing.id },
@@ -100,6 +105,8 @@ export class CmsService {
             actionUrl: dto.actionUrl ?? null,
             sortOrder: dto.sortOrder ?? 0,
             isActive: dto.isActive ?? true,
+            ...(dto.status ? { status: dto.status } : {}),
+            ...(publishing && !existing.publishedAt ? { publishedAt: new Date() } : {}),
           },
         })
       : await this.prisma.cmsBanner.create({
@@ -112,6 +119,8 @@ export class CmsService {
             actionUrl: dto.actionUrl ?? null,
             sortOrder: dto.sortOrder ?? 0,
             isActive: dto.isActive ?? true,
+            status: dto.status ?? 'DRAFT',
+            publishedAt: publishing ? new Date() : null,
           },
         });
     await this.audit.record({

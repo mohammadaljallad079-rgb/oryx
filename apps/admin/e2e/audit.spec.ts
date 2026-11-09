@@ -132,8 +132,15 @@ test.describe('live module audit', () => {
       ['mobile', 390, 844],
     ] as const) {
       await page.setViewportSize({ width, height });
+      // The loop above leaves the page on the last locale/theme it tried, so
+      // the theme is set explicitly here: without it these files are named
+      // `-ar-dark` but hold an English light render.
+      await setLocale(page, 'ar');
+      await setTheme(page, 'dark');
       await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
       await page.waitForTimeout(700);
+      await expect(page.locator('html')).toHaveAttribute('data-dir', 'rtl');
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
       await page.screenshot({ path: `${OUT}/dashboard-${label}-ar-dark.png` });
       // The page must not overflow horizontally at handset width.
       const overflow = await page.evaluate(

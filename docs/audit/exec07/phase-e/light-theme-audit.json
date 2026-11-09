@@ -1,0 +1,1293 @@
+{
+  "/": {
+    "page": {
+      "layers": [
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgb(34, 32, 29)",
+      "borderWidth": "0px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "(function(){try{var d=document.documentE",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(139, 144, 148)",
+      "contrast": 5.07
+    },
+    "header": {
+      "layers": [
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgb(34, 32, 29)",
+      "borderWidth": "0px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "منصة السياراتالرئيسيةالخدماتمزودو الخدمة",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(248, 248, 247)",
+      "contrast": 15.25
+    },
+    "card": {
+      "layers": [
+        "rgb(255, 255, 255)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgba(36, 31, 20, 0.09)",
+      "borderWidth": "1px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "مزودون معتمدونلا يُنشر المزود إلا بعد اع",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "composited-layers",
+      "background": "rgb(255, 255, 255)",
+      "contrast": 16.25
+    },
+    "btn": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgba(36, 31, 20, 0.14)",
+      "borderWidth": "1px",
+      "fontSize": "14px",
+      "fontWeight": "600",
+      "ownText": "EN",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "EN",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(253, 253, 252)",
+      "contrast": 15.98
+    },
+    "btn-primary": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": "linear-gradient(145deg, rgb(224, 193, 104), rgb(201, 162, 39))",
+      "color": "rgb(36, 31, 20)",
+      "borderColor": "rgba(0, 0, 0, 0)",
+      "borderWidth": "1px",
+      "fontSize": "15px",
+      "fontWeight": "600",
+      "ownText": "احجز موعدًا",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "احجز موعدًا",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(209, 175, 71)",
+      "contrast": 7.75
+    },
+    "nav-link": {
+      "layers": [
+        "rgb(244, 240, 232)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgb(34, 32, 29)",
+      "borderWidth": "0px",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "ownText": "الرئيسية",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "الرئيسية",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(244, 240, 232)",
+      "contrast": 14.29
+    },
+    "footer": {
+      "layers": [
+        "rgb(10, 27, 47)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(159, 179, 200)",
+      "borderColor": "rgba(36, 31, 20, 0.09)",
+      "borderWidth": "1px",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "افحص، وصِن، وتابع سيارتك مع مزودي خدمة م",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "composited-layers",
+      "background": "rgb(10, 27, 47)",
+      "contrast": 8.06
+    },
+    "hero": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": "radial-gradient(90% 120% at 90% 10%, color(srgb 0.490196 0.372549 0.0627451 / 0.16), rgba(0, 0, 0, 0) 55%), linear-gradi",
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgba(125, 95, 16, 0.5)",
+      "borderWidth": "1px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "منصة خدمات السيارات في البحرينكل ما تحتا",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(30, 44, 59)",
+      "contrast": 1.14
+    },
+    "cat-card": {
+      "layers": [
+        "rgb(251, 249, 244)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgba(36, 31, 20, 0.09)",
+      "borderWidth": "1px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "فحص المركباتفحص دوري وفحص ما قبل الشراء ",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(212, 209, 203)",
+      "contrast": 10.69
+    },
+    "stat-label": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(159, 179, 200)",
+      "borderColor": "rgb(159, 179, 200)",
+      "borderWidth": "0px",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "ownText": "مزودو خدمة",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "مزودو خدمة",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(15, 30, 49)",
+      "contrast": 7.79
+    },
+    "muted": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(90, 84, 75)",
+      "borderColor": "rgb(90, 84, 75)",
+      "borderWidth": "0px",
+      "fontSize": "13px",
+      "fontWeight": "700",
+      "ownText": "منصة السيارات",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "منصة السيارات",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(255, 255, 254)",
+      "contrast": 7.48
+    },
+    "feature-icon": {
+      "layers": [
+        "color(srgb 0.490196 0.372549 0.0627451 / 0.12)",
+        "rgb(255, 255, 255)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(122, 92, 16)",
+      "borderColor": "color(srgb 0.490196 0.372549 0.0627451 / 0.26)",
+      "borderWidth": "1px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": true,
+      "threshold": 3,
+      "text": "",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "composited-layers",
+      "background": "rgb(239, 236, 226)",
+      "contrast": 5.28
+    }
+  },
+  "/dashboard": {
+    "page": {
+      "layers": [
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgb(34, 32, 29)",
+      "borderWidth": "0px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "(function(){try{var d=document.documentE",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(200, 202, 202)",
+      "contrast": 9.84
+    },
+    "header": {
+      "layers": [
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgb(34, 32, 29)",
+      "borderWidth": "0px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "منصة السياراتالرئيسيةالخدماتمزودو الخدمة",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(248, 248, 247)",
+      "contrast": 15.31
+    },
+    "card": {
+      "layers": [
+        "rgb(255, 255, 255)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgba(36, 31, 20, 0.09)",
+      "borderWidth": "1px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "السيارات0مرآب سياراتي",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(253, 252, 251)",
+      "contrast": 15.89
+    },
+    "btn": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgba(36, 31, 20, 0.14)",
+      "borderWidth": "1px",
+      "fontSize": "14px",
+      "fontWeight": "600",
+      "ownText": "EN",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "EN",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(253, 253, 252)",
+      "contrast": 15.98
+    },
+    "btn-primary": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": "linear-gradient(145deg, rgb(224, 193, 104), rgb(201, 162, 39))",
+      "color": "rgb(36, 31, 20)",
+      "borderColor": "rgba(0, 0, 0, 0)",
+      "borderWidth": "1px",
+      "fontSize": "14px",
+      "fontWeight": "600",
+      "ownText": "حجز جديد",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "حجز جديد",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(204, 171, 70)",
+      "contrast": 7.44
+    },
+    "nav-link": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(90, 84, 75)",
+      "borderColor": "rgb(90, 84, 75)",
+      "borderWidth": "0px",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "ownText": "الرئيسية",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "الرئيسية",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(254, 254, 253)",
+      "contrast": 7.45
+    },
+    "footer": {
+      "layers": [
+        "rgb(10, 27, 47)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(159, 179, 200)",
+      "borderColor": "rgba(36, 31, 20, 0.09)",
+      "borderWidth": "1px",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "افحص، وصِن، وتابع سيارتك مع مزودي خدمة م",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(15, 31, 51)",
+      "contrast": 7.7
+    },
+    "muted": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(90, 84, 75)",
+      "borderColor": "rgb(90, 84, 75)",
+      "borderWidth": "0px",
+      "fontSize": "13px",
+      "fontWeight": "700",
+      "ownText": "منصة السيارات",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "منصة السيارات",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(255, 255, 254)",
+      "contrast": 7.48
+    },
+    "kpi-icon": {
+      "layers": [
+        "color(srgb 0.490196 0.372549 0.0627451 / 0.12)",
+        "rgb(255, 255, 255)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(122, 92, 16)",
+      "borderColor": "color(srgb 0.490196 0.372549 0.0627451 / 0.26)",
+      "borderWidth": "1px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": true,
+      "threshold": 3,
+      "text": "",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(237, 234, 223)",
+      "contrast": 5.18
+    }
+  },
+  "/providers": {
+    "page": {
+      "layers": [
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgb(34, 32, 29)",
+      "borderWidth": "0px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "(function(){try{var d=document.documentE",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(209, 209, 205)",
+      "contrast": 10.65
+    },
+    "header": {
+      "layers": [
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgb(34, 32, 29)",
+      "borderWidth": "0px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "منصة السياراتالرئيسيةالخدماتمزودو الخدمة",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(247, 247, 247)",
+      "contrast": 15.22
+    },
+    "card": {
+      "layers": [
+        "rgb(255, 255, 255)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgba(36, 31, 20, 0.09)",
+      "borderWidth": "1px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "االنور لقطع الغيارلا توجد تقييمات بعدالخ",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(247, 243, 231)",
+      "contrast": 14.69
+    },
+    "btn": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgba(36, 31, 20, 0.14)",
+      "borderWidth": "1px",
+      "fontSize": "14px",
+      "fontWeight": "600",
+      "ownText": "EN",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "EN",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(253, 253, 252)",
+      "contrast": 15.98
+    },
+    "btn-primary": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": "linear-gradient(145deg, rgb(224, 193, 104), rgb(201, 162, 39))",
+      "color": "rgb(36, 31, 20)",
+      "borderColor": "rgba(0, 0, 0, 0)",
+      "borderWidth": "1px",
+      "fontSize": "14px",
+      "fontWeight": "600",
+      "ownText": "الكل",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "الكل",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(214, 181, 81)",
+      "contrast": 8.29
+    },
+    "nav-link": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(90, 84, 75)",
+      "borderColor": "rgb(90, 84, 75)",
+      "borderWidth": "0px",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "ownText": "الرئيسية",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "الرئيسية",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(254, 254, 253)",
+      "contrast": 7.45
+    },
+    "footer": {
+      "layers": [
+        "rgb(10, 27, 47)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(159, 179, 200)",
+      "borderColor": "rgba(36, 31, 20, 0.09)",
+      "borderWidth": "1px",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "افحص، وصِن، وتابع سيارتك مع مزودي خدمة م",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "composited-layers",
+      "background": "rgb(10, 27, 47)",
+      "contrast": 8.06
+    },
+    "muted": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(90, 84, 75)",
+      "borderColor": "rgb(90, 84, 75)",
+      "borderWidth": "0px",
+      "fontSize": "13px",
+      "fontWeight": "700",
+      "ownText": "منصة السيارات",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "منصة السيارات",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(255, 255, 254)",
+      "contrast": 7.48
+    },
+    "page-head": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": "radial-gradient(120% 140% at 88% 6%, color(srgb 0.909804 0.780392 0.4 / 0.2), rgba(0, 0, 0, 0) 58%), linear-gradient(150",
+      "color": "rgb(255, 255, 255)",
+      "borderColor": "rgba(36, 31, 20, 0.14)",
+      "borderWidth": "1px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "منصة السياراتدليل مزودي الخدمةورشات ومرا",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(20, 36, 54)",
+      "contrast": 15.73
+    }
+  },
+  "/login": {
+    "page": {
+      "layers": [
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgb(34, 32, 29)",
+      "borderWidth": "0px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "(function(){try{var d=document.documentE",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(246, 242, 235)",
+      "contrast": 14.59
+    },
+    "header": {
+      "layers": [
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgb(34, 32, 29)",
+      "borderWidth": "0px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "منصة السياراتالرئيسيةالخدماتمزودو الخدمة",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(248, 248, 247)",
+      "contrast": 15.31
+    },
+    "input": {
+      "layers": [
+        "rgb(255, 255, 255)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgba(36, 31, 20, 0.18)",
+      "borderWidth": "1px",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(253, 253, 253)",
+      "contrast": 15.97
+    },
+    "btn": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgba(36, 31, 20, 0.14)",
+      "borderWidth": "1px",
+      "fontSize": "14px",
+      "fontWeight": "600",
+      "ownText": "EN",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "EN",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(253, 253, 252)",
+      "contrast": 15.98
+    },
+    "btn-primary": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": "linear-gradient(145deg, rgb(212, 175, 55), rgb(184, 145, 42))",
+      "color": "rgb(36, 31, 20)",
+      "borderColor": "rgba(125, 95, 16, 0.5)",
+      "borderWidth": "1px",
+      "fontSize": "14px",
+      "fontWeight": "600",
+      "ownText": "دخول",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "دخول",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(198, 161, 53)",
+      "contrast": 6.66
+    },
+    "nav-link": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(90, 84, 75)",
+      "borderColor": "rgb(90, 84, 75)",
+      "borderWidth": "0px",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "ownText": "الرئيسية",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "الرئيسية",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(254, 254, 253)",
+      "contrast": 7.45
+    },
+    "footer": {
+      "layers": [
+        "rgb(10, 27, 47)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(159, 179, 200)",
+      "borderColor": "rgba(36, 31, 20, 0.09)",
+      "borderWidth": "1px",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "افحص، وصِن، وتابع سيارتك مع مزودي خدمة م",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "composited-layers",
+      "background": "rgb(10, 27, 47)",
+      "contrast": 8.06
+    },
+    "muted": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(90, 84, 75)",
+      "borderColor": "rgb(90, 84, 75)",
+      "borderWidth": "0px",
+      "fontSize": "13px",
+      "fontWeight": "700",
+      "ownText": "منصة السيارات",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "منصة السيارات",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(255, 255, 254)",
+      "contrast": 7.48
+    },
+    "auth-card": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": "linear-gradient(color(srgb 0.954667 0.940235 0.903216), rgb(251, 249, 244))",
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgba(36, 31, 20, 0.09)",
+      "borderWidth": "1px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "ORYXتسجيل الدخولادخل إلى مرآبك وحجوزاتك ",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(242, 236, 221)",
+      "contrast": 13.82
+    }
+  },
+  "/profile": {
+    "page": {
+      "layers": [
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgb(34, 32, 29)",
+      "borderWidth": "0px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "(function(){try{var d=document.documentE",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(222, 222, 222)",
+      "contrast": 12.11
+    },
+    "header": {
+      "layers": [
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgb(34, 32, 29)",
+      "borderWidth": "0px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "منصة السياراتالرئيسيةالخدماتمزودو الخدمة",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(248, 248, 247)",
+      "contrast": 15.31
+    },
+    "card": {
+      "layers": [
+        "rgb(255, 255, 255)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgba(36, 31, 20, 0.09)",
+      "borderWidth": "1px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "الملف الشخصيحدّث بياناتك الأساسية المستخ",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(250, 250, 247)",
+      "contrast": 15.5
+    },
+    "input": {
+      "layers": [
+        "rgb(255, 255, 255)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgba(36, 31, 20, 0.18)",
+      "borderWidth": "1px",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(253, 253, 253)",
+      "contrast": 15.98
+    },
+    "btn": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(34, 32, 29)",
+      "borderColor": "rgba(36, 31, 20, 0.14)",
+      "borderWidth": "1px",
+      "fontSize": "14px",
+      "fontWeight": "600",
+      "ownText": "EN",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "EN",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(253, 253, 252)",
+      "contrast": 15.98
+    },
+    "btn-primary": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgb(255, 255, 255)"
+      ],
+      "backgroundImage": "linear-gradient(145deg, rgb(224, 193, 104), rgb(201, 162, 39))",
+      "color": "rgb(36, 31, 20)",
+      "borderColor": "rgba(0, 0, 0, 0)",
+      "borderWidth": "1px",
+      "fontSize": "14px",
+      "fontWeight": "600",
+      "ownText": "حفظ",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "حفظ",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(214, 181, 80)",
+      "contrast": 8.27
+    },
+    "nav-link": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(90, 84, 75)",
+      "borderColor": "rgb(90, 84, 75)",
+      "borderWidth": "0px",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "ownText": "الرئيسية",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "الرئيسية",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(254, 254, 253)",
+      "contrast": 7.45
+    },
+    "footer": {
+      "layers": [
+        "rgb(10, 27, 47)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(159, 179, 200)",
+      "borderColor": "rgba(36, 31, 20, 0.09)",
+      "borderWidth": "1px",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "افحص، وصِن، وتابع سيارتك مع مزودي خدمة م",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "composited-layers",
+      "background": "rgb(10, 27, 47)",
+      "contrast": 8.06
+    },
+    "muted": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "color(srgb 1 1 1 / 0.94)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": null,
+      "color": "rgb(90, 84, 75)",
+      "borderColor": "rgb(90, 84, 75)",
+      "borderWidth": "0px",
+      "fontSize": "13px",
+      "fontWeight": "700",
+      "ownText": "منصة السيارات",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "منصة السيارات",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(255, 255, 254)",
+      "contrast": 7.48
+    },
+    "page-head": {
+      "layers": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgb(247, 244, 237)"
+      ],
+      "backgroundImage": "radial-gradient(120% 140% at 88% 6%, color(srgb 0.909804 0.780392 0.4 / 0.2), rgba(0, 0, 0, 0) 58%), linear-gradient(150",
+      "color": "rgb(255, 255, 255)",
+      "borderColor": "rgba(36, 31, 20, 0.14)",
+      "borderWidth": "1px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "ownText": "",
+      "isIcon": false,
+      "threshold": 4.5,
+      "text": "منصة السياراتالملف الشخصيبياناتك الشخصية",
+      "tokens": {
+        "bg": "#f7f4ed",
+        "surface": "#fff",
+        "gold": "#7d5f10",
+        "textFaint": "#6b6459"
+      },
+      "measuredFrom": "rendered-pixels",
+      "background": "rgb(13, 30, 49)",
+      "contrast": 16.87
+    }
+  }
+}

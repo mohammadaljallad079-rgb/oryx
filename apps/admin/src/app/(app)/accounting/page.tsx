@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput, todayIso } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { DocumentActions } from '@/components/document-actions';
+import { AttachmentsPanel, DocumentPrintActions } from '@/components/document-print';
 import {
   Badge,
   Button,
@@ -23,15 +25,18 @@ import {
 } from '@/components/ui';
 import type {
   BalanceSheetDto,
+  CustomerDto,
   ErpAccountDto,
   FiscalYearDto,
   IncomeStatementDto,
   JournalEntryDto,
   LedgerAccountDto,
+  PaymentDto,
+  SupplierDto,
   TrialBalanceDto,
 } from '@oryx/shared';
 
-type Tab = 'accounts' | 'journals' | 'periods' | 'statements' | 'ledger';
+type Tab = 'accounts' | 'journals' | 'periods' | 'payments' | 'statements' | 'ledger' | 'receipts';
 
 export default function AccountingPage() {
   const { t } = useUi();
@@ -40,17 +45,21 @@ export default function AccountingPage() {
 
   const canManageCoa = can('erp.accounting.coa.manage');
   const canPost = can('erp.accounting.journal.post');
+  const canPay = can('erp.accounting.payment.manage');
+  const canManagePayments = can('erp.accounting.payment.manage');
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'accounts', label: t('erp.accounting.accounts') },
     { key: 'journals', label: t('erp.accounting.journals') },
+    { key: 'receipts', label: t('erp.accounting.receipts') },
     { key: 'periods', label: t('erp.accounting.periods') },
+    { key: 'payments', label: t('erp.accounting.payments') },
     { key: 'statements', label: t('erp.accounting.statements') },
     { key: 'ledger', label: t('erp.accounting.ledger') },
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="accounting-page">
+    <div className="flex flex-col gap-4" data-testid="accounting-page">
       <SectionHeader
         title={t('nav.financial_accounting')}
         subtitle={t('erp.accounting.subtitle')}
@@ -75,10 +84,93 @@ export default function AccountingPage() {
 
       {tab === 'accounts' ? <AccountsTab canManage={canManageCoa} /> : null}
       {tab === 'journals' ? <JournalsTab canPost={canPost} /> : null}
+      {tab === 'receipts' ? <ReceiptsTab canManage={canManagePayments} /> : null}
       {tab === 'periods' ? <PeriodsTab canManage={canManageCoa} /> : null}
+      {tab === 'payments' ? <PaymentsTab canPay={canPay} /> : null}
       {tab === 'statements' ? <StatementsTab /> : null}
       {tab === 'ledger' ? <LedgerTab /> : null}
     </div>
+  );
+}
+
+// ------------------------------------------------------------------ receipts
+
+function ReceiptsTab({ canManage }: { canManage: boolean }) {
+  const { t } = useUi();
+  const [detail, setDetail] = useState<PaymentDto | null>(null);
+  const list = useAsync(() => api.payments({ page: 1 }), []);
+
+  const receipts = (list.data?.items ?? []).filter((p) => p.direction === 'RECEIPT');
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
+        <p className="oryx-panel-title m-0">{t('erp.accounting.receipts')}</p>
+        <Button size="sm" onClick={() => void list.reload()} data-testid="receipts-refresh">
+          <Icon name="search" size={15} />
+          {t('common.refresh')}
+        </Button>
+      </div>
+      {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
+      {list.loading ? (
+        <div className="flex flex-col gap-3 p-4">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} height={34} />)}</div>
+      ) : receipts.length === 0 ? (
+        <EmptyState title={t('common.empty')} hint={t('erp.accounting.emptyReceipts')} />
+      ) : (
+        <TableShell>
+          <thead>
+            <tr>
+              <th>{t('erp.sales.receiptNumber')}</th>
+              <th>{t('common.date')}</th>
+              <th>{t('erp.sales.customer')}</th>
+              <th>{t('erp.sales.method')}</th>
+              <th>{t('erp.sales.total')}</th>
+              <th>{t('common.actions')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {receipts.map((p) => (
+              <tr key={p.id} data-testid={`receipt-row-${p.paymentNumber}`}>
+                <td className="font-mono text-[12px]">{p.paymentNumber}</td>
+                <td className="text-[12.5px]">{p.paidAt?.slice(0, 10)}</td>
+                <td className="text-[12.5px]">{p.partyNameEn ?? '—'}</td>
+                <td className="text-[12.5px]">{p.method.replace(/_/g, ' ')}</td>
+                <td className="tabular-nums text-[12.5px] font-semibold">{money(p.amountMinor, p.currency)}</td>
+                <td>
+                  <div className="flex items-center gap-1.5">
+                    <DocumentPrintActions kind="RECEIPT" id={p.id} compact />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setDetail(p)}
+                      title={t('attachments.title')}
+                      data-testid={`receipt-attach-open-${p.paymentNumber}`}
+                    >
+                      <Icon name="paperclip" size={15} />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </TableShell>
+      )}
+      <Modal
+        open={detail !== null}
+        title={`${t('erp.sales.receiptNumber')} ${detail?.paymentNumber ?? ''}`}
+        onClose={() => setDetail(null)}
+      >
+        {detail ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[13px] font-semibold">{detail.partyNameEn ?? '—'}</span>
+              <DocumentPrintActions kind="RECEIPT" id={detail.id} />
+            </div>
+            <AttachmentsPanel entityType="PAYMENT" entityId={detail.id} canManage={canManage} />
+          </div>
+        ) : null}
+      </Modal>
+    </Card>
   );
 }
 
@@ -87,9 +179,15 @@ export default function AccountingPage() {
 function AccountsTab({ canManage }: { canManage: boolean }) {
   const { t, locale } = useUi();
   const [search, setSearch] = useState('');
-  const [createOpen, setCreateOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<ErpAccountDto | null>(null);
 
   const list = useAsync(() => api.accountingAccounts({ search: search || undefined }), [search]);
+
+  const setStatus = async (row: ErpAccountDto, next: boolean) => {
+    await api.updateAccount(row.id, { isActive: next });
+    await list.reload();
+  };
 
   return (
     <Card>
@@ -109,7 +207,7 @@ function AccountsTab({ canManage }: { canManage: boolean }) {
           {t('common.refresh')}
         </Button>
         {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)} data-testid="new-account">
+          <Button variant="primary" size="sm" onClick={() => { setEditing(null); setOpen(true); }} data-testid="new-account">
             <Icon name="plus" size={16} />
             {t('erp.accounting.newAccount')}
           </Button>
@@ -140,6 +238,7 @@ function AccountsTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.accounting.normalBalance')}</th>
               <th>{t('erp.accounting.systemRole')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -157,25 +256,52 @@ function AccountsTab({ canManage }: { canManage: boolean }) {
                     {a.isActive ? t('common.active') : t('common.inactive')}
                   </Badge>
                 </td>
+                <td>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {canManage ? (
+                      <>
+                        <Button size="sm" variant="ghost" aria-label={`${t('common.edit')} ${a.code}`} onClick={() => { setEditing(a); setOpen(true); }} data-testid={`account-edit-${a.code}`}>
+                          <Icon name="edit" size={14} />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          aria-label={`${a.isActive ? t('common.deactivate') : t('common.reactivate')} ${a.code}`}
+                          onClick={() => void setStatus(a, !a.isActive)}
+                          data-testid={`account-toggle-${a.code}`}
+                        >
+                          <Icon name={a.isActive ? 'close' : 'check'} size={14} />
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
 
-      <CreateAccountModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={list.reload} />
+      <AccountModal
+        open={open}
+        account={editing}
+        onClose={() => { setOpen(false); setEditing(null); }}
+        onSaved={list.reload}
+      />
     </Card>
   );
 }
 
-function CreateAccountModal({
+function AccountModal({
   open,
+  account,
   onClose,
-  onCreated,
+  onSaved,
 }: {
   open: boolean;
+  account: ErpAccountDto | null;
   onClose: () => void;
-  onCreated: () => Promise<void>;
+  onSaved: () => Promise<void>;
 }) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
@@ -188,14 +314,48 @@ function CreateAccountModal({
     normalBalance: 'DEBIT',
   });
 
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setForm({
+      code: account?.code ?? '',
+      nameEn: account?.nameEn ?? '',
+      nameAr: account?.nameAr ?? '',
+      type: account?.type ?? 'ASSET',
+      normalBalance: account?.normalBalance ?? 'DEBIT',
+    });
+  }, [open, account]);
+
+  // A new account is numbered automatically: whenever the type changes, ask the
+  // API for the next free code in that type's block. The field stays editable,
+  // so an operator may still type their own code.
+  useEffect(() => {
+    if (!open || account) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { code } = await api.nextAccountCode({ type: form.type });
+        if (!cancelled) setForm((f) => ({ ...f, code }));
+      } catch {
+        /* leave the field for manual entry if the suggestion fails */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, account, form.type]);
+
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.createAccount(form);
-      await onCreated();
+      if (account) {
+        await api.updateAccount(account.id, { nameEn: form.nameEn, nameAr: form.nameAr });
+      } else {
+        await api.createAccount(form);
+      }
+      await onSaved();
       onClose();
-      setForm({ code: '', nameEn: '', nameAr: '', type: 'ASSET', normalBalance: 'DEBIT' });
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
@@ -206,12 +366,17 @@ function CreateAccountModal({
   return (
     <Modal
       open={open}
-      title={t('erp.accounting.newAccount')}
+      title={account ? t('erp.accounting.editAccount') : t('erp.accounting.newAccount')}
       onClose={onClose}
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy} onClick={submit} data-testid="save-account">
+          <Button
+            variant="primary"
+            disabled={busy || !form.nameEn || !form.nameAr || (!account && !form.code)}
+            onClick={submit}
+            data-testid="save-account"
+          >
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </>
@@ -220,10 +385,10 @@ function CreateAccountModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="account-code" />
+          <input className="oryx-input" value={form.code} disabled={Boolean(account)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="account-code" />
         </Field>
         <Field label={t('erp.accounting.type')} required>
-          <select className="oryx-select" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+          <select className="oryx-select" value={form.type} disabled={Boolean(account)} onChange={(e) => setForm({ ...form, type: e.target.value })} data-testid="account-type">
             {['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'].map((x) => (
               <option key={x} value={x}>
                 {x}
@@ -238,7 +403,7 @@ function CreateAccountModal({
           <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="account-name-ar" />
         </Field>
         <Field label={t('erp.accounting.normalBalance')}>
-          <select className="oryx-select" value={form.normalBalance} onChange={(e) => setForm({ ...form, normalBalance: e.target.value })}>
+          <select className="oryx-select" value={form.normalBalance} disabled={Boolean(account)} onChange={(e) => setForm({ ...form, normalBalance: e.target.value })} data-testid="account-normal-balance">
             <option value="DEBIT">DEBIT</option>
             <option value="CREDIT">CREDIT</option>
           </select>
@@ -252,10 +417,13 @@ function CreateAccountModal({
 
 function JournalsTab({ canPost }: { canPost: boolean }) {
   const { t } = useUi();
+  const { can } = useAuth();
   const [page, setPage] = useState(1);
   const [postOpen, setPostOpen] = useState(false);
+  const [reversing, setReversing] = useState<JournalEntryDto | null>(null);
   const list = useAsync(() => api.journals({ page, pageSize: 15 }), [page]);
   const accounts = useAsync(() => api.accountingAccounts(), []);
+  const canReverse = can('erp.accounting.journal.reverse');
 
   return (
     <Card>
@@ -317,9 +485,27 @@ function JournalsTab({ canPost }: { canPost: boolean }) {
                     <StatusBadge status={j.status} label={j.status} />
                   </td>
                   <td>
-                    <span className="oryx-faint text-[11.5px]">
-                      {j.lines.length} {t('erp.accounting.lines')}
-                    </span>
+                    <div className="flex flex-wrap items-center justify-end gap-1">
+                      <span className="oryx-faint text-[11.5px]">
+                        {j.lines.length} {t('erp.accounting.lines')}
+                      </span>
+                      {canReverse && j.status === 'POSTED' ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setReversing(j)}
+                          data-testid={`journal-reverse-${j.entryNumber}`}
+                        >
+                          {t('erp.accounting.reverse')}
+                        </Button>
+                      ) : null}
+                      <DocumentActions
+                        sourceType="JournalEntry"
+                        sourceId={j.id}
+                        type="JOURNAL_ENTRY"
+                        permissions={['erp.accounting.read']}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -341,7 +527,81 @@ function JournalsTab({ canPost }: { canPost: boolean }) {
         onClose={() => setPostOpen(false)}
         onPosted={list.reload}
       />
+
+      {reversing ? (
+        <ReverseJournalModal
+          entry={reversing}
+          onClose={() => setReversing(null)}
+          onReversed={async () => {
+            await list.reload();
+          }}
+        />
+      ) : null}
     </Card>
+  );
+}
+
+/**
+ * Reverses a posted journal entry with a counter-entry.
+ *
+ * A posted entry is never edited or deleted: the correction is a new POSTED
+ * entry that mirrors the original. The dialog states that plainly and asks for
+ * a reason, which the API stores on the reversal.
+ */
+function ReverseJournalModal({
+  entry,
+  onClose,
+  onReversed,
+}: {
+  entry: JournalEntryDto;
+  onClose: () => void;
+  onReversed: () => Promise<void>;
+}) {
+  const { t } = useUi();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
+  const [reversalDate, setReversalDate] = useState(todayIso());
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.reverseJournal(entry.id, reason.trim() || undefined, new Date(reversalDate).toISOString());
+      await onReversed();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      open
+      title={`${t('erp.accounting.reverse')} ${entry.entryNumber}`}
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button variant="primary" disabled={busy || !reason.trim()} onClick={submit} data-testid="confirm-reverse-journal">
+            {busy ? t('common.loading') : t('erp.accounting.reverse')}
+          </Button>
+        </>
+      }
+    >
+      {error ? <ErrorBanner message={error} /> : null}
+      <p className="oryx-muted m-0 mb-3 text-[12.5px]">{t('erp.accounting.reverseHint')}</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label={t('common.date')} required>
+          <input type="date" className="oryx-input" value={reversalDate} onChange={(e) => setReversalDate(e.target.value)} data-testid="reverse-date" />
+        </Field>
+        <Field label={t('erp.accounting.reverseReason')} required>
+          <input className="oryx-input" value={reason} onChange={(e) => setReason(e.target.value)} data-testid="reverse-reason" />
+        </Field>
+      </div>
+    </Modal>
   );
 }
 
@@ -547,6 +807,348 @@ function PeriodsTab({ canManage }: { canManage: boolean }) {
         </div>
       )}
     </Card>
+  );
+}
+
+// ------------------------------------------------------- receipts & payments
+
+/**
+ * Receipts and payment vouchers (سندات القبض والصرف).
+ *
+ * A receipt collects money from a customer, a voucher pays a supplier. Both are
+ * financial documents, so the row offers the same preview/print/download cell as
+ * an invoice — the printed slip is issued from the stored payment record rather
+ * than recomposed in the browser.
+ */
+function PaymentsTab({ canPay }: { canPay: boolean }) {
+  const { t, locale } = useUi();
+  const [page, setPage] = useState(1);
+  const [open, setOpen] = useState(false);
+  const list = useAsync(() => api.payments({ page }), [page]);
+  const customers = useAsync(() => api.salesCustomers(), []);
+  const suppliers = useAsync(() => api.suppliers(), []);
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
+        <p className="oryx-panel-title m-0">{t('erp.accounting.payments')}</p>
+        {canPay ? (
+          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-payment">
+            <Icon name="plus" size={16} />
+            {t('erp.accounting.newPayment')}
+          </Button>
+        ) : null}
+      </div>
+      {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
+      {list.loading ? (
+        <div className="flex flex-col gap-3 p-4">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} height={34} />)}</div>
+      ) : (list.data?.items.length ?? 0) === 0 ? (
+        <EmptyState title={t('common.empty')} hint={t('erp.accounting.emptyPayments')} />
+      ) : (
+        <TableShell>
+          <thead>
+            <tr>
+              <th>{t('erp.accounting.paymentNumber')}</th>
+              <th>{t('erp.accounting.direction')}</th>
+              <th>{t('erp.accounting.party')}</th>
+              <th>{t('erp.accounting.method')}</th>
+              <th>{t('erp.payments.amount')}</th>
+              <th>{t('common.date')}</th>
+              <th>{t('common.actions')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.data!.items.map((p: PaymentDto) => (
+              <tr key={p.id} data-testid={`payment-row-${p.paymentNumber}`}>
+                <td className="font-mono text-[12px]">{p.paymentNumber}</td>
+                <td><StatusBadge status={p.direction} label={t(`erp.accounting.${p.direction === 'RECEIPT' ? 'receipt' : 'voucher'}`)} /></td>
+                <td className="text-[12.5px]">{locale === 'ar' ? p.partyNameAr ?? p.partyNameEn : p.partyNameEn}</td>
+                <td className="text-[12.5px]">{p.method}</td>
+                <td className="tabular-nums text-[12.5px] font-semibold">{money(p.amountMinor, p.currency)}</td>
+                <td className="text-[12.5px]">{p.paidAt?.slice(0, 10)}</td>
+                <td>
+                  <DocumentActions
+                    sourceType="Payment"
+                    sourceId={p.id}
+                    type={p.direction === 'RECEIPT' ? 'PAYMENT_RECEIPT' : 'PAYMENT_VOUCHER'}
+                    permissions={['erp.accounting.read', 'erp.accounting.payment.manage']}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </TableShell>
+      )}
+      {list.data && list.data.total > list.data.pageSize ? (
+        <Pagination
+          page={page}
+          pageSize={list.data.pageSize}
+          total={list.data.total}
+          onPage={setPage}
+          labels={{ previous: t('common.previous'), next: t('common.next'), page: t('common.page'), of: t('common.of') }}
+        />
+      ) : null}
+      <PaymentModal
+        open={open}
+        customers={customers.data?.items ?? []}
+        suppliers={suppliers.data?.items ?? []}
+        onClose={() => setOpen(false)}
+        onCreated={async () => {
+          await list.reload();
+        }}
+      />
+    </Card>
+  );
+}
+
+function PaymentModal({
+  open,
+  customers,
+  suppliers,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  customers: CustomerDto[];
+  suppliers: SupplierDto[];
+  onClose: () => void;
+  onCreated: () => Promise<void>;
+}) {
+  const { t } = useUi();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [direction, setDirection] = useState<'RECEIPT' | 'PAYMENT'>('RECEIPT');
+  const [customerId, setCustomerId] = useState('');
+  const [supplierId, setSupplierId] = useState('');
+  const [method, setMethod] = useState('CASH');
+  const [amount, setAmount] = useState('');
+  const [reference, setReference] = useState('');
+  const [notes, setNotes] = useState('');
+  // The name the printed slip shows on its "Received By" line. Left blank it
+  // defaults server-side to the signed-in operator, so it is never empty.
+  const [receivedByName, setReceivedByName] = useState('');
+  const [paidAt, setPaidAt] = useState(todayIso());
+  // Chosen invoice allocations, keyed by invoice id. An empty amount leaves the
+  // invoice open; the sum may never exceed the payment amount.
+  const [allocations, setAllocations] = useState<Record<string, string>>({});
+
+  const partyId = direction === 'RECEIPT' ? customerId : supplierId;
+
+  // The party's open invoices (posted or partially paid), loaded when a party
+  // is chosen so a receipt can be applied to exactly what it settles.
+  const openInvoices = useAsync<Array<{ id: string; number: string; outstandingMinor: number; currency: string; date: string }>>(
+    async () => {
+      if (!partyId) return [];
+      if (direction === 'RECEIPT') {
+        const res = await api.salesInvoices({ customerId: partyId, status: 'POSTED' });
+        const partial = await api.salesInvoices({ customerId: partyId, status: 'PARTIALLY_PAID' });
+        return [...res.items, ...partial.items]
+          .filter((i) => (i.outstandingMinor ?? 0) > 0)
+          .map((i) => ({
+            id: i.id,
+            number: i.invoiceNumber ?? i.id,
+            outstandingMinor: i.outstandingMinor ?? 0,
+            currency: i.currency,
+            date: (i.invoiceDate ?? '').slice(0, 10),
+          }));
+      }
+      const res = await api.supplierInvoices({ supplierId: partyId, status: 'POSTED' });
+      const partial = await api.supplierInvoices({ supplierId: partyId, status: 'PARTIALLY_PAID' });
+      return [...res.items, ...partial.items]
+        .filter((i) => (i.outstandingMinor ?? 0) > 0)
+        .map((i) => ({
+          id: i.id,
+          number: i.invoiceNumber ?? i.id,
+          outstandingMinor: i.outstandingMinor ?? 0,
+          currency: i.currency,
+          date: (i.invoiceDate ?? '').slice(0, 10),
+        }));
+    },
+    [partyId, direction],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    setAllocations({});
+    setAmount('');
+  }, [open, partyId]);
+
+  const amountMinor = toMinorInput(amount);
+  const allocatedMinor = Object.values(allocations).reduce((s, v) => s + toMinorInput(v), 0);
+  const overAllocated = allocatedMinor > amountMinor;
+  const partyOk = direction === 'RECEIPT' ? Boolean(customerId) : Boolean(supplierId);
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const chosen = Object.entries(allocations)
+        .map(([id, value]) => ({ id, amountMinor: toMinorInput(value) }))
+        .filter((a) => a.amountMinor > 0);
+      await api.recordPayment({
+        direction,
+        partyType: direction === 'RECEIPT' ? 'CUSTOMER' : 'SUPPLIER',
+        ...(direction === 'RECEIPT' ? { customerId } : { supplierId }),
+        method,
+        amountMinor,
+        reference: reference || undefined,
+        notes: notes || undefined,
+        receivedByName: receivedByName.trim() || undefined,
+        paidAt: new Date(paidAt).toISOString(),
+        ...(chosen.length
+          ? {
+              allocations: chosen.map((a) =>
+                direction === 'RECEIPT'
+                  ? { target: 'SALES_INVOICE', salesInvoiceId: a.id, amountMinor: a.amountMinor }
+                  : { target: 'SUPPLIER_INVOICE', supplierInvoiceId: a.id, amountMinor: a.amountMinor },
+              ),
+            }
+          : {}),
+      });
+      await onCreated();
+      onClose();
+      setAmount('');
+      setReference('');
+      setNotes('');
+      setAllocations({});
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      title={t('erp.accounting.newPayment')}
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            variant="primary"
+            disabled={busy || !partyOk || !amount || overAllocated}
+            onClick={submit}
+            data-testid="save-payment"
+          >
+            {busy ? t('common.loading') : t('common.save')}
+          </Button>
+        </>
+      }
+    >
+      {error ? <ErrorBanner message={error} /> : null}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label={t('erp.accounting.direction')} required>
+          <select
+            className="oryx-select"
+            value={direction}
+            onChange={(e) => setDirection(e.target.value as 'RECEIPT' | 'PAYMENT')}
+            data-testid="payment-direction"
+          >
+            <option value="RECEIPT">{t('erp.accounting.receipt')}</option>
+            <option value="PAYMENT">{t('erp.accounting.voucher')}</option>
+          </select>
+        </Field>
+        <Field label={direction === 'RECEIPT' ? t('erp.sales.customer') : t('erp.purchasing.supplier')} required>
+          {direction === 'RECEIPT' ? (
+            <select className="oryx-select" value={customerId} onChange={(e) => setCustomerId(e.target.value)} data-testid="payment-customer">
+              <option value="">—</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code} — {c.nameEn}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select className="oryx-select" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} data-testid="payment-supplier">
+              <option value="">—</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.code} — {s.nameEn}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+        <Field label={t('erp.accounting.method')} required>
+          <select className="oryx-select" value={method} onChange={(e) => setMethod(e.target.value)} data-testid="payment-method">
+            {['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER'].map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={t('erp.payments.amount')} required>
+          <input
+            className="oryx-input tabular-nums"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            data-testid="payment-amount"
+          />
+        </Field>
+        <Field label={t('common.date')} required>
+          <input type="date" className="oryx-input" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} data-testid="payment-date" />
+        </Field>
+        <Field label={t('erp.payments.manualReference')}>
+          <input className="oryx-input" value={reference} onChange={(e) => setReference(e.target.value)} data-testid="payment-reference" />
+        </Field>
+        <Field label={t('erp.payments.receivedBy')} hint={t('erp.payments.receivedByHint')}>
+          <input
+            className="oryx-input"
+            value={receivedByName}
+            onChange={(e) => setReceivedByName(e.target.value)}
+            data-testid="payment-received-by"
+          />
+        </Field>
+        <Field label={t('common.notes')}>
+          <input className="oryx-input" value={notes} onChange={(e) => setNotes(e.target.value)} data-testid="payment-notes" />
+        </Field>
+      </div>
+
+      {partyId ? (
+        <div className="mt-4" data-testid="payment-allocations">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="oryx-label m-0">{t('erp.accounting.allocateTo')}</span>
+            <span className={`text-[11.5px] tabular-nums ${overAllocated ? 'text-[var(--danger)]' : 'oryx-faint'}`}>
+              {t('erp.accounting.allocated')} {money(allocatedMinor)} / {money(amountMinor)}
+            </span>
+          </div>
+          {openInvoices.loading ? (
+            <Skeleton height={40} />
+          ) : (openInvoices.data?.length ?? 0) === 0 ? (
+            <p className="oryx-faint m-0 text-[12px]">{t('erp.accounting.noOpenInvoices')}</p>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {openInvoices.data!.map((inv) => (
+                <div key={inv.id} className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] px-3 py-1.5">
+                  <span className="text-[12.5px]">
+                    <span className="font-mono font-semibold">{inv.number}</span>
+                    <span className="oryx-faint"> · {inv.date}</span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="oryx-faint text-[11.5px] tabular-nums">{t('erp.sales.outstanding')} {money(inv.outstandingMinor, inv.currency)}</span>
+                    <input
+                      className="oryx-input w-28 tabular-nums"
+                      inputMode="decimal"
+                      placeholder="0"
+                      value={allocations[inv.id] ?? ''}
+                      onChange={(e) => setAllocations({ ...allocations, [inv.id]: e.target.value })}
+                      data-testid={`payment-allocate-${inv.number}`}
+                    />
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {overAllocated ? (
+            <p className="m-0 mt-2 text-[11.5px] text-[var(--danger)]">{t('erp.accounting.overAllocated')}</p>
+          ) : null}
+        </div>
+      ) : null}
+    </Modal>
   );
 }
 

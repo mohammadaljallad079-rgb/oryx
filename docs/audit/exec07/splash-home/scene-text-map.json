@@ -1,0 +1,28 @@
+{
+  "screen": [
+    533,
+    1024
+  ],
+  "lockup": {
+    "yPct": 23.4,
+    "xPct": 50.0
+  },
+  "textLines": [
+    {
+      "yPct": 24.3,
+      "text": "AUTO"
+    },
+    {
+      "yPct": 75.2,
+      "text": "Everything Your ="
+    },
+    {
+      "yPct": 79.6,
+      "text": "Car Needs"
+    },
+    {
+      "yPct": 84.3,
+      "text": "Parts Services Trusted Providers"
+    }
+  ]
+}

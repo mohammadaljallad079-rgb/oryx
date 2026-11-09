@@ -50,7 +50,7 @@ export default function SecurityPage() {
   }, []);
 
   return (
-    <div className="flex flex-col gap-5" data-testid="security-page">
+    <div className="flex flex-col gap-4" data-testid="security-page">
       <SectionHeader
         title={t('mfa.title')}
         subtitle={t('mfa.subtitle')}
@@ -64,7 +64,7 @@ export default function SecurityPage() {
 
       {error ? <ErrorBanner message={error} onRetry={load} retryLabel={t('common.retry')} /> : null}
 
-      <Card className="p-5" data-testid="mfa-card">
+      <Card className="p-4" data-testid="mfa-card">
         {loading ? (
           <Skeleton height={120} />
         ) : (
@@ -131,7 +131,7 @@ export default function SecurityPage() {
       <PasswordCard />
 
       {isPlatform ? (
-        <Card className="p-5" data-testid="mfa-admin-reset">
+        <Card className="p-4" data-testid="mfa-admin-reset">
           <div className="oryx-card-header flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="oryx-panel-title m-0">{t('mfa.adminReset')}</p>
@@ -268,7 +268,7 @@ function PasswordCard() {
   }
 
   return (
-    <Card className="p-5" data-testid="password-card">
+    <Card className="p-4" data-testid="password-card">
       <form onSubmit={submit} className="flex flex-col gap-4">
         <div>
           <p className="oryx-panel-title m-0">{t('password.title')}</p>

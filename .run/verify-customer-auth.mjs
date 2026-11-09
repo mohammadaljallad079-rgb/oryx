@@ -10,7 +10,7 @@
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
-const BASE = 'https://work-2-cpaunenxhadbkkef.prod-runtime.all-hands.dev';
+const BASE = 'https://work-2-yumhfnmvqfdgaghd.prod-runtime.all-hands.dev';
 const OUT = process.env.OUT_DIR ?? '/workspace/project/oryx/.run/evidence/final-sweep';
 const CUSTOMER = { email: 'customer@oryx-demo.local', password: 'OryxDemo!2026' };
 
@@ -42,9 +42,11 @@ for (const [label, route, heading] of ROUTES) {
   const entry = { label, route, ok: false };
   try {
     await page.goto(`${BASE}/login`, { waitUntil: 'networkidle', timeout: 90000 });
-    await page.locator('input[type="email"]').first().fill(CUSTOMER.email);
-    await page.locator('input[type="password"]').first().fill(CUSTOMER.password);
-    await page.locator('button[type="submit"]').first().click();
+    // Scope to the form's test ids: the header also renders a search form whose
+    // submit button matches a bare `button[type="submit"]`.
+    await page.locator('[data-testid="login-email"]').fill(CUSTOMER.email);
+    await page.locator('[data-testid="login-password"]').fill(CUSTOMER.password);
+    await page.locator('[data-testid="login-password"]').press('Enter');
     await page.waitForURL('**/dashboard', { timeout: 60000 });
 
     // Full navigation: the cookie restores the session on mount.

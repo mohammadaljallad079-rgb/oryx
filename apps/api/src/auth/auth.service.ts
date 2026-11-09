@@ -6,7 +6,8 @@ import { randomBytes, createHash } from 'node:crypto';
 import type { LoginResponse, LoginResult, MembershipSummary, SessionUser } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
-import { ERROR_CODES, forbidden, unauthorized } from '../common/errors';
+import { findPlatformSuperAdminRole } from '../common/platform-role';
+import { ERROR_CODES, forbidden, notFound, unauthorized } from '../common/errors';
 import { MfaEnrollmentService } from './mfa-enrollment.service';
 
 export interface AccessTokenPayload {
@@ -139,6 +140,7 @@ export class AuthService {
     email: string,
     password: string,
     meta: { ip?: string; userAgent?: string },
+    deviceKind: 'WEB' | 'MOBILE' = 'WEB',
   ): Promise<LoginResult> {
     const user = await this.validateCredentials(email, password);
 
@@ -166,7 +168,7 @@ export class AuthService {
       };
     }
 
-    return this.issueSession(user, meta, 'auth.login');
+    return this.issueSession(user, meta, 'auth.login', deviceKind);
   }
 
   /**
@@ -177,6 +179,7 @@ export class AuthService {
     challengeToken: string,
     code: string,
     meta: { ip?: string; userAgent?: string },
+    deviceKind: 'WEB' | 'MOBILE' = 'WEB',
   ): Promise<LoginResponse> {
     let payload: { sub: string; mfa?: string };
     try {
@@ -219,7 +222,7 @@ export class AuthService {
       userAgent: meta.userAgent ?? null,
     });
 
-    return this.issueSession(user, meta, 'auth.login_mfa');
+    return this.issueSession(user, meta, 'auth.login_mfa', deviceKind);
   }
 
   /** Issue a full session (access token + refresh token + audit entry). */
@@ -236,6 +239,7 @@ export class AuthService {
     },
     meta: { ip?: string; userAgent?: string },
     auditAction: string,
+    deviceKind: 'WEB' | 'MOBILE' = 'WEB',
   ): Promise<LoginResponse> {
     const memberships = await this.loadMemberships(user.id);
     const activeMemberships = memberships.filter((m) => m.companyStatus === 'ACTIVE');
@@ -274,6 +278,8 @@ export class AuthService {
         userId: user.id,
         tokenHash: this.hashToken(refreshToken),
         expiresAt: new Date(Date.now() + this.refreshTtl() * 1000),
+        deviceKind,
+        deviceName: meta.userAgent?.slice(0, 120) ?? null,
         ipAddress: meta.ip ?? null,
         userAgent: meta.userAgent ?? null,
       },
@@ -377,7 +383,7 @@ export class AuthService {
             summary: 'Concurrent refresh handled within the rotation grace window.',
             ipAddress: meta.ip ?? null,
           });
-          return this.issueSibling(record.user, record.familyId, meta);
+          return this.issueSibling(record.user, record.familyId, meta, record);
         }
       }
       throw unauthorized(ERROR_CODES.AUTH_REFRESH_REVOKED, 'Refresh token is no longer valid.');
@@ -395,7 +401,14 @@ export class AuthService {
    * reuse path above, which the grace window handles.
    */
   private async rotateFrom(
-    record: { id: string; userId: string; familyId: string; user: UserRecord },
+    record: {
+      id: string;
+      userId: string;
+      familyId: string;
+      deviceKind: string;
+      deviceName: string | null;
+      user: UserRecord;
+    },
     meta: { ip?: string; userAgent?: string },
   ): Promise<LoginResponse> {
     const sessionId = randomBytes(16).toString('hex');
@@ -415,6 +428,8 @@ export class AuthService {
         tokenHash: this.hashToken(newRefresh),
         expiresAt: new Date(Date.now() + this.refreshTtl() * 1000),
         familyId: record.familyId,
+        deviceKind: record.deviceKind,
+        deviceName: record.deviceName,
         ipAddress: meta.ip ?? null,
         userAgent: meta.userAgent ?? null,
       },
@@ -450,7 +465,7 @@ export class AuthService {
         });
         // A sibling token in the same family: the successor is left untouched,
         // so the other caller's cookie keeps working.
-        return this.issueSibling(record.user, record.familyId, meta);
+        return this.issueSibling(record.user, record.familyId, meta, record);
       }
       throw unauthorized(ERROR_CODES.AUTH_REFRESH_REVOKED, 'Refresh token is no longer valid.');
     }
@@ -509,6 +524,7 @@ export class AuthService {
     user: UserRecord,
     familyId: string,
     meta: { ip?: string; userAgent?: string },
+    device: { deviceKind?: string; deviceName?: string | null } = {},
   ): Promise<LoginResponse> {
     const sessionId = randomBytes(16).toString('hex');
     const jti = randomBytes(24).toString('hex');
@@ -523,6 +539,8 @@ export class AuthService {
         tokenHash: this.hashToken(refreshToken),
         expiresAt: new Date(Date.now() + this.refreshTtl() * 1000),
         familyId,
+        deviceKind: device.deviceKind ?? 'WEB',
+        deviceName: device.deviceName ?? null,
         ipAddress: meta.ip ?? null,
         userAgent: meta.userAgent ?? null,
       },
@@ -596,6 +614,22 @@ export class AuthService {
     }
   }
 
+  /**
+   * Revoke a single session by its row id.
+   *
+   * Scoped by `userId` so one account can never revoke another account's
+   * session, and so the endpoint cannot be used to probe for row ids.
+   */
+  async revokeSession(userId: string, sessionRowId: string): Promise<void> {
+    const result = await this.prisma.refreshToken.updateMany({
+      where: { id: sessionRowId, userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    if (result.count === 0) {
+      throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Session not found.');
+    }
+  }
+
   async revokeAllSessions(userId: string): Promise<void> {
     await this.prisma.refreshToken.updateMany({
       where: { userId, revokedAt: null },
@@ -633,10 +667,7 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) return [];
     if (user.isSuperAdmin) {
-      const role = await this.prisma.role.findFirst({
-        where: { isPlatform: true, code: 'platform_super_admin' },
-        include: { permissions: true },
-      });
+      const role = await findPlatformSuperAdminRole(this.prisma);
       return role?.permissions.map((p) => p.permissionCode) ?? [];
     }
     if (!membershipId) return [];

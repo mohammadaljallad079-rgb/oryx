@@ -1,0 +1,140 @@
+{
+  "generatedAt": "2026-11-08T04:07:30.172Z",
+  "base": "http://127.0.0.1:3001",
+  "documents": [
+    {
+      "name": "vehicle-inspection-full.pdf",
+      "type": "VEHICLE_INSPECTION_REPORT",
+      "documentNumber": "Z00217",
+      "pageCount": 6,
+      "byteSize": 333580,
+      "verificationToken": "DywkT_-u78gou8wiVwy63OAzlw2vNB7zB6pDNI2uMIE",
+      "areas": [
+        "PAINT_BODY",
+        "CHASSIS_UNDERCARRIAGE",
+        "INTERIOR",
+        "EXTERIOR",
+        "ENGINE_COMPARTMENT",
+        "ROAD_TEST",
+        "COMPUTER_UNIT"
+      ]
+    },
+    {
+      "name": "vehicle-inspection-partial.pdf",
+      "type": "VEHICLE_INSPECTION_REPORT",
+      "documentNumber": "Z00218",
+      "pageCount": 5,
+      "byteSize": 274637,
+      "verificationToken": "X_7LLICoOtnRRIjRjvn-gO4KTntawXCzBQ21PQcsQOg",
+      "areas": [
+        "PAINT_BODY",
+        "ENGINE_COMPARTMENT",
+        "COMPUTER_UNIT"
+      ]
+    },
+    {
+      "name": "quotation.pdf",
+      "type": "QUOTATION",
+      "documentNumber": "Q00099",
+      "pageCount": 1,
+      "byteSize": 202567,
+      "verificationToken": "ZOh309VoVgXnm-j4sDXaFbN_3wKQBMCSIiG3W9hnbyI"
+    },
+    {
+      "name": "sales-order.pdf",
+      "type": "SALES_ORDER",
+      "documentNumber": "O00076",
+      "pageCount": 1,
+      "byteSize": 194106,
+      "verificationToken": "4TD3o25s8DupIW7AoIlo3SosWNuE0JQMXdTiHGTW0Ds"
+    },
+    {
+      "name": "sales-invoice.pdf",
+      "type": "SALES_INVOICE",
+      "documentNumber": "S00385",
+      "pageCount": 1,
+      "byteSize": 201895,
+      "verificationToken": "mf_BUf2a32pI8TYkGgIrcsmUQd-_gwcB6xl6rNWQfWo"
+    },
+    {
+      "name": "sales-return.pdf",
+      "type": "SALES_RETURN",
+      "documentNumber": "C00033",
+      "pageCount": 1,
+      "byteSize": 199292,
+      "verificationToken": "hTjiXrme-oc8LbVwKDyhUP8VVpXjHaK3YgFTHHVOb_M"
+    },
+    {
+      "name": "purchase-order.pdf",
+      "type": "PURCHASE_ORDER",
+      "documentNumber": "P00013",
+      "pageCount": 1,
+      "byteSize": 200505,
+      "verificationToken": "yNb52OZA6ofzA5hyWehi1njChATfZlll1phDS5hozX8"
+    },
+    {
+      "name": "purchase-invoice.pdf",
+      "type": "PURCHASE_INVOICE",
+      "documentNumber": "B00025",
+      "pageCount": 1,
+      "byteSize": 200824,
+      "verificationToken": "eBhoTnAYZM7i23wEhfgztAKNS6pRU4Hvopyne_swy_Q"
+    },
+    {
+      "name": "purchase-return.pdf",
+      "type": "PURCHASE_RETURN",
+      "documentNumber": "U00013",
+      "pageCount": 1,
+      "byteSize": 197874,
+      "verificationToken": "ShFx2uaMN_lFIHSh07CRHcsbkbL-OYbr3QuEeKO-0nE"
+    },
+    {
+      "name": "payment-receipt.pdf",
+      "type": "PAYMENT_RECEIPT",
+      "documentNumber": "Y00026",
+      "pageCount": 1,
+      "byteSize": 197475,
+      "verificationToken": "liTYgo1ak3LA3cdpaiEOhcTFCxS8gtc_Y1-iKCtNthM"
+    },
+    {
+      "name": "payment-voucher.pdf",
+      "type": "PAYMENT_VOUCHER",
+      "documentNumber": "Y00027",
+      "pageCount": 1,
+      "byteSize": 197773,
+      "verificationToken": "qUzl0PWI27w-jITwSeVA0qWlQZ5kPj2ZMOeM3R4AUz0"
+    },
+    {
+      "name": "customer-statement.pdf",
+      "type": "CUSTOMER_STATEMENT",
+      "documentNumber": "G00006",
+      "pageCount": 1,
+      "byteSize": 214072,
+      "verificationToken": "PdiMYFJmHh6vckQ9puBUZby5f2x-GfY5Z4vVlyF92_k"
+    },
+    {
+      "name": "supplier-statement.pdf",
+      "type": "SUPPLIER_STATEMENT",
+      "documentNumber": "W00006",
+      "pageCount": 1,
+      "byteSize": 213484,
+      "verificationToken": "n-HjDafHF7Xw2mfsiZ-bPDIO4kXM1YQyl9_PybXxw70"
+    },
+    {
+      "name": "journal-entry.pdf",
+      "type": "JOURNAL_ENTRY",
+      "documentNumber": "J00778",
+      "pageCount": 1,
+      "byteSize": 212313,
+      "verificationToken": "2_SmeMr2pY8s5InjmAsWZjQXZg6it8uzLKYpRQPYaOU"
+    },
+    {
+      "name": "pos-receipt.pdf",
+      "type": "POS_RECEIPT",
+      "documentNumber": "T00046",
+      "pageCount": 1,
+      "byteSize": 197696,
+      "verificationToken": "u3X3_N1PvEFgrIUOo_WbG1nyvkWIVo9PzeHH0p85DAo"
+    }
+  ]
+}

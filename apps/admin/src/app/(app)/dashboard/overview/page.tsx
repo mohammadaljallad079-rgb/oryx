@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { type DashboardResponse } from '@oryx/shared';
+import { DEFAULT_CURRENCY, type DashboardResponse } from '@oryx/shared';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { Icon } from '@/components/icons';
-import { Badge, Card, EmptyState, ErrorBanner, Skeleton } from '@/components/ui';
+import { Badge, Card, EmptyState, ErrorBanner, Skeleton, StatCard, StatGrid } from '@/components/ui';
 import { MiniBarChart, MiniDonut } from '@/components/charts';
 
 /**
@@ -52,12 +52,12 @@ export default function DashboardOverviewPage() {
   const k = data?.kpis;
   const currency = new Intl.NumberFormat(locale === 'ar' ? 'ar-SA' : 'en-US', {
     style: 'currency',
-    currency: k?.currency ?? 'SAR',
+    currency: k?.currency ?? DEFAULT_CURRENCY,
     maximumFractionDigits: 0,
   });
 
   return (
-    <div className="flex flex-col gap-5" data-testid="dashboard">
+    <div className="flex flex-col gap-4" data-testid="dashboard">
       <section className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="m-0 text-[22px] font-extrabold">{t('dash.title')}</h1>
@@ -86,55 +86,55 @@ export default function DashboardOverviewPage() {
       ) : null}
 
       {/* KPI row */}
-      <section className="grid grid-cols-2 gap-4 lg:grid-cols-4 [&>*]:min-w-0" data-testid="kpi-row">
+      <StatGrid data-testid="kpi-row">
         {loading || !k ? (
           Array.from({ length: 8 }).map((_, i) => (
-            <Card key={i} className="p-4">
-              <Skeleton height={12} width="55%" />
-              <div className="mt-3">
-                <Skeleton height={26} width="40%" />
+            <Card key={i} className="p-3">
+              <Skeleton height={11} width="55%" />
+              <div className="mt-2">
+                <Skeleton height={18} width="40%" />
               </div>
             </Card>
           ))
         ) : (
           <>
-            <Kpi
+            <StatCard
               icon="building"
               label={t('dash.kpi.companies')}
               value={String(k.companies)}
               sub={`${k.activeCompanies} ${t('common.active')}`}
             />
-            <Kpi icon="mapPin" label={t('dash.kpi.branches')} value={String(k.branches)} />
-            <Kpi icon="users" label={t('dash.kpi.users')} value={String(k.users)} />
-            <Kpi
+            <StatCard icon="mapPin" label={t('dash.kpi.branches')} value={String(k.branches)} />
+            <StatCard icon="users" label={t('dash.kpi.users')} value={String(k.users)} />
+            <StatCard
               icon="creditCard"
               label={t('dash.kpi.activeSubscriptions')}
               value={String(k.activeSubscriptions)}
             />
-            <Kpi
+            <StatCard
               icon="scroll"
               label={t('dash.kpi.mrr')}
               value={currency.format(k.monthlyRecurringRevenue)}
               sub={k.currency}
             />
-            <Kpi icon="package" label={t('dash.kpi.modulesLicensed')} value={String(k.modulesLicensed)} />
-            <Kpi
+            <StatCard icon="package" label={t('dash.kpi.modulesLicensed')} value={String(k.modulesLicensed)} />
+            <StatCard
               icon="shield"
               label={t('dash.kpi.planUtilisation')}
               value={`${k.planUtilisationPct}%`}
             />
-            <Kpi
+            <StatCard
               icon="lifeBuoy"
               label={t('dash.kpi.supportSessions')}
               value={String(k.openSupportSessions)}
             />
           </>
         )}
-      </section>
+      </StatGrid>
 
       {/* Analytics */}
       <section className="grid gap-4 lg:grid-cols-3 [&>*]:min-w-0">
-        <Card className="p-5 lg:col-span-2" data-testid="chart-branches">
+        <Card className="p-4 lg:col-span-2" data-testid="chart-branches">
           <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
             <div>
               <p className="oryx-panel-title m-0">{t('dash.branchPerformance')}</p>
@@ -155,7 +155,7 @@ export default function DashboardOverviewPage() {
           )}
         </Card>
 
-        <Card className="p-5" data-testid="chart-modules">
+        <Card className="p-4" data-testid="chart-modules">
           <div className="mb-3">
             <p className="oryx-panel-title m-0">{t('dash.moduleAdoption')}</p>
             <p className="oryx-faint m-0 text-[11.5px]">{t('dash.moduleAdoptionHint')}</p>
@@ -174,7 +174,7 @@ export default function DashboardOverviewPage() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-3 [&>*]:min-w-0">
-        <Card className="p-5 lg:col-span-2" data-testid="module-adoption">
+        <Card className="p-4 lg:col-span-2" data-testid="module-adoption">
           <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
             <div>
               <p className="oryx-panel-title m-0">{t('dash.moduleAdoption')}</p>
@@ -217,7 +217,7 @@ export default function DashboardOverviewPage() {
           )}
         </Card>
 
-        <Card className="p-5" data-testid="recent-activity">
+        <Card className="p-4" data-testid="recent-activity">
           <p className="oryx-panel-title m-0 mb-3">{t('dash.recentActivity')}</p>
           {loading ? (
             <Skeleton height={160} />
@@ -247,20 +247,3 @@ export default function DashboardOverviewPage() {
   );
 }
 
-function Kpi({ icon, label, value, sub }: { icon: string; label: string; value: string; sub?: string }) {
-  return (
-    <Card className="flex items-start gap-3 p-4" data-testid={`kpi-${label}`}>
-      <span
-        className="grid h-10 w-10 flex-none place-items-center rounded-xl"
-        style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-strong)', color: 'var(--gold)' }}
-      >
-        <Icon name={icon} size={18} />
-      </span>
-      <span className="min-w-0">
-        <span className="oryx-muted oryx-kpi-label block text-[11.5px] font-semibold uppercase tracking-wide">{label}</span>
-        <span className="oryx-kpi-value block truncate">{value}</span>
-        {sub ? <span className="oryx-faint block text-[11.5px]">{sub}</span> : null}
-      </span>
-    </Card>
-  );
-}

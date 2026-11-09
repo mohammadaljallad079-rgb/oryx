@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentPrincipal,
   RequireAnyPermission,
@@ -17,6 +18,7 @@ import {
   DecideReportDto,
   InvoiceInspectionDto,
   ListQueryDto,
+  OcrExtractDto,
   RecordFindingsDto,
   RecordMileageDto,
   SubmitReportDto,
@@ -88,9 +90,52 @@ export class VehicleController {
   @Post('vehicles/:id/documents')
   @RequireModule('automotive_inspections')
   @RequirePermissions('erp.vehicle.manage')
-  @ApiOperation({ summary: 'Add a vehicle document' })
-  addDocument(@Param('id') id: string, @Body() dto: VehicleDocumentDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
-    return this.vehicles.addVehicleDocument(id, dto, p, actorFrom(p, req));
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 12 * 1024 * 1024, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Add a vehicle document, optionally with a scanned image' })
+  addDocument(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() dto: VehicleDocumentDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.vehicles.addVehicleDocument(id, dto, p, actorFrom(p, req), file);
+  }
+
+  @Delete('vehicles/:id/documents/:documentId')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.vehicle.manage')
+  @ApiOperation({ summary: 'Remove a vehicle document' })
+  removeDocument(
+    @Param('id') id: string,
+    @Param('documentId') documentId: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.vehicles.removeVehicleDocument(id, documentId, p, actorFrom(p, req));
+  }
+
+  /**
+   * Read a registration card or insurance scan and return suggested fields.
+   *
+   * Stateless: nothing is persisted. The operator reviews the suggestion in the
+   * form and saves through the ordinary document endpoint, which is the only
+   * path that writes a document.
+   */
+  @Post('vehicles/:id/documents/ocr')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.vehicle.manage')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 12 * 1024 * 1024, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'OCR-assisted extraction from a registration-card scan (suggestions only)' })
+  extractDocument(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() dto: OcrExtractDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+  ) {
+    return this.vehicles.extractVehicleDocument(id, dto, p, file);
   }
 
   // ------------------------------------------------------------- inspections

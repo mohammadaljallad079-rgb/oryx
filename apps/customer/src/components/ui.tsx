@@ -2,7 +2,8 @@
 
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
-import { useUi } from '@/lib/ui-context';
+import { DEFAULT_CURRENCY } from '@oryx/shared';
+import { useUi, type Translator } from '@/lib/ui-context';
 
 export function Card({
   children,
@@ -115,12 +116,31 @@ const STATUS_TONE: Record<string, string> = {
   REFUNDED: 'oryx-badge-danger',
 };
 
+/**
+ * Render a raw API status as a localised badge.
+ *
+ * The API returns an enum (`HELD`, `IN_PROGRESS`); showing it verbatim leaked
+ * English into the Arabic interface. Every label comes from the dictionary and
+ * falls back to the de-underscored value only for a status the dictionary has
+ * not seen yet, so a new server enum degrades to a readable word rather than
+ * disappearing.
+ */
 export function StatusBadge({ status }: { status: string }) {
+  const { t } = useUi();
+  const key = `status.${status}`;
+  const label = t(key);
   return (
     <span className={clsx('oryx-badge', STATUS_TONE[status])}>
-      {status.replace(/_/g, ' ').toLowerCase()}
+      {label === key ? status.replace(/_/g, ' ').toLowerCase() : label}
     </span>
   );
+}
+
+/** Render a booking type enum (`INSPECTION`) through the dictionary. */
+export function bookingTypeLabel(t: Translator, value: string): string {
+  const key = `bookingType.${value}`;
+  const label = t(key);
+  return label === key ? value.replace(/_/g, ' ').toLowerCase() : label;
 }
 
 export function Alert({ children, tone = 'error' }: { children: ReactNode; tone?: 'error' | 'success' }) {
@@ -137,7 +157,7 @@ export function Loading({ label }: { label?: string }) {
 }
 
 /** Render a monetary minor-unit amount in the currency's own scale. */
-export function Money({ minor, currency = 'BHD', scale = 3 }: { minor: number; currency?: string; scale?: number }) {
+export function Money({ minor, currency = DEFAULT_CURRENCY, scale = 3 }: { minor: number; currency?: string; scale?: number }) {
   const value = minor / 10 ** scale;
   const formatted = value.toLocaleString('en-BH', {
     minimumFractionDigits: scale,

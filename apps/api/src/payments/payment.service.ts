@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { currencyScale } from '@oryx/shared';
+import { currencyScale, DEFAULT_CURRENCY } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import {
@@ -130,7 +130,7 @@ export class PaymentService {
     if (existing) return existing;
 
     const gateway = this.gatewayFor(input.provider);
-    const currency = input.currency ?? 'BHD';
+    const currency = input.currency ?? DEFAULT_CURRENCY;
     const intentNumber = await this.nextIntentNumber(input.companyId);
 
     const intent = await this.prisma.paymentIntent.create({
@@ -828,26 +828,26 @@ export class PaymentService {
   private async nextIntentNumber(companyId: string): Promise<string> {
     const count = await this.prisma.paymentIntent.count({ where: { companyId } });
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const candidate = `PI-${String(count + 1 + attempt).padStart(6, '0')}`;
+      const candidate = `I${String(count + 1 + attempt).padStart(6, '0')}`;
       const clash = await this.prisma.paymentIntent.findFirst({
         where: { companyId, intentNumber: candidate },
         select: { id: true },
       });
       if (!clash) return candidate;
     }
-    return `PI-${Date.now().toString(36).toUpperCase()}`;
+    return `I${Date.now().toString(36).toUpperCase()}`;
   }
 
   private async nextRefundNumber(companyId: string): Promise<string> {
     const count = await this.prisma.refund.count({ where: { companyId } });
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const candidate = `RF-${String(count + 1 + attempt).padStart(6, '0')}`;
+      const candidate = `F${String(count + 1 + attempt).padStart(6, '0')}`;
       const clash = await this.prisma.refund.findFirst({
         where: { companyId, refundNumber: candidate },
         select: { id: true },
       });
       if (!clash) return candidate;
     }
-    return `RF-${Date.now().toString(36).toUpperCase()}`;
+    return `F${Date.now().toString(36).toUpperCase()}`;
   }
 }

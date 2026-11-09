@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { isKnownModule } from '@oryx/shared';
+import { DEFAULT_CURRENCY, isKnownModule } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { badRequest, conflict, ERROR_CODES, forbidden, notFound } from '../common/errors';
@@ -63,7 +63,7 @@ export class PlansService {
         descriptionAr: dto.descriptionAr ?? '',
         monthlyPrice: dto.monthlyPrice.toFixed(2),
         annualPrice: dto.annualPrice.toFixed(2),
-        currency: dto.currency ?? 'SAR',
+        currency: dto.currency ?? DEFAULT_CURRENCY,
         isPublic: dto.isPublic ?? true,
         isActive: dto.isActive ?? true,
         trialDays: dto.trialDays ?? 14,

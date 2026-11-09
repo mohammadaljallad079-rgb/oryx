@@ -8,7 +8,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, feature/execution-01-super-admin-foundation, feature/execution-02-erp-core, feature/execution-03-hr-crm-automotive, feature/execution-04-customer-marketplace-mobile, feature/execution-05-platform-completion]
+    branches: [main, feature/execution-01-super-admin-foundation, feature/execution-02-erp-core, feature/execution-03-hr-crm-automotive, feature/execution-04-customer-marketplace-mobile, feature/execution-05-platform-completion, feature/execution-07-premium-web]
   workflow_dispatch:
 
 # Cancel superseded runs on the same ref to conserve CI minutes.
@@ -31,6 +31,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # GitHub rejects an invalid workflow file at the *workflow* level: the run
+      # appears with zero jobs and a failure, which is easy to misread as a code
+      # failure. Lint every workflow before anything else so that cannot happen.
+      # Pinned by image digest; actionlint is a single static binary with no
+      # post-install script.
+      - name: Validate workflow files
+        uses: docker://rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: -color
 
       - uses: pnpm/action-setup@v4
         with:
@@ -69,7 +79,7 @@ jobs:
       - name: Build admin app
         run: pnpm --filter @oryx/admin build
         env:
-          NEXT_PUBLIC_API_BASE_URL: http://localhost:3001/api
+          NEXT_PUBLIC_API_BASE_URL: /api
 
       - name: Typecheck customer app
         run: pnpm --filter @oryx/customer typecheck
@@ -80,7 +90,7 @@ jobs:
       - name: Build customer app
         run: pnpm --filter @oryx/customer build
         env:
-          NEXT_PUBLIC_API_BASE_URL: http://localhost:3001/api
+          NEXT_PUBLIC_API_BASE_URL: /api
 
       - name: Typecheck mobile app
         run: pnpm --filter @oryx/mobile typecheck
@@ -102,7 +112,10 @@ jobs:
   # ------------------------------------------------------- unit + API suites
   test-api:
     name: Unit and API integration tests
-    runs-on: ubuntu-latest
+    # Pinned like the browser job: this job installs the Playwright Chromium the
+    # PDF renderer uses, and Playwright 1.56.1 refuses to install it on
+    # ubuntu26.04-x64, which `ubuntu-latest` now resolves to.
+    runs-on: ubuntu-24.04
     needs: quality
 
     services:
@@ -165,6 +178,14 @@ jobs:
       - name: Verify the schema is in sync with the migrations
         run: pnpm --filter @oryx/database exec prisma migrate status
 
+      # The document and PDF suites render real PDFs through Playwright's
+      # Chromium, so the browser must be present even though this job runs no
+      # browser test. Without it every document test fails with
+      # `browserType.launch: Executable doesn't exist`, which reads as a code
+      # defect rather than a missing dependency.
+      - name: Install the Playwright browser used by the PDF renderer
+        run: pnpm --filter @oryx/admin exec playwright install --with-deps chromium
+
       - name: Run authorization unit tests
         run: pnpm --filter @oryx/shared test
 
@@ -185,7 +206,11 @@ jobs:
   # ------------------------------------------------------------- UI suites
   test-ui:
     name: Browser acceptance tests
-    runs-on: ubuntu-latest
+    # Pinned: `ubuntu-latest` now resolves to Ubuntu 26.04, which Playwright
+    # 1.56.1 refuses to install Chromium on ("does not support
+    # chromium on ubuntu26.04-x64"). 24.04 is the newest image this Playwright
+    # release supports. Lift the pin when Playwright gains 26.04 support.
+    runs-on: ubuntu-24.04
     needs: quality
 
     services:
@@ -213,7 +238,7 @@ jobs:
       SEED_SUPER_ADMIN_EMAIL: superadmin@oryx.local
       SEED_SUPER_ADMIN_PASSWORD: CiTestPassword!2026
       NODE_ENV: test
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:3001/api
+      NEXT_PUBLIC_API_BASE_URL: /api
       NEXT_PUBLIC_DEFAULT_LOCALE: ar
       NEXT_PUBLIC_DEFAULT_THEME: dark
       # The suites sign in many times; raise the ceilings so the limiter does not
@@ -258,6 +283,12 @@ jobs:
       - name: Build the admin app
         run: pnpm --filter @oryx/admin build
 
+      # The document suite asserts that the public verification page is served
+      # by the customer site, not the admin app, so the customer site must be
+      # running. `next start` serves the build produced above.
+      - name: Build the customer app
+        run: pnpm --filter @oryx/customer build
+
       - name: Install Playwright browsers
         run: pnpm --filter @oryx/admin exec playwright install --with-deps chromium
 
@@ -289,17 +320,33 @@ jobs:
           done
           echo "Admin app failed to become ready"; tail -50 /tmp/oryx-admin.log; exit 1
 
+      # Start the customer site and wait for it to answer, so the public
+      # verification assertion does not race a half-started server.
+      - name: Start the customer site
+        run: |
+          (cd apps/customer && pnpm start > /tmp/oryx-customer.log 2>&1 &)
+          for i in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://localhost:3002/; then
+              echo "Customer site is ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Customer site failed to become ready"; tail -50 /tmp/oryx-customer.log; exit 1
+
       - name: Run browser acceptance, MFA, responsive and functional suites
         run: pnpm --filter @oryx/admin test:ui
         env:
           ORYX_ADMIN_URL: http://localhost:3000
           ORYX_API: http://localhost:3001/api/v1
+          ORYX_CUSTOMER_URL: http://localhost:3002
 
       - name: Show server logs on failure
         if: failure()
         run: |
           echo '--- API log ---'; tail -100 /tmp/oryx-api.log || true
           echo '--- Admin log ---'; tail -100 /tmp/oryx-admin.log || true
+          echo '--- Customer log ---'; tail -100 /tmp/oryx-customer.log || true
 
       - name: Upload Playwright report
         if: always()

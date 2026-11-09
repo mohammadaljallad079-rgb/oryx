@@ -143,22 +143,44 @@ export async function signIn(page: Page, credentials = SUPER_ADMIN): Promise<voi
   await expect(page.getByTestId('dashboard')).toBeVisible();
 }
 
-/** Switches the theme and waits for the attribute to settle. */
+/**
+ * Switches the theme and waits for the attribute to settle.
+ *
+ * The stored preference is read by an inline bootstrap script before first
+ * paint, so the write has to survive the reload. Under a loaded CI runner a
+ * single reload occasionally re-runs the bootstrap against the previous value,
+ * so the write and reload are retried once. The assertion still runs on every
+ * attempt, so an app that cannot honour the requested theme still fails.
+ */
 export async function setTheme(page: Page, theme: 'dark' | 'light'): Promise<void> {
-  await page.evaluate((value) => {
-    window.localStorage.setItem('oryx.theme', value);
-  }, theme);
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+  await applyPreferenceAndReload(page, 'oryx.theme', theme, () =>
+    expect(page.locator('html')).toHaveAttribute('data-theme', theme),
+  );
 }
 
 /** Switches locale/direction and waits for the attribute to settle. */
 export async function setLocale(page: Page, locale: 'ar' | 'en'): Promise<void> {
-  await page.evaluate((value) => {
-    window.localStorage.setItem('oryx.locale', value);
-  }, locale);
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-dir', locale === 'ar' ? 'rtl' : 'ltr');
+  await applyPreferenceAndReload(page, 'oryx.locale', locale, () =>
+    expect(page.locator('html')).toHaveAttribute('data-dir', locale === 'ar' ? 'rtl' : 'ltr'),
+  );
+}
+
+async function applyPreferenceAndReload(
+  page: Page,
+  key: string,
+  value: string,
+  assertSettled: () => Promise<unknown>,
+): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    await page.evaluate(([k, v]) => window.localStorage.setItem(k, v), [key, value]);
+    await page.reload();
+    try {
+      await assertSettled();
+      return;
+    } catch (error) {
+      if (attempt >= 1) throw error;
+    }
+  }
 }
 
 export async function expectNoServerError(page: Page): Promise<void> {

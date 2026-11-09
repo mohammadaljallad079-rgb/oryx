@@ -88,7 +88,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
       }
-      const me = await api.me();
+      let me = await api.me();
+
+      // Platform super admin: no Membership is required.
+      // Resolve a tenant context from the platform company list.
+      if (me.user.isSuperAdmin && !me.context.companyId) {
+        const platformContext = await api.context();
+        const firstCompany = platformContext.companies.find(
+          (company) => company.status !== 'ARCHIVED',
+        );
+
+        if (firstCompany) {
+          tokenStore.setContext(firstCompany.id, null);
+          me = await api.me();
+        }
+      }
+
       setState((p) => ({
         ...p,
         ready: true,

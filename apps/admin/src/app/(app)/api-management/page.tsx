@@ -29,7 +29,7 @@ function ApiManagementPageInner() {
   const [created, setCreated] = useState<{ clientId: string; secret: string } | null>(null);
 
   return (
-    <div className="flex flex-col gap-5" data-testid="api-management-page">
+    <div className="flex flex-col gap-4" data-testid="api-management-page">
       <SectionHeader
         title={t('nav.apiClients')}
         subtitle={t('app.subtitle')}

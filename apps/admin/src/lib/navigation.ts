@@ -98,6 +98,36 @@ const AUTOMOTIVE = MODULES.filter((m) => m.group === 'automotive');
 const ANALYTICS = MODULES.filter((m) => m.group === 'analytics');
 const ADMIN = MODULES.filter((m) => m.group === 'administration');
 
+/** Centralized ecosystem management — Super Admin control panel. */
+export const CONTROL_PANEL_NAV: NavGroup = {
+  key: 'control',
+  labelKey: 'nav.group.control',
+  platformOnly: true,
+  items: [
+    { key: 'ecosystem', labelKey: 'nav.ecosystem', href: '/ecosystem', icon: 'globe', permission: 'platform.ecosystem.read', platformOnly: true },
+    { key: 'coupons', labelKey: 'nav.coupons', href: '/coupons', icon: 'tag', permission: 'platform.coupon.read', platformOnly: true },
+    { key: 'notifications', labelKey: 'nav.notifications', href: '/notifications', icon: 'bell', permission: 'platform.notification.read', platformOnly: true },
+  ],
+};
+
+/**
+ * Ecosystem Operations — the staff surface for the planned ecosystem modules.
+ *
+ * These entries are company-scoped, not platform-scoped: a consumer return, a
+ * recovery job and an AI suggestion each belong to a tenant, and the API scopes
+ * every read to the principal's active company. They live in their own group so
+ * the control panel above stays a platform-only surface.
+ */
+export const ECOSYSTEM_OPS_NAV: NavGroup = {
+  key: 'ecosystemOps',
+  labelKey: 'nav.group.ecosystemOps',
+  items: [
+    { key: 'ecoReturns', labelKey: 'nav.ecoReturns', href: '/ecosystem/returns', icon: 'scroll', permission: 'erp.customer_portal.read' },
+    { key: 'ecoRecovery', labelKey: 'nav.ecoRecovery', href: '/ecosystem/recovery', icon: 'lifeBuoy', permission: 'erp.marketplace.request.manage' },
+    { key: 'ecoSensage', labelKey: 'nav.ecoSensage', href: '/ecosystem/sensage', icon: 'wrench', permission: 'erp.customer_portal.read' },
+  ],
+};
+
 /** Platform governance group — visible only to Super Admin principals. */
 export const PLATFORM_NAV: NavGroup = {
   key: 'platform',
@@ -159,12 +189,33 @@ export const ERP_NAV: NavGroup[] = [
   { key: 'commerce', labelKey: 'nav.group.commerce', items: COMMERCE.map(erpItem) },
   { key: 'operations', labelKey: 'nav.group.operations', items: OPERATIONS.map(erpItem) },
   { key: 'customer', labelKey: 'nav.group.customer', items: CUSTOMER.map(erpItem) },
-  { key: 'automotive', labelKey: 'nav.group.automotive', items: AUTOMOTIVE.map(erpItem) },
+  {
+    key: 'automotive',
+    labelKey: 'nav.group.automotive',
+    items: [
+      ...AUTOMOTIVE.map(erpItem),
+      // Official documents are issued from an inspection, an invoice or an
+      // order, so the entry sits with the automotive group and reuses the
+      // inspection read permission rather than inventing a new one.
+      {
+        key: 'documents',
+        labelKey: 'nav.documents',
+        href: '/documents',
+        icon: 'scroll',
+        anyPermission: [
+          'erp.inspection.read',
+          'erp.sales.read',
+          'erp.purchasing.read',
+          'erp.accounting.read',
+        ],
+      },
+    ],
+  },
   { key: 'analytics', labelKey: 'nav.group.analytics', items: ANALYTICS.map(erpItem) },
   { key: 'administration', labelKey: 'nav.group.administration', items: ADMIN.map(erpItem) },
 ];
 
-export const ALL_NAV_GROUPS: NavGroup[] = [PLATFORM_NAV, WEBSITE_APP_NAV, ...ERP_NAV];
+export const ALL_NAV_GROUPS: NavGroup[] = [CONTROL_PANEL_NAV, PLATFORM_NAV, WEBSITE_APP_NAV, ECOSYSTEM_OPS_NAV, ...ERP_NAV];
 
 /** Resolve the module that owns a route, used by the planned-module page. */
 export function moduleForRoute(route: string): ModuleDefinition | undefined {
