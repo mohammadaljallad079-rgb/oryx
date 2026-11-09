@@ -470,6 +470,10 @@ model Company {
    */
   documentLocale     Locale          @default(en)
   taxNumber          String?
+  /** Commercial registration number, printed on documents beside the VAT number. */
+  crNumber           String?
+  /** The registered street address, printed in the document footer. */
+  addressLine        String?
   parentCompanyId    String?
   notes              String?
   createdAt          DateTime        @default(now())
@@ -727,6 +731,10 @@ model Branch {
 
 model Role {
   id            String   @id @default(cuid())
+  /// NULL for a platform role. `Role_companyId_code_key` cannot constrain those:
+  /// Postgres treats NULL as distinct, so at most one platform role per `code`
+  /// is enforced by the partial unique index `Role_platform_code_key`, written by
+  /// hand in the migration and not expressible here.
   companyId     String?
   code          String
   nameEn        String

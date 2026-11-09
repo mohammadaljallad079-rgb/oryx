@@ -151,10 +151,10 @@ export const DEFAULT_PDF_MARGINS: PdfMargins = {
  * reference document.
  */
 export const OFFICIAL_PDF_MARGINS: PdfMargins = {
-  top: '4mm',
-  right: '9mm',
+  top: '5.7mm',
+  right: '8.6mm',
   bottom: '14mm',
-  left: '13mm',
+  left: '9.3mm',
 };
 
 /**

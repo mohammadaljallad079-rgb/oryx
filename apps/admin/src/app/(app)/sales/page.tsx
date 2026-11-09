@@ -330,6 +330,7 @@ interface CustomerFormState {
   taxNumber: string;
   addressLine: string;
   city: string;
+  countryCode: string;
   sourceId: string | null;
   departmentId: string | null;
   creditLimit: string;
@@ -368,6 +369,7 @@ function CustomerModal({
     taxNumber: '',
     addressLine: '',
     city: '',
+    countryCode: '',
     sourceId: null as string | null,
     departmentId: null as string | null,
     creditLimit: '0.000',
@@ -387,6 +389,7 @@ function CustomerModal({
       taxNumber: customer?.taxNumber ?? '',
       addressLine: customer?.addressLine ?? '',
       city: customer?.city ?? '',
+      countryCode: customer?.countryCode ?? '',
       sourceId: customer?.sourceId ?? null,
       departmentId: customer?.departmentId ?? null,
       creditLimit: minorToInput(customer?.creditLimitMinor ?? 0, customer?.currency),
@@ -411,6 +414,7 @@ function CustomerModal({
         taxNumber: form.taxNumber || undefined,
         addressLine: form.addressLine || undefined,
         city: form.city || undefined,
+        countryCode: form.countryCode || undefined,
         sourceId: form.sourceId ?? undefined,
         departmentId: form.departmentId ?? undefined,
         creditLimitMinor: toMinorInput(form.creditLimit, customer?.currency),
@@ -476,6 +480,16 @@ function CustomerModal({
         </Field>
         <Field label={t('common.city')}>
           <input className="oryx-input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+        </Field>
+        <Field label={t('common.country')} hint={t('erp.sales.countryHint')}>
+          <input
+            className="oryx-input"
+            value={form.countryCode}
+            maxLength={2}
+            placeholder="BH"
+            onChange={(e) => setForm({ ...form, countryCode: e.target.value.toUpperCase() })}
+            data-testid="customer-country"
+          />
         </Field>
         <Field label={t('erp.sales.customerSource')} hint={t('erp.sales.customerSourceHint')}>
           <div className="flex items-center gap-2">

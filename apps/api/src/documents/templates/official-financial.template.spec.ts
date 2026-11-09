@@ -44,6 +44,7 @@ function payload(overrides: Partial<FinancialDocumentPayload> = {}): FinancialDo
       phone: '37702020',
       addressLine: 'Villa 1455, road 5455, block 555',
       city: 'Manama',
+      countryCode: 'BH',
     },
     lines: [
       {

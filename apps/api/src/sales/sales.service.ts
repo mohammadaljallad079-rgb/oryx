@@ -193,6 +193,7 @@ export class SalesService {
         ...(dto.taxNumber !== undefined ? { taxNumber: dto.taxNumber } : {}),
         ...(dto.addressLine !== undefined ? { addressLine: dto.addressLine } : {}),
         ...(dto.city !== undefined ? { city: dto.city } : {}),
+        ...(dto.countryCode !== undefined ? { countryCode: dto.countryCode } : {}),
         ...(dto.sourceId !== undefined ? { sourceId: dto.sourceId || null } : {}),
         ...(dto.departmentId !== undefined ? { departmentId: dto.departmentId || null } : {}),
         ...(dto.creditLimitMinor !== undefined ? { creditLimitMinor: dto.creditLimitMinor } : {}),

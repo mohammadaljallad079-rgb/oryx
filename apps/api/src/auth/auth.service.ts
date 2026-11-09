@@ -6,6 +6,7 @@ import { randomBytes, createHash } from 'node:crypto';
 import type { LoginResponse, LoginResult, MembershipSummary, SessionUser } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
+import { findPlatformSuperAdminRole } from '../common/platform-role';
 import { ERROR_CODES, forbidden, notFound, unauthorized } from '../common/errors';
 import { MfaEnrollmentService } from './mfa-enrollment.service';
 
@@ -666,10 +667,7 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) return [];
     if (user.isSuperAdmin) {
-      const role = await this.prisma.role.findFirst({
-        where: { isPlatform: true, code: 'platform_super_admin' },
-        include: { permissions: true },
-      });
+      const role = await findPlatformSuperAdminRole(this.prisma);
       return role?.permissions.map((p) => p.permissionCode) ?? [];
     }
     if (!membershipId) return [];

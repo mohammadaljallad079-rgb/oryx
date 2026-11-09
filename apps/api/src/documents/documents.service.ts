@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { readFile } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
-import { basisPointsOfMinor, lineAmountMinor } from '@oryx/shared';
+import { basisPointsOfMinor, lineAmountMinor, toQuantity } from '@oryx/shared';
 import {
   CHASSIS_REGIONS,
   INSPECTION_SECTION_SPECS,
@@ -783,6 +783,12 @@ export class DocumentsService {
     // Falling back to the branch phone keeps a tenant that only filled the
     // branch record from printing an empty footer.
     const branch = company.branches[0];
+    // The printed address is the issuer's registered address: prefer the
+    // operator-entered branch address, but fall back to the company's own record
+    // so a tenant that filled only the company keeps a real address in the
+    // footer instead of a bare city name.
+    const addressLine = branch?.addressLine || company.addressLine || null;
+    const city = branch?.city || null;
     return {
       companyId,
       nameEn: company.branding?.nameEn ?? company.nameEn,
@@ -790,8 +796,9 @@ export class DocumentsService {
       code: company.code,
       legalNameEn: company.legalNameEn,
       taxNumber: company.taxNumber,
-      addressLine: branch?.addressLine ?? null,
-      city: branch?.city ?? null,
+      crNumber: company.crNumber,
+      addressLine,
+      city,
       countryCode: company.countryCode,
       phone: company.branding?.supportPhone ?? branch?.phone ?? null,
       email: company.branding?.supportEmail ?? null,
@@ -1356,12 +1363,16 @@ export class DocumentsService {
                 phone: null,
                 addressLine: null,
                 city: null,
+                countryCode: null,
               },
           lines: [
             {
               description: payment.notes ?? 'Payment received',
               sku: null,
-              quantity: 1,
+              // `quantity` is stored scaled by QUANTITY_SCALE, so a whole unit is
+              // `toQuantity(1)`, not `1` — the raw 1 printed "0.0001" on the
+              // receipt.
+              quantity: toQuantity(1),
               unitPriceMinor: payment.amountMinor,
               discountMinor: 0,
               taxMinor: 0,
@@ -1419,6 +1430,7 @@ export class DocumentsService {
                 phone: null,
                 addressLine: null,
                 city: null,
+                countryCode: null,
               },
           lines: sale.lines.map((l) => ({
             description: l.description,
@@ -1636,6 +1648,7 @@ export class DocumentsService {
             phone: null,
             addressLine: null,
             city: null,
+            countryCode: null,
           },
           lines: [],
           subtotalMinor: entry.totalDebitMinor,
@@ -1728,6 +1741,7 @@ function counterparty(customer: {
   phone: string | null;
   addressLine: string | null;
   city: string | null;
+  countryCode: string | null;
 }) {
   return {
     nameEn: customer.nameEn,
@@ -1738,6 +1752,7 @@ function counterparty(customer: {
     phone: customer.phone,
     addressLine: customer.addressLine,
     city: customer.city,
+    countryCode: customer.countryCode,
   };
 }
 
