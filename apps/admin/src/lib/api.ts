@@ -3,6 +3,8 @@ import type {
   AgingRowDto,
   AiSuggestionDto,
   AppVersionDto,
+  AttachmentDto,
+  AttachmentEntityType,
   AuditLogDto,
   BalanceSheetDto,
   BranchDto,
@@ -1156,6 +1158,47 @@ export const api = {
     if (companyId) headers['x-oryx-company-id'] = companyId;
     const res = await fetch(`${API_BASE}/v1/documents/${id}/file`, { headers, credentials: 'include' });
     if (!res.ok) throw new ApiError(res.status, 'document_download_failed', 'The document could not be opened.');
+    return URL.createObjectURL(await res.blob());
+  },
+
+  // ---- document attachments ----
+  /**
+   * Attachments for a sales invoice (`SALES_INVOICE`) or a receipt (`PAYMENT`).
+   *
+   * The upload posts multipart `FormData`; the browser sets the boundary, so
+   * `raw` is set and no Content-Type is written by the client.
+   */
+  attachments: (entityType: AttachmentEntityType, entityId: string) =>
+    request<AttachmentDto[]>(`/attachments/${entityType}/${entityId}`),
+  uploadAttachment: (entityType: AttachmentEntityType, entityId: string, file: File) => {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return request<AttachmentDto>(`/attachments/${entityType}/${entityId}`, {
+      method: 'POST',
+      body: form,
+      raw: true,
+    });
+  },
+  removeAttachment: (entityType: AttachmentEntityType, entityId: string, attachmentId: string) =>
+    request<{ deleted: true }>(`/attachments/${entityType}/${entityId}/${attachmentId}`, {
+      method: 'DELETE',
+    }),
+  /** The attachment bytes as a blob URL (the route needs the bearer token). */
+  attachmentBlobUrl: async (
+    entityType: AttachmentEntityType,
+    entityId: string,
+    attachmentId: string,
+  ): Promise<string> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    const res = await fetch(
+      `${API_BASE}/v1/attachments/${entityType}/${entityId}/${attachmentId}/download`,
+      { headers, credentials: 'include' },
+    );
+    if (!res.ok) throw new ApiError(res.status, 'attachment_download_failed', 'The attachment could not be opened.');
     return URL.createObjectURL(await res.blob());
   },
 

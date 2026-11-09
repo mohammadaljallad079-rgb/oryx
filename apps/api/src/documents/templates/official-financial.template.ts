@@ -40,7 +40,11 @@ function numberLabel(titleEn: string): string {
   const t = titleEn.toLowerCase();
   if (t.includes('quotation')) return 'QUOTATION';
   if (t.includes('order')) return 'ORDER';
-  if (t.includes('return')) return 'CREDIT NOTE';
+  if (t.includes('credit') || t.includes('return')) return 'CREDIT NOTE';
+  if (t.includes('receipt')) return 'RECEIPT';
+  if (t.includes('voucher')) return 'VOUCHER';
+  if (t.includes('statement')) return 'STATEMENT';
+  if (t.includes('journal')) return 'JOURNAL';
   return 'INVOICE';
 }
 
@@ -86,6 +90,11 @@ function documentTitle(payload: FinancialDocumentPayload): { ar: string; en: str
   const t = payload.titleEn.toLowerCase();
   if (t.includes('quotation')) return { ar: 'تسعيرة', en: 'QUOTATION' };
   if (t.includes('credit') || t.includes('return')) return { ar: 'إشعار دائن', en: 'CREDIT NOTE' };
+  if (t.includes('pos')) return { ar: 'إيصال نقطة بيع', en: 'POS RECEIPT' };
+  if (t.includes('receipt')) return { ar: 'سند قبض', en: 'RECEIPT' };
+  if (t.includes('voucher')) return { ar: 'سند صرف', en: 'VOUCHER' };
+  if (t.includes('statement')) return { ar: 'كشف حساب', en: 'STATEMENT' };
+  if (t.includes('journal')) return { ar: 'قيد محاسبي', en: 'JOURNAL ENTRY' };
   if (t.includes('order')) return { ar: 'طلب', en: 'ORDER' };
   return { ar: 'فاتورة', en: 'INVOICE' };
 }

@@ -16,3 +16,4 @@ export * from './integrations';
 export * from './branding';
 export * from './contracts';
 export * from './documents';
+export * from './attachments';
