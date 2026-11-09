@@ -227,6 +227,11 @@ export class UpdateCustomerDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(3)
+  countryCode?: string;
+
+  @IsOptional()
+  @IsString()
   sourceId?: string;
 
   @IsOptional()

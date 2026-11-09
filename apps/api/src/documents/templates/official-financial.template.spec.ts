@@ -44,6 +44,7 @@ function payload(overrides: Partial<FinancialDocumentPayload> = {}): FinancialDo
       phone: '37702020',
       addressLine: 'Villa 1455, road 5455, block 555',
       city: 'Manama',
+      countryCode: 'BH',
     },
     lines: [
       {
@@ -209,6 +210,25 @@ describe('official financial template — reference titles', () => {
     const html = render({ titleEn: 'Quotation', titleAr: 'عرض سعر' });
     expect(html).toContain('>QUOTATION<');
     expect(html).toContain('>تسعيرة<');
+  });
+
+  it('names a receipt page "سند قبض / RECEIPT", not "فاتورة / INVOICE"', () => {
+    const html = render({ titleEn: 'Payment Receipt', titleAr: 'سند قبض' });
+    expect(html).toContain('>RECEIPT<');
+    expect(html).toContain('>سند قبض<');
+    expect(html).not.toContain('>INVOICE<');
+  });
+
+  it('names a voucher page "سند صرف / VOUCHER"', () => {
+    const html = render({ titleEn: 'Payment Voucher', titleAr: 'سند صرف' });
+    expect(html).toContain('>VOUCHER<');
+    expect(html).toContain('>سند صرف<');
+  });
+
+  it('names a POS receipt page "إيصال نقطة بيع / POS RECEIPT"', () => {
+    const html = render({ titleEn: 'POS Receipt', titleAr: 'إيصال نقطة بيع' });
+    expect(html).toContain('>POS RECEIPT<');
+    expect(html).toContain('>إيصال نقطة بيع<');
   });
 });
 

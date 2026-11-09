@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { AttachmentDto, AttachmentEntityType } from '@oryx/shared';
 import { api, ApiError, type OfficialDocumentDto } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
 import { useAuth } from '@/lib/auth-context';
@@ -83,6 +84,18 @@ export interface DocumentActionsProps {
   permissions: string[];
 }
 
+/**
+ * The attachment entity an attachment row hangs off, or null when the record
+ * kind has no attachment support. Only the invoice and the receipt carry
+ * supporting paperwork today; anything else hides the control rather than
+ * offering a button the API would reject.
+ */
+function attachmentEntityFor(sourceType: DocumentSourceType): AttachmentEntityType | null {
+  if (sourceType === 'SalesInvoice') return 'SALES_INVOICE';
+  if (sourceType === 'Payment') return 'PAYMENT';
+  return null;
+}
+
 export function DocumentActions({ sourceType, sourceId, type, permissions }: DocumentActionsProps) {
   const { t, locale } = useUi();
   const { canAny } = useAuth();
@@ -96,6 +109,69 @@ export function DocumentActions({ sourceType, sourceId, type, permissions }: Doc
   const frameRef = useRef<HTMLIFrameElement>(null);
 
   const canRead = canAny(...permissions);
+
+  // ---- attachments ---------------------------------------------------------
+  const attachmentEntity = attachmentEntityFor(sourceType);
+  const [attachments, setAttachments] = useState<AttachmentDto[]>([]);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [attachBusy, setAttachBusy] = useState(false);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const canAttach = canAny('erp.sales.invoice.manage', 'erp.accounting.payment.manage');
+
+  const loadAttachments = useCallback(async () => {
+    if (!canRead || !attachmentEntity || !sourceId) return;
+    try {
+      setAttachments(await api.attachments(attachmentEntity, sourceId));
+    } catch {
+      // A missing list must not break the document actions beside it.
+      setAttachments([]);
+    }
+  }, [canRead, attachmentEntity, sourceId]);
+
+  useEffect(() => {
+    void loadAttachments();
+  }, [loadAttachments]);
+
+  const onPickFile = async (file: File | undefined) => {
+    if (!file || !attachmentEntity) return;
+    setAttachBusy(true);
+    setAttachError(null);
+    try {
+      await api.uploadAttachment(attachmentEntity, sourceId, file);
+      setAttachOpen(false);
+      await loadAttachments();
+    } catch (e) {
+      setAttachError(e instanceof ApiError ? e.message : t('common.error'));
+    } finally {
+      setAttachBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const removeAttachment = async (attachmentId: string) => {
+    if (!attachmentEntity) return;
+    if (!window.confirm(t('common.confirm'))) return;
+    try {
+      await api.removeAttachment(attachmentEntity, sourceId, attachmentId);
+      await loadAttachments();
+    } catch (e) {
+      setAttachError(e instanceof ApiError ? e.message : t('common.error'));
+    }
+  };
+
+  const openAttachment = async (attachmentId: string) => {
+    if (!attachmentEntity) return;
+    try {
+      const url = await api.attachmentBlobUrl(attachmentEntity, sourceId, attachmentId);
+      window.open(url, '_blank', 'noopener');
+      // The new tab owns the blob now; revoke after a delay so it has loaded.
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      setAttachError(e instanceof ApiError ? e.message : t('common.error'));
+    }
+  };
 
   const load = useCallback(async () => {
     if (!canRead || !sourceId) return;
@@ -264,6 +340,18 @@ export function DocumentActions({ sourceType, sourceId, type, permissions }: Doc
           {t(TYPE_LABEL_KEY[type])}
         </Button>
       )}
+      {attachmentEntity ? (
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => setAttachOpen(true)}
+          data-testid={`doc-attach-${sourceId}`}
+          title={t('documents.attach')}
+        >
+          <Icon name="paperclip" size={14} />
+          {attachments.length > 0 ? `${t('documents.attach')} (${attachments.length})` : t('documents.attach')}
+        </Button>
+      ) : null}
       {error ? <span className="oryx-danger text-[12px]">{error}</span> : null}
 
       <Modal
@@ -304,6 +392,79 @@ export function DocumentActions({ sourceType, sourceId, type, permissions }: Doc
           </p>
         ) : null}
       </Modal>
+
+      {attachmentEntity ? (
+        <Modal
+          open={attachOpen}
+          title={t('documents.attachmentsTitle')}
+          onClose={() => setAttachOpen(false)}
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setAttachOpen(false)}>
+                {t('common.close')}
+              </Button>
+              {canAttach ? (
+                <Button
+                  variant="primary"
+                  disabled={attachBusy}
+                  onClick={() => fileInputRef.current?.click()}
+                  data-testid={`doc-attach-upload-${sourceId}`}
+                >
+                  <Icon name="paperclip" size={14} />
+                  {attachBusy ? t('common.loading') : t('documents.attachFile')}
+                </Button>
+              ) : null}
+            </>
+          }
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+            className="hidden"
+            data-testid={`doc-attach-input-${sourceId}`}
+            onChange={(e) => void onPickFile(e.target.files?.[0])}
+          />
+          <p className="oryx-faint m-0 mb-2 text-[12px]">{t('documents.attachHint')}</p>
+          {attachError ? <p className="oryx-danger m-0 mb-2 text-[12px]">{attachError}</p> : null}
+          {attachments.length === 0 ? (
+            <p className="oryx-faint m-0 text-[12.5px]">{t('documents.noAttachments')}</p>
+          ) : (
+            <ul className="m-0 flex list-none flex-col gap-1 p-0">
+              {attachments.map((a) => (
+                <li
+                  key={a.id}
+                  className="flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2 text-[12.5px]"
+                  data-testid={`doc-attachment-${a.id}`}
+                >
+                  <button
+                    type="button"
+                    className="flex flex-col items-start bg-transparent p-0 text-start"
+                    onClick={() => void openAttachment(a.id)}
+                    data-testid={`doc-attachment-open-${a.id}`}
+                  >
+                    <span className="font-semibold">{a.fileName}</span>
+                    <span className="oryx-faint text-[11px]" dir="ltr">
+                      {(a.mimeType ?? '').replace('application/', '').replace('image/', '')} ·{' '}
+                      {Math.max(1, Math.round(a.sizeBytes / 1024))} KB
+                    </span>
+                  </button>
+                  {canAttach ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => void removeAttachment(a.id)}
+                      data-testid={`doc-attachment-remove-${a.id}`}
+                    >
+                      {t('common.delete')}
+                    </Button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Modal>
+      ) : null}
     </div>
   );
 }

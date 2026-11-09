@@ -1,8 +1,8 @@
 import { createReadStream } from 'node:fs';
 import { mkdir, stat, unlink, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import { basename, extname, join, resolve } from 'node:path';
-import { Injectable } from '@nestjs/common';
+import { basename, extname, join, resolve, sep } from 'node:path';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   ATTACHMENT_ENTITY_TYPES,
   ATTACHMENT_MAX_BYTES,
@@ -12,6 +12,7 @@ import {
 } from '@oryx/shared';
 import { badRequest, ERROR_CODES, notFound } from '../common/errors';
 import { ErpContextService } from '../common/erp-context.service';
+import { AuditService } from '../common/audit.service';
 import { PrismaService } from '../common/prisma.service';
 import type { RequestPrincipal } from '../auth/auth.decorators';
 
@@ -26,22 +27,47 @@ export interface UploadedFileLike {
 const EXTENSIONS: Record<string, string> = {
   'application/pdf': '.pdf',
   'image/jpeg': '.jpg',
+  'image/jpg': '.jpg',
   'image/png': '.png',
 };
 
+/**
+ * Attachments for sales invoices and financial receipts.
+ *
+ * The binary lands on disk under an opaque, server-generated name; the database
+ * keeps only metadata and that reference. Every route is scoped by the owning
+ * record's company, so a user can only attach to — or read — a document inside
+ * their own tenant, and the download path re-checks that ownership each time
+ * rather than trusting the stored reference alone.
+ */
 @Injectable()
 export class AttachmentsService {
+  private readonly logger = new Logger(AttachmentsService.name);
   private readonly root: string;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly context: ErpContextService,
+    private readonly audit: AuditService,
   ) {
-    this.root = resolve(process.env.ATTACHMENT_STORAGE_DIR ?? join(process.cwd(), 'storage', 'attachments'));
+    this.root = resolve(
+      process.env.ATTACHMENT_STORAGE_DIR ?? join(process.cwd(), 'storage', 'attachments'),
+    );
   }
 
-  /** Assert the entity exists inside the company before a file is linked to it. */
-  private async assertEntityExists(companyId: string, entityType: string, entityId: string): Promise<void> {
+  private static assertEntityType(entityType: string): AttachmentEntityType {
+    if (!(ATTACHMENT_ENTITY_TYPES as readonly string[]).includes(entityType)) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Unsupported attachment entity type.');
+    }
+    return entityType as AttachmentEntityType;
+  }
+
+  /** Assert the record exists inside the company before a file is linked to it. */
+  private async assertEntityExists(
+    companyId: string,
+    entityType: AttachmentEntityType,
+    entityId: string,
+  ): Promise<void> {
     if (entityType === 'SALES_INVOICE') {
       const found = await this.prisma.salesInvoice.findFirst({ where: { id: entityId, companyId } });
       if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Sales invoice not found.');
@@ -53,13 +79,6 @@ export class AttachmentsService {
       return;
     }
     throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Unsupported attachment entity type.');
-  }
-
-  private static assertEntityType(entityType: string): AttachmentEntityType {
-    if (!(ATTACHMENT_ENTITY_TYPES as readonly string[]).includes(entityType)) {
-      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Unsupported attachment entity type.');
-    }
-    return entityType as AttachmentEntityType;
   }
 
   private toDto(row: {
@@ -84,7 +103,11 @@ export class AttachmentsService {
     };
   }
 
-  async list(entityTypeRaw: string, entityId: string, principal: RequestPrincipal): Promise<AttachmentDto[]> {
+  async list(
+    entityTypeRaw: string,
+    entityId: string,
+    principal: RequestPrincipal,
+  ): Promise<AttachmentDto[]> {
     const entityType = AttachmentsService.assertEntityType(entityTypeRaw);
     const { companyId } = await this.context.resolveCompanyScope(principal);
     await this.assertEntityExists(companyId, entityType, entityId);
@@ -136,6 +159,14 @@ export class AttachmentsService {
         uploadedById: principal.userId,
       },
     });
+    await this.audit.record({
+      actorUserId: principal.userId,
+      companyId,
+      action: 'attachment.uploaded',
+      targetType: entityType,
+      targetId: entityId,
+      summary: `Attached ${safeName} (${file.mimetype})`,
+    });
     return this.toDto(row);
   }
 
@@ -151,11 +182,13 @@ export class AttachmentsService {
     const row = await this.prisma.entityAttachment.findFirst({
       where: { id: attachmentId, companyId, entityType, entityId },
     });
-    if (!row || !row.storageRef) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Attachment not found.');
+    if (!row || !row.storageRef) {
+      throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Attachment not found.');
+    }
 
     const path = join(this.root, row.storageRef);
     // Guard against a tampered storage reference escaping the storage root.
-    if (!resolve(path).startsWith(this.root)) {
+    if (path !== this.root && !path.startsWith(this.root + sep)) {
       throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Attachment not found.');
     }
     try {
@@ -191,10 +224,18 @@ export class AttachmentsService {
     await this.prisma.entityAttachment.delete({ where: { id: row.id } });
     if (row.storageRef) {
       const path = join(this.root, row.storageRef);
-      if (resolve(path).startsWith(this.root)) {
+      if (path === this.root || path.startsWith(this.root + sep)) {
         await unlink(path).catch(() => undefined);
       }
     }
+    await this.audit.record({
+      actorUserId: principal.userId,
+      companyId,
+      action: 'attachment.removed',
+      targetType: entityType,
+      targetId: entityId,
+      summary: `Removed ${row.fileName}`,
+    });
     return { deleted: true };
   }
 }

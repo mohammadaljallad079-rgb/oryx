@@ -16,6 +16,7 @@ import {
 } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { EntitlementService } from '../common/entitlement.service';
+import { findPlatformSuperAdminRole } from '../common/platform-role';
 import { ERROR_CODES, forbidden, unauthorized } from '../common/errors';
 import { IS_PUBLIC_KEY, CUSTOMER_PLANE_KEY, MFA_ENROLLMENT_KEY, type RequestPrincipal } from './auth.decorators';
 import type { AccessTokenPayload } from './auth.service';
@@ -144,10 +145,7 @@ export class PrincipalGuard implements CanActivate {
 
     // ------------------------------------------------------------ platform
     if (user.isSuperAdmin) {
-      const role = await this.prisma.role.findFirst({
-        where: { isPlatform: true, code: 'platform_super_admin' },
-        include: { permissions: { select: { permissionCode: true } } },
-      });
+      const role = await findPlatformSuperAdminRole(this.prisma);
       const granted = role?.permissions.map((p) => p.permissionCode) ?? [];
       const base: Principal = { kind: 'PLATFORM', userId: user.id, grantedPermissions: granted };
 

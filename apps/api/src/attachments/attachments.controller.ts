@@ -3,7 +3,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
 import type { Response } from 'express';
-import type { AttachmentDto } from '@oryx/shared';
+import { ATTACHMENT_MAX_BYTES, type AttachmentDto } from '@oryx/shared';
 import {
   CurrentPrincipal,
   RequireAnyPermission,
@@ -12,12 +12,13 @@ import {
 import { AttachmentsService, type UploadedFileLike } from './attachments.service';
 
 /**
- * Attachments for sales invoices and receipts.
+ * Attachments for sales invoices and financial receipts.
  *
  * Every route is scoped by permission and by the owning document's company, so
  * a user can only attach to — or read — a document inside their own tenant. The
- * stored value never leaves the API: reads return metadata only and the bytes
- * stream back through this controller, which re-checks ownership each time.
+ * stored bytes never travel in a listing: reads return metadata only, and the
+ * file streams back through this controller, which re-checks ownership each
+ * time rather than trusting a URL.
  */
 @ApiTags('attachments')
 @ApiBearerAuth()
@@ -42,7 +43,7 @@ export class AttachmentsController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+      limits: { fileSize: ATTACHMENT_MAX_BYTES, files: 1 },
     }),
   )
   @ApiOperation({ summary: 'Attach a PDF/JPG/PNG to a document' })
@@ -68,8 +69,8 @@ export class AttachmentsController {
     const file = await this.attachments.resolveForDownload(entityType, entityId, attachmentId, p);
     res.setHeader('Content-Type', file.mimeType);
     res.setHeader('Content-Length', String(file.sizeBytes));
-    // `inline` lets the browser preview PDFs/images; the filename is quoted so a
-    // name with spaces or non-ASCII characters survives the header.
+    // `inline` lets the browser preview a PDF or an image; the filename is
+    // RFC 5987 encoded so a name with spaces or Arabic survives the header.
     res.setHeader(
       'Content-Disposition',
       `inline; filename*=UTF-8''${encodeURIComponent(file.fileName)}`,

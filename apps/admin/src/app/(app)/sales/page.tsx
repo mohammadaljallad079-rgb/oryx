@@ -331,6 +331,7 @@ interface CustomerFormState {
   taxNumber: string;
   addressLine: string;
   city: string;
+  countryCode: string;
   sourceId: string | null;
   departmentId: string | null;
   creditLimit: string;
@@ -369,6 +370,7 @@ function CustomerModal({
     taxNumber: '',
     addressLine: '',
     city: '',
+    countryCode: '',
     sourceId: null as string | null,
     departmentId: null as string | null,
     creditLimit: '0.000',
@@ -388,6 +390,7 @@ function CustomerModal({
       taxNumber: customer?.taxNumber ?? '',
       addressLine: customer?.addressLine ?? '',
       city: customer?.city ?? '',
+      countryCode: customer?.countryCode ?? '',
       sourceId: customer?.sourceId ?? null,
       departmentId: customer?.departmentId ?? null,
       creditLimit: minorToInput(customer?.creditLimitMinor ?? 0, customer?.currency),
@@ -412,6 +415,7 @@ function CustomerModal({
         taxNumber: form.taxNumber || undefined,
         addressLine: form.addressLine || undefined,
         city: form.city || undefined,
+        countryCode: form.countryCode || undefined,
         sourceId: form.sourceId ?? undefined,
         departmentId: form.departmentId ?? undefined,
         creditLimitMinor: toMinorInput(form.creditLimit, customer?.currency),
@@ -477,6 +481,16 @@ function CustomerModal({
         </Field>
         <Field label={t('common.city')}>
           <input className="oryx-input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+        </Field>
+        <Field label={t('common.country')} hint={t('erp.sales.countryHint')}>
+          <input
+            className="oryx-input"
+            value={form.countryCode}
+            maxLength={2}
+            placeholder="BH"
+            onChange={(e) => setForm({ ...form, countryCode: e.target.value.toUpperCase() })}
+            data-testid="customer-country"
+          />
         </Field>
         <Field label={t('erp.sales.customerSource')} hint={t('erp.sales.customerSourceHint')}>
           <div className="flex items-center gap-2">
@@ -2283,7 +2297,7 @@ function DocumentModal({
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
 }) {
   const { t } = useUi();
-  const { companyId } = useAuth();
+  const { companyId, user } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [company, setCompany] = useState<{
@@ -2306,6 +2320,10 @@ function DocumentModal({
   useEffect(() => {
     if (!open) return;
     setDocumentDate(new Date().toISOString().slice(0, 10));
+    // Default the printed "Staf Name" to the signed-in operator. The server
+    // applies the same fallback, so an untouched field still prints a real name;
+    // prefilling it here shows the operator what the document will say.
+    setSalespersonName((prev) => prev || user?.fullNameEn || user?.fullNameAr || user?.email || '');
     if (!companyId) return;
     let cancelled = false;
     void (async () => {

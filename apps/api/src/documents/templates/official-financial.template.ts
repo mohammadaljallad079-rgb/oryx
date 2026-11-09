@@ -1,5 +1,5 @@
-import { esc, escMultiline, money, quantity, docDate } from './html.util';
-import { CHROME_CSS, signatureBlock, verificationBlock } from './chrome';
+import { esc, escMultiline, money, quantity, countryName } from './html.util';
+import { CHROME_CSS, signatureBlock } from './chrome';
 import type {
   DocumentIssuer,
   DocumentVerification,
@@ -40,7 +40,11 @@ function numberLabel(titleEn: string): string {
   const t = titleEn.toLowerCase();
   if (t.includes('quotation')) return 'QUOTATION';
   if (t.includes('order')) return 'ORDER';
-  if (t.includes('return')) return 'CREDIT NOTE';
+  if (t.includes('credit') || t.includes('return')) return 'CREDIT NOTE';
+  if (t.includes('receipt')) return 'RECEIPT';
+  if (t.includes('voucher')) return 'VOUCHER';
+  if (t.includes('statement')) return 'STATEMENT';
+  if (t.includes('journal')) return 'JOURNAL';
   return 'INVOICE';
 }
 
@@ -75,6 +79,43 @@ function paymentLabel(payload: FinancialDocumentPayload): string | null {
 }
 
 /**
+ * The label printed above the settlement value.
+ *
+ * The reference invoice labels the row "Payment" and names the method; the
+ * reference quotation labels it "Payment at Account" and prints the bank
+ * reference beneath. Both read exactly as the approved documents do.
+ */
+function paymentFieldLabel(payload: FinancialDocumentPayload): string {
+  return paymentReference(payload) ? 'Payment at Account' : 'Payment';
+}
+
+/**
+ * The reference's date stamp: "Sat 20/09/2026, 3:30 PM" in Bahrain time.
+ *
+ * The approved invoice prints a weekday, a dd/mm/yyyy date and a 12-hour clock;
+ * `docDate` produces a different (day-month-year) shape, so the official layout
+ * has its own formatter rather than reusing the report one.
+ */
+function docStamp(value: string | null | undefined): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'Asia/Bahrain' }).format(date);
+  const day = new Intl.DateTimeFormat('en-GB', { day: '2-digit', timeZone: 'Asia/Bahrain' }).format(date);
+  const month = new Intl.DateTimeFormat('en-GB', { month: '2-digit', timeZone: 'Asia/Bahrain' }).format(date);
+  const year = new Intl.DateTimeFormat('en-GB', { year: 'numeric', timeZone: 'Asia/Bahrain' }).format(date);
+  const time = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Bahrain',
+  })
+    .format(date)
+    .replace(/\u202f/g, ' ');
+  return `${weekday} ${day}/${month}/${year}, ${time}`;
+}
+
+/**
  * The bilingual document title exactly as the approved reference prints it.
  *
  * The reference names the page "فاتورة / INVOICE" and "تسعيرة / QUOTATION" — the
@@ -86,6 +127,11 @@ function documentTitle(payload: FinancialDocumentPayload): { ar: string; en: str
   const t = payload.titleEn.toLowerCase();
   if (t.includes('quotation')) return { ar: 'تسعيرة', en: 'QUOTATION' };
   if (t.includes('credit') || t.includes('return')) return { ar: 'إشعار دائن', en: 'CREDIT NOTE' };
+  if (t.includes('pos')) return { ar: 'إيصال نقطة بيع', en: 'POS RECEIPT' };
+  if (t.includes('receipt')) return { ar: 'سند قبض', en: 'RECEIPT' };
+  if (t.includes('voucher')) return { ar: 'سند صرف', en: 'VOUCHER' };
+  if (t.includes('statement')) return { ar: 'كشف حساب', en: 'STATEMENT' };
+  if (t.includes('journal')) return { ar: 'قيد محاسبي', en: 'JOURNAL ENTRY' };
   if (t.includes('order')) return { ar: 'طلب', en: 'ORDER' };
   return { ar: 'فاتورة', en: 'INVOICE' };
 }
@@ -105,8 +151,9 @@ function documentTaxRate(payload: FinancialDocumentPayload): number {
 }
 
 /**
- * The identity band: the official logo on the leading edge, the tagline on the
- * trailing edge and a navy rule beneath.
+ * The identity band: the official logo on the leading edge and the tagline on
+ * the trailing edge, measured from the approved reference (logo lockup at
+ * x 16.5-154, y 16.3-49.5; tagline right-aligned at the same height).
  *
  * The tagline is fixed English/Arabic marketing copy that is part of the
  * approved identity, not tenant data, so it is written here rather than read
@@ -116,7 +163,7 @@ function identityBand(issuer: DocumentIssuer): string {
   const logo = issuer.logoDataUri
     ? `<img class="of-logo" src="${esc(issuer.logoDataUri)}" alt="${esc(issuer.nameEn)}">`
     : `<div class="of-wordmark">
-         <div class="of-wordmark-ar">اوريكس لخدمات السيارات</div>
+         <div class="of-wordmark-ar">اوريكس لخـدمات السيارات</div>
          <div class="of-wordmark-en">AUTO SERVICES</div>
        </div>`;
   return `
@@ -129,14 +176,20 @@ function identityBand(issuer: DocumentIssuer): string {
   </div>`;
 }
 
-/** The navy strip carrying the issuer's TRN, as on the printed invoice. */
+/**
+ * The navy strip carrying the issuer's TRN.
+ *
+ * The reference prints it as a full-width navy band (x 26.5-571, y 108.4-125.3)
+ * with the number right-aligned in white, sitting directly above the
+ * document/customer panel.
+ */
 function trnStrip(issuer: DocumentIssuer): string {
   if (!issuer.taxNumber) return '';
   return `
   <div class="of-trn">TRN: <span class="num">${esc(issuer.taxNumber)}</span></div>`;
 }
 
-/** The centred bilingual document title. */
+/** The centred bilingual document title (reference y 79.7 / 93.9). */
 function titleBlock(payload: FinancialDocumentPayload): string {
   const title = documentTitle(payload);
   return `
@@ -154,24 +207,36 @@ function infoPanel(
 ): string {
   const payment = paymentLabel(payload);
   const reference = paymentReference(payload);
+  const country = countryName(payload.counterparty.countryCode);
+  const address = [payload.counterparty.addressLine, payload.counterparty.city, country]
+    .filter(Boolean)
+    .map((line) => `<span class="of-addr-line">${esc(line)}</span>`)
+    .join('');
+  const isQuotation = /quotation/i.test(payload.titleEn);
+  // The reference quotation labels the date row "Quotation Date" and carries a
+  // second "Expiration Date"; an invoice labels it "Order Date" and has no
+  // expiration row. The dates print as "Sat 20/09/2026, 3:30 PM" in the
+  // reference, not as a bare day-month.
   return `
   <div class="of-panel">
     <div class="of-panel-left">
-      <div class="of-docno">${numberLabel(payload.titleEn)} # <span class="num">${esc(
+      <div class="of-docno">${esc(numberLabel(payload.titleEn))} # <span class="num">${esc(
         payload.documentNumber ?? '',
       )}</span></div>
-      <div class="of-field">
-        <span class="of-field-label">${esc(dateLabel)}</span>
-        <span class="of-field-value num">${esc(docDate(payload.documentDate))}</span>
+      <div class="of-lgrid">
+        <div class="of-field">
+          <span class="of-field-label">${esc(dateLabel)}</span>
+          <span class="of-field-value num">${esc(docStamp(payload.documentDate))}</span>
+        </div>
+        ${
+          isQuotation && payload.dueDate
+            ? `<div class="of-field">
+                 <span class="of-field-label">Expiration Date</span>
+                 <span class="of-field-value num">${esc(docStamp(payload.dueDate))}</span>
+               </div>`
+            : ''
+        }
       </div>
-      ${
-        payload.dueDate
-          ? `<div class="of-field">
-               <span class="of-field-label">Expiration Date</span>
-               <span class="of-field-value num">${esc(docDate(payload.dueDate))}</span>
-             </div>`
-          : ''
-      }
       ${
         payload.salespersonName
           ? `<div class="of-field">
@@ -181,49 +246,37 @@ function infoPanel(
           : ''
       }
       ${
-        payment
-          ? `<div class="of-field">
-               <span class="of-field-label">Payment</span>
-               <span class="of-field-value">${esc(payment)}</span>
-             </div>`
-          : ''
-      }
-      ${
         reference
           ? `<div class="of-field">
+               <span class="of-field-label">Payment at Account</span>
                <span class="of-field-value num">${esc(reference)}</span>
              </div>`
-          : ''
+          : payment
+            ? `<div class="of-field">
+                 <span class="of-field-label">Payment</span>
+                 <span class="of-field-value">${esc(payment)}</span>
+               </div>`
+            : ''
       }
     </div>
     <div class="of-panel-right">
-      <div class="of-field">
-        <span class="of-field-label">Customer Name</span>
-        <span class="of-field-value">${esc(counterpartyName)}</span>
+      <div class="of-cp-row">
+        <span class="of-cp-label">Customer Name</span>
+        <span class="of-cp-value">${esc(counterpartyName)}</span>
       </div>
       ${
         payload.counterparty.phone
-          ? `<div class="of-field">
-               <span class="of-field-label">Contact No.</span>
-               <span class="of-field-value num">${esc(payload.counterparty.phone)}</span>
+          ? `<div class="of-cp-row">
+               <span class="of-cp-label">Contact No.</span>
+               <span class="of-cp-value num">${esc(payload.counterparty.phone)}</span>
              </div>`
           : ''
       }
       ${
-        payload.counterparty.addressLine || payload.counterparty.city
-          ? `<div class="of-field">
-               <span class="of-field-label">Address:</span>
-               <span class="of-field-value">${esc(payload.counterparty.addressLine ?? '')}${
-                 payload.counterparty.city ? `<br>${esc(payload.counterparty.city)}` : ''
-               }</span>
-             </div>`
-          : ''
-      }
-      ${
-        payload.counterparty.taxNumber
-          ? `<div class="of-field">
-               <span class="of-field-label">TRN</span>
-               <span class="of-field-value num">${esc(payload.counterparty.taxNumber)}</span>
+        address
+          ? `<div class="of-cp-row of-cp-row-top">
+               <span class="of-cp-label">Address:</span>
+               <span class="of-cp-value">${address}</span>
              </div>`
           : ''
       }
@@ -338,10 +391,9 @@ ${OFFICIAL_FINANCIAL_CSS}
     <div class="of-thanks-en">Thank you for your trust.</div>
   </div>
   ${signatureBlock([
-    { ar: 'توقيع العميل', en: 'Customer Signature', name: null },
     { ar: 'اعتماد المركز', en: 'Authorized Stamp & Signature', name: null },
+    { ar: 'توقيع العميل', en: 'Customer Signature', name: null },
   ])}
-  ${verificationBlock(input.verification)}
 </section>
 </body>
 </html>`;
@@ -357,38 +409,55 @@ ${OFFICIAL_FINANCIAL_CSS}
 export const OFFICIAL_FINANCIAL_CSS = `
   .of-page{ position:relative; }
   /* The reference watermark is the "AUTO SERVICES" wordmark set in the identity
-     navy at ~52pt and centred, not the logo lockup. */
-  .of-watermark{ position:absolute; left:0; right:0; top:47%;
+     navy at ~52pt and centred (measured y 374-426 on a 842pt page, i.e. ~47%),
+     not the logo lockup. */
+  .of-watermark{ position:absolute; left:0; right:0; top:44.4%;
     text-align:center; font-size:52pt; font-weight:700; letter-spacing:1px;
     color:#0a1f44; opacity:0.055; pointer-events:none; z-index:-1;
     font-family:Arial,Helvetica,sans-serif; }
   .of-band{ display:flex; justify-content:space-between; align-items:center;
-    padding-bottom:6px; }
+    min-height:33pt; }
   .of-band-lead{ flex:0 0 auto; }
   .of-band-trail{ text-align:end; }
-  .of-logo{ height:42px; width:auto; }
-  .of-wordmark-ar{ font-size:15pt; font-weight:700; color:#0a1f44; }
-  .of-wordmark-en{ font-size:12pt; font-weight:700; color:#0a1f44; letter-spacing:.5px; }
-  .of-tag-ar{ font-size:9.5pt; font-weight:700; color:#102749; }
-  .of-tag-en{ font-size:7pt; font-weight:700; color:#102749; letter-spacing:.4px; }
-  .of-title{ text-align:center; margin-top:20px; }
-  .of-title-ar{ font-size:12pt; font-weight:700; color:#0f2b48; }
-  .of-title-en{ font-size:12pt; font-weight:700; color:#0f2b48; letter-spacing:.6px; }
-  .of-trn{ margin-top:12px; background:#0f2b48; color:#fff; font-size:8.5pt;
-    font-weight:700; text-align:end; padding:3px 10px; }
-  .of-panel{ display:flex; border:1px solid #94a3b8; border-top:none; }
-  .of-panel-left{ flex:0 0 42%; border-inline-end:1px solid #94a3b8; padding:8px 10px; }
-  .of-panel-right{ flex:1 1 auto; padding:8px 10px; }
-  .of-docno{ font-size:12pt; font-weight:700; color:#0f2b48; margin-bottom:4px; }
-  .of-field{ margin-top:5px; }
-  .of-field-label{ display:block; font-size:7.5pt; color:#64748b; font-weight:700; }
-  .of-field-value{ display:block; font-size:9.5pt; color:#0f2b48; font-weight:700; }
-  .of-table{ margin-top:14px; border-top:1.5px solid #94a3b8; border-bottom:1.5px solid #94a3b8; }
-  .of-table th{ font-size:9.5pt; font-weight:700; color:#0f2b48; text-align:start;
-    padding:8px 7px; background:transparent; }
-  .of-table td{ font-size:9.5pt; color:#0f2b48; font-weight:700; padding:8px 7px;
-    border-top:1px solid #cbd5e1; }
-  .of-table tbody tr:nth-child(odd) td{ background:rgba(10,65,117,0.16); }
+  .of-logo{ height:33pt; width:auto; }
+  .of-wordmark-ar{ font-size:14.5pt; font-weight:700; color:#0a1f44; }
+  .of-wordmark-en{ font-size:14.2pt; font-weight:700; color:#0a1f44; letter-spacing:.5px; }
+  .of-tag-ar{ font-size:11.8pt; font-weight:700; color:#102749; }
+  .of-tag-en{ font-size:7.9pt; font-weight:700; color:#102749; letter-spacing:.4px; }
+  .of-title{ text-align:center; margin-top:25pt; }
+  .of-title-ar{ font-size:12.3pt; font-weight:700; color:#0f2b48; line-height:1.2; }
+  .of-title-en{ font-size:12.3pt; font-weight:700; color:#0f2b48; letter-spacing:.6px; line-height:1.2; }
+  .of-trn{ margin-top:4pt; background:#0f2b48; color:#fff; font-size:8.8pt;
+    font-weight:700; text-align:end; padding:3pt 10pt; line-height:1.2; }
+  /* The reference panel has a hairline light border and no internal divider:
+     the left column is wide, the customer column is a label/value grid. */
+  .of-panel{ display:flex; border:0.75px solid #c2c9d5; border-top:none;
+    line-height:1.2; }
+  .of-panel-left{ flex:0 0 46%; padding:7pt 10pt; }
+  .of-panel-right{ flex:1 1 auto; padding:7pt 10pt; }
+  .of-docno{ font-size:13.3pt; font-weight:700; color:#0f2b48; margin-bottom:2pt; }
+  .of-field{ margin-top:3pt; }
+  /* The reference prints the date and the expiration date side by side in one
+     row (invoice has only the date). */
+  .of-lgrid{ display:grid; grid-template-columns:1fr 1fr; gap:0 10pt; }
+  .of-field-label{ display:block; font-size:7.3pt; color:#64748b; font-weight:700; }
+  .of-field-value{ display:block; font-size:8.8pt; color:#0f2b48; font-weight:700; }
+  /* The customer column is a two-column grid so every value lines up on the
+     same x, exactly as the reference ("Customer Name" over "Ahmed …"). */
+  .of-cp-row{ display:grid; grid-template-columns:78pt 1fr; gap:0 6pt;
+    margin-top:3pt; align-items:baseline; }
+  .of-cp-row-top{ align-items:start; }
+  .of-cp-label{ font-size:7.3pt; color:#64748b; font-weight:700; }
+  .of-cp-value{ font-size:8.8pt; color:#0f2b48; font-weight:700; }
+  .of-addr-line{ display:block; }
+  .of-table{ margin-top:5pt; }
+  .of-table th{ font-size:8.8pt; font-weight:700; color:#0f2b48; text-align:start;
+    padding:10pt 6pt; background:transparent; white-space:nowrap;
+    border-top:1.5px solid #94a3b8; border-bottom:1.5px solid #94a3b8; }
+  .of-table td{ font-size:8.8pt; color:#0f2b48; font-weight:700; padding:10pt 6pt; }
+  .of-table td.of-c-price,.of-table td.of-c-amt{ white-space:nowrap; }
+  /* The reference shades alternate body rows with the #0a4175 accent. */
+  .of-table tbody tr:nth-child(odd) td{ background:#dbe3ec; }
   /* Column proportions are measured from the approved reference invoice: the
      description column is much wider than a naive split, and the four numeric
      columns are close to equal. Matching them keeps every label and figure on
@@ -400,24 +469,25 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-c-amt{ width:10.4%; text-align:end !important; }
   .of-line-name{ display:block; }
   .of-line-sku{ display:block; font-size:7.5pt; color:#64748b; font-weight:400; }
-  .of-totals{ width:58.7%; margin-inline-start:auto; margin-top:12px; }
-  .of-totals th{ font-size:9.5pt; font-weight:700; color:#0f2b48; text-align:start;
-    padding:6px 9px; border-bottom:1px solid #cbd5e1; }
-  .of-totals td{ font-size:9.5pt; font-weight:700; color:#0f2b48; text-align:end;
-    padding:6px 9px; border-bottom:1px solid #cbd5e1; }
-  .of-total-grand th,.of-total-grand td{ border-top:1.5px solid #0f2b48; border-bottom:none; }
-  .of-notes{ margin-top:10px; border:1px solid #94a3b8; padding:6px 10px; }
-  .of-notes-title{ font-size:9.5pt; font-weight:700; color:#0f2b48; margin-bottom:3px; }
+  /* The reference totals block is a right-aligned table with only two rules:
+     one above the first row and one above the grand Total. */
+  .of-totals{ width:58.7%; margin-inline-start:auto; margin-top:12pt;
+    border-top:0.75px solid #0f2b48; }
+  .of-totals th{ font-size:8.8pt; font-weight:700; color:#0f2b48; text-align:start;
+    padding:3.5pt 9pt; }
+  .of-totals td{ font-size:8.8pt; font-weight:700; color:#0f2b48; text-align:end;
+    padding:3.5pt 9pt; }
+  .of-total-grand th,.of-total-grand td{ border-top:0.75px solid #0f2b48; }
+  .of-notes{ margin-top:10pt; border:1.5px solid #94a3b8; padding:6pt 10pt; }
+  .of-notes-title{ font-size:9.5pt; font-weight:700; color:#0f2b48; margin-bottom:3pt; }
   .of-notes-body{ font-size:9pt; color:#334155; }
-  .of-thanks{ margin-top:10px; text-align:center; }
+  .of-thanks{ margin-top:10pt; text-align:center; }
   .of-thanks-ar{ font-size:9pt; font-weight:700; color:#05162b; }
   .of-thanks-en{ font-size:8.5pt; font-weight:700; color:#05162b; }
   /* The shared signature and verification blocks are sized down here so a
      one-page invoice stays on one page, as the printed reference does. */
-  .of-page .signatures{ margin-top:10px; gap:24px; }
-  .of-page .sig-line{ height:16px; }
+  .of-page .signatures{ margin-top:10pt; gap:24pt; }
+  .of-page .sig-line{ height:16pt; }
   .of-page .sig-label-en{ text-transform:none; letter-spacing:0; color:#0f2b48; font-weight:700; }
   .of-page .sig-label-ar{ color:#0f2b48; font-weight:700; }
-  .of-page .verify{ margin-top:8px; }
-  .of-page .verify-qr img{ width:84px; height:84px; }
 `;

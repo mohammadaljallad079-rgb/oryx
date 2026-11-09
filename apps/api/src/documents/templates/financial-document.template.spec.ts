@@ -15,7 +15,8 @@ const issuer: DocumentIssuer = {
   nameEn: 'ORYX Auto Services',
   nameAr: 'أوريكس لخدمات السيارات',
   code: 'ORYX-AUTO',
-  taxNumber: 'CR-998877',
+  taxNumber: '998877',
+  crNumber: 'CR-998877',
   addressLine: 'Building 42, Road 15',
   city: 'Manama',
   phone: '+97317000000',
@@ -42,6 +43,7 @@ function payloadWithQuantity(quantity: number): FinancialDocumentPayload {
       phone: null,
       addressLine: null,
       city: null,
+      countryCode: null,
     },
     lines: [
       {

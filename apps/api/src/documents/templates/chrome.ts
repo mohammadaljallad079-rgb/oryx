@@ -69,7 +69,8 @@ export function documentHeader(chrome: DocumentChrome): string {
       <div class="doc-issuer-en">${esc(issuer.nameEn)}</div>
       ${issuer.nameAr ? `<div class="doc-issuer-ar">${esc(issuer.nameAr)}</div>` : ''}
       <div class="doc-issuer-meta">
-        ${issuer.taxNumber ? `<span>CR / VAT: <span class="num">${esc(issuer.taxNumber)}</span></span>` : ''}
+        ${issuer.taxNumber ? `<span>VAT: <span class="num">${esc(issuer.taxNumber)}</span></span>` : ''}
+        ${issuer.crNumber ? `<span>CR: <span class="num">${esc(issuer.crNumber)}</span></span>` : ''}
         ${issuer.phone ? `<span class="num">${esc(issuer.phone)}</span>` : ''}
         ${issuer.email ? `<span class="ltr">${esc(issuer.email)}</span>` : ''}
       </div>
@@ -168,24 +169,30 @@ export function signatureBlock(
 export function officialFooterTemplate(issuer: DocumentIssuer): string {
   const base = [
     'font-family:Arial,Helvetica,sans-serif',
-    'color:#475569',
+    'color:#1f2d3d',
     '-webkit-print-color-adjust:exact',
   ].join(';');
-  const contact: string[] = [];
-  if (issuer.phone) contact.push(`☎ ${esc(issuer.phone)}`);
-  if (issuer.email) contact.push(`✉ ${esc(issuer.email)}`);
-  if (issuer.websiteUrl) contact.push(esc(issuer.websiteUrl));
-  const address = [issuer.addressLine, issuer.city].filter(Boolean).join(' · ');
-  const taxLine = issuer.taxNumber ? ` | CR / VAT: ${esc(issuer.taxNumber)}` : '';
+  // The reference footer spreads the contacts across one row — the page counter
+  // on the left, the phone and email in the middle, the website on the right —
+  // over a hairline rule, with the registered address (and its CR number)
+  // centred beneath. The VAT/TRN is the navy strip at the top of the page, so it
+  // is deliberately not repeated here.
+  const phone = issuer.phone ? `&#9742; ${esc(issuer.phone)}` : '';
+  const email = issuer.email ? `&#9993; ${esc(issuer.email)}` : '';
+  const website = issuer.websiteUrl ? `&#127760; ${esc(issuer.websiteUrl)}` : '';
+  const address = [issuer.addressLine, issuer.city].filter(Boolean).join(' - ');
+  const registration = issuer.crNumber ? `CR ${esc(issuer.crNumber)}` : '';
+  const addressLine = [address, registration].filter(Boolean).join(' | ');
   return `
 <div style="${base};width:100%;padding:0 4mm;box-sizing:border-box;">
-  <div style="border-top:0.75px solid #94a3b8;padding-top:4px;display:flex;justify-content:space-between;align-items:baseline;font-size:7pt;font-weight:700;">
+  <div style="border-top:0.75px solid #94a3b8;padding-top:3px;display:flex;justify-content:space-between;align-items:baseline;font-size:6.5pt;font-weight:700;">
     <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
-    <span>${contact.join(' &nbsp;·&nbsp; ')}</span>
+    <span>${phone}${phone && email ? ' &nbsp; ' : ''}${email}</span>
+    <span>${website}</span>
   </div>
   ${
-    address || taxLine
-      ? `<div style="margin-top:2px;text-align:center;font-size:6.5pt;color:#64748b;">${esc(address)}${taxLine}</div>`
+    addressLine
+      ? `<div style="margin-top:2px;text-align:center;font-size:6.5pt;color:#334155;">${addressLine}</div>`
       : ''
   }
 </div>`;
@@ -209,9 +216,13 @@ export function footerTemplate(chrome: DocumentFooterInput): string {
   const issuer = chrome.issuer;
   const contact = [issuer.phone, issuer.email, issuer.websiteUrl].filter(Boolean).join(' · ');
   const address = [issuer.addressLine, issuer.city].filter(Boolean).join(', ');
-  const meta = [address, issuer.taxNumber ? `CR / VAT: ${issuer.taxNumber}` : '', contact]
+  const registration = [
+    issuer.crNumber ? `CR ${issuer.crNumber}` : '',
+    issuer.taxNumber ? `VAT ${issuer.taxNumber}` : '',
+  ]
     .filter(Boolean)
-    .join('  ·  ');
+    .join(' · ');
+  const meta = [address, registration, contact].filter(Boolean).join('  ·  ');
   const style = [
     'font-family:Arial,Helvetica,sans-serif',
     'font-size:8px',

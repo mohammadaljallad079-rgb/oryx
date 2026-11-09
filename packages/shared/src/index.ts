@@ -18,3 +18,4 @@ export * from './contracts';
 export * from './documents';
 
 export * from './print';
+export * from './attachments';

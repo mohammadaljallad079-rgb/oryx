@@ -97,6 +97,27 @@ export function orDash(value: unknown): string {
   return String(value);
 }
 
+/**
+ * The display name of an ISO 3166-1 alpha-2 country code.
+ *
+ * The customer record stores a code ("BH"); the printed address shows the
+ * country name ("Bahrain"), so it must be resolved rather than printed raw. An
+ * unknown or absent code yields an empty string, which the caller drops.
+ */
+export function countryName(
+  code: string | null | undefined,
+  locale: 'ar' | 'en' = 'en',
+): string {
+  if (!code) return '';
+  const normalized = code.trim().toUpperCase();
+  if (normalized.length !== 2) return code.trim();
+  try {
+    return new Intl.DisplayNames([locale], { type: 'region' }).of(normalized) ?? normalized;
+  } catch {
+    return normalized;
+  }
+}
+
 /** A grouped integer with Latin digits, e.g. an odometer reading. */
 export function grouped(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—';

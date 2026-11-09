@@ -11,6 +11,7 @@ import {
 import { PrismaService } from '../common/prisma.service';
 import { EntitlementService } from '../common/entitlement.service';
 import { AuditService } from '../common/audit.service';
+import { findPlatformSuperAdminRole } from '../common/platform-role';
 import {
   badRequest,
   conflict,
@@ -65,10 +66,7 @@ export class RbacService {
   }
 
   private async platformPermissionCodes(): Promise<string[]> {
-    const role = await this.prisma.role.findFirst({
-      where: { isPlatform: true, code: 'platform_super_admin' },
-      include: { permissions: true },
-    });
+    const role = await findPlatformSuperAdminRole(this.prisma);
     return role?.permissions.map((p) => p.permissionCode) ?? [];
   }
 

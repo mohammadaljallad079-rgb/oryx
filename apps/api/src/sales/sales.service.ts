@@ -129,6 +129,25 @@ export class SalesService {
     return { source, department };
   }
 
+  /**
+   * The "Staf Name" printed on a document: the salesperson the caller named, or
+   * failing that the signed-in operator. Resolving the operator's own name keeps
+   * the field truthful and never blank without asking the form for a value the
+   * session already knows.
+   */
+  private async resolveSalespersonName(
+    explicit: string | undefined,
+    actorUserId: string,
+  ): Promise<string | null> {
+    const trimmed = explicit?.trim();
+    if (trimmed) return trimmed;
+    const user = await this.prisma.user.findUnique({
+      where: { id: actorUserId },
+      select: { fullNameEn: true, fullNameAr: true, email: true },
+    });
+    return user?.fullNameEn ?? user?.fullNameAr ?? user?.email ?? null;
+  }
+
   async createCustomer(dto: CreateCustomerDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     // A new customer inherits the tenant's own market, not a hard-coded one.
@@ -193,6 +212,7 @@ export class SalesService {
         ...(dto.taxNumber !== undefined ? { taxNumber: dto.taxNumber } : {}),
         ...(dto.addressLine !== undefined ? { addressLine: dto.addressLine } : {}),
         ...(dto.city !== undefined ? { city: dto.city } : {}),
+        ...(dto.countryCode !== undefined ? { countryCode: dto.countryCode } : {}),
         ...(dto.sourceId !== undefined ? { sourceId: dto.sourceId || null } : {}),
         ...(dto.departmentId !== undefined ? { departmentId: dto.departmentId || null } : {}),
         ...(dto.creditLimitMinor !== undefined ? { creditLimitMinor: dto.creditLimitMinor } : {}),
@@ -341,6 +361,7 @@ export class SalesService {
     const currency = dto.currency ?? (await this.context.companyCurrency(companyId));
     const rounding = await this.context.companyRoundingMode(companyId);
     const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })), rounding.mode, rounding.scale);
+    const salespersonName = await this.resolveSalespersonName(dto.salespersonName, actor.userId);
     const quotation = await this.posting.withTransaction(async (tx) => {
       const quoteNumber = await this.sequences.next(tx, companyId, 'quotation');
       return tx.quotation.create({
@@ -359,7 +380,7 @@ export class SalesService {
           totalMinor: totals.totalMinor,
           currency,
           paymentMethod: (dto.paymentMethod as PaymentMethod | undefined) ?? 'CASH',
-          salespersonName: dto.salespersonName ?? null,
+          salespersonName,
           paymentReference: dto.paymentReference ?? null,
           notes: dto.notes ?? null,
           createdById: actor.userId,
@@ -464,6 +485,7 @@ export class SalesService {
     const currency = dto.currency ?? (await this.context.companyCurrency(companyId));
     const rounding = await this.context.companyRoundingMode(companyId);
     const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })), rounding.mode, rounding.scale);
+    const salespersonName = await this.resolveSalespersonName(dto.salespersonName, actor.userId);
     const order = await this.posting.withTransaction(async (tx) => {
       const orderNumber = await this.sequences.next(tx, companyId, 'salesOrder');
       return tx.salesOrder.create({
@@ -482,7 +504,7 @@ export class SalesService {
           totalMinor: totals.totalMinor,
           currency,
           paymentMethod: (dto.paymentMethod as PaymentMethod | undefined) ?? 'CASH',
-          salespersonName: dto.salespersonName ?? null,
+          salespersonName,
           notes: dto.notes ?? null,
           createdById: actor.userId,
           lines: { create: buildSimpleLineRows(totals, dto.lines) },
@@ -552,6 +574,7 @@ export class SalesService {
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
 
     const companyCurrency = await this.context.companyCurrency(companyId);
+    const salespersonName = await this.resolveSalespersonName(dto.salespersonName, actor.userId);
     const result = await this.posting.withTransaction(async (tx) => {
       let customerId = dto.customerId ?? null;
       let orderId: string | null = null;
@@ -633,7 +656,7 @@ export class SalesService {
           totalMinor: totals.totalMinor,
           currency,
           paymentMethod: (dto.paymentMethod as PaymentMethod | undefined) ?? 'CASH',
-          salespersonName: dto.salespersonName ?? null,
+          salespersonName,
           paymentReference: dto.paymentReference ?? null,
           notes: dto.notes ?? null,
           createdById: actor.userId,

@@ -72,6 +72,8 @@ apps/api/.media/
 # Local QA account credentials (a live test password; never committed).
 .run/qa-customer-creds.txt
 
-# Attachment storage (runtime)
+# Uploaded document attachments (invoice/receipt supporting files) and the
+# OCR trained-data cache. These bytes are runtime state written by the API,
+# never source.
 storage/
 apps/api/storage/

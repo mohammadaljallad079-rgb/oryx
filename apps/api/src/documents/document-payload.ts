@@ -16,6 +16,8 @@ export interface DocumentIssuer {
   code: string;
   legalNameEn?: string | null;
   taxNumber?: string | null;
+  /** The commercial registration number, printed separately from the VAT number. */
+  crNumber?: string | null;
   addressLine?: string | null;
   city?: string | null;
   countryCode?: string | null;
@@ -170,6 +172,8 @@ export interface FinancialDocumentPayload {
     phone: string | null;
     addressLine: string | null;
     city: string | null;
+    /** The customer's country, printed as a third address line when present. */
+    countryCode: string | null;
   };
   lines: FinancialDocumentLine[];
   subtotalMinor: number;
