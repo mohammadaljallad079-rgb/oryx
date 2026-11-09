@@ -2401,7 +2401,7 @@ function DocumentModal({
     setCustomerId(initialDocument?.customerId ?? '');
     setWarehouseId(initialDocument?.warehouseId ?? '');
     setDueDate(initialDocument?.dueDate?.slice(0, 10) ?? '');
-    setNotes(initialDocument?.notes ?? '');
+    setNotes(reasonField ? '' : initialDocument?.notes ?? '');
     setPaymentMethod(initialDocument?.paymentMethod ?? 'CASH');
     setRestock(!(initialDocument && reasonField));
     setSalespersonName(initialDocument?.salespersonName ?? user?.fullNameEn ?? user?.fullNameAr ?? user?.email ?? '');
@@ -2469,7 +2469,7 @@ function DocumentModal({
         ...(settlement ? { paymentMethod } : {}),
         ...(settlement && salespersonName.trim() ? { salespersonName: salespersonName.trim() } : {}),
         ...(settlement && paymentReference.trim() ? { paymentReference: paymentReference.trim() } : {}),
-        ...(notes.trim() ? { notes: notes.trim() } : {}),
+        ...(!reasonField && notes.trim() ? { notes: notes.trim() } : {}),
         restockInventory: showRestock ? restock : undefined,
         lines: lines.map((l) => ({
           productId: l.productId || undefined,
