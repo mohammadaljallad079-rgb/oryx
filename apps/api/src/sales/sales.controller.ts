@@ -22,6 +22,7 @@ import {
   CustomerAttachmentDto,
   ListQueryDto,
   UpdateCustomerDto,
+  UpdateInvoiceDto,
 } from './sales.dto';
 
 interface RequestLike {
@@ -156,6 +157,25 @@ export class SalesController {
   @ApiOperation({ summary: 'Sales invoice detail' })
   invoice(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
     return this.sales.getInvoice(id, p);
+  }
+
+  @Post('invoices/:id')
+  @RequirePermissions('erp.sales.invoice.manage')
+  @ApiOperation({ summary: 'Update a draft sales invoice' })
+  updateInvoice(
+    @Param('id') id: string,
+    @Body() dto: UpdateInvoiceDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.sales.updateInvoice(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('invoices/:id')
+  @RequirePermissions('erp.sales.invoice.manage')
+  @ApiOperation({ summary: 'Delete an unposted draft sales invoice' })
+  deleteInvoice(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.sales.deleteInvoice(id, p, actorFrom(p, req));
   }
 
   @Post('invoices')
