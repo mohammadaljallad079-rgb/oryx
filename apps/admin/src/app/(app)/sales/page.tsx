@@ -815,6 +815,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
+  const [autoPreviewId, setAutoPreviewId] = useState<string | null>(null);
   const list = useAsync(() => api.salesInvoices({ page: 1 }), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
@@ -865,6 +866,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                     sourceId={inv.id}
                     type="SALES_INVOICE"
                     permissions={['erp.sales.read', 'erp.accounting.read']}
+                    autoOpenOnMount={autoPreviewId === inv.id}
                   />
                 </td>
               </tr>
@@ -886,8 +888,9 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         dateField="invoiceDate"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
-          await api.createSalesInvoice({ ...payload, post: true });
+          const created = await api.createSalesInvoice({ ...payload, post: true });
           await list.reload();
+          setAutoPreviewId(created.id);
         }}
       />
       <Modal
