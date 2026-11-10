@@ -800,8 +800,22 @@ export const api = {
     request<WarehouseDto>('/inventory/warehouses', { method: 'POST', body }),
   updateWarehouse: (id: string, body: Record<string, unknown>) =>
     request<WarehouseDto>(`/inventory/warehouses/${id}`, { method: 'PATCH', body }),
-  products: (params: { companyId?: string; search?: string; category?: string } = {}) =>
-    request<Paginated<ProductDto>>(`/inventory/products?${toQuery(params)}`),
+  products: (
+    params: {
+      companyId?: string;
+      search?: string;
+      category?: string;
+      barcode?: string;
+      type?: 'PRODUCT' | 'SERVICE';
+      isActive?: boolean;
+      hasBarcode?: boolean;
+      stockStatus?: 'in' | 'low' | 'out';
+      page?: number;
+      pageSize?: number;
+    } = {},
+  ) => request<Paginated<ProductDto>>(`/inventory/products?${toQuery(params)}`),
+  productCategories: (companyId?: string) =>
+    request<{ items: string[] }>(`/inventory/product-categories${companyId ? `?companyId=${companyId}` : ''}`),
   createProduct: (body: Record<string, unknown>) =>
     request<ProductDto>('/inventory/products', { method: 'POST', body }),
   updateProduct: (id: string, body: Record<string, unknown>) =>
@@ -996,6 +1010,60 @@ export const api = {
     request<EmployeeAdvanceDto>(`/hr/advances/${id}/settle`, { method: 'POST', body: { amountMinor, note } }),
   hrDashboard: (companyId?: string) =>
     request<HrDashboardDto>(`/hr/dashboard${companyId ? `?companyId=${companyId}` : ''}`),
+  // Attendance policy & geofenced work sites (execution 06).
+  hrAttendancePolicy: () => request<Record<string, unknown>>('/hr/attendance-policy'),
+  updateAttendancePolicy: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/hr/attendance-policy', { method: 'PATCH', body }),
+  hrWorkSites: (params: { companyId?: string } = {}) =>
+    request<Paginated<Record<string, unknown>>>(`/hr/work-sites?${toQuery(params)}`),
+  createWorkSite: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/hr/work-sites', { method: 'POST', body }),
+  updateWorkSite: (id: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/hr/work-sites/${id}`, { method: 'PATCH', body }),
+  workSiteQrToken: (id: string) => request<Record<string, unknown>>(`/hr/work-sites/${id}/qr-token`),
+  salaryHistory: (employeeId: string) => request<Record<string, unknown>>(`/hr/employees/${employeeId}/salary-history`),
+  myPayslips: () => request<Paginated<Record<string, unknown>>>('/hr/payslips/me'),
+  // Employee self-service attendance.
+  myAttendance: () => request<Record<string, unknown>>('/hr/attendance/me'),
+  myAttendanceHistory: (params: Record<string, unknown> = {}) =>
+    request<Paginated<Record<string, unknown>>>(`/hr/attendance/me/history?${toQuery(params)}`),
+  selfCheckIn: (body: Record<string, unknown>) => request<Record<string, unknown>>('/hr/attendance/check-in', { method: 'POST', body }),
+  selfCheckOut: (body: Record<string, unknown>) => request<Record<string, unknown>>('/hr/attendance/check-out', { method: 'POST', body }),
+  selfBreakStart: (body: Record<string, unknown> = {}) => request<Record<string, unknown>>('/hr/attendance/break/start', { method: 'POST', body }),
+  selfBreakEnd: (body: Record<string, unknown> = {}) => request<Record<string, unknown>>('/hr/attendance/break/end', { method: 'POST', body }),
+  // Reports and their CSV exports.
+  hrReport: (kind: string, params: Record<string, unknown> = {}) =>
+    request<Record<string, unknown>>(`/hr/reports/${kind}?${toQuery(params)}`),
+  hrReportExportUrl: (kind: string, params: Record<string, unknown> = {}) =>
+    `/hr/reports/${kind}/export?${toQuery(params)}`,
+  payslipPdfUrl: (payslipId: string) => `/hr/payslips/${payslipId}/pdf`,
+  /** Fetch a payslip PDF as a blob URL (the route needs the bearer token). */
+  payslipPdfBlobUrl: async (payslipId: string): Promise<string> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    const res = await fetch(`${API_BASE}/v1/hr/payslips/${payslipId}/pdf`, { headers, credentials: 'include' });
+    if (!res.ok) throw new ApiError(res.status, 'payslip_download_failed', 'The payslip could not be opened.');
+    return URL.createObjectURL(await res.blob());
+  },
+  /** Download a report CSV (the route needs the bearer token). */
+  downloadHrReportCsv: async (kind: string, params: Record<string, unknown> = {}): Promise<void> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    const res = await fetch(`${API_BASE}/v1/hr/reports/${kind}/export?${toQuery(params)}`, { headers, credentials: 'include' });
+    if (!res.ok) throw new ApiError(res.status, 'report_export_failed', 'The report could not be exported.');
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hr-${kind}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
 
   // ------------------------------------------------------------ CRM (E03)
   crmLeadSources: (params: { companyId?: string } = {}) =>

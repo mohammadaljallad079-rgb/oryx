@@ -24,6 +24,6 @@ import { QrService } from './pdf/qr.service';
     PdfRendererService,
     QrService,
   ],
-  exports: [DocumentsService],
+  exports: [DocumentsService, PdfRendererService, DocumentFontService],
 })
 export class DocumentsModule {}

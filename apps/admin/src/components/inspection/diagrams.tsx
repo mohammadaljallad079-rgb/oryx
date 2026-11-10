@@ -162,6 +162,7 @@ export function BodyDiagram({
     redo: string;
     clear: string;
     clearConfirm: string;
+    canvas: string;
   };
 }) {
   const [tool, setTool] = useState<PaintCondition>('PAINT');
@@ -289,7 +290,7 @@ export function BodyDiagram({
         onPointerDown={(e) => addAt(e.clientX, e.clientY)}
         data-testid="paint-canvas"
         role="application"
-        aria-label="Vehicle body diagram"
+        aria-label={labels.canvas}
       >
         <BodyArt />
         {value.map((m, i) => (

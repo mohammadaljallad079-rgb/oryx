@@ -295,10 +295,10 @@ function ResourcesTab({ canManage }: { canManage: boolean }) {
           </Field>
           <Field label={t('erp.booking.kind')} required>
             <select className="oryx-select" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })} data-testid="resource-kind">
-              <option value="BAY">BAY</option>
-              <option value="LIFT">LIFT</option>
-              <option value="TECHNICIAN">TECHNICIAN</option>
-              <option value="PROVIDER">PROVIDER</option>
+              <option value="BAY">{t('erp.booking.kindBay')}</option>
+              <option value="LIFT">{t('erp.booking.kindLift')}</option>
+              <option value="TECHNICIAN">{t('erp.booking.kindTechnician')}</option>
+              <option value="PROVIDER">{t('erp.booking.kindProvider')}</option>
             </select>
           </Field>
           <Field label={t('erp.booking.nameEn')} required>

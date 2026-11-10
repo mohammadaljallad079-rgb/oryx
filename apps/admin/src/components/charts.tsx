@@ -78,7 +78,15 @@ export function MiniBarChart({
   );
 }
 
-export function MiniLineChart({ data, height = 160 }: { data: SeriesPoint[]; height?: number }) {
+export function MiniLineChart({
+  data,
+  height = 160,
+  label = 'Trend',
+}: {
+  data: SeriesPoint[];
+  height?: number;
+  label?: string;
+}) {
   const width = 520;
   const pad = 18;
   const max = niceMax(data.map((d) => d.value));
@@ -101,7 +109,7 @@ export function MiniLineChart({ data, height = 160 }: { data: SeriesPoint[]; hei
       width="100%"
       height={height}
       role="img"
-      aria-label="Trend"
+      aria-label={label}
       preserveAspectRatio="none"
     >
       <defs>

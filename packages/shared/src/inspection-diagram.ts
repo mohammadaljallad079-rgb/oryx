@@ -39,8 +39,13 @@ export const CHASSIS_DIAGRAM_ID = 'oryx-original-chassis';
  * The fixed coordinate box both drawings are authored in. Marker coordinates
  * are normalised to 0–1 of this box, so a marker is independent of screen size,
  * zoom, device orientation and text direction.
+ *
+ * The body drawing is a *top view* (plan) of the vehicle, which is the scheme
+ * the approved ORYX paint &amp; body page uses: front at the top, rear at the
+ * bottom, the driver's side on the right. Markers therefore land on the same
+ * panel on screen and on the printed page.
  */
-export const BODY_VIEWBOX = { width: 1000, height: 420 } as const;
+export const BODY_VIEWBOX = { width: 520, height: 1000 } as const;
 export const CHASSIS_VIEWBOX = { width: 420, height: 720 } as const;
 
 /**
@@ -59,7 +64,7 @@ export const INSPECTION_MARKER_COLORS = {
 
 export type InspectionMarkerColor = keyof typeof INSPECTION_MARKER_COLORS;
 
-/** A named, clickable panel of the body elevation. */
+/** A named, clickable panel of the body plan. */
 export interface BodyPanelSpec {
   /** Stable key stored on a marker; never renumber an existing key. */
   key: string;
@@ -72,46 +77,66 @@ export interface BodyPanelSpec {
 /**
  * The body-panel diagnostic scheme.
  *
- * A left-to-right side elevation: front (nose) on the left, rear on the right,
- * which is the conventional reading of a paint-thickness inspection sheet. The
- * panels are the ones the report names; a marker dropped anywhere inside one is
- * associated with it via `bodyPanelAt`.
+ * A top-down plan: the bonnet and windscreen at the front (top), the boot at
+ * the rear (bottom), the left flank on the left and the right flank on the
+ * right. The panels tile the outline without overlap, so a marker dropped
+ * anywhere inside one is associated with it via `bodyPanelAt`.
  */
 export const BODY_PANELS: readonly BodyPanelSpec[] = [
-  { key: 'frontBumper', labelEn: 'Front bumper', labelAr: 'المصد الأمامي', d: 'M52 300 L52 258 Q52 238 74 231 L150 216 L150 300 Z' },
-  { key: 'hood', labelEn: 'Hood / bonnet', labelAr: 'غطاء المحرك', d: 'M150 216 L300 172 Q330 160 372 158 L372 300 L150 300 Z' },
-  { key: 'frontFender', labelEn: 'Front fender', labelAr: 'الرفرف الأمامي', d: 'M300 172 L372 158 L372 214 L300 214 Z' },
-  { key: 'frontDoor', labelEn: 'Front door', labelAr: 'الباب الأمامي', d: 'M372 214 L500 214 L500 300 L372 300 Z' },
-  { key: 'rearDoor', labelEn: 'Rear door', labelAr: 'الباب الخلفي', d: 'M500 214 L628 214 L628 300 L500 300 Z' },
-  { key: 'rearFender', labelEn: 'Rear fender', labelAr: 'الرفرف الخلفي', d: 'M628 214 L700 218 L760 234 L760 300 L628 300 Z' },
-  { key: 'trunk', labelEn: 'Trunk / boot', labelAr: 'صندوق الأمتعة', d: 'M760 234 L860 244 Q920 252 928 272 L928 300 L760 300 Z' },
-  { key: 'roof', labelEn: 'Roof', labelAr: 'السقف', d: 'M400 158 L640 158 Q664 158 688 178 L700 214 L372 214 Q372 176 400 158 Z' },
-  { key: 'rearBumper', labelEn: 'Rear bumper', labelAr: 'المصد الخلفي', d: 'M928 272 L948 276 Q958 284 958 296 L958 300 L928 300 Z' },
+  { key: 'frontBumper', labelEn: 'Front bumper', labelAr: 'المصد الأمامي', d: 'M150 70 Q260 70 370 70 L372 104 L148 104 Z' },
+  { key: 'hood', labelEn: 'Hood / bonnet', labelAr: 'غطاء المحرك', d: 'M148 104 L372 104 L372 250 L148 250 Z' },
+  { key: 'windshield', labelEn: 'Windshield', labelAr: 'الزجاج الأمامي', d: 'M148 250 L372 250 L368 292 L152 292 Z' },
+  { key: 'roof', labelEn: 'Roof', labelAr: 'السقف', d: 'M152 292 L368 292 L368 606 L152 606 Z' },
+  { key: 'rearGlass', labelEn: 'Rear glass', labelAr: 'الزجاج الخلفي', d: 'M152 606 L368 606 L372 648 L148 648 Z' },
+  { key: 'trunk', labelEn: 'Trunk / boot', labelAr: 'صندوق الأمتعة', d: 'M148 648 L372 648 L372 800 L148 800 Z' },
+  { key: 'rearBumper', labelEn: 'Rear bumper', labelAr: 'المصد الخلفي', d: 'M148 800 L372 800 L370 844 L150 844 Z' },
+  { key: 'frontLeftDoor', labelEn: 'Front left door', labelAr: 'الباب الأمامي الأيسر', d: 'M64 300 L152 300 L152 452 L64 452 Z' },
+  { key: 'rearLeftDoor', labelEn: 'Rear left door', labelAr: 'الباب الخلفي الأيسر', d: 'M64 452 L152 452 L152 604 L64 604 Z' },
+  { key: 'frontLeftFender', labelEn: 'Front left fender', labelAr: 'الرفرف الأمامي الأيسر', d: 'M64 178 L152 190 L152 300 L64 300 Z' },
+  { key: 'rearLeftFender', labelEn: 'Rear left fender', labelAr: 'الرفرف الخلفي الأيسر', d: 'M64 604 L152 604 L152 760 L64 772 Z' },
+  { key: 'frontRightDoor', labelEn: 'Front right door', labelAr: 'الباب الأمامي الأيمن', d: 'M368 300 L456 300 L456 452 L368 452 Z' },
+  { key: 'rearRightDoor', labelEn: 'Rear right door', labelAr: 'الباب الخلفي الأيمن', d: 'M368 452 L456 452 L456 604 L368 604 Z' },
+  { key: 'frontRightFender', labelEn: 'Front right fender', labelAr: 'الرفرف الأمامي الأيمن', d: 'M368 190 L456 178 L456 300 L368 300 Z' },
+  { key: 'rearRightFender', labelEn: 'Rear right fender', labelAr: 'الرفرف الخلفي الأيمن', d: 'M368 604 L456 604 L456 772 L368 760 Z' },
 ] as const;
 
 /** The outer silhouette, drawn beneath the panels. */
 export const BODY_SILHOUETTE =
-  'M52 300 L52 258 Q52 236 76 229 L300 172 Q332 158 376 158 L640 158 Q666 158 690 178 L842 224 Q932 236 948 254 Q958 266 958 286 L958 300 Q958 322 936 322 L74 322 Q52 322 52 300 Z';
+  'M120 66 Q260 58 400 66 Q458 92 462 150 L466 400 Q470 560 466 700 Q462 782 400 850 Q260 858 120 850 Q58 782 54 700 L50 400 Q46 150 54 150 Q58 92 120 66 Z';
 
 /** The glazing, drawn above the silhouette and below the markers. */
 export const BODY_GLASS_PATHS: readonly string[] = [
-  'M398 168 Q420 162 452 162 L498 162 L498 208 L376 208 Q376 182 398 168 Z',
-  'M512 162 L640 162 Q666 162 682 178 L698 208 L512 208 Z',
+  'M152 250 L368 250 L368 292 L152 292 Z',
+  'M152 606 L368 606 L368 648 L152 648 Z',
 ];
 
-/** The wheel positions (centre x, centre y, radius) in viewBox units. */
+/**
+ * The wheel contact patches, drawn at the four corners of the plan.
+ *
+ * The body is a plan view, so the "wheels" are the tyres seen from above — a
+ * filled rounded rectangle straddling the flank on each corner.
+ */
 export const BODY_WHEELS: readonly { cx: number; cy: number; r: number }[] = [
-  { cx: 250, cy: 322, r: 62 },
-  { cx: 762, cy: 322, r: 62 },
+  { cx: 60, cy: 250, r: 46 },
+  { cx: 60, cy: 748, r: 46 },
+  { cx: 460, cy: 250, r: 46 },
+  { cx: 460, cy: 748, r: 46 },
 ];
 
 /** Panel separation lines drawn over the silhouette. */
 export const BODY_SEAM_PATHS: readonly string[] = [
-  'M150 216 L150 322',
-  'M372 158 L372 322',
-  'M500 214 L500 322',
-  'M628 214 L628 322',
-  'M760 234 L760 322',
+  'M54 104 L466 104',
+  'M54 250 L466 250',
+  'M54 292 L466 292',
+  'M54 606 L466 606',
+  'M54 648 L466 648',
+  'M54 800 L466 800',
+  'M152 104 L152 844',
+  'M368 104 L368 844',
+  'M54 452 L152 452',
+  'M368 452 L466 452',
+  'M54 604 L152 604',
+  'M368 604 L466 604',
 ];
 
 /**
@@ -120,7 +145,7 @@ export const BODY_SEAM_PATHS: readonly string[] = [
  * The hit test is a bounding-box approximation of each panel's outline, which is
  * exact enough for a marker: the panels tile the body without overlap, so the
  * only ambiguity is a point exactly on a seam. Returns `null` for a point off
- * the vehicle (sky or ground), so a marker there is stored without a panel.
+ * the vehicle, so a marker there is stored without a panel.
  */
 export function bodyPanelAt(x: number, y: number): BodyPanelSpec | null {
   const px = x * BODY_VIEWBOX.width;

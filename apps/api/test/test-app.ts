@@ -306,7 +306,11 @@ export async function cleanupFixtures(prisma: PrismaService): Promise<void> {
   await prisma.payrollPeriod.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.salaryComponent.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.salaryStructure.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.salaryChangeLog.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.attendanceBreak.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.attendanceRecord.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.workSite.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.attendancePolicy.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.employeeShift.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.shift.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.leaveRequest.deleteMany({ where: { companyId: { in: ids } } });

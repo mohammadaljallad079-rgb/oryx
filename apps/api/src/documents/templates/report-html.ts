@@ -4,9 +4,11 @@ import { INSPECTION_REPORT_CSS } from './inspection-report.template';
 import { esc } from './html.util';
 import type { DocumentIssuer, DocumentVerification, InspectionReportPayload } from '../document-payload';
 import {
+  chassisSectionPage,
+  computerSectionPage,
   identificationPage,
-  sectionPage,
-  summaryPage,
+  inspectionGroupPage,
+  paintSectionPage,
 } from './inspection-report.template';
 
 /**
@@ -41,30 +43,32 @@ export function renderInspectionReportHtml(input: ReportRenderInput): string {
     subtitle: `${input.payload.vehicle.make} ${input.payload.vehicle.model} · ${input.payload.vehicle.vin}`,
   };
 
+  const byArea = new Map(input.payload.sections.map((s) => [s.area, s]));
   const pages: string[] = [];
   pages.push(identificationPage(input, chrome));
 
   for (const page of plan) {
     if (page.kind === 'IDENTIFICATION') continue;
     const specs = sectionsOnReportPage(page, input.payload.selectedAreas);
-    pages.push(sectionPage(input, chrome, specs, page.number));
-  }
+    const first = specs[0]?.key;
+    if (!first) continue;
 
-  // The summary is only added when there is something to summarise: the
-  // assessment, a remark, or the verification block. A summary page with three
-  // empty boxes reads as a defect.
-  const hasSummaryContent =
-    Boolean(input.payload.finalAssessment) ||
-    Boolean(input.payload.generalRemarks) ||
-    Boolean(input.payload.interiorRemarks) ||
-    Boolean(input.payload.exteriorRemarks) ||
-    Boolean(input.payload.engineRemarks) ||
-    Boolean(input.payload.roadTestRemarks) ||
-    Boolean(input.verification);
-  if (hasSummaryContent) {
-    pages.push(summaryPage(input, chrome, pages.length + 1));
+    // The section that owns the page decides its shape: paint and chassis each
+    // have a dedicated drawing page, the computer unit has the fault table, and
+    // the four remaining sections share the interior/exterior/engine/road page.
+    if (first === 'PAINT_BODY') {
+      pages.push(paintSectionPage(input, byArea.get('PAINT_BODY')));
+    } else if (first === 'CHASSIS_UNDERCARRIAGE') {
+      pages.push(chassisSectionPage(input, byArea.get('CHASSIS_UNDERCARRIAGE')));
+    } else if (first === 'COMPUTER_UNIT') {
+      pages.push(computerSectionPage(input, byArea.get('COMPUTER_UNIT')));
+    } else {
+      const group = specs
+        .map((s) => byArea.get(s.key))
+        .filter((s): s is NonNullable<typeof s> => Boolean(s));
+      pages.push(inspectionGroupPage(input, group));
+    }
   }
-
 
   return `<!doctype html>
 <html lang="ar" dir="rtl">

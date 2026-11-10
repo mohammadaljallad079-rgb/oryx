@@ -319,8 +319,8 @@ function AccountModal({
         </Field>
         <Field label={t('erp.accounting.normalBalance')}>
           <select className="oryx-select" value={form.normalBalance} disabled={Boolean(account)} onChange={(e) => setForm({ ...form, normalBalance: e.target.value })} data-testid="account-normal-balance">
-            <option value="DEBIT">DEBIT</option>
-            <option value="CREDIT">CREDIT</option>
+            <option value="DEBIT">{t('erp.accounting.debit')}</option>
+            <option value="CREDIT">{t('erp.accounting.credit')}</option>
           </select>
         </Field>
       </div>

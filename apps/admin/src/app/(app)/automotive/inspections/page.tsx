@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -184,6 +184,7 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   const [customerId, setCustomerId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
   const [areas, setAreas] = useState<InspectionSectionKey[]>([]);
+  const [addVehicleOpen, setAddVehicleOpen] = useState(false);
   const customers = useAsync(() => api.salesCustomers(), []);
 
   // The vehicle options are stored together with the customer they were loaded
@@ -193,6 +194,17 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   // have the server reject the job.
   const [vehicleSource, setVehicleSource] = useState<{ customerId: string; items: VehicleDto[] } | null>(
     null,
+  );
+  const loadVehicles = useCallback(
+    async (forCustomer: string) => {
+      try {
+        const res = await api.vehicles({ customerId: forCustomer });
+        setVehicleSource({ customerId: forCustomer, items: res.items ?? [] });
+      } catch {
+        setVehicleSource({ customerId: forCustomer, items: [] });
+      }
+    },
+    [],
   );
   useEffect(() => {
     if (!customerId) return;
@@ -212,6 +224,16 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 
   const vehiclesLoading = Boolean(customerId) && vehicleSource?.customerId !== customerId;
   const vehicleOptions = vehicleSource?.customerId === customerId ? vehicleSource.items : [];
+
+  // The identification fields are prefilled from the chosen vehicle so the
+  // operator confirms them rather than retyping them, and so the report's cover
+  // prints the same make/model/VIN the picker showed.
+  const [identity, setIdentity] = useState<{ make: string; model: string; modelYear: string; plate: string; vin: string } | null>(null);
+  useEffect(() => {
+    const v = vehicleOptions.find((x) => x.id === vehicleId);
+    setIdentity(v ? { make: v.make, model: v.model, modelYear: String(v.modelYear), plate: v.plateNumber ?? '', vin: v.vin } : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicleId, vehicleSource]);
 
   const toggleArea = (key: InspectionSectionKey) =>
     setAreas((prev) => (prev.includes(key) ? prev.filter((a) => a !== key) : [...prev, key]));
@@ -269,22 +291,37 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
           </select>
         </Field>
 
-        <Field label={t('inspection.selectVehicle')} required>
-          <select
-            className="oryx-select"
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <span className="oryx-label">{t('inspection.selectVehicle')}</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={!customerId}
+              onClick={() => setAddVehicleOpen(true)}
+              data-testid="job-add-vehicle"
+            >
+              <Icon name="plus" size={14} />
+              {t('erp.automotive.newVehicle')}
+            </Button>
+          </div>
+          <VehiclePicker
+            vehicles={vehicleOptions}
             value={vehicleId}
-            onChange={(e) => setVehicleId(e.target.value)}
             disabled={!customerId || vehiclesLoading}
-            data-testid="job-vehicle"
-          >
-            <option value="">{t('common.select')}</option>
-            {vehicleOptions.map((v: VehicleDto) => (
-              <option key={v.id} value={v.id}>
-                {v.make} {v.model} · {v.modelYear} · {v.vin}
-              </option>
-            ))}
-          </select>
-        </Field>
+            onSelect={setVehicleId}
+            testId="job-vehicle"
+          />
+          {identity ? (
+            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg border border-[var(--border)] p-2 text-[12px]" data-testid="job-vehicle-identity">
+              <span className="oryx-faint">{t('erp.automotive.make')}: <span className="text-[var(--text)] font-semibold">{identity.make}</span></span>
+              <span className="oryx-faint">{t('erp.automotive.model')}: <span className="text-[var(--text)] font-semibold">{identity.model}</span></span>
+              <span className="oryx-faint">{t('erp.automotive.modelYear')}: <span className="text-[var(--text)] font-semibold">{identity.modelYear}</span></span>
+              <span className="oryx-faint">{t('erp.automotive.plate')}: <span className="text-[var(--text)] font-semibold">{identity.plate || '—'}</span></span>
+              <span className="oryx-faint col-span-2">{t('erp.automotive.vin')}: <span className="font-mono text-[var(--text)]">{identity.vin}</span></span>
+            </div>
+          ) : null}
+        </div>
 
         <div>
           <span className="oryx-label">{t('inspection.selectTypes')}</span>
@@ -306,6 +343,19 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
           <p className="oryx-faint mt-1 text-[11.5px]">{t('inspection.selectTypesHint')}</p>
         </div>
       </div>
+
+      <CreateVehicleModal
+        open={addVehicleOpen}
+        vehicle={null}
+        customers={(customers.data?.items ?? []).map((c: CustomerDto) => ({ id: c.id, code: c.code, nameEn: c.nameEn || c.nameAr || c.code }))}
+        defaultCustomerId={customerId}
+        onClose={() => setAddVehicleOpen(false)}
+        onSaved={async (created) => {
+          if (!created) return;
+          await loadVehicles(customerId);
+          setVehicleId(created.id);
+        }}
+      />
     </Modal>
   );
 }
@@ -643,29 +693,112 @@ function VehicleDocumentsModal({
   );
 }
 
+/**
+ * The vehicle picker: a searchable combobox over the selected customer's cars.
+ *
+ * A native `<select>` cannot be typed into, and an operator with dozens of
+ * vehicles on file needs to filter by VIN, plate, make or model. The list is
+ * filtered client-side from the already-loaded options, so no request is made
+ * per keystroke. Selecting a vehicle calls `onSelect`, which the job form uses
+ * to prefill the identification fields.
+ */
+function VehiclePicker({
+  vehicles,
+  value,
+  disabled,
+  onSelect,
+  testId,
+}: {
+  vehicles: VehicleDto[];
+  value: string;
+  disabled?: boolean;
+  onSelect: (vehicleId: string) => void;
+  testId?: string;
+}) {
+  const { t } = useUi();
+  const [query, setQuery] = useState('');
+  const [openList, setOpenList] = useState(false);
+  const selected = vehicles.find((v) => v.id === value) ?? null;
+
+  const needle = query.trim().toLowerCase();
+  const matches = needle
+    ? vehicles.filter((v) =>
+        [v.vin, v.plateNumber ?? '', v.make, v.model, String(v.modelYear)]
+          .join(' ')
+          .toLowerCase()
+          .includes(needle),
+      )
+    : vehicles;
+
+  const label = (v: VehicleDto) => `${v.make} ${v.model} · ${v.modelYear} · ${v.vin}${v.plateNumber ? ` · ${v.plateNumber}` : ''}`;
+
+  return (
+    <div className="relative" data-testid={testId}>
+      <input
+        className="oryx-input"
+        placeholder={selected ? label(selected) : t('erp.automotive.searchVehicle')}
+        value={query}
+        disabled={disabled}
+        onChange={(e) => { setQuery(e.target.value); setOpenList(true); }}
+        onFocus={() => setOpenList(true)}
+        data-testid={testId ? `${testId}-input` : undefined}
+      />
+      {openList && !disabled ? (
+        <div className="oryx-combo" role="listbox" data-testid={testId ? `${testId}-list` : undefined}>
+          {matches.length === 0 ? (
+            <div className="oryx-combo-empty">{t('erp.automotive.noVehicles')}</div>
+          ) : (
+            matches.slice(0, 50).map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                role="option"
+                aria-selected={v.id === value}
+                className={`oryx-combo-item${v.id === value ? ' is-selected' : ''}`}
+                onClick={() => { onSelect(v.id); setQuery(''); setOpenList(false); }}
+                data-testid={`vehicle-option-${v.vin}`}
+              >
+                <span className="block font-semibold">{v.make} {v.model} · {v.modelYear}</span>
+                <span className="oryx-faint block text-[11.5px]">{v.vin}{v.plateNumber ? ` · ${v.plateNumber}` : ''}</span>
+              </button>
+            ))
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function CreateVehicleModal({
   open,
   vehicle,
   customers,
+  defaultCustomerId,
   onClose,
   onSaved,
 }: {
   open: boolean;
   vehicle: VehicleDto | null;
   customers: Array<{ id: string; code: string; nameEn: string }>;
+  /** Preselected customer when the modal is opened from an inspection form. */
+  defaultCustomerId?: string;
   onClose: () => void;
-  onSaved: () => Promise<void>;
+  onSaved: (created?: VehicleDto) => Promise<void>;
 }) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [form, setForm] = useState({ customerId: '', vin: '', plateNumber: '', make: '', model: '', modelYear: '2024', mileage: '0', color: '', registrationExpiresAt: '' });
 
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setPhoto(null);
+    setPhotoPreview(null);
     setForm({
-      customerId: vehicle?.customerId ?? '',
+      customerId: vehicle?.customerId ?? defaultCustomerId ?? '',
       vin: vehicle?.vin ?? '',
       plateNumber: vehicle?.plateNumber ?? '',
       make: vehicle?.make ?? '',
@@ -675,7 +808,22 @@ function CreateVehicleModal({
       color: vehicle?.color ?? '',
       registrationExpiresAt: vehicle?.registrationExpiresAt?.slice(0, 10) ?? '',
     });
-  }, [open, vehicle]);
+  }, [open, vehicle, defaultCustomerId]);
+
+  // The camera capture is offered as a file input with `capture`, which a phone
+  // opens straight into the rear camera and a desktop turns into a file picker.
+  // The preview is an object URL, revoked when the modal closes, so a large
+  // photograph is never held twice in memory.
+  useEffect(() => {
+    if (!photo) { setPhotoPreview(null); return; }
+    const url = URL.createObjectURL(photo);
+    setPhotoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photo]);
+
+  // A VIN is 17 characters excluding I, O and Q. The server enforces this too;
+  // checking here gives the operator an immediate, specific message.
+  const vinValid = /^[A-HJ-NPR-Z0-9]{11,17}$/.test(form.vin.toUpperCase());
 
   const submit = async () => {
     setBusy(true); setError(null);
@@ -689,10 +837,17 @@ function CreateVehicleModal({
           color: form.color || undefined,
           registrationExpiresAt: form.registrationExpiresAt || undefined,
         });
+        if (photo) {
+          const fd = new FormData();
+          fd.append('category', 'vehicle-photo');
+          fd.append('file', photo);
+          await api.addVehicleDocument(vehicle.id, fd);
+        }
+        await onSaved();
       } else {
-        await api.createVehicle({
+        const created = await api.createVehicle({
           customerId: form.customerId,
-          vin: form.vin,
+          vin: form.vin.toUpperCase(),
           plateNumber: form.plateNumber || undefined,
           make: form.make,
           model: form.model,
@@ -701,15 +856,21 @@ function CreateVehicleModal({
           color: form.color || undefined,
           registrationExpiresAt: form.registrationExpiresAt || undefined,
         });
+        if (photo && created?.id) {
+          const fd = new FormData();
+          fd.append('category', 'vehicle-photo');
+          fd.append('file', photo);
+          await api.addVehicleDocument(created.id, fd);
+        }
+        await onSaved(created);
       }
-      await onSaved();
       onClose();
     } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); } finally { setBusy(false); }
   };
 
   return (
     <Modal open={open} title={vehicle ? t('erp.automotive.editVehicle') : t('erp.automotive.newVehicle')} onClose={onClose}
-      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || (!vehicle && !form.customerId) || !form.vin || !form.make || !form.model} onClick={submit} data-testid="save-vehicle">{busy ? t('common.loading') : t('common.save')}</Button></>}>
+      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || (!vehicle && !form.customerId) || !vinValid || !form.make || !form.model} onClick={submit} data-testid="save-vehicle">{busy ? t('common.loading') : t('common.save')}</Button></>}>
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.sales.customer')} required>
@@ -718,8 +879,8 @@ function CreateVehicleModal({
             {customers.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.nameEn}</option>)}
           </select>
         </Field>
-        <Field label={t('erp.automotive.vin')} required hint={t('erp.automotive.vinHint')}>
-          <input className="oryx-input" value={form.vin} disabled={Boolean(vehicle)} onChange={(e) => setForm({ ...form, vin: e.target.value.toUpperCase() })} maxLength={17} data-testid="vehicle-vin" />
+        <Field label={t('erp.automotive.vin')} required hint={vinValid ? t('erp.automotive.vinHint') : t('erp.automotive.vinInvalid')}>
+          <input className={`oryx-input${form.vin && !vinValid ? ' oryx-input--invalid' : ''}`} value={form.vin} disabled={Boolean(vehicle)} onChange={(e) => setForm({ ...form, vin: e.target.value.toUpperCase() })} maxLength={17} data-testid="vehicle-vin" />
         </Field>
         <Field label={t('erp.automotive.make')} required><input className="oryx-input" value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} data-testid="vehicle-make" /></Field>
         <Field label={t('erp.automotive.model')} required><input className="oryx-input" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} data-testid="vehicle-model" /></Field>
@@ -730,6 +891,22 @@ function CreateVehicleModal({
         ) : null}
         <Field label={t('erp.automotive.color')}><input className="oryx-input" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} data-testid="vehicle-color" /></Field>
         <Field label={t('erp.automotive.registrationExpiresAt')}><input type="date" className="oryx-input" value={form.registrationExpiresAt} onChange={(e) => setForm({ ...form, registrationExpiresAt: e.target.value })} data-testid="vehicle-registration-expires" /></Field>
+        <Field label={t('erp.automotive.vehiclePhoto')} hint={t('erp.automotive.vehiclePhotoHint')}>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="oryx-input"
+            onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+            data-testid="vehicle-photo"
+          />
+        </Field>
+        {photoPreview ? (
+          <div className="sm:col-span-2" data-testid="vehicle-photo-preview">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={photoPreview} alt={t('erp.automotive.vehiclePhoto')} className="max-h-40 rounded-lg border border-[var(--border)] object-cover" />
+          </div>
+        ) : null}
       </div>
     </Modal>
   );

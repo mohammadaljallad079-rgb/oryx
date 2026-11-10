@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Icon } from './icons';
+import { useUi } from '@/lib/ui-context';
 
 export function Card({
   children,
@@ -127,6 +128,7 @@ export function Modal({
    */
   size?: 'default' | 'full' | 'document';
 }) {
+  const { t } = useUi();
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -151,7 +153,7 @@ export function Modal({
             type="button"
             className="oryx-btn oryx-btn--ghost oryx-btn--sm"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t('common.closeLabel')}
           >
             <Icon name="close" size={16} />
           </button>

@@ -237,6 +237,7 @@ export class OrganizationsService {
         ...(dto.roundingMode !== undefined ? { roundingMode: dto.roundingMode } : {}),
         ...(dto.documentLocale !== undefined ? { documentLocale: dto.documentLocale } : {}),
         ...(dto.taxNumber !== undefined ? { taxNumber: dto.taxNumber } : {}),
+        ...(dto.crNumber !== undefined ? { crNumber: dto.crNumber } : {}),
         ...(dto.parentCompanyId !== undefined ? { parentCompanyId: dto.parentCompanyId } : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
       },
@@ -470,6 +471,7 @@ export class OrganizationsService {
     roundingMode: string;
     documentLocale: string;
     taxNumber: string | null;
+    crNumber: string | null;
     notes: string | null;
     parentCompanyId: string | null;
     createdAt: Date;
@@ -506,6 +508,7 @@ export class OrganizationsService {
       roundingMode: c.roundingMode as CompanyDto['roundingMode'],
       documentLocale: c.documentLocale as CompanyDto['documentLocale'],
       taxNumber: c.taxNumber,
+      crNumber: c.crNumber,
       notes: c.notes,
       parentCompanyId: c.parentCompanyId,
       parentCompanyNameEn: c.parent?.nameEn ?? null,

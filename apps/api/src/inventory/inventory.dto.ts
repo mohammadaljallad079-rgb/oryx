@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
@@ -43,6 +43,40 @@ export class ListQueryDto {
   @IsOptional()
   @IsString()
   category?: string;
+
+  /**
+   * An exact barcode. A scanner emits the whole code and a trailing Enter, so an
+   * exact match is resolved on its own path rather than through the fuzzy
+   * `search`, which could also match a SKU or a name fragment.
+   */
+  @IsOptional()
+  @IsString()
+  barcode?: string;
+
+  /** `PRODUCT` or `SERVICE`. */
+  @IsOptional()
+  @IsIn(['PRODUCT', 'SERVICE'])
+  type?: 'PRODUCT' | 'SERVICE';
+
+  /** `true` returns only active rows, `false` only inactive ones. */
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  isActive?: boolean;
+
+  /** `true` returns only rows that carry a barcode, `false` only rows without one. */
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  hasBarcode?: boolean;
+
+  /**
+   * A stock-level filter across the company's warehouses: `out` (never in
+   * stock), `low` (at or below the reorder level) or `in` (above it).
+   */
+  @IsOptional()
+  @IsIn(['in', 'low', 'out'])
+  stockStatus?: 'in' | 'low' | 'out';
 }
 
 export class CreateWarehouseDto {

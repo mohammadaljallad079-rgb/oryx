@@ -116,6 +116,7 @@ const payload: InspectionReportPayload = {
   finalAssessment: 'Roadworthy.',
   reviewedByName: 'Sara',
   reviewedAt: '2026-01-02',
+  vehiclePhotoDataUri: null,
   sections: [interiorSection, paintSection, chassisSection],
 };
 

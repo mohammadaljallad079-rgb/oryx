@@ -1,5 +1,6 @@
+import { existsSync } from 'node:fs';
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
-import type { Browser } from 'playwright';
+import type { Browser, BrowserType } from 'playwright';
 import { DocumentFontService, DOCUMENT_FONT_STACK, DOCUMENT_LATIN_STACK } from './document-fonts.service';
 
 /**
@@ -35,9 +36,7 @@ export class PdfRendererService implements OnModuleDestroy {
       // Imported lazily so the API can boot (and unit tests can run) without
       // the browser binary present; only a PDF request needs it.
       const { chromium } = await import('playwright');
-      const browser = await chromium.launch({
-        args: ['--no-sandbox', '--disable-dev-shm-usage', '--font-render-hinting=none'],
-      });
+      const browser = await launchChromium(chromium);
       // A launch that later dies must not leave a stale promise behind.
       browser.on('disconnected', () => {
         this.browserPromise = null;
@@ -120,6 +119,39 @@ export class PdfRendererService implements OnModuleDestroy {
 }
 
 /**
+ * Launches Chromium for document rendering.
+ *
+ * Playwright's bundled build is preferred, but the binary is not installed by
+ * `pnpm install` — it needs `playwright install chromium`. A deployment that
+ * skipped that step (or a sandbox that wiped the browser cache) would otherwise
+ * fail *every* issue, preview and print request with an opaque
+ * "Executable doesn't exist" 500. Falling back to a system Chromium keeps the
+ * documents working, and the explicit message below tells an operator how to
+ * restore the bundled build.
+ *
+ * `PLAYWRIGHT_CHROMIUM` names a build explicitly, matching the audit scripts.
+ */
+export async function launchChromium(chromium: BrowserType): Promise<Browser> {
+  const args = ['--no-sandbox', '--disable-dev-shm-usage', '--font-render-hinting=none'];
+  const explicit = process.env.PLAYWRIGHT_CHROMIUM;
+  if (explicit) return chromium.launch({ args, executablePath: explicit });
+  try {
+    return await chromium.launch({ args });
+  } catch (error) {
+    const system = ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'].find(
+      (path) => existsSync(path),
+    );
+    if (!system) {
+      throw new Error(
+        `Document rendering needs Chromium. Run "pnpm --filter @oryx/admin exec playwright install chromium", ` +
+          `or set PLAYWRIGHT_CHROMIUM. Cause: ${(error as Error).message}`,
+      );
+    }
+    return chromium.launch({ args, executablePath: system });
+  }
+}
+
+/**
  * Page margins for a generated PDF, in Chromium's CSS length units.
  */
 export interface PdfMargins {
@@ -153,7 +185,7 @@ export const DEFAULT_PDF_MARGINS: PdfMargins = {
 export const OFFICIAL_PDF_MARGINS: PdfMargins = {
   top: '5.7mm',
   right: '8.6mm',
-  bottom: '14mm',
+  bottom: '10.5mm',
   left: '9.3mm',
 };
 

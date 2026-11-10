@@ -1,5 +1,6 @@
-import { esc, escMultiline, money, quantity, countryName } from './html.util';
-import { CHROME_CSS, signatureBlock } from './chrome';
+import { esc, escMultiline, money, moneyPlain, quantity, countryName } from './html.util';
+import { CHROME_CSS } from './chrome';
+import { DOCUMENT_LATIN_STACK } from '../pdf/document-fonts.service';
 import type {
   DocumentIssuer,
   DocumentVerification,
@@ -159,7 +160,7 @@ function documentTaxRate(payload: FinancialDocumentPayload): number {
  * approved identity, not tenant data, so it is written here rather than read
  * from a settings row.
  */
-function identityBand(issuer: DocumentIssuer): string {
+export function identityBand(issuer: DocumentIssuer): string {
   const logo = issuer.logoDataUri
     ? `<img class="of-logo" src="${esc(issuer.logoDataUri)}" alt="${esc(issuer.nameEn)}">`
     : `<div class="of-wordmark">
@@ -183,10 +184,42 @@ function identityBand(issuer: DocumentIssuer): string {
  * with the number right-aligned in white, sitting directly above the
  * document/customer panel.
  */
-function trnStrip(issuer: DocumentIssuer): string {
+export function trnStrip(issuer: DocumentIssuer): string {
   if (!issuer.taxNumber) return '';
   return `
   <div class="of-trn">TRN: <span class="num">${esc(issuer.taxNumber)}</span></div>`;
+}
+
+/**
+ * The verification block for the official layout: a compact, ruled strip that
+ * carries the QR code, the plain-language instruction and the token.
+ *
+ * The approved reference predates QR verification and so carries none; the
+ * requirement is that a verifiable document shows its code without disturbing
+ * the approved sheet. The strip is therefore rendered only when the document is
+ * verifiable (every type except the internal journal entry) and only when the
+ * caller supplied a verification block, and it sits between the notes and the
+ * pinned signature strip where the reference leaves its whitespace. A document
+ * that is not verifiable prints nothing here, so no code is invented for it.
+ */
+export function verificationStrip(verification: DocumentVerification | null): string {
+  if (!verification) return '';
+  return `
+  <div class="of-verify avoid-break">
+    <div class="of-verify-qr">
+      <img src="${esc(verification.qrDataUri)}" alt="QR verification code">
+    </div>
+    <div class="of-verify-text">
+      <div class="of-verify-title">التحقق من صحة المستند · Document authenticity</div>
+      <p class="of-verify-body">
+        امسح رمز الاستجابة السريعة أو افتح الرابط وأدخل رمز التحقق للتأكد من أن هذا المستند صادر
+        رسميًا عن النظام ولم يُعدّل. / Scan the QR code or open the address and enter the code to
+        confirm this document was issued by the system and has not been altered.
+      </p>
+      <div class="of-verify-code num">${esc(verification.token)}</div>
+      <div class="of-verify-url ltr">${esc(verification.url)}</div>
+    </div>
+  </div>`;
 }
 
 /** The centred bilingual document title (reference y 79.7 / 93.9). */
@@ -208,8 +241,12 @@ function infoPanel(
   const payment = paymentLabel(payload);
   const reference = paymentReference(payload);
   const country = countryName(payload.counterparty.countryCode);
-  const address = [payload.counterparty.addressLine, payload.counterparty.city, country]
+  // The reference prints the country once; a record whose city and country are
+  // the same word must not print it twice.
+  const addrLines = [payload.counterparty.addressLine, payload.counterparty.city, country]
     .filter(Boolean)
+    .filter((line, index, all) => all.findIndex((x) => x?.toLowerCase() === line?.toLowerCase()) === index);
+  const address = addrLines
     .map((line) => `<span class="of-addr-line">${esc(line)}</span>`)
     .join('');
   const isQuotation = /quotation/i.test(payload.titleEn);
@@ -285,7 +322,11 @@ function infoPanel(
 }
 
 /** The five-column priced table from the reference document. */
-function lineTable(payload: FinancialDocumentPayload, locale: 'ar' | 'en'): string {
+function lineTable(
+  payload: FinancialDocumentPayload,
+  locale: 'ar' | 'en',
+  quotation = false,
+): string {
   const rows = payload.lines
     .map(
       (line) => `
@@ -295,14 +336,14 @@ function lineTable(payload: FinancialDocumentPayload, locale: 'ar' | 'en'): stri
           ${line.sku ? `<span class="of-line-sku num">${esc(line.sku)}</span>` : ''}
         </td>
         <td class="of-c-qty num">${esc(quantity(line.quantity))}</td>
-        <td class="of-c-price num">${esc(money(line.unitPriceMinor, payload.currency, locale))}</td>
+        <td class="of-c-price num">${esc(moneyPlain(line.unitPriceMinor, payload.currency))}</td>
         <td class="of-c-tax">${esc(taxLabel(line.taxPercentBp))}</td>
         <td class="of-c-amt num">${esc(money(line.lineTotalMinor, payload.currency, locale))}</td>
       </tr>`,
     )
     .join('');
   return `
-  <table class="of-table">
+  <table class="of-table${quotation ? ' of-table-quote' : ''}">
     <thead>
       <tr>
         <th class="of-c-desc">Description</th>
@@ -376,27 +417,50 @@ ${OFFICIAL_FINANCIAL_CSS}
   ${titleBlock(payload)}
   ${trnStrip(input.issuer)}
   ${infoPanel(numbered, counterpartyName, dateLabel)}
-  ${lineTable(payload, docLocale)}
+  ${lineTable(payload, docLocale, /quotation/i.test(payload.titleEn))}
   ${totalsBlock(payload, docLocale)}
   ${
     payload.notes
       ? `<div class="of-notes avoid-break">
-           <div class="of-notes-title">Notes</div>
            <div class="of-notes-body">${escMultiline(payload.notes)}</div>
          </div>`
       : ''
   }
-  <div class="of-thanks">
-    <div class="of-thanks-ar">شكراً لثقتكم بنا.</div>
-    <div class="of-thanks-en">Thank you for your trust.</div>
+  ${verificationStrip(input.verification)}
+  <div class="of-bottom">
+    ${signatureStrip()}
+    <div class="of-thanks">
+      <div class="of-thanks-ar">شكراً لثقتكم بنا.</div>
+      <div class="of-thanks-en">Thank you for your trust.</div>
+    </div>
   </div>
-  ${signatureBlock([
-    { ar: 'اعتماد المركز', en: 'Authorized Stamp & Signature', name: null },
-    { ar: 'توقيع العميل', en: 'Customer Signature', name: null },
-  ])}
 </section>
 </body>
 </html>`;
+}
+
+/**
+ * The signature strip exactly as the approved reference prints it.
+ *
+ * The reference places the English and Arabic labels of each signatory on one
+ * line — "Authorized Stamp & Signature اعتماد المركز" on the leading edge and
+ * "Customer Signature توقيع العميل" on the trailing edge — rather than the
+ * stacked three-line block the shared `signatureBlock` renders. This local strip
+ * keeps the approved wording and geometry without changing the shared chrome
+ * used by the other document kinds.
+ */
+function signatureStrip(): string {
+  return `
+  <div class="of-signrow">
+    <div class="of-sign">
+      <span class="of-sign-en">Authorized Stamp &amp; Signature</span>
+      <span class="of-sign-ar">اعتماد المركز</span>
+    </div>
+    <div class="of-sign">
+      <span class="of-sign-en">Customer Signature</span>
+      <span class="of-sign-ar">توقيع العميل</span>
+    </div>
+  </div>`;
 }
 
 /**
@@ -407,16 +471,27 @@ ${OFFICIAL_FINANCIAL_CSS}
  * Sizes are in points and mirror the measured reference geometry.
  */
 export const OFFICIAL_FINANCIAL_CSS = `
-  .of-page{ position:relative; }
+  /* The approved sheet is a single A4 page whose thanks/signature strip sits at
+     the foot, not directly under the table. The page box therefore fills the
+     printable area (842.25 - 5.7mm top - 14mm bottom ≈ 786pt) and the bottom
+     strip is pinned to its end, so a short invoice still prints its signatures
+     where the reference does. */
+  .of-page{ position:relative; min-height:796pt; box-sizing:border-box;
+    display:flex; flex-direction:column; padding-bottom:0;
+    /* The approved sheet sets its Latin labels and figures in a Latin face
+       (Verdana/CodecPro) and its Arabic in an Arabic face. The base print CSS
+       is Arabic-first, which would set every Latin word in the wide Naskh face
+       and widen the labels; the official sheet therefore leads with the Latin
+       stack and falls back to the Arabic face for the Arabic runs. */
+    font-family:${DOCUMENT_LATIN_STACK}; }
   /* The reference watermark is the "AUTO SERVICES" wordmark set in the identity
-     navy at ~52pt and centred (measured y 374-426 on a 842pt page, i.e. ~47%),
-     not the logo lockup. */
-  .of-watermark{ position:absolute; left:0; right:0; top:44.4%;
+     navy at ~52pt, centred on the page (measured y 374-426 on an 842pt sheet). */
+  .of-watermark{ position:absolute; left:0; right:0; top:45%;
     text-align:center; font-size:52pt; font-weight:700; letter-spacing:1px;
     color:#0a1f44; opacity:0.055; pointer-events:none; z-index:-1;
-    font-family:Arial,Helvetica,sans-serif; }
+    font-family:Verdana,Arial,Helvetica,sans-serif; }
   .of-band{ display:flex; justify-content:space-between; align-items:center;
-    min-height:33pt; }
+    min-height:37pt; }
   .of-band-lead{ flex:0 0 auto; }
   .of-band-trail{ text-align:end; }
   .of-logo{ height:33pt; width:auto; }
@@ -424,17 +499,19 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-wordmark-en{ font-size:14.2pt; font-weight:700; color:#0a1f44; letter-spacing:.5px; }
   .of-tag-ar{ font-size:11.8pt; font-weight:700; color:#102749; }
   .of-tag-en{ font-size:7.9pt; font-weight:700; color:#102749; letter-spacing:.4px; }
-  .of-title{ text-align:center; margin-top:25pt; }
-  .of-title-ar{ font-size:12.3pt; font-weight:700; color:#0f2b48; line-height:1.2; }
-  .of-title-en{ font-size:12.3pt; font-weight:700; color:#0f2b48; letter-spacing:.6px; line-height:1.2; }
-  .of-trn{ margin-top:4pt; background:#0f2b48; color:#fff; font-size:8.8pt;
-    font-weight:700; text-align:end; padding:3pt 10pt; line-height:1.2; }
+  .of-title{ text-align:center; margin-top:31.5pt; }
+  .of-title-ar{ font-size:12.3pt; font-weight:700; color:#0f2b48; line-height:1.0; }
+  .of-title-en{ font-size:12.3pt; font-weight:700; color:#0f2b48; letter-spacing:.6px; line-height:1.0; }
+  .of-trn{ margin-top:1pt; background:#0f2b48; color:#fff; font-size:8.8pt;
+    font-weight:700; text-align:end; padding:2pt 10pt; line-height:1.0; }
   /* The reference panel has a hairline light border and no internal divider:
      the left column is wide, the customer column is a label/value grid. */
   .of-panel{ display:flex; border:0.75px solid #c2c9d5; border-top:none;
     line-height:1.2; }
-  .of-panel-left{ flex:0 0 46%; padding:7pt 10pt; }
-  .of-panel-right{ flex:1 1 auto; padding:7pt 10pt; }
+  /* Measured from the reference: the customer column's labels begin at x≈327
+     on a 545pt content width, so the left column is ~51% (not an even split). */
+  .of-panel-left{ flex:0 0 51%; padding:4pt 10pt; }
+  .of-panel-right{ flex:1 1 auto; padding:4pt 10pt; }
   .of-docno{ font-size:13.3pt; font-weight:700; color:#0f2b48; margin-bottom:2pt; }
   .of-field{ margin-top:3pt; }
   /* The reference prints the date and the expiration date side by side in one
@@ -442,19 +519,26 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-lgrid{ display:grid; grid-template-columns:1fr 1fr; gap:0 10pt; }
   .of-field-label{ display:block; font-size:7.3pt; color:#64748b; font-weight:700; }
   .of-field-value{ display:block; font-size:8.8pt; color:#0f2b48; font-weight:700; }
-  /* The customer column is a two-column grid so every value lines up on the
-     same x, exactly as the reference ("Customer Name" over "Ahmed …"). */
-  .of-cp-row{ display:grid; grid-template-columns:78pt 1fr; gap:0 6pt;
+  /* The reference customer column is a label/value grid whose labels are
+     right-aligned (every label ends on the same x, ≈392) with the values on a
+     common left edge (≈400), exactly as the approved sheet prints them. */
+  .of-cp-row{ display:grid; grid-template-columns:72pt 1fr; gap:0 8pt;
     margin-top:3pt; align-items:baseline; }
   .of-cp-row-top{ align-items:start; }
-  .of-cp-label{ font-size:7.3pt; color:#64748b; font-weight:700; }
+  .of-cp-label{ font-size:7.3pt; color:#64748b; font-weight:700; text-align:end; }
   .of-cp-value{ font-size:8.8pt; color:#0f2b48; font-weight:700; }
   .of-addr-line{ display:block; }
-  .of-table{ margin-top:5pt; }
+  .of-table{ margin-top:13pt; }
+  /* The approved quotation sheet leaves a wider gap between the info panel
+     and the table than the invoice does (measured 31pt vs 17.5pt). */
+  .of-table-quote{ margin-top:22.5pt; }
   .of-table th{ font-size:8.8pt; font-weight:700; color:#0f2b48; text-align:start;
-    padding:10pt 6pt; background:transparent; white-space:nowrap;
+    padding:10pt 7pt; background:transparent; white-space:nowrap;
     border-top:1.5px solid #94a3b8; border-bottom:1.5px solid #94a3b8; }
-  .of-table td{ font-size:8.8pt; color:#0f2b48; font-weight:700; padding:10pt 6pt; }
+  .of-table td{ font-size:8.8pt; color:#0f2b48; font-weight:700; padding:10pt 7pt; }
+  /* The reference insets the description column a little further than the
+     numeric columns, so its text starts at x≈37.5 rather than the cell edge. */
+  .of-table th.of-c-desc,.of-table td.of-c-desc{ padding-inline-start:12pt; }
   .of-table td.of-c-price,.of-table td.of-c-amt{ white-space:nowrap; }
   /* The reference shades alternate body rows with the #0a4175 accent. */
   .of-table tbody tr:nth-child(odd) td{ background:#dbe3ec; }
@@ -462,32 +546,56 @@ export const OFFICIAL_FINANCIAL_CSS = `
      description column is much wider than a naive split, and the four numeric
      columns are close to equal. Matching them keeps every label and figure on
      the same x-position the printed document uses. */
-  .of-c-desc{ width:57.5%; }
-  .of-c-qty{ width:9.5%; text-align:center !important; }
-  .of-c-price{ width:11.6%; text-align:end !important; }
-  .of-c-tax{ width:11%; text-align:start !important; }
-  .of-c-amt{ width:10.4%; text-align:end !important; }
+  .of-c-desc{ width:58.5%; }
+  .of-c-qty{ width:9.9%; text-align:center !important; }
+  .of-c-price{ width:10.8%; text-align:end !important; }
+  .of-c-tax{ width:10.5%; text-align:start !important; }
+  .of-c-amt{ width:10.3%; text-align:end !important; }
   .of-line-name{ display:block; }
   .of-line-sku{ display:block; font-size:7.5pt; color:#64748b; font-weight:400; }
   /* The reference totals block is a right-aligned table with only two rules:
      one above the first row and one above the grand Total. */
-  .of-totals{ width:58.7%; margin-inline-start:auto; margin-top:12pt;
+  .of-totals{ width:59.6%; margin-inline-start:auto; margin-top:6pt;
     border-top:0.75px solid #0f2b48; }
   .of-totals th{ font-size:8.8pt; font-weight:700; color:#0f2b48; text-align:start;
     padding:3.5pt 9pt; }
   .of-totals td{ font-size:8.8pt; font-weight:700; color:#0f2b48; text-align:end;
     padding:3.5pt 9pt; }
   .of-total-grand th,.of-total-grand td{ border-top:0.75px solid #0f2b48; }
-  .of-notes{ margin-top:10pt; border:1.5px solid #94a3b8; padding:6pt 10pt; }
-  .of-notes-title{ font-size:9.5pt; font-weight:700; color:#0f2b48; margin-bottom:3pt; }
+  /* The approved reference prints the note as a bordered box with no heading,
+     so the box height is exactly the note text and its padding. */
+  .of-notes{ margin-top:9pt; border:1px solid #c2c9d5; padding:7pt 10pt; }
   .of-notes-body{ font-size:9pt; color:#334155; }
   .of-thanks{ margin-top:10pt; text-align:center; }
   .of-thanks-ar{ font-size:9pt; font-weight:700; color:#05162b; }
   .of-thanks-en{ font-size:8.5pt; font-weight:700; color:#05162b; }
-  /* The shared signature and verification blocks are sized down here so a
-     one-page invoice stays on one page, as the printed reference does. */
-  .of-page .signatures{ margin-top:10pt; gap:24pt; }
-  .of-page .sig-line{ height:16pt; }
-  .of-page .sig-label-en{ text-transform:none; letter-spacing:0; color:#0f2b48; font-weight:700; }
-  .of-page .sig-label-ar{ color:#0f2b48; font-weight:700; }
+  /* The thanks/signature strip is pinned to the foot of the page box, as the
+     approved reference prints it, rather than trailing the last table row. */
+  .of-bottom{ margin-top:auto; }
+  /* The reference leaves a clear gap between the signature strip and the
+     thank-you line (measured 761pt to 798pt), so the strip is not cramped. */
+  .of-bottom .of-thanks{ margin-top:10pt; }
+  /* The reference signature strip is a single row. Each signatory's English and
+     Arabic label sit inline on one line; the first label starts at the content
+     edge and the second at ~60% across, exactly as the approved sheet prints
+     them (measured x 24.3 and 351.1 on a 595.5pt page). */
+  .of-signrow{ display:flex; margin-top:12pt; }
+  .of-sign{ display:flex; gap:8pt; justify-content:flex-start; align-items:baseline; }
+  .of-sign:first-child{ flex:0 0 60%; }
+  .of-sign:last-child{ flex:1 1 auto; }
+  .of-sign-en{ font-size:8.8pt; font-weight:700; color:#0f2b48; }
+  .of-sign-ar{ font-size:8.8pt; font-weight:700; color:#0f2b48; }
+  /* The verification strip: a compact ruled box above the signature strip. It is
+     deliberately restrained so it reads as a security footnote and never
+     competes with the priced table or the approved identity band. */
+  .of-verify{ display:flex; gap:12pt; align-items:center; margin-top:11pt;
+    border:0.75px solid #c2c9d5; border-radius:4pt; padding:7pt 10pt; }
+  .of-verify-qr{ flex:0 0 auto; }
+  .of-verify-qr img{ width:74pt; height:74pt; display:block; }
+  .of-verify-text{ flex:1 1 auto; }
+  .of-verify-title{ font-size:8.8pt; font-weight:700; color:#0f2b48; }
+  .of-verify-body{ font-size:7.2pt; color:#475569; margin:3pt 0 0; line-height:1.35; }
+  .of-verify-code{ margin-top:4pt; font-size:9pt; font-weight:700; color:#0f2b48;
+    letter-spacing:.6px; }
+  .of-verify-url{ font-size:7.2pt; color:#0a4175; margin-top:2pt; word-break:break-all; }
 `;

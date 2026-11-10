@@ -24,7 +24,7 @@ import {
 } from '@/components/ui';
 import type { EmployeeDto, LeaveRequestDto, PayrollRunDto } from '@oryx/shared';
 
-type Tab = 'dashboard' | 'employees' | 'leave' | 'attendance' | 'payroll' | 'advances';
+type Tab = 'dashboard' | 'employees' | 'leave' | 'attendance' | 'payroll' | 'advances' | 'policy' | 'reports';
 
 export default function HrPage() {
   const { t } = useUi();
@@ -36,7 +36,9 @@ export default function HrPage() {
     { key: 'employees', label: t('erp.hr.employees') },
     { key: 'leave', label: t('erp.hr.leave') },
     { key: 'attendance', label: t('erp.hr.attendance') },
+    { key: 'policy', label: t('erp.hr.policyTab') },
     { key: 'payroll', label: t('erp.hr.payroll') },
+    { key: 'reports', label: t('erp.hr.reportsTab') },
     { key: 'advances', label: t('erp.hr.advances') },
   ];
 
@@ -67,8 +69,10 @@ export default function HrPage() {
       {tab === 'dashboard' ? <DashboardTab /> : null}
       {tab === 'employees' ? <EmployeesTab canManage={can('erp.hr.employee.manage')} /> : null}
       {tab === 'leave' ? <LeaveTab canRequest={can('erp.hr.leave.request')} canApprove={can('erp.hr.leave.approve')} /> : null}
-      {tab === 'attendance' ? <AttendanceTab canManage={can('erp.hr.attendance.manage')} /> : null}
+      {tab === 'attendance' ? <AttendanceTab canManage={can('erp.hr.attendance.manage')} canSelf={can('erp.hr.attendance.self')} /> : null}
+      {tab === 'policy' ? <PolicyTab canManage={can('erp.hr.attendance.policy') || can('erp.hr.worksite.manage')} /> : null}
       {tab === 'payroll' ? <PayrollTab canRun={can('erp.hr.payroll.run')} canApprove={can('erp.hr.payroll.approve')} /> : null}
+      {tab === 'reports' ? <ReportsTab /> : null}
       {tab === 'advances' ? <AdvancesTab canManage={can('erp.hr.advance.manage')} /> : null}
     </div>
   );
@@ -571,7 +575,7 @@ function LeaveRequestModal({
   );
 }
 
-function AttendanceTab({ canManage }: { canManage: boolean }) {
+function AttendanceTab({ canManage, canSelf }: { canManage: boolean; canSelf: boolean }) {
   const { t } = useUi();
   const list = useAsync(() => api.hrAttendance(), []);
   const employees = useAsync(() => api.hrEmployees(), []);
@@ -581,7 +585,9 @@ function AttendanceTab({ canManage }: { canManage: boolean }) {
   const clock = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—');
 
   return (
-    <Card>
+    <div className="flex flex-col gap-4">
+      {canSelf ? <SelfServiceCard onRecorded={list.reload} /> : null}
+      <Card>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.hr.attendance')}</p>
         {canManage ? (
@@ -628,6 +634,79 @@ function AttendanceTab({ canManage }: { canManage: boolean }) {
         onClose={() => setOpen(false)}
         onSaved={list.reload}
       />
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * Employee self-service clock.
+ *
+ * Uses the browser's geolocation when available and falls back to a plain punch,
+ * so the card still works on a device that denies location access. The API is the
+ * authority on whether a punch is verified; the UI only reports what it returned.
+ */
+function SelfServiceCard({ onRecorded }: { onRecorded: () => Promise<void> }) {
+  const { t } = useUi();
+  const today = useAsync(() => api.myAttendance(), []);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const withLocation = async (): Promise<Record<string, unknown>> => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return {};
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ location: { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy } }),
+        () => resolve({}),
+        { timeout: 4000 },
+      );
+    });
+  };
+
+  const punch = async (kind: 'in' | 'out' | 'break-start' | 'break-end') => {
+    setBusy(true);
+    setError(null);
+    try {
+      const body = await withLocation();
+      if (kind === 'in') await api.selfCheckIn(body);
+      else if (kind === 'out') await api.selfCheckOut(body);
+      else if (kind === 'break-start') await api.selfBreakStart(body);
+      else await api.selfBreakEnd(body);
+      await today.reload();
+      await onRecorded();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rec = today.data as Record<string, unknown> | null;
+  const hours = (m: unknown) => `${Math.floor(Number(m ?? 0) / 60)}:${String(Number(m ?? 0) % 60).padStart(2, '0')}`;
+
+  return (
+    <Card className="p-4" data-testid="self-service">
+      <div className="mb-3 flex items-center justify-between">
+        <p className="oryx-panel-title m-0">{t('erp.hr.selfService')}</p>
+        {rec ? <Badge tone="info">{String(rec.status ?? '—')}</Badge> : null}
+      </div>
+      {error ? <ErrorBanner message={error} /> : null}
+      {today.loading ? <Skeleton height={80} /> : (
+        <>
+          <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4 text-[12.5px]">
+            <div><span className="oryx-muted">{t('erp.hr.checkIn')}: </span><span className="tabular-nums">{rec?.checkInAt ? new Date(String(rec.checkInAt)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</span></div>
+            <div><span className="oryx-muted">{t('erp.hr.checkOut')}: </span><span className="tabular-nums">{rec?.checkOutAt ? new Date(String(rec.checkOutAt)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</span></div>
+            <div><span className="oryx-muted">{t('erp.hr.workedHours')}: </span><span className="tabular-nums">{hours(rec?.netMinutes)}</span></div>
+            <div><span className="oryx-muted">{t('erp.hr.overtime')}: </span><span className="tabular-nums">{hours(rec?.overtimeMinutes)}</span></div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="primary" size="sm" disabled={busy} onClick={() => punch('in')} data-testid="self-check-in">{t('erp.hr.checkIn')}</Button>
+            <Button size="sm" disabled={busy} onClick={() => punch('break-start')} data-testid="self-break-start">{t('erp.hr.breakStart')}</Button>
+            <Button size="sm" disabled={busy} onClick={() => punch('break-end')} data-testid="self-break-end">{t('erp.hr.breakEnd')}</Button>
+            <Button size="sm" disabled={busy} onClick={() => punch('out')} data-testid="self-check-out">{t('erp.hr.checkOut')}</Button>
+          </div>
+        </>
+      )}
     </Card>
   );
 }
@@ -821,6 +900,7 @@ function PayrollTab({ canRun, canApprove }: { canRun: boolean; canApprove: boole
                   <th>{t('erp.hr.allowances')}</th>
                   <th>{t('erp.hr.deductions')}</th>
                   <th>{t('erp.hr.net')}</th>
+                  <th>{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -831,6 +911,9 @@ function PayrollTab({ canRun, canApprove }: { canRun: boolean; canApprove: boole
                     <td className="tabular-nums text-[12.5px]">{money(Number(p.allowancesMinor))}</td>
                     <td className="tabular-nums text-[12.5px]">{money(Number(p.deductionsMinor))}</td>
                     <td className="tabular-nums text-[12.5px] font-semibold">{money(Number(p.netMinor))}</td>
+                    <td>
+                      <PayslipPdfButton payslipId={String(p.id)} code={String(p.employeeCode)} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -938,6 +1021,257 @@ function AdvancesTab({ canManage }: { canManage: boolean }) {
         </TableShell>
       )}
       <span className="hidden">{canManage ? '1' : '0'} {toMinorInput('0')}</span>
+    </Card>
+  );
+}
+
+/** Downloads a payslip PDF (the route needs the bearer token, so it is fetched). */
+function PayslipPdfButton({ payslipId, code }: { payslipId: string; code: string }) {
+  const { t } = useUi();
+  const [busy, setBusy] = useState(false);
+  const open = async () => {
+    setBusy(true);
+    try {
+      const url = await api.payslipPdfBlobUrl(payslipId);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `payslip-${code}.pdf`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Button size="sm" disabled={busy} onClick={open} data-testid={`payslip-pdf-${code}`}>
+      <Icon name="download" size={14} />
+      {t('erp.hr.payslipPdf')}
+    </Button>
+  );
+}
+
+function PolicyTab({ canManage }: { canManage: boolean }) {
+  const { t } = useUi();
+  const policy = useAsync(() => api.hrAttendancePolicy(), []);
+  const sites = useAsync(() => api.hrWorkSites(), []);
+  const [form, setForm] = useState<Record<string, unknown> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (policy.data && !form) setForm(policy.data);
+  }, [policy.data, form]);
+
+  const save = async () => {
+    if (!form) return;
+    setBusy(true);
+    try {
+      await api.updateAttendancePolicy({
+        graceMinutes: Number(form.graceMinutes),
+        standardDailyHours: Number(form.standardDailyHours),
+        overtimeMultiplierBp: Number(form.overtimeMultiplierBp),
+        deductLate: Boolean(form.deductLate),
+        deductAbsence: Boolean(form.deductAbsence),
+      });
+      await policy.reload();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Card className="p-4" data-testid="attendance-policy">
+        <p className="oryx-panel-title mb-3">{t('erp.hr.attendancePolicy')}</p>
+        {policy.loading || !form ? <Skeleton height={120} /> : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Field label={t('erp.hr.graceMinutes')}>
+              <input type="number" className="oryx-input" value={String(form.graceMinutes ?? 0)} disabled={!canManage} onChange={(e) => setForm({ ...form, graceMinutes: e.target.value })} data-testid="policy-grace" />
+            </Field>
+            <Field label={t('erp.hr.standardDailyHours')}>
+              <input type="number" className="oryx-input" value={String(form.standardDailyHours ?? 8)} disabled={!canManage} onChange={(e) => setForm({ ...form, standardDailyHours: e.target.value })} data-testid="policy-hours" />
+            </Field>
+            <Field label={t('erp.hr.overtimeMultiplier')} hint={t('erp.hr.overtimeHint')}>
+              <input type="number" className="oryx-input" value={String(form.overtimeMultiplierBp ?? 15000)} disabled={!canManage} onChange={(e) => setForm({ ...form, overtimeMultiplierBp: e.target.value })} data-testid="policy-ot" />
+            </Field>
+            <label className="flex items-center gap-2 text-[13px]">
+              <input type="checkbox" checked={Boolean(form.deductLate)} disabled={!canManage} onChange={(e) => setForm({ ...form, deductLate: e.target.checked })} data-testid="policy-deduct-late" />
+              {t('erp.hr.deductLate')}
+            </label>
+            <label className="flex items-center gap-2 text-[13px]">
+              <input type="checkbox" checked={Boolean(form.deductAbsence)} disabled={!canManage} onChange={(e) => setForm({ ...form, deductAbsence: e.target.checked })} data-testid="policy-deduct-absence" />
+              {t('erp.hr.deductAbsence')}
+            </label>
+          </div>
+        )}
+        {canManage ? (
+          <div className="mt-4">
+            <Button variant="primary" size="sm" disabled={busy} onClick={save} data-testid="save-policy">{t('common.save')}</Button>
+          </div>
+        ) : null}
+      </Card>
+
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
+          <p className="oryx-panel-title m-0">{t('erp.hr.workSites')}</p>
+          {canManage ? (
+            <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-work-site">
+              <Icon name="plus" size={16} />
+              {t('erp.hr.newWorkSite')}
+            </Button>
+          ) : null}
+        </div>
+        {sites.loading ? <div className="p-4"><Skeleton height={100} /></div> : (sites.data?.items.length ?? 0) === 0 ? (
+          <EmptyState title={t('common.empty')} hint={t('erp.hr.workSites')} />
+        ) : (
+          <TableShell>
+            <thead>
+              <tr>
+                <th>{t('erp.hr.code')}</th>
+                <th>{t('common.name')}</th>
+                <th>{t('erp.hr.latitude')}</th>
+                <th>{t('erp.hr.longitude')}</th>
+                <th>{t('erp.hr.radius')}</th>
+                <th>{t('erp.hr.wifi')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sites.data!.items.map((s, i) => (
+                <tr key={String(s.id ?? i)}>
+                  <td className="font-mono text-[12px]">{String(s.code)}</td>
+                  <td className="text-[12.5px]">{String(s.nameEn)}</td>
+                  <td className="tabular-nums text-[12.5px]">{String(s.latitude ?? '—')}</td>
+                  <td className="tabular-nums text-[12.5px]">{String(s.longitude ?? '—')}</td>
+                  <td className="tabular-nums text-[12.5px]">{String(s.radiusMeters ?? '—')}</td>
+                  <td className="text-[12.5px]">{String(s.wifiSsids ?? '—')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </TableShell>
+        )}
+        <CreateWorkSiteModal open={open} onClose={() => setOpen(false)} onSaved={sites.reload} />
+      </Card>
+    </div>
+  );
+}
+
+function CreateWorkSiteModal({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: () => Promise<void> }) {
+  const { t } = useUi();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', latitude: '', longitude: '', radiusMeters: '150', wifiSsids: '' });
+
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setForm({ code: '', nameEn: '', nameAr: '', latitude: '', longitude: '', radiusMeters: '150', wifiSsids: '' });
+  }, [open]);
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.createWorkSite({
+        code: form.code,
+        nameEn: form.nameEn,
+        nameAr: form.nameAr || form.nameEn,
+        latitude: form.latitude ? Number(form.latitude) : undefined,
+        longitude: form.longitude ? Number(form.longitude) : undefined,
+        radiusMeters: form.radiusMeters ? Number(form.radiusMeters) : undefined,
+        wifiSsids: form.wifiSsids || undefined,
+      });
+      await onSaved();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open={open} title={t('erp.hr.newWorkSite')} onClose={onClose} footer={
+      <>
+        <Button size="sm" variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
+        <Button size="sm" variant="primary" disabled={busy || !form.code || !form.nameEn} onClick={submit} data-testid="submit-work-site">{t('common.save')}</Button>
+      </>
+    }>
+      {error ? <ErrorBanner message={error} /> : null}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label={t('erp.hr.code')}><input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="work-site-code" /></Field>
+        <Field label={t('erp.hr.radius')}><input type="number" className="oryx-input" value={form.radiusMeters} onChange={(e) => setForm({ ...form, radiusMeters: e.target.value })} data-testid="work-site-radius" /></Field>
+        <Field label={`${t('common.name')} (EN)`}><input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="work-site-name-en" /></Field>
+        <Field label={`${t('common.name')} (AR)`}><input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="work-site-name-ar" /></Field>
+        <Field label={t('erp.hr.latitude')}><input className="oryx-input" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} data-testid="work-site-lat" /></Field>
+        <Field label={t('erp.hr.longitude')}><input className="oryx-input" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} data-testid="work-site-lng" /></Field>
+        <Field label={t('erp.hr.wifi')}><input className="oryx-input" value={form.wifiSsids} onChange={(e) => setForm({ ...form, wifiSsids: e.target.value })} data-testid="work-site-wifi" /></Field>
+      </div>
+    </Modal>
+  );
+}
+
+const REPORT_KINDS = ['attendance', 'late-absence', 'overtime', 'worked-hours', 'payroll', 'deductions-allowances', 'employee-payroll', 'payroll-cost'] as const;
+
+function ReportsTab() {
+  const { t } = useUi();
+  const [kind, setKind] = useState<string>('attendance');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const report = useAsync(() => api.hrReport(kind, { from: from || undefined, to: to || undefined }), [kind, from, to]);
+  const [busy, setBusy] = useState(false);
+
+  const rows: Array<Record<string, unknown>> = (() => {
+    const d = report.data as Record<string, unknown> | null;
+    if (!d) return [];
+    if (Array.isArray(d.items)) return d.items as Array<Record<string, unknown>>;
+    if (Array.isArray(d.byDepartment)) return d.byDepartment as Array<Record<string, unknown>>;
+    return [];
+  })();
+  const columns = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+
+  const exportCsv = async () => {
+    setBusy(true);
+    try {
+      await api.downloadHrReportCsv(kind, { from: from || undefined, to: to || undefined });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-end gap-3 border-b border-[var(--border)] p-4">
+        <Field label={t('erp.hr.reportTitle')}>
+          <select className="oryx-select" value={kind} onChange={(e) => setKind(e.target.value)} data-testid="report-kind">
+            {REPORT_KINDS.map((k) => <option key={k} value={k}>{t(`erp.hr.report.${k}`)}</option>)}
+          </select>
+        </Field>
+        <Field label={t('common.from')}><input type="date" className="oryx-input" value={from} onChange={(e) => setFrom(e.target.value)} data-testid="report-from" /></Field>
+        <Field label={t('common.to')}><input type="date" className="oryx-input" value={to} onChange={(e) => setTo(e.target.value)} data-testid="report-to" /></Field>
+        <Button size="sm" disabled={busy} onClick={exportCsv} data-testid="export-report-csv">
+          <Icon name="download" size={14} />
+          {t('erp.hr.exportCsv')}
+        </Button>
+      </div>
+      {report.error ? <div className="p-4"><ErrorBanner message={report.error} onRetry={report.reload} /></div> : null}
+      {report.loading ? <div className="p-4"><Skeleton height={140} /></div> : rows.length === 0 ? (
+        <EmptyState title={t('common.empty')} hint={t('erp.hr.reportsTab')} />
+      ) : (
+        <TableShell>
+          <thead>
+            <tr>{columns.map((c) => <th key={c}>{c}</th>)}</tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                {columns.map((c) => (
+                  <td key={c} className="tabular-nums text-[12.5px]">{r[c] === null || r[c] === undefined ? '—' : String(r[c])}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </TableShell>
+      )}
     </Card>
   );
 }

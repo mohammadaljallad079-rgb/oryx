@@ -290,9 +290,35 @@ export class InventoryService {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? 200, 500);
+
+    // An exact barcode (a scanner emits the whole code) is resolved on its own,
+    // so a code that also looks like a SKU or a name fragment is never widened
+    // into an ambiguous list. The fuzzy `search` keeps its broader meaning.
+    const barcode = query.barcode?.trim();
+    if (barcode) {
+      const rows = await this.prisma.product.findMany({
+        where: { companyId, barcode },
+        orderBy: { sku: 'asc' },
+        take: pageSize,
+      });
+      const items = rows.map(toProductDto);
+      return { items, total: items.length, page: 1, pageSize };
+    }
+
+    // A stock-level filter needs the per-warehouse levels, so it is applied in
+    // memory after the products (and only the products) have been narrowed by
+    // the other filters. Without it the query stays a plain, paginated find.
+    const stockStatus = query.stockStatus;
     const where = {
       companyId,
       ...(query.category ? { category: query.category } : {}),
+      ...(query.type ? { type: query.type } : {}),
+      ...(query.isActive !== undefined ? { isActive: query.isActive } : {}),
+      ...(query.hasBarcode === true
+        ? { barcode: { not: null } }
+        : query.hasBarcode === false
+          ? { barcode: null }
+          : {}),
       ...(query.search
         ? {
             OR: [
@@ -304,11 +330,46 @@ export class InventoryService {
           }
         : {}),
     };
-    const [rows, total] = await Promise.all([
-      this.prisma.product.findMany({ where, orderBy: { sku: 'asc' }, skip: (page - 1) * pageSize, take: pageSize }),
-      this.prisma.product.count({ where }),
-    ]);
-    return { items: rows.map(toProductDto), total, page, pageSize };
+
+    if (!stockStatus) {
+      const [rows, total] = await Promise.all([
+        this.prisma.product.findMany({ where, orderBy: { sku: 'asc' }, skip: (page - 1) * pageSize, take: pageSize }),
+        this.prisma.product.count({ where }),
+      ]);
+      return { items: rows.map(toProductDto), total, page, pageSize };
+    }
+
+    const all = await this.prisma.product.findMany({
+      where,
+      orderBy: { sku: 'asc' },
+      include: { levels: { select: { quantity: true } } },
+    });
+    const matching = all.filter((p) => {
+      const onHand = sumMinor(p.levels.map((l) => l.quantity));
+      if (stockStatus === 'out') return onHand <= 0;
+      if (stockStatus === 'low') return onHand > 0 && p.reorderLevel > 0 && onHand <= p.reorderLevel;
+      return onHand > 0 && (p.reorderLevel <= 0 || onHand > p.reorderLevel);
+    });
+    const items = matching.slice((page - 1) * pageSize, page * pageSize).map(toProductDto);
+    return { items, total: matching.length, page, pageSize };
+  }
+
+  /**
+   * The distinct groupings a product can be filtered by.
+   *
+   * Derived from the company's products (active or not) so the filter chips
+   * always reflect what the catalogue actually holds; a category that no longer
+   * has any product is not offered.
+   */
+  async productCategories(principal: RequestPrincipal, companyIdQuery?: string) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, companyIdQuery);
+    const rows = await this.prisma.product.findMany({
+      where: { companyId, category: { not: null } },
+      distinct: ['category'],
+      select: { category: true },
+      orderBy: { category: 'asc' },
+    });
+    return { items: rows.map((r) => r.category).filter((c): c is string => Boolean(c)) };
   }
 
   async createProduct(dto: CreateProductDto, principal: RequestPrincipal, actor: ActorContext) {

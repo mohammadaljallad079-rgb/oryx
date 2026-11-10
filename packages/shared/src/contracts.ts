@@ -254,6 +254,8 @@ export interface CompanyDto {
   /** Language of issued documents; decides their printed reading direction. */
   documentLocale: 'ar' | 'en';
   taxNumber: string | null;
+  /** Commercial-registration number printed in the document footer. */
+  crNumber: string | null;
   notes: string | null;
   parentCompanyId: string | null;
   parentCompanyNameEn: string | null;
@@ -1055,6 +1057,13 @@ export interface SalesReportDto {
     totalMinor: number;
     taxMinor: number;
   }>;
+  /** Sales grouped by the operator who prepared each invoice ("Staf Name"). */
+  bySalesperson: Array<{
+    salespersonName: string;
+    invoiceCount: number;
+    totalMinor: number;
+    paidMinor: number;
+  }>;
 }
 
 export interface PurchasingReportDto {
@@ -1470,6 +1479,7 @@ export const VEHICLE_DOCUMENT_CATEGORIES = [
   'insurance',
   'permit',
   'ownership',
+  'vehicle-photo',
   'other',
 ] as const;
 

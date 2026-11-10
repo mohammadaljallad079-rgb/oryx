@@ -434,8 +434,8 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
       // Page tree reports the page count the API stored.
       const counts = [...text.matchAll(/\/Count\s+(\d+)/g)].map((m) => Number(m[1]));
       expect(Math.max(...counts)).toBe(document.pageCount);
-      // The Arabic face is embedded, not substituted.
-      expect(text).toContain('NotoNaskhArabic');
+      // The approved Arabic face (Arial) is embedded, not substituted.
+      expect(text).toContain('Arial');
       // A variable font embeds as Type3 with a broken text layer; a static
       // instance embeds as Type0/CID. This is the regression guard.
       expect(text).toContain('/Type0');
@@ -458,9 +458,9 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
       );
       expect(issued.status).toBe(201);
 
-      // The planner already counts the identification page; the report always
-      // appends one summary page because the assessment is set.
-      const planned = planInspectionReport(areas).length + 1;
+      // The planner already counts the identification page; the report emits
+      // exactly one page per planned entry, so the stored count matches it.
+      const planned = planInspectionReport(areas).length;
       expect(issued.body.pageCount).toBe(planned);
 
       const pdf = await fetch(`${ctx.base}/api/v1/documents/${issued.body.id}/file`, {
@@ -710,9 +710,9 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
       const bytes = Buffer.from(await pdf.arrayBuffer());
       expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
       const text = bytes.toString('latin1');
-      // Both the Arabic and the Latin face are embedded.
-      expect(text).toContain('NotoNaskhArabic');
-      expect(text).toContain('NotoSans');
+      // Both the approved Arabic (Arial) and Latin (Verdana) faces are embedded.
+      expect(text).toContain('Arial');
+      expect(text).toContain('Verdana');
       expect(text).toContain('/Type0');
       expect(text).not.toContain('/Type3');
       // A literal `&nbsp;` in the text layer is the escaped-entity regression.

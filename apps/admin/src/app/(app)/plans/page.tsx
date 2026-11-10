@@ -320,7 +320,7 @@ function PlanEditor({
 
       <div className="grid gap-4 sm:grid-cols-2">
         {!plan ? (
-          <Field label={t('common.code')} required hint="lowercase, digits, dash">
+          <Field label={t('common.code')} required hint={t('plans.codeHint')}>
             <input
               className="oryx-input"
               value={form.code}
@@ -403,7 +403,7 @@ function PlanEditor({
             onChange={(e) => setForm({ ...form, trialDays: Number(e.target.value) })}
           />
         </Field>
-        <Field label={t('plans.maxBranches')} hint="-1 = unlimited">
+        <Field label={t('plans.maxBranches')} hint={t('plans.unlimitedHint')}>
           <input
             className="oryx-input"
             type="number"
@@ -411,7 +411,7 @@ function PlanEditor({
             onChange={(e) => setForm({ ...form, maxBranches: Number(e.target.value) })}
           />
         </Field>
-        <Field label={t('plans.maxUsers')} hint="-1 = unlimited">
+        <Field label={t('plans.maxUsers')} hint={t('plans.unlimitedHint')}>
           <input
             className="oryx-input"
             type="number"

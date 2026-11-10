@@ -31,17 +31,27 @@ async function approvedInspection(page: Page, areas: string[]): Promise<{ id: st
   return page.evaluate(
     async ({ api, token, areas, keys }) => {
       const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-      const customers = (await (await fetch(`${api}/sales/customers?pageSize=5`, { headers })).json()) as {
+      const customers = (await (await fetch(`${api}/sales/customers?pageSize=50`, { headers })).json()) as {
         items: Array<{ id: string }>;
       };
-      const customerId = customers.items[0].id;
-      const vehicles = (await (
-        await fetch(`${api}/automotive/vehicles?customerId=${customerId}`, { headers })
-      ).json()) as { items: Array<{ id: string }> };
+      // First customer that owns a vehicle; sibling specs leave bare customers
+      // behind that would otherwise be indexed here (see the phase-2 spec).
+      let customerId = '';
+      let vehicleId = '';
+      for (const candidate of customers.items) {
+        const vehicles = (await (
+          await fetch(`${api}/automotive/vehicles?customerId=${candidate.id}`, { headers })
+        ).json()) as { items: Array<{ id: string }> };
+        if (vehicles.items.length > 0) {
+          customerId = candidate.id;
+          vehicleId = vehicles.items[0].id;
+          break;
+        }
+      }
       const created = await fetch(`${api}/automotive/inspections`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ customerId, vehicleId: vehicles.items[0].id, selectedAreas: areas }),
+        body: JSON.stringify({ customerId, vehicleId, selectedAreas: areas }),
       });
       if (!created.ok) throw new Error(`Job creation failed: ${created.status} ${await created.text()}`);
       const session = (await created.json()) as { id: string; jobNumber: string };
@@ -76,18 +86,29 @@ async function draftInspection(page: Page): Promise<{ id: string }> {
   return page.evaluate(
     async ({ api, token }) => {
       const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-      const customers = (await (await fetch(`${api}/sales/customers?pageSize=5`, { headers })).json()) as {
+      const customers = (await (await fetch(`${api}/sales/customers?pageSize=50`, { headers })).json()) as {
         items: Array<{ id: string }>;
       };
-      const vehicles = (await (
-        await fetch(`${api}/automotive/vehicles?customerId=${customers.items[0].id}`, { headers })
-      ).json()) as { items: Array<{ id: string }> };
+      // The first customer with a vehicle, not the first customer — see the
+      // note in the phase-2 spec: sibling specs leave bare customers behind.
+      let customerId = '';
+      let vehicleId = '';
+      for (const candidate of customers.items) {
+        const vehicles = (await (
+          await fetch(`${api}/automotive/vehicles?customerId=${candidate.id}`, { headers })
+        ).json()) as { items: Array<{ id: string }> };
+        if (vehicles.items.length > 0) {
+          customerId = candidate.id;
+          vehicleId = vehicles.items[0].id;
+          break;
+        }
+      }
       const created = await fetch(`${api}/automotive/inspections`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          customerId: customers.items[0].id,
-          vehicleId: vehicles.items[0].id,
+          customerId,
+          vehicleId,
           selectedAreas: ['INTERIOR'],
         }),
       });
@@ -194,7 +215,7 @@ test.describe('Execution Phase 3 — official documents', () => {
           contentType: file.headers.get('content-type') ?? '',
           head,
           hasMediaBox: text.includes('/MediaBox'),
-          hasArabicFace: text.includes('NotoNaskhArabic'),
+          hasArabicFace: text.includes('Arial'),
           pageCount: rows[0].pageCount,
           storedPageCount: Math.max(...[...text.matchAll(/\/Count\s+(\d+)/g)].map((m) => Number(m[1]))),
         };

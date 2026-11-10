@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ENTERPRISE_ADMIN, apiToken, expectNoServerError, setLocale, setTheme, signIn } from './helpers';
+import { ENTERPRISE_ADMIN, apiToken, ensureStock, expectNoServerError, setLocale, setTheme, signIn } from './helpers';
 
 /**
  * Sales-register document actions.
@@ -32,7 +32,7 @@ interface Scenario {
  * fresh customer with headroom keeps the scenario about documents.
  */
 async function scenario(page: import('@playwright/test').Page, token: string): Promise<Scenario> {
-  return page.evaluate(
+  const ids = await page.evaluate(
     async ({ api, bearer }) => {
       const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` };
       const stamp = Date.now();
@@ -61,6 +61,10 @@ async function scenario(page: import('@playwright/test').Page, token: string): P
     },
     { api: API, bearer: token },
   );
+  // The suite sells from the first seeded product, whose level drains across
+  // runs; restore it so the invoice is refused by stock, not by the test.
+  await ensureStock(page, token, ids.productId, ids.warehouseId);
+  return ids;
 }
 
 test.describe('Sales register — official document actions', () => {

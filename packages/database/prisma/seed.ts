@@ -114,8 +114,19 @@ const DEMO_PRODUCTS = [
 ];
 
 const DEMO_CUSTOMERS = [
-  { code: 'CUST-001', nameEn: 'Al Noor Trading Est.', nameAr: 'مؤسسة النور التجارية', creditLimitMinor: 5000000 },
-  { code: 'CUST-002', nameEn: 'Gulf Motors LLC', nameAr: 'خليج موتورز ذ.م.م', creditLimitMinor: 8000000 },
+  {
+    code: 'CUST-001',
+    nameEn: 'Al Noor Trading Est.',
+    nameAr: 'مؤسسة النور التجارية',
+    creditLimitMinor: 5000000,
+    // Contact details printed in the customer block of an issued invoice
+    // (the approved reference shows a contact number and a Bahraini address).
+    phone: '37702020',
+    addressLine: 'Villa 1455, road 5455, block 555',
+    city: 'Manama',
+    countryCode: 'BH',
+  },
+  { code: 'CUST-002', nameEn: 'Gulf Motors LLC', nameAr: 'خليج موتورز ذ.م.م', creditLimitMinor: 8000000, phone: '39001122', addressLine: 'Building 220, Road 1501, Block 115', city: 'Bahrain', countryCode: 'BH' },
 ];
 
 const DEMO_SUPPLIERS = [
@@ -433,7 +444,21 @@ interface CompanySpec {
   industry: string;
   parentCode?: string;
   demo?: boolean;
-  branches: Array<{ code: string; nameEn: string; nameAr: string; city: string }>;
+  /**
+   * Identity fields printed on this tenant's issued documents (the approved
+   * invoice footer carries the VAT/TRN strip, the CR number and the registered
+   * address). Only set where a real value is known; omitted fields stay null and
+   * the template simply omits them.
+   */
+  taxNumber?: string;
+  crNumber?: string;
+  addressLine?: string;
+  documentLocale?: 'ar' | 'en';
+  /** Support contacts and website printed in the document footer. */
+  supportPhone?: string;
+  supportEmail?: string;
+  websiteUrl?: string;
+  branches: Array<{ code: string; nameEn: string; nameAr: string; city: string; addressLine?: string; phone?: string }>;
 }
 
 const COMPANIES: CompanySpec[] = [
@@ -452,9 +477,17 @@ const COMPANIES: CompanySpec[] = [
     type: 'INTERNAL',
     industry: 'Automotive Services',
     parentCode: 'ORYX-HOLDING',
+    // The approved reference documents (VAT/TRN strip, CR number and registered
+    // address) print these exact identity values.
+    taxNumber: '200001111222111',
+    crNumber: '146375-2',
+    addressLine: 'Bldg 886, Road 533, Block 405 Tashan',
+    supportPhone: '+973 37702020',
+    supportEmail: 'oryxbhr1@gmail.com',
+    websiteUrl: 'www.oryxbhr.com',
     branches: [
-      { code: 'RUH-01', nameEn: 'Riyadh North Workshop', nameAr: 'ورشة شمال الرياض', city: 'Riyadh' },
-      { code: 'JED-01', nameEn: 'Jeddah Inspection Center', nameAr: 'مركز فحص جدة', city: 'Jeddah' },
+      { code: 'RUH-01', nameEn: 'Riyadh North Workshop', nameAr: 'ورشة شمال الرياض', city: 'Kingdom of Bahrain', addressLine: 'Bldg 886, Road 533, Block 405 Tashan', phone: '+973 37702020' },
+      { code: 'JED-01', nameEn: 'Jeddah Inspection Center', nameAr: 'مركز فحص جدة', city: 'Kingdom of Bahrain', addressLine: 'Bldg 886, Road 533, Block 405 Tashan', phone: '+973 37702020' },
     ],
   },
   {
@@ -516,6 +549,10 @@ async function seedCompanies(superAdminId: string) {
         industry: spec.industry,
         status: 'ACTIVE',
         notes,
+        taxNumber: spec.taxNumber ?? null,
+        crNumber: spec.crNumber ?? null,
+        addressLine: spec.addressLine ?? null,
+        ...(spec.documentLocale ? { documentLocale: spec.documentLocale } : {}),
       },
       create: {
         code: spec.code,
@@ -528,14 +565,42 @@ async function seedCompanies(superAdminId: string) {
         countryCode: DEFAULT_COUNTRY_CODE,
         currency: DEFAULT_CURRENCY,
         notes,
+        taxNumber: spec.taxNumber ?? null,
+        crNumber: spec.crNumber ?? null,
+        addressLine: spec.addressLine ?? null,
+        ...(spec.documentLocale ? { documentLocale: spec.documentLocale } : {}),
       },
     });
     idByCode.set(spec.code, company.id);
 
+    if (spec.supportEmail || spec.supportPhone || spec.websiteUrl) {
+      await prisma.companyBranding.upsert({
+        where: { companyId: company.id },
+        update: {
+          supportEmail: spec.supportEmail ?? null,
+          supportPhone: spec.supportPhone ?? null,
+          websiteUrl: spec.websiteUrl ?? null,
+        },
+        create: {
+          companyId: company.id,
+          supportEmail: spec.supportEmail ?? null,
+          supportPhone: spec.supportPhone ?? null,
+          websiteUrl: spec.websiteUrl ?? null,
+        },
+      });
+    }
+
     for (const b of spec.branches) {
       await prisma.branch.upsert({
         where: { companyId_code: { companyId: company.id, code: b.code } },
-        update: { nameEn: b.nameEn, nameAr: b.nameAr, city: b.city, isActive: true },
+        update: {
+          nameEn: b.nameEn,
+          nameAr: b.nameAr,
+          city: b.city,
+          isActive: true,
+          ...(b.addressLine ? { addressLine: b.addressLine } : {}),
+          ...(b.phone ? { phone: b.phone } : {}),
+        },
         create: {
           companyId: company.id,
           code: b.code,
@@ -544,6 +609,8 @@ async function seedCompanies(superAdminId: string) {
           city: b.city,
           countryCode: DEFAULT_COUNTRY_CODE,
           isActive: true,
+          ...(b.addressLine ? { addressLine: b.addressLine } : {}),
+          ...(b.phone ? { phone: b.phone } : {}),
         },
       });
     }
@@ -925,7 +992,12 @@ async function seedErpBaseline(idByCode: Map<string, string>, superAdminId: stri
     for (const c of DEMO_CUSTOMERS) {
       await prisma.customer.upsert({
         where: { companyId_code: { companyId: company.id, code: c.code } },
-        update: {},
+        update: {
+          phone: c.phone ?? null,
+          addressLine: c.addressLine ?? null,
+          city: c.city ?? null,
+          countryCode: c.countryCode ?? null,
+        },
         create: {
           companyId: company.id,
           code: c.code,
@@ -933,6 +1005,10 @@ async function seedErpBaseline(idByCode: Map<string, string>, superAdminId: stri
           nameAr: c.nameAr,
           creditLimitMinor: c.creditLimitMinor,
           paymentTermsDays: 30,
+          phone: c.phone ?? null,
+          addressLine: c.addressLine ?? null,
+          city: c.city ?? null,
+          countryCode: c.countryCode ?? null,
         },
       });
       customers += 1;

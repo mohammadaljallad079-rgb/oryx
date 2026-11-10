@@ -702,7 +702,7 @@ function PageEditor({
         <Field label={t('cms.locale')} required>
           <select className="oryx-select" value={form.locale} onChange={(e) => setForm({ ...form, locale: e.target.value })}>
             <option value="ar">العربية</option>
-            <option value="en">English</option>
+            <option value="en">{t('common.english')}</option>
           </select>
         </Field>
         <Field label={t('cms.titleField')} required>
@@ -837,7 +837,7 @@ function BannerEditor({
         <Field label={t('cms.locale')} required>
           <select className="oryx-select" value={form.locale} onChange={(e) => setForm({ ...form, locale: e.target.value })}>
             <option value="ar">العربية</option>
-            <option value="en">English</option>
+            <option value="en">{t('common.english')}</option>
           </select>
         </Field>
         <Field label={t('cms.titleField')} required>
@@ -848,21 +848,21 @@ function BannerEditor({
             data-testid="banner-title"
           />
         </Field>
-        <Field label="Subtitle">
+        <Field label={t('cms.subtitleField')}>
           <input
             className="oryx-input"
             value={form.subtitle}
             onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
           />
         </Field>
-        <Field label="Image URL">
+        <Field label={t('cms.imageUrl')}>
           <input
             className="oryx-input"
             value={form.imageUrl}
             onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
           />
         </Field>
-        <Field label="Action URL">
+        <Field label={t('cms.actionUrl')}>
           <input
             className="oryx-input"
             value={form.actionUrl}

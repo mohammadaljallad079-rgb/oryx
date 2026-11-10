@@ -525,6 +525,58 @@ describe('ORYX ERP core (e2e)', () => {
       expect(hidden.body.items.map((i) => i.sku)).not.toContain('WIDGET');
       await erp(`/inventory/products/${productId}`, { method: 'PATCH', body: { isActive: true } });
     });
+
+    it('resolves an exact barcode on its own path', async () => {
+      await erp(`/inventory/products/${productId}`, { method: 'PATCH', body: { barcode: '6281000000017' } });
+
+      const exact = await erp<{ total: number; items: Array<{ sku: string; barcode: string | null }> }>(
+        '/inventory/products?barcode=6281000000017',
+      );
+      expect(exact.status).toBe(200);
+      expect(exact.body.total).toBe(1);
+      expect(exact.body.items[0]!.sku).toBe('WIDGET');
+      expect(exact.body.items[0]!.barcode).toBe('6281000000017');
+
+      // A code that matches nothing is an empty list, never every product.
+      const miss = await erp<{ total: number; items: unknown[] }>('/inventory/products?barcode=0000000000000');
+      expect(miss.body.total).toBe(0);
+      expect(miss.body.items).toHaveLength(0);
+    });
+
+    it('filters the catalogue by type, category, status, barcode presence and stock level', async () => {
+      await erp(`/inventory/products/${productId}`, {
+        method: 'PATCH',
+        body: { barcode: '6281000000017', category: 'Widgets', isActive: true, reorderLevel: 0 },
+      });
+
+      const byType = await erp<{ items: Array<{ sku: string; type: string }> }>('/inventory/products?type=SERVICE');
+      expect(byType.body.items.every((i) => i.type === 'SERVICE')).toBe(true);
+      expect(byType.body.items.map((i) => i.sku)).not.toContain('WIDGET');
+
+      const byCategory = await erp<{ items: Array<{ category: string | null }> }>(
+        '/inventory/products?category=Widgets',
+      );
+      expect(byCategory.body.items.map((i) => i.category)).toContain('Widgets');
+
+      const withBarcode = await erp<{ items: Array<{ barcode: string | null }> }>(
+        '/inventory/products?hasBarcode=true',
+      );
+      expect(withBarcode.body.items.every((i) => i.barcode !== null)).toBe(true);
+
+      const inactive = await erp<{ items: Array<{ isActive: boolean }> }>('/inventory/products?isActive=false');
+      expect(inactive.body.items.every((i) => i.isActive === false)).toBe(true);
+
+      // The category chips endpoint returns the distinct groupings.
+      const categories = await erp<{ items: string[] }>('/inventory/product-categories');
+      expect(categories.body.items).toContain('Widgets');
+
+      // Stock-level filter: WIDGET holds a positive balance here, so `in` finds
+      // it and `out` never does.
+      const inStock = await erp<{ items: Array<{ sku: string }> }>('/inventory/products?stockStatus=in');
+      expect(inStock.body.items.map((i) => i.sku)).toContain('WIDGET');
+      const outOfStock = await erp<{ items: Array<{ sku: string }> }>('/inventory/products?stockStatus=out');
+      expect(outOfStock.body.items.map((i) => i.sku)).not.toContain('WIDGET');
+    });
   });
 
   // ---------------------------------------------------------------------- sales

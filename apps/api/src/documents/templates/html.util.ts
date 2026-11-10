@@ -63,6 +63,22 @@ export function quantity(value: number): string {
   return fromQuantity(value).replace(/\.?0+$/, '') || '0';
 }
 
+/**
+ * A formatted amount without the currency symbol.
+ *
+ * The approved reference prints the unit-price column as a bare figure
+ * ("7.500") and carries the currency only on the Amount column, so the priced
+ * table needs one number without a symbol beside figures that have one.
+ */
+export function moneyPlain(minor: number | null | undefined, currency = 'BHD'): string {
+  const value = minor ?? 0;
+  const scale = currency === 'BHD' || currency === 'KWD' || currency === 'OMR' ? 3 : 2;
+  return toMajor(value, scale).toLocaleString('en-US', {
+    minimumFractionDigits: scale,
+    maximumFractionDigits: scale,
+  });
+}
+
 /** A short date in both the Gregorian and the Bahraini convention. */
 export function docDate(value: Date | string | null | undefined): string {
   if (!value) return '—';

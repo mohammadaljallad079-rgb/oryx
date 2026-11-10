@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -149,24 +149,170 @@ function ValuationTab() {
 function ProductsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
+  const [barcode, setBarcode] = useState('');
+  const [category, setCategory] = useState('');
+  const [type, setType] = useState<'' | 'PRODUCT' | 'SERVICE'>('');
+  const [stockStatus, setStockStatus] = useState<'' | 'in' | 'low' | 'out'>('');
+  const [status, setStatus] = useState<'' | 'active' | 'inactive'>('');
+  const [barcodeState, setBarcodeState] = useState<'' | 'with' | 'without'>('');
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ProductDto | null>(null);
   const [imagesFor, setImagesFor] = useState<ProductDto | null>(null);
-  const list = useAsync(() => api.products({ search: search || undefined }), [search]);
+  const scanRef = useRef<HTMLInputElement>(null);
+
+  const categories = useAsync(() => api.productCategories(), []);
+  const list = useAsync(
+    () =>
+      api.products({
+        search: search.trim() || undefined,
+        category: category || undefined,
+        type: type || undefined,
+        stockStatus: stockStatus || undefined,
+        isActive: status === '' ? undefined : status === 'active',
+        hasBarcode: barcodeState === '' ? undefined : barcodeState === 'with',
+      }),
+    [search, category, type, stockStatus, status, barcodeState],
+  );
+
+  const activeFilterCount =
+    (category ? 1 : 0) + (type ? 1 : 0) + (stockStatus ? 1 : 0) + (status ? 1 : 0) + (barcodeState ? 1 : 0);
+
+  function clearFilters() {
+    setCategory('');
+    setType('');
+    setStockStatus('');
+    setStatus('');
+    setBarcodeState('');
+    setSearch('');
+  }
+
+  // A scanner emits the whole code and a trailing Enter, so an exact-barcode
+  // lookup runs on its own path and focuses back to the field for the next scan.
+  async function onScanSubmit() {
+    const code = barcode.trim();
+    if (!code) return;
+    setSearch(code);
+    await list.reload();
+    setBarcode('');
+    window.setTimeout(() => scanRef.current?.focus(), 50);
+  }
 
   return (
     <Card>
-      <div className="flex flex-wrap items-end gap-3 border-b border-[var(--border)] p-4">
-        <label className="min-w-[220px] flex-1">
-          <span className="oryx-label">{t('common.search')}</span>
-          <input className="oryx-input" value={search} onChange={(e) => setSearch(e.target.value)} data-testid="product-search" />
-        </label>
-        {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-product">
-            <Icon name="plus" size={16} />
-            {t('erp.inventory.newProduct')}
-          </Button>
-        ) : null}
+      <div className="flex flex-col gap-3 border-b border-[var(--border)] p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="min-w-[220px] flex-1">
+            <span className="oryx-label">{t('erp.inventory.scanBarcode')}</span>
+            <div className="relative">
+              <Icon
+                name="search"
+                size={16}
+                className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[var(--muted)]"
+              />
+              <input
+                ref={scanRef}
+                className="oryx-input ps-9 font-mono"
+                value={barcode}
+                onChange={(e) => setBarcode(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    void onScanSubmit();
+                  }
+                }}
+                placeholder={t('erp.inventory.scanHint')}
+                data-testid="product-barcode-scan"
+                aria-label={t('erp.inventory.scanBarcode')}
+              />
+            </div>
+          </label>
+          <label className="min-w-[200px] flex-1">
+            <span className="oryx-label">{t('common.search')}</span>
+            <input
+              className="oryx-input"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('erp.inventory.searchHint')}
+              data-testid="product-search"
+            />
+          </label>
+          {canManage ? (
+            <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-product">
+              <Icon name="plus" size={16} />
+              {t('erp.inventory.newProduct')}
+            </Button>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap items-end gap-3" data-testid="product-filters">
+          <label className="min-w-[150px]">
+            <span className="oryx-label">{t('erp.inventory.category')}</span>
+            <select
+              className="oryx-select"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              data-testid="filter-category"
+            >
+              <option value="">{t('erp.inventory.allCategories')}</option>
+              {(categories.data?.items ?? []).map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="min-w-[130px]">
+            <span className="oryx-label">{t('erp.inventory.type')}</span>
+            <select className="oryx-select" value={type} onChange={(e) => setType(e.target.value as typeof type)} data-testid="filter-type">
+              <option value="">{t('common.all')}</option>
+              <option value="PRODUCT">{t('erp.inventory.typeProduct')}</option>
+              <option value="SERVICE">{t('erp.inventory.typeService')}</option>
+            </select>
+          </label>
+          <label className="min-w-[150px]">
+            <span className="oryx-label">{t('erp.inventory.stockStatus')}</span>
+            <select
+              className="oryx-select"
+              value={stockStatus}
+              onChange={(e) => setStockStatus(e.target.value as typeof stockStatus)}
+              data-testid="filter-stock"
+            >
+              <option value="">{t('common.all')}</option>
+              <option value="in">{t('erp.inventory.stockIn')}</option>
+              <option value="low">{t('erp.inventory.stockLow')}</option>
+              <option value="out">{t('erp.inventory.stockOut')}</option>
+            </select>
+          </label>
+          <label className="min-w-[130px]">
+            <span className="oryx-label">{t('common.status')}</span>
+            <select className="oryx-select" value={status} onChange={(e) => setStatus(e.target.value as typeof status)} data-testid="filter-status">
+              <option value="">{t('common.all')}</option>
+              <option value="active">{t('common.active')}</option>
+              <option value="inactive">{t('common.inactive')}</option>
+            </select>
+          </label>
+          <label className="min-w-[150px]">
+            <span className="oryx-label">{t('erp.inventory.barcode')}</span>
+            <select
+              className="oryx-select"
+              value={barcodeState}
+              onChange={(e) => setBarcodeState(e.target.value as typeof barcodeState)}
+              data-testid="filter-barcode"
+            >
+              <option value="">{t('common.all')}</option>
+              <option value="with">{t('erp.inventory.withBarcode')}</option>
+              <option value="without">{t('erp.inventory.withoutBarcode')}</option>
+            </select>
+          </label>
+          {activeFilterCount > 0 ? (
+            <Button size="sm" variant="ghost" onClick={clearFilters} data-testid="clear-filters">
+              {t('erp.inventory.clearFilters')}
+            </Button>
+          ) : null}
+          <span className="ms-auto self-center text-[12.5px] text-[var(--muted)]" data-testid="product-count">
+            {t('erp.inventory.resultCount', { count: list.data?.total ?? 0 })}
+          </span>
+        </div>
       </div>
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
       {list.loading ? (
@@ -181,6 +327,7 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
             <tr>
               <th>{t('erp.inventory.sku')}</th>
               <th>{t('common.name')}</th>
+              <th>{t('erp.inventory.barcode')}</th>
               <th>{t('erp.inventory.category')}</th>
               <th>{t('erp.inventory.unit')}</th>
               <th>{t('erp.inventory.salesPrice')}</th>
@@ -197,6 +344,9 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
                 <td>
                   <span className="block font-semibold">{p.nameEn}</span>
                   <span className="oryx-faint block text-[11px]">{p.nameAr}</span>
+                </td>
+                <td className="font-mono text-[12px]" data-testid={`product-barcode-${p.sku}`}>
+                  {p.barcode ?? '—'}
                 </td>
                 <td className="text-[12.5px]">{p.category ?? '—'}</td>
                 <td className="text-[12.5px]">{p.unit}</td>

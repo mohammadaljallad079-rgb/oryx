@@ -18,17 +18,29 @@ async function seedJob(page: Page, areas: string[]): Promise<string> {
   return page.evaluate(
     async ({ api, token, areas }) => {
       const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-      const customers = (await (await fetch(`${api}/sales/customers?pageSize=5`, { headers })).json()) as {
+      const customers = (await (await fetch(`${api}/sales/customers?pageSize=50`, { headers })).json()) as {
         items: Array<{ id: string }>;
       };
-      const customerId = customers.items[0].id;
-      const vehicles = (await (
-        await fetch(`${api}/automotive/vehicles?customerId=${customerId}`, { headers })
-      ).json()) as { items: Array<{ id: string }> };
+      // Pick the first customer that actually owns a vehicle. Other specs
+      // (document attachments) create bare customers that sort ahead of the
+      // seeded ones, so indexing blindly into the list would hand the job a
+      // customer with no vehicle and fail on an unrelated test's leftovers.
+      let customerId = '';
+      let vehicleId = '';
+      for (const candidate of customers.items) {
+        const vehicles = (await (
+          await fetch(`${api}/automotive/vehicles?customerId=${candidate.id}`, { headers })
+        ).json()) as { items: Array<{ id: string }> };
+        if (vehicles.items.length > 0) {
+          customerId = candidate.id;
+          vehicleId = vehicles.items[0].id;
+          break;
+        }
+      }
       const created = await fetch(`${api}/automotive/inspections`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ customerId, vehicleId: vehicles.items[0].id, selectedAreas: areas }),
+        body: JSON.stringify({ customerId, vehicleId, selectedAreas: areas }),
       });
       if (!created.ok) throw new Error(`Job creation failed: ${created.status} ${await created.text()}`);
       return ((await created.json()) as { id: string }).id;
@@ -56,18 +68,27 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await expect(page.getByTestId('job-type-CHASSIS_UNDERCARRIAGE')).toBeVisible();
     await expect(page.getByTestId('job-type-COMPUTER_UNIT')).toBeVisible();
 
-    await page.getByTestId('job-customer').selectOption({ index: 1 });
+    // Select the seeded Toyota owner by name rather than by position: sibling
+    // specs create bare customers that sort to the top of the list, so an
+    // index-based pick would land on a customer with no vehicles.
+    await page.getByTestId('job-customer').selectOption({ label: 'Al Noor Trading Est.' });
 
     // The vehicle list must be scoped to the chosen customer and must never be
     // offered from a stale, unfiltered fetch. The second seeded customer owns
     // the Nissan, so its VIN appearing here would mean the previous customer's
     // vehicles leaked into the selector — the defect that let an operator pick
-    // another customer's car and have the server reject the job.
-    await expect(page.getByTestId('job-vehicle')).toBeEnabled();
-    const vehicleOptions = await page.getByTestId('job-vehicle').locator('option').allInnerTexts();
+    // another customer's car and have the server reject the job. The picker is
+    // a searchable combobox, so the options are read from the opened list.
+    const vehicleInput = page.getByTestId('job-vehicle-input');
+    await expect(vehicleInput).toBeEnabled();
+    await vehicleInput.click();
+    const options = page.getByTestId('job-vehicle-list').locator('[role="option"]');
+    await expect(options.first()).toBeVisible();
+    const vehicleOptions = await options.allInnerTexts();
     expect(vehicleOptions.some((text) => text.includes('JN1TBNT32Z0123456'))).toBe(false);
 
-    await page.getByTestId('job-vehicle').selectOption({ index: 1 });
+    await options.first().click();
+    await expect(page.getByTestId('job-vehicle-identity')).toBeVisible();
     await page.getByTestId('job-type-INTERIOR').click();
     await page.getByTestId('job-type-EXTERIOR').click();
     await page.getByTestId('create-inspection-job').click();

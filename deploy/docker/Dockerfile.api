@@ -66,6 +66,15 @@ FROM base AS runtime
 ENV NODE_ENV=production
 ENV API_PORT=3001
 
+# Document rendering runs in this image, so Chromium and fontconfig must be
+# present: `GET /documents/:id/file` renders HTML to PDF with a headless
+# browser, and a missing browser answers every issue/preview/print with a 500.
+# `fonts-liberation` is the sane last-resort family for anything the bundled
+# faces do not cover; the approved Verdana/Arial faces are installed below.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends chromium fontconfig fonts-liberation \
+ && rm -rf /var/lib/apt/lists/*
+
 # Run as an unprivileged user. The numeric uid keeps the image usable under a
 # read-only-root-filesystem policy and in restricted cluster runtimes.
 RUN groupadd --system --gid 1001 oryx \
@@ -96,7 +105,25 @@ RUN mkdir -p packages/database/node_modules/@oryx \
  && chown -R oryx:oryx packages/database/scripts packages/database/node_modules
 COPY --from=build   /app/apps/api/dist           ./apps/api/dist
 COPY --from=build   /app/apps/api/package.json   ./apps/api/package.json
+# The document renderer reads its fonts and the official brand mark from
+# `apps/api/assets`, which `nest build` does not copy into `dist/`. Without this
+# the renderer throws "Document font ... is missing" and every preview/print is
+# a 500. The approved faces are also installed as system fonts so Chromium's
+# own footer template (which cannot embed a data-URI `@font-face`) resolves the
+# footer in Verdana/Arial rather than a fallback.
+COPY --from=build   /app/apps/api/assets         ./apps/api/assets
+RUN mkdir -p /usr/local/share/fonts/oryx \
+ && cp apps/api/assets/fonts/Verdana-Regular.ttf apps/api/assets/fonts/Verdana-Bold.ttf \
+       apps/api/assets/fonts/Arial-Regular.ttf   apps/api/assets/fonts/Arial-Bold.ttf \
+       /usr/local/share/fonts/oryx/ \
+ && fc-cache -f >/dev/null
 COPY package.json pnpm-workspace.yaml ./
+
+# Point the renderer at the system Chromium installed above. The bundled
+# Playwright browser is never downloaded in this image, so without this the
+# launcher falls back to probing `/usr/bin/chromium`, which happens to exist on
+# Debian — naming it explicitly keeps the path deterministic.
+ENV PLAYWRIGHT_CHROMIUM=/usr/bin/chromium
 
 # Upload root. Declared as a volume so media survives a container replacement.
 RUN mkdir -p /data/media && chown -R oryx:oryx /data

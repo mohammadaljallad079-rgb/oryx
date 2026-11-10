@@ -210,7 +210,7 @@ export class DocumentsService {
     issuer: DocumentIssuer;
     actor: ActorContext;
     req?: RequestLike;
-    render: (verification: DocumentVerification) => string;
+    render: (verification: DocumentVerification | null) => string;
     /**
      * Which page furniture to paint. `official` is the measured invoice/
      * quotation layout with its own margins and contact footer; `report` is the
@@ -239,7 +239,11 @@ export class DocumentsService {
     const verification: DocumentVerification = { token, url, qrDataUri };
 
     const baseCss = await this.renderer.baseStyles();
-    const bodyHtml = args.render(verification);
+    // A document that is not verifiable (the internal journal entry) must not
+    // print a verification code, so the renderer receives no verification block
+    // and the templates that render one print nothing. The token is still stored
+    // because the column is non-null, but it is never surfaced on the sheet.
+    const bodyHtml = args.render(spec.verifiable ? verification : null);
     // The financial template receives an empty `baseCss` and needs the shared
     // faces injected; the report template already embeds them itself.
     const html = bodyHtml.includes('@font-face')
@@ -362,6 +366,9 @@ export class DocumentsService {
 
     const payload = row.payload as unknown as DocumentPayload;
     const baseCss = await this.renderer.baseStyles();
+    // A non-verifiable document must not gain a verification block on reprint
+    // either, so the same gate the issue path applies is applied here.
+    const printedVerification = spec.verifiable ? verification : null;
     // A reprint must use the same layout the original issue chose, or a
     // renumbered statement would come back as an invoice-shaped page.
     const referenceLayout =
@@ -374,7 +381,7 @@ export class DocumentsService {
             documentNumber,
             issuedAt: row.issuedAt,
             version: row.version,
-            verification,
+            verification: printedVerification,
             baseCss: '',
           })
         : referenceLayout
@@ -383,7 +390,7 @@ export class DocumentsService {
               payload: { ...payload, documentNumber },
               documentNumber,
               issuedAt: row.issuedAt,
-              verification,
+              verification: printedVerification,
               baseCss: '',
             })
           : renderFinancialDocumentHtml({
@@ -391,7 +398,7 @@ export class DocumentsService {
               payload: { ...payload, documentNumber },
               documentNumber,
               issuedAt: row.issuedAt,
-              verification,
+              verification: printedVerification,
               baseCss: '',
             });
     const html = bodyHtml.includes('@font-face')
@@ -751,7 +758,7 @@ export class DocumentsService {
   }
 
   /** The issuer identity for a company, with its branding logo inlined. */
-  private async issuerFor(companyId: string): Promise<DocumentIssuer> {
+  async issuerFor(companyId: string): Promise<DocumentIssuer> {
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
       include: {
@@ -874,6 +881,7 @@ export class DocumentsService {
       modelYear: number;
       plateNumber: string | null;
       vin: string;
+      vehicleId: string;
       color: string | null;
       odometer: number | null;
       branchId: string | null;
@@ -997,6 +1005,15 @@ export class DocumentsService {
       section.attachments = attachmentsByArea.get(section.area) ?? [];
     }
 
+    // The cover photograph is the vehicle's `vehicle-photo` document, if one was
+    // uploaded. A missing photograph renders a neutral placeholder rather than
+    // failing the report, so an inspection without a photo still issues.
+    const photoDoc = await this.prisma.vehicleDocument.findFirst({
+      where: { companyId, vehicleId: session.vehicleId, category: 'vehicle-photo' },
+      orderBy: { createdAt: 'desc' },
+    });
+    const vehiclePhotoDataUri = photoDoc ? await this.inlineAttachment(photoDoc.fileRef) : null;
+
     return {
       kind: 'INSPECTION_REPORT',
       jobNumber: session.jobNumber,
@@ -1024,6 +1041,7 @@ export class DocumentsService {
       finalAssessment: session.finalAssessment,
       reviewedByName: reviewer?.fullNameEn ?? reviewer?.fullNameAr ?? null,
       reviewedAt: session.reviewedAt?.toISOString() ?? null,
+      vehiclePhotoDataUri,
       sections,
     };
   }

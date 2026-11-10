@@ -30,6 +30,10 @@ interface FontFace {
 }
 
 const FACES: readonly FontFace[] = [
+  { family: 'ORYX Latin', weight: 400, file: 'Verdana-Regular.ttf' },
+  { family: 'ORYX Latin', weight: 700, file: 'Verdana-Bold.ttf' },
+  { family: 'ORYX Arabic', weight: 400, file: 'Arial-Regular.ttf' },
+  { family: 'ORYX Arabic', weight: 700, file: 'Arial-Bold.ttf' },
   { family: 'ORYX Naskh', weight: 400, file: 'NotoNaskhArabic-Regular.ttf' },
   { family: 'ORYX Naskh', weight: 700, file: 'NotoNaskhArabic-Bold.ttf' },
   { family: 'ORYX Sans', weight: 400, file: 'NotoSans-Regular.ttf' },
@@ -37,12 +41,19 @@ const FACES: readonly FontFace[] = [
 ];
 
 /**
- * The Arabic face used for headings and body text, and the Latin face used for
- * numerals and Latin words. Both are always installed, so a mixed string is
- * laid out by the browser's own font fallback without a per-run decision.
+ * The official ORYX type stack, exactly as the approved print forms carry it:
+ * **Verdana** for Latin text and numerals, **Arial** for Arabic.
+ *
+ * The stack lists the Latin face first. Arial also contains Latin glyphs, so the
+ * order is what makes a mixed string resolve the way the reference does — Latin
+ * runs take Verdana, and only the Arabic runs fall through to Arial. The Noto
+ * faces stay at the tail as a last resort for any glyph the approved pair lacks,
+ * so a document can never render a missing glyph as a box.
  */
-export const DOCUMENT_FONT_STACK = "'ORYX Naskh', 'ORYX Sans', sans-serif";
-export const DOCUMENT_LATIN_STACK = "'ORYX Sans', 'ORYX Naskh', sans-serif";
+export const DOCUMENT_FONT_STACK =
+  "'ORYX Latin', 'ORYX Arabic', 'ORYX Naskh', 'ORYX Sans', sans-serif";
+export const DOCUMENT_LATIN_STACK =
+  "'ORYX Latin', 'ORYX Arabic', 'ORYX Sans', sans-serif";
 
 @Injectable()
 export class DocumentFontService {

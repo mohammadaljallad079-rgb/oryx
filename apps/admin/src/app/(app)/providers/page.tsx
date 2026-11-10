@@ -123,10 +123,10 @@ function ProvidersTab({ canDecide }: { canDecide: boolean }) {
           <span className="oryx-label">{t('common.status')}</span>
           <select className="oryx-select" value={status} onChange={(e) => setStatus(e.target.value)} data-testid="provider-status">
             <option value="">{t('common.all')}</option>
-            <option value="PENDING">PENDING</option>
-            <option value="APPROVED">APPROVED</option>
-            <option value="SUSPENDED">SUSPENDED</option>
-            <option value="REJECTED">REJECTED</option>
+            <option value="PENDING">{t('common.statusPending')}</option>
+            <option value="APPROVED">{t('common.statusApproved')}</option>
+            <option value="SUSPENDED">{t('common.statusSuspended')}</option>
+            <option value="REJECTED">{t('common.statusRejected')}</option>
           </select>
         </label>
       </div>

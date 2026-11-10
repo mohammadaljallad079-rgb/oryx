@@ -11,17 +11,9 @@ import {
   CHASSIS_VIEWBOX,
   CHASSIS_ZONES,
   CHASSIS_ZONE_COLORS,
-  INSPECTION_MARKER_COLORS,
   PAINT_CONDITIONS,
-  inspectionResultsFor,
-  inspectionSectionSpec,
-  planInspectionReport,
-  sectionsOnReportPage,
-  type InspectionSectionSpec,
 } from '@oryx/shared';
 import {
-  documentHeader,
-  documentWatermark,
   signatureBlock,
   verificationBlock,
   type DocumentChrome,
@@ -37,10 +29,11 @@ import type {
 /**
  * The ORYX Vehicle Inspection Report.
  *
- * The page plan is not computed here — it comes from `planInspectionReport`, so
- * the printed pagination is the same rule the tests assert. This module only
- * draws the plan it is handed, which keeps "which pages exist" testable without
- * a browser.
+ * The document is the approved five-page form: an identification cover, a paint
+ * and body page, a chassis page, an interior/exterior/engine/road-test page and
+ * a computer-unit page. The page plan is not computed here — it comes from
+ * `planInspectionReport`, so the printed pagination is the same rule the tests
+ * assert; this module only draws the pages it is handed.
  */
 
 export interface InspectionReportInput {
@@ -57,9 +50,8 @@ export interface InspectionReportInput {
  *
  * The bundled faces carry no U+2713 / U+2715 / U+2717, so Chromium synthesises a
  * Type3 bitmap font from whatever host face has the glyph. That breaks the PDF
- * text layer — the marks are not selectable or searchable — and it makes the
- * output depend on the host: a machine with the face renders one PDF, a CI
- * runner without it another. A vector mark has no font dependency.
+ * text layer and makes the output depend on the host. A vector mark has no font
+ * dependency.
  */
 type MarkKind = 'check' | 'cross' | 'x';
 function markGlyph(kind: MarkKind, sizePt: number): string {
@@ -77,135 +69,379 @@ function markGlyph(kind: MarkKind, sizePt: number): string {
   );
 }
 
-/** A pass/fail/NA pill. */
-function resultPill(result: string): string {
-  const map: Record<string, string> = {
-    PASS: `<span class="pill r-pass">${markGlyph('check', 9)}</span>`,
-    FAIL: `<span class="pill r-fail">${markGlyph('cross', 9)}</span>`,
-    NA: '<span class="pill r-na">—</span>',
-    UNSET: '<span class="pill r-unset">·</span>',
-  };
-  return map[result] ?? map.UNSET;
+/** A pass/fail/NA cell mark, matching the approved form's tick / cross / N-A. */
+function resultMark(result: string): string {
+  switch (result) {
+    case 'PASS':
+      return `<span class="rm rm-pass">${markGlyph('check', 11)}</span>`;
+    case 'FAIL':
+      return `<span class="rm rm-fail">${markGlyph('cross', 11)}</span>`;
+    case 'NA':
+      return '<span class="rm rm-na">N/A</span>';
+    default:
+      return '<span class="rm rm-unset">·</span>';
+  }
 }
 
-/** The identification block on page 1. */
+/** The bilingual title band that heads the reference page. */
+function pageTitleBar(titleAr: string, titleEn: string): string {
+  return `
+  <div class="p-title">
+    <span class="p-title-ar">${esc(titleAr)}</span>
+    <span class="p-title-en">${esc(titleEn)}</span>
+  </div>`;
+}
+
+/**
+ * The compact brand band the reference prints at the head of every page: the
+ * mark on one side, the company name and the inspection tagline on the other.
+ *
+ * Drawn from the configured issuer so the same band appears on the report and
+ * the financial documents; with no configured logo it falls back to the same
+ * neutral monogram the shared chrome uses.
+ */
+function reportHeader(issuer: DocumentIssuer): string {
+  const initials = (issuer.nameEn || 'ORYX')
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
+  const mark = issuer.logoDataUri
+    ? `<img class="rh-logo" src="${esc(issuer.logoDataUri)}" alt="${esc(issuer.nameEn)}">`
+    : `<div class="rh-monogram">${esc(initials || 'OR')}</div>`;
+  return `
+  <header class="report-head">
+    <div class="rh-left">
+      ${mark}
+      <div class="rh-name">
+        <span class="rh-name-ar">${esc(issuer.nameAr || issuer.nameEn)}</span>
+        <span class="rh-name-en">${esc(issuer.nameEn)}</span>
+      </div>
+    </div>
+    <div class="rh-right">
+      <span class="rh-tag-ar">خبراء فحص المركبات</span>
+      <span class="rh-tag-en">VEHICLE INSPECTION EXPERTS</span>
+    </div>
+  </header>`;
+}
+
+/** A legend chip with a vector mark and its bilingual label. */
+function legendChip(kind: MarkKind, ar: string, en: string): string {
+  return `<span class="lg-chip">${markGlyph(kind, 10)}${esc(ar)} / ${esc(en)}</span>`;
+}
+
+/**
+ * The job and vehicle strip repeated under the title on every section page.
+ *
+ * Reproduces the reference: the job number and timestamp on one line, then a
+ * band carrying the VIN, plate, car and odometer. The values are the session
+ * snapshot, so a later edit to the vehicle record cannot rewrite a printed page.
+ */
+function jobStrip(p: InspectionReportPayload): string {
+  const v = p.vehicle;
+  const when = new Date(p.inspectedAt);
+  const stamp = Number.isNaN(when.getTime())
+    ? '—'
+    : new Intl.DateTimeFormat('en-GB', {
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Bahrain',
+      }).format(when);
+  const car = `${v.make} ${v.model} (${v.modelYear})`;
+  return `
+  <div class="job-line">
+    <span class="job-no num">JOB #${esc(p.jobNumber)}</span>
+    <span class="job-date num">${esc(stamp)}</span>
+  </div>
+  <div class="vstrip">
+    <div class="vcell"><span class="vcell-lab">رقم القاعدة (الشاصي)<br><span class="ltr">VIN Number</span></span><span class="vcell-val num">${esc(v.vin)}</span></div>
+    <div class="vcell"><span class="vcell-lab">رقم اللوحة<br><span class="ltr">Plate No.</span></span><span class="vcell-val num">${esc(orDash(v.plateNumber))}</span></div>
+    <div class="vcell"><span class="vcell-lab">السيارة<br><span class="ltr">Car</span></span><span class="vcell-val">${esc(car)}</span></div>
+    <div class="vcell"><span class="vcell-lab">عداد المسافات<br><span class="ltr">ODO Meter</span></span><span class="vcell-val num">${esc(grouped(v.odometer))} km</span></div>
+  </div>`;
+}
+
+/** The fixed legal texts, taken verbatim from the approved reference. */
+const LIABILITY_AR =
+  'اوريكس لخدمات السيارات ليست مصنّعة للمركبات ولا بائعة لها، ولن تتحمل اي مسؤولية عن عيوب تصنيعية أو أضرار غير مُفصح عنها أو غير مُبلغ عنها. يقتصر دور اوريكس لخدمات السيارات على إجراء فحص بصري وفحص بأجهزة تقنية لتحديد الإصلاحات والأضرار السابقة والظاهرة التي لحقت بالمكونات الميكانيكية والهيكلية، ودون تقديم أي ضمان للسلامة الهيكلية أو الصلاحية العامة للسير على الطرق. أنت توافق على انحصار مسؤولية اوريكس لخدمات السيارات في فحص المركبة داخله وبالأدوات المعتمدة في المركز ووفق حدود الباقة المختارة فقط، دون أدنى مسؤولية عن أي خدمات غير مشمولة بالباقة أو عن حالة المركبة قبل دخولها وبعد خروجها منه. وبناءً عليه يُصدر التقرير الفني ليعكس نتيجة الفحص ضمن نطاق الباقة المحددة حصرا.';
+
+const LIABILITY_EN =
+  'Oryx Auto Services is neither a vehicle manufacturer nor a seller and assumes no liability for manufacturing defects or undisclosed or unreported damage. The role of Oryx Auto Services is limited to conducting visual and technical inspections to identify existing or prior damage and necessary repairs regarding mechanical and structural components; it provides no guarantee regarding structural integrity or general roadworthiness. You acknowledge that the liability of Oryx Auto Services is strictly limited to the inspection performed on site using the centre\u2019s approved tools and within the scope of the selected service package; the company bears no responsibility for services not included in the package or for the vehicle\u2019s condition prior to its arrival at or after its departure from the centre. Accordingly, the technical report is issued to reflect inspection results exclusively within the scope of the specified package.';
+
+const IMPORTANT_REMARKS_AR = [
+  'يتم إصدار التقرير بواسطة أجهزة الفحص الإلكتروني المعتمدة.',
+  'أي كشط أو حذف أو تغيير في محتويات التقرير يجعله لاغياً وغير معتمد.',
+  'يصف التقرير حالة السيارة أثناء وجودها داخل المركز فقط.',
+  'المركز غير مسؤول عن المتعلقات الشخصية المتروكة داخل السيارة.',
+  'تتطلب بعض الحالات اختبار قيادة إضافي للتحقق من أداء ناقل الحركة والأجزاء الميكانيكية.',
+];
+
+const IMPORTANT_REMARKS_EN = [
+  'The report is issued by approved electronic inspection devices.',
+  'Any erasure, deletion or change in the contents of the report renders it invalid and unsupported.',
+  'The report describes the condition of the vehicle while it is inside the centre only.',
+  'The centre is not responsible for personal belongings left inside the car.',
+  'Some cases require an additional test drive to check the performance of the transmission and mechanical parts.',
+];
+
+/** The numbered Important Remarks block. */
+function importantRemarks(): string {
+  return `
+  <div class="remarks-block avoid-break">
+    <div class="remarks-title">ملاحظات هامة<span class="ltr">Important Remarks</span></div>
+    <div class="remarks-cols">
+      <ol class="remarks-list">
+        ${IMPORTANT_REMARKS_AR.map((t) => `<li>${esc(t)}</li>`).join('')}
+      </ol>
+      <ol class="remarks-list ltr">
+        ${IMPORTANT_REMARKS_EN.map((t) => `<li>${esc(t)}</li>`).join('')}
+      </ol>
+    </div>
+  </div>`;
+}
+
+/** The Limitation of Liability block. */
+function liabilityBlock(): string {
+  return `
+  <div class="terms avoid-break">
+    <div class="terms-title">الشروط والأحكام ومسؤولية الفحص<span class="ltr">Terms, Conditions &amp; Liability Disclaimer</span></div>
+    <div class="terms-sub">تحديد المسؤولية القانونية<span class="ltr">Limitation of Liability</span></div>
+    <div class="terms-cols">
+      <p class="terms-ar">${esc(LIABILITY_AR)}</p>
+      <p class="terms-en ltr">${esc(LIABILITY_EN)}</p>
+    </div>
+  </div>`;
+}
+
+/** The vehicle photo, or a neutral placeholder when none was attached. */
+function vehiclePhoto(p: InspectionReportPayload): string {
+  if (p.vehiclePhotoDataUri) {
+    return `
+    <figure class="vphoto">
+      <img src="${esc(p.vehiclePhotoDataUri)}" alt="${esc(`${p.vehicle.make} ${p.vehicle.model}`)}">
+      <figcaption>صورة المركبة · Vehicle photograph</figcaption>
+    </figure>`;
+  }
+  return `
+    <figure class="vphoto vphoto-empty">
+      <div class="vphoto-ph">لا توجد صورة مرفقة للمركبة<span class="ltr">No vehicle photograph attached</span></div>
+    </figure>`;
+}
+
+/** The identification cover (page 1). */
 export function identificationPage(input: InspectionReportInput, chrome: DocumentChrome): string {
   const p = input.payload;
   const v = p.vehicle;
+  const when = new Date(p.inspectedAt);
+  const stamp = Number.isNaN(when.getTime())
+    ? '—'
+    : new Intl.DateTimeFormat('en-GB', {
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Bahrain',
+      }).format(when);
   return `
   <section class="doc-page">
-    ${documentWatermark(chrome.issuer)}
-    ${documentHeader(chrome)}
-    <div class="id-grid">
-      <div class="id-box">
-        <div class="id-box-title">بيانات المركبة · Vehicle</div>
-        <table class="kv">
-          <tr><th>الصنع / Make</th><td>${esc(v.make)}</td></tr>
-          <tr><th>الموديل / Model</th><td>${esc(v.model)}</td></tr>
-          <tr><th>سنة الصنع / Year</th><td class="num">${esc(v.modelYear)}</td></tr>
-          <tr><th>رقم اللوحة / Plate</th><td class="num">${esc(orDash(v.plateNumber))}</td></tr>
-          <tr><th>اللون / Colour</th><td>${esc(orDash(v.color))}</td></tr>
-          <tr><th>رقم الهيكل / VIN</th><td class="num">${esc(v.vin)}</td></tr>
-          <tr><th>قراءة العدّاد / Odometer</th><td class="num">${esc(grouped(v.odometer))} km</td></tr>
+    ${reportHeader(chrome.issuer)}
+    ${pageTitleBar('تقرير فحص المركبة', 'VEHICLE INSPECTION REPORT')}
+    <div class="cover-grid">
+      <div class="cover-info">
+        <div class="cover-sec-title">معلومات المركبة<span class="ltr">Vehicle Information</span></div>
+        <table class="vinfo">
+          <tr><th>اسم العميل<span class="ltr">Customer Name</span></th><td>${esc(p.customerName)}</td>
+              <th>رقم التواصل<span class="ltr">Contact No.</span></th><td class="num">${esc(orDash(p.contactNumber))}</td></tr>
+          <tr><th>رقم العمل<span class="ltr">Job No.</span></th><td class="num">${esc(p.jobNumber)}</td>
+              <th>التاريخ والوقت<span class="ltr">Date &amp; Time</span></th><td class="num">${esc(stamp)}</td></tr>
+          <tr><th>رقم اللوحة<span class="ltr">Plate No.</span></th><td class="num">${esc(orDash(v.plateNumber))}</td>
+              <th>نوع السيارة<span class="ltr">Car Make</span></th><td>${esc(v.make)}</td></tr>
+          <tr><th>طراز السيارة<span class="ltr">Car Model</span></th><td>${esc(v.model)}</td>
+              <th>سنة الصنع<span class="ltr">Car Year</span></th><td class="num">${esc(v.modelYear)}</td></tr>
+          <tr><th>عداد المسافات<span class="ltr">ODO Meter</span></th><td class="num">${esc(grouped(v.odometer))} km</td>
+              <th>لون السيارة<span class="ltr">Car Color</span></th><td>${esc(orDash(v.color))}</td></tr>
+          <tr><th>رقم القاعدة (الشاصي)<span class="ltr">VIN Number</span></th><td class="num" colspan="3">${esc(v.vin)}</td></tr>
         </table>
+        ${vehiclePhoto(p)}
       </div>
-      <div class="id-box">
-        <div class="id-box-title">بيانات العميل والزيارة · Customer &amp; Visit</div>
-        <table class="kv">
-          <tr><th>اسم العميل / Customer</th><td>${esc(p.customerName)}</td></tr>
-          <tr><th>رقم الاتصال / Contact</th><td class="num">${esc(orDash(p.contactNumber))}</td></tr>
-          <tr><th>رقم المهمة / Job No.</th><td class="num">${esc(p.jobNumber)}</td></tr>
-          <tr><th>تاريخ الفحص / Inspected</th><td class="num">${esc(new Date(p.inspectedAt).toISOString().slice(0, 10))}</td></tr>
-          <tr><th>الفرع / Branch</th><td>${esc(orDash(p.branchName))}</td></tr>
-          <tr><th>الفاحص / Inspector</th><td>${esc(orDash(p.inspectorName))}</td></tr>
-          <tr><th>الحالة / Status</th><td>${esc(p.status)}</td></tr>
-        </table>
+      <div class="cover-verify">
+        ${verificationBlock(input.verification)}
       </div>
     </div>
-
-    <div class="areas-block avoid-break">
-      <div class="areas-title">مناطق الفحص المختارة · Selected Inspection Areas</div>
-      <div class="areas-list">
-        ${p.selectedAreas
-          .map((area) => {
-            const spec = inspectionSectionSpec(area);
-            return `<span class="area-chip"><span class="area-ar">${esc(spec.labelAr)}</span><span class="area-en">${esc(spec.labelEn)}</span></span>`;
-          })
-          .join('')}
-      </div>
-    </div>
-
-    <div class="terms avoid-break">
-      <div class="terms-title">إقرار · Declaration</div>
-      <p>
-        يقر العميل بأن الفحص تم بحضوره أو بموافقته، وأن النتائج الموضحة في هذا التقرير تعكس
-        الحالة الفنية للمركبة في تاريخ الفحص المذكور أعلاه. لا يشمل هذا الفحص أي أعطال ظهرت
-        لاحقًا أو كانت مخفية ولا يمكن الكشف عنها بالفحص الظاهري.
-      </p>
-      <p class="ltr">
-        The customer confirms the inspection was carried out with their presence or consent and
-        that the findings reflect the technical condition of the vehicle on the inspection date
-        above. The inspection does not cover faults that appeared later or that were concealed
-        and undetectable by a visual and functional check.
-      </p>
-    </div>
-
+    ${liabilityBlock()}
+    ${importantRemarks()}
     ${signatureBlock([
-      { ar: 'توقيع الفاحص', en: 'Inspector', name: p.inspectorName },
-      { ar: 'توقيع العميل', en: 'Customer', name: p.customerName },
-      { ar: 'اعتماد الإدارة', en: 'Authorised Signatory', name: p.reviewedByName },
+      { ar: 'اعتماد المركز', en: 'Authorized Stamp & Signature' },
+      { ar: 'توقيع العميل', en: 'Customer Signature', name: p.customerName },
     ])}
   </section>`;
 }
 
-/** One checklist section: the item table, the remarks block, the attachments. */
-function itemsSection(section: InspectionReportSection): string {
-  if (section.items.length === 0) return '';
+/** The paint and body page (page 2). */
+export function paintSectionPage(
+  input: InspectionReportInput,
+  section: InspectionReportSection | undefined,
+): string {
+  if (!section) return '';
   return `
-  <div class="sec avoid-break">
-    <div class="sec-head">
-      <span class="sec-head-ar">${esc(section.labelAr)}</span>
-      <span class="sec-head-en">${esc(section.labelEn)}</span>
+  <section class="doc-page">
+    ${reportHeader(input.issuer)}
+    ${pageTitleBar('فحص الصبغ وبدن المركبة', 'VEHICLE PAINT & BODY CHECK')}
+    ${jobStrip(input.payload)}
+    ${paintDiagram(section)}
+  </section>`;
+}
+
+/** The chassis page (page 3). */
+export function chassisSectionPage(
+  input: InspectionReportInput,
+  section: InspectionReportSection | undefined,
+): string {
+  if (!section) return '';
+  return `
+  <section class="doc-page">
+    ${reportHeader(input.issuer)}
+    ${pageTitleBar('فحص الشاصي وأسفل المركبة', 'CHASSIS & UNDERCARRIAGE CONDITION')}
+    ${jobStrip(input.payload)}
+    ${chassisDiagram(section)}
+  </section>`;
+}
+
+/** The interior/exterior/engine/road-test page (page 4). */
+export function inspectionGroupPage(
+  input: InspectionReportInput,
+  sections: InspectionReportSection[],
+): string {
+  const byArea = new Map(sections.map((s) => [s.area, s]));
+  const interior = byArea.get('INTERIOR');
+  const exterior = byArea.get('EXTERIOR');
+  const engine = byArea.get('ENGINE_COMPARTMENT');
+  const road = byArea.get('ROAD_TEST');
+
+  const cabin = `
+  <div class="grp">
+    <div class="grp-title">فحص التجهيزات الداخلية والملحقات الخارجية<span class="ltr">Cabin Electronics &amp; Exterior Accessories Checks</span>
+      <span class="grp-legend">${legendChip('check', 'اجتياز', 'Pass')}${legendChip('cross', 'فشل', 'Fail')}<span class="lg-chip">N/A · غير متوفر</span></span>
     </div>
+    <div class="two-col">
+      ${interior ? itemsTable(interior, 'داخلية السيارة', 'Interior Car', true) : ''}
+      ${exterior ? itemsTable(exterior, 'خارجية السيارة', 'Exterior Car', true) : ''}
+    </div>
+  </div>`;
+
+  const engineBlock = engine
+    ? `<div class="grp">
+        <div class="grp-title">مقصورة المحرك<span class="ltr">Engine Compartment</span>
+          <span class="grp-legend">${legendChip('check', 'اجتياز', 'Pass')}${legendChip('cross', 'فشل', 'Fail')}</span>
+        </div>
+        ${itemsTable(engine, 'مقصورة المحرك', 'Engine Compartment', false)}
+      </div>`
+    : '';
+
+  const roadBlock = road
+    ? `<div class="grp">
+        <div class="grp-title">تجربة القيادة<span class="ltr">Road Test Drive</span>
+          <span class="grp-legend">${legendChip('check', 'اجتياز', 'Pass')}${legendChip('cross', 'فشل', 'Fail')}</span>
+        </div>
+        ${itemsTable(road, 'تجربة القيادة', 'Road Test', false)}
+      </div>`
+    : '';
+
+  const remarkRows: string[] = [];
+  if (input.payload.generalRemarks) remarkRows.push(input.payload.generalRemarks);
+  if (input.payload.finalAssessment) remarkRows.push(input.payload.finalAssessment);
+  const remarks = remarkRows.length
+    ? `<div class="grp">
+        <div class="grp-title">الملاحظات والتعليقات العامة<span class="ltr">General Inspection Remarks</span></div>
+        <div class="general-remarks">${remarkRows.map((r) => escMultiline(r)).join('<br>')}</div>
+      </div>`
+    : '';
+
+  return `
+  <section class="doc-page">
+    ${reportHeader(input.issuer)}
+    ${pageTitleBar('الفحص الداخلي والخارجي / مقصورة المحرك / تجربة القيادة', 'INTERIOR & EXTERIOR INSPECTION / ENGINE COMPARTMENT / ROAD TEST')}
+    ${jobStrip(input.payload)}
+    ${cabin}
+    <div class="two-col">${engineBlock}${roadBlock}</div>
+    ${remarks}
+  </section>`;
+}
+
+/** The computer-unit page (page 5). */
+export function computerSectionPage(
+  input: InspectionReportInput,
+  section: InspectionReportSection | undefined,
+): string {
+  return `
+  <section class="doc-page">
+    ${reportHeader(input.issuer)}
+    ${pageTitleBar('فحص وحدة الكمبيوتر', 'COMPUTER UNIT INSPECTION')}
+    ${jobStrip(input.payload)}
+    ${diagnosticSection(section)}
+    ${input.verification ? `<div class="p5-verify">${verificationBlock(input.verification)}</div>` : ''}
+  </section>`;
+}
+
+/**
+ * One pass/fail checklist as the approved two-column table.
+ *
+ * The reference prints the Arabic label with its English translation beneath and
+ * three result columns (Pass / Fail / N/A); the cell matching the recorded
+ * result carries the tick or cross. `withNa` is false for the engine and road
+ * tables, which are strictly pass/fail on the approved form.
+ */
+function itemsTable(
+  section: InspectionReportSection,
+  titleAr: string,
+  titleEn: string,
+  withNa: boolean,
+): string {
+  const results = withNa ? (['PASS', 'FAIL', 'NA'] as const) : (['PASS', 'FAIL'] as const);
+  return `
+  <div class="itable avoid-break">
+    <div class="itable-head">${esc(titleAr)}<span class="ltr">${esc(titleEn)}</span></div>
     <table class="items">
       <thead>
         <tr>
-          <th class="c-idx">#</th>
-          <th class="c-item">البند · Item</th>
-          <th class="c-res">النتيجة · Result</th>
-          <th class="c-note">ملاحظات · Notes</th>
+          <th class="c-item">البند<span class="ltr">Item</span></th>
+          ${results
+            .map(
+              (r) =>
+                `<th class="c-res">${r === 'PASS' ? 'اجتياز<span class="ltr">Pass</span>' : r === 'FAIL' ? 'فشل<span class="ltr">Fail</span>' : 'غير متوفر<span class="ltr">N/A</span>'}</th>`,
+            )
+            .join('')}
         </tr>
       </thead>
       <tbody>
         ${section.items
           .map(
-            (item, index) => `
+            (item) => `
         <tr>
-          <td class="c-idx num">${index + 1}</td>
-          <td class="c-item">
-            <span class="item-ar">${esc(item.labelAr)}</span>
-            <span class="item-en">${esc(item.labelEn)}</span>
-          </td>
-          <td class="c-res">${resultPill(item.result)}</td>
-          <td class="c-note">${esc(item.note ?? '')}</td>
+          <td class="c-item"><span class="item-ar">${esc(item.labelAr)}</span><span class="item-en ltr">${esc(item.labelEn)}</span></td>
+          ${results.map((r) => `<td class="c-res">${item.result === r ? resultMark(r) : ''}</td>`).join('')}
         </tr>`,
           )
           .join('')}
       </tbody>
     </table>
-    ${section.remarks ? `<div class="sec-remarks"><b>${esc(section.remarksLabelAr)}:</b> ${escMultiline(section.remarks)}</div>` : ''}
   </div>`;
 }
 
 /**
- * The body-panel diagnostic diagram.
+ * The body-panel diagnostic diagram (top view).
  *
  * Markers carry normalised coordinates, so the diagram is drawn from the same
  * numbers the inspector placed on screen and a marker lands on the same panel at
- * any page size. The drawing itself comes from `@oryx/shared/inspection-diagram`
- * — the exact geometry the admin editor renders — so the printed report and the
- * form can never show two different vehicles. The diagram is a side elevation
- * and is not mirrored in RTL: the coordinates are physical, not textual.
+ * any page size. The drawing comes from `@oryx/shared/inspection-diagram` — the
+ * exact geometry the admin editor renders — so the printed report and the form
+ * can never show two different vehicles.
  */
 function paintDiagram(section: InspectionReportSection): string {
   const legend = PAINT_CONDITIONS.map(
@@ -221,48 +457,40 @@ function paintDiagram(section: InspectionReportSection): string {
     })
     .join('');
 
+  const rows =
+    section.markers.length > 0
+      ? `<table class="marker-table">
+          <thead><tr><th>#</th><th>الموضع / Location</th><th>الحالة / Condition</th><th>ملاحظة / Note</th></tr></thead>
+          <tbody>${section.markers
+            .map((m, i) => {
+              const spec = PAINT_CONDITIONS.find((c) => c.key === m.condition);
+              const panel = BODY_PANELS.find((p) => p.key === m.panelKey);
+              return `<tr><td class="num">${i + 1}</td><td>${esc(panel ? `${panel.labelAr} / ${panel.labelEn}` : (m.panelKey ?? '—'))}</td><td>${esc(spec?.labelAr ?? '')} / ${esc(spec?.labelEn ?? '')}</td><td>${esc(m.note ?? '')}</td></tr>`;
+            })
+            .join('')}</tbody>
+        </table>`
+      : `<div class="no-findings">لا توجد ملاحظات على الصبغ والهيكل · No paint or body findings recorded</div>`;
+
   return `
   <div class="diagram-block avoid-break">
-    <div class="diagram-title">مخطط تشخيص الهيكل · Body Panels Diagnostic Scheme</div>
+    <div class="diagram-title">مخطط الفحص السطحي لهيكل السيارة<span class="ltr">Body Panels Diagnostic Scheme</span></div>
     <div class="diagram-wrap">
-      <div class="diagram">
-        ${bodyPlanSvg()}
-        ${markers}
-      </div>
+      <div class="diagram">${bodyPlanSvg()}${markers}</div>
       <div class="legend">${legend}</div>
     </div>
-    ${
-      section.markers.length > 0
-        ? `<table class="marker-table">
-            <thead><tr><th>#</th><th>الموضع / Location</th><th>الحالة / Condition</th><th>ملاحظة / Note</th></tr></thead>
-            <tbody>${section.markers
-              .map((m, i) => {
-                const spec = PAINT_CONDITIONS.find((c) => c.key === m.condition);
-                const panel = BODY_PANELS.find((p) => p.key === m.panelKey);
-                return `<tr><td class="num">${i + 1}</td><td>${esc(panel ? `${panel.labelAr} / ${panel.labelEn}` : (m.panelKey ?? '—'))}</td><td>${esc(spec?.labelAr ?? '')} / ${esc(spec?.labelEn ?? '')}</td><td>${esc(m.note ?? '')}</td></tr>`;
-              })
-              .join('')}</tbody>
-          </table>`
-        : `<div class="no-findings">لا توجد ملاحظات على الصبغ والهيكل · No paint or body findings recorded</div>`
-    }
+    ${rows}
+    ${section.remarks ? `<div class="sec-remarks"><b>${esc(section.remarksLabelAr)}:</b> ${escMultiline(section.remarks)}</div>` : ''}
   </div>`;
 }
 
-/**
- * The vehicle side elevation, from the shared geometry.
- *
- * Drawn as inline SVG rather than an image so it stays crisp at print
- * resolution, carries no external reference, and cannot fail to load. It is the
- * same path data the admin editor renders.
- */
+/** The vehicle plan view, from the shared geometry. */
 function bodyPlanSvg(): string {
   const panels = BODY_PANELS.map((p) => `<path class="bp-panel" d="${p.d}"/>`).join('');
   const glass = BODY_GLASS_PATHS.map((d) => `<path class="bp-glass" d="${d}"/>`).join('');
   const seams = BODY_SEAM_PATHS.map((d) => `<path class="bp-seam" d="${d}"/>`).join('');
   const wheels = BODY_WHEELS.map(
     (w) =>
-      `<circle class="bp-wheel" cx="${w.cx}" cy="${w.cy}" r="${w.r}"/>` +
-      `<circle class="bp-rim" cx="${w.cx}" cy="${w.cy}" r="${(w.r * 0.45).toFixed(1)}"/>`,
+      `<rect class="bp-wheel" x="${(w.cx - w.r * 0.55).toFixed(1)}" y="${(w.cy - w.r).toFixed(1)}" width="${(w.r * 1.1).toFixed(1)}" height="${(w.r * 2).toFixed(1)}" rx="8"/>`,
   ).join('');
   return `
   <svg class="bodyplan" viewBox="0 0 ${BODY_VIEWBOX.width} ${BODY_VIEWBOX.height}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -295,14 +523,15 @@ function chassisDiagram(section: InspectionReportSection): string {
     const row = byKey.get(region.key);
     const state = row?.condition ?? 'UNSET';
     const cls = state === 'OK' ? 'ch-ok' : state === 'DAMAGE' ? 'ch-bad' : 'ch-unset';
-    const symbol = state === 'OK' ? markGlyph('check', 11) : state === 'DAMAGE' ? markGlyph('cross', 11) : '·';
+    const symbol =
+      state === 'OK' ? markGlyph('check', 11) : state === 'DAMAGE' ? markGlyph('cross', 11) : '·';
     return `
     <div class="ch-region ${cls}">
       <div class="ch-region-head">
         <span class="ch-region-ar">${esc(region.labelAr)}</span>
         <span class="ch-region-mark">${symbol}</span>
       </div>
-      <div class="ch-region-en">${esc(region.labelEn)}</div>
+      <div class="ch-region-en ltr">${esc(region.labelEn)}</div>
       ${row?.note ? `<div class="ch-region-note">${esc(row.note)}</div>` : ''}
     </div>`;
   }).join('');
@@ -310,7 +539,7 @@ function chassisDiagram(section: InspectionReportSection): string {
   const damaged = section.chassisRegions.filter((r) => r.condition === 'DAMAGE');
   return `
   <div class="chassis-block avoid-break">
-    <div class="diagram-title">مخطط فحص الهيكل السفلي · Chassis Safety Diagram</div>
+    <div class="diagram-title">مخطط سلامة الشاصي<span class="ltr">Chassis safety diagram</span></div>
     <div class="chassis-wrap">
       <svg class="chassisplan" viewBox="0 0 ${CHASSIS_VIEWBOX.width} ${CHASSIS_VIEWBOX.height}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <path class="cp-outline" d="${CHASSIS_OUTLINE}"/>
@@ -319,6 +548,10 @@ function chassisDiagram(section: InspectionReportSection): string {
       </svg>
       <div class="chassis-grid">${chips}</div>
     </div>
+    <div class="legend-row">
+      <span class="lg-chip">${markGlyph('check', 10)}سليم / OK</span>
+      <span class="lg-chip">${markGlyph('cross', 10)}متضرر / Damage</span>
+    </div>
     <div class="chassis-summary ${damaged.length ? 'chassis-summary-bad' : 'chassis-summary-ok'}">
       ${
         damaged.length
@@ -326,6 +559,7 @@ function chassisDiagram(section: InspectionReportSection): string {
           : 'لم يتم تسجيل أي أضرار في الهيكل السفلي · No chassis damage recorded'
       }
     </div>
+    ${section.remarks ? `<div class="sec-remarks"><b>${esc(section.remarksLabelAr)}:</b> ${escMultiline(section.remarks)}</div>` : ''}
   </div>`;
 }
 
@@ -335,17 +569,17 @@ function chassisRegionLabel(key: string): string {
 }
 
 /** The free-form computer-unit fault table. */
-function diagnosticSection(section: InspectionReportSection): string {
-  if (section.diagnostics.length === 0) {
+function diagnosticSection(section: InspectionReportSection | undefined): string {
+  if (!section || section.diagnostics.length === 0) {
     return `
     <div class="diag-block avoid-break">
-      <div class="diagram-title">أعطال وحدة الكمبيوتر · Computer Module Faults</div>
+      <div class="diagram-title">أعطال وحدة الكمبيوتر<span class="ltr">Computer Module Faults</span></div>
       <div class="no-findings">لم يتم تسجيل أي أعطال · No computer module faults recorded</div>
     </div>`;
   }
   return `
   <div class="diag-block">
-    <div class="diagram-title">أعطال وحدة الكمبيوتر · Computer Module Faults</div>
+    <div class="diagram-title">أعطال وحدة الكمبيوتر<span class="ltr">Computer Module Faults</span></div>
     <table class="diag-table">
       <thead>
         <tr>
@@ -369,193 +603,132 @@ function diagnosticSection(section: InspectionReportSection): string {
           .join('')}
       </tbody>
     </table>
+    ${section.remarks ? `<div class="sec-remarks"><b>${esc(section.remarksLabelAr)}:</b> ${escMultiline(section.remarks)}</div>` : ''}
   </div>`;
 }
 
-/** The photograph grid for a section. */
-function attachmentGrid(section: InspectionReportSection): string {
-  if (section.attachments.length === 0) return '';
-  return `
-  <div class="photo-block avoid-break">
-    <div class="diagram-title">صور الفحص · Inspection Photographs</div>
-    <div class="photo-grid">
-      ${section.attachments
-        .map(
-          (a) => `
-      <figure class="photo">
-        <img src="${esc(a.dataUri)}" alt="${esc(a.caption ?? 'Inspection photograph')}">
-        ${a.caption ? `<figcaption>${esc(a.caption)}</figcaption>` : ''}
-      </figure>`,
-        )
-        .join('')}
-    </div>
-  </div>`;
-}
-
-/** The remarks recorded for a section that has no checklist of its own. */
-function sectionBody(section: InspectionReportSection): string {
-  const parts: string[] = [];
-  if (section.kind === 'DIAGRAM_PAINT') parts.push(paintDiagram(section));
-  if (section.kind === 'DIAGRAM_CHASSIS') parts.push(chassisDiagram(section));
-  if (section.kind === 'DIAGNOSTIC') parts.push(diagnosticSection(section));
-  if (section.kind === 'ITEMS') parts.push(itemsSection(section));
-  if (section.remarks) {
-    parts.push(
-      `<div class="sec-remarks"><b>${esc(section.remarksLabelAr)}:</b> ${escMultiline(section.remarks)}</div>`,
-    );
-  }
-  if (section.noFindings && section.items.length === 0 && section.diagnostics.length === 0) {
-    parts.push(
-      `<div class="no-findings">تم الفحص ولا توجد ملاحظات · Inspected with no findings to report</div>`,
-    );
-  }
-  parts.push(attachmentGrid(section));
-  return parts.join('');
-}
-
-export function sectionPage(
-  input: InspectionReportInput,
-  chrome: DocumentChrome,
-  sectionKeys: InspectionSectionSpec[],
-  pageNumber: number,
-): string {
-  const payloadSections = new Map(input.payload.sections.map((s) => [s.area, s]));
-  const body = sectionKeys
-    .map((spec) => payloadSections.get(spec.key))
-    .filter((s): s is InspectionReportSection => Boolean(s))
-    .map((s) => `<div class="sec-block">${sectionBody(s)}</div>`)
-    .join('');
-
-  return `
-  <section class="doc-page">
-    ${documentWatermark(chrome.issuer)}
-    ${documentHeader(chrome)}
-    ${body}
-  </section>`;
-}
-
-/** The final page: general remarks, the assessment and the verification block. */
-export function summaryPage(
-  input: InspectionReportInput,
-  chrome: DocumentChrome,
-  pageNumber: number,
-): string {
-  const p = input.payload;
-  const rows: Array<[string, string, string | null]> = [
-    ['ملاحظات عامة', 'General Remarks', p.generalRemarks],
-    ['ملاحظات المقصورة', 'Interior Remarks', p.interiorRemarks],
-    ['ملاحظات الخارج', 'Exterior Remarks', p.exteriorRemarks],
-    ['ملاحظات المحرك', 'Engine Compartment Remarks', p.engineRemarks],
-    ['ملاحظات اختبار الطريق', 'Road Test Remarks', p.roadTestRemarks],
-  ].filter(([, , value]) => Boolean(value)) as Array<[string, string, string | null]>;
-
-  return `
-  <section class="doc-page">
-    ${documentWatermark(chrome.issuer)}
-    ${documentHeader(chrome)}
-    ${
-      rows.length
-        ? `<div class="sec avoid-break">
-             <div class="sec-head"><span class="sec-head-ar">الملخص والملاحظات</span><span class="sec-head-en">Summary &amp; Remarks</span></div>
-             <table class="items">
-               <tbody>
-                 ${rows
-                   .map(
-                     ([ar, en, value]) =>
-                       `<tr><th class="c-item"><span class="item-ar">${esc(ar)}</span><span class="item-en">${esc(en)}</span></th><td>${escMultiline(value)}</td></tr>`,
-                   )
-                   .join('')}
-               </tbody>
-             </table>
-           </div>`
-        : ''
-    }
-    <div class="assessment avoid-break">
-      <div class="assessment-title">التقييم النهائي · Final Assessment</div>
-      <div class="assessment-body">${p.finalAssessment ? escMultiline(p.finalAssessment) : 'لم يتم تسجيل تقييم نهائي · No final assessment recorded'}</div>
-    </div>
-    ${verificationBlock(input.verification)}
-    ${signatureBlock([
-      { ar: 'توقيع الفاحص', en: 'Inspector', name: p.inspectorName },
-      { ar: 'اعتماد المراجع', en: 'Reviewed By', name: p.reviewedByName },
-    ])}
-  </section>`;
-}
 
 export const INSPECTION_REPORT_CSS = `
-  .id-grid{ display:flex; gap:10px; margin-top:12px; }
-  .id-box{ flex:1 1 0; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
-  .id-box-title{ background:var(--navy); color:#fff; font-size:9.5pt; font-weight:700; padding:5px 9px; }
-  .kv{ font-size:9pt; }
-  .kv th{ text-align:start; width:44%; padding:4px 9px; color:var(--muted); font-weight:400;
-    border-bottom:1px solid var(--line); background:#f7f9fc; }
-  .kv td{ padding:4px 9px; border-bottom:1px solid var(--line); font-weight:700; color:var(--ink); }
-  .areas-block{ margin-top:12px; border:1px solid var(--line); border-radius:6px; padding:9px; }
-  .areas-title{ font-size:9.5pt; font-weight:700; color:var(--navy); margin-bottom:6px; }
-  .areas-list{ display:flex; flex-wrap:wrap; gap:6px; }
-  .area-chip{ border:1px solid var(--gold); border-radius:20px; padding:3px 10px; background:#fffdf5; }
-  .area-ar{ font-size:9pt; font-weight:700; color:var(--navy); }
-  .area-en{ font-size:7.5pt; color:var(--muted); margin-inline-start:6px; }
-  .terms{ margin-top:12px; border:1px solid var(--line); border-radius:6px; padding:9px; background:#f7f9fc; }
-  .terms-title{ font-size:9.5pt; font-weight:700; color:var(--navy); margin-bottom:4px; }
-  .terms p{ font-size:8pt; color:var(--muted); margin:0 0 5px; }
-  .sec-block{ margin-bottom:6px; }
-  .sec-head{ display:flex; justify-content:space-between; align-items:baseline;
-    background:var(--navy); color:#fff; padding:3px 10px; border-radius:5px 5px 0 0; }
-  .sec-head-ar{ font-size:11.5pt; font-weight:700; }
-  .sec-head-en{ font-size:8pt; color:var(--gold-soft); text-transform:uppercase; letter-spacing:.5px; }
-  .items{ border:1px solid var(--line); border-top:none; }
-  .items th,.items td{ border-bottom:1px solid var(--line); padding:0 6px; font-size:7.6pt; line-height:1.06; vertical-align:top; }
-  .items thead th{ background:#eef2f8; color:var(--navy); font-size:8pt; text-align:start; }
-  .c-idx{ width:6%; text-align:center; }
-  .c-item{ width:40%; }
-  .c-res{ width:12%; text-align:center; }
-  .c-note{ width:42%; color:var(--muted); font-size:6.4pt; line-height:1.06; }
-  .item-ar{ display:block; font-size:7.6pt; line-height:1.06; color:var(--ink); }
-  .item-en{ display:block; font-size:6.2pt; line-height:1.06; color:var(--muted); }
-  .pill{ display:inline-block; min-width:16px; padding:1px 5px; border-radius:3px; font-weight:700; font-size:9pt; }
-  /* Vector marks (check / cross / x) align to the text baseline without a font. */
+  /* ---- brand band ---- */
+  .report-head{ display:flex; justify-content:space-between; align-items:center;
+    border-bottom:2.5px solid var(--navy); padding-bottom:4px; margin-bottom:5px; }
+  .rh-left{ display:flex; align-items:center; gap:8px; }
+  .rh-logo{ height:34px; width:auto; }
+  .rh-monogram{ width:34px; height:34px; border-radius:7px; background:var(--navy); color:var(--gold);
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13pt; letter-spacing:.5px; }
+  .rh-name{ display:flex; flex-direction:column; line-height:1.1; }
+  .rh-name-ar{ font-size:12pt; font-weight:700; color:var(--navy); }
+  .rh-name-en{ font-size:8pt; font-weight:700; color:var(--muted); letter-spacing:.5px; text-transform:uppercase; }
+  .rh-right{ display:flex; flex-direction:column; align-items:flex-end; line-height:1.15; text-align:end; }
+  .rh-tag-ar{ font-size:8.5pt; color:var(--navy-soft); }
+  .rh-tag-en{ font-size:7pt; font-weight:700; color:var(--gold); letter-spacing:.6px; }
+  /* ---- shared page furniture ---- */
+  .p-title{ display:flex; flex-direction:column; align-items:center; margin:0 0 6px; }
+  .p-title-ar{ font-size:15pt; font-weight:700; color:var(--navy); }
+  .p-title-en{ font-size:9.5pt; font-weight:700; color:var(--muted); letter-spacing:.6px; text-transform:uppercase; }
+  .job-line{ display:flex; justify-content:space-between; align-items:baseline; background:var(--navy); color:#fff;
+    padding:4px 10px; border-radius:5px 5px 0 0; font-size:9.5pt; font-weight:700; }
+  .vstrip{ display:flex; border:1px solid var(--line); border-top:none; border-radius:0 0 5px 5px; overflow:hidden; }
+  .vcell{ flex:1 1 0; padding:4px 8px; border-inline-end:1px solid var(--line); }
+  .vcell:last-child{ border-inline-end:none; }
+  .vcell-lab{ display:block; font-size:7pt; color:var(--muted); line-height:1.15; }
+  .vcell-val{ display:block; font-size:9.5pt; font-weight:700; color:var(--ink); }
+  .ltr{ direction:ltr; unicode-bidi:isolate; }
+  .lg-chip{ display:inline-flex; align-items:center; gap:4px; font-size:8pt; color:var(--ink); margin-inline-start:10px; }
+  .legend-row{ display:flex; gap:6px; margin-top:6px; }
+  /* ---- cover ---- */
+  .cover-grid{ display:flex; gap:12px; align-items:flex-start; }
+  .cover-info{ flex:1 1 auto; }
+  .cover-sec-title{ background:var(--navy); color:#fff; font-size:9.5pt; font-weight:700; padding:3px 10px; border-radius:5px 5px 0 0; }
+  .cover-sec-title .ltr{ margin-inline-start:8px; color:var(--gold-soft); font-size:8pt; font-weight:400; }
+  .vinfo{ border:1px solid var(--line); border-top:none; }
+  .vinfo th,.vinfo td{ border:1px solid var(--line); padding:3px 7px; font-size:8pt; text-align:start; vertical-align:middle; }
+  .vinfo th{ width:16%; background:#f7f9fc; color:var(--muted); font-weight:400; font-size:7.5pt; line-height:1.15; }
+  .vinfo th .ltr{ display:block; }
+  .vinfo td{ width:34%; font-weight:700; color:var(--ink); }
+  .cover-verify{ flex:0 0 250px; }
+  .cover-verify .verify{ margin-top:0; flex-direction:column; align-items:stretch; }
+  .cover-verify .verify-qr{ display:flex; justify-content:center; }
+  .cover-verify .verify-qr img{ width:130px; height:130px; }
+  .vphoto{ margin:10px 0 0; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#fff; }
+  .vphoto img{ width:100%; height:132px; object-fit:cover; display:block; }
+  .vphoto figcaption{ font-size:7.5pt; color:var(--muted); padding:3px 6px; }
+  .vphoto-empty .vphoto-ph{ display:flex; flex-direction:column; align-items:center; justify-content:center;
+    height:64px; color:var(--muted); font-size:8pt; background:#f7f9fc; }
+  .vphoto-ph .ltr{ font-size:7.5pt; color:var(--line-strong); }
+  .terms{ margin-top:10px; border:1px solid var(--line); border-radius:6px; padding:8px 10px; background:#f7f9fc; }
+  .terms-title{ font-size:9.5pt; font-weight:700; color:var(--navy); }
+  .terms-title .ltr{ margin-inline-start:8px; font-size:8pt; color:var(--muted); font-weight:400; }
+  .terms-sub{ font-size:8pt; color:var(--navy-soft); margin:2px 0 5px; }
+  .terms-sub .ltr{ margin-inline-start:8px; color:var(--muted); }
+  .terms-cols{ display:flex; gap:14px; }
+  .terms-ar{ flex:1 1 0; margin:0; font-size:7pt; line-height:1.2; color:var(--ink); }
+  .terms-en{ flex:1 1 0; margin:0; font-size:6.8pt; line-height:1.2; color:var(--muted); text-align:left; }
+  .remarks-block{ margin-top:10px; border:1px solid var(--line); border-radius:6px; padding:8px 10px; }
+  .remarks-title{ font-size:9.5pt; font-weight:700; color:var(--navy); margin-bottom:4px; }
+  .remarks-title .ltr{ margin-inline-start:8px; font-size:8pt; color:var(--muted); font-weight:400; }
+  .remarks-cols{ display:flex; gap:14px; }
+  .remarks-list{ flex:1 1 0; margin:0; padding-inline-start:15px; font-size:7pt; line-height:1.22; color:var(--ink); }
+  .remarks-list.ltr{ text-align:left; }
+  /* ---- section groups ---- */
+  .grp{ margin-top:7px; }
+  .grp-title{ display:flex; align-items:baseline; flex-wrap:wrap; background:var(--navy); color:#fff;
+    font-size:10pt; font-weight:700; padding:4px 10px; border-radius:5px 5px 0 0; }
+  .grp-title .ltr{ margin-inline-start:8px; font-size:8pt; color:var(--gold-soft); font-weight:400; }
+  .grp-legend{ margin-inline-start:auto; display:flex; gap:2px; }
+  .grp-legend .lg-chip{ color:#fff; }
+  .two-col{ display:flex; gap:10px; align-items:flex-start; }
+  .two-col > *{ flex:1 1 0; min-width:0; }
+  .itable{ border:1px solid var(--line); border-top:none; }
+  .itable-head{ background:#eef2f8; color:var(--navy); font-size:8.2pt; font-weight:700; padding:2px 7px; border-bottom:1px solid var(--line); }
+  .itable-head .ltr{ margin-inline-start:6px; font-size:7.5pt; color:var(--muted); font-weight:400; }
+  .items th,.items td{ border-bottom:1px solid var(--line); border-inline-end:1px solid var(--line); padding:1px 5px; font-size:7.2pt; line-height:1.04; vertical-align:middle; }
+  .items thead th{ background:#f7f9fc; color:var(--navy); font-size:7.6pt; text-align:center; }
+  .items thead th.c-item{ text-align:start; }
+  .items th:last-child,.items td:last-child{ border-inline-end:none; }
+  .items tr:last-child td{ border-bottom:none; }
+  .c-item{ width:62%; }
+  .c-res{ width:12.66%; text-align:center; }
+  .item-ar{ display:block; font-size:7.1pt; line-height:1.04; color:var(--ink); }
+  .item-en{ display:block; font-size:5.9pt; line-height:1.04; color:var(--muted); }
+  .rm{ display:inline-flex; align-items:center; justify-content:center; font-size:7pt; font-weight:700; }
+  .rm-pass{ color:var(--ok); } .rm-fail{ color:var(--bad); } .rm-na{ color:var(--muted); } .rm-unset{ color:#c3c9d2; }
   .mark{ display:inline-block; vertical-align:-2px; }
-  .r-pass{ background:#dcfce7; color:var(--ok); }
-  .r-fail{ background:#fee2e2; color:var(--bad); }
-  .r-na{ background:#eef2f8; color:var(--muted); }
-  .r-unset{ background:#f5f5f5; color:#9aa4b2; }
-  .sec-remarks{ border:1px solid var(--line); border-top:none; padding:6px 9px; font-size:7.4pt; line-height:1.05; color:var(--ink); background:#fbfcfe; }
-  .no-findings{ border:1px solid var(--line); border-radius:5px; padding:8px; font-size:8.5pt;
-    color:var(--muted); background:#f7f9fc; text-align:center; }
-  .diagram-block,.chassis-block,.diag-block,.photo-block{ margin:10px 0; }
-  .diagram-title{ font-size:10pt; font-weight:700; color:var(--navy); margin-bottom:6px;
-    border-inline-start:4px solid var(--gold); padding-inline-start:7px; }
-  .diagram-wrap{ display:flex; gap:12px; align-items:flex-start; }
-  .diagram{ position:relative; width:300px; flex:0 0 300px; }
+  .general-remarks{ border:1px solid var(--line); border-top:none; border-radius:0 0 5px 5px; padding:5px 9px;
+    font-size:7.8pt; line-height:1.3; color:var(--ink); min-height:22px; }
+  .sec-remarks{ margin-top:6px; border:1px solid var(--line); border-radius:5px; padding:6px 9px; font-size:7.6pt; line-height:1.3; color:var(--ink); background:#fbfcfe; }
+  .no-findings{ border:1px solid var(--line); border-top:none; padding:8px; font-size:8.5pt; color:var(--muted); background:#f7f9fc; text-align:center; }
+  /* ---- diagrams ---- */
+  .diagram-block,.chassis-block,.diag-block{ margin-top:10px; }
+  .diagram-title{ display:flex; align-items:baseline; font-size:10pt; font-weight:700; color:var(--navy);
+    margin-bottom:6px; border-inline-start:4px solid var(--gold); padding-inline-start:7px; }
+  .diagram-title .ltr{ margin-inline-start:8px; font-size:8pt; color:var(--muted); font-weight:400; }
+  .diagram-wrap{ display:flex; gap:14px; align-items:flex-start; }
+  .diagram{ position:relative; width:230px; flex:0 0 230px; }
   .bodyplan{ width:100%; height:auto; display:block; }
-  /* The body elevation is the shared geometry; these styles only colour it. */
   .bp-body{ fill:#eef2f8; stroke:#5b6472; stroke-width:3; }
   .bp-glass{ fill:#d6e2f0; stroke:#5b6472; stroke-width:2; }
   .bp-panel{ fill:none; stroke:#9aa4b2; stroke-width:1.6; }
   .bp-seam{ fill:none; stroke:#9aa4b2; stroke-width:2; }
   .bp-wheel{ fill:#3c4653; stroke:#5b6472; stroke-width:2; }
-  .bp-rim{ fill:#8b95a3; }
-  .marker{ position:absolute; width:13px; height:13px; border-radius:50%; transform:translate(-50%,-50%);
+  .marker{ position:absolute; width:14px; height:14px; border-radius:50%; transform:translate(-50%,-50%);
     display:flex; align-items:center; justify-content:center; font-size:8pt; font-weight:700; color:#fff;
     border:1.5px solid #fff; box-shadow:0 0 0 .5px rgba(0,0,0,.4); }
-  .m-green{ background:#1f9d55; }
-  .m-orange{ background:#e08a1e; }
-  .m-red{ background:#d92d20; }
-  .legend{ flex:1 1 auto; display:flex; flex-direction:column; gap:4px; }
+  .m-green{ background:#1f9d55; } .m-orange{ background:#e08a1e; } .m-red{ background:#d92d20; }
+  .legend{ flex:1 1 auto; display:flex; flex-wrap:wrap; gap:8px 16px; align-content:flex-start; }
   .legend-item{ font-size:8.5pt; color:var(--ink); display:flex; align-items:center; gap:6px; }
-  .legend-dot{ width:13px; height:13px; border-radius:50%; display:inline-flex; align-items:center;
+  .legend-dot{ width:14px; height:14px; border-radius:50%; display:inline-flex; align-items:center;
     justify-content:center; font-size:8pt; color:#fff; font-weight:700; }
   .ld-green{ background:#1f9d55; } .ld-orange{ background:#e08a1e; } .ld-red{ background:#d92d20; }
   .marker-table{ margin-top:8px; border:1px solid var(--line); }
   .marker-table th,.marker-table td{ border-bottom:1px solid var(--line); padding:3px 7px; font-size:8pt; text-align:start; }
   .marker-table thead th{ background:#eef2f8; color:var(--navy); }
-  .chassis-wrap{ display:flex; gap:12px; align-items:flex-start; }
-  .chassisplan{ width:210px; flex:0 0 210px; height:auto; }
+  .chassis-wrap{ display:flex; gap:14px; align-items:flex-start; }
+  .chassisplan{ width:190px; flex:0 0 190px; height:auto; }
   .cp-outline{ fill:#f2f5f9; stroke:#5b6472; stroke-width:3; }
   .cp-seam{ fill:none; stroke:#9aa4b2; stroke-width:1.4; }
   .cz path{ stroke:#9aa4b2; stroke-width:1.2; }
-  .cz-num{ font-size:26px; font-weight:800; fill:#7a8494; text-anchor:middle; dominant-baseline:middle; }
+  .cz-num{ font-size:24px; font-weight:800; fill:#7a8494; text-anchor:middle; dominant-baseline:middle; }
   .cz-ok .cz-num,.cz-damage .cz-num{ fill:#fff; }
   .chassis-grid{ flex:1 1 auto; display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
   .ch-region{ border:1px solid var(--line); border-radius:5px; padding:6px 7px; background:#f7f9fc; }
@@ -578,11 +751,8 @@ export const INSPECTION_REPORT_CSS = `
   .sev-low{ background:#ecfdf5; color:var(--ok); }
   .sev-medium{ background:#fffbeb; color:var(--warn); }
   .sev-high,.sev-critical{ background:#fef2f2; color:var(--bad); }
-  .photo-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:7px; }
-  .photo{ margin:0; border:1px solid var(--line); border-radius:5px; overflow:hidden; background:#fff; }
-  .photo img{ width:100%; height:118px; object-fit:cover; display:block; }
-  .photo figcaption{ font-size:7.5pt; color:var(--muted); padding:3px 5px; }
-  .assessment{ margin-top:12px; border:2px solid var(--navy); border-radius:6px; overflow:hidden; }
-  .assessment-title{ background:var(--navy); color:var(--gold-soft); font-size:10pt; font-weight:700; padding:6px 10px; }
-  .assessment-body{ padding:9px 10px; font-size:9.5pt; color:var(--ink); min-height:38px; }
+  .p5-verify{ margin-top:14px; }
+  .p5-verify .verify{ flex-direction:column; align-items:stretch; }
+  .p5-verify .verify-qr{ display:flex; justify-content:center; }
+  .p5-verify .verify-qr img{ width:120px; height:120px; }
 `;

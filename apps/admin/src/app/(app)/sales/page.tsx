@@ -2317,7 +2317,7 @@ function DocumentModal({
     return () => {
       cancelled = true;
     };
-  }, [open, companyId]);
+  }, [open, companyId, user]);
 
   const currency = company?.currency;
   const selected = customers.find((c) => c.id === customerId) ?? null;
@@ -2436,14 +2436,10 @@ function DocumentModal({
               </Field>
             ) : null}
             {settlement ? (
-              <Field label={t('erp.sales.form.staffName')}>
-                <input
-                  className="oryx-input"
-                  value={salespersonName}
-                  onChange={(e) => setSalespersonName(e.target.value)}
-                  data-testid={`${testIdPrefix}-salesperson`}
-                />
-              </Field>
+              <MirrorField
+                label={t('erp.sales.form.staffName')}
+                value={salespersonName || user?.fullNameEn || user?.fullNameAr || user?.email}
+              />
             ) : null}
             {settlement && paymentMethod === 'BANK_TRANSFER' ? (
               <Field label={t('erp.sales.form.paymentAtAccount')}>

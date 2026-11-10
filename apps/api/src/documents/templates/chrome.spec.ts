@@ -1,4 +1,4 @@
-import { footerTemplate, signatureBlock } from './chrome';
+import { footerTemplate, officialFooterTemplate, signatureBlock } from './chrome';
 import type { DocumentIssuer } from '../document-payload';
 
 const issuer: DocumentIssuer = {
@@ -81,6 +81,28 @@ describe('document chrome', () => {
         titleAr: 'فاتورة ضريبية',
         documentNumber: 'SI-1',
       });
+      expect(html).not.toContain('<img');
+    });
+  });
+
+  describe('officialFooterTemplate', () => {
+    it('prints the page counter bilingually, matching the approved sheet', () => {
+      const html = officialFooterTemplate(issuer);
+      // English half carries the placeholders Chromium fills per page.
+      expect(html).toContain('Page <span class="pageNumber"></span> of <span class="totalPages"></span>');
+      // Arabic half repeats them, so both counters stay in step.
+      expect(html).toContain('من <span class="totalPages"></span> صفحة');
+      expect((html.match(/class="pageNumber"/g) || []).length).toBe(2);
+    });
+
+    it('keeps the registered address and CR number in the footer', () => {
+      const html = officialFooterTemplate(issuer);
+      expect(html).toContain('Manama');
+      expect(html).toContain('CR CR-998877');
+    });
+
+    it('escapes an issuer value rather than injecting it as markup', () => {
+      const html = officialFooterTemplate({ ...issuer, addressLine: '<img src=x onerror=alert(1)>' });
       expect(html).not.toContain('<img');
     });
   });

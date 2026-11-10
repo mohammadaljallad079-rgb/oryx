@@ -61,6 +61,13 @@ function RolesInner() {
   const [creating, setCreating] = useState(false);
 
   const delegableSet = useMemo(() => new Set(delegable.data?.permissions ?? []), [delegable.data]);
+  // Seeded system roles carry a bilingual description; custom roles fall back to
+  // the free-text English description the tenant supplied.
+  const roleDescription = (role: RoleDto): string => {
+    const key = `roles.description.${role.code}`;
+    const seeded = t(key);
+    return seeded === key ? role.descriptionEn ?? '' : seeded;
+  };
   const catalogByCode = useMemo(() => {
     const map = new Map<string, CatalogPermission>();
     for (const p of catalog.data?.permissions ?? []) map.set(p.code, p);
@@ -123,7 +130,7 @@ function RolesInner() {
                   </div>
                 </div>
 
-                <p className="oryx-muted m-0 mb-3 text-[12px]">{r.descriptionEn ?? ''}</p>
+                <p className="oryx-muted m-0 mb-3 text-[12px]">{roleDescription(r)}</p>
 
                 <div className="mb-3 flex flex-wrap gap-1">
                   {r.permissions.slice(0, 10).map((p) => {
@@ -163,7 +170,7 @@ function RolesInner() {
       </div>
 
       <Card className="p-4" data-testid="permission-catalog">
-        <p className="oryx-panel-title m-0 mb-1">Permission catalog</p>
+        <p className="oryx-panel-title m-0 mb-1">{t('roles.catalogTitle')}</p>
         <p className="oryx-muted m-0 mb-4 text-[12px]">
           {locale === 'ar'
             ? 'كل صلاحية تُقيَّم على الخادم. الصلاحيات المرتبطة بوحدة غير مرخصة تُعطَّل تلقائياً.'

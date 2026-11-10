@@ -53,13 +53,16 @@ export function UiProvider({
   const mounted = useRef(false);
 
   // Hydrate from persisted preference (localStorage), falling back to the
-  // server-provided initial values.
+  // server-provided initial values. When nothing is stored yet, the server
+  // default is written back so the bootstrap script and the next reload agree.
   useEffect(() => {
     const storedLocale = window.localStorage.getItem(LOCALE_KEY);
     const storedTheme = window.localStorage.getItem(THEME_KEY);
     if (storedLocale && isLocale(storedLocale)) setLocaleState(storedLocale);
+    else window.localStorage.setItem(LOCALE_KEY, initialLocale);
     if (storedTheme === 'dark' || storedTheme === 'light') setThemeState(storedTheme);
-  }, []);
+    else window.localStorage.setItem(THEME_KEY, initialTheme);
+  }, [initialLocale, initialTheme]);
 
   useEffect(() => {
     if (!mounted.current) return;

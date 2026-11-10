@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsBoolean, IsOptional } from 'class-validator';
+import type { Response } from 'express';
 import {
   CurrentPrincipal,
   RequireAnyPermission,
@@ -10,6 +11,7 @@ import {
 } from '../auth/auth.decorators';
 import { actorFrom } from '../common/erp-context.service';
 import { HrService } from './hr.service';
+import { HrExportService } from './hr-export.service';
 import {
   AdjustBalanceDto,
   CreateAdvanceDto,
@@ -23,13 +25,19 @@ import {
   CreatePayrollRunDto,
   CreateSalaryStructureDto,
   CreateShiftDto,
+  CreateWorkSiteDto,
   DecideLeaveDto,
   ListQueryDto,
   RecordAttendanceDto,
   RequestLeaveDto,
+  SelfBreakDto,
+  SelfCheckInDto,
+  SelfCheckOutDto,
   SettleAdvanceDto,
   StartLifecycleDto,
+  UpdateAttendancePolicyDto,
   UpdateEmployeeDto,
+  UpdateWorkSiteDto,
 } from './hr.dto';
 
 interface RequestLike {
@@ -48,7 +56,10 @@ class ToggleItemDto {
 @RequireModule('human_resources')
 @Controller('hr')
 export class HrController {
-  constructor(private readonly hr: HrService) {}
+  constructor(
+    private readonly hr: HrService,
+    private readonly hrExport: HrExportService,
+  ) {}
 
   // ------------------------------------------------------------ departments
   @Get('departments')
@@ -311,5 +322,192 @@ export class HrController {
   @ApiOperation({ summary: 'Workforce dashboard' })
   dashboard(@Query('companyId') companyId: string | undefined, @CurrentPrincipal() p: RequestPrincipal) {
     return this.hr.workforceDashboard(p, companyId);
+  }
+
+  // ------------------------------------------------------- policy & worksites
+  @Get('attendance-policy')
+  @RequireAnyPermission('erp.hr.read', 'erp.hr.attendance.manage', 'erp.hr.attendance.policy')
+  @ApiOperation({ summary: 'Read the attendance and payroll policy' })
+  getPolicy(@CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.getPolicy(p);
+  }
+
+  @Patch('attendance-policy')
+  @RequirePermissions('erp.hr.attendance.policy')
+  @ApiOperation({ summary: 'Update the attendance and payroll policy' })
+  updatePolicy(@Body() dto: UpdateAttendancePolicyDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.updatePolicy(dto, p, actorFrom(p, req));
+  }
+
+  @Get('work-sites')
+  @RequireAnyPermission('erp.hr.read', 'erp.hr.worksite.manage', 'erp.hr.attendance.manage')
+  @ApiOperation({ summary: 'List geofenced work sites' })
+  workSites(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.listWorkSites(query, p);
+  }
+
+  @Post('work-sites')
+  @RequirePermissions('erp.hr.worksite.manage')
+  @ApiOperation({ summary: 'Create a work site' })
+  createWorkSite(@Body() dto: CreateWorkSiteDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.createWorkSite(dto, p, actorFrom(p, req));
+  }
+
+  @Patch('work-sites/:id')
+  @RequirePermissions('erp.hr.worksite.manage')
+  @ApiOperation({ summary: 'Update a work site' })
+  updateWorkSite(@Param('id') id: string, @Body() dto: UpdateWorkSiteDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.updateWorkSite(id, dto, p, actorFrom(p, req));
+  }
+
+  @Get('work-sites/:id/qr-token')
+  @RequirePermissions('erp.hr.worksite.manage')
+  @ApiOperation({ summary: 'Current rotating QR token for a work site kiosk' })
+  workSiteQrToken(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.workSiteQrToken(id, p);
+  }
+
+  // --------------------------------------------------------- self-service
+  @Get('attendance/me')
+  @RequirePermissions('erp.hr.attendance.self')
+  @ApiOperation({ summary: "Today's attendance for the signed-in employee" })
+  myAttendance(@CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.myAttendanceToday(p);
+  }
+
+  @Get('attendance/me/history')
+  @RequirePermissions('erp.hr.attendance.self')
+  @ApiOperation({ summary: "The signed-in employee's own attendance history" })
+  myAttendanceHistory(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.myAttendanceHistory(p, query.from, query.to);
+  }
+
+  @Post('attendance/check-in')
+  @RequirePermissions('erp.hr.attendance.self')
+  @ApiOperation({ summary: 'Self check-in with optional GPS/Wi-Fi/QR verification' })
+  selfCheckIn(@Body() dto: SelfCheckInDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.selfCheckIn(dto, p, actorFrom(p, req), this.canManage(p));
+  }
+
+  @Post('attendance/check-out')
+  @RequirePermissions('erp.hr.attendance.self')
+  @ApiOperation({ summary: 'Self check-out and derive the day' })
+  selfCheckOut(@Body() dto: SelfCheckOutDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.selfCheckOut(dto, p, actorFrom(p, req), this.canManage(p));
+  }
+
+  @Post('attendance/break/start')
+  @RequirePermissions('erp.hr.attendance.self')
+  @ApiOperation({ summary: 'Start a break' })
+  selfBreakStart(@Body() dto: SelfBreakDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.selfBreakStart(dto, p, actorFrom(p, req), this.canManage(p));
+  }
+
+  @Post('attendance/break/end')
+  @RequirePermissions('erp.hr.attendance.self')
+  @ApiOperation({ summary: 'End the open break' })
+  selfBreakEnd(@Body() dto: SelfBreakDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.selfBreakEnd(dto, p, actorFrom(p, req), this.canManage(p));
+  }
+
+  // --------------------------------------------------------- salary history
+  @Get('employees/:id/salary-history')
+  @RequireAnyPermission('erp.hr.read', 'erp.hr.salary.manage')
+  @ApiOperation({ summary: 'Effective salary structures and change log for an employee' })
+  salaryHistory(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.listSalaryHistory(id, p);
+  }
+
+  // ----------------------------------------------------------- payslips
+  @Get('payslips/me')
+  @RequirePermissions('erp.hr.payslip.self')
+  @ApiOperation({ summary: 'The signed-in employee’s own payslips' })
+  myPayslips(@CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.myPayslips(p);
+  }
+
+  @Get('payslips/:id/pdf')
+  @RequireAnyPermission('erp.hr.payslip.read', 'erp.hr.payslip.self', 'erp.hr.payroll.approve')
+  @ApiOperation({ summary: 'Download a payslip as PDF' })
+  async payslipPdf(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Res() res: Response) {
+    await this.hr.assertPayslipReadable(id, p);
+    const { bytes, filename } = await this.hrExport.payslipPdf(id, p);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(bytes);
+  }
+
+  // ----------------------------------------------------------- HR reports
+  @Get('reports/attendance')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'Attendance detail report' })
+  reportAttendance(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.reportAttendance(query, p);
+  }
+
+  @Get('reports/late-absence')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'Late arrival and absence report' })
+  reportLateAbsence(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.reportLateAbsence(query, p);
+  }
+
+  @Get('reports/overtime')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'Overtime report' })
+  reportOvertime(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.reportOvertime(query, p);
+  }
+
+  @Get('reports/worked-hours')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'Worked hours report' })
+  reportWorkedHours(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.reportWorkedHours(query, p);
+  }
+
+  @Get('reports/payroll')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'Monthly payroll report' })
+  reportPayroll(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.reportPayroll(query, p);
+  }
+
+  @Get('reports/deductions-allowances')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'Deductions and allowances report' })
+  reportDeductions(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.reportDeductionsAllowances(query, p);
+  }
+
+  @Get('reports/employee-payroll')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'Employee payroll register' })
+  reportEmployeePayroll(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.reportEmployeePayroll(query, p);
+  }
+
+  @Get('reports/payroll-cost')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'Payroll cost by department and branch' })
+  reportPayrollCost(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.reportPayrollCost(query, p);
+  }
+
+  @Get('reports/:kind/export')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'Export an HR report as CSV' })
+  async exportReport(@Param('kind') kind: string, @Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal, @Res() res: Response) {
+    const result = await this.hr.runReport(kind, query, p);
+    const csv = this.hrExport.toCsv(result as Record<string, unknown>);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="hr-${kind}-${new Date().toISOString().slice(0, 10)}.csv"`);
+    // A BOM makes Excel open a UTF-8 CSV in the right encoding, so the Arabic
+    // headers and names do not turn into mojibake.
+    res.send(`\uFEFF${csv}`);
+  }
+
+  private canManage(p: RequestPrincipal): boolean {
+    return p.grantedPermissions.includes('erp.hr.attendance.manage');
   }
 }

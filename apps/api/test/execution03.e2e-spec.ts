@@ -181,15 +181,16 @@ describe('ORYX Execution 03 (e2e)', () => {
       expect(run.body.grossMinor).toBeGreaterThan(625000);
       expect(run.body.netMinor).toBeLessThanOrEqual(run.body.grossMinor);
 
-      // Overtime is priced at the hourly rate, not 1/100 of it. 120 minutes is
-      // 2.00 h (200 hundredths); basic 5000.00 gives an hourly rate of 20.83,
-      // so the line is 41.66 — not the 0.42 the quantity-scaled helper produced.
+      // Overtime is priced from the company policy at 150% (15000 bp). Basic
+      // 5000.00 over the standard 240 h month gives an hourly rate of 20.83;
+      // 120 minutes (2.00 h) is 41.66, and 150% of that is 62.49 — the figure
+      // the policy-driven run must print, not the flat 1.0x of the old engine.
       const slips = await erp<{ items: Array<{ employeeId: string; lines: Array<{ code: string; amountMinor: number }> }> }>(
         `/hr/payroll-runs/${run.body.id}/payslips`,
       );
       const slip = slips.body.items.find((s) => s.employeeId === employeeId);
       const overtime = slip?.lines.find((l) => l.code === 'OVERTIME');
-      expect(overtime?.amountMinor).toBe(4166);
+      expect(overtime?.amountMinor).toBe(6249);
     });
 
     it('posts payroll to the ledger exactly once (atomic and idempotent)', async () => {
@@ -254,6 +255,91 @@ describe('ORYX Execution 03 (e2e)', () => {
       const res = await call(ctx.base, '/hr/employees', { token: isolatedToken, headers: { 'x-oryx-company-id': demo.id } });
       expect(res.status).toBe(403);
       expect((res.body as { code?: string }).code).toBe('authz.cross_tenant_denied');
+    });
+
+    it('round-trips the attendance policy and a work site', async () => {
+      const policy = await erp<{ graceMinutes: number; standardDailyHours: number }>('/hr/attendance-policy');
+      expect(policy.status).toBe(200);
+
+      const updated = await erp<{ graceMinutes: number; deductAbsence: boolean }>('/hr/attendance-policy', {
+        method: 'PATCH',
+        body: { graceMinutes: 15, standardDailyHours: 800, overtimeMultiplierBp: 15000, deductLate: false, deductAbsence: true },
+      });
+      expect(updated.status).toBe(200);
+      expect(updated.body.graceMinutes).toBe(15);
+
+      const site = await erp<{ id: string; code: string }>('/hr/work-sites', {
+        method: 'POST',
+        body: { code: 'HQ', nameEn: 'Head office', nameAr: 'المكتب الرئيسي', latitude: 26.2285, longitude: 50.586, radiusMeters: 200 },
+      });
+      expect(site.status).toBe(201);
+      const list = await erp<{ items: Array<{ code: string }> }>('/hr/work-sites');
+      expect(list.body.items.some((s) => s.code === 'HQ')).toBe(true);
+    });
+
+    it('records a self check-in with GPS and computes the worked time', async () => {
+      // Link the fixture employee to the signed-in user so the self-service path
+      // (which resolves the employee from the principal) can be exercised.
+      const adminUser = await ctx.prisma.user.findUniqueOrThrow({ where: { email: SEED_COMPANY_ADMIN.email } });
+      await ctx.prisma.employee.update({ where: { id: employeeId }, data: { userId: adminUser.id } });
+
+      const site = await erp<{ id: string }>('/hr/work-sites', {
+        method: 'POST',
+        body: { code: 'FIELD', nameEn: 'Field', nameAr: 'ميداني', latitude: 26.2, longitude: 50.58, radiusMeters: 500 },
+      });
+      expect(site.status).toBe(201);
+      const checkIn = await erp<{ id: string; status: string; checkInAt: string | null }>('/hr/attendance/check-in', {
+        method: 'POST',
+        body: { location: { latitude: 26.2005, longitude: 50.5805, accuracy: 8 } },
+      });
+      expect(checkIn.status).toBe(201);
+      expect(checkIn.body.checkInAt).not.toBeNull();
+
+      const checkOut = await erp<{ checkOutAt: string | null; netMinutes: number }>('/hr/attendance/check-out', {
+        method: 'POST',
+        body: { location: { latitude: 26.2005, longitude: 50.5805, accuracy: 8 } },
+      });
+      expect(checkOut.status).toBe(201);
+      expect(checkOut.body.checkOutAt).not.toBeNull();
+      // Self-service clock times are exposed on the employee's own record.
+      const mine = await erp<{ status: string }>('/hr/attendance/me');
+      expect(mine.status).toBe(200);
+    });
+
+    it('serves the payslip PDF for a posted run', async () => {
+      const runs = await erp<{ items: Array<{ id: string; status: string }> }>('/hr/payroll-runs');
+      const runId = runs.body.items[0].id;
+      const slips = await erp<{ items: Array<{ id: string; employeeId: string }> }>(`/hr/payroll-runs/${runId}/payslips`);
+      const slip = slips.body.items.find((s) => s.employeeId === employeeId)!;
+
+      const res = await fetch(`${ctx.base}/api/v1/hr/payslips/${slip.id}/pdf`, {
+        headers: { Authorization: `Bearer ${token}`, 'x-oryx-company-id': tenantId },
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toContain('application/pdf');
+      const bytes = Buffer.from(await res.arrayBuffer());
+      expect(bytes.subarray(0, 4).toString()).toBe('%PDF');
+      expect(bytes.length).toBeGreaterThan(10_000);
+    });
+
+    it('exports every HR report as CSV and renders each report payload', async () => {
+      const kinds = ['attendance', 'late-absence', 'overtime', 'worked-hours', 'payroll', 'deductions-allowances', 'employee-payroll', 'payroll-cost'];
+      for (const kind of kinds) {
+        const report = await erp<Record<string, unknown>>(`/hr/reports/${kind}`);
+        expect(report.status).toBe(200);
+        const csv = await fetch(`${ctx.base}/api/v1/hr/reports/${kind}/export`, {
+          headers: { Authorization: `Bearer ${token}`, 'x-oryx-company-id': tenantId },
+        });
+        expect(csv.status).toBe(200);
+        expect(csv.headers.get('content-type')).toContain('text/csv');
+      }
+    });
+
+    it('returns the HR dashboard KPIs', async () => {
+      const dash = await erp<{ totalEmployees: number; attendanceToday: Record<string, number> }>('/hr/dashboard');
+      expect(dash.status).toBe(200);
+      expect(typeof dash.body.totalEmployees).toBe('number');
+      expect(dash.body.attendanceToday).toBeDefined();
     });
   });
 

@@ -363,9 +363,9 @@ function NotificationsPageInner() {
               value={announceSeverity}
               onChange={(e) => setAnnounceSeverity(e.target.value)}
             >
-              <option value="INFO">INFO</option>
-              <option value="WARNING">WARNING</option>
-              <option value="CRITICAL">CRITICAL</option>
+              <option value="INFO">{t('notif.severityInfo')}</option>
+              <option value="WARNING">{t('notif.severityWarning')}</option>
+              <option value="CRITICAL">{t('notif.severityCritical')}</option>
             </select>
           </Field>
           <Field label={t('notif.announceAudience')}>

@@ -76,13 +76,15 @@ describe('inspection report composition', () => {
     }
   });
 
-  it('keeps paint and chassis on one page when both are selected', () => {
+  it('gives paint and chassis their own pages, as in the approved report', () => {
     const plan = planInspectionReport(['PAINT_BODY', 'CHASSIS_UNDERCARRIAGE']);
-    // Both live on original page 2, so the document is identification + one page.
-    expect(plan).toHaveLength(2);
-    expect(plan[1].number).toBe(2);
+    // Paint is page 2 and chassis is page 3 of the original, so the document is
+    // identification + two section pages.
+    expect(plan).toHaveLength(3);
+    expect(plan[1].section).toBe('PAINT_BODY');
+    expect(plan[2].section).toBe('CHASSIS_UNDERCARRIAGE');
     const onPage = sectionsOnReportPage(plan[1], ['PAINT_BODY', 'CHASSIS_UNDERCARRIAGE']);
-    expect(onPage.map((s) => s.key)).toEqual(['PAINT_BODY', 'CHASSIS_UNDERCARRIAGE']);
+    expect(onPage.map((s) => s.key)).toEqual(['PAINT_BODY']);
   });
 
   it('uses the section title when one section stands alone, and the combined title when they share a page', () => {
@@ -90,7 +92,9 @@ describe('inspection report composition', () => {
     expect(alone[1].titleEn).toBe('Interior Inspection');
 
     const together = planInspectionReport(['INTERIOR', 'EXTERIOR']);
-    expect(together[1].titleEn).toBe('Interior & Exterior Inspection');
+    expect(together[1].titleEn).toBe(
+      'Interior & Exterior Inspection / Engine Compartment / Road Test',
+    );
   });
 
   it('returns only the identification page when nothing is selected', () => {

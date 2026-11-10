@@ -40,8 +40,8 @@ describe('inspection diagram geometry — body panels', () => {
     }
   });
 
-  it('places both wheels on the ground line inside the box', () => {
-    expect(BODY_WHEELS).toHaveLength(2);
+  it('places a wheel patch at each corner inside the box', () => {
+    expect(BODY_WHEELS).toHaveLength(4);
     for (const w of BODY_WHEELS) {
       expect(w.cx - w.r).toBeGreaterThanOrEqual(0);
       expect(w.cx + w.r).toBeLessThanOrEqual(BODY_VIEWBOX.width);
@@ -49,8 +49,8 @@ describe('inspection diagram geometry — body panels', () => {
   });
 
   it('resolves a normalised point to the panel it sits on', () => {
-    // Mid-body, mid-height: the front door.
-    expect(bodyPanelAt(0.43, 0.6)?.key).toBe('frontDoor');
+    // Left flank, mid-length: the front-left door.
+    expect(bodyPanelAt(0.21, 0.38)?.key).toBe('frontLeftDoor');
     // Far above the vehicle: nothing.
     expect(bodyPanelAt(0.5, 0.01)).toBeNull();
   });

@@ -46,25 +46,82 @@ export interface PayslipResult {
 export const STANDARD_MONTH_HOURS = 24000;
 
 /** Monthly basic salary divided by the standard month, in minor units. */
-export function hourlyRateMinor(basicMinor: number): number {
-  return Math.round((basicMinor * 100) / STANDARD_MONTH_HOURS);
+export function hourlyRateMinor(basicMinor: number, standardMonthHours = STANDARD_MONTH_HOURS): number {
+  if (standardMonthHours <= 0) return 0;
+  return Math.round((basicMinor * 100) / standardMonthHours);
 }
+
+/** Monthly basic divided by the standard 30-day month, in minor units per day. */
+export function dailyRateMinor(basicMinor: number): number {
+  return Math.round((basicMinor * 100) / 3000);
+}
+
+/**
+ * Policy inputs the payroll run applies. The values arrive from the company's
+ * `AttendancePolicy`; the calculator stays pure and does not read the database.
+ */
+export interface PayrollPolicy {
+  /** Pay overtime at all. */
+  overtimeEnabled: boolean;
+  /** Overtime multiplier in basis points (15000 = 150%). */
+  overtimeMultiplierBp: number;
+  /** Standard daily hours in hundredths, used to derive the hourly rate. */
+  standardDailyHours: number;
+  /** Deduct late minutes from pay. */
+  deductLate: boolean;
+  /** Deduct early-leave minutes from pay. */
+  deductEarlyLeave: boolean;
+  /** Deduct full absent days from pay. */
+  deductAbsence: boolean;
+}
+
+/** Attendance totals for one employee across the payroll period. */
+export interface AttendanceTotals {
+  /** Overtime minutes to pay. */
+  overtimeMinutes: number;
+  /** Late minutes across the period. */
+  lateMinutes: number;
+  /** Early-leave minutes across the period. */
+  earlyLeaveMinutes: number;
+  /** Whole absent days to deduct. */
+  absenceDays: number;
+  /** Net worked minutes across the period (informational). */
+  workedMinutes: number;
+}
+
+export const DEFAULT_PAYROLL_POLICY: PayrollPolicy = {
+  overtimeEnabled: true,
+  overtimeMultiplierBp: 15000,
+  standardDailyHours: 800,
+  deductLate: false,
+  deductEarlyLeave: false,
+  deductAbsence: true,
+};
 
 /**
  * Compute a payslip from a basic salary, its components and any period inputs.
  *
  * `overtimeHours` is in hundredths of an hour; `unpaidLeaveDays` is in
  * hundredths of a day and is deducted at the daily rate (basic / 30).
+ *
+ * When `attendance` and `policy` are supplied the run additionally pays overtime
+ * (at `policy.overtimeMultiplierBp`) and deducts late/early/absence according to
+ * the policy. The monetary rules all live here, so the run and a re-calculation
+ * can never disagree.
  */
 export function computePayslip(input: {
   basicMinor: number;
   components: SalaryComponentInput[];
   overtimeHours?: number;
   overtimeMultiplierBp?: number;
+  overtimeRateMinor?: number | null;
   unpaidLeaveDays?: number;
   advanceDeductionMinor?: number;
+  policy?: PayrollPolicy;
+  attendance?: AttendanceTotals;
 }): PayslipResult {
   const lines: PayslipLineResult[] = [];
+  const policy = input.policy ?? DEFAULT_PAYROLL_POLICY;
 
   for (const [index, component] of input.components.entries()) {
     const amount = component.isPercentage
@@ -80,10 +137,25 @@ export function computePayslip(input: {
     });
   }
 
+  // The standard month hours drive the derived hourly rate; a per-employee
+  // override changes the month length, not the pay period.
+  const standardMonthHours = Math.max(
+    STANDARD_MONTH_HOURS,
+    policy.standardDailyHours > 0 ? policy.standardDailyHours * 30 : STANDARD_MONTH_HOURS,
+  );
+  const hourlyRate = input.overtimeRateMinor ?? hourlyRateMinor(input.basicMinor, standardMonthHours);
+  const dayRate = dailyRateMinor(input.basicMinor);
+
   // Overtime is an earning; the multiplier is in basis points (15000 = 150%).
-  if (input.overtimeHours && input.overtimeHours > 0) {
-    const base = hoursAmountMinor(input.overtimeHours, hourlyRateMinor(input.basicMinor));
-    const multiplier = input.overtimeMultiplierBp ?? 10000;
+  const overtimeHours = input.attendance
+    ? Math.round((input.attendance.overtimeMinutes * 100) / 60)
+    : input.overtimeHours ?? 0;
+  const overtimeAllowed = input.attendance ? policy.overtimeEnabled : true;
+  if (overtimeAllowed && overtimeHours > 0) {
+    const base = hoursAmountMinor(overtimeHours, hourlyRate);
+    const multiplier = input.attendance
+      ? policy.overtimeMultiplierBp
+      : input.overtimeMultiplierBp ?? 10000;
     lines.push({
       type: 'ALLOWANCE',
       code: 'OVERTIME',
@@ -96,14 +168,45 @@ export function computePayslip(input: {
 
   // Unpaid leave reduces the basic at the daily rate (basic / 30 days).
   if (input.unpaidLeaveDays && input.unpaidLeaveDays > 0) {
-    const dailyRate = Math.round((input.basicMinor * 100) / 3000);
     lines.push({
       type: 'DEDUCTION',
       code: 'UNPAID_LEAVE',
       nameEn: 'Unpaid leave',
       nameAr: 'إجازة غير مدفوعة',
-      amountMinor: hoursAmountMinor(input.unpaidLeaveDays, dailyRate),
+      amountMinor: hoursAmountMinor(input.unpaidLeaveDays, dayRate),
       sortOrder: 9100,
+    });
+  }
+
+  // Attendance-driven deductions, only when the policy enables them.
+  if (input.attendance && input.attendance.absenceDays > 0 && policy.deductAbsence) {
+    lines.push({
+      type: 'DEDUCTION',
+      code: 'ABSENCE',
+      nameEn: 'Absence',
+      nameAr: 'غياب',
+      amountMinor: input.attendance.absenceDays * dayRate,
+      sortOrder: 9150,
+    });
+  }
+  if (input.attendance && policy.deductLate && input.attendance.lateMinutes > 0) {
+    lines.push({
+      type: 'DEDUCTION',
+      code: 'LATE',
+      nameEn: 'Late arrival',
+      nameAr: 'تأخير',
+      amountMinor: Math.round((input.attendance.lateMinutes * hourlyRate) / 60),
+      sortOrder: 9160,
+    });
+  }
+  if (input.attendance && policy.deductEarlyLeave && input.attendance.earlyLeaveMinutes > 0) {
+    lines.push({
+      type: 'DEDUCTION',
+      code: 'EARLY_LEAVE',
+      nameEn: 'Early leave',
+      nameAr: 'انصراف مبكر',
+      amountMinor: Math.round((input.attendance.earlyLeaveMinutes * hourlyRate) / 60),
+      sortOrder: 9170,
     });
   }
 

@@ -66,11 +66,12 @@ describe('inspection catalogue — section and item completeness', () => {
       (acc[s.page] ??= []).push(s.key);
       return acc;
     }, {});
-    // Paint and chassis share page 2; interior and exterior page 3; engine and
-    // road test page 4; the computer unit page 5.
-    expect(byPage[2]).toEqual(['PAINT_BODY', 'CHASSIS_UNDERCARRIAGE']);
-    expect(byPage[3]).toEqual(['INTERIOR', 'EXTERIOR']);
-    expect(byPage[4]).toEqual(['ENGINE_COMPARTMENT', 'ROAD_TEST']);
+    // The approved five-page report: paint on page 2, chassis on page 3, the
+    // interior/exterior/engine/road group on page 4 and the computer unit on
+    // page 5.
+    expect(byPage[2]).toEqual(['PAINT_BODY']);
+    expect(byPage[3]).toEqual(['CHASSIS_UNDERCARRIAGE']);
+    expect(byPage[4]).toEqual(['INTERIOR', 'EXTERIOR', 'ENGINE_COMPARTMENT', 'ROAD_TEST']);
     expect(byPage[5]).toEqual(['COMPUTER_UNIT']);
   });
 

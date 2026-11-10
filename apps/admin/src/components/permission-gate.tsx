@@ -50,7 +50,7 @@ export function PermissionGate({
             <p className="oryx-muted mt-1 mb-3 max-w-[70ch] text-[13px]">
               {isPlatform
                 ? t('users.delegationNote')
-                : 'This screen belongs to platform governance. Contact your platform administrator if you need access.'}
+                : t('error.platformGovernance')}
             </p>
             <Link href="/dashboard" className="oryx-btn oryx-btn--primary">
               <Icon name="gauge" size={16} />

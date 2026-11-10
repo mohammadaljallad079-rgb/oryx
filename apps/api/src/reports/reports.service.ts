@@ -109,6 +109,19 @@ export class ReportsService {
 
     const byBranch = await this.branchBreakdown(companyId, invoices);
 
+    // Sales by the operator who prepared the invoice. An invoice with no
+    // recorded operator groups under a single "unassigned" bucket rather than
+    // being dropped, so the totals always reconcile with `invoiceCount`.
+    const bySalesperson = new Map<string, { total: number; paid: number; count: number }>();
+    for (const inv of invoices) {
+      const key = inv.salespersonName?.trim() || '—';
+      const agg = bySalesperson.get(key) ?? { total: 0, paid: 0, count: 0 };
+      agg.total += inv.totalMinor;
+      agg.paid += inv.amountPaidMinor;
+      agg.count += 1;
+      bySalesperson.set(key, agg);
+    }
+
     const posSales = await this.prisma.posSale.findMany({
       where: { companyId, status: 'COMPLETED', ...(dateFilter ? { createdAt: dateFilter } : {}), ...branchFilter },
     });
@@ -139,6 +152,14 @@ export class ReportsService {
         }))
         .sort((a, b) => b.totalMinor - a.totalMinor),
       byBranch,
+      bySalesperson: [...bySalesperson.entries()]
+        .map(([salespersonName, v]) => ({
+          salespersonName,
+          invoiceCount: v.count,
+          totalMinor: v.total,
+          paidMinor: v.paid,
+        }))
+        .sort((a, b) => b.totalMinor - a.totalMinor),
     };
   }
 

@@ -38,12 +38,20 @@ export type InspectionSectionKey = (typeof INSPECTION_SECTION_KEYS)[number];
 export type InspectionSectionKind = 'ITEMS' | 'DIAGRAM_PAINT' | 'DIAGRAM_CHASSIS' | 'DIAGNOSTIC';
 
 /** Which printed page of the report a section comes from, so the official
- * document can be regrouped in Phase 3 without changing the data model. */
+ * document can be regrouped in Phase 3 without changing the data model.
+ *
+ * The mapping follows the approved ORYX inspection report:
+ *   page 1 — identification, vehicle photograph, terms and signatures;
+ *   page 2 — paint &amp; body (top-view panel diagram);
+ *   page 3 — chassis &amp; undercarriage (underbody diagram);
+ *   page 4 — interior &amp; exterior, engine compartment and road test;
+ *   page 5 — computer unit inspection.
+ */
 export const INSPECTION_SECTION_PAGE: Record<InspectionSectionKey, number> = {
   PAINT_BODY: 2,
-  CHASSIS_UNDERCARRIAGE: 2,
-  INTERIOR: 3,
-  EXTERIOR: 3,
+  CHASSIS_UNDERCARRIAGE: 3,
+  INTERIOR: 4,
+  EXTERIOR: 4,
   ENGINE_COMPARTMENT: 4,
   ROAD_TEST: 4,
   COMPUTER_UNIT: 5,
@@ -109,7 +117,7 @@ export const INSPECTION_SECTION_SPECS: readonly InspectionSectionSpec[] = [
     labelAr: 'الشاسيه والأسفل',
     summaryEn: 'Chassis safety diagram with eight assessed regions.',
     summaryAr: 'مخطط سلامة الشاسيه بثماني مناطق تقييم.',
-    page: 2,
+    page: 3,
     kind: 'DIAGRAM_CHASSIS',
     resultSet: PASS_FAIL,
     items: [],
@@ -122,7 +130,7 @@ export const INSPECTION_SECTION_SPECS: readonly InspectionSectionSpec[] = [
     labelAr: 'الفحص الداخلي',
     summaryEn: 'Cabin, controls, comfort and interior fittings.',
     summaryAr: 'المقصورة وأدوات التحكم والراحة والتجهيزات الداخلية.',
-    page: 3,
+    page: 4,
     kind: 'ITEMS',
     resultSet: PASS_FAIL_NA,
     items: [
@@ -148,7 +156,7 @@ export const INSPECTION_SECTION_SPECS: readonly InspectionSectionSpec[] = [
     labelAr: 'الفحص الخارجي',
     summaryEn: 'Body glazing, lighting, wipers, mirrors and tyres.',
     summaryAr: 'الزجاج والإضاءة والمساحات والمرايا والإطارات.',
-    page: 3,
+    page: 4,
     kind: 'ITEMS',
     resultSet: PASS_FAIL_NA,
     items: [

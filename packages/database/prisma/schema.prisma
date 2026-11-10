@@ -534,8 +534,12 @@ model Company {
   shifts              Shift[]
   employeeShifts      EmployeeShift[]
   attendanceRecords   AttendanceRecord[]
+  attendanceBreaks    AttendanceBreak[]
+  workSites           WorkSite[]
+  attendancePolicies  AttendancePolicy[]
   salaryStructures    SalaryStructure[]
   salaryComponents    SalaryComponent[]
+  salaryChangeLogs    SalaryChangeLog[]
   payrollPeriods      PayrollPeriod[]
   payrollRuns         PayrollRun[]
   payslips            Payslip[]
@@ -722,6 +726,9 @@ model Branch {
   paymentIntents   PaymentIntent[]
 
   inspectionSessions InspectionSession[]
+
+  // Attendance check-in worksites attached to this branch.
+  workSites WorkSite[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -2859,6 +2866,8 @@ model Employee {
   leaveBalances    LeaveBalance[]
   leaveRequests    LeaveRequest[]
   attendance       AttendanceRecord[]
+  attendanceBreaks AttendanceBreak[]
+  salaryChangeLogs SalaryChangeLog[]
   shiftAssignments EmployeeShift[]
   salaryStructures SalaryStructure[]
   payslips         Payslip[]
@@ -3075,15 +3084,146 @@ model AttendanceRecord {
   overtimeMinutes Int              @default(0)
   status          AttendanceStatus @default(PRESENT)
   notes           String?
+  /**
+   * Minutes between the scheduled start and the check-in (late arrival), and
+   * between the check-out and the scheduled end (early leave). Both are derived
+   * server-side from the shift and stored so a report never has to recompute.
+   */
+  lateMinutes     Int              @default(0)
+  earlyLeaveMinutes Int            @default(0)
+  breakMinutes    Int              @default(0)
+  /**
+   * Net minutes actually worked: worked − breaks. Stored rather than derived so
+   * a payroll run reads one column.
+   */
+  netMinutes      Int              @default(0)
+  /**
+   * How the check-in was verified, so an audit can tell a GPS fix from a QR
+   * scan and how confident the fix was. Never treated as an identity proof on
+   * its own.
+   */
+  checkInSource   String?
+  checkOutSource  String?
+  checkInLat      Float?
+  checkInLng      Float?
+  checkInAccuracy Float?
+  checkInDistanceM Int?
+  checkInSiteId   String?
+  checkOutLat     Float?
+  checkOutLng     Float?
+  checkOutDistanceM Int?
+  checkOutSiteId  String?
+  /**
+   * When the client could not verify location it may fall back to a reason the
+   * operator reviews, rather than blocking the punch.
+   */
+  fallbackReason  String?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
   company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   shift    Shift?   @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  breaks   AttendanceBreak[]
 
   @@unique([employeeId, workDate])
   @@index([companyId, workDate])
+  @@index([companyId, status])
+}
+
+/**
+ * One break within an attendance day. A day may hold several; the sum feeds the
+ * record's `breakMinutes` and therefore the net worked time.
+ */
+model AttendanceBreak {
+  id                 String    @id @default(cuid())
+  companyId          String
+  attendanceRecordId String
+  employeeId         String
+  startedAt          DateTime
+  endedAt            DateTime?
+  minutes            Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  company    Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  record     AttendanceRecord @relation(fields: [attendanceRecordId], references: [id], onDelete: Cascade)
+  employee   Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([attendanceRecordId])
+  @@index([companyId, employeeId])
+}
+
+/**
+ * An approved physical location where an employee may check in. Verification
+ * uses a GPS radius, an optional Wi-Fi SSID/BSSID allow-list and a rotating QR
+ * token. None of these is an identity proof on its own; the record stores which
+ * one was used and its measured accuracy so the check can be reviewed.
+ */
+model WorkSite {
+  id             String   @id @default(cuid())
+  companyId      String
+  branchId       String?
+  code           String
+  nameEn         String
+  nameAr         String
+  latitude       Float
+  longitude      Float
+  /** Allowed GPS radius in metres. */
+  radiusMeters   Int      @default(150)
+  /** Comma-separated Wi-Fi SSIDs accepted at this site. */
+  wifiSsids      String?
+  /** Comma-separated Wi-Fi BSSIDs (AP MAC addresses) accepted at this site. */
+  wifiBssids     String?
+  /** Secret used to derive the rotating check-in QR token. */
+  qrSecret       String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch  Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, code])
+  @@index([companyId])
+}
+
+/**
+ * The company's attendance and payroll policy. One row per company. Every
+ * monetary rule a payroll run applies is read from here, so a change is a
+ * deliberate, audited edit rather than a code change.
+ */
+model AttendancePolicy {
+  id                        String   @id @default(cuid())
+  companyId                 String   @unique
+  /** Grace period before an arrival counts as late, in minutes. */
+  graceMinutes              Int      @default(10)
+  /** Daily standard hours in hundredths (800 = 8 h). */
+  standardDailyHours        Int      @default(800)
+  /** Weekly standard hours in hundredths (4000 = 40 h). */
+  standardWeeklyHours       Int      @default(4000)
+  /** Working week: comma-separated ISO weekdays (1=Mon … 7=Sun). */
+  workingDays               String   @default("1,2,3,4,5")
+  /** Whether overtime is paid at all. */
+  overtimeEnabled           Boolean  @default(true)
+  /** Overtime pay multiplier in basis points (15000 = 150%). */
+  overtimeMultiplierBp      Int      @default(15000)
+  /** Daily overtime beyond which the higher rate applies, in hundredths of an hour. */
+  overtimeThresholdHours    Int      @default(0)
+  /** Deduct late minutes from pay when true. */
+  deductLate                Boolean  @default(false)
+  /** Deduct early-leave minutes from pay when true. */
+  deductEarlyLeave          Boolean  @default(false)
+  /** Deduct absent days from pay when true. */
+  deductAbsence             Boolean  @default(true)
+  /** Require a location verification (GPS, Wi-Fi or QR) for a self check-in. */
+  requireLocation           Boolean  @default(false)
+  /** Allow a reasoned fallback check-in when verification is impossible. */
+  allowFallback             Boolean  @default(true)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
 
 /**
@@ -3094,10 +3234,21 @@ model SalaryStructure {
   companyId     String
   employeeId    String
   effectiveFrom DateTime
+  /** When the next structure supersedes this one; null means open-ended. */
+  effectiveTo   DateTime?
   /**
    * Base monthly salary in minor units.
    */
   basicMinor    Int
+  /**
+   * Explicit hourly overtime rate in minor units. When null the run derives the
+   * rate from the basic (basic / standard month hours).
+   */
+  overtimeRateMinor Int?
+  /** Per-employee working-hour overrides; null falls back to the policy. */
+  dailyHours    Int?
+  weeklyHours   Int?
+  workingDays   String?
   currency      String   @default("BHD")
   isActive      Boolean  @default(true)
   notes         String?
@@ -3109,6 +3260,30 @@ model SalaryStructure {
   components SalaryComponent[]
 
   @@index([companyId, employeeId, effectiveFrom])
+}
+
+/**
+ * An append-only record of every change to an employee's salary, so the "who,
+ * what and when" of a pay change survives independently of the structure row.
+ */
+model SalaryChangeLog {
+  id             String   @id @default(cuid())
+  companyId      String
+  employeeId     String
+  structureId    String?
+  previousBasicMinor Int?
+  newBasicMinor  Int
+  currency       String   @default("BHD")
+  effectiveFrom  DateTime
+  reason         String?
+  changedById    String
+  changedAt      DateTime @default(now())
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, employeeId])
+  @@index([companyId, changedAt])
 }
 
 model SalaryComponent {
@@ -3206,6 +3381,15 @@ model Payslip {
   netMinor              Int      @default(0)
   currency              String   @default("BHD")
   advanceDeductionMinor Int      @default(0)
+  /**
+   * Attendance-derived figures the run applied, kept on the payslip so a payslip
+   * PDF or report never has to re-read the attendance rows.
+   */
+  overtimeMinutes       Int      @default(0)
+  lateMinutes           Int      @default(0)
+  absenceDays           Int      @default(0)
+  paidLeaveDays         Int      @default(0)
+  workedMinutes         Int      @default(0)
   /**
    * Full snapshot of the salary structure and computed components at run time.
    */

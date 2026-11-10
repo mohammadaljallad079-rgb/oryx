@@ -10,12 +10,14 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  isLocale,
   resolveEffectivePermissions,
   type LoginResponse,
   type MembershipSummary,
   type SessionUser,
 } from '@oryx/shared';
 import { api, ApiError, restoreSession, tokenStore } from './api';
+import { useUi } from './ui-context';
 
 interface AuthState {
   user: SessionUser | null;
@@ -50,6 +52,11 @@ interface AuthContextValue extends AuthState {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // The account's saved language/theme live on the user record, so a signed-in
+  // operator keeps their preference across devices and reloads. The UI provider
+  // owns the live value; this effect pushes the account preference into it once
+  // the session is known (and after a preference change on the settings page).
+  const { setLocale, setTheme } = useUi();
   const [state, setState] = useState<AuthState>({
     user: null,
     memberships: [],
@@ -130,6 +137,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void loadSession();
   }, [loadSession]);
+
+  /**
+   * Seed the language and theme from the signed-in account on a fresh browser.
+   *
+   * `localStorage` is the operator's explicit, device-local choice and stays
+   * authoritative once it exists (the header toggle and the settings page both
+   * write it). The account's `preferredLocale`/`preferredTheme` are only a
+   * fallback for a browser that has never chosen, so a first visit opens in the
+   * operator's language instead of the Arabic server default. Applying them
+   * unconditionally would fight an explicit choice, which is why the stored
+   * value wins whenever it is present.
+   */
+  useEffect(() => {
+    const user = state.user;
+    if (!user) return;
+    const hasStoredLocale = window.localStorage.getItem('oryx.locale');
+    const hasStoredTheme = window.localStorage.getItem('oryx.theme');
+    if (!hasStoredLocale && isLocale(user.preferredLocale)) setLocale(user.preferredLocale);
+    if (!hasStoredTheme && (user.preferredTheme === 'dark' || user.preferredTheme === 'light')) {
+      setTheme(user.preferredTheme);
+    }
+  }, [state.user, setLocale, setTheme]);
 
   // When a request proves the session is gone (refresh failed), drop local state
   // so the shell redirects to sign-in rather than showing a broken screen.

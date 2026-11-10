@@ -43,6 +43,7 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
+  '.pdf': 'application/pdf',
   '.md': 'text/plain; charset=utf-8',
   '.apk': 'application/vnd.android.package-archive',
 };

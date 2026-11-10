@@ -171,6 +171,33 @@ export default function ReportsPage() {
                   </TableShell>
                 )}
               </div>
+              <div className="border-t border-[var(--border)] p-4">
+                <p className="oryx-panel-title m-0 mb-3">{t('erp.reports.bySalesperson')}</p>
+                {(sales.data.bySalesperson ?? []).length === 0 ? (
+                  <p className="oryx-muted m-0 text-[12.5px]">{t('common.empty')}</p>
+                ) : (
+                  <TableShell>
+                    <thead>
+                      <tr>
+                        <th>{t('erp.reports.salesperson')}</th>
+                        <th>{t('erp.reports.invoices')}</th>
+                        <th>{t('erp.sales.total')}</th>
+                        <th>{t('erp.reports.collected')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(sales.data.bySalesperson ?? []).map((s) => (
+                        <tr key={s.salespersonName} data-testid={`report-salesperson-${s.salespersonName}`}>
+                          <td>{s.salespersonName}</td>
+                          <td className="tabular-nums text-[12.5px]">{s.invoiceCount}</td>
+                          <td className="tabular-nums text-[12.5px] font-semibold">{money(s.totalMinor)}</td>
+                          <td className="tabular-nums text-[12.5px]">{money(s.paidMinor)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </TableShell>
+                )}
+              </div>
             </>
           )}
         </Card>

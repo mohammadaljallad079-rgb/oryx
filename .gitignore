@@ -77,3 +77,19 @@ apps/api/.media/
 # never source.
 storage/
 apps/api/storage/
+
+# Per-task comparison scratch. These directories hold renders and side-by-side
+# images of the owner-supplied reference documents, which carry a real
+# customer's name, phone and address. Like `.run/pdf-compare/` above they are a
+# local comparison input, never a repository artefact.
+.run/task1/
+.run/task2/
+.run/preview/
+.run/print-compare/
+oryx out put*.pdf
+
+# Ad-hoc verification/repro scripts kept out of the release branch.
+.run/*.mjs
+.run/*.py
+.run/*.sh
+.run/preview-links/

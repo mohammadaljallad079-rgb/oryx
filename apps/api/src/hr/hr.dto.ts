@@ -6,8 +6,10 @@ import {
   IsIn,
   IsInt,
   IsISO8601,
+  IsNumber,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -22,6 +24,9 @@ export class ListQueryDto {
   @IsOptional() @IsString() companyId?: string;
   @IsOptional() @IsString() branchId?: string;
   @IsOptional() @IsString() departmentId?: string;
+  @IsOptional() @IsString() employeeId?: string;
+  @IsOptional() @IsISO8601() from?: string;
+  @IsOptional() @IsISO8601() to?: string;
 }
 
 // ------------------------------------------------------------- departments
@@ -161,7 +166,88 @@ export class RecordAttendanceDto {
   @IsOptional() @IsString() @MaxLength(400) notes?: string;
 }
 
-// ------------------------------------------------------------------ payroll
+// ------------------------------------------------------------ worksites
+
+export class CreateWorkSiteDto {
+  @IsString() @MinLength(1) @MaxLength(40) code!: string;
+  @IsString() @MinLength(2) @MaxLength(160) nameEn!: string;
+  @IsString() @MinLength(2) @MaxLength(160) nameAr!: string;
+  @IsOptional() @IsString() branchId?: string;
+  @Type(() => Number) @IsNumber() latitude!: number;
+  @Type(() => Number) @IsNumber() longitude!: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(10) @Max(5000) radiusMeters?: number;
+  @IsOptional() @IsString() @MaxLength(400) wifiSsids?: string;
+  @IsOptional() @IsString() @MaxLength(400) wifiBssids?: string;
+  @IsOptional() @IsString() @MaxLength(120) qrSecret?: string;
+  @IsOptional() @IsBoolean() isActive?: boolean;
+}
+
+export class UpdateWorkSiteDto {
+  @IsOptional() @IsString() @MaxLength(160) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(160) nameAr?: string;
+  @IsOptional() @Type(() => Number) @IsNumber() latitude?: number;
+  @IsOptional() @Type(() => Number) @IsNumber() longitude?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(10) @Max(5000) radiusMeters?: number;
+  @IsOptional() @IsString() @MaxLength(400) wifiSsids?: string;
+  @IsOptional() @IsString() @MaxLength(400) wifiBssids?: string;
+  @IsOptional() @IsString() @MaxLength(120) qrSecret?: string;
+  @IsOptional() @IsBoolean() isActive?: boolean;
+}
+
+// ---------------------------------------------------------- attendance policy
+
+export class UpdateAttendancePolicyDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(120) graceMinutes?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(100) @Max(2400) standardDailyHours?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(100) @Max(16800) standardWeeklyHours?: number;
+  @IsOptional() @IsString() @MaxLength(40) workingDays?: string;
+  @IsOptional() @IsBoolean() overtimeEnabled?: boolean;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(50000) overtimeMultiplierBp?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) overtimeThresholdHours?: number;
+  @IsOptional() @IsBoolean() deductLate?: boolean;
+  @IsOptional() @IsBoolean() deductEarlyLeave?: boolean;
+  @IsOptional() @IsBoolean() deductAbsence?: boolean;
+  @IsOptional() @IsBoolean() requireLocation?: boolean;
+  @IsOptional() @IsBoolean() allowFallback?: boolean;
+}
+
+// -------------------------------------------------------- self-service punch
+
+export class PunchLocationDto {
+  @IsOptional() @Type(() => Number) @IsNumber() latitude?: number;
+  @IsOptional() @Type(() => Number) @IsNumber() longitude?: number;
+  @IsOptional() @Type(() => Number) @IsNumber() accuracy?: number;
+  @IsOptional() @IsString() @MaxLength(120) wifiSsid?: string;
+  @IsOptional() @IsString() @MaxLength(120) wifiBssid?: string;
+  @IsOptional() @IsString() @MaxLength(400) qrToken?: string;
+  @IsOptional() @IsString() @MaxLength(400) fallbackReason?: string;
+}
+
+export class SelfCheckInDto {
+  @IsOptional() @IsString() employeeId?: string;
+  @IsOptional() @IsISO8601() at?: string;
+  @IsOptional() @IsString() shiftId?: string;
+  @IsOptional() @ValidateNested() @Type(() => PunchLocationDto) location?: PunchLocationDto;
+  @IsOptional() @IsString() @MaxLength(400) notes?: string;
+}
+
+export class SelfCheckOutDto {
+  @IsOptional() @IsString() employeeId?: string;
+  @IsOptional() @IsISO8601() at?: string;
+  @IsOptional() @ValidateNested() @Type(() => PunchLocationDto) location?: PunchLocationDto;
+  @IsOptional() @IsString() @MaxLength(400) notes?: string;
+}
+
+export class SelfBreakDto {
+  @IsOptional() @IsString() employeeId?: string;
+  @IsOptional() @IsISO8601() at?: string;
+}
+
+export class QrTokenQueryDto {
+  @IsString() siteId!: string;
+}
+
+// --------------------------------------------------------------- payroll
 
 export class SalaryComponentDto {
   @IsIn(['ALLOWANCE', 'DEDUCTION']) type!: string;
@@ -176,9 +262,15 @@ export class SalaryComponentDto {
 export class CreateSalaryStructureDto {
   @IsString() employeeId!: string;
   @IsISO8601() effectiveFrom!: string;
+  @IsOptional() @IsISO8601() effectiveTo?: string;
   @Type(() => Number) @IsInt() @Min(0) basicMinor!: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) overtimeRateMinor?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(100) @Max(2400) dailyHours?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(100) @Max(16800) weeklyHours?: number;
+  @IsOptional() @IsString() @MaxLength(40) workingDays?: string;
   @IsOptional() @IsString() @MaxLength(3) currency?: string;
   @IsOptional() @IsString() @MaxLength(400) notes?: string;
+  @IsOptional() @IsString() @MaxLength(400) changeReason?: string;
   @IsArray() @ValidateNested({ each: true }) @Type(() => SalaryComponentDto)
   components!: SalaryComponentDto[];
 }

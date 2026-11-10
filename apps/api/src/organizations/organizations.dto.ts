@@ -151,6 +151,16 @@ export class UpdateCompanyDto {
   @MaxLength(40)
   taxNumber?: string;
 
+  /**
+   * The commercial-registration number printed on issued documents' footer
+   * (the reference invoice prints "CR 146375-2"). Stored on the company so a
+   * document reprint carries the same registration the approved sheet does.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  crNumber?: string;
+
   @IsOptional()
   @IsString()
   parentCompanyId?: string | null;

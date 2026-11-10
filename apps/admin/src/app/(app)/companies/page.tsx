@@ -484,7 +484,7 @@ function CreateCompanyModal({
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t('common.code')} required hint="UPPERCASE, digits and dashes">
+        <Field label={t('common.code')} required hint={t('companies.codeHint')}>
           <input
             className="oryx-input"
             value={form.code}

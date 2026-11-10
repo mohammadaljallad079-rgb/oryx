@@ -783,6 +783,28 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   compiled output; after a source change run `pnpm --filter @oryx/api build`
   first or the server serves stale routes.
 
+### Document / PDF gotchas (Task 1 — preview, print, attachments)
+
+- **A Chromium footer template is its own document and ignores `@font-face`.**
+  Declaring a face in `headerTemplate` / `footerTemplate` (even a valid base64
+  data URI) makes Chromium render *nothing* in that region. The footer therefore
+  uses the host fallback face, so a glyph the host lacks prints as a broken box.
+  The contact icons in `officialFooterTemplate` are inline SVG for this reason —
+  never put an emoji such as 📞 (U+1F4DE) or 🌐 (U+1F310) there; no installed
+  face covers it and it emitted a `\x00`. `CONTACT_ICON_{PHONE,MAIL,GLOBE}` in
+  `apps/api/src/documents/templates/chrome.ts` are the replacements.
+- **Latin text must use `DOCUMENT_LATIN_STACK`, not the Arabic-first stack.** The
+  official template inherited the Arabic body font, so Latin (the TRN, the row
+  labels) rendered in a wide Naskh face and the TRN block drifted ~21.6pt. Latin
+  runs set `font-family:${DOCUMENT_LATIN_STACK}`; Arabic keeps falling back to
+  NotoNaskhArabic.
+- **The 500 on preview/print is a missing Chromium, not a template bug.**
+  `launchChromium` in `apps/api/src/documents/pdf/pdf-renderer.service.ts` falls
+  back to a system browser (`/usr/bin/chromium`) and raises an actionable error
+  when none exists, instead of an opaque `Internal Server Error`.
+- **A footer icon renders as vector, not text.** A visual diff will show it as a
+  drawing; a text-extraction diff will not — check `page.get_drawings()`.
+
 ### Mobile gotchas
 
 - **An access token expires mid-session, not at start-up.** Cold-start restore is

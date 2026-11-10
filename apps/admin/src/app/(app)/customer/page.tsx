@@ -92,10 +92,10 @@ export default function CustomerPlatformPage() {
             <span className="oryx-label">{t('common.status')}</span>
             <select className="oryx-select" value={status} onChange={(e) => setStatus(e.target.value)} data-testid="cp-status">
               <option value="">{t('common.all')}</option>
-              <option value="ACTIVE">ACTIVE</option>
-              <option value="PENDING">PENDING</option>
-              <option value="SUSPENDED">SUSPENDED</option>
-              <option value="CLOSED">CLOSED</option>
+              <option value="ACTIVE">{t('common.statusActive')}</option>
+              <option value="PENDING">{t('common.statusPending')}</option>
+              <option value="SUSPENDED">{t('common.statusSuspended')}</option>
+              <option value="CLOSED">{t('common.statusClosed')}</option>
             </select>
           </label>
         </div>

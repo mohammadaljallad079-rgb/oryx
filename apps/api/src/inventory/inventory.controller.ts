@@ -74,6 +74,13 @@ export class InventoryController {
     return this.inventory.listProducts(query, p);
   }
 
+  @Get('product-categories')
+  @RequireAnyPermission('erp.inventory.read', 'erp.inventory.item.manage', 'erp.sales.catalog.manage')
+  @ApiOperation({ summary: 'Distinct product categories for the catalogue filters' })
+  productCategories(@Query('companyId') companyId: string | undefined, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.inventory.productCategories(p, companyId);
+  }
+
   @Post('products')
   @RequireAnyPermission('erp.inventory.item.manage', 'erp.sales.catalog.manage')
   @ApiOperation({ summary: 'Create a product or service' })

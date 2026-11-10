@@ -152,8 +152,8 @@ function AppVersionsPageInner() {
               onChange={(e) => setForm({ ...form, platform: e.target.value })}
               data-testid="version-platform"
             >
-              <option value="IOS">iOS</option>
-              <option value="ANDROID">Android</option>
+              <option value="IOS">{t('common.ios')}</option>
+              <option value="ANDROID">{t('common.android')}</option>
             </select>
           </Field>
           <Field label={t('app.version')} required>

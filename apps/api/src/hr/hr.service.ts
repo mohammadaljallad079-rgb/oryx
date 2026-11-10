@@ -10,6 +10,8 @@ import { badRequest, conflict, ERROR_CODES, forbidden, notFound } from '../commo
 import type { ActorContext } from '../organizations/organizations.service';
 import type { RequestPrincipal } from '../auth/auth.decorators';
 import { computePayslip, leaveDaysBetween, type SalaryComponentInput } from './payroll-calculator';
+import { deriveAttendance, zonedDateKey, zonedParts } from './attendance-calculator';
+import { verifyPunch, qrTokenFor, type PunchLocation } from './attendance-verification';
 import type {
   AdjustBalanceDto,
   CreateAdvanceDto,
@@ -30,6 +32,12 @@ import type {
   SettleAdvanceDto,
   StartLifecycleDto,
   UpdateEmployeeDto,
+  CreateWorkSiteDto,
+  UpdateWorkSiteDto,
+  UpdateAttendancePolicyDto,
+  SelfCheckInDto,
+  SelfCheckOutDto,
+  SelfBreakDto,
 } from './hr.dto';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -513,22 +521,37 @@ export class HrService {
   async listAttendance(query: ListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const rows = await this.prisma.attendanceRecord.findMany({
-      where: { companyId, ...(query.branchId ? { employee: { branchId: query.branchId } } : {}) },
+      where: {
+        companyId,
+        ...(query.branchId ? { employee: { branchId: query.branchId } } : {}),
+        ...(query.departmentId ? { employee: { departmentId: query.departmentId } } : {}),
+        ...(query.employeeId ? { employeeId: query.employeeId } : {}),
+        ...(query.status ? { status: query.status as never } : {}),
+        ...(query.from || query.to
+          ? { workDate: { ...(query.from ? { gte: new Date(query.from) } : {}), ...(query.to ? { lte: new Date(query.to) } : {}) } }
+          : {}),
+      },
       orderBy: { workDate: 'desc' },
-      take: 200,
+      take: 500,
       include: { employee: { select: { code: true, fullNameEn: true, fullNameAr: true } } },
     });
     return { items: rows.map(toAttendanceDto), total: rows.length, page: 1, pageSize: rows.length };
   }
 
-  /** Record (or update) one day of attendance for an employee. */
+  /** Record (or update) one day of attendance for an employee (manager path). */
   async recordAttendance(dto: RecordAttendanceDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     await this.assertEmployee(companyId, dto.employeeId);
     const workDate = new Date(dto.workDate);
     const checkIn = dto.checkInAt ? new Date(dto.checkInAt) : null;
     const checkOut = dto.checkOutAt ? new Date(dto.checkOutAt) : null;
-    const workedMinutes = checkIn && checkOut ? Math.max(0, Math.round((checkOut.getTime() - checkIn.getTime()) / 60000)) : 0;
+    const shift = dto.shiftId ? await this.prisma.shift.findFirst({ where: { id: dto.shiftId, companyId } }) : null;
+    const policy = await this.ensurePolicy(companyId);
+
+    const derived =
+      checkIn && checkOut
+        ? deriveAttendance({ checkIn, checkOut, shift, graceMinutes: policy.graceMinutes, timeZone: await this.companyTimeZone(companyId) })
+        : null;
 
     const record = await this.prisma.attendanceRecord.upsert({
       where: { employeeId_workDate: { employeeId: dto.employeeId, workDate } },
@@ -539,23 +562,398 @@ export class HrService {
         workDate,
         checkInAt: checkIn,
         checkOutAt: checkOut,
-        workedMinutes,
-        overtimeMinutes: dto.overtimeMinutes ?? 0,
-        status: (dto.status as never) ?? 'PRESENT',
+        workedMinutes: derived?.workedMinutes ?? 0,
+        breakMinutes: derived?.breakMinutes ?? 0,
+        netMinutes: derived?.netMinutes ?? 0,
+        lateMinutes: derived?.lateMinutes ?? 0,
+        earlyLeaveMinutes: derived?.earlyLeaveMinutes ?? 0,
+        overtimeMinutes: dto.overtimeMinutes ?? derived?.overtimeMinutes ?? 0,
+        status: (dto.status as never) ?? derived?.status ?? 'PRESENT',
         notes: dto.notes ?? null,
+        checkInSource: checkIn ? 'MANUAL' : null,
+        checkOutSource: checkOut ? 'MANUAL' : null,
       },
       update: {
         shiftId: dto.shiftId ?? null,
         checkInAt: checkIn,
         checkOutAt: checkOut,
-        workedMinutes,
-        overtimeMinutes: dto.overtimeMinutes ?? 0,
-        ...(dto.status ? { status: dto.status as never } : {}),
+        workedMinutes: derived?.workedMinutes ?? 0,
+        breakMinutes: derived?.breakMinutes ?? 0,
+        netMinutes: derived?.netMinutes ?? 0,
+        lateMinutes: derived?.lateMinutes ?? 0,
+        earlyLeaveMinutes: derived?.earlyLeaveMinutes ?? 0,
+        overtimeMinutes: dto.overtimeMinutes ?? derived?.overtimeMinutes ?? 0,
+        ...(dto.status ? { status: dto.status as never } : derived ? { status: derived.status as never } : {}),
         notes: dto.notes ?? null,
       },
     });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.attendance_recorded', targetType: 'ATTENDANCE_RECORD', targetId: record.id, summary: `Attendance recorded for ${workDate.toISOString().slice(0, 10)}` });
     return record;
+  }
+
+  // ------------------------------------------------------------ self-service
+
+  /**
+   * Resolve the employee record for the signed-in user.
+   *
+   * A self-service punch is always for the caller's own employee row; the
+   * `employeeId` in the body is ignored unless the principal holds the
+   * attendance-manage permission, which lets a manager punch on behalf of a
+   * worker. This is what stops an employee recording another's time.
+   */
+  private async resolveSelfEmployee(
+    companyId: string,
+    principal: RequestPrincipal,
+    requestedEmployeeId: string | undefined,
+    canManage: boolean,
+  ) {
+    if (requestedEmployeeId && canManage) {
+      const employee = await this.prisma.employee.findFirst({ where: { id: requestedEmployeeId, companyId } });
+      if (!employee) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Employee not found in this company.');
+      return employee;
+    }
+    const employee = await this.prisma.employee.findFirst({ where: { companyId, userId: principal.userId } });
+    if (!employee) {
+      throw forbidden(ERROR_CODES.FORBIDDEN_PERMISSION, 'No employee record is linked to your user account.');
+    }
+    return employee;
+  }
+
+  private async companyTimeZone(companyId: string): Promise<string> {
+    const company = await this.prisma.company.findUnique({ where: { id: companyId }, select: { timezone: true } });
+    return company?.timezone ?? 'Asia/Bahrain';
+  }
+
+  /** The company's attendance policy, creating the default row on first read. */
+  async ensurePolicy(companyId: string) {
+    const existing = await this.prisma.attendancePolicy.findUnique({ where: { companyId } });
+    if (existing) return existing;
+    return this.prisma.attendancePolicy.create({ data: { companyId } });
+  }
+
+  async getPolicy(principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    return this.ensurePolicy(companyId);
+  }
+
+  async updatePolicy(dto: UpdateAttendancePolicyDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    await this.ensurePolicy(companyId);
+    const updated = await this.prisma.attendancePolicy.update({
+      where: { companyId },
+      data: {
+        ...(dto.graceMinutes !== undefined ? { graceMinutes: dto.graceMinutes } : {}),
+        ...(dto.standardDailyHours !== undefined ? { standardDailyHours: dto.standardDailyHours } : {}),
+        ...(dto.standardWeeklyHours !== undefined ? { standardWeeklyHours: dto.standardWeeklyHours } : {}),
+        ...(dto.workingDays !== undefined ? { workingDays: dto.workingDays } : {}),
+        ...(dto.overtimeEnabled !== undefined ? { overtimeEnabled: dto.overtimeEnabled } : {}),
+        ...(dto.overtimeMultiplierBp !== undefined ? { overtimeMultiplierBp: dto.overtimeMultiplierBp } : {}),
+        ...(dto.overtimeThresholdHours !== undefined ? { overtimeThresholdHours: dto.overtimeThresholdHours } : {}),
+        ...(dto.deductLate !== undefined ? { deductLate: dto.deductLate } : {}),
+        ...(dto.deductEarlyLeave !== undefined ? { deductEarlyLeave: dto.deductEarlyLeave } : {}),
+        ...(dto.deductAbsence !== undefined ? { deductAbsence: dto.deductAbsence } : {}),
+        ...(dto.requireLocation !== undefined ? { requireLocation: dto.requireLocation } : {}),
+        ...(dto.allowFallback !== undefined ? { allowFallback: dto.allowFallback } : {}),
+      },
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.attendance_policy_updated', targetType: 'ATTENDANCE_POLICY', targetId: updated.id, summary: 'Updated attendance and payroll policy' });
+    return updated;
+  }
+
+  // -------------------------------------------------------------- worksites
+
+  async listWorkSites(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const rows = await this.prisma.workSite.findMany({ where: { companyId }, orderBy: { code: 'asc' } });
+    return { items: rows, total: rows.length, page: 1, pageSize: rows.length };
+  }
+
+  async createWorkSite(dto: CreateWorkSiteDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
+    if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
+    const dup = await this.prisma.workSite.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Work site ${dto.code} already exists.`);
+    const site = await this.prisma.workSite.create({
+      data: {
+        companyId,
+        branchId: dto.branchId ?? null,
+        code: dto.code,
+        nameEn: dto.nameEn,
+        nameAr: dto.nameAr,
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+        radiusMeters: dto.radiusMeters ?? 150,
+        wifiSsids: dto.wifiSsids ?? null,
+        wifiBssids: dto.wifiBssids ?? null,
+        qrSecret: dto.qrSecret ?? null,
+        isActive: dto.isActive ?? true,
+      },
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.worksite_created', targetType: 'WORK_SITE', targetId: site.id, summary: `Created work site ${site.code}` });
+    return site;
+  }
+
+  async updateWorkSite(id: string, dto: UpdateWorkSiteDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const existing = await this.prisma.workSite.findFirst({ where: { id, companyId } });
+    if (!existing) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Work site not found.');
+    const site = await this.prisma.workSite.update({
+      where: { id },
+      data: {
+        ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
+        ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
+        ...(dto.latitude !== undefined ? { latitude: dto.latitude } : {}),
+        ...(dto.longitude !== undefined ? { longitude: dto.longitude } : {}),
+        ...(dto.radiusMeters !== undefined ? { radiusMeters: dto.radiusMeters } : {}),
+        ...(dto.wifiSsids !== undefined ? { wifiSsids: dto.wifiSsids } : {}),
+        ...(dto.wifiBssids !== undefined ? { wifiBssids: dto.wifiBssids } : {}),
+        ...(dto.qrSecret !== undefined ? { qrSecret: dto.qrSecret } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+      },
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.worksite_updated', targetType: 'WORK_SITE', targetId: site.id, summary: `Updated work site ${site.code}` });
+    return site;
+  }
+
+  /** The current rotating QR token for a worksite, for a kiosk display. */
+  async workSiteQrToken(siteId: string, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const site = await this.prisma.workSite.findFirst({ where: { id: siteId, companyId } });
+    if (!site) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Work site not found.');
+    if (!site.qrSecret) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'This work site has no QR secret configured.');
+    const now = new Date();
+    return { siteId: site.id, token: qrTokenFor(site.qrSecret, now), expiresInSeconds: 60 };
+  }
+
+  // ------------------------------------------------------ attendance punches
+
+  private async activeShiftFor(companyId: string, employeeId: string): Promise<{ id: string; startTime: string; endTime: string; breakMinutes: number } | null> {
+    const assignment = await this.prisma.employeeShift.findFirst({
+      where: { companyId, employeeId, effectiveFrom: { lte: new Date() }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date() } }] },
+      orderBy: { effectiveFrom: 'desc' },
+      include: { shift: true },
+    });
+    if (!assignment) return null;
+    return { id: assignment.shift.id, startTime: assignment.shift.startTime, endTime: assignment.shift.endTime, breakMinutes: assignment.shift.breakMinutes };
+  }
+
+  /** Resolve a shift for a punch: the requested one, the assignment, or null. */
+  private async shiftForPunch(companyId: string, employeeId: string, shiftId?: string) {
+    if (shiftId) {
+      const shift = await this.prisma.shift.findFirst({ where: { id: shiftId, companyId } });
+      if (shift) return { id: shift.id, startTime: shift.startTime, endTime: shift.endTime, breakMinutes: shift.breakMinutes };
+    }
+    return this.activeShiftFor(companyId, employeeId);
+  }
+
+  /** Verify a punch's location against the company's active worksites. */
+  private async verifyLocation(companyId: string, location: PunchLocation | undefined, at: Date) {
+    const sites = await this.prisma.workSite.findMany({ where: { companyId, isActive: true } });
+    return verifyPunch(
+      sites.map((s) => ({ id: s.id, latitude: s.latitude, longitude: s.longitude, radiusMeters: s.radiusMeters, wifiSsids: s.wifiSsids, wifiBssids: s.wifiBssids, qrSecret: s.qrSecret })),
+      location,
+      at,
+    );
+  }
+
+  /**
+   * Self check-in.
+   *
+   * The punch is rejected when the employee has already checked in today, when
+   * the policy requires a verified location and none matched, or when the
+   * location could not be verified and no fallback reason was given. The
+   * verification source and measured distance are stored, never inferred.
+   */
+  async selfCheckIn(dto: SelfCheckInDto, principal: RequestPrincipal, actor: ActorContext, canManage: boolean) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const employee = await this.resolveSelfEmployee(companyId, principal, dto.employeeId, canManage);
+    const policy = await this.ensurePolicy(companyId);
+    const tz = await this.companyTimeZone(companyId);
+    const at = dto.at ? new Date(dto.at) : new Date();
+    const workDate = zonedDateKey(at, tz);
+
+    const existing = await this.prisma.attendanceRecord.findUnique({ where: { employeeId_workDate: { employeeId: employee.id, workDate } } });
+    if (existing?.checkInAt) throw conflict(ERROR_CODES.ATTENDANCE_ALREADY_CHECKED_IN, 'You have already checked in today.');
+
+    const verification = await this.verifyLocation(companyId, dto.location, at);
+    if (policy.requireLocation && !verification.verified && !(policy.allowFallback && dto.location?.fallbackReason)) {
+      if (!dto.location?.fallbackReason) throw badRequest(ERROR_CODES.ATTENDANCE_LOCATION_REQUIRED, 'A verified location is required to check in.');
+      throw badRequest(ERROR_CODES.ATTENDANCE_LOCATION_UNVERIFIED, verification.detail);
+    }
+
+    const shift = await this.shiftForPunch(companyId, employee.id, dto.shiftId);
+    const record = await this.prisma.attendanceRecord.upsert({
+      where: { employeeId_workDate: { employeeId: employee.id, workDate } },
+      create: {
+        companyId,
+        employeeId: employee.id,
+        shiftId: shift?.id ?? null,
+        workDate,
+        checkInAt: at,
+        status: 'PRESENT',
+        notes: dto.notes ?? null,
+        checkInSource: verification.verified ? verification.source : dto.location?.fallbackReason ? 'FALLBACK' : 'MANUAL',
+        checkInLat: dto.location?.latitude ?? null,
+        checkInLng: dto.location?.longitude ?? null,
+        checkInAccuracy: dto.location?.accuracy ?? null,
+        checkInDistanceM: verification.distanceM,
+        checkInSiteId: verification.siteId,
+        fallbackReason: dto.location?.fallbackReason ?? null,
+      },
+      update: {
+        checkInAt: at,
+        shiftId: shift?.id ?? null,
+        status: 'PRESENT',
+        checkInSource: verification.verified ? verification.source : dto.location?.fallbackReason ? 'FALLBACK' : 'MANUAL',
+        checkInLat: dto.location?.latitude ?? null,
+        checkInLng: dto.location?.longitude ?? null,
+        checkInAccuracy: dto.location?.accuracy ?? null,
+        checkInDistanceM: verification.distanceM,
+        checkInSiteId: verification.siteId,
+        fallbackReason: dto.location?.fallbackReason ?? null,
+      },
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.attendance_check_in', targetType: 'ATTENDANCE_RECORD', targetId: record.id, summary: `Check-in via ${record.checkInSource}${verification.distanceM !== null ? ` (${verification.distanceM} m)` : ''}` });
+    return { ...toAttendanceDto({ ...record, employee }), verification };
+  }
+
+  /**
+   * Self check-out. Requires an open check-in and no open break; the day's
+   * worked, break, late, early-leave and overtime minutes are derived from the
+   * shift and the policy and frozen on the record.
+   */
+  async selfCheckOut(dto: SelfCheckOutDto, principal: RequestPrincipal, actor: ActorContext, canManage: boolean) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const employee = await this.resolveSelfEmployee(companyId, principal, dto.employeeId, canManage);
+    const policy = await this.ensurePolicy(companyId);
+    const tz = await this.companyTimeZone(companyId);
+    const at = dto.at ? new Date(dto.at) : new Date();
+    const workDate = zonedDateKey(at, tz);
+
+    const record = await this.prisma.attendanceRecord.findUnique({
+      where: { employeeId_workDate: { employeeId: employee.id, workDate } },
+      include: { breaks: true },
+    });
+    if (!record || !record.checkInAt) throw badRequest(ERROR_CODES.ATTENDANCE_NOT_CHECKED_IN, 'You have not checked in today.');
+    if (record.checkOutAt) throw conflict(ERROR_CODES.ATTENDANCE_ALREADY_CHECKED_OUT, 'You have already checked out today.');
+    if (record.breaks.some((b) => !b.endedAt)) throw conflict(ERROR_CODES.ATTENDANCE_BREAK_OPEN, 'End your open break before checking out.');
+
+    const verification = await this.verifyLocation(companyId, dto.location, at);
+    const shift = record.shiftId
+      ? await this.prisma.shift.findFirst({ where: { id: record.shiftId, companyId } })
+      : await this.shiftForPunch(companyId, employee.id);
+    const takenBreak = record.breaks.reduce((sum, b) => sum + b.minutes, 0);
+    const derived = deriveAttendance({
+      checkIn: record.checkInAt,
+      checkOut: at,
+      shift,
+      breakMinutes: takenBreak,
+      graceMinutes: policy.graceMinutes,
+      timeZone: tz,
+    });
+
+    const updated = await this.prisma.attendanceRecord.update({
+      where: { id: record.id },
+      data: {
+        checkOutAt: at,
+        workedMinutes: derived.workedMinutes,
+        breakMinutes: derived.breakMinutes,
+        netMinutes: derived.netMinutes,
+        lateMinutes: derived.lateMinutes,
+        earlyLeaveMinutes: derived.earlyLeaveMinutes,
+        overtimeMinutes: derived.overtimeMinutes,
+        status: derived.status,
+        checkOutSource: verification.verified ? verification.source : dto.location?.fallbackReason ? 'FALLBACK' : 'MANUAL',
+        checkOutLat: dto.location?.latitude ?? null,
+        checkOutLng: dto.location?.longitude ?? null,
+        checkOutDistanceM: verification.distanceM,
+        checkOutSiteId: verification.siteId,
+      },
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.attendance_check_out', targetType: 'ATTENDANCE_RECORD', targetId: updated.id, summary: `Check-out: ${derived.netMinutes} net minutes, ${derived.overtimeMinutes} overtime` });
+    return { ...toAttendanceDto({ ...updated, employee }), verification };
+  }
+
+  /** Start a break. Only one open break is allowed at a time. */
+  async selfBreakStart(dto: SelfBreakDto, principal: RequestPrincipal, actor: ActorContext, canManage: boolean) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const employee = await this.resolveSelfEmployee(companyId, principal, dto.employeeId, canManage);
+    const tz = await this.companyTimeZone(companyId);
+    const at = dto.at ? new Date(dto.at) : new Date();
+    const workDate = zonedDateKey(at, tz);
+    const record = await this.prisma.attendanceRecord.findUnique({ where: { employeeId_workDate: { employeeId: employee.id, workDate } }, include: { breaks: true } });
+    if (!record || !record.checkInAt) throw badRequest(ERROR_CODES.ATTENDANCE_NOT_CHECKED_IN, 'Check in before taking a break.');
+    if (record.checkOutAt) throw conflict(ERROR_CODES.ATTENDANCE_ALREADY_CHECKED_OUT, 'You have already checked out today.');
+    if (record.breaks.some((b) => !b.endedAt)) throw conflict(ERROR_CODES.ATTENDANCE_BREAK_OPEN, 'A break is already open.');
+
+    const created = await this.prisma.attendanceBreak.create({ data: { companyId, attendanceRecordId: record.id, employeeId: employee.id, startedAt: at } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.attendance_break_start', targetType: 'ATTENDANCE_BREAK', targetId: created.id, summary: 'Break started' });
+    return created;
+  }
+
+  /** End the open break and roll its minutes into the day's break total. */
+  async selfBreakEnd(dto: SelfBreakDto, principal: RequestPrincipal, actor: ActorContext, canManage: boolean) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const employee = await this.resolveSelfEmployee(companyId, principal, dto.employeeId, canManage);
+    const tz = await this.companyTimeZone(companyId);
+    const at = dto.at ? new Date(dto.at) : new Date();
+    const workDate = zonedDateKey(at, tz);
+    const record = await this.prisma.attendanceRecord.findUnique({ where: { employeeId_workDate: { employeeId: employee.id, workDate } }, include: { breaks: true } });
+    if (!record) throw badRequest(ERROR_CODES.ATTENDANCE_NOT_CHECKED_IN, 'No attendance record for today.');
+    const open = record.breaks.find((b) => !b.endedAt);
+    if (!open) throw badRequest(ERROR_CODES.ATTENDANCE_NO_OPEN_BREAK, 'There is no open break to end.');
+
+    const minutes = Math.max(0, Math.round((at.getTime() - open.startedAt.getTime()) / 60_000));
+    const ended = await this.prisma.attendanceBreak.update({ where: { id: open.id }, data: { endedAt: at, minutes } });
+    const totalBreak = record.breaks.filter((b) => b.endedAt).reduce((sum, b) => sum + b.minutes, 0) + minutes;
+    const netMinutes = record.checkOutAt ? Math.max(0, record.workedMinutes - totalBreak) : record.netMinutes;
+    await this.prisma.attendanceRecord.update({ where: { id: record.id }, data: { breakMinutes: totalBreak, netMinutes } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.attendance_break_end', targetType: 'ATTENDANCE_BREAK', targetId: ended.id, summary: `Break ended: ${minutes} minutes` });
+    return ended;
+  }
+
+  /** Today's attendance record for the signed-in employee, with breaks. */
+  async myAttendanceToday(principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const employee = await this.prisma.employee.findFirst({ where: { companyId, userId: principal.userId } });
+    if (!employee) return { employee: null, record: null };
+    const tz = await this.companyTimeZone(companyId);
+    const workDate = zonedDateKey(new Date(), tz);
+    const record = await this.prisma.attendanceRecord.findUnique({
+      where: { employeeId_workDate: { employeeId: employee.id, workDate } },
+      include: { breaks: true },
+    });
+    return {
+      employee: { id: employee.id, code: employee.code, fullNameEn: employee.fullNameEn, fullNameAr: employee.fullNameAr },
+      record: record ? { ...toAttendanceDto({ ...record, employee }), breaks: record.breaks.map((b) => ({ id: b.id, startedAt: b.startedAt.toISOString(), endedAt: b.endedAt ? b.endedAt.toISOString() : null, minutes: b.minutes })) } : null,
+    };
+  }
+
+  /** The signed-in employee's own attendance history. */
+  async myAttendanceHistory(principal: RequestPrincipal, from?: string, to?: string) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const employee = await this.prisma.employee.findFirst({ where: { companyId, userId: principal.userId } });
+    if (!employee) return { items: [], total: 0 };
+    const rows = await this.prisma.attendanceRecord.findMany({
+      where: { companyId, employeeId: employee.id, ...(from || to ? { workDate: { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: new Date(to) } : {}) } } : {}) },
+      orderBy: { workDate: 'desc' },
+      take: 120,
+    });
+    return { items: rows.map((r) => toAttendanceDto({ ...r, employee })), total: rows.length };
+  }
+
+  /** The signed-in employee's own payslips (issued, i.e. posted or locked). */
+  async myPayslips(principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const employee = await this.prisma.employee.findFirst({ where: { companyId, userId: principal.userId } });
+    if (!employee) return { items: [], total: 0 };
+    const rows = await this.prisma.payslip.findMany({
+      where: { companyId, employeeId: employee.id, payrollRun: { status: { in: ['POSTED', 'LOCKED'] } } },
+      include: { lines: true, payrollRun: { select: { runNumber: true, status: true, period: { select: { code: true, nameEn: true, nameAr: true } } } } },
+      orderBy: { createdAt: 'desc' },
+      take: 60,
+    });
+    return { items: rows.map((p) => toPayslipDto(p)), total: rows.length };
   }
 
   // --------------------------------------------------------- salary structure
@@ -564,19 +962,30 @@ export class HrService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     await this.assertEmployee(companyId, dto.employeeId);
     const companyCurrency = await this.context.companyCurrency(companyId);
+    const effectiveFrom = new Date(dto.effectiveFrom);
     const structure = await this.posting.withTransaction(async (tx) => {
       // Supersede the previous active structure rather than editing it, so
-      // historical payroll results stay intact.
+      // historical payroll results stay intact. The superseded row is stamped
+      // with the new structure's start so a history query can show the span.
+      const previous = await tx.salaryStructure.findFirst({
+        where: { companyId, employeeId: dto.employeeId, isActive: true },
+        orderBy: { effectiveFrom: 'desc' },
+      });
       await tx.salaryStructure.updateMany({
         where: { companyId, employeeId: dto.employeeId, isActive: true },
-        data: { isActive: false },
+        data: { isActive: false, effectiveTo: effectiveFrom },
       });
-      return tx.salaryStructure.create({
+      const created = await tx.salaryStructure.create({
         data: {
           companyId,
           employeeId: dto.employeeId,
-          effectiveFrom: new Date(dto.effectiveFrom),
+          effectiveFrom,
+          effectiveTo: dto.effectiveTo ? new Date(dto.effectiveTo) : null,
           basicMinor: dto.basicMinor,
+          overtimeRateMinor: dto.overtimeRateMinor ?? null,
+          dailyHours: dto.dailyHours ?? null,
+          weeklyHours: dto.weeklyHours ?? null,
+          workingDays: dto.workingDays ?? null,
           currency: dto.currency ?? companyCurrency,
           notes: dto.notes ?? null,
           components: {
@@ -595,9 +1004,65 @@ export class HrService {
         },
         include: { components: true },
       });
+      // The change log is append-only: it survives even if the structure row is
+      // later superseded, and it records who changed the pay and why.
+      await tx.salaryChangeLog.create({
+        data: {
+          companyId,
+          employeeId: dto.employeeId,
+          structureId: created.id,
+          previousBasicMinor: previous?.basicMinor ?? null,
+          newBasicMinor: dto.basicMinor,
+          currency: created.currency,
+          effectiveFrom,
+          reason: dto.changeReason ?? dto.notes ?? null,
+          changedById: actor.userId ?? 'system',
+        },
+      });
+      return created;
     });
-    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.salary_structure_created', targetType: 'SALARY_STRUCTURE', targetId: structure.id, summary: `Created salary structure effective ${dto.effectiveFrom.slice(0, 10)}` });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.salary_structure_created', targetType: 'SALARY_STRUCTURE', targetId: structure.id, summary: `Set salary effective ${dto.effectiveFrom.slice(0, 10)}` });
     return structure;
+  }
+
+  /** The effective salary structures for one employee, newest first. */
+  async listSalaryHistory(employeeId: string, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    await this.assertEmployee(companyId, employeeId);
+    const [structures, changes] = await Promise.all([
+      this.prisma.salaryStructure.findMany({
+        where: { companyId, employeeId },
+        orderBy: { effectiveFrom: 'desc' },
+        include: { components: true },
+      }),
+      this.prisma.salaryChangeLog.findMany({
+        where: { companyId, employeeId },
+        orderBy: { changedAt: 'desc' },
+        take: 100,
+      }),
+    ]);
+    return {
+      items: structures.map((s) => ({
+        id: s.id,
+        effectiveFrom: s.effectiveFrom.toISOString(),
+        effectiveTo: s.effectiveTo ? s.effectiveTo.toISOString() : null,
+        basicMinor: s.basicMinor,
+        overtimeRateMinor: s.overtimeRateMinor,
+        currency: s.currency,
+        isActive: s.isActive,
+        components: s.components.map((c) => ({ code: c.code, nameEn: c.nameEn, nameAr: c.nameAr, type: c.type, amountMinor: c.amountMinor, isPercentage: c.isPercentage, percentBp: c.percentBp })),
+      })),
+      changes: changes.map((c) => ({
+        id: c.id,
+        previousBasicMinor: c.previousBasicMinor,
+        newBasicMinor: c.newBasicMinor,
+        currency: c.currency,
+        effectiveFrom: c.effectiveFrom.toISOString(),
+        reason: c.reason,
+        changedById: c.changedById,
+        changedAt: c.changedAt.toISOString(),
+      })),
+    };
   }
 
   // ---------------------------------------------------------------- payroll
@@ -655,12 +1120,21 @@ export class HrService {
     if (period.status !== 'OPEN') throw forbidden(ERROR_CODES.PAYROLL_PERIOD_LOCKED, 'The payroll period is not open.');
 
     const companyCurrency = await this.context.companyCurrency(companyId);
+    const policy = await this.ensurePolicy(companyId);
     const employees = await this.prisma.employee.findMany({
       where: { companyId, status: { in: ['ACTIVE', 'ON_LEAVE'] } },
       include: {
         salaryStructures: { where: { isActive: true }, include: { components: true } },
         advances: { where: { status: { in: ['OPEN', 'PARTIALLY_SETTLED'] } } },
         attendance: { where: { workDate: { gte: period.startDate, lte: period.endDate } } },
+        leaveRequests: {
+          where: {
+            status: 'APPROVED',
+            leaveType: { isPaid: false },
+            startDate: { lte: period.endDate },
+            endDate: { gte: period.startDate },
+          },
+        },
       },
     });
     if (employees.length === 0) throw badRequest(ERROR_CODES.PAYROLL_NO_EMPLOYEES, 'No active employees with a salary structure.');
@@ -693,8 +1167,18 @@ export class HrService {
         }));
 
         const overtimeMinutes = sumMinor(employee.attendance.map((a) => a.overtimeMinutes));
-        // Overtime hours are hundredths: minutes / 60 * 100 = minutes * 5 / 3.
-        const overtimeHours = Math.round((overtimeMinutes * 100) / 60);
+        const lateMinutes = sumMinor(employee.attendance.map((a) => a.lateMinutes));
+        const earlyLeaveMinutes = sumMinor(employee.attendance.map((a) => a.earlyLeaveMinutes));
+        const absenceDays = employee.attendance.filter((a) => a.status === 'ABSENT').length;
+        const workedMinutes = sumMinor(employee.attendance.map((a) => a.netMinutes));
+        // Unpaid approved leave inside the period is deducted at the daily rate.
+        const unpaidLeaveDays = employee.leaveRequests.reduce(
+          (sum, r) => sum + leaveDaysBetween(
+            r.startDate < period.startDate ? period.startDate : r.startDate,
+            r.endDate > period.endDate ? period.endDate : r.endDate,
+          ),
+          0,
+        );
 
         // One outstanding advance is settled per run, evenly across instalments.
         const advance = employee.advances[0];
@@ -708,9 +1192,18 @@ export class HrService {
         const slip = computePayslip({
           basicMinor: structure.basicMinor,
           components,
-          overtimeHours,
-          overtimeMultiplierBp: dto.overtimeMultiplierBp ?? 10000,
+          overtimeRateMinor: structure.overtimeRateMinor,
+          unpaidLeaveDays,
           advanceDeductionMinor: advanceDeduction,
+          policy: {
+            overtimeEnabled: policy.overtimeEnabled,
+            overtimeMultiplierBp: dto.overtimeMultiplierBp ?? policy.overtimeMultiplierBp,
+            standardDailyHours: structure.dailyHours ?? policy.standardDailyHours,
+            deductLate: policy.deductLate,
+            deductEarlyLeave: policy.deductEarlyLeave,
+            deductAbsence: policy.deductAbsence,
+          },
+          attendance: { overtimeMinutes, lateMinutes, earlyLeaveMinutes, absenceDays, workedMinutes },
         });
 
         const payslip = await tx.payslip.create({
@@ -728,13 +1221,28 @@ export class HrService {
             netMinor: slip.netMinor,
             currency: structure.currency,
             advanceDeductionMinor: advanceDeduction,
+            overtimeMinutes,
+            lateMinutes,
+            absenceDays,
+            workedMinutes,
             snapshot: {
               structureId: structure.id,
               effectiveFrom: structure.effectiveFrom.toISOString(),
               basicMinor: structure.basicMinor,
               components: components as unknown as Prisma.InputJsonValue,
-              overtimeHours,
+              overtimeMinutes,
+              lateMinutes,
+              earlyLeaveMinutes,
+              absenceDays,
+              unpaidLeaveDays,
               advanceDeductionMinor: advanceDeduction,
+              policy: {
+                overtimeEnabled: policy.overtimeEnabled,
+                overtimeMultiplierBp: dto.overtimeMultiplierBp ?? policy.overtimeMultiplierBp,
+                deductLate: policy.deductLate,
+                deductEarlyLeave: policy.deductEarlyLeave,
+                deductAbsence: policy.deductAbsence,
+              } as unknown as Prisma.InputJsonValue,
             },
             lines: { create: slip.lines.map((l) => ({ type: l.type as never, code: l.code, nameEn: l.nameEn, nameAr: l.nameAr, amountMinor: l.amountMinor, sortOrder: l.sortOrder })) },
           },
@@ -923,32 +1431,312 @@ export class HrService {
 
   async workforceDashboard(principal: RequestPrincipal, companyIdInput?: string) {
     const { companyId } = await this.context.resolveCompanyScope(principal, companyIdInput);
-    const [total, active, onLeave, departments, byDepartment] = await Promise.all([
+    const tz = await this.companyTimeZone(companyId);
+    const today = zonedDateKey(new Date(), tz);
+
+    const [total, active, onLeave, departments, byDepartment, todayRecords, pendingLeave, latestRun, approvedRuns, pendingRuns] = await Promise.all([
       this.prisma.employee.count({ where: { companyId } }),
       this.prisma.employee.count({ where: { companyId, status: 'ACTIVE' } }),
       this.prisma.employee.count({ where: { companyId, status: 'ON_LEAVE' } }),
       this.prisma.department.findMany({ where: { companyId }, include: { _count: { select: { employees: true } } } }),
       this.prisma.employee.groupBy({ by: ['departmentId'], where: { companyId }, _count: true }),
+      this.prisma.attendanceRecord.findMany({ where: { companyId, workDate: today }, include: { employee: { select: { departmentId: true } } } }),
+      this.prisma.leaveRequest.count({ where: { companyId, status: 'SUBMITTED' } }),
+      this.prisma.payrollRun.findFirst({ where: { companyId }, orderBy: { createdAt: 'desc' } }),
+      this.prisma.payrollRun.count({ where: { companyId, status: { in: ['POSTED', 'LOCKED'] } } }),
+      this.prisma.payrollRun.count({ where: { companyId, status: { in: ['DRAFT', 'APPROVED'] } } }),
     ]);
-    const pendingLeave = await this.prisma.leaveRequest.count({ where: { companyId, status: 'SUBMITTED' } });
-    const latestRun = await this.prisma.payrollRun.findFirst({ where: { companyId }, orderBy: { createdAt: 'desc' } });
+
+    const presentNow = todayRecords.filter((r) => r.checkInAt && !r.checkOutAt).length;
+    const lateToday = todayRecords.filter((r) => r.lateMinutes > 0).length;
+    const absentToday = todayRecords.filter((r) => r.status === 'ABSENT').length;
+    const missingCheckout = todayRecords.filter((r) => r.checkInAt && !r.checkOutAt).length;
+    const workedMinutesToday = todayRecords.reduce((sum, r) => sum + r.netMinutes, 0);
+    const overtimeMinutesToday = todayRecords.reduce((sum, r) => sum + r.overtimeMinutes, 0);
+
     return {
       totalEmployees: total,
       activeEmployees: active,
       onLeaveEmployees: onLeave,
       pendingLeaveRequests: pendingLeave,
       departmentCount: departments.length,
-      headcountByDepartment: byDepartment.map((g) => ({
-        departmentId: g.departmentId,
-        count: g._count,
-      })),
+      headcountByDepartment: byDepartment.map((g) => ({ departmentId: g.departmentId, count: g._count })),
+      attendanceToday: {
+        date: today.toISOString().slice(0, 10),
+        presentNow,
+        late: lateToday,
+        absent: absentToday,
+        missingCheckout,
+        workedMinutes: workedMinutesToday,
+        overtimeMinutes: overtimeMinutesToday,
+      },
+      payroll: {
+        approvedRuns,
+        pendingRuns,
+        dueNetMinor: latestRun?.netMinor ?? 0,
+      },
       latestPayroll: latestRun
         ? { id: latestRun.id, runNumber: latestRun.runNumber, status: latestRun.status, netMinor: latestRun.netMinor, employeeCount: latestRun.employeeCount }
         : null,
     };
   }
 
+  // ------------------------------------------------------------ HR reports
+
+  /**
+   * A date window for a report, defaulting to the current calendar month in the
+   * company's timezone. A report never guesses a window silently: the resolved
+   * from/to are returned so the caller can show what was aggregated.
+   */
+  private async reportWindow(companyId: string, from?: string, to?: string) {
+    const tz = await this.companyTimeZone(companyId);
+    const now = new Date();
+    const p = zonedParts(now, tz);
+    const start = from ? new Date(from) : new Date(Date.UTC(p.year, p.month - 1, 1));
+    const end = to ? new Date(to) : new Date(Date.UTC(p.year, p.month - 1, p.day));
+    return { start, end, tz };
+  }
+
+  async reportAttendance(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const { start, end } = await this.reportWindow(companyId, query.from, query.to);
+    const rows = await this.prisma.attendanceRecord.findMany({
+      where: {
+        companyId,
+        workDate: { gte: start, lte: end },
+        ...(query.employeeId ? { employeeId: query.employeeId } : {}),
+        ...(query.departmentId ? { employee: { departmentId: query.departmentId } } : {}),
+        ...(query.branchId ? { employee: { branchId: query.branchId } } : {}),
+      },
+      include: { employee: { select: { code: true, fullNameEn: true, fullNameAr: true, department: { select: { nameEn: true, nameAr: true } } } } },
+      orderBy: { workDate: 'asc' },
+    });
+    return { from: start.toISOString(), to: end.toISOString(), items: rows.map(toAttendanceDto), total: rows.length };
+  }
+
+  /** Late arrivals and absences, aggregated per employee for the window. */
+  async reportLateAbsence(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const { start, end } = await this.reportWindow(companyId, query.from, query.to);
+    const rows = await this.prisma.attendanceRecord.findMany({
+      where: {
+        companyId,
+        workDate: { gte: start, lte: end },
+        ...(query.departmentId ? { employee: { departmentId: query.departmentId } } : {}),
+        ...(query.branchId ? { employee: { branchId: query.branchId } } : {}),
+      },
+      include: { employee: { select: { code: true, fullNameEn: true, fullNameAr: true } } },
+    });
+    const byEmployee = new Map<string, { employeeCode: string; employeeNameEn: string; employeeNameAr: string; lateCount: number; lateMinutes: number; absentDays: number; earlyLeaveCount: number }>();
+    for (const r of rows) {
+      const key = r.employeeId;
+      const entry = byEmployee.get(key) ?? { employeeCode: r.employee.code, employeeNameEn: r.employee.fullNameEn, employeeNameAr: r.employee.fullNameAr, lateCount: 0, lateMinutes: 0, absentDays: 0, earlyLeaveCount: 0 };
+      if (r.lateMinutes > 0) { entry.lateCount += 1; entry.lateMinutes += r.lateMinutes; }
+      if (r.earlyLeaveMinutes > 0) entry.earlyLeaveCount += 1;
+      if (r.status === 'ABSENT') entry.absentDays += 1;
+      byEmployee.set(key, entry);
+    }
+    return { from: start.toISOString(), to: end.toISOString(), items: [...byEmployee.values()], total: byEmployee.size };
+  }
+
+  /** Overtime hours and estimated cost per employee for the window. */
+  async reportOvertime(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const { start, end } = await this.reportWindow(companyId, query.from, query.to);
+    const policy = await this.ensurePolicy(companyId);
+    const rows = await this.prisma.attendanceRecord.findMany({
+      where: { companyId, workDate: { gte: start, lte: end }, overtimeMinutes: { gt: 0 } },
+      include: { employee: { select: { id: true, code: true, fullNameEn: true, fullNameAr: true, salaryStructures: { where: { isActive: true }, select: { basicMinor: true, overtimeRateMinor: true }, take: 1 } } } },
+    });
+    const byEmployee = new Map<string, { employeeCode: string; employeeNameEn: string; employeeNameAr: string; overtimeMinutes: number; overtimeCostMinor: number }>();
+    for (const r of rows) {
+      const structure = r.employee.salaryStructures[0];
+      const hourly = structure?.overtimeRateMinor ?? (structure ? Math.round((structure.basicMinor * 100) / Math.max(1, policy.standardDailyHours * 30)) : 0);
+      const cost = Math.round((r.overtimeMinutes * hourly) / 60);
+      const entry = byEmployee.get(r.employeeId) ?? { employeeCode: r.employee.code, employeeNameEn: r.employee.fullNameEn, employeeNameAr: r.employee.fullNameAr, overtimeMinutes: 0, overtimeCostMinor: 0 };
+      entry.overtimeMinutes += r.overtimeMinutes;
+      entry.overtimeCostMinor += cost;
+      byEmployee.set(r.employeeId, entry);
+    }
+    return { from: start.toISOString(), to: end.toISOString(), items: [...byEmployee.values()], total: byEmployee.size };
+  }
+
+  /** Net worked minutes per employee for the window. */
+  async reportWorkedHours(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const { start, end } = await this.reportWindow(companyId, query.from, query.to);
+    const rows = await this.prisma.attendanceRecord.findMany({
+      where: {
+        companyId,
+        workDate: { gte: start, lte: end },
+        ...(query.departmentId ? { employee: { departmentId: query.departmentId } } : {}),
+        ...(query.branchId ? { employee: { branchId: query.branchId } } : {}),
+      },
+      include: { employee: { select: { code: true, fullNameEn: true, fullNameAr: true } } },
+    });
+    const byEmployee = new Map<string, { employeeCode: string; employeeNameEn: string; employeeNameAr: string; workedMinutes: number; netMinutes: number; days: number }>();
+    for (const r of rows) {
+      const entry = byEmployee.get(r.employeeId) ?? { employeeCode: r.employee.code, employeeNameEn: r.employee.fullNameEn, employeeNameAr: r.employee.fullNameAr, workedMinutes: 0, netMinutes: 0, days: 0 };
+      entry.workedMinutes += r.workedMinutes;
+      entry.netMinutes += r.netMinutes;
+      entry.days += 1;
+      byEmployee.set(r.employeeId, entry);
+    }
+    return { from: start.toISOString(), to: end.toISOString(), items: [...byEmployee.values()], total: byEmployee.size };
+  }
+
+  /** Monthly payroll totals across runs in the window. */
+  async reportPayroll(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const { start, end } = await this.reportWindow(companyId, query.from, query.to);
+    const runs = await this.prisma.payrollRun.findMany({
+      where: { companyId, createdAt: { gte: start, lte: end } },
+      include: { period: { select: { code: true, nameEn: true, nameAr: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return {
+      from: start.toISOString(),
+      to: end.toISOString(),
+      items: runs.map((r) => ({ id: r.id, runNumber: r.runNumber, status: r.status, periodCode: r.period.code, employeeCount: r.employeeCount, grossMinor: r.grossMinor, allowancesMinor: r.allowancesMinor, deductionsMinor: r.deductionsMinor, netMinor: r.netMinor, currency: r.currency, createdAt: r.createdAt.toISOString() })),
+      total: runs.length,
+    };
+  }
+
+  /** Deductions and allowances by component code across posted runs. */
+  async reportDeductionsAllowances(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const { start, end } = await this.reportWindow(companyId, query.from, query.to);
+    const lines = await this.prisma.payslipLine.findMany({
+      where: { payslip: { companyId, payrollRun: { createdAt: { gte: start, lte: end }, status: { in: ['POSTED', 'LOCKED'] } } } },
+      select: { type: true, code: true, nameEn: true, nameAr: true, amountMinor: true },
+    });
+    const byCode = new Map<string, { type: string; code: string; nameEn: string; nameAr: string; totalMinor: number; count: number }>();
+    for (const l of lines) {
+      const entry = byCode.get(l.code) ?? { type: l.type, code: l.code, nameEn: l.nameEn, nameAr: l.nameAr, totalMinor: 0, count: 0 };
+      entry.totalMinor += l.amountMinor;
+      entry.count += 1;
+      byCode.set(l.code, entry);
+    }
+    return { from: start.toISOString(), to: end.toISOString(), items: [...byCode.values()], total: byCode.size };
+  }
+
+  /** A roster of employees with their current salary, for the payroll register. */
+  async reportEmployeePayroll(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const employees = await this.prisma.employee.findMany({
+      where: {
+        companyId,
+        ...(query.departmentId ? { departmentId: query.departmentId } : {}),
+        ...(query.branchId ? { branchId: query.branchId } : {}),
+        ...(query.status ? { status: query.status as never } : {}),
+      },
+      include: { salaryStructures: { where: { isActive: true }, include: { components: true }, take: 1 }, department: { select: { nameEn: true, nameAr: true } } },
+      orderBy: { code: 'asc' },
+    });
+    return {
+      items: employees.map((e) => {
+        const s = e.salaryStructures[0];
+        const allowances = (s?.components ?? []).filter((c) => c.type === 'ALLOWANCE');
+        const deductions = (s?.components ?? []).filter((c) => c.type === 'DEDUCTION');
+        return {
+          employeeId: e.id,
+          employeeCode: e.code,
+          employeeNameEn: e.fullNameEn,
+          employeeNameAr: e.fullNameAr,
+          departmentNameEn: e.department?.nameEn ?? null,
+          departmentNameAr: e.department?.nameAr ?? null,
+          status: e.status,
+          basicMinor: s?.basicMinor ?? 0,
+          allowancesMinor: sumMinor(allowances.map((c) => (c.isPercentage ? Math.round((s!.basicMinor * c.percentBp) / 10000) : c.amountMinor))),
+          deductionsMinor: sumMinor(deductions.map((c) => (c.isPercentage ? Math.round((s!.basicMinor * c.percentBp) / 10000) : c.amountMinor))),
+          currency: s?.currency ?? 'BHD',
+        };
+      }),
+      total: employees.length,
+    };
+  }
+
+  /** Payroll cost grouped by company, department and branch. */
+  async reportPayrollCost(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const { start, end } = await this.reportWindow(companyId, query.from, query.to);
+    const payslips = await this.prisma.payslip.findMany({
+      where: { companyId, payrollRun: { createdAt: { gte: start, lte: end }, status: { in: ['POSTED', 'LOCKED'] } } },
+      include: { employee: { select: { department: { select: { nameEn: true, nameAr: true } }, branch: { select: { nameEn: true, nameAr: true } } } } },
+    });
+    const byDepartment = new Map<string, { nameEn: string; nameAr: string; grossMinor: number; netMinor: number; headcount: number }>();
+    const byBranch = new Map<string, { nameEn: string; nameAr: string; grossMinor: number; netMinor: number; headcount: number }>();
+    let totalGross = 0;
+    let totalNet = 0;
+    for (const p of payslips) {
+      const deptName = p.employee.department?.nameEn ?? 'Unassigned';
+      const deptAr = p.employee.department?.nameAr ?? 'غير محدد';
+      const d = byDepartment.get(deptName) ?? { nameEn: deptName, nameAr: deptAr, grossMinor: 0, netMinor: 0, headcount: 0 };
+      d.grossMinor += p.grossMinor; d.netMinor += p.netMinor; d.headcount += 1;
+      byDepartment.set(deptName, d);
+
+      const brName = p.employee.branch?.nameEn ?? 'Unassigned';
+      const brAr = p.employee.branch?.nameAr ?? 'غير محدد';
+      const b = byBranch.get(brName) ?? { nameEn: brName, nameAr: brAr, grossMinor: 0, netMinor: 0, headcount: 0 };
+      b.grossMinor += p.grossMinor; b.netMinor += p.netMinor; b.headcount += 1;
+      byBranch.set(brName, b);
+
+      totalGross += p.grossMinor;
+      totalNet += p.netMinor;
+    }
+    return {
+      from: start.toISOString(),
+      to: end.toISOString(),
+      totals: { grossMinor: totalGross, netMinor: totalNet, payslips: payslips.length },
+      byDepartment: [...byDepartment.values()],
+      byBranch: [...byBranch.values()],
+    };
+  }
+
   // ----------------------------------------------------------------- helpers
+
+  /**
+   * Assert a payslip may be read by this principal.
+   *
+   * A holder of the company-wide payslip permission may read any payslip in the
+   * tenant. An employee with only the self-service permission may read exactly
+   * their own; the check is by the payslip's own `employeeId`, so a peer's
+   * payslip id cannot be used to read theirs.
+   */
+  async assertPayslipReadable(payslipId: string, principal: RequestPrincipal): Promise<void> {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const payslip = await this.prisma.payslip.findFirst({ where: { id: payslipId, companyId }, select: { employeeId: true } });
+    if (!payslip) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Payslip not found.');
+    if (principal.grantedPermissions.includes('erp.hr.payslip.read')) return;
+    const employee = await this.prisma.employee.findFirst({ where: { companyId, userId: principal.userId }, select: { id: true } });
+    if (!employee || employee.id !== payslip.employeeId) {
+      throw forbidden(ERROR_CODES.FORBIDDEN_PERMISSION, 'You may only read your own payslips.');
+    }
+  }
+
+  /** Dispatch a report by its slug, for the CSV export route. */
+  async runReport(kind: string, query: ListQueryDto, principal: RequestPrincipal) {
+    switch (kind) {
+      case 'attendance':
+        return this.reportAttendance(query, principal);
+      case 'late-absence':
+        return this.reportLateAbsence(query, principal);
+      case 'overtime':
+        return this.reportOvertime(query, principal);
+      case 'worked-hours':
+        return this.reportWorkedHours(query, principal);
+      case 'payroll':
+        return this.reportPayroll(query, principal);
+      case 'deductions-allowances':
+        return this.reportDeductionsAllowances(query, principal);
+      case 'employee-payroll':
+        return this.reportEmployeePayroll(query, principal);
+      case 'payroll-cost':
+        return this.reportPayrollCost(query, principal);
+      default:
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, `Unknown report "${kind}".`);
+    }
+  }
 
   private async assertEmployee(companyId: string, employeeId: string) {
     const employee = await this.prisma.employee.findFirst({ where: { id: employeeId, companyId } });
@@ -1039,6 +1827,15 @@ function toAttendanceDto(a: {
   status: string;
   checkInAt: Date | null;
   checkOutAt: Date | null;
+  lateMinutes?: number;
+  earlyLeaveMinutes?: number;
+  breakMinutes?: number;
+  netMinutes?: number;
+  checkInSource?: string | null;
+  checkOutSource?: string | null;
+  checkInDistanceM?: number | null;
+  checkInSiteId?: string | null;
+  fallbackReason?: string | null;
   employee?: { code: string; fullNameEn: string; fullNameAr: string } | null;
 }) {
   return {
@@ -1052,6 +1849,15 @@ function toAttendanceDto(a: {
     checkOutAt: a.checkOutAt ? a.checkOutAt.toISOString() : null,
     workedMinutes: a.workedMinutes,
     overtimeMinutes: a.overtimeMinutes,
+    lateMinutes: a.lateMinutes ?? 0,
+    earlyLeaveMinutes: a.earlyLeaveMinutes ?? 0,
+    breakMinutes: a.breakMinutes ?? 0,
+    netMinutes: a.netMinutes ?? 0,
+    checkInSource: a.checkInSource ?? null,
+    checkOutSource: a.checkOutSource ?? null,
+    checkInDistanceM: a.checkInDistanceM ?? null,
+    checkInSiteId: a.checkInSiteId ?? null,
+    fallbackReason: a.fallbackReason ?? null,
     status: a.status,
   };
 }
@@ -1141,5 +1947,53 @@ function toAdvanceDto(a: {
     currency: a.currency,
     issuedAt: a.issuedAt.toISOString(),
     reason: a.reason,
+  };
+}
+
+function toPayslipDto(p: {
+  id: string;
+  employeeId: string;
+  employeeCode: string;
+  employeeNameEn: string;
+  employeeNameAr: string;
+  basicMinor: number;
+  allowancesMinor: number;
+  deductionsMinor: number;
+  grossMinor: number;
+  netMinor: number;
+  currency: string;
+  advanceDeductionMinor: number;
+  overtimeMinutes: number;
+  lateMinutes: number;
+  absenceDays: number;
+  workedMinutes: number;
+  createdAt: Date;
+  lines?: Array<{ type: string; code: string; nameEn: string; nameAr: string; amountMinor: number; sortOrder: number }>;
+  payrollRun?: { runNumber: string; status: string; period?: { code: string; nameEn: string; nameAr: string } | null } | null;
+}) {
+  return {
+    id: p.id,
+    employeeId: p.employeeId,
+    employeeCode: p.employeeCode,
+    employeeNameEn: p.employeeNameEn,
+    employeeNameAr: p.employeeNameAr,
+    basicMinor: p.basicMinor,
+    allowancesMinor: p.allowancesMinor,
+    deductionsMinor: p.deductionsMinor,
+    grossMinor: p.grossMinor,
+    netMinor: p.netMinor,
+    currency: p.currency,
+    advanceDeductionMinor: p.advanceDeductionMinor,
+    overtimeMinutes: p.overtimeMinutes,
+    lateMinutes: p.lateMinutes,
+    absenceDays: p.absenceDays,
+    workedMinutes: p.workedMinutes,
+    runNumber: p.payrollRun?.runNumber ?? null,
+    runStatus: p.payrollRun?.status ?? null,
+    periodCode: p.payrollRun?.period?.code ?? null,
+    periodNameEn: p.payrollRun?.period?.nameEn ?? null,
+    periodNameAr: p.payrollRun?.period?.nameAr ?? null,
+    createdAt: p.createdAt.toISOString(),
+    lines: p.lines?.map((l) => ({ type: l.type, code: l.code, nameEn: l.nameEn, nameAr: l.nameAr, amountMinor: l.amountMinor, sortOrder: l.sortOrder })) ?? [],
   };
 }

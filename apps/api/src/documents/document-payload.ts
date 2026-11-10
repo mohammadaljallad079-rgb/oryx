@@ -131,6 +131,8 @@ export interface InspectionReportPayload {
   finalAssessment: string | null;
   reviewedByName: string | null;
   reviewedAt: string | null;
+  /** The customer-supplied photograph of the vehicle, inlined for the cover. */
+  vehiclePhotoDataUri: string | null;
   sections: InspectionReportSection[];
 }
 

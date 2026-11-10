@@ -253,9 +253,12 @@ export interface InspectionReportPage {
  * own page. Either way the page heading comes from this table.
  */
 export const INSPECTION_PAGE_TITLES: Record<number, { en: string; ar: string }> = {
-  2: { en: 'Paint & Body Check', ar: 'فحص الصبغ والهيكل' },
-  3: { en: 'Interior & Exterior Inspection', ar: 'فحص المقصورة والخارج' },
-  4: { en: 'Engine Compartment & Road Test', ar: 'فحص حجرة المحرك واختبار الطريق' },
+  2: { en: 'Vehicle Paint & Body Check', ar: 'فحص الصبغ وبدن المركبة' },
+  3: { en: 'Chassis & Undercarriage Condition', ar: 'فحص الشاسي وأسفل المركبة' },
+  4: {
+    en: 'Interior & Exterior Inspection / Engine Compartment / Road Test',
+    ar: 'الفحص الداخلي والخارجي / مقصورة المحرك / تجربة القيادة',
+  },
   5: { en: 'Computer Unit Inspection', ar: 'فحص وحدة الكمبيوتر' },
 };
 

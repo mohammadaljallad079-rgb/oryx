@@ -42,6 +42,7 @@ export function CompanySettingsPanel() {
     industry: '',
     countryCode: '',
     taxNumber: '',
+    crNumber: '',
     notes: '',
     currency: '',
     functionalCurrency: '',
@@ -92,6 +93,7 @@ export function CompanySettingsPanel() {
         industry: res.industry ?? '',
         countryCode: res.countryCode ?? '',
         taxNumber: res.taxNumber ?? '',
+        crNumber: res.crNumber ?? '',
         notes: res.notes ?? '',
         currency: res.currency,
         functionalCurrency: res.functionalCurrency ?? '',
@@ -130,6 +132,7 @@ export function CompanySettingsPanel() {
         industry: form.industry,
         countryCode: form.countryCode,
         taxNumber: form.taxNumber,
+        crNumber: form.crNumber,
         notes: form.notes,
         currency: form.currency,
         functionalCurrency: form.functionalCurrency,
@@ -244,6 +247,15 @@ export function CompanySettingsPanel() {
                 onChange={(e) => setForm({ ...form, taxNumber: e.target.value })}
                 disabled={!canEdit}
                 data-testid="company-tax-number"
+              />
+            </Field>
+            <Field label={t('settings.crNumber')}>
+              <input
+                className="oryx-input"
+                value={form.crNumber}
+                onChange={(e) => setForm({ ...form, crNumber: e.target.value })}
+                disabled={!canEdit}
+                data-testid="company-cr-number"
               />
             </Field>
             <Field label={t('settings.notes')}>

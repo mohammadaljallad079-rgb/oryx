@@ -113,7 +113,7 @@ function EcosystemPageInner() {
           ) : trend.length === 0 ? (
             <EmptyState title={t('eco.empty')} hint={t('common.emptyHint')} />
           ) : (
-            <MiniLineChart data={trend} height={170} />
+            <MiniLineChart data={trend} height={170} label={t('charts.trend')} />
           )}
         </Card>
       </section>

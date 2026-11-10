@@ -417,6 +417,7 @@ function SectionEditor({
             redo: t('inspection.redo'),
             clear: t('inspection.clearMarkers'),
             clearConfirm: t('inspection.clearMarkersConfirm'),
+            canvas: t('inspection.bodyDiagram'),
           }}
         />
       ) : null}
