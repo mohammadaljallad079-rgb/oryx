@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { fromMinor, type PrintDocumentDto, type PrintDocumentKind, type PrintPartyDto } from '@oryx/shared';
+import { fromMinor, currencyScale, type PrintDocumentDto, type PrintDocumentKind, type PrintPartyDto } from '@oryx/shared';
 import { notFound, ERROR_CODES } from '../common/errors';
 import { ErpContextService } from '../common/erp-context.service';
 import { PrismaService } from '../common/prisma.service';
@@ -323,14 +323,19 @@ export class PrintService {
 
     const invoiceNumber = payment.allocations.find((a) => a.salesInvoice)?.salesInvoice?.invoiceNumber ?? null;
     const spec = TITLES.RECEIPT;
+    // The line must be rendered at the currency's own scale (BHD/KWD/OMR carry
+    // three minor units), or a 10.000 BHD receipt would print a 100.00 BHD line
+    // beside a 10.000 BHD total.
+    const scale = currencyScale(payment.currency);
+    const amount = fromMinor(payment.amountMinor, scale);
     const lines = [
       {
         description: invoiceNumber ? `Settlement of invoice ${invoiceNumber}` : 'Payment received',
         quantity: '1',
-        unitPrice: fromMinor(payment.amountMinor),
+        unitPrice: amount,
         taxLabel: '—',
         discountPercent: '—',
-        amount: `${fromMinor(payment.amountMinor)} ${payment.currency}`,
+        amount: `${amount} ${payment.currency}`,
       },
     ];
     return {

@@ -34,6 +34,7 @@ interface PrintModel {
   lines: Array<{ description: string; quantity: string; unitPrice: string; amount: string }>;
   totals: { untaxedAmount: string; taxAmount: string; discount: string; total: string };
   amountInWords: string;
+  currency: string;
 }
 
 interface AttachmentRow {
@@ -99,6 +100,10 @@ describe('print model and document attachments (e2e)', () => {
         nameAr: 'شركة اختبار الطباعة',
         type: 'SAAS_TENANT',
         planId: enterprise.id,
+        // The amounts below are written for a two-decimal currency, so the
+        // fixture pins it rather than inheriting the three-decimal default.
+        currency: 'SAR',
+        countryCode: 'SA',
       },
     });
     tenantId = created.body.company.id;
@@ -233,7 +238,8 @@ describe('print model and document attachments (e2e)', () => {
       const res = await erp<PrintModel>(`/print/SALES_INVOICE/${invoiceId}`);
       expect(res.status).toBe(200);
       expect(res.body.kind).toBe('SALES_INVOICE');
-      expect(res.body.documentNumber).toMatch(/^SI-/);
+      // Single-letter numbering: the approved form prints `INVOICE # S00022`.
+      expect(res.body.documentNumber).toMatch(/^S\d{5}$/);
       expect(res.body.titleEn).toBe('INVOICE');
       expect(res.body.titleAr).toBe('فاتورة');
       expect(res.body.party.name).toBe('Al Haddad Trading');
@@ -253,9 +259,15 @@ describe('print model and document attachments (e2e)', () => {
       const res = await erp<PrintModel>(`/print/RECEIPT/${receiptId}`);
       expect(res.status).toBe(200);
       expect(res.body.kind).toBe('RECEIPT');
-      expect(res.body.documentNumber).toMatch(/^PMT-/);
+      expect(res.body.documentNumber).toMatch(/^Y\d{5}$/);
       expect(res.body.party.name).toBe('Al Haddad Trading');
       expect(res.body.totals.total).toBe('10.00 SAR');
+      // The voucher's single line must agree with its own total at the
+      // currency's scale; a scale slip prints a line ten times the total
+      // (the three-decimal BHD case that motivated this assertion).
+      expect(res.body.lines).toHaveLength(1);
+      expect(res.body.lines[0].amount).toBe(res.body.totals.total);
+      expect(`${res.body.lines[0].unitPrice} ${res.body.currency}`).toBe(res.body.totals.total);
     });
 
     it('refuses an unknown document id without a 500', async () => {

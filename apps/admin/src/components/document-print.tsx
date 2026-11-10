@@ -15,7 +15,8 @@ const TOOLBAR = `
   <button type="button" onclick="window.print()" style="cursor:pointer;border:0;border-radius:6px;padding:6px 14px;
     background:#d4af37;color:#00162b;font-weight:700">Print / طباعة</button>
 </div>
-<style>@media print { .oryx-print-toolbar { display:none !important; } } body { padding-top: 44px; }</style>
+<style>@media screen { body { padding-top: 44px; } }
+  @media print { .oryx-print-toolbar { display:none !important; } body { padding-top: 0 !important; } }</style>
 `;
 
 /**
