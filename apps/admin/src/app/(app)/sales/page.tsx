@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync, useDebounced } from '@/lib/hooks';
@@ -232,6 +232,17 @@ function CustomersTab({ canManage }: { canManage: boolean }) {
     await list.reload();
   };
 
+  const onDelete = async (row: CustomerDto) => {
+    if (!window.confirm(t('common.deleteConfirm'))) return;
+    try {
+      await api.deleteCustomer(row.id);
+      await list.reload();
+    } catch (err) {
+      const key = err instanceof ApiError && err.code === 'resource.conflict' ? 'erp.sales.deleteCustomerBlocked' : 'common.error';
+      window.alert(t(key));
+    }
+  };
+
   return (
     <Card>
       <div className="flex flex-wrap items-end gap-3 border-b border-[var(--border)] p-4">
@@ -291,6 +302,11 @@ function CustomersTab({ canManage }: { canManage: boolean }) {
                     {canManage ? (
                       <Button size="sm" variant="ghost" onClick={() => void setStatus(c, !c.isActive)} data-testid={`customer-toggle-${c.code}`}>
                         {c.isActive ? t('common.deactivate') : t('common.reactivate')}
+                      </Button>
+                    ) : null}
+                    {canManage ? (
+                      <Button size="sm" variant="danger" onClick={() => void onDelete(c)} data-testid={`customer-delete-${c.code}`}>
+                        {t('common.delete')}
                       </Button>
                     ) : null}
                     <DocumentActions
@@ -902,13 +918,25 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                       </Button>
                     ) : null}
                     {inv.status !== 'DRAFT' ? (
-                      <DocumentActions
-                        sourceType="SalesInvoice"
-                        sourceId={inv.id}
-                        type="SALES_INVOICE"
-                        permissions={['erp.sales.read', 'erp.accounting.read']}
-                        autoOpenOnMount={autoPreviewId === inv.id}
-                      />
+                      <>
+                        <DocumentPrintActions kind="SALES_INVOICE" id={inv.id} compact />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setDetail(inv)}
+                          title={t('attachments.title')}
+                          data-testid={`invoice-attach-open-${inv.invoiceNumber}`}
+                        >
+                          <Icon name="paperclip" size={15} />
+                        </Button>
+                        <DocumentActions
+                          sourceType="SalesInvoice"
+                          sourceId={inv.id}
+                          type="SALES_INVOICE"
+                          permissions={['erp.sales.read', 'erp.accounting.read']}
+                          autoOpenOnMount={autoPreviewId === inv.id}
+                        />
+                      </>
                     ) : null}
                   </div>
                 </td>

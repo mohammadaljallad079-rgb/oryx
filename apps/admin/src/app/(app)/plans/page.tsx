@@ -4,7 +4,7 @@ import { PermissionGate } from '@/components/permission-gate';
 import { useEffect, useState } from 'react';
 import type { PlanDto } from '@oryx/shared';
 import { CURRENCIES, DEFAULT_CURRENCY, MODULES } from '@oryx/shared';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
@@ -25,6 +25,20 @@ function PlansPageInner() {
   const plans = useAsync(() => api.listPlans(), []);
   const [editing, setEditing] = useState<PlanDto | null>(null);
   const [creating, setCreating] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const removePlan = async (p: PlanDto) => {
+    if (!window.confirm(t('plans.confirmDelete'))) return;
+    setBusyId(p.id);
+    try {
+      await api.deletePlan(p.id);
+      await plans.reload();
+    } catch (e) {
+      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('plans.deleteBlocked') : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-4" data-testid="plans-page">
@@ -130,9 +144,22 @@ function PlansPageInner() {
                   <Badge tone="neutral">
                     {p.subscriberCount ?? 0} {t('plans.subscribers')}
                   </Badge>
-                  <Button size="sm" onClick={() => setEditing(p)} data-testid={`edit-plan-${p.code}`}>
-                    {t('common.edit')}
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" onClick={() => setEditing(p)} data-testid={`edit-plan-${p.code}`}>
+                      {t('common.edit')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      disabled={busyId === p.id || (p.subscriberCount ?? 0) > 0}
+                      title={(p.subscriberCount ?? 0) > 0 ? t('plans.deleteBlocked') : undefined}
+                      aria-label={`${t('common.delete')} ${p.code}`}
+                      onClick={() => void removePlan(p)}
+                      data-testid={`delete-plan-${p.code}`}
+                    >
+                      <Icon name="trash" size={14} />
+                    </Button>
+                  </div>
                 </div>
               </Card>
             ))}

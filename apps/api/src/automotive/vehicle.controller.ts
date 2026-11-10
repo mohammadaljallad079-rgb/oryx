@@ -79,6 +79,14 @@ export class VehicleController {
     return this.vehicles.recordMileage(id, dto, p, actorFrom(p, req));
   }
 
+  @Delete('vehicles/:id')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.vehicle.manage')
+  @ApiOperation({ summary: 'Delete a vehicle that carries no inspection, job card, warranty or booking' })
+  deleteVehicle(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.vehicles.deleteVehicle(id, p, actorFrom(p, req));
+  }
+
   @Get('vehicles/:id/documents')
   @RequireModule('automotive_inspections')
   @RequireAnyPermission('erp.vehicle.read', 'erp.vehicle.manage')
@@ -155,6 +163,14 @@ export class VehicleController {
     return this.vehicles.createInspectionService(dto, p, actorFrom(p, req));
   }
 
+  @Delete('inspection-services/:id')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.inspection.service.manage')
+  @ApiOperation({ summary: 'Delete an inspection service that has no bookings' })
+  deleteService(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.vehicles.deleteInspectionService(id, p, actorFrom(p, req));
+  }
+
   @Post('inspection-checklist-items')
   @RequireModule('automotive_inspections')
   @RequirePermissions('erp.inspection.service.manage')
@@ -185,6 +201,14 @@ export class VehicleController {
   @ApiOperation({ summary: 'Update an inspection booking' })
   updateBooking(@Param('id') id: string, @Body() dto: UpdateInspectionBookingDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.vehicles.updateInspectionBooking(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('inspection-bookings/:id')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.inspection.booking.manage')
+  @ApiOperation({ summary: 'Delete an inspection booking that produced nothing' })
+  deleteBooking(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.vehicles.deleteInspectionBooking(id, p, actorFrom(p, req));
   }
 
   @Post('inspection-bookings/:id/findings')

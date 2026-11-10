@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
@@ -97,12 +97,26 @@ function LeadsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [editing, setEditing] = useState<LeadDto | null>(null);
   const list = useAsync(() => api.crmLeads({ search: search || undefined }), [search]);
 
   const setStatus = async (row: LeadDto, status: string) => {
     await api.updateLead(row.id, { status });
     await list.reload();
+  };
+
+  const removeLead = async (row: LeadDto) => {
+    if (!window.confirm(t('erp.crm.confirmDeleteLead'))) return;
+    setBusyId(row.id);
+    try {
+      await api.deleteLead(row.id);
+      await list.reload();
+    } catch (e) {
+      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('erp.crm.deleteLeadBlocked') : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (
@@ -165,6 +179,16 @@ function LeadsTab({ canManage }: { canManage: boolean }) {
                             <option key={s} value={s}>{t(`erp.crm.leadStatusValue.${s}` as const)}</option>
                           ))}
                         </select>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          disabled={busyId === l.id}
+                          aria-label={`${t('common.delete')} ${l.code}`}
+                          onClick={() => void removeLead(l)}
+                          data-testid={`lead-delete-${l.code}`}
+                        >
+                          <Icon name="trash" size={14} />
+                        </Button>
                       </>
                     ) : null}
                   </div>
@@ -298,6 +322,20 @@ function OpportunitiesTab({ canManage, canConvert }: { canManage: boolean; canCo
   const pipelines = useAsync(() => api.crmPipelines(), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const [open, setOpen] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const removeOpportunity = async (o: OpportunityDto) => {
+    if (!window.confirm(t('erp.crm.confirmDeleteOpportunity'))) return;
+    setBusyId(o.id);
+    try {
+      await api.deleteOpportunity(o.id);
+      await list.reload();
+    } catch (e) {
+      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('erp.crm.deleteOpportunityBlocked') : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <Card>
@@ -337,13 +375,27 @@ function OpportunitiesTab({ canManage, canConvert }: { canManage: boolean; canCo
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(o.amountMinor, o.currency)}</td>
                 <td><StatusBadge status={o.status} label={o.status} /></td>
                 <td>
-                  {canConvert && o.status === 'WON' && !o.quotationId ? (
-                    <Button size="sm" data-testid={`convert-opportunity-${o.code}`} onClick={async () => { await api.convertOpportunity(o.id); await list.reload(); }}>
-                      {t('erp.crm.convert')}
-                    </Button>
-                  ) : o.quotationId ? (
-                    <span className="oryx-faint text-[11.5px]">{t('erp.crm.converted')}</span>
-                  ) : null}
+                  <div className="flex flex-wrap items-center gap-1">
+                    {canConvert && o.status === 'WON' && !o.quotationId ? (
+                      <Button size="sm" data-testid={`convert-opportunity-${o.code}`} onClick={async () => { await api.convertOpportunity(o.id); await list.reload(); }}>
+                        {t('erp.crm.convert')}
+                      </Button>
+                    ) : o.quotationId ? (
+                      <span className="oryx-faint text-[11.5px]">{t('erp.crm.converted')}</span>
+                    ) : null}
+                    {canManage && !o.quotationId ? (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={busyId === o.id}
+                        aria-label={`${t('common.delete')} ${o.code}`}
+                        onClick={() => void removeOpportunity(o)}
+                        data-testid={`opportunity-delete-${o.code}`}
+                      >
+                        <Icon name="trash" size={14} />
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -452,7 +504,21 @@ function TicketsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const list = useAsync(() => api.crmTickets({ search: search || undefined }), [search]);
+
+  const removeTicket = async (k: SupportTicketDto) => {
+    if (!window.confirm(t('erp.crm.confirmDeleteTicket'))) return;
+    setBusyId(k.id);
+    try {
+      await api.deleteTicket(k.id);
+      await list.reload();
+    } catch {
+      window.alert(t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <Card>
@@ -494,11 +560,25 @@ function TicketsTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{k.resolutionDueAt ? k.resolutionDueAt.slice(0, 16).replace('T', ' ') : '—'}</td>
                 <td><StatusBadge status={k.status} label={k.status} /></td>
                 <td>
-                  {canManage && k.status !== 'RESOLVED' && k.status !== 'CLOSED' ? (
-                    <Button size="sm" data-testid={`resolve-ticket-${k.ticketNumber}`} onClick={async () => { await api.updateTicket(k.id, { status: 'RESOLVED' }); await list.reload(); }}>
-                      {t('erp.crm.resolve')}
-                    </Button>
-                  ) : null}
+                  <div className="flex flex-wrap items-center gap-1">
+                    {canManage && k.status !== 'RESOLVED' && k.status !== 'CLOSED' ? (
+                      <Button size="sm" data-testid={`resolve-ticket-${k.ticketNumber}`} onClick={async () => { await api.updateTicket(k.id, { status: 'RESOLVED' }); await list.reload(); }}>
+                        {t('erp.crm.resolve')}
+                      </Button>
+                    ) : null}
+                    {canManage ? (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={busyId === k.id}
+                        aria-label={`${t('common.delete')} ${k.ticketNumber}`}
+                        onClick={() => void removeTicket(k)}
+                        data-testid={`ticket-delete-${k.ticketNumber}`}
+                      >
+                        <Icon name="trash" size={14} />
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -563,6 +643,20 @@ function CreateTicketModal({ open, onClose, onCreated }: { open: boolean; onClos
 function ActivitiesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const list = useAsync(() => api.crmActivities(), []);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const removeActivity = async (id: string) => {
+    if (!window.confirm(t('erp.crm.confirmDeleteActivity'))) return;
+    setBusyId(id);
+    try {
+      await api.deleteActivity(id);
+      await list.reload();
+    } catch {
+      window.alert(t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
   return (
     <Card>
       <div className="border-b border-[var(--border)] p-4">
@@ -590,9 +684,23 @@ function ActivitiesTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{a.dueAt ? a.dueAt.slice(0, 16).replace('T', ' ') : '—'}</td>
                 <td><StatusBadge status={a.status} label={a.status} /></td>
                 <td>
-                  {canManage && a.status === 'OPEN' ? (
-                    <Button size="sm" onClick={async () => { await api.completeActivity(a.id); await list.reload(); }}>{t('erp.crm.complete')}</Button>
-                  ) : null}
+                  <div className="flex flex-wrap items-center gap-1">
+                    {canManage && a.status === 'OPEN' ? (
+                      <Button size="sm" onClick={async () => { await api.completeActivity(a.id); await list.reload(); }}>{t('erp.crm.complete')}</Button>
+                    ) : null}
+                    {canManage ? (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={busyId === a.id}
+                        aria-label={`${t('common.delete')} ${a.subject}`}
+                        onClick={() => void removeActivity(a.id)}
+                        data-testid={`activity-delete-${a.id}`}
+                      >
+                        <Icon name="trash" size={14} />
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}

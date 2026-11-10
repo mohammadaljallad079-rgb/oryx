@@ -152,23 +152,37 @@ export function AttachmentsPanel({
     };
   }, [preview]);
 
-  const onFile = async (file: File | undefined) => {
-    if (!file) return;
-    if (!(ATTACHMENT_MIME_TYPES as readonly string[]).includes(file.type)) {
-      setError(t('attachments.unsupported'));
-      return;
+  const onFiles = async (selected: FileList | null) => {
+    const files = Array.from(selected ?? []);
+    if (files.length === 0) return;
+
+    // Validate every file before uploading any, so a bad file in a multi-file
+    // selection does not leave a partial upload behind.
+    for (const file of files) {
+      if (!(ATTACHMENT_MIME_TYPES as readonly string[]).includes(file.type)) {
+        setError(t('attachments.unsupported'));
+        if (fileRef.current) fileRef.current.value = '';
+        return;
+      }
+      if (file.size > ATTACHMENT_MAX_BYTES) {
+        setError(t('attachments.tooLarge'));
+        if (fileRef.current) fileRef.current.value = '';
+        return;
+      }
     }
-    if (file.size > ATTACHMENT_MAX_BYTES) {
-      setError(t('attachments.tooLarge'));
-      return;
-    }
+
     setBusy(true);
     setError(null);
     try {
-      await api.uploadAttachment(entityType, entityId, file);
+      // Uploaded one at a time so a failure names the file it stopped on; the
+      // list is re-read once at the end, so every successful upload appears.
+      for (const file of files) {
+        await api.uploadAttachment(entityType, entityId, file);
+      }
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
+      await load();
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -225,15 +239,21 @@ export function AttachmentsPanel({
         <span className="oryx-label m-0 inline-flex items-center gap-1.5">
           <Icon name="paperclip" size={15} />
           {t('attachments.title')}
+          {items && items.length > 0 ? (
+            <span className="oryx-faint text-[11px] font-normal">
+              {t('attachments.count').replace('{count}', String(items.length))}
+            </span>
+          ) : null}
         </span>
         {canManage ? (
           <>
             <input
               ref={fileRef}
               type="file"
+              multiple
               accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
               className="hidden"
-              onChange={(e) => onFile(e.target.files?.[0])}
+              onChange={(e) => void onFiles(e.target.files)}
               data-testid={`attach-input-${entityId}`}
             />
             <Button size="sm" disabled={busy} onClick={() => fileRef.current?.click()} data-testid={`attach-${entityId}`}>
@@ -247,7 +267,10 @@ export function AttachmentsPanel({
       {items === null ? (
         <Skeleton height={32} />
       ) : items.length === 0 ? (
-        <p className="oryx-faint m-0 text-[12px]">{t('attachments.empty')}</p>
+        <div>
+          <p className="oryx-faint m-0 text-[12px]">{t('attachments.empty')}</p>
+          <p className="oryx-faint m-0 mt-0.5 text-[11px]">{t('attachments.hint')}</p>
+        </div>
       ) : (
         <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
           {items.map((item) => (

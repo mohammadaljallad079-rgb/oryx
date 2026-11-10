@@ -559,6 +559,19 @@ export const api = {
    */
   archiveCompany: (id: string, reason?: string) =>
     request<CompanyDto>(`/companies/${id}/status`, { method: 'PATCH', body: { status: 'ARCHIVED', reason } }),
+  /**
+   * Permanently delete a company and everything it owns (platform only).
+   *
+   * Unlike `archiveCompany`, this cannot be undone: the tenant, its branches,
+   * memberships, documents and ledger are removed. The `confirm: true` flag is
+   * required by the API so an accidental call can never erase a tenant. The
+   * audit trail survives the delete.
+   */
+  deleteCompany: (id: string) =>
+    request<{ ok: boolean; code: string; childrenDetached: number }>(`/companies/${id}`, {
+      method: 'DELETE',
+      body: { confirm: true },
+    }),
 
   // ---------------------------------------------------------------- branding
   /**
@@ -656,6 +669,7 @@ export const api = {
   createPlan: (body: Record<string, unknown>) => request<PlanDto>('/plans', { method: 'POST', body }),
   updatePlan: (id: string, body: Record<string, unknown>) =>
     request<PlanDto>(`/plans/${id}`, { method: 'PATCH', body }),
+  deletePlan: (id: string) => request<{ id: string; deleted: boolean }>(`/plans/${id}`, { method: 'DELETE' }),
   listSubscriptions: (params: { companyId?: string; status?: string } = {}) =>
     request<Array<SubscriptionDto & { events: Array<Record<string, unknown>> }>>(
       `/subscriptions?${toQuery(params)}`,
@@ -670,6 +684,7 @@ export const api = {
       method: 'PATCH',
       body: { status, note },
     }),
+  deleteSubscription: (id: string) => request<{ id: string; deleted: boolean }>(`/subscriptions/${id}`, { method: 'DELETE' }),
 
   // ------------------------------------------------------------------- audit
   listAuditLogs: (
@@ -761,12 +776,16 @@ export const api = {
     request<{ code: string }>(`/accounting/accounts/next-code?${toQuery(params)}`),
   updateAccount: (id: string, body: Record<string, unknown>) =>
     request<ErpAccountDto>(`/accounting/accounts/${id}`, { method: 'PATCH', body }),
+  deleteAccount: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/accounting/accounts/${id}`, { method: 'DELETE' }),
   seedStandardChart: () =>
     request<{ created: number }>('/accounting/accounts/seed-standard-chart', { method: 'POST', body: {} }),
   fiscalYears: (companyId?: string) =>
     request<FiscalYearDto[]>(`/accounting/fiscal-years${companyId ? `?companyId=${companyId}` : ''}`),
   createFiscalYear: (body: Record<string, unknown>) =>
     request<{ id: string; code: string; periods: number }>('/accounting/fiscal-years', { method: 'POST', body }),
+  deleteFiscalYear: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/accounting/fiscal-years/${id}`, { method: 'DELETE' }),
   setPeriodStatus: (id: string, status: string) =>
     request<{ id: string; status: string }>(`/accounting/fiscal-periods/${id}/status`, {
       method: 'PATCH',
@@ -805,6 +824,8 @@ export const api = {
     request<WarehouseDto>('/inventory/warehouses', { method: 'POST', body }),
   updateWarehouse: (id: string, body: Record<string, unknown>) =>
     request<WarehouseDto>(`/inventory/warehouses/${id}`, { method: 'PATCH', body }),
+  deleteWarehouse: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/inventory/warehouses/${id}`, { method: 'DELETE' }),
   products: (
     params: {
       companyId?: string;
@@ -815,6 +836,9 @@ export const api = {
       isActive?: boolean;
       hasBarcode?: boolean;
       stockStatus?: 'in' | 'low' | 'out';
+      warehouseId?: string;
+      minPriceMinor?: number;
+      maxPriceMinor?: number;
       page?: number;
       pageSize?: number;
     } = {},
@@ -825,6 +849,8 @@ export const api = {
     request<ProductDto>('/inventory/products', { method: 'POST', body }),
   updateProduct: (id: string, body: Record<string, unknown>) =>
     request<ProductDto>(`/inventory/products/${id}`, { method: 'PATCH', body }),
+  deleteProduct: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/inventory/products/${id}`, { method: 'DELETE' }),
   /**
    * A product's photographs, primary first.
    *
@@ -879,6 +905,8 @@ export const api = {
     request<CustomerDto>('/sales/customers', { method: 'POST', body }),
   updateCustomer: (id: string, body: Record<string, unknown>) =>
     request<CustomerDto>(`/sales/customers/${id}`, { method: 'POST', body }),
+  deleteCustomer: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/sales/customers/${id}`, { method: 'DELETE' }),
   customerAttachments: (id: string) =>
     request<Paginated<CustomerAttachmentDto>>(`/sales/customers/${id}/attachments`),
   addCustomerAttachment: (id: string, body: Record<string, unknown>) =>
@@ -971,6 +999,8 @@ export const api = {
     request<SupplierDto>('/purchasing/suppliers', { method: 'POST', body }),
   updateSupplier: (id: string, body: Record<string, unknown>) =>
     request<SupplierDto>(`/purchasing/suppliers/${id}`, { method: 'POST', body }),
+  deleteSupplier: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/purchasing/suppliers/${id}`, { method: 'DELETE' }),
   requisitions: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<RequisitionDto>>(`/purchasing/requisitions?${toQuery(params)}`),
   createRequisition: (body: Record<string, unknown>) =>
@@ -1021,6 +1051,8 @@ export const api = {
   createEmployee: (body: Record<string, unknown>) => request<EmployeeDto>('/hr/employees', { method: 'POST', body }),
   updateEmployee: (id: string, body: Record<string, unknown>) =>
     request<EmployeeDto>(`/hr/employees/${id}`, { method: 'PATCH', body }),
+  deleteEmployee: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/hr/employees/${id}`, { method: 'DELETE' }),
   createContract: (employeeId: string, body: Record<string, unknown>) =>
     request<Record<string, unknown>>(`/hr/employees/${employeeId}/contracts`, { method: 'POST', body }),
   employeeDocuments: (employeeId: string) =>
@@ -1120,6 +1152,7 @@ export const api = {
   crmLeadSources: (params: { companyId?: string } = {}) =>
     request<Paginated<LeadSourceDto>>(`/crm/lead-sources?${toQuery(params)}`),
   createLeadSource: (body: Record<string, unknown>) => request<LeadSourceDto>('/crm/lead-sources', { method: 'POST', body }),
+  deleteLeadSource: (id: string) => request<{ id: string; deleted: boolean }>(`/crm/lead-sources/${id}`, { method: 'DELETE' }),
   // Tax management (§5 of the completion brief). A saved list the sales,
   // purchasing and POS forms select from instead of a free-text percentage.
   taxes: (params: { companyId?: string; scope?: string; search?: string; includeInactive?: string } = {}) =>
@@ -1133,12 +1166,15 @@ export const api = {
     request<Paginated<LeadDto>>(`/crm/leads?${toQuery(params)}`),
   createLead: (body: Record<string, unknown>) => request<LeadDto>('/crm/leads', { method: 'POST', body }),
   updateLead: (id: string, body: Record<string, unknown>) => request<LeadDto>(`/crm/leads/${id}`, { method: 'PATCH', body }),
+  deleteLead: (id: string) => request<{ id: string; deleted: boolean }>(`/crm/leads/${id}`, { method: 'DELETE' }),
   crmPipelines: (params: { companyId?: string } = {}) =>
     request<Paginated<PipelineDto>>(`/crm/pipelines?${toQuery(params)}`),
   createPipeline: (body: Record<string, unknown>) => request<PipelineDto>('/crm/pipelines', { method: 'POST', body }),
+  deletePipeline: (id: string) => request<{ id: string; deleted: boolean }>(`/crm/pipelines/${id}`, { method: 'DELETE' }),
   crmOpportunities: (params: { companyId?: string; status?: string; page?: number } = {}) =>
     request<Paginated<OpportunityDto>>(`/crm/opportunities?${toQuery(params)}`),
   createOpportunity: (body: Record<string, unknown>) => request<OpportunityDto>('/crm/opportunities', { method: 'POST', body }),
+  deleteOpportunity: (id: string) => request<{ id: string; deleted: boolean }>(`/crm/opportunities/${id}`, { method: 'DELETE' }),
   moveOpportunityStage: (id: string, stageId: string, note?: string) =>
     request<OpportunityDto>(`/crm/opportunities/${id}/stage`, { method: 'POST', body: { stageId, note } }),
   convertOpportunity: (id: string, body: Record<string, unknown> = {}) =>
@@ -1151,33 +1187,40 @@ export const api = {
   addTicketMessage: (id: string, body: string, isInternal = false) =>
     request<Record<string, unknown>>(`/crm/tickets/${id}/messages`, { method: 'POST', body: { body, isInternal } }),
   updateTicket: (id: string, body: Record<string, unknown>) => request<SupportTicketDto>(`/crm/tickets/${id}`, { method: 'PATCH', body }),
+  deleteTicket: (id: string) => request<{ id: string; deleted: boolean }>(`/crm/tickets/${id}`, { method: 'DELETE' }),
   crmActivities: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<CrmActivityDto>>(`/crm/activities?${toQuery(params)}`),
   createActivity: (body: Record<string, unknown>) => request<CrmActivityDto>('/crm/activities', { method: 'POST', body }),
   completeActivity: (id: string) => request<CrmActivityDto>(`/crm/activities/${id}/complete`, { method: 'POST', body: {} }),
+  deleteActivity: (id: string) => request<{ id: string; deleted: boolean }>(`/crm/activities/${id}`, { method: 'DELETE' }),
   crmSlaPolicies: (params: { companyId?: string } = {}) =>
     request<Paginated<Record<string, unknown>>>(`/crm/sla-policies?${toQuery(params)}`),
   setSlaPolicy: (body: Record<string, unknown>) => request<Record<string, unknown>>('/crm/sla-policies', { method: 'POST', body }),
+  deleteSlaPolicy: (id: string) => request<{ id: string; deleted: boolean }>(`/crm/sla-policies/${id}`, { method: 'DELETE' }),
   crmSegments: (params: { companyId?: string } = {}) =>
     request<Paginated<Record<string, unknown>>>(`/crm/segments?${toQuery(params)}`),
   createSegment: (body: Record<string, unknown>) => request<Record<string, unknown>>('/crm/segments', { method: 'POST', body }),
+  deleteSegment: (id: string) => request<{ id: string; deleted: boolean }>(`/crm/segments/${id}`, { method: 'DELETE' }),
   crmDashboard: (companyId?: string) => request<CrmDashboardDto>(`/crm/dashboard${companyId ? `?companyId=${companyId}` : ''}`),
 
   // ----------------------------------------------------- Operations (E03)
   operationsProjects: (params: { companyId?: string; status?: string; page?: number } = {}) =>
     request<Paginated<ProjectDto>>(`/operations/projects?${toQuery(params)}`),
   createOperationsProject: (body: Record<string, unknown>) => request<ProjectDto>('/operations/projects', { method: 'POST', body }),
+  deleteOperationsProject: (id: string) => request<{ id: string; deleted: boolean }>(`/operations/projects/${id}`, { method: 'DELETE' }),
   updateOperationsProject: (id: string, body: Record<string, unknown>) =>
     request<ProjectDto>(`/operations/projects/${id}`, { method: 'PATCH', body }),
   operationsTasks: (params: { companyId?: string; status?: string; page?: number } = {}) =>
     request<Paginated<ProjectTaskDto>>(`/operations/tasks?${toQuery(params)}`),
   createOperationsTask: (body: Record<string, unknown>) => request<ProjectTaskDto>('/operations/tasks', { method: 'POST', body }),
+  deleteOperationsTask: (id: string) => request<{ id: string; deleted: boolean }>(`/operations/tasks/${id}`, { method: 'DELETE' }),
   updateOperationsTask: (id: string, body: Record<string, unknown>) =>
     request<ProjectTaskDto>(`/operations/tasks/${id}`, { method: 'PATCH', body }),
   workOrders: (params: { companyId?: string; status?: string; page?: number } = {}) =>
     request<Paginated<WorkOrderDto>>(`/operations/work-orders?${toQuery(params)}`),
   workOrder: (id: string) => request<WorkOrderDto>(`/operations/work-orders/${id}`),
   createWorkOrder: (body: Record<string, unknown>) => request<WorkOrderDto>('/operations/work-orders', { method: 'POST', body }),
+  deleteWorkOrder: (id: string) => request<{ id: string; deleted: boolean }>(`/operations/work-orders/${id}`, { method: 'DELETE' }),
   assignWorkOrder: (id: string, body: Record<string, unknown>) =>
     request<WorkOrderDto>(`/operations/work-orders/${id}/assign`, { method: 'POST', body }),
   updateWorkOrder: (id: string, body: Record<string, unknown>) =>
@@ -1187,14 +1230,17 @@ export const api = {
   operationsApprovals: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<Record<string, unknown>>>(`/operations/approvals?${toQuery(params)}`),
   createApproval: (body: Record<string, unknown>) => request<Record<string, unknown>>('/operations/approvals', { method: 'POST', body }),
+  deleteApproval: (id: string) => request<{ id: string; deleted: boolean }>(`/operations/approvals/${id}`, { method: 'DELETE' }),
   decideApproval: (id: string, decision: string, note?: string) =>
     request<Record<string, unknown>>(`/operations/approvals/${id}/decide`, { method: 'POST', body: { decision, note } }),
   operationsCalendar: (params: { companyId?: string } = {}) =>
     request<Paginated<Record<string, unknown>>>(`/operations/calendar?${toQuery(params)}`),
   createCalendarEvent: (body: Record<string, unknown>) => request<Record<string, unknown>>('/operations/calendar', { method: 'POST', body }),
+  deleteCalendarEvent: (id: string) => request<{ id: string; deleted: boolean }>(`/operations/calendar/${id}`, { method: 'DELETE' }),
   operationsNotifications: (unreadOnly = false) =>
     request<Paginated<Record<string, unknown>>>(`/operations/notifications?unreadOnly=${unreadOnly}`),
   markNotificationsRead: () => request<{ updated: number }>('/operations/notifications/read', { method: 'POST', body: { all: true } }),
+  deleteOperationNotification: (id: string) => request<{ id: string; deleted: boolean }>(`/operations/notifications/${id}`, { method: 'DELETE' }),
   operationsDashboard: (companyId?: string) =>
     request<OperationsDashboardDto>(`/operations/dashboard${companyId ? `?companyId=${companyId}` : ''}`),
 
@@ -1204,6 +1250,8 @@ export const api = {
   vehicle: (id: string) => request<Record<string, unknown>>(`/automotive/vehicles/${id}`),
   createVehicle: (body: Record<string, unknown>) => request<VehicleDto>('/automotive/vehicles', { method: 'POST', body }),
   updateVehicle: (id: string, body: Record<string, unknown>) => request<VehicleDto>(`/automotive/vehicles/${id}`, { method: 'PATCH', body }),
+  deleteVehicle: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/automotive/vehicles/${id}`, { method: 'DELETE' }),
   recordMileage: (id: string, mileage: number) =>
     request<Record<string, unknown>>(`/automotive/vehicles/${id}/mileage`, { method: 'POST', body: { mileage } }),
   vehicleDocuments: (id: string) =>
@@ -1218,12 +1266,16 @@ export const api = {
     request<Paginated<InspectionServiceDto>>(`/automotive/inspection-services?${toQuery(params)}`),
   createInspectionService: (body: Record<string, unknown>) =>
     request<InspectionServiceDto>('/automotive/inspection-services', { method: 'POST', body }),
+  deleteInspectionService: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/automotive/inspection-services/${id}`, { method: 'DELETE' }),
   inspectionBookings: (params: { companyId?: string; status?: string; page?: number } = {}) =>
     request<Paginated<InspectionBookingDto>>(`/automotive/inspection-bookings?${toQuery(params)}`),
   createInspectionBooking: (body: Record<string, unknown>) =>
     request<InspectionBookingDto>('/automotive/inspection-bookings', { method: 'POST', body }),
   updateInspectionBooking: (id: string, body: Record<string, unknown>) =>
     request<InspectionBookingDto>(`/automotive/inspection-bookings/${id}`, { method: 'PATCH', body }),
+  deleteInspectionBooking: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/automotive/inspection-bookings/${id}`, { method: 'DELETE' }),
   recordInspectionFindings: (id: string, findings: Array<Record<string, unknown>>) =>
     request<Record<string, unknown>>(`/automotive/inspection-bookings/${id}/findings`, { method: 'POST', body: { findings } }),
   inspectionReport: (id: string) => request<Record<string, unknown>>(`/automotive/inspection-bookings/${id}/report`),
@@ -1318,6 +1370,8 @@ export const api = {
     request<InspectionSessionDto>('/automotive/inspections', { method: 'POST', body }),
   updateInspectionSession: (id: string, body: Record<string, unknown>) =>
     request<InspectionSessionDto>(`/automotive/inspections/${id}`, { method: 'PATCH', body }),
+  deleteInspectionSession: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/automotive/inspections/${id}`, { method: 'DELETE' }),
   inspectionProgress: (id: string) => request<InspectionProgressDto>(`/automotive/inspections/${id}/progress`),
   saveInspectionSection: (id: string, area: InspectionAreaKey, body: Record<string, unknown>) =>
     request<InspectionSessionDto>(`/automotive/inspections/${id}/sections/${area}`, { method: 'PUT', body }),
@@ -1446,10 +1500,14 @@ export const api = {
     request<Record<string, unknown>>(`/bookings/${id}/reschedule`, { method: 'POST', body }),
   cancelBooking: (id: string, reason: string) =>
     request<Record<string, unknown>>(`/bookings/${id}/cancel`, { method: 'POST', body: { reason } }),
+  deleteBooking: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/bookings/${id}`, { method: 'DELETE' }),
   bookingResources: (branchId?: string) =>
     request<Array<Record<string, unknown>>>(`/bookings/resources/list${branchId ? `?branchId=${branchId}` : ''}`),
   createBookingResource: (body: Record<string, unknown>) =>
     request<Record<string, unknown>>('/bookings/resources', { method: 'POST', body }),
+  deleteBookingResource: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/bookings/resources/${id}`, { method: 'DELETE' }),
   setBookingResourceHours: (id: string, hours: Array<Record<string, unknown>>) =>
     request<Record<string, unknown>>(`/bookings/resources/${id}/hours`, { method: 'POST', body: { hours } }),
 
@@ -1460,6 +1518,7 @@ export const api = {
   createPaymentIntent: (body: Record<string, unknown>) =>
     request<Record<string, unknown>>('/payments/intents', { method: 'POST', body }),
   paymentIntent: (id: string) => request<Record<string, unknown>>(`/payments/intents/${id}`),
+  deletePaymentIntent: (id: string) => request<{ id: string; deleted: boolean }>(`/payments/intents/${id}`, { method: 'DELETE' }),
   confirmPaymentIntent: (id: string, providerReference: string) =>
     request<Record<string, unknown>>(`/payments/intents/${id}/confirm`, { method: 'POST', body: { providerReference } }),
   cancelPaymentIntent: (id: string, reason: string) =>
@@ -1472,6 +1531,7 @@ export const api = {
     request<Record<string, unknown>>('/payments/reconciliations', { method: 'POST', body }),
   paymentReconciliations: (onlyUnmatched = false) =>
     request<Array<Record<string, unknown>>>(`/payments/reconciliations?onlyUnmatched=${onlyUnmatched}`),
+  deletePaymentReconciliation: (id: string) => request<{ id: string; deleted: boolean }>(`/payments/reconciliations/${id}`, { method: 'DELETE' }),
 
   // ------------------------------------------------------- integrations center
   integrations: () => request<IntegrationCenterResponse>('/integrations'),

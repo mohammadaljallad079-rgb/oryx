@@ -36,6 +36,7 @@ export default function CompaniesPage() {
   const canCreate = can('platform.company.create');
   const canSuspend = can('platform.company.suspend');
   const canUpdate = can('platform.company.update');
+  const canDelete = can('platform.company.delete');
 
   const list = useAsync(
     () =>
@@ -55,13 +56,35 @@ export default function CompaniesPage() {
   const [rowError, setRowError] = useState<string | null>(null);
 
   /**
+   * Hard delete: permanently remove a company and everything it owns.
+   *
+   * Unlike archiving, this cannot be undone. The confirmation is deliberately
+   * blunt — it names the company and spells out that every branch, user and
+   * document goes with it — so a mis-click can never erase the wrong tenant.
+   */
+  async function deleteCompany(company: CompanyDto) {
+    const name = locale === 'ar' ? company.nameAr : company.nameEn;
+    if (!window.confirm(t('companies.confirmDelete').replace('{name}', name))) return;
+    setBusyId(company.id);
+    setRowError(null);
+    try {
+      await api.deleteCompany(company.id);
+      await list.reload();
+    } catch (err) {
+      setRowError(err instanceof Error ? err.message : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  /**
    * Soft-delete: move the company to `ARCHIVED`.
    *
-   * The platform never hard-deletes a company, because a tenant owns accounting,
-   * stock and payroll history that must stay reconcilable. Archiving hides it
-   * from the working lists, keeps every linked record, and is reversible through
-   * the same action (restore → `ACTIVE`). The confirmation names the company so
-   * a mis-click cannot archive the wrong tenant.
+   * Archiving hides a company from the working lists, keeps every linked record
+   * intact and is reversible through the same action (restore → `ACTIVE`). It is
+   * the safer alternative to the hard delete above, which removes the tenant for
+   * good. The confirmation names the company so a mis-click cannot archive the
+   * wrong tenant.
    */
   async function changeStatus(company: CompanyDto, status: 'ACTIVE' | 'ARCHIVED', confirmKey: string) {
     if (!window.confirm(t(confirmKey).replace('{name}', locale === 'ar' ? company.nameAr : company.nameEn))) return;
@@ -243,16 +266,27 @@ export default function CompaniesPage() {
                             {c.status === 'ACTIVE' ? t('companies.suspend') : t('companies.activate')}
                           </Button>
                         ) : null}
-                        {isPlatform && canSuspend && c.status !== 'ARCHIVED' ? (
+                        {isPlatform && canDelete ? (
                           <Button
                             size="sm"
                             variant="danger"
                             disabled={busyId === c.id}
-                            onClick={() => changeStatus(c, 'ARCHIVED', 'companies.confirmArchive')}
-                            data-testid={`company-archive-${c.code}`}
+                            onClick={() => void deleteCompany(c)}
+                            data-testid={`company-delete-${c.code}`}
                           >
                             <Icon name="trash" size={14} />
                             {t('common.delete')}
+                          </Button>
+                        ) : null}
+                        {isPlatform && canSuspend && c.status !== 'ARCHIVED' ? (
+                          <Button
+                            size="sm"
+                            disabled={busyId === c.id}
+                            onClick={() => changeStatus(c, 'ARCHIVED', 'companies.confirmArchive')}
+                            data-testid={`company-archive-${c.code}`}
+                          >
+                            <Icon name="archive" size={14} />
+                            {t('companies.archive')}
                           </Button>
                         ) : null}
                         {isPlatform && canSuspend && c.status === 'ARCHIVED' ? (

@@ -102,6 +102,13 @@ export class SalesController {
     return this.sales.updateCustomer(id, dto, p, actorFrom(p, req));
   }
 
+  @Delete('customers/:id')
+  @RequirePermissions('erp.sales.customer.manage')
+  @ApiOperation({ summary: 'Delete a customer that carries no commercial history' })
+  deleteCustomer(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.sales.deleteCustomer(id, p, actorFrom(p, req));
+  }
+
   // -------------------------------------------------------------- quotations
   @Get('quotations')
   @RequireAnyPermission('erp.sales.read', 'erp.sales.order.manage')

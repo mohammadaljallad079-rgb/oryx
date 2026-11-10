@@ -93,7 +93,6 @@ const STANDARD_CHART: Array<{
   { code: '5900', nameEn: 'Cash over / short', nameAr: 'فروق الصندوق', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: 'CASH_OVER_SHORT' },
   { code: '5910', nameEn: 'Inventory adjustment', nameAr: 'تسوية المخزون', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: 'STOCK_ADJUSTMENT' },
   { code: '5920', nameEn: 'Purchase price variance', nameAr: 'فروق أسعار الشراء', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: 'PURCHASE_PRICE_VARIANCE' },
-  { code: '5930', nameEn: 'Rounding gain / loss', nameAr: 'أرباح وخسائر التقريب', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: 'ROUNDING_GAIN_LOSS' },
   { code: '6000', nameEn: 'Salaries and wages expense', nameAr: 'مصروف الرواتب والأجور', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: 'SALARIES_EXPENSE' },
   { code: '2200', nameEn: 'Salaries payable', nameAr: 'الرواتب المستحقة الدفع', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: 'WAGES_PAYABLE' },
   { code: '2210', nameEn: 'Payroll deductions payable', nameAr: 'استقطاعات الرواتب المستحقة', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: 'PAYROLL_DEDUCTIONS' },

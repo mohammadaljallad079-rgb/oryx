@@ -284,6 +284,134 @@ export class InventoryService {
     return toWarehouseDto(updated);
   }
 
+  /**
+   * Permanently delete a product.
+   *
+   * A product that carries any history — stock movements, an opening level, a
+   * line on a sales/purchase document, a consumer cart entry or a workshop part
+   * reference — must not be erased, because doing so would silently break the
+   * stock ledger and the documents that reference it. In that case the caller is
+   * told to deactivate instead, which keeps the row and its history intact.
+   * Only a product with no references at all is removed, and its own
+   * stock-level rows (which then exist nowhere else) go with it.
+   */
+  async deleteProduct(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const product = await this.prisma.product.findFirst({ where: { id, companyId } });
+    if (!product) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Product not found.');
+
+    const [
+      levels,
+      movements,
+      images,
+      quotationLines,
+      orderLines,
+      invoiceLines,
+      creditLines,
+      posLines,
+      purchaseLines,
+      reservationLines,
+      partRefs,
+      cartItems,
+      favorites,
+      customerOrderLines,
+      returnLines,
+    ] = await Promise.all([
+      this.prisma.stockLevel.count({ where: { productId: id } }),
+      this.prisma.stockMovement.count({ where: { productId: id } }),
+      this.prisma.productImage.count({ where: { productId: id } }),
+      this.prisma.quotationLine.count({ where: { productId: id } }),
+      this.prisma.salesOrderLine.count({ where: { productId: id } }),
+      this.prisma.salesInvoiceLine.count({ where: { productId: id } }),
+      this.prisma.creditNoteLine.count({ where: { productId: id } }),
+      this.prisma.posSaleLine.count({ where: { productId: id } }),
+      this.prisma.purchaseOrderLine.count({ where: { productId: id } }),
+      this.prisma.partsReservationLine.count({ where: { productId: id } }),
+      this.prisma.partReference.count({ where: { productId: id } }),
+      this.prisma.cartItem.count({ where: { productId: id } }),
+      this.prisma.favorite.count({ where: { productId: id } }),
+      this.prisma.customerOrderLine.count({ where: { productId: id } }),
+      this.prisma.customerOrderReturnLine.count({ where: { productId: id } }),
+    ]);
+
+    const blocking =
+      movements +
+      quotationLines +
+      orderLines +
+      invoiceLines +
+      creditLines +
+      posLines +
+      purchaseLines +
+      reservationLines +
+      partRefs +
+      customerOrderLines +
+      returnLines;
+    if (blocking > 0) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This product is referenced by stock movements or documents and cannot be deleted. Deactivate it instead to keep its history.',
+      );
+    }
+
+    await this.posting.withTransaction(async (tx) => {
+      await tx.productImage.deleteMany({ where: { productId: id } });
+      await tx.cartItem.deleteMany({ where: { productId: id } });
+      await tx.favorite.deleteMany({ where: { productId: id } });
+      await tx.stockLevel.deleteMany({ where: { productId: id } });
+      await tx.product.delete({ where: { id } });
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'inventory.product_deleted',
+      targetType: 'PRODUCT',
+      targetId: id,
+      summary: `Permanently deleted product ${product.sku} (${levels} stock level rows removed)`,
+    });
+    return { id, deleted: true };
+  }
+
+  /**
+   * Permanently delete a warehouse that holds no stock and no movements.
+   *
+   * Any movement or non-zero level means the warehouse is part of the stock
+   * ledger, so it is only deactivated instead.
+   */
+  async deleteWarehouse(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const warehouse = await this.prisma.warehouse.findFirst({ where: { id, companyId } });
+    if (!warehouse) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Warehouse not found.');
+
+    const [movements, levelsWithStock, transfersFrom, transfersTo] = await Promise.all([
+      this.prisma.stockMovement.count({ where: { warehouseId: id } }),
+      this.prisma.stockLevel.count({ where: { warehouseId: id, quantity: { not: 0 } } }),
+      this.prisma.stockTransfer.count({ where: { fromWarehouseId: id } }),
+      this.prisma.stockTransfer.count({ where: { toWarehouseId: id } }),
+    ]);
+    if (movements + levelsWithStock + transfersFrom + transfersTo > 0) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This warehouse holds stock or movement history and cannot be deleted. Deactivate it instead.',
+      );
+    }
+
+    await this.posting.withTransaction(async (tx) => {
+      await tx.stockLevel.deleteMany({ where: { warehouseId: id } });
+      await tx.warehouse.delete({ where: { id } });
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'inventory.warehouse_deleted',
+      targetType: 'WAREHOUSE',
+      targetId: id,
+      summary: `Permanently deleted warehouse ${warehouse.code}`,
+    });
+    return { id, deleted: true };
+  }
+
   // ---------------------------------------------------------------- products
 
   async listProducts(query: ListQueryDto, principal: RequestPrincipal) {
@@ -319,6 +447,14 @@ export class InventoryService {
         : query.hasBarcode === false
           ? { barcode: null }
           : {}),
+      ...(query.minPriceMinor !== undefined || query.maxPriceMinor !== undefined
+        ? {
+            salesPriceMinor: {
+              ...(query.minPriceMinor !== undefined ? { gte: query.minPriceMinor } : {}),
+              ...(query.maxPriceMinor !== undefined ? { lte: query.maxPriceMinor } : {}),
+            },
+          }
+        : {}),
       ...(query.search
         ? {
             OR: [
@@ -342,7 +478,12 @@ export class InventoryService {
     const all = await this.prisma.product.findMany({
       where,
       orderBy: { sku: 'asc' },
-      include: { levels: { select: { quantity: true } } },
+      include: {
+        levels: {
+          where: query.warehouseId ? { warehouseId: query.warehouseId } : undefined,
+          select: { quantity: true },
+        },
+      },
     });
     const matching = all.filter((p) => {
       const onHand = sumMinor(p.levels.map((l) => l.quantity));

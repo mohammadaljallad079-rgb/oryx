@@ -157,6 +157,52 @@ export class VehicleService {
     return toVehicleDto(updated);
   }
 
+  /**
+   * Permanently delete a vehicle and its own records.
+   *
+   * A vehicle is only removable while nothing financial or historical depends on
+   * it. An inspection session, job card, warranty, booking or RFQ is a record of
+   * work done against that chassis, so a vehicle carrying any of them must be
+   * deactivated (status `INACTIVE`/`SOLD`) rather than deleted — deleting would
+   * destroy the linked history. Mileage records, documents and customer-app
+   * photographs are the vehicle's own and cascade away with it.
+   */
+  async deleteVehicle(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const vehicle = await this.prisma.vehicle.findFirst({ where: { id, companyId } });
+    if (!vehicle) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Vehicle not found.');
+
+    const [sessions, jobCards, warranties, bookings, maintenance, rfqs, recovery, fleet] = await Promise.all([
+      this.prisma.inspectionSession.count({ where: { vehicleId: id } }),
+      this.prisma.jobCard.count({ where: { vehicleId: id } }),
+      this.prisma.warrantyRecord.count({ where: { vehicleId: id } }),
+      this.prisma.inspectionBooking.count({ where: { vehicleId: id } }),
+      this.prisma.maintenanceBooking.count({ where: { vehicleId: id } }),
+      this.prisma.customerRfq.count({ where: { vehicleId: id } }),
+      this.prisma.recoveryRequest.count({ where: { vehicleId: id } }),
+      this.prisma.fleetVehicle.count({ where: { vehicleId: id } }),
+    ]);
+    const blockers = sessions + jobCards + warranties + bookings + maintenance + rfqs + recovery + fleet;
+    if (blockers > 0) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This vehicle has inspections, job cards, warranties, bookings or requests and cannot be deleted. Set its status to inactive or sold instead so the history is preserved.',
+      );
+    }
+
+    await this.prisma.vehicle.delete({ where: { id } });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'automotive.vehicle_deleted',
+      targetType: 'VEHICLE',
+      targetId: id,
+      summary: `Deleted vehicle ${vehicle.vin}`,
+      metadata: { vin: vehicle.vin, plateNumber: vehicle.plateNumber ?? null },
+    });
+    return { id, deleted: true };
+  }
+
   /** Record mileage; the vehicle's current mileage only ever increases. */
   async recordMileage(id: string, dto: RecordMileageDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
@@ -322,6 +368,30 @@ export class VehicleService {
     return service;
   }
 
+  /**
+   * Delete an inspection service that nothing has booked yet.
+   *
+   * A service is a catalogue entry: once a booking references it, deleting it
+   * would break that booking's history, so it is deactivated (`isActive: false`)
+   * instead. The check is explicit because the foreign key is `Restrict`, which
+   * would otherwise surface as an opaque database error.
+   */
+  async deleteInspectionService(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const service = await this.prisma.inspectionService.findFirst({ where: { id, companyId } });
+    if (!service) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection service not found.');
+    const bookings = await this.prisma.inspectionBooking.count({ where: { serviceId: id } });
+    if (bookings > 0) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This service has bookings and cannot be deleted. Deactivate it instead so past bookings keep their record.',
+      );
+    }
+    await this.prisma.inspectionService.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.inspection_service_deleted', targetType: 'INSPECTION_SERVICE', targetId: id, summary: `Deleted inspection service ${service.code}` });
+    return { id, deleted: true };
+  }
+
   async addChecklistItem(dto: CreateChecklistItemDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const count = await this.prisma.inspectionChecklistItem.count({ where: { companyId, serviceId: dto.serviceId ?? null } });
@@ -398,6 +468,40 @@ export class VehicleService {
     }
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.inspection_updated', targetType: 'INSPECTION_BOOKING', targetId: id, summary: `Inspection ${updated.bookingNumber} -> ${updated.status}` });
     return toInspectionBookingDto(updated);
+  }
+
+  /**
+   * Delete an inspection booking that produced nothing.
+   *
+   * A booking that was invoiced, completed, has recorded findings, an approved
+   * report, or a structured inspection session created from it is history and
+   * must be cancelled rather than deleted. A booking with none of those is a
+   * scheduling entry that was created by mistake, so it can go.
+   */
+  async deleteInspectionBooking(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const booking = await this.prisma.inspectionBooking.findFirst({
+      where: { id, companyId },
+      include: { report: true, session: { select: { id: true } }, _count: { select: { findings: true } } },
+    });
+    if (!booking) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection booking not found.');
+    const reportStatus = booking.report?.status ?? null;
+    const locked =
+      booking.status === 'COMPLETED' ||
+      booking.status === 'CANCELLED' ||
+      Boolean(booking.report) ||
+      Boolean(booking.session) ||
+      booking._count.findings > 0;
+    if (locked) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        `This booking cannot be deleted (status ${booking.status}${reportStatus ? `, report ${reportStatus}` : ''}). Cancel it instead so the history is preserved.`,
+      );
+    }
+
+    await this.prisma.inspectionBooking.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.inspection_booking_deleted', targetType: 'INSPECTION_BOOKING', targetId: id, summary: `Deleted inspection booking ${booking.bookingNumber}` });
+    return { id, deleted: true };
   }
 
   /** Record findings for a booking, replacing any previous set. */

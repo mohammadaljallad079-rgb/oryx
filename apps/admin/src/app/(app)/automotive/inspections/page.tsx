@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync, useDebounced } from '@/lib/hooks';
@@ -90,8 +90,22 @@ function JobsTab({ canWrite }: { canWrite: boolean }) {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const debounced = useDebounced(search);
   const list = useAsync(() => api.inspectionSessions({ search: debounced || undefined }), [debounced]);
+
+  const remove = async (id: string) => {
+    if (!window.confirm(t('inspection.deleteConfirm'))) return;
+    setBusyId(id);
+    try {
+      await api.deleteInspectionSession(id);
+      await list.reload();
+    } catch (e) {
+      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('inspection.deleteBlocked') : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-3" data-testid="inspection-jobs">
@@ -151,9 +165,22 @@ function JobsTab({ canWrite }: { canWrite: boolean }) {
                       <StatusBadge status={j.status} label={t(`inspection.status.${j.status}`)} />
                     </td>
                     <td className="text-end">
-                      <Button size="sm" onClick={() => router.push(`/automotive/inspections/${j.id}`)} data-testid={`open-job-${j.id}`}>
-                        {t('inspection.open')}
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" onClick={() => router.push(`/automotive/inspections/${j.id}`)} data-testid={`open-job-${j.id}`}>
+                          {t('inspection.open')}
+                        </Button>
+                        {canWrite && j.status !== 'APPROVED' ? (
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={() => void remove(j.id)}
+                            data-testid={`delete-job-${j.id}`}
+                          >
+                            <Icon name="trash" size={14} />
+                            {t('inspection.delete')}
+                          </Button>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -364,6 +391,7 @@ function VehiclesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [editing, setEditing] = useState<VehicleDto | null>(null);
   const [documentsFor, setDocumentsFor] = useState<VehicleDto | null>(null);
   const list = useAsync(() => api.vehicles({ search: search || undefined }), [search]);
@@ -372,6 +400,19 @@ function VehiclesTab({ canManage }: { canManage: boolean }) {
   const setStatus = async (row: VehicleDto, status: string) => {
     await api.updateVehicle(row.id, { status });
     await list.reload();
+  };
+
+  const removeVehicle = async (row: VehicleDto) => {
+    if (!window.confirm(t('erp.automotive.confirmDeleteVehicle'))) return;
+    setBusyId(row.id);
+    try {
+      await api.deleteVehicle(row.id);
+      await list.reload();
+    } catch (e) {
+      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('erp.automotive.deleteVehicleBlocked') : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (
@@ -437,6 +478,16 @@ function VehiclesTab({ canManage }: { canManage: boolean }) {
                             <option key={s} value={s}>{t(`erp.automotive.vehicleStatusValue.${s}` as const)}</option>
                           ))}
                         </select>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          disabled={busyId === v.id}
+                          aria-label={`${t('common.delete')} ${v.vin}`}
+                          onClick={() => void removeVehicle(v)}
+                          data-testid={`vehicle-delete-${v.vin}`}
+                        >
+                          <Icon name="trash" size={14} />
+                        </Button>
                       </>
                     ) : null}
                   </div>
@@ -918,8 +969,23 @@ function BookingsTab({ canBook, canApprove, canInvoice }: { canBook: boolean; ca
   const vehicles = useAsync(() => api.vehicles(), []);
   const services = useAsync(() => api.inspectionServices(), []);
   const [open, setOpen] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
   const report = useAsync(() => (detail ? api.inspectionReport(detail) : Promise.resolve(null)), [detail]);
+
+  const removeBooking = async (id: string) => {
+    if (!window.confirm(t('erp.automotive.confirmDeleteBooking'))) return;
+    setBusyId(id);
+    try {
+      await api.deleteInspectionBooking(id);
+      if (detail === id) setDetail(null);
+      await list.reload();
+    } catch (e) {
+      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('erp.automotive.deleteBookingBlocked') : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <Card>
@@ -971,6 +1037,18 @@ function BookingsTab({ canBook, canApprove, canInvoice }: { canBook: boolean; ca
                       </Button>
                     ) : b.invoiceId ? (
                       <span className="oryx-faint text-[11.5px]">{t('erp.automotive.invoiced')}</span>
+                    ) : null}
+                    {canBook && b.status !== 'COMPLETED' && b.status !== 'CANCELLED' && !b.reportStatus && !b.invoiceId ? (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={busyId === b.id}
+                        aria-label={`${t('common.delete')} ${b.bookingNumber}`}
+                        onClick={() => void removeBooking(b.id)}
+                        data-testid={`delete-booking-${b.bookingNumber}`}
+                      >
+                        <Icon name="trash" size={14} />
+                      </Button>
                     ) : null}
                   </div>
                 </td>
@@ -1064,6 +1142,20 @@ function ServicesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const list = useAsync(() => api.inspectionServices(), []);
   const [open, setOpen] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const removeService = async (id: string) => {
+    if (!window.confirm(t('erp.automotive.confirmDeleteService'))) return;
+    setBusyId(id);
+    try {
+      await api.deleteInspectionService(id);
+      await list.reload();
+    } catch (e) {
+      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('erp.automotive.deleteServiceBlocked') : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <Card>
@@ -1087,6 +1179,7 @@ function ServicesTab({ canManage }: { canManage: boolean }) {
               <th>{t('common.name')}</th>
               <th>{t('erp.automotive.price')}</th>
               <th>{t('erp.inventory.taxRate')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -1096,6 +1189,20 @@ function ServicesTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{s.nameEn}</td>
                 <td className="tabular-nums text-[12.5px]">{money(s.priceMinor)}</td>
                 <td className="text-[12.5px]">{(s.taxPercentBp / 100).toFixed(2)}%</td>
+                <td>
+                  {canManage ? (
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      disabled={busyId === s.id}
+                      aria-label={`${t('common.delete')} ${s.code}`}
+                      onClick={() => void removeService(s.id)}
+                      data-testid={`service-delete-${s.code}`}
+                    >
+                      <Icon name="trash" size={14} />
+                    </Button>
+                  ) : null}
+                </td>
               </tr>
             ))}
           </tbody>

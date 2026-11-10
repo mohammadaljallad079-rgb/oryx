@@ -274,7 +274,7 @@ function infoPanel(
   // reference, not as a bare day-month.
   return `
   <div class="of-panel">
-    <div class="of-panel-left">
+    <div class="of-panel-left${isQuotation ? ' of-panel-left-quote' : ''}">
       <div class="of-docno">${esc(numberLabel(payload.titleEn))} # <span class="num">${esc(
         payload.documentNumber ?? '',
       )}</span></div>
@@ -530,10 +530,14 @@ export const OFFICIAL_FINANCIAL_CSS = `
     line-height:1.2; }
   /* Measured from the reference: the customer column's labels begin at x≈327
      on a 545pt content width, so the left column is ~51% (not an even split). */
-  .of-panel-left{ flex:0 0 51%; padding:4pt 10pt; }
+  .of-panel-left{ flex:0 0 51%; padding:7pt 10pt; }
+  /* The approved quotation sets its field block 3.3pt lower than the invoice's
+     (Quotation Date 155.3 against Order Date 152.0) while the document number
+     stays at the same height, so only the field grid is inset. */
+  .of-panel-left-quote .of-lgrid{ margin-top:3.3pt; }
   .of-panel-right{ flex:1 1 auto; padding:4pt 10pt; }
   .of-docno{ font-size:13.3pt; font-weight:700; color:#0f2b48; margin-bottom:2pt; }
-  .of-field{ margin-top:3pt; }
+  .of-field{ margin-top:4.5pt; }
   /* The reference prints the date and the expiration date side by side in one
      row (invoice has only the date). */
   .of-lgrid{ display:grid; grid-template-columns:1fr 1fr; gap:0 10pt; }
@@ -549,17 +553,24 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-cp-label{ font-size:7.3pt; color:#64748b; font-weight:700; text-align:end; }
   .of-cp-value{ font-size:8.8pt; color:#0f2b48; font-weight:700; }
   .of-addr-line{ display:block; }
-  .of-table{ margin-top:13pt; }
+  .of-table{ margin-top:4pt; table-layout:fixed; }
   /* The approved quotation sheet leaves a wider gap between the info panel
      and the table than the invoice does (measured 31pt vs 17.5pt). */
-  .of-table-quote{ margin-top:22.5pt; }
+  .of-table-quote{ margin-top:18.4pt; }
   .of-table th{ font-size:8.8pt; font-weight:700; color:#0f2b48; text-align:start;
     padding:10pt 7pt; background:transparent; white-space:nowrap;
     border-top:1.5px solid #94a3b8; border-bottom:1.5px solid #94a3b8; }
-  .of-table td{ font-size:8.8pt; color:#0f2b48; font-weight:700; padding:10pt 7pt; }
+  /* The reference shades a fixed band per body row and spaces the rows 33.5pt
+     apart (measured band tops 265.1, 298.5, 332.0), so a row that carries a
+     product name *and* a note beneath it occupies the same pitch as a
+     name-only row. Without the fixed pitch the note row grows by its second
+     line and pushes the totals block ~7pt down the page. */
+  .of-table tbody tr{ height:33.5pt; }
+  .of-table td{ font-size:8.8pt; color:#0f2b48; font-weight:700; padding:2pt 7pt;
+    vertical-align:middle; }
   /* The reference insets the description column a little further than the
      numeric columns, so its text starts at x≈37.5 rather than the cell edge. */
-  .of-table th.of-c-desc,.of-table td.of-c-desc{ padding-inline-start:12pt; }
+  .of-table th.of-c-desc,.of-table td.of-c-desc{ padding-inline-start:10pt; }
   .of-table td.of-c-price,.of-table td.of-c-amt{ white-space:nowrap; }
   /* The approved sheet prints the tax label on one line inside a body row
      ("VAT 10%"); without this it wraps and the row doubles in height. */
@@ -570,10 +581,10 @@ export const OFFICIAL_FINANCIAL_CSS = `
      description column is much wider than a naive split, and the four numeric
      columns are close to equal. Matching them keeps every label and figure on
      the same x-position the printed document uses. */
-  .of-c-desc{ width:58.5%; }
-  .of-c-qty{ width:9.9%; text-align:center !important; }
+  .of-c-desc{ width:58.2%; }
+  .of-c-qty{ width:9.8%; text-align:center !important; }
   .of-c-price{ width:10.8%; text-align:end !important; }
-  .of-c-tax{ width:10.5%; text-align:start !important; }
+  .of-c-tax{ width:10.9%; text-align:start !important; }
   .of-c-amt{ width:10.3%; text-align:end !important; }
   .of-line-name{ display:block; }
   /* The line's note prints on its own line under the name, smaller and lighter,
@@ -597,8 +608,11 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-thanks-ar{ font-size:9pt; font-weight:700; color:#05162b; }
   .of-thanks-en{ font-size:8.5pt; font-weight:700; color:#05162b; }
   /* The thanks/signature strip is pinned to the foot of the page box, as the
-     approved reference prints it, rather than trailing the last table row. */
-  .of-bottom{ margin-top:auto; }
+     approved reference prints it, rather than trailing the last table row. The
+     reference leaves ~3.5pt more clearance below the strip than the box end, so
+     a small bottom margin lifts the strip and the thank-you line onto the
+     measured reference positions (signature 761.1, thanks 797.9). */
+  .of-bottom{ margin-top:auto; margin-bottom:3.5pt; }
   /* The reference leaves a clear gap between the signature strip and the
      thank-you line (measured 761pt to 798pt), so the strip is not cramped. */
   .of-bottom .of-thanks{ margin-top:10pt; }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
@@ -116,6 +116,17 @@ function SuppliersTab({ canManage }: { canManage: boolean }) {
     await list.reload();
   };
 
+  const onDelete = async (row: SupplierDto) => {
+    if (!window.confirm(t('common.deleteConfirm'))) return;
+    try {
+      await api.deleteSupplier(row.id);
+      await list.reload();
+    } catch (err) {
+      const key = err instanceof ApiError && err.code === 'resource.conflict' ? 'erp.purchasing.deleteSupplierBlocked' : 'common.error';
+      window.alert(t(key));
+    }
+  };
+
   return (
     <Card>
       <div className="flex flex-wrap items-end gap-3 border-b border-[var(--border)] p-4">
@@ -171,6 +182,15 @@ function SuppliersTab({ canManage }: { canManage: boolean }) {
                           data-testid={`supplier-toggle-${s.code}`}
                         >
                           <Icon name={s.isActive ? 'close' : 'check'} size={14} />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          aria-label={`${t('common.delete')} ${s.code}`}
+                          onClick={() => void onDelete(s)}
+                          data-testid={`supplier-delete-${s.code}`}
+                        >
+                          <Icon name="trash" size={14} />
                         </Button>
                       </>
                     ) : null}

@@ -276,6 +276,51 @@ export class OrganizationsService {
     return this.getCompany(id, actor);
   }
 
+  /**
+   * Permanently remove a company and everything it owns.
+   *
+   * Platform-only and gated on an explicit confirmation flag, because the delete
+   * is irreversible: every branch, membership, document and ledger entry the
+   * tenant owns is removed with it. Two things are deliberately preserved:
+   * `AuditLog` rows are `SetNull`, so the record of who did what outlives the
+   * tenant, and child companies are detached (their `parentCompanyId` is
+   * `SetNull`) rather than cascaded, so deleting a group never silently destroys
+   * a separate tenant's data.
+   */
+  async deleteCompany(id: string, confirm: boolean, actor: ActorContext) {
+    if (actor.kind !== 'PLATFORM') {
+      throw forbidden(ERROR_CODES.FORBIDDEN_PLATFORM_ONLY, 'Only a platform administrator may delete a company.');
+    }
+    if (!confirm) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Deleting a company requires an explicit confirmation.');
+    }
+    const company = await this.prisma.company.findUnique({
+      where: { id },
+      include: { _count: { select: { children: true, branches: true, memberships: true } } },
+    });
+    if (!company) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Company not found.');
+
+    // Written before the row disappears and with no tenant scope, so the trail
+    // survives the delete instead of being nulled by the cascade.
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId: null,
+      action: 'company.deleted',
+      targetType: 'COMPANY',
+      targetId: id,
+      summary: `Deleted company ${company.nameEn} (${company.code})`,
+      metadata: {
+        code: company.code,
+        nameEn: company.nameEn,
+        branches: company._count.branches,
+        memberships: company._count.memberships,
+        childrenDetached: company._count.children,
+      },
+    });
+    await this.prisma.company.delete({ where: { id } });
+    return { ok: true, code: company.code, childrenDetached: company._count.children };
+  }
+
   // -------------------------------------------------------------------- branches
 
   async listBranches(companyId: string, query: ListQueryDto, actor: ActorContext) {
@@ -399,16 +444,19 @@ export class OrganizationsService {
     if (!branch) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Branch not found.');
     this.assertCompanyAccess(branch.companyId, actor);
 
-    // Soft delete preserves referential history.
-    const updated = await this.prisma.branch.update({ where: { id: branchId }, data: { isActive: false } });
+    // A real delete, not a deactivation. Documents that point at the branch keep
+    // their history: their `branchId` is `SetNull`, so the row survives with the
+    // branch detached. The audit entry is written first so the branch's identity
+    // is on record before the row disappears.
     await this.audit.record({
       actorUserId: actor.userId,
       companyId: branch.companyId,
-      action: 'branch.deactivated',
+      action: 'branch.deleted',
       targetType: 'BRANCH',
       targetId: branchId,
-      summary: `Deactivated branch ${updated.nameEn}`,
+      summary: `Deleted branch ${branch.nameEn} (${branch.code})`,
     });
+    await this.prisma.branch.delete({ where: { id: branchId } });
     return { ok: true };
   }
 

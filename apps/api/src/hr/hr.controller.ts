@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsBoolean, IsOptional } from 'class-validator';
 import type { Response } from 'express';
@@ -117,6 +117,13 @@ export class HrController {
   @ApiOperation({ summary: 'Update an employee' })
   updateEmployee(@Param('id') id: string, @Body() dto: UpdateEmployeeDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.hr.updateEmployee(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('employees/:id')
+  @RequirePermissions('erp.hr.employee.manage')
+  @ApiOperation({ summary: 'Delete an employee that has no payroll history' })
+  deleteEmployee(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.deleteEmployee(id, p, actorFrom(p, req));
   }
 
   // -------------------------------------------------------------- contracts

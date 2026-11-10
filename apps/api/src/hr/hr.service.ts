@@ -240,6 +240,47 @@ export class HrService {
     return this.getEmployee(id, principal);
   }
 
+  /**
+   * Permanently delete an employee and their HR detail rows.
+   *
+   * Contracts, documents, leave, attendance, shifts, salary history and
+   * lifecycle all cascade with the employee. Payroll history does not: a payslip
+   * or an advance is a financial record that must survive, so an employee that
+   * has any is refused and should be terminated (status TERMINATED) instead.
+   */
+  async deleteEmployee(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const employee = await this.prisma.employee.findFirst({ where: { id, companyId } });
+    if (!employee) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Employee not found.');
+
+    const [payslips, advances] = await Promise.all([
+      this.prisma.payslip.count({ where: { employeeId: id } }),
+      this.prisma.employeeAdvance.count({ where: { employeeId: id } }),
+    ]);
+    if (payslips + advances > 0) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This employee has payroll history (payslips or advances) and cannot be deleted. Terminate the record instead so the payroll history is preserved.',
+      );
+    }
+
+    await this.posting.withTransaction(async (tx) => {
+      await tx.entityAttachment.deleteMany({ where: { companyId, entityType: 'EMPLOYEE', entityId: id } });
+      await tx.entityComment.deleteMany({ where: { companyId, entityType: 'EMPLOYEE', entityId: id } });
+      await tx.employee.delete({ where: { id } });
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'hr.employee_deleted',
+      targetType: 'EMPLOYEE',
+      targetId: id,
+      summary: `Permanently deleted employee ${employee.code}`,
+    });
+    return { id, deleted: true };
+  }
+
   // -------------------------------------------------------------- contracts
 
   async createContract(employeeId: string, dto: CreateContractDto, principal: RequestPrincipal, actor: ActorContext) {

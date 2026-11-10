@@ -54,6 +54,7 @@ export const PERMISSIONS: PermissionDefinition[] = [
   P('platform.company.read', 'Platform', 'View all companies', 'عرض جميع الشركات', 'PLATFORM', false, 'Read every company across the platform.'),
   P('platform.company.update', 'Platform', 'Update company', 'تعديل الشركة', 'PLATFORM', false, 'Edit company profile and hierarchy.'),
   P('platform.company.suspend', 'Platform', 'Suspend/activate company', 'إيقاف/تنشيط الشركة', 'PLATFORM', false, 'Change company lifecycle status.'),
+  P('platform.company.delete', 'Platform', 'Delete company', 'حذف الشركة', 'PLATFORM', false, 'Permanently remove a company and every record it owns.'),
   P('platform.branch.manage', 'Platform', 'Manage all branches', 'إدارة جميع الفروع', 'PLATFORM', false, 'Create and edit branches for any company.'),
   P('platform.user.read', 'Platform', 'View all users', 'عرض جميع المستخدمين', 'PLATFORM', false, 'Read user accounts across tenants.'),
   P('platform.user.manage', 'Platform', 'Manage platform users', 'إدارة مستخدمي المنصة', 'PLATFORM', false, 'Invite and administer platform-level users.'),

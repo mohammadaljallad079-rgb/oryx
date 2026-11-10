@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { CompanyDto, PlanDto, SubscriptionDto } from '@oryx/shared';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
@@ -30,6 +30,20 @@ export default function SubscriptionsPage() {
 
   const [assignTo, setAssignTo] = useState<CompanyDto | null>(null);
   const [historyOf, setHistoryOf] = useState<SubscriptionRow | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const removeSubscription = async (s: SubscriptionRow) => {
+    if (!window.confirm(t('subscriptions.confirmDelete'))) return;
+    setBusyId(s.id);
+    try {
+      await api.deleteSubscription(s.id);
+      await subs.reload();
+    } catch (e) {
+      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('subscriptions.deleteBlocked') : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-4" data-testid="subscriptions-page">
@@ -98,6 +112,18 @@ export default function SubscriptionsPage() {
                       >
                         {s.status === 'ACTIVE' ? t('companies.suspend') : t('companies.activate')}
                       </Button>
+                      {s.status === 'CANCELLED' || s.status === 'EXPIRED' ? (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          disabled={busyId === s.id}
+                          onClick={() => void removeSubscription(s)}
+                          data-testid={`delete-subscription-${s.companyId}`}
+                        >
+                          <Icon name="trash" size={14} />
+                          {t('common.delete')}
+                        </Button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>

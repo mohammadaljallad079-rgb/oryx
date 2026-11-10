@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
@@ -182,11 +182,25 @@ function AccountsTab({ canManage }: { canManage: boolean }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ErpAccountDto | null>(null);
 
+  const [busyId, setBusyId] = useState<string | null>(null);
   const list = useAsync(() => api.accountingAccounts({ search: search || undefined }), [search]);
 
   const setStatus = async (row: ErpAccountDto, next: boolean) => {
     await api.updateAccount(row.id, { isActive: next });
     await list.reload();
+  };
+
+  const removeAccount = async (row: ErpAccountDto) => {
+    if (!window.confirm(t('erp.accounting.confirmDeleteAccount'))) return;
+    setBusyId(row.id);
+    try {
+      await api.deleteAccount(row.id);
+      await list.reload();
+    } catch (e) {
+      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('erp.accounting.deleteAccountBlocked') : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (
@@ -271,6 +285,16 @@ function AccountsTab({ canManage }: { canManage: boolean }) {
                           data-testid={`account-toggle-${a.code}`}
                         >
                           <Icon name={a.isActive ? 'close' : 'check'} size={14} />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          disabled={busyId === a.id}
+                          aria-label={`${t('common.delete')} ${a.code}`}
+                          onClick={() => void removeAccount(a)}
+                          data-testid={`account-delete-${a.code}`}
+                        >
+                          <Icon name="trash" size={14} />
                         </Button>
                       </>
                     ) : null}
@@ -754,6 +778,20 @@ function PostJournalModal({
 function PeriodsTab({ canManage }: { canManage: boolean }) {
   const { t, locale } = useUi();
   const years = useAsync<FiscalYearDto[]>(() => api.fiscalYears(), []);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const removeYear = async (id: string, code: string) => {
+    if (!window.confirm(t('erp.accounting.confirmDeleteFiscalYear'))) return;
+    setBusyId(id);
+    try {
+      await api.deleteFiscalYear(id);
+      await years.reload();
+    } catch (e) {
+      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('erp.accounting.deleteFiscalYearBlocked') : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <Card className="p-4">
@@ -776,6 +814,11 @@ function PeriodsTab({ canManage }: { canManage: boolean }) {
                 <Badge tone={y.isClosed ? 'danger' : 'success'}>
                   {y.isClosed ? t('erp.accounting.closed') : t('erp.accounting.open')}
                 </Badge>
+                {canManage ? (
+                  <Button size="sm" variant="danger" disabled={busyId === y.id} aria-label={`${t('common.delete')} ${y.code}`} onClick={() => void removeYear(y.id, y.code)} data-testid={`fiscal-year-delete-${y.code}`}>
+                    <Icon name="trash" size={14} />
+                  </Button>
+                ) : null}
               </div>
               <div className="flex flex-wrap gap-2">
                 {y.periods.map((p) => (

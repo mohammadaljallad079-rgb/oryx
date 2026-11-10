@@ -181,6 +181,15 @@ export class SetCompanyStatusDto {
   reason?: string;
 }
 
+/**
+ * Body for the irreversible company delete. The confirmation flag is required
+ * and must be `true`, so an accidental `DELETE` cannot erase a tenant.
+ */
+export class DeleteCompanyDto {
+  @IsBoolean()
+  confirm!: boolean;
+}
+
 export class CreateBranchDto {
   @IsString()
   @Matches(/^[A-Z0-9][A-Z0-9-]{0,20}$/, { message: 'code must be uppercase letters, digits or dashes' })

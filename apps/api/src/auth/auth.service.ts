@@ -9,6 +9,7 @@ import { AuditService } from '../common/audit.service';
 import { findPlatformSuperAdminRole } from '../common/platform-role';
 import { ERROR_CODES, forbidden, notFound, unauthorized } from '../common/errors';
 import { MfaEnrollmentService } from './mfa-enrollment.service';
+import { AttendanceAutoService } from '../hr/attendance-auto.service';
 
 export interface AccessTokenPayload {
   sub: string;
@@ -59,6 +60,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly audit: AuditService,
     private readonly mfa: MfaEnrollmentService,
+    private readonly attendance: AttendanceAutoService,
   ) {}
 
   private hashToken(token: string): string {
@@ -296,6 +298,11 @@ export class AuthService {
       ipAddress: meta.ip ?? null,
       userAgent: meta.userAgent ?? null,
     });
+
+    // Attendance is stamped from the sign-in itself: a user linked to an
+    // employee record is checked in for the day without filling a form. Best
+    // effort — it never blocks the login.
+    await this.attendance.recordLogin(user.id, meta);
 
     const permissions = await this.effectivePermissionCodes(user.id, primary?.membershipId);
 
@@ -604,6 +611,10 @@ export class AuthService {
       });
     }
     if (userId) {
+      // Close the day's attendance from the sign-out, deriving the hours from
+      // the assigned shift and the company policy. Best effort, like the
+      // sign-in stamp.
+      await this.attendance.recordLogout(userId);
       await this.audit.record({
         actorUserId: userId,
         action: 'auth.logout',

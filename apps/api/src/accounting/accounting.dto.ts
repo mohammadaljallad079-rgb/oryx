@@ -253,6 +253,15 @@ export class RecordPaymentDto {
   @IsISO8601()
   paidAt!: string;
 
+  /**
+   * ISO currency code. Optional: when absent the API records the tenant's own
+   * currency so a receipt never silently defaults to the launch-market one.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(3)
+  currency?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(80)

@@ -93,3 +93,8 @@ oryx out put*.pdf
 .run/*.py
 .run/*.sh
 .run/preview-links/
+
+# Ad-hoc visual-comparison scratch produced while matching the approved
+# print references; the PNGs are large and reproducible from the sources.
+.run/insp-cmp/
+.run/task1final/

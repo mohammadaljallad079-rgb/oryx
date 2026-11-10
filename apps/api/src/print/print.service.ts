@@ -94,9 +94,24 @@ export class PrintService {
 
   async build(kind: PrintDocumentKind, id: string, principal: RequestPrincipal): Promise<PrintDocumentDto> {
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      include: {
+        branches: {
+          where: { isActive: true },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          select: { addressLine: true, city: true },
+        },
+      },
+    });
     if (!company) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Company not found.');
 
+    // The footer's legal line prints the registered address, so it resolves the
+    // same way the API-rendered document does (`DocumentsService.issuerFor`):
+    // the operator-entered branch address wins, and the branch supplies the city
+    // that sits between the street address and the CR number.
+    const branch = company.branches[0];
     const meta = {
       nameEn: company.nameEn,
       nameAr: company.nameAr,
@@ -107,7 +122,8 @@ export class PrintService {
       phone: company.phone,
       email: company.email,
       website: company.website,
-      addressLine: company.addressLine,
+      addressLine: branch?.addressLine || company.addressLine,
+      city: branch?.city ?? null,
       crNumber: company.crNumber,
     };
 
@@ -416,7 +432,7 @@ export class PrintService {
       secondaryDateValue: null,
       staffName: await this.staffName(payment.receivedByName, payment.createdById),
       paymentLabel: 'Payment Method',
-      paymentValue: paymentMethodLabel(payment.method) ?? payment.method.replace(/_/g, ' '),
+      paymentValue: paymentMethodLabel(payment.method),
       reference: payment.reference,
       company,
       party,

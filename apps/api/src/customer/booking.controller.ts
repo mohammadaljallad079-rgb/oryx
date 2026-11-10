@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -214,6 +215,17 @@ export class BookingController {
     return this.bookings.markNoShow(principal.company?.companyId ?? '', id, principal.userId);
   }
 
+  @Delete(':id')
+  @RequirePermissions('erp.booking.manage')
+  @ApiOperation({ summary: 'Delete a held, cancelled or no-show booking' })
+  async remove(@Param('id') id: string, @CurrentPrincipal() principal: RequestPrincipal) {
+    return this.bookings.deleteBooking(
+      principal.company?.companyId ?? '',
+      id,
+      principal.userId,
+    );
+  }
+
   // ---------------------------------------------------------------- resources
 
   @Get('resources/list')
@@ -264,6 +276,13 @@ export class BookingController {
       closesMinute: dto.closesMinute ?? null,
       reason: dto.reason,
     });
+  }
+
+  @Delete('resources/:id')
+  @RequirePermissions('erp.booking.resource.manage')
+  @ApiOperation({ summary: 'Delete a resource that has no bookings' })
+  async removeResource(@Param('id') id: string, @CurrentPrincipal() principal: RequestPrincipal) {
+    return this.bookings.deleteResource(principal.company?.companyId ?? '', id);
   }
 }
 

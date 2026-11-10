@@ -66,6 +66,13 @@ export class InventoryController {
     return this.inventory.updateWarehouse(id, dto, p, actorFrom(p, req));
   }
 
+  @Delete('warehouses/:id')
+  @RequirePermissions('erp.inventory.warehouse.manage')
+  @ApiOperation({ summary: 'Delete a warehouse that holds no stock or history' })
+  deleteWarehouse(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.inventory.deleteWarehouse(id, p, actorFrom(p, req));
+  }
+
   // ---------------------------------------------------------------- products
   @Get('products')
   @RequireAnyPermission('erp.inventory.read', 'erp.inventory.item.manage', 'erp.sales.catalog.manage')
@@ -98,6 +105,13 @@ export class InventoryController {
     @Req() req: RequestLike,
   ) {
     return this.inventory.updateProduct(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('products/:id')
+  @RequireAnyPermission('erp.inventory.item.manage', 'erp.sales.catalog.manage')
+  @ApiOperation({ summary: 'Delete a product that carries no history' })
+  deleteProduct(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.inventory.deleteProduct(id, p, actorFrom(p, req));
   }
 
   // --------------------------------------------------------- stock movements

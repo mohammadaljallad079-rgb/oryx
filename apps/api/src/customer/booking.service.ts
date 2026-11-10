@@ -1112,6 +1112,62 @@ export class BookingService {
     });
   }
 
+  /**
+   * Delete a booking that carries no settled work.
+   *
+   * A HELD, CANCELLED or NO_SHOW booking reserves no time and represents no
+   * delivered service, so removing it is safe. A booking that was confirmed,
+   * started or completed is part of the service record and must be cancelled
+   * instead of deleted.
+   */
+  async deleteBooking(companyId: string, slotId: string, actorId?: string) {
+    const slot = await this.findSlot(companyId, slotId);
+    if (!['HELD', 'CANCELLED', 'NO_SHOW'].includes(slot.status)) {
+      throw conflict(
+        ERROR_CODES.BOOKING_STATE,
+        'Only a held, cancelled or no-show booking can be deleted. Cancel it first.',
+      );
+    }
+    await this.prisma.bookingSlot.delete({ where: { id: slot.id } });
+    await this.audit.record({
+      action: 'booking.deleted',
+      companyId,
+      targetType: 'BOOKING_SLOT',
+      targetId: slot.id,
+      summary: `Booking ${slot.reference} deleted.`,
+      actorUserId: actorId ?? null,
+    });
+    return { id: slot.id, deleted: true as const };
+  }
+
+  /**
+   * Delete a resource that has never been booked. A resource with slots is
+   * retained so historical bookings still resolve to a name; deactivate it
+   * instead.
+   */
+  async deleteResource(companyId: string, resourceId: string) {
+    const resource = await this.prisma.bookingResource.findFirst({
+      where: { id: resourceId, companyId },
+      include: { _count: { select: { slots: true } } },
+    });
+    if (!resource) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Resource not found.');
+    if (resource._count.slots > 0) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This resource has bookings and cannot be deleted. Deactivate it instead.',
+      );
+    }
+    await this.prisma.bookingResource.delete({ where: { id: resourceId } });
+    await this.audit.record({
+      action: 'booking.resource_deleted',
+      companyId,
+      targetType: 'BOOKING_RESOURCE',
+      targetId: resourceId,
+      summary: `Resource ${resource.code} deleted.`,
+    });
+    return { id: resourceId, deleted: true as const };
+  }
+
   // ------------------------------------------------------------------ helpers
 
   /**

@@ -47,7 +47,6 @@ const STANDARD_CHART: Array<{
   { code: '5900', nameEn: 'Cash over / short', nameAr: 'فروق الصندوق', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: SYSTEM_ROLES.CASH_OVER_SHORT },
   { code: '5910', nameEn: 'Inventory adjustment', nameAr: 'تسوية المخزون', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: SYSTEM_ROLES.STOCK_ADJUSTMENT },
   { code: '5920', nameEn: 'Purchase price variance', nameAr: 'فروق أسعار الشراء', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: SYSTEM_ROLES.PURCHASE_PRICE_VARIANCE },
-  { code: '5930', nameEn: 'Rounding gain / loss', nameAr: 'أرباح وخسائر التقريب', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: SYSTEM_ROLES.ROUNDING_GAIN_LOSS },
   { code: '6000', nameEn: 'Salaries and wages expense', nameAr: 'مصروف الرواتب والأجور', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: SYSTEM_ROLES.SALARIES_EXPENSE },
   { code: '2200', nameEn: 'Salaries payable', nameAr: 'الرواتب المستحقة الدفع', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: SYSTEM_ROLES.WAGES_PAYABLE },
   { code: '2210', nameEn: 'Payroll deductions payable', nameAr: 'استقطاعات الرواتب المستحقة', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: SYSTEM_ROLES.PAYROLL_DEDUCTIONS },
@@ -258,6 +257,46 @@ export class AccountingService {
       summary: `Updated account ${updated.code}`,
     });
     return toAccountDto(updated);
+  }
+
+  /**
+   * Delete a chart-of-accounts entry that carries no postings and no children.
+   *
+   * A ledger that has ever touched the account keeps it; the account is
+   * deactivated (`isActive: false`) instead so historical statements still
+   * resolve. The parent link is `SetNull`, so a child would otherwise survive
+   * orphaned; the explicit child check prevents that.
+   */
+  async deleteAccount(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const account = await this.prisma.account.findFirst({ where: { id, companyId } });
+    if (!account) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Account not found.');
+    const [children, lines] = await Promise.all([
+      this.prisma.account.count({ where: { companyId, parentId: id } }),
+      this.prisma.journalLine.count({ where: { companyId, accountId: id } }),
+    ]);
+    if (children > 0) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'This account has child accounts and cannot be deleted.');
+    if (lines > 0) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'This account has ledger postings and cannot be deleted. Deactivate it instead so the statements still resolve.');
+    await this.prisma.account.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'accounting.account_deleted', targetType: 'ACCOUNT', targetId: id, summary: `Deleted account ${account.code}` });
+    return { id, deleted: true };
+  }
+
+  /**
+   * Delete a fiscal year that has no posted journals. Its periods cascade away.
+   */
+  async deleteFiscalYear(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const year = await this.prisma.fiscalYear.findFirst({ where: { id, companyId } });
+    if (!year) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Fiscal year not found.');
+    const periodIds = (await this.prisma.fiscalPeriod.findMany({ where: { companyId, fiscalYearId: id }, select: { id: true } })).map((p) => p.id);
+    const posted = periodIds.length
+      ? await this.prisma.journalEntry.count({ where: { companyId, fiscalPeriodId: { in: periodIds } } })
+      : 0;
+    if (posted > 0) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'This fiscal year has journals and cannot be deleted.');
+    await this.prisma.fiscalYear.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'accounting.fiscal_year_deleted', targetType: 'FISCAL_YEAR', targetId: id, summary: `Deleted fiscal year ${year.code}` });
+    return { id, deleted: true };
   }
 
   // -------------------------------------------------------------- fiscal years
@@ -787,6 +826,9 @@ export class AccountingService {
       }
 
       const paymentNumber = await this.sequences.next(tx, companyId, 'payment');
+      // The payment must carry the tenant's own currency, not the schema default,
+      // or a non-BHD tenant stores and prints every receipt in the wrong currency.
+      const currency = dto.currency ?? (await this.context.companyCurrency(companyId, tx));
       // The printed slip names who took the money. Fall back to the operator's
       // own name so the "Received By" line is never blank, and let an explicit
       // value win when the caller names someone else.
@@ -805,6 +847,7 @@ export class AccountingService {
           paymentNumber,
           method: dto.method,
           amountMinor: dto.amountMinor,
+          currency,
           reference: dto.reference ?? null,
           notes: dto.notes ?? null,
           receivedByName,

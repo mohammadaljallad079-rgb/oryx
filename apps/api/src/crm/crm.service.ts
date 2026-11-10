@@ -579,6 +579,108 @@ export class CrmService {
     return member;
   }
 
+  // ------------------------------------------------------------------- delete
+
+  /**
+   * Delete a lead source. A source that leads or customers still reference is
+   * deactivated instead, so the reference stays resolvable.
+   */
+  async deleteLeadSource(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const source = await this.prisma.leadSource.findFirst({ where: { id, companyId } });
+    if (!source) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Lead source not found.');
+    const [leads, customers] = await Promise.all([
+      this.prisma.lead.count({ where: { sourceId: id } }),
+      this.prisma.customer.count({ where: { sourceId: id } }),
+    ]);
+    if (leads + customers > 0) {
+      throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'This source is used by leads or customers and cannot be deleted. Deactivate it instead.');
+    }
+    await this.prisma.leadSource.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'crm.lead_source_deleted', targetType: 'LEAD_SOURCE', targetId: id, summary: `Deleted lead source ${source.code}` });
+    return { id, deleted: true };
+  }
+
+  /**
+   * Delete a lead. A lead that was converted (to a customer or an opportunity)
+   * is history and is refused; an open, unconverted lead can go.
+   */
+  async deleteLead(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const lead = await this.prisma.lead.findFirst({ where: { id, companyId }, include: { _count: { select: { opportunities: true } } } });
+    if (!lead) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Lead not found.');
+    if (lead.customerId || lead.convertedOpportunityId || lead._count.opportunities > 0) {
+      throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'This lead has been converted and cannot be deleted; the conversion history must be kept.');
+    }
+    await this.prisma.lead.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'crm.lead_deleted', targetType: 'LEAD', targetId: id, summary: `Deleted lead ${lead.code}` });
+    return { id, deleted: true };
+  }
+
+  /** Delete a pipeline that holds no opportunities. Its stages cascade away. */
+  async deletePipeline(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const pipeline = await this.prisma.pipeline.findFirst({ where: { id, companyId } });
+    if (!pipeline) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Pipeline not found.');
+    if (pipeline.isDefault) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'The default pipeline cannot be deleted. Make another pipeline the default first.');
+    const opportunities = await this.prisma.opportunity.count({ where: { pipelineId: id } });
+    if (opportunities > 0) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'This pipeline holds opportunities and cannot be deleted.');
+    await this.prisma.pipeline.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'crm.pipeline_deleted', targetType: 'PIPELINE', targetId: id, summary: `Deleted pipeline ${pipeline.code}` });
+    return { id, deleted: true };
+  }
+
+  /** Delete an opportunity that has not been converted into a quotation. */
+  async deleteOpportunity(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const opp = await this.prisma.opportunity.findFirst({ where: { id, companyId } });
+    if (!opp) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Opportunity not found.');
+    if (opp.quotationId) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'This opportunity was converted into a quotation and cannot be deleted.');
+    await this.prisma.opportunity.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'crm.opportunity_deleted', targetType: 'OPPORTUNITY', targetId: id, summary: `Deleted opportunity ${opp.code}` });
+    return { id, deleted: true };
+  }
+
+  /** Delete a CRM activity or follow-up. */
+  async deleteActivity(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const activity = await this.prisma.crmActivity.findFirst({ where: { id, companyId } });
+    if (!activity) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Activity not found.');
+    await this.prisma.crmActivity.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'crm.activity_deleted', targetType: 'CRM_ACTIVITY', targetId: id, summary: `Deleted activity ${activity.subject}` });
+    return { id, deleted: true };
+  }
+
+  /** Delete an SLA policy. Tickets keep the due dates derived from it at creation. */
+  async deleteSlaPolicy(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const policy = await this.prisma.slaPolicy.findFirst({ where: { id, companyId } });
+    if (!policy) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'SLA policy not found.');
+    await this.prisma.slaPolicy.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'crm.sla_policy_deleted', targetType: 'SLA_POLICY', targetId: id, summary: `Deleted SLA policy for ${policy.priority}` });
+    return { id, deleted: true };
+  }
+
+  /** Delete a support ticket. Its messages cascade away. */
+  async deleteTicket(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const ticket = await this.prisma.supportTicket.findFirst({ where: { id, companyId } });
+    if (!ticket) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Ticket not found.');
+    await this.prisma.supportTicket.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'crm.ticket_deleted', targetType: 'SUPPORT_TICKET', targetId: id, summary: `Deleted ticket ${ticket.ticketNumber}` });
+    return { id, deleted: true };
+  }
+
+  /** Delete a customer segment. Its memberships cascade away. */
+  async deleteSegment(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const segment = await this.prisma.customerSegment.findFirst({ where: { id, companyId } });
+    if (!segment) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Segment not found.');
+    await this.prisma.customerSegment.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'crm.segment_deleted', targetType: 'CUSTOMER_SEGMENT', targetId: id, summary: `Deleted segment ${segment.code}` });
+    return { id, deleted: true };
+  }
+
   // --------------------------------------------------------------- reporting
 
   async crmDashboard(principal: RequestPrincipal, companyIdInput?: string) {

@@ -127,6 +127,50 @@ export class PurchasingService {
     return toSupplierDto(updated);
   }
 
+  /**
+   * Permanently delete a supplier.
+   *
+   * A supplier that appears on a purchase order, receipt, invoice or return is
+   * part of the procurement ledger and must not be erased; the caller is told to
+   * deactivate instead. A supplier with only a set-null link (a payment or an
+   * unconverted requisition) can be removed — those rows survive with a null
+   * supplier.
+   */
+  async deleteSupplier(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const supplier = await this.prisma.supplier.findFirst({ where: { id, companyId } });
+    if (!supplier) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Supplier not found.');
+
+    const [orders, receipts, invoices, returns] = await Promise.all([
+      this.prisma.purchaseOrder.count({ where: { supplierId: id } }),
+      this.prisma.goodsReceipt.count({ where: { supplierId: id } }),
+      this.prisma.supplierInvoice.count({ where: { supplierId: id } }),
+      this.prisma.purchaseReturn.count({ where: { supplierId: id } }),
+    ]);
+    if (orders + receipts + invoices + returns > 0) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This supplier appears on purchase documents and cannot be deleted. Deactivate it instead to keep its history.',
+      );
+    }
+
+    await this.posting.withTransaction(async (tx) => {
+      await tx.purchaseRequisition.updateMany({ where: { supplierId: id }, data: { supplierId: null } });
+      await tx.payment.updateMany({ where: { supplierId: id }, data: { supplierId: null } });
+      await tx.supplier.delete({ where: { id } });
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'purchasing.supplier_deleted',
+      targetType: 'SUPPLIER',
+      targetId: id,
+      summary: `Permanently deleted supplier ${supplier.code}`,
+    });
+    return { id, deleted: true };
+  }
+
   // ------------------------------------------------------------ requisitions
 
   async listRequisitions(query: ListQueryDto, principal: RequestPrincipal) {

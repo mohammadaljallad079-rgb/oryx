@@ -227,4 +227,12 @@ export class InspectionController {
   cancel(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.inspections.cancel(id, p, actorFrom(p, req));
   }
+
+  @Delete(':id')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.inspection.write')
+  @ApiOperation({ summary: 'Permanently delete an inspection that has not been approved' })
+  remove(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.inspections.delete(id, p, actorFrom(p, req));
+  }
 }

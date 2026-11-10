@@ -4,6 +4,7 @@ import {
   PRINT_FOOTER_LEFT,
   PRINT_FOOTER_RIGHT,
   PRINT_LOGO_MARK,
+  PRINT_MASTHEAD_LOCKUP,
   PRINT_TAGLINE,
   PRINT_WATERMARK,
 } from './print-assets';
@@ -155,6 +156,17 @@ const HEAD = {
 const ROW_TOP = 265.06;
 const ROW_PITCH = 33.5;
 
+/**
+ * How far the approved quotation drops its table and totals below the invoice's.
+ *
+ * The two forms share a masthead, a title, a TRN strip and an info panel, but
+ * the quotation leaves a wider gap before the items table (the reference puts
+ * the table header at y 256.7 on the quotation against y 242.4 on the invoice)
+ * and the totals move down with it. Without this the quotation's priced rows and
+ * totals print ~14pt above where the approved sheet puts them.
+ */
+const QUOTE_TABLE_SHIFT = 14.3;
+
 export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): string {
   const rtl = locale === 'ar';
   const company = doc.company;
@@ -164,6 +176,14 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
   const title = doc.titleAr;
   const titleAlt = doc.titleEn;
   const trn = company.taxNumber ?? doc.party.taxNumber ?? null;
+  // The footer's legal line joins the registered street address to the issuer's
+  // city with " - ", then the CR number after " | ", exactly as the approved
+  // form prints it (e.g. "Bldg 886, Road 533, Block 405 Tashan - Kingdom of
+  // Bahrain | CR 146375-2").
+  const legalAddress = [company.addressLine, company.city].filter((x): x is string => Boolean(x && x.trim())).join(' - ');
+  // Only the quotation carries a second date, so its presence selects the
+  // quotation's taller layout without a separate "is quotation" flag.
+  const tableShift = doc.secondaryDateLabel ? QUOTE_TABLE_SHIFT : 0;
 
   const addressBlock = [doc.party.addressLine, doc.party.city, countryName(doc.party.countryCode, locale)].filter(
     (x): x is string => Boolean(x && x.trim()),
@@ -222,11 +242,11 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
   // line's height follows the number of text lines it holds.
   const rowParts: string[] = [];
   doc.lines.forEach((line, i) => {
-    const top = ROW_TOP + i * ROW_PITCH;
+    const top = ROW_TOP + tableShift + i * ROW_PITCH;
     const name = dash(line.description);
     const sub = line.subDescription && line.subDescription.trim() ? esc(line.subDescription) : null;
     const band = `<div class="row-band${i % 2 === 0 ? ' row-band--alt' : ''}" style="top:${top.toFixed(2)}pt"></div>`;
-    const valueTop = 275.16 + i * ROW_PITCH;
+    const valueTop = 275.16 + tableShift + i * ROW_PITCH;
     const nameTop = valueTop - (sub ? 5.62 : 0.75);
     const cells = `
     <div class="cell c-qty" style="${centreAt(COL.qty, valueTop, 8.79)}">${esc(line.quantity)}</div>
@@ -247,12 +267,12 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
   ]
     .map(
       (t, i) => `
-    <div class="tlabel" style="${at(255.0, TOTAL_TOP[i], 8.79)}">${esc(t.label)}</div>
-    <div class="tvalue" style="${rightAt(569.83, TOTAL_TOP[i], 8.79)}">${esc(t.value)}</div>`,
+    <div class="tlabel" style="${at(255.0, TOTAL_TOP[i] + tableShift, 8.79)}">${esc(t.label)}</div>
+    <div class="tvalue" style="${rightAt(569.83, TOTAL_TOP[i] + tableShift, 8.79)}">${esc(t.value)}</div>`,
     )
     .join('');
 
-  const totalTop = TOTAL_TOP[3];
+  const totalTop = TOTAL_TOP[3] + tableShift;
   const CONTACT_TOP = 820.15;
   // The reference prints small vector icons before the phone and the website.
   // An emoji (U+1F4DE / U+1F310) is absent from every installed face and prints
@@ -307,6 +327,8 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
 
   /* masthead - the reference's own vectors, at the reference's positions */
   .logo-mark { position:absolute; left:16.4pt; top:16.1pt; width:137.6pt; height:44.3pt; }
+  /* The Arabic lockup the approved masthead sets immediately right of the rule. */
+  .masthead-lockup { position:absolute; left:157.3pt; top:15.8pt; width:54.3pt; height:45.1pt; }
   .tagline { position:absolute; left:433.0pt; top:25.5pt; width:149.0pt; height:28.0pt; }
   .masthead-rule { position:absolute; left:156.47pt; top:16.2pt; height:44.09pt; border-left:1.5pt solid var(--navy); }
 
@@ -316,14 +338,17 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
   /* details card with the navy registration band across the top */
   .info { position:absolute; left:26.46pt; top:113.55pt; width:545.04pt; height:112.74pt;
           border:1.5pt solid var(--border); }
-  .trn-band { position:absolute; left:26.46pt; top:113.55pt; width:545.34pt; height:16.88pt; background:var(--navy); }
+  /* The navy registration band straddles the card's top border: the approved
+     form starts it at y 108.43, above the 113.55 card edge, not inside it. */
+  .trn-band { position:absolute; left:26.46pt; top:108.43pt; width:545.34pt; height:16.88pt; background:var(--navy); }
   .trn-text { right:33.0pt; font-size:8.79pt; color:#fff; letter-spacing:0.2pt; }
-  .info-rule { position:absolute; left:26.46pt; top:123.65pt; width:543.31pt; border-top:0.75pt solid var(--navy); }
-  .info-split { position:absolute; left:299.0pt; top:125.15pt; height:99.5pt; border-left:1pt solid var(--row); }
+  .info-rule { position:absolute; left:26.46pt; top:125.19pt; width:543.31pt; border-top:0.75pt solid var(--navy); }
   .docno { color:var(--navy); }
 
-  /* items table - white header strip, alternating light-blue rows, no vertical rules */
-  .items-frame { position:absolute; left:27.86pt; top:233.06pt; width:544.87pt; height:139.53pt;
+  /* items table - a ruled header strip over unframed alternating light-blue rows.
+     The approved form draws the border around the header only (y 233.06-263.56);
+     the priced rows below carry no vertical rules and no outer frame. */
+  .items-frame { position:absolute; left:27.86pt; top:${(233.06 + tableShift).toFixed(2)}pt; width:544.87pt; height:30.50pt;
                  border:1.5pt solid var(--border); }
   .row-band { position:absolute; left:27.86pt; width:544.87pt; height:30.5pt; }
   .row-band--alt { background:var(--row); }
@@ -341,7 +366,7 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
   /* totals - right aligned, a rule above the grand total */
   .tlabel { color:var(--ink); }
   .tvalue { color:var(--ink); text-align:right; }
-  .totals-rule { position:absolute; left:251.0pt; top:433.24pt; width:320.13pt; border-top:0.75pt solid var(--navy); }
+  .totals-rule { position:absolute; left:251.0pt; top:${(433.24 + tableShift).toFixed(2)}pt; width:320.13pt; border-top:0.75pt solid var(--navy); }
 
   /* notes / warranty box below the totals */
   .notes { position:absolute; left:29.02pt; top:481.17pt; width:544.99pt; height:27.9pt;
@@ -373,6 +398,7 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
 <body>
   <div class="sheet">
     <img class="logo-mark" alt="" src="${PRINT_LOGO_MARK}" />
+    <img class="masthead-lockup" alt="اوريكس لخدمات السيارات" src="${PRINT_MASTHEAD_LOCKUP}" />
     <img class="tagline" alt="" src="${PRINT_TAGLINE}" />
     <div class="masthead-rule"></div>
 
@@ -383,17 +409,16 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
     <div class="trn-band"></div>
     <div class="trn-text" style="top:${topFor(110.63)}pt">TRN: ${dash(trn)}</div>
     <div class="info-rule"></div>
-    <div class="info-split"></div>
     <div class="docno" style="${at(37.17, 131.31, 13.28)}">${esc(doc.titleEn)} # ${esc(doc.documentNumber)}</div>
     ${leftFieldHtml}${secondaryHtml}
     ${rightFieldHtml}
 
     <div class="items-frame"></div>
-    <div class="th" style="${at(HEAD.desc, 242.40, 8.79)}">Description</div>
-    <div class="th" style="${centreAt(HEAD.qty, 242.40, 8.79)}">Quantity</div>
-    <div class="th" style="${rightAt(HEAD.priceRight, 242.40, 8.79)}">Unit Price</div>
-    <div class="th" style="${centreAt(HEAD.tax, 242.40, 8.79)}">Taxes</div>
-    <div class="th" style="${rightAt(HEAD.amountRight, 242.40, 8.79)}">Amount</div>
+    <div class="th" style="${at(HEAD.desc, 242.40 + tableShift, 8.79)}">Description</div>
+    <div class="th" style="${centreAt(HEAD.qty, 242.40 + tableShift, 8.79)}">Quantity</div>
+    <div class="th" style="${rightAt(HEAD.priceRight, 242.40 + tableShift, 8.79)}">Unit Price</div>
+    <div class="th" style="${centreAt(HEAD.tax, 242.40 + tableShift, 8.79)}">Taxes</div>
+    <div class="th" style="${rightAt(HEAD.amountRight, 242.40 + tableShift, 8.79)}">Amount</div>
     ${rowParts.join('')}
 
     <div class="watermark">${PRINT_WATERMARK}</div>
@@ -423,7 +448,7 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
     <div class="page-no" style="${at(94.0, 815.88, 6.5)}">صفحة 1 من 1</div>
     ${contactIcons.map((c) => `<div class="contact-icon" style="left:${c.x}pt;top:${topFor(CONTACT_TOP)}pt">${c.svg}</div>`).join('\n    ')}
     ${contactBits.map((c) => `<div class="contact" style="${at(c.x, CONTACT_TOP, 7.2)}">${esc(c.text)}</div>`).join('\n    ')}
-    <div class="legal" style="${rightAt(557.94, 830.51, 6.68)}">${esc([company.addressLine, company.crNumber ? `CR ${company.crNumber}` : null].filter(Boolean).join(' | '))}</div>
+    <div class="legal" style="${rightAt(557.94, 830.51, 6.68)}">${esc([legalAddress, company.crNumber ? `CR ${company.crNumber}` : null].filter(Boolean).join(' | '))}</div>
   </div>
 </body>
 </html>`;

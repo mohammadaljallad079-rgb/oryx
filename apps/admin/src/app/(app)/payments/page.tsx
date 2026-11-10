@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
@@ -97,7 +97,21 @@ function IntentsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [status, setStatus] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const list = useAsync(() => api.paymentIntents({ status: status || undefined }), [status]);
+
+  const removeIntent = async (row: IntentRow) => {
+    if (!window.confirm(t('erp.payments.confirmDeleteIntent'))) return;
+    setBusyId(row.id);
+    try {
+      await api.deletePaymentIntent(row.id);
+      await list.reload();
+    } catch (e) {
+      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('erp.payments.deleteIntentBlocked') : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <Card>
@@ -141,9 +155,16 @@ function IntentsTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{p.provider}</td>
                 <td><StatusBadge status={p.status} label={p.status} /></td>
                 <td className="text-end">
-                  <Button size="sm" onClick={() => setOpenId(p.id)} data-testid={`intent-open-${p.intentNumber}`}>
-                    {t('common.view')}
-                  </Button>
+                  <div className="flex flex-wrap items-center justify-end gap-1">
+                    <Button size="sm" onClick={() => setOpenId(p.id)} data-testid={`intent-open-${p.intentNumber}`}>
+                      {t('common.view')}
+                    </Button>
+                    {canManage ? (
+                      <Button size="sm" variant="danger" disabled={busyId === p.id} aria-label={`${t('common.delete')} ${p.intentNumber}`} onClick={() => void removeIntent(p)} data-testid={`intent-delete-${p.intentNumber}`}>
+                        {t('common.delete')}
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -345,7 +366,21 @@ function ReconciliationTab({ canManage }: { canManage: boolean }) {
   });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const list = useAsync(() => api.paymentReconciliations(onlyUnmatched), [onlyUnmatched]);
+
+  const removeRecon = async (id: string) => {
+    if (!window.confirm(t('erp.payments.confirmDeleteReconciliation'))) return;
+    setBusyId(id);
+    try {
+      await api.deletePaymentReconciliation(id);
+      await list.reload();
+    } catch (e) {
+      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('erp.payments.deleteReconciliationBlocked') : t('common.error'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   async function submit() {
     setBusy(true);
@@ -395,6 +430,7 @@ function ReconciliationTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.payments.external')}</th>
               <th>{t('erp.payments.variance')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -406,6 +442,13 @@ function ReconciliationTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px]">{String(r.externalMinor ?? 0)}</td>
                 <td className="tabular-nums text-[12.5px]">{String(r.varianceMinor ?? 0)}</td>
                 <td><StatusBadge status={r.matched ? 'MATCHED' : 'UNMATCHED'} label={r.matched ? t('erp.payments.matched') : t('erp.payments.unmatched')} /></td>
+                <td>
+                  {canManage && !r.matched ? (
+                    <Button size="sm" variant="danger" disabled={busyId === String(r.id)} aria-label={t('common.delete')} onClick={() => void removeRecon(String(r.id))} data-testid={`recon-delete-${String(r.id)}`}>
+                      {t('common.delete')}
+                    </Button>
+                  ) : null}
+                </td>
               </tr>
             ))}
           </tbody>

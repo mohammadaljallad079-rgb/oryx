@@ -77,6 +77,28 @@ export class ListQueryDto {
   @IsOptional()
   @IsIn(['in', 'low', 'out'])
   stockStatus?: 'in' | 'low' | 'out';
+
+  /**
+   * Restrict the stock-level filter to one warehouse. The on-hand quantity is
+   * then read from that warehouse's level only, so "low" and "out" reflect the
+   * chosen location rather than the company total.
+   */
+  @IsOptional()
+  @IsString()
+  warehouseId?: string;
+
+  /** Inclusive sales-price bounds in minor units, for the catalogue price filter. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minPriceMinor?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  maxPriceMinor?: number;
 }
 
 export class CreateWarehouseDto {

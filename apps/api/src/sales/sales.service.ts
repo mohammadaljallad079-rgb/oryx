@@ -334,6 +334,81 @@ export class SalesService {
     return { removed: true };
   }
 
+  /**
+   * Permanently delete a customer.
+   *
+   * A customer with any commercial history — a quotation, order, invoice, credit
+   * note, payment, vehicle or inspection — is refused, because deleting it would
+   * either violate the ledger's referential integrity or silently drop the
+   * counterparty from issued documents. The generated "Walk-in customer" row is
+   * also protected: the POS recreates it on demand and the seeded invoices point
+   * at it. Only a customer whose own detail rows are the sole references is
+   * removed, and those detail rows go with it.
+   */
+  async deleteCustomer(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const customer = await this.prisma.customer.findFirst({ where: { id, companyId } });
+    if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+    if (customer.code === 'WALK-IN') {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'The walk-in customer cannot be deleted.');
+    }
+
+    const [
+      quotations,
+      orders,
+      invoices,
+      creditNotes,
+      posSales,
+      payments,
+      vehicles,
+      inspections,
+      bookingSlots,
+      paymentIntents,
+      contactCount,
+      segmentCount,
+    ] = await Promise.all([
+      this.prisma.quotation.count({ where: { customerId: id } }),
+      this.prisma.salesOrder.count({ where: { customerId: id } }),
+      this.prisma.salesInvoice.count({ where: { customerId: id } }),
+      this.prisma.creditNote.count({ where: { customerId: id } }),
+      this.prisma.posSale.count({ where: { customerId: id } }),
+      this.prisma.payment.count({ where: { customerId: id } }),
+      this.prisma.vehicle.count({ where: { customerId: id } }),
+      this.prisma.inspectionSession.count({ where: { customerId: id } }),
+      this.prisma.bookingSlot.count({ where: { customerId: id } }),
+      this.prisma.paymentIntent.count({ where: { customerId: id } }),
+      this.prisma.customerContact.count({ where: { customerId: id } }),
+      this.prisma.customerSegmentMember.count({ where: { customerId: id } }),
+    ]);
+
+    if (
+      quotations + orders + invoices + creditNotes + posSales + payments + vehicles + inspections + bookingSlots + paymentIntents >
+      0
+    ) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This customer has documents, payments or vehicles on file and cannot be deleted. Deactivate it instead to keep its history.',
+      );
+    }
+
+    await this.posting.withTransaction(async (tx) => {
+      await tx.entityAttachment.deleteMany({ where: { companyId, entityType: 'CUSTOMER', entityId: id } });
+      await tx.customerContact.deleteMany({ where: { customerId: id } });
+      await tx.customerSegmentMember.deleteMany({ where: { customerId: id } });
+      await tx.customer.delete({ where: { id } });
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'sales.customer_deleted',
+      targetType: 'CUSTOMER',
+      targetId: id,
+      summary: `Permanently deleted customer ${customer.code} (${contactCount} contacts, ${segmentCount} segment memberships removed)`,
+    });
+    return { id, deleted: true };
+  }
+
   // -------------------------------------------------------------- quotations
 
   async listQuotations(query: ListQueryDto, principal: RequestPrincipal) {

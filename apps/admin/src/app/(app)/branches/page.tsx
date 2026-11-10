@@ -148,12 +148,30 @@ function BranchesInner() {
                         </Button>
                       ) : null}
                       {canDelete ? (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={async () => {
+                            if (!window.confirm(t('branches.confirmDelete').replace('{name}', locale === 'ar' ? b.nameAr : b.nameEn))) return;
+                            try {
+                              await api.deleteBranch(b.id);
+                              await list.reload();
+                            } catch (err) {
+                              window.alert(err instanceof Error ? err.message : t('common.error'));
+                            }
+                          }}
+                          data-testid={`delete-branch-${b.code}`}
+                        >
+                          <Icon name="trash" size={14} />
+                          {t('common.delete')}
+                        </Button>
+                      ) : null}
+                      {canEdit ? (
                         b.isActive ? (
                           <Button
                             size="sm"
-                            variant="danger"
                             onClick={async () => {
-                              await api.deleteBranch(b.id);
+                              await api.updateBranch(b.id, { isActive: false });
                               await list.reload();
                             }}
                             data-testid={`deactivate-branch-${b.code}`}

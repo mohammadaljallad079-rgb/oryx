@@ -33,7 +33,7 @@ interface PrintModel {
   issueDateValue: string;
   secondaryDateLabel: string | null;
   party: { name: string; taxNumber: string | null };
-  company: { taxNumber: string | null; crNumber: string | null };
+  company: { taxNumber: string | null; crNumber: string | null; addressLine: string | null; city: string | null };
   lines: Array<{ description: string; quantity: string; unitPrice: string; amount: string }>;
   totals: { untaxedAmount: string; taxAmount: string; discount: string; total: string };
   amountInWords: string;
@@ -124,6 +124,22 @@ describe('print model and document attachments (e2e)', () => {
         email: 'print@fixture.local',
         website: 'www.fixture.local',
         addressLine: 'Building 1, Road 2, Block 3, Manama',
+      },
+    });
+
+    // The printed address is the issuer's registered address, so the footer's
+    // legal line resolves the first active branch the same way the rendered
+    // document does. The branch supplies the city printed between the street
+    // address and the CR number.
+    await ctx.prisma.branch.create({
+      data: {
+        companyId: tenantId,
+        code: 'HQ',
+        nameEn: 'Head Office',
+        nameAr: 'المكتب الرئيسي',
+        addressLine: 'Building 1, Road 2, Block 3',
+        city: 'Manama',
+        isActive: true,
       },
     });
 
@@ -262,6 +278,10 @@ describe('print model and document attachments (e2e)', () => {
       // The seller's registration number the navy band prints comes from the company.
       expect(res.body.company.taxNumber).toBe('300000000000003');
       expect(res.body.company.crNumber).toBe('9000000009');
+      // The footer's legal line prints the registered address then the city, so
+      // the preview and the rendered document agree on both.
+      expect(res.body.company.addressLine).toBe('Building 1, Road 2, Block 3');
+      expect(res.body.company.city).toBe('Manama');
       expect(res.body.lines).toHaveLength(2);
       expect(res.body.lines[0].description).toBe('Oil (Havoline 5w20)');
       // 7.50 + 2.00 = 9.50 net, 10% VAT = 0.95, total 10.45
@@ -335,6 +355,40 @@ describe('print model and document attachments (e2e)', () => {
       const up = await upload('PAYMENT', receiptId, { name: 'voucher.pdf', type: 'application/pdf', bytes: pdf });
       expect(up.status).toBe(201);
       expect((up.body as AttachmentRow).mimeType).toBe('application/pdf');
+    });
+
+    it('keeps several attachments on one document', async () => {
+      const pdf = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n');
+      const first = await upload('SALES_INVOICE', invoiceId, { name: 'front.jpg', type: 'image/jpeg', bytes: PNG });
+      const second = await upload('SALES_INVOICE', invoiceId, { name: 'signed.pdf', type: 'application/pdf', bytes: pdf });
+      expect(first.status).toBe(201);
+      expect(second.status).toBe(201);
+
+      const list = await erp<AttachmentRow[]>(`/attachments/SALES_INVOICE/${invoiceId}`);
+      expect(list.status).toBe(200);
+      const names = list.body.map((a) => a.fileName);
+      // Both new files are present alongside the PNG attached earlier, so one
+      // document carries more than one attachment.
+      expect(names).toContain('front.jpg');
+      expect(names).toContain('signed.pdf');
+      expect(names.length).toBeGreaterThanOrEqual(3);
+
+      // Each attachment streams its own bytes back for preview and download.
+      for (const row of list.body) {
+        const res = await fetch(
+          `${ctx.base}/api/v1/attachments/SALES_INVOICE/${invoiceId}/${row.id}/download`,
+          { headers: { Authorization: `Bearer ${token}`, 'x-oryx-company-id': tenantId } },
+        );
+        expect(res.status).toBe(200);
+        expect((await res.arrayBuffer()).byteLength).toBe(row.sizeBytes);
+      }
+
+      // Removing one leaves the others untouched.
+      const removedId = (second.body as AttachmentRow).id;
+      await erp(`/attachments/SALES_INVOICE/${invoiceId}/${removedId}`, { method: 'DELETE' });
+      const after = await erp<AttachmentRow[]>(`/attachments/SALES_INVOICE/${invoiceId}`);
+      expect(after.body.map((a) => a.fileName)).toContain('front.jpg');
+      expect(after.body.map((a) => a.id)).not.toContain(removedId);
     });
 
     it('rejects an unsupported file type', async () => {

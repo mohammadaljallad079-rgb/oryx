@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentPrincipal,
@@ -71,6 +71,13 @@ export class PlansController {
   ) {
     return this.plans.updatePlan(id, dto, actorFrom(p, req));
   }
+
+  @Delete(':id')
+  @RequirePermissions('platform.plan.manage')
+  @ApiOperation({ summary: 'Delete a plan that has no subscriptions (platform only)' })
+  remove(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.plans.deletePlan(id, actorFrom(p, req));
+  }
 }
 
 @ApiTags('subscriptions')
@@ -113,5 +120,12 @@ export class SubscriptionsController {
     @Req() req: RequestLike,
   ) {
     return this.plans.changeSubscriptionStatus(id, dto, actorFrom(p, req));
+  }
+
+  @Delete(':id')
+  @RequirePermissions('platform.subscription.manage')
+  @ApiOperation({ summary: 'Delete a cancelled or expired subscription (platform only)' })
+  remove(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.plans.deleteSubscription(id, actorFrom(p, req));
   }
 }

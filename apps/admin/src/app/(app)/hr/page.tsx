@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
@@ -119,6 +119,17 @@ function EmployeesTab({ canManage }: { canManage: boolean }) {
     await list.reload();
   };
 
+  const onDelete = async (row: EmployeeDto) => {
+    if (!window.confirm(t('common.deleteConfirm'))) return;
+    try {
+      await api.deleteEmployee(row.id);
+      await list.reload();
+    } catch (err) {
+      const key = err instanceof ApiError && err.code === 'resource.conflict' ? 'erp.hr.deleteBlocked' : 'common.error';
+      window.alert(t(key));
+    }
+  };
+
   return (
     <Card>
       <div className="flex flex-wrap items-end gap-3 border-b border-[var(--border)] p-4">
@@ -184,6 +195,15 @@ function EmployeesTab({ canManage }: { canManage: boolean }) {
                             <option key={s} value={s}>{t(`erp.hr.employeeStatusValue.${s}` as const)}</option>
                           ))}
                         </select>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          aria-label={`${t('common.delete')} ${e.code}`}
+                          onClick={() => void onDelete(e)}
+                          data-testid={`employee-delete-${e.code}`}
+                        >
+                          <Icon name="trash" size={14} />
+                        </Button>
                       </>
                     ) : null}
                   </div>

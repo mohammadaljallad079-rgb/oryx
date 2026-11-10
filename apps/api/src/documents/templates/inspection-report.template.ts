@@ -1,18 +1,13 @@
 import {
-  BODY_GLASS_PATHS,
   BODY_PANELS,
-  BODY_SEAM_PATHS,
-  BODY_SILHOUETTE,
-  BODY_VIEWBOX,
-  BODY_WHEELS,
-  CHASSIS_OUTLINE,
   CHASSIS_REGIONS,
-  CHASSIS_STRUCTURE_PATHS,
-  CHASSIS_VIEWBOX,
-  CHASSIS_ZONES,
-  CHASSIS_ZONE_COLORS,
   PAINT_CONDITIONS,
 } from '@oryx/shared';
+import {
+  BODY_SCHEME_DATA_URI,
+  CHASSIS_DIAGRAM_DATA_URI,
+  INTERIOR_DIAGRAM_DATA_URI,
+} from './inspection-artwork.assets';
 import {
   signatureBlock,
   verificationBlock,
@@ -324,34 +319,36 @@ export function inspectionGroupPage(
   const engine = byArea.get('ENGINE_COMPARTMENT');
   const road = byArea.get('ROAD_TEST');
 
+  // The approved form packs the four checklists into a 2x2 grid on one sheet:
+  // road test and engine compartment on the upper row, exterior and interior on
+  // the lower row, with the interior reference drawing and the general remarks
+  // beneath. A layout *table* (not flexbox) is used because Chromium cannot
+  // fragment a flex row across pages, so a flex grid that does not fit jumps
+  // wholesale to the next sheet; a table keeps the four tables on one page.
+  const cell = (
+    section: InspectionReportSection | undefined,
+    titleAr: string,
+    titleEn: string,
+    withNa: boolean,
+  ): string =>
+    section
+      ? `<div class="grp"><div class="grp-title">${esc(titleAr)}<span class="ltr">${esc(titleEn)}</span>
+          <span class="grp-legend">${legendChip('check', 'اجتياز', 'Pass')}${legendChip('cross', 'فشل', 'Fail')}${withNa ? '<span class="lg-chip">N/A · غير متوفر</span>' : ''}</span>
+        </div>${itemsTable(section, titleAr, titleEn, withNa)}</div>`
+      : '';
+
+  const pair = (right: string, left: string): string =>
+    `<table class="grid"><tr><td>${right || '&nbsp;'}</td><td>${left || '&nbsp;'}</td></tr></table>`;
+
   const cabin = `
-  <div class="grp">
+  <div class="grp cabin">
     <div class="grp-title">فحص التجهيزات الداخلية والملحقات الخارجية<span class="ltr">Cabin Electronics &amp; Exterior Accessories Checks</span>
       <span class="grp-legend">${legendChip('check', 'اجتياز', 'Pass')}${legendChip('cross', 'فشل', 'Fail')}<span class="lg-chip">N/A · غير متوفر</span></span>
     </div>
-    <div class="two-col">
-      ${interior ? itemsTable(interior, 'داخلية السيارة', 'Interior Car', true) : ''}
-      ${exterior ? itemsTable(exterior, 'خارجية السيارة', 'Exterior Car', true) : ''}
-    </div>
+    ${pair(cell(engine, 'مقصورة المحرك', 'Engine Compartment', false), cell(road, 'تجربة القيادة', 'Road Test', false))}
+    ${pair(cell(interior, 'داخلية السيارة', 'Interior Car', true), cell(exterior, 'خارجية السيارة', 'Exterior Car', true))}
+    ${interior ? `<figure class="interior-art"><img src="${INTERIOR_DIAGRAM_DATA_URI}" alt=""><figcaption>مخطط التجهيزات الداخلية<span class="ltr">Interior fittings reference</span></figcaption></figure>` : ''}
   </div>`;
-
-  const engineBlock = engine
-    ? `<div class="grp">
-        <div class="grp-title">مقصورة المحرك<span class="ltr">Engine Compartment</span>
-          <span class="grp-legend">${legendChip('check', 'اجتياز', 'Pass')}${legendChip('cross', 'فشل', 'Fail')}</span>
-        </div>
-        ${itemsTable(engine, 'مقصورة المحرك', 'Engine Compartment', false)}
-      </div>`
-    : '';
-
-  const roadBlock = road
-    ? `<div class="grp">
-        <div class="grp-title">تجربة القيادة<span class="ltr">Road Test Drive</span>
-          <span class="grp-legend">${legendChip('check', 'اجتياز', 'Pass')}${legendChip('cross', 'فشل', 'Fail')}</span>
-        </div>
-        ${itemsTable(road, 'تجربة القيادة', 'Road Test', false)}
-      </div>`
-    : '';
 
   const remarkRows: string[] = [];
   if (input.payload.generalRemarks) remarkRows.push(input.payload.generalRemarks);
@@ -369,7 +366,6 @@ export function inspectionGroupPage(
     ${pageTitleBar('الفحص الداخلي والخارجي / مقصورة المحرك / تجربة القيادة', 'INTERIOR & EXTERIOR INSPECTION / ENGINE COMPARTMENT / ROAD TEST')}
     ${jobStrip(input.payload)}
     ${cabin}
-    <div class="two-col">${engineBlock}${roadBlock}</div>
     ${remarks}
   </section>`;
 }
@@ -475,7 +471,10 @@ function paintDiagram(section: InspectionReportSection): string {
   <div class="diagram-block avoid-break">
     <div class="diagram-title">مخطط الفحص السطحي لهيكل السيارة<span class="ltr">Body Panels Diagnostic Scheme</span></div>
     <div class="diagram-wrap">
-      <div class="diagram">${bodyPlanSvg()}${markers}</div>
+      <div class="diagram diagram--art">
+        <img class="artplan" src="${BODY_SCHEME_DATA_URI}" alt="">
+        ${markers}
+      </div>
       <div class="legend">${legend}</div>
     </div>
     ${rows}
@@ -483,41 +482,9 @@ function paintDiagram(section: InspectionReportSection): string {
   </div>`;
 }
 
-/** The vehicle plan view, from the shared geometry. */
-function bodyPlanSvg(): string {
-  const panels = BODY_PANELS.map((p) => `<path class="bp-panel" d="${p.d}"/>`).join('');
-  const glass = BODY_GLASS_PATHS.map((d) => `<path class="bp-glass" d="${d}"/>`).join('');
-  const seams = BODY_SEAM_PATHS.map((d) => `<path class="bp-seam" d="${d}"/>`).join('');
-  const wheels = BODY_WHEELS.map(
-    (w) =>
-      `<rect class="bp-wheel" x="${(w.cx - w.r * 0.55).toFixed(1)}" y="${(w.cy - w.r).toFixed(1)}" width="${(w.r * 1.1).toFixed(1)}" height="${(w.r * 2).toFixed(1)}" rx="8"/>`,
-  ).join('');
-  return `
-  <svg class="bodyplan" viewBox="0 0 ${BODY_VIEWBOX.width} ${BODY_VIEWBOX.height}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path class="bp-body" d="${BODY_SILHOUETTE}"/>
-    ${glass}
-    ${panels}
-    ${wheels}
-    ${seams}
-  </svg>`;
-}
-
-/** The eight-region chassis safety diagram, from the shared geometry. */
+/** The eight-region chassis safety diagram, drawn over the approved artwork. */
 function chassisDiagram(section: InspectionReportSection): string {
   const byKey = new Map(section.chassisRegions.map((r) => [r.regionKey, r]));
-
-  const zones = CHASSIS_ZONES.map((zone, idx) => {
-    const region = CHASSIS_REGIONS.find((r) => r.key === zone.key);
-    const state = byKey.get(zone.key)?.condition ?? 'UNSET';
-    const fill = CHASSIS_ZONE_COLORS[state as 'OK' | 'DAMAGE' | 'UNSET'] ?? 'transparent';
-    return (
-      `<g class="cz cz-${state.toLowerCase()}">` +
-      `<path d="${zone.d}" fill="${fill}"/>` +
-      `<text x="${zone.labelX}" y="${zone.labelY}" class="cz-num">${idx + 1}</text>` +
-      `<title>${esc(region?.labelEn ?? zone.key)}: ${esc(state)}</title>` +
-      `</g>`
-    );
-  }).join('');
 
   const chips = CHASSIS_REGIONS.map((region) => {
     const row = byKey.get(region.key);
@@ -541,11 +508,10 @@ function chassisDiagram(section: InspectionReportSection): string {
   <div class="chassis-block avoid-break">
     <div class="diagram-title">مخطط سلامة الشاصي<span class="ltr">Chassis safety diagram</span></div>
     <div class="chassis-wrap">
-      <svg class="chassisplan" viewBox="0 0 ${CHASSIS_VIEWBOX.width} ${CHASSIS_VIEWBOX.height}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path class="cp-outline" d="${CHASSIS_OUTLINE}"/>
-        ${CHASSIS_STRUCTURE_PATHS.map((d) => `<path class="cp-seam" d="${d}"/>`).join('')}
-        ${zones}
-      </svg>
+      <div class="chassis-art">
+        <img class="artchassis" src="${CHASSIS_DIAGRAM_DATA_URI}" alt="">
+        ${chassisMarkers(section)}
+      </div>
       <div class="chassis-grid">${chips}</div>
     </div>
     <div class="legend-row">
@@ -566,6 +532,25 @@ function chassisDiagram(section: InspectionReportSection): string {
 /** The Arabic label of a chassis region, or its key if the catalogue changed. */
 function chassisRegionLabel(key: string): string {
   return CHASSIS_REGIONS.find((r) => r.key === key)?.labelAr ?? key;
+}
+
+/**
+ * The region condition dots drawn on the approved chassis artwork.
+ *
+ * Each region has a fixed normalised position (`CHASSIS_REGIONS`), so a region
+ * marked sound prints a green dot and a damaged one a red dot at the same spot
+ * on the drawing every time. An unassessed region prints no dot rather than a
+ * misleading green one.
+ */
+function chassisMarkers(section: InspectionReportSection): string {
+  const byKey = new Map(section.chassisRegions.map((r) => [r.regionKey, r]));
+  return CHASSIS_REGIONS.map((region) => {
+    const state = byKey.get(region.key)?.condition ?? 'UNSET';
+    if (state === 'UNSET') return '';
+    const color = state === 'OK' ? 'green' : 'red';
+    const glyph = state === 'OK' ? markGlyph('check', 7) : markGlyph('cross', 7);
+    return `<span class="chmark m-${color}" style="left:${(region.x * 100).toFixed(2)}%;top:${(region.y * 100).toFixed(2)}%" title="${esc(region.labelEn)}">${glyph}</span>`;
+  }).join('');
 }
 
 /** The free-form computer-unit fault table. */
@@ -679,6 +664,16 @@ export const INSPECTION_REPORT_CSS = `
   .grp-legend .lg-chip{ color:#fff; }
   .two-col{ display:flex; gap:10px; align-items:flex-start; }
   .two-col > *{ flex:1 1 0; min-width:0; }
+  .cabin .two-col{ margin-top:5px; }
+  .cabin .itable-head{ padding:1px 6px; font-size:7.6pt; }
+  .cabin .items th,.cabin .items td{ padding:0 4px; font-size:6.8pt; line-height:1.0; }
+  .cabin .item-ar{ font-size:6.7pt; line-height:1.0; }
+  .cabin .item-en{ font-size:5.6pt; line-height:1.0; }
+  .grid{ table-layout:fixed; border-collapse:separate; border-spacing:4px 2px; }
+  .grid > tbody > tr > td{ width:50%; vertical-align:top; padding:0; }
+  .interior-art{ margin:6px 0 0; }
+  .interior-art img{ width:100%; max-height:46px; object-fit:contain; object-position:top; display:block; }
+  .interior-art figcaption{ font-size:7pt; color:var(--muted); padding-top:2px; }
   .itable{ border:1px solid var(--line); border-top:none; }
   .itable-head{ background:#eef2f8; color:var(--navy); font-size:8.2pt; font-weight:700; padding:2px 7px; border-bottom:1px solid var(--line); }
   .itable-head .ltr{ margin-inline-start:6px; font-size:7.5pt; color:var(--muted); font-weight:400; }
@@ -705,6 +700,8 @@ export const INSPECTION_REPORT_CSS = `
   .diagram-title .ltr{ margin-inline-start:8px; font-size:8pt; color:var(--muted); font-weight:400; }
   .diagram-wrap{ display:flex; gap:14px; align-items:flex-start; }
   .diagram{ position:relative; width:230px; flex:0 0 230px; }
+  .diagram--art{ width:200px; flex:0 0 200px; }
+  .artplan{ width:100%; height:auto; display:block; }
   .bodyplan{ width:100%; height:auto; display:block; }
   .bp-body{ fill:#eef2f8; stroke:#5b6472; stroke-width:3; }
   .bp-glass{ fill:#d6e2f0; stroke:#5b6472; stroke-width:2; }
@@ -724,6 +721,11 @@ export const INSPECTION_REPORT_CSS = `
   .marker-table th,.marker-table td{ border-bottom:1px solid var(--line); padding:3px 7px; font-size:8pt; text-align:start; }
   .marker-table thead th{ background:#eef2f8; color:var(--navy); }
   .chassis-wrap{ display:flex; gap:14px; align-items:flex-start; }
+  .chassis-art{ position:relative; width:210px; flex:0 0 210px; }
+  .artchassis{ width:100%; height:auto; display:block; }
+  .chmark{ position:absolute; width:15px; height:15px; border-radius:50%; transform:translate(-50%,-50%);
+    display:flex; align-items:center; justify-content:center; font-size:8pt; font-weight:700; color:#fff;
+    border:1.5px solid #fff; box-shadow:0 0 0 .5px rgba(0,0,0,.4); }
   .chassisplan{ width:190px; flex:0 0 190px; height:auto; }
   .cp-outline{ fill:#f2f5f9; stroke:#5b6472; stroke-width:3; }
   .cp-seam{ fill:none; stroke:#9aa4b2; stroke-width:1.4; }

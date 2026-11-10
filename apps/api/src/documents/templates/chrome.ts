@@ -209,7 +209,7 @@ export function officialFooterTemplate(issuer: DocumentIssuer): string {
   // right ≈ 13mm), so the counter, the contacts and the website land on the same
   // x-positions the approved sheet uses.
   return `
-<div style="${base};width:100%;padding:0 16.8mm 0 15mm;box-sizing:border-box;">
+<div style="${base};width:100%;padding:0 16.8mm 0 15mm;box-sizing:border-box;position:relative;top:11pt;">
   <div style="border-top:0.75px solid #94a3b8;padding-top:5px;display:flex;justify-content:space-between;align-items:baseline;font-size:6.5pt;font-weight:700;">
     <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span> &bull; <span style="direction:rtl;unicode-bidi:embed;display:inline-block;"><span class="pageNumber"></span> من <span class="totalPages"></span> صفحة</span></span>
     <span>${phone}${phone && email ? ' &nbsp; ' : ''}${email}</span>

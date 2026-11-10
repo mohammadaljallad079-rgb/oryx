@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
@@ -150,32 +150,57 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
   const [barcode, setBarcode] = useState('');
+  // The committed scan target. Kept apart from the input so a scanner that emits
+  // the code and a trailing Enter runs an exact-barcode lookup through the API's
+  // dedicated path instead of a fuzzy text search.
+  const [barcodeQuery, setBarcodeQuery] = useState('');
   const [category, setCategory] = useState('');
   const [type, setType] = useState<'' | 'PRODUCT' | 'SERVICE'>('');
   const [stockStatus, setStockStatus] = useState<'' | 'in' | 'low' | 'out'>('');
   const [status, setStatus] = useState<'' | 'active' | 'inactive'>('');
   const [barcodeState, setBarcodeState] = useState<'' | 'with' | 'without'>('');
+  const [warehouseId, setWarehouseId] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ProductDto | null>(null);
   const [imagesFor, setImagesFor] = useState<ProductDto | null>(null);
   const scanRef = useRef<HTMLInputElement>(null);
 
   const categories = useAsync(() => api.productCategories(), []);
+  const warehouses = useAsync(() => api.warehouses(), []);
+
+  // Prices are entered in whole currency units and sent as integer minor units,
+  // so a blank field means "no bound" rather than a zero bound.
+  const minPriceMinor = minPrice.trim() === '' ? undefined : Math.round(Number(minPrice) * 100);
+  const maxPriceMinor = maxPrice.trim() === '' ? undefined : Math.round(Number(maxPrice) * 100);
+
   const list = useAsync(
     () =>
       api.products({
         search: search.trim() || undefined,
+        barcode: barcodeQuery.trim() || undefined,
         category: category || undefined,
         type: type || undefined,
         stockStatus: stockStatus || undefined,
         isActive: status === '' ? undefined : status === 'active',
         hasBarcode: barcodeState === '' ? undefined : barcodeState === 'with',
+        warehouseId: warehouseId || undefined,
+        minPriceMinor: Number.isFinite(minPriceMinor) ? minPriceMinor : undefined,
+        maxPriceMinor: Number.isFinite(maxPriceMinor) ? maxPriceMinor : undefined,
       }),
-    [search, category, type, stockStatus, status, barcodeState],
+    [search, barcodeQuery, category, type, stockStatus, status, barcodeState, warehouseId, minPriceMinor, maxPriceMinor],
   );
 
   const activeFilterCount =
-    (category ? 1 : 0) + (type ? 1 : 0) + (stockStatus ? 1 : 0) + (status ? 1 : 0) + (barcodeState ? 1 : 0);
+    (category ? 1 : 0) +
+    (type ? 1 : 0) +
+    (stockStatus ? 1 : 0) +
+    (status ? 1 : 0) +
+    (barcodeState ? 1 : 0) +
+    (warehouseId ? 1 : 0) +
+    (minPrice.trim() ? 1 : 0) +
+    (maxPrice.trim() ? 1 : 0);
 
   function clearFilters() {
     setCategory('');
@@ -183,16 +208,32 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
     setStockStatus('');
     setStatus('');
     setBarcodeState('');
+    setWarehouseId('');
+    setMinPrice('');
+    setMaxPrice('');
     setSearch('');
+    setBarcode('');
+    setBarcodeQuery('');
   }
 
-  // A scanner emits the whole code and a trailing Enter, so an exact-barcode
-  // lookup runs on its own path and focuses back to the field for the next scan.
+  async function onDeleteProduct(p: ProductDto) {
+    if (!window.confirm(t('common.deleteConfirm'))) return;
+    try {
+      await api.deleteProduct(p.id);
+      await list.reload();
+    } catch (err) {
+      const key = err instanceof ApiError && err.code === 'resource.conflict' ? 'erp.inventory.deleteBlocked' : 'common.error';
+      window.alert(t(key));
+    }
+  }
+
+  // A scanner emits the whole code and a trailing Enter. The code is committed to
+  // its own filter, so the API resolves it as an exact barcode match rather than
+  // a name/SKU substring search, and the field is refocused for the next scan.
   async function onScanSubmit() {
     const code = barcode.trim();
     if (!code) return;
-    setSearch(code);
-    await list.reload();
+    setBarcodeQuery(code);
     setBarcode('');
     window.setTimeout(() => scanRef.current?.focus(), 50);
   }
@@ -225,6 +266,20 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
                 aria-label={t('erp.inventory.scanBarcode')}
               />
             </div>
+            {barcodeQuery ? (
+              <div className="mt-1 flex items-center gap-2" data-testid="product-barcode-active">
+                <span className="oryx-faint text-[11.5px]">{t('erp.inventory.scanActive')}</span>
+                <span className="font-mono text-[11.5px] text-[var(--text)]">{barcodeQuery}</span>
+                <button
+                  type="button"
+                  className="oryx-faint text-[11.5px] underline"
+                  onClick={() => setBarcodeQuery('')}
+                  data-testid="product-barcode-clear"
+                >
+                  {t('common.clear')}
+                </button>
+              </div>
+            ) : null}
           </label>
           <label className="min-w-[200px] flex-1">
             <span className="oryx-label">{t('common.search')}</span>
@@ -303,6 +358,46 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
               <option value="with">{t('erp.inventory.withBarcode')}</option>
               <option value="without">{t('erp.inventory.withoutBarcode')}</option>
             </select>
+          </label>
+          <label className="min-w-[150px]">
+            <span className="oryx-label">{t('erp.inventory.warehouse')}</span>
+            <select
+              className="oryx-select"
+              value={warehouseId}
+              onChange={(e) => setWarehouseId(e.target.value)}
+              data-testid="filter-warehouse"
+            >
+              <option value="">{t('erp.inventory.allWarehouses')}</option>
+              {(warehouses.data?.items ?? []).map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.nameEn}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="min-w-[120px]">
+            <span className="oryx-label">{t('erp.inventory.minPrice')}</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              min="0"
+              className="oryx-input"
+              value={minPrice}
+              onChange={(e) => setMinPrice(e.target.value)}
+              data-testid="filter-min-price"
+            />
+          </label>
+          <label className="min-w-[120px]">
+            <span className="oryx-label">{t('erp.inventory.maxPrice')}</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              min="0"
+              className="oryx-input"
+              value={maxPrice}
+              onChange={(e) => setMaxPrice(e.target.value)}
+              data-testid="filter-max-price"
+            />
           </label>
           {activeFilterCount > 0 ? (
             <Button size="sm" variant="ghost" onClick={clearFilters} data-testid="clear-filters">
@@ -391,6 +486,14 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
                           {t('common.reactivate')}
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => void onDeleteProduct(p)}
+                        data-testid={`delete-product-${p.sku}`}
+                      >
+                        {t('common.delete')}
+                      </Button>
                     </div>
                   </td>
                 ) : null}
@@ -830,6 +933,17 @@ function WarehousesTab({ canManage }: { canManage: boolean }) {
   const [open, setOpen] = useState(false);
   const list = useAsync(() => api.warehouses(), []);
 
+  async function onDeleteWarehouse(w: WarehouseDto) {
+    if (!window.confirm(t('common.deleteConfirm'))) return;
+    try {
+      await api.deleteWarehouse(w.id);
+      await list.reload();
+    } catch (err) {
+      const key = err instanceof ApiError && err.code === 'resource.conflict' ? 'erp.inventory.deleteWarehouseBlocked' : 'common.error';
+      window.alert(t(key));
+    }
+  }
+
   return (
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
@@ -864,6 +978,7 @@ function WarehousesTab({ canManage }: { canManage: boolean }) {
                 <td><Badge tone={w.isActive ? 'success' : 'neutral'}>{w.isActive ? t('common.active') : t('common.inactive')}</Badge></td>
                 {canManage ? (
                   <td>
+                    <div className="flex flex-wrap gap-2">
                     {w.isActive ? (
                       <Button
                         size="sm"
@@ -889,6 +1004,15 @@ function WarehousesTab({ canManage }: { canManage: boolean }) {
                         {t('common.reactivate')}
                       </Button>
                     )}
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      onClick={() => void onDeleteWarehouse(w)}
+                      data-testid={`delete-warehouse-${w.code}`}
+                    >
+                      {t('common.delete')}
+                    </Button>
+                    </div>
                   </td>
                 ) : null}
               </tr>

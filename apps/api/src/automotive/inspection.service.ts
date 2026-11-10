@@ -735,6 +735,42 @@ export class InspectionService {
     return this.get(id, principal);
   }
 
+  /**
+   * Permanently delete an inspection and everything it owns.
+   *
+   * A draft created by mistake must be removable, but an approved report is a
+   * signed document: deleting it would silently rewrite history and orphan the
+   * issued PDF, so an approved one must be cancelled instead. The children
+   * (sections, item results, markers, chassis regions, diagnostics and
+   * attachments) cascade at the database level. As with `removeAttachment`, the
+   * underlying media assets stay in the library — they may be referenced
+   * elsewhere, and deleting them here could blank an unrelated page.
+   */
+  async delete(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const session = await this.prisma.inspectionSession.findFirst({ where: { id, companyId } });
+    if (!session) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection not found.');
+    if (session.status === 'APPROVED') {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'An approved inspection cannot be deleted. Cancel or archive the report instead.',
+      );
+    }
+
+    await this.prisma.inspectionSession.delete({ where: { id } });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'inspection.deleted',
+      targetType: 'INSPECTION_SESSION',
+      targetId: id,
+      summary: `Deleted inspection ${session.jobNumber}`,
+      metadata: { jobNumber: session.jobNumber, status: session.status },
+    });
+    return { id, deleted: true };
+  }
+
   /** Cancel an inspection that has not been approved. */
   async cancel(id: string, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);

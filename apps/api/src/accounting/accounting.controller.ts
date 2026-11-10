@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentPrincipal,
@@ -72,6 +72,17 @@ export class AccountingController {
     return this.accounting.updateAccount(id, dto, p, actorFrom(p, req));
   }
 
+  @Delete('accounts/:id')
+  @RequirePermissions('erp.accounting.coa.manage')
+  @ApiOperation({ summary: 'Delete an account that has no children and no postings' })
+  deleteAccount(
+    @Param('id') id: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.accounting.deleteAccount(id, p, actorFrom(p, req));
+  }
+
   @Post('accounts/seed-standard-chart')
   @RequirePermissions('erp.accounting.coa.manage')
   @ApiOperation({ summary: 'Seed the standard chart of accounts when empty' })
@@ -98,6 +109,17 @@ export class AccountingController {
     @Req() req: RequestLike,
   ) {
     return this.accounting.createFiscalYear(dto, p, actorFrom(p, req));
+  }
+
+  @Delete('fiscal-years/:id')
+  @RequirePermissions('erp.accounting.fiscal.manage')
+  @ApiOperation({ summary: 'Delete a fiscal year that has no journals' })
+  deleteFiscalYear(
+    @Param('id') id: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.accounting.deleteFiscalYear(id, p, actorFrom(p, req));
   }
 
   @Patch('fiscal-periods/:id/status')

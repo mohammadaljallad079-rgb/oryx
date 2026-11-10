@@ -22,6 +22,8 @@ export interface PrintCompanyDto {
   email: string | null;
   website: string | null;
   addressLine: string | null;
+  /** Registered city printed after the address on the footer's legal line. */
+  city: string | null;
   crNumber: string | null;
 }
 

@@ -20,6 +20,7 @@ import { OrganizationsService, type ActorContext } from './organizations.service
 import {
   CreateBranchDto,
   CreateCompanyDto,
+  DeleteCompanyDto,
   ListQueryDto,
   SetCompanyStatusDto,
   UpdateBranchDto,
@@ -92,6 +93,18 @@ export class CompaniesController {
     @Req() req: RequestLike,
   ) {
     return this.orgs.setCompanyStatus(id, dto.status, dto.reason, actorFrom(p, req));
+  }
+
+  @Delete(':id')
+  @RequirePermissions('platform.company.delete')
+  @ApiOperation({ summary: 'Permanently delete a company and all of its records (platform only)' })
+  remove(
+    @Param('id') id: string,
+    @Body() dto: DeleteCompanyDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.orgs.deleteCompany(id, dto.confirm === true, actorFrom(p, req));
   }
 
   @Get(':companyId/branches')
