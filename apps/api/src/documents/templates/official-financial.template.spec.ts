@@ -121,6 +121,43 @@ describe('official financial template — reference columns', () => {
     const html = render({ documentNumber: 'S00252' });
     expect(html).toContain('S00252');
   });
+
+  it('prints a line note as a second line under the description', () => {
+    const html = render({
+      lines: [
+        {
+          description: 'Car Battry (AMARON 55)',
+          subDescription: '1 Years Warranty Car Battry (AMARON 55).',
+          quantity: 10_000,
+          unitPriceMinor: 22_500,
+          discountMinor: 0,
+          taxMinor: 2_250,
+          lineTotalMinor: 24_750,
+          taxPercentBp: 1000,
+        },
+      ],
+    });
+    expect(html).toContain('of-line-name">Car Battry (AMARON 55)</span>');
+    expect(html).toContain('of-line-sub">1 Years Warranty Car Battry (AMARON 55).</span>');
+  });
+
+  it('splits a legacy description that carries its note after a newline', () => {
+    const html = render({
+      lines: [
+        {
+          description: 'Car Battry (AMARON 55)\n1 Years Warranty Car Battry (AMARON 55).',
+          quantity: 10_000,
+          unitPriceMinor: 22_500,
+          discountMinor: 0,
+          taxMinor: 2_250,
+          lineTotalMinor: 24_750,
+          taxPercentBp: 1000,
+        },
+      ],
+    });
+    expect(html).toContain('of-line-name">Car Battry (AMARON 55)</span>');
+    expect(html).toContain('of-line-sub">1 Years Warranty Car Battry (AMARON 55).</span>');
+  });
 });
 
 describe('official financial template — totals block', () => {

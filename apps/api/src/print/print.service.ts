@@ -37,6 +37,30 @@ function formatDate(value: Date | null | undefined): string {
   return `${pick('weekday')} ${pick('day')}/${pick('month')}/${pick('year')}, ${time}`;
 }
 
+/**
+ * The settlement-method label the approved form prints on its "Payment" line.
+ *
+ * The invoice and the receipt each store their own settlement method, so the
+ * printed value is read from the document rather than only from a linked payment
+ * allocation. The enum is mapped to the wording the approved sheet uses ("Cash",
+ * "Card terminal", "Benefit Pay") instead of the raw uppercase constant, so the
+ * line reads the way the reference does.
+ */
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CASH: 'Cash',
+  CARD: 'Card',
+  CARD_TERMINAL: 'Card terminal',
+  BANK_TRANSFER: 'Bank Transfer',
+  CHEQUE: 'Cheque',
+  WALLET: 'Benefit Pay',
+  OTHER: 'Other',
+};
+
+function paymentMethodLabel(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  return PAYMENT_METHOD_LABELS[raw] ?? raw.replace(/_/g, ' ');
+}
+
 interface TitleSpec {
   titleEn: string;
   titleAr: string;
@@ -103,7 +127,19 @@ export class PrintService {
     }
   }
 
-  private async staffName(userId: string | null | undefined): Promise<string> {
+  /**
+   * The name the "Staf Name" line prints.
+   *
+   * The document's own stored salesperson wins, so a reprint shows the same
+   * name the approved form did; only a document that carries no salesperson
+   * falls back to the operator who created it.
+   */
+  private async staffName(
+    preferred: string | null | undefined,
+    userId: string | null | undefined,
+  ): Promise<string> {
+    const stored = preferred?.trim();
+    if (stored) return stored;
     if (!userId) return '—';
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     return user?.fullNameEn ?? user?.email ?? '—';
@@ -154,6 +190,10 @@ export class PrintService {
     );
     const payment = invoice.allocations[0]?.payment;
     const spec = TITLES.SALES_INVOICE;
+    // The reference invoice always prints a "Payment" line naming how the sale
+    // was settled. That value lives on the invoice itself; a linked allocation
+    // is only a fallback for records issued before the column existed.
+    const settlement = paymentMethodLabel(invoice.paymentMethod ?? payment?.method ?? null);
     return {
       kind: 'SALES_INVOICE',
       documentNumber: invoice.invoiceNumber,
@@ -163,9 +203,9 @@ export class PrintService {
       issueDateValue: formatDate(invoice.invoiceDate),
       secondaryDateLabel: spec.secondaryLabel ?? null,
       secondaryDateValue: invoice.dueDate ? formatDate(invoice.dueDate) : null,
-      staffName: await this.staffName(invoice.createdById),
-      paymentLabel: payment ? 'Payment' : null,
-      paymentValue: payment ? payment.method.replace(/_/g, ' ') : null,
+      staffName: await this.staffName(invoice.salespersonName, invoice.createdById),
+      paymentLabel: settlement ? 'Payment' : null,
+      paymentValue: settlement,
       reference: invoice.notes,
       company,
       party: this.partyFromCustomer(invoice.customer),
@@ -200,7 +240,7 @@ export class PrintService {
       issueDateValue: formatDate(quote.issueDate),
       secondaryDateLabel: spec.secondaryLabel ?? null,
       secondaryDateValue: quote.validUntil ? formatDate(quote.validUntil) : null,
-      staffName: await this.staffName(quote.createdById),
+      staffName: await this.staffName(quote.salespersonName, quote.createdById),
       paymentLabel: null,
       paymentValue: null,
       reference: quote.notes,
@@ -246,7 +286,7 @@ export class PrintService {
       issueDateValue: formatDate(order.orderDate),
       secondaryDateLabel: null,
       secondaryDateValue: null,
-      staffName: await this.staffName(order.createdById),
+      staffName: await this.staffName(order.salespersonName, order.createdById),
       paymentLabel: null,
       paymentValue: null,
       reference: order.notes,
@@ -292,7 +332,7 @@ export class PrintService {
       issueDateValue: formatDate(note.issueDate),
       secondaryDateLabel: null,
       secondaryDateValue: null,
-      staffName: await this.staffName(note.createdById),
+      staffName: await this.staffName(null, note.createdById),
       paymentLabel: null,
       paymentValue: null,
       reference: note.reason,
@@ -374,9 +414,9 @@ export class PrintService {
       issueDateValue: formatDate(payment.paidAt),
       secondaryDateLabel: null,
       secondaryDateValue: null,
-      staffName: await this.staffName(payment.createdById),
+      staffName: await this.staffName(payment.receivedByName, payment.createdById),
       paymentLabel: 'Payment Method',
-      paymentValue: payment.method.replace(/_/g, ' '),
+      paymentValue: paymentMethodLabel(payment.method) ?? payment.method.replace(/_/g, ' '),
       reference: payment.reference,
       company,
       party,

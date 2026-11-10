@@ -38,6 +38,9 @@ interface PrintModel {
   totals: { untaxedAmount: string; taxAmount: string; discount: string; total: string };
   amountInWords: string;
   currency: string;
+  paymentLabel: string | null;
+  paymentValue: string | null;
+  staffName: string;
 }
 
 interface AttachmentRow {
@@ -207,6 +210,10 @@ describe('print model and document attachments (e2e)', () => {
         customerId,
         invoiceDate: '2026-05-02',
         warehouseId,
+        // The approved invoice prints a "Payment" line naming the settlement
+        // method stored on the invoice itself.
+        paymentMethod: 'WALLET',
+        salespersonName: 'Hussain Alhaddad',
         lines: [
           { productId, description: 'Oil (Havoline 5w20)', quantity: 10000, unitPriceMinor: 750, taxPercentBp: 1000 },
           { productId, description: 'Oil filter Mazda - orginal', quantity: 10000, unitPriceMinor: 200, taxPercentBp: 1000 },
@@ -261,6 +268,11 @@ describe('print model and document attachments (e2e)', () => {
       expect(res.body.totals.untaxedAmount).toBe('9.50 SAR');
       expect(res.body.totals.total).toBe('10.45 SAR');
       expect(res.body.amountInWords).toContain('Saudi Riyal');
+      // The approved invoice prints a "Payment" line naming the settlement
+      // method stored on the invoice, not only one inferred from an allocation.
+      expect(res.body.paymentLabel).toBe('Payment');
+      expect(res.body.paymentValue).toBe('Benefit Pay');
+      expect(res.body.staffName).toBe('Hussain Alhaddad');
     });
 
     it('renders a receipt voucher', async () => {

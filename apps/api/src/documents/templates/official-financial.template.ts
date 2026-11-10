@@ -36,6 +36,24 @@ export interface OfficialFinancialRenderInput {
   baseCss: string;
 }
 
+/**
+ * The name and the note a priced row prints.
+ *
+ * Newer payloads carry the note as its own `subDescription`. A document issued
+ * before that field existed stores the note after a newline in `description`, so
+ * it is split here as well — a reprinted old invoice then reads exactly as the
+ * approved form, with the name on the first line and the note beneath it.
+ */
+function lineParts(line: { description: string; subDescription?: string | null }): {
+  name: string;
+  note: string | null;
+} {
+  if (line.subDescription) return { name: line.description, note: line.subDescription };
+  const [name, ...rest] = (line.description ?? '').split('\n');
+  const note = rest.join(' ').trim();
+  return { name: (name ?? '').trim() || line.description, note: note || null };
+}
+
 /** Which label the document's own number line carries. */
 function numberLabel(titleEn: string): string {
   const t = titleEn.toLowerCase();
@@ -328,19 +346,21 @@ function lineTable(
   quotation = false,
 ): string {
   const rows = payload.lines
-    .map(
-      (line) => `
+    .map((line) => {
+      const { name, note } = lineParts(line);
+      return `
       <tr>
         <td class="of-c-desc">
-          <span class="of-line-name">${esc(line.description)}</span>
+          <span class="of-line-name">${esc(name)}</span>
+          ${note ? `<span class="of-line-sub">${esc(note)}</span>` : ''}
           ${line.sku ? `<span class="of-line-sku num">${esc(line.sku)}</span>` : ''}
         </td>
         <td class="of-c-qty num">${esc(quantity(line.quantity))}</td>
         <td class="of-c-price num">${esc(moneyPlain(line.unitPriceMinor, payload.currency))}</td>
         <td class="of-c-tax">${esc(taxLabel(line.taxPercentBp))}</td>
         <td class="of-c-amt num">${esc(money(line.lineTotalMinor, payload.currency, locale))}</td>
-      </tr>`,
-    )
+      </tr>`;
+    })
     .join('');
   return `
   <table class="of-table${quotation ? ' of-table-quote' : ''}">
@@ -556,6 +576,9 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-c-tax{ width:10.5%; text-align:start !important; }
   .of-c-amt{ width:10.3%; text-align:end !important; }
   .of-line-name{ display:block; }
+  /* The line's note prints on its own line under the name, smaller and lighter,
+     exactly as the approved sheet prints a product's warranty note. */
+  .of-line-sub{ display:block; font-size:7.5pt; color:#64748b; font-weight:400; }
   .of-line-sku{ display:block; font-size:7.5pt; color:#64748b; font-weight:400; }
   /* The reference totals block is a right-aligned table with only two rules:
      one above the first row and one above the grand Total. */

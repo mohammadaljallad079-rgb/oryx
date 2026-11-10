@@ -142,6 +142,12 @@ export interface InspectionReportPayload {
 
 export interface FinancialDocumentLine {
   description: string;
+  /**
+   * The note printed on the second line under the description, exactly as the
+   * approved form splits it (the product name on the first line, the warranty or
+   * specification note beneath). Null when the line carries no note.
+   */
+  subDescription?: string | null;
   /** Present for a product or service line; absent for a free-text line. */
   sku?: string | null;
   quantity: number;

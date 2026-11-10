@@ -1109,7 +1109,7 @@ export class DocumentsService {
             status: invoice.status,
             counterparty: counterparty(invoice.customer),
             lines: invoice.lines.map((l) => ({
-              description: l.description,
+              ...splitLineDescription(l.description),
               sku: l.productId ? skus.get(l.productId) ?? null : null,
               quantity: l.quantity,
               unitPriceMinor: l.unitPriceMinor,
@@ -1221,7 +1221,7 @@ export class DocumentsService {
         if (!creditNote) return null;
         const cnSkus = await this.skuMap(companyId, creditNote.lines.map((l) => l.productId));
         const lines = creditNote.lines.map((l) => ({
-          description: l.description,
+          ...splitLineDescription(l.description),
           sku: l.productId ? cnSkus.get(l.productId) ?? null : null,
           quantity: l.quantity,
           unitPriceMinor: l.unitPriceMinor,
@@ -1281,7 +1281,7 @@ export class DocumentsService {
           lines: order.lines.map((l) => {
             const gross = lineAmountMinor(l.quantity, l.unitCostMinor);
             return {
-              description: l.description,
+              ...splitLineDescription(l.description),
               sku: l.productId ? poSkus.get(l.productId) ?? null : null,
               quantity: l.quantity,
               unitPriceMinor: l.unitCostMinor,
@@ -1326,7 +1326,7 @@ export class DocumentsService {
           lines: invoice.lines.map((l) => {
             const gross = lineAmountMinor(l.quantity, l.unitCostMinor);
             return {
-              description: l.description,
+              ...splitLineDescription(l.description),
               sku: l.productId ? siSkus.get(l.productId) ?? null : null,
               quantity: l.quantity,
               unitPriceMinor: l.unitCostMinor,
@@ -1451,7 +1451,7 @@ export class DocumentsService {
                 countryCode: null,
               },
           lines: sale.lines.map((l) => ({
-            description: l.description,
+            ...splitLineDescription(l.description),
             sku: l.productId ? posSkus.get(l.productId) ?? null : null,
             quantity: l.quantity,
             unitPriceMinor: l.unitPriceMinor,
@@ -1789,6 +1789,24 @@ function newDocumentId(): string {
 }
 
 /**
+ * Split a stored line description into the name and the note the approved form
+ * prints beneath it.
+ *
+ * A line's description may carry a note after a newline (the warranty text a
+ * battery is sold with). The reference prints the name on the first line and the
+ * note on a second line inside the same row, so the two are kept apart here
+ * rather than run together into one cell.
+ */
+function splitLineDescription(description: string): {
+  description: string;
+  subDescription: string | null;
+} {
+  const [name, ...rest] = (description ?? '').split('\n');
+  const note = rest.join(' ').trim();
+  return { description: (name ?? '').trim() || description, subDescription: note || null };
+}
+
+/**
  * Maps a line that stores percentages to one that carries amounts.
  *
  * A quotation and an order line keep a discount and a tax *rate*, not the
@@ -1809,7 +1827,7 @@ function percentLine(l: {
   const discount = basisPointsOfMinor(gross, l.discountPercentBp);
   const tax = basisPointsOfMinor(gross - discount, l.taxPercentBp);
   return {
-    description: l.description,
+    ...splitLineDescription(l.description),
     sku: l.productId ? skus.get(l.productId) ?? null : null,
     quantity: l.quantity,
     unitPriceMinor: l.unitPriceMinor,
