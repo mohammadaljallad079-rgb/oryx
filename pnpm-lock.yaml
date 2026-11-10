@@ -17,7 +17,11 @@ overrides:
 
 importers:
 
-  .: {}
+  .:
+    devDependencies:
+      '@types/multer':
+        specifier: 1.4.12
+        version: 1.4.12
 
   apps/admin:
     dependencies:

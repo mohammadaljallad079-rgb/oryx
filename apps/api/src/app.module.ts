@@ -27,7 +27,6 @@ import { CrmModule } from './crm/crm.module';
 import { OperationsModule } from './operations/operations.module';
 import { AutomotiveModule } from './automotive/automotive.module';
 import { DocumentsModule } from './documents/documents.module';
-import { AttachmentsModule } from './attachments/attachments.module';
 import { CustomerModule } from './customer/customer.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
@@ -38,6 +37,8 @@ import { CouponsModule } from './coupons/coupons.module';
 import { BrandingModule } from './branding/branding.module';
 import { EcosystemModule } from './ecosystem/ecosystem.module';
 import { TaxModule } from './tax/tax.module';
+import { PrintModule } from './print/print.module';
+import { AttachmentsModule } from './attachments/attachments.module';
 
 @Module({
   imports: [
@@ -84,6 +85,8 @@ import { TaxModule } from './tax/tax.module';
     BrandingModule,
     EcosystemModule,
     TaxModule,
+    PrintModule,
+
   ],
   providers: [
     // Global rate limiting; sensitive auth routes override with @Throttle.

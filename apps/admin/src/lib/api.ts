@@ -106,6 +106,8 @@ import type {
   WarehouseDto,
   OfficialDocumentType,
   OfficialDocumentStatus,
+  PrintDocumentDto,
+  PrintDocumentKind,
 } from '@oryx/shared';
 
 /**
@@ -359,9 +361,10 @@ export async function restoreSession(): Promise<RefreshOutcome> {
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? 'GET';
   const headers: Record<string, string> = {};
-  // A raw body is a multipart upload: the browser sets the boundary, so no
-  // Content-Type may be written here or the request is rejected as malformed.
-  if (options.body !== undefined && !options.raw) headers['Content-Type'] = 'application/json';
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+  if (options.body !== undefined && !options.raw && !isFormData) {
+    headers['Content-Type'] = 'application/json';
+  }
   if (!options.anonymous) {
     const token = tokenStore.access;
     if (token) headers.Authorization = `Bearer ${token}`;
@@ -385,7 +388,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         ? undefined
         : options.raw
           ? (options.body as BodyInit)
-          : JSON.stringify(options.body),
+          : isFormData
+            ? (options.body as FormData)
+            : JSON.stringify(options.body),
     cache: 'no-store',
   });
 
@@ -895,10 +900,56 @@ export const api = {
   getSalesInvoice: (id: string) => request<SalesDocumentDto>(`/sales/invoices/${id}`),
   createSalesInvoice: (body: Record<string, unknown>) =>
     request<SalesDocumentDto>('/sales/invoices', { method: 'POST', body }),
+  updateSalesInvoice: (id: string, body: Record<string, unknown>) =>
+    request<SalesDocumentDto>(`/sales/invoices/${id}`, { method: 'POST', body }),
+  deleteSalesInvoice: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/sales/invoices/${id}`, { method: 'DELETE' }),
   creditNotes: (params: { companyId?: string } = {}) =>
     request<Paginated<SalesDocumentDto>>(`/sales/credit-notes?${toQuery(params)}`),
   createCreditNote: (body: Record<string, unknown>) =>
     request<SalesDocumentDto>('/sales/credit-notes', { method: 'POST', body }),
+
+  // ------------------------------------------------------ print (documents)
+  printDocument: (kind: PrintDocumentKind, id: string) =>
+    request<PrintDocumentDto>(`/print/${kind}/${id}`),
+
+  // ----------------------------------------------------------- attachments
+  attachments: (entityType: string, entityId: string) =>
+    request<AttachmentDto[]>(`/attachments/${entityType}/${entityId}`),
+  uploadAttachment: (entityType: string, entityId: string, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return request<AttachmentDto>(`/attachments/${entityType}/${entityId}`, {
+      method: 'POST',
+      body: form,
+    });
+  },
+  deleteAttachment: (entityType: string, entityId: string, attachmentId: string) =>
+    request<{ deleted: true }>(`/attachments/${entityType}/${entityId}/${attachmentId}`, {
+      method: 'DELETE',
+    }),
+  attachmentDownloadUrl: (entityType: string, entityId: string, attachmentId: string) =>
+    `${API_BASE}/v1/attachments/${entityType}/${entityId}/${attachmentId}/download`,
+  /**
+   * Fetch an attachment as a blob so a preview can be shown without exposing the
+   * bearer token in a URL. The access token is read from the same in-memory
+   * store the request helper uses, and the tenant context headers ride along.
+   */
+  fetchAttachmentBlob: async (entityType: string, entityId: string, attachmentId: string): Promise<Blob> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    const branchId = tokenStore.branchId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    if (branchId) headers['x-oryx-branch-id'] = branchId;
+    const res = await fetch(
+      `${API_BASE}/v1/attachments/${entityType}/${entityId}/${attachmentId}/download`,
+      { headers, credentials: 'include', cache: 'no-store' },
+    );
+    if (!res.ok) throw new ApiError(res.status, 'attachment_fetch_failed', 'Could not load the attachment.');
+    return res.blob();
+  },
   cashierSessions: (params: { companyId?: string } = {}) =>
     request<Paginated<CashierSessionDto>>(`/sales/cashier-sessions?${toQuery(params)}`),
   openCashierSession: (body: Record<string, unknown>) =>
@@ -1229,29 +1280,13 @@ export const api = {
     return URL.createObjectURL(await res.blob());
   },
 
-  // ---- document attachments ----
-  /**
-   * Attachments for a sales invoice (`SALES_INVOICE`) or a receipt (`PAYMENT`).
-   *
-   * The upload posts multipart `FormData`; the browser sets the boundary, so
-   * `raw` is set and no Content-Type is written by the client.
-   */
-  attachments: (entityType: AttachmentEntityType, entityId: string) =>
-    request<AttachmentDto[]>(`/attachments/${entityType}/${entityId}`),
-  uploadAttachment: (entityType: AttachmentEntityType, entityId: string, file: File) => {
-    const form = new FormData();
-    form.append('file', file, file.name);
-    return request<AttachmentDto>(`/attachments/${entityType}/${entityId}`, {
-      method: 'POST',
-      body: form,
-      raw: true,
-    });
-  },
+
+  // ---- document attachment actions ----
   removeAttachment: (entityType: AttachmentEntityType, entityId: string, attachmentId: string) =>
     request<{ deleted: true }>(`/attachments/${entityType}/${entityId}/${attachmentId}`, {
       method: 'DELETE',
     }),
-  /** The attachment bytes as a blob URL (the route needs the bearer token). */
+
   attachmentBlobUrl: async (
     entityType: AttachmentEntityType,
     entityId: string,
@@ -1262,11 +1297,16 @@ export const api = {
     if (token) headers.Authorization = `Bearer ${token}`;
     const companyId = tokenStore.companyId;
     if (companyId) headers['x-oryx-company-id'] = companyId;
+
     const res = await fetch(
       `${API_BASE}/v1/attachments/${entityType}/${entityId}/${attachmentId}/download`,
       { headers, credentials: 'include' },
     );
-    if (!res.ok) throw new ApiError(res.status, 'attachment_download_failed', 'The attachment could not be opened.');
+
+    if (!res.ok) {
+      throw new ApiError(res.status, 'attachment_download_failed', 'The attachment could not be opened.');
+    }
+
     return URL.createObjectURL(await res.blob());
   },
 

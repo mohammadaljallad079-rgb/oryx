@@ -93,6 +93,7 @@ const STANDARD_CHART: Array<{
   { code: '5900', nameEn: 'Cash over / short', nameAr: 'فروق الصندوق', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: 'CASH_OVER_SHORT' },
   { code: '5910', nameEn: 'Inventory adjustment', nameAr: 'تسوية المخزون', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: 'STOCK_ADJUSTMENT' },
   { code: '5920', nameEn: 'Purchase price variance', nameAr: 'فروق أسعار الشراء', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: 'PURCHASE_PRICE_VARIANCE' },
+  { code: '5930', nameEn: 'Rounding gain / loss', nameAr: 'أرباح وخسائر التقريب', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: 'ROUNDING_GAIN_LOSS' },
   { code: '6000', nameEn: 'Salaries and wages expense', nameAr: 'مصروف الرواتب والأجور', type: 'EXPENSE', normalBalance: 'DEBIT', systemRole: 'SALARIES_EXPENSE' },
   { code: '2200', nameEn: 'Salaries payable', nameAr: 'الرواتب المستحقة الدفع', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: 'WAGES_PAYABLE' },
   { code: '2210', nameEn: 'Payroll deductions payable', nameAr: 'استقطاعات الرواتب المستحقة', type: 'LIABILITY', normalBalance: 'CREDIT', systemRole: 'PAYROLL_DEDUCTIONS' },
@@ -458,6 +459,13 @@ interface CompanySpec {
   supportPhone?: string;
   supportEmail?: string;
   websiteUrl?: string;
+  /** Print metadata carried on issued documents. */
+  legalNameEn?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  printNoteEn?: string;
+  printNoteAr?: string;
   branches: Array<{ code: string; nameEn: string; nameAr: string; city: string; addressLine?: string; phone?: string }>;
 }
 
@@ -478,13 +486,21 @@ const COMPANIES: CompanySpec[] = [
     industry: 'Automotive Services',
     parentCode: 'ORYX-HOLDING',
     // The approved reference documents (VAT/TRN strip, CR number and registered
-    // address) print these exact identity values.
+    // address) print these exact identity values; the generic company-level
+    // contact fields mirror them so both the branding footer and the company row
+    // agree.
+    legalNameEn: 'ORYX Auto Services Ltd.',
     taxNumber: '200001111222111',
     crNumber: '146375-2',
     addressLine: 'Bldg 886, Road 533, Block 405 Tashan',
     supportPhone: '+973 37702020',
     supportEmail: 'oryxbhr1@gmail.com',
     websiteUrl: 'www.oryxbhr.com',
+    phone: '+973 37702020',
+    email: 'oryxbhr1@gmail.com',
+    website: 'www.oryxbhr.com',
+    printNoteEn: 'Goods sold are not refundable after 14 days. Warranty terms apply.',
+    printNoteAr: 'لا يمكن إرجاع البضاعة بعد 14 يوماً. تسري شروط الضمان.',
     branches: [
       { code: 'RUH-01', nameEn: 'Riyadh North Workshop', nameAr: 'ورشة شمال الرياض', city: 'Kingdom of Bahrain', addressLine: 'Bldg 886, Road 533, Block 405 Tashan', phone: '+973 37702020' },
       { code: 'JED-01', nameEn: 'Jeddah Inspection Center', nameAr: 'مركز فحص جدة', city: 'Kingdom of Bahrain', addressLine: 'Bldg 886, Road 533, Block 405 Tashan', phone: '+973 37702020' },
@@ -535,9 +551,23 @@ const COMPANIES: CompanySpec[] = [
   },
 ];
 
+/** Print metadata for a company, defaulting the contact bar from the code. */
+function printMeta(spec: CompanySpec) {
+  return {
+    legalNameEn: spec.legalNameEn ?? `${spec.nameEn} Ltd.`,
+    taxNumber: spec.taxNumber ?? null,
+    crNumber: spec.crNumber ?? null,
+    phone: spec.phone ?? null,
+    email: spec.email ?? null,
+    website: spec.website ?? null,
+    addressLine: spec.addressLine ?? null,
+    printNoteEn: spec.printNoteEn ?? null,
+    printNoteAr: spec.printNoteAr ?? null,
+  };
+}
+
 async function seedCompanies(superAdminId: string) {
   const idByCode = new Map<string, string>();
-
   for (const spec of COMPANIES) {
     const notes = spec.demo ? `${DEMO_MARKER}: synthetic tenant for dashboard demonstration` : null;
     const company = await prisma.company.upsert({
@@ -549,25 +579,21 @@ async function seedCompanies(superAdminId: string) {
         industry: spec.industry,
         status: 'ACTIVE',
         notes,
-        taxNumber: spec.taxNumber ?? null,
-        crNumber: spec.crNumber ?? null,
-        addressLine: spec.addressLine ?? null,
+        ...printMeta(spec),
         ...(spec.documentLocale ? { documentLocale: spec.documentLocale } : {}),
       },
       create: {
         code: spec.code,
         nameEn: spec.nameEn,
         nameAr: spec.nameAr,
-        legalNameEn: `${spec.nameEn} Ltd.`,
+        legalNameEn: spec.legalNameEn ?? `${spec.nameEn} Ltd.`,
         type: spec.type,
         industry: spec.industry,
         status: 'ACTIVE',
         countryCode: DEFAULT_COUNTRY_CODE,
         currency: DEFAULT_CURRENCY,
         notes,
-        taxNumber: spec.taxNumber ?? null,
-        crNumber: spec.crNumber ?? null,
-        addressLine: spec.addressLine ?? null,
+        ...printMeta(spec),
         ...(spec.documentLocale ? { documentLocale: spec.documentLocale } : {}),
       },
     });

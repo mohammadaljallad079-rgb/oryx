@@ -470,10 +470,13 @@ model Company {
    */
   documentLocale     Locale          @default(en)
   taxNumber          String?
-  /** Commercial registration number, printed on documents beside the VAT number. */
-  crNumber           String?
-  /** The registered street address, printed in the document footer. */
+  phone              String?
+  email              String?
+  website            String?
   addressLine        String?
+  crNumber           String?
+  printNoteEn        String?
+  printNoteAr        String?
   parentCompanyId    String?
   notes              String?
   createdAt          DateTime        @default(now())

@@ -16,6 +16,7 @@ import {
   type RoundingMode,
 } from '@oryx/shared';
 import { Icon } from '@/components/icons';
+import { AttachmentsPanel, DocumentPrintActions } from '@/components/document-print';
 import {
   Badge,
   Button,
@@ -154,6 +155,7 @@ export default function SalesPage() {
   const { t } = useUi();
   const { can } = useAuth();
   const [tab, setTab] = useState<Tab>('invoices');
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'invoices', label: t('erp.sales.invoices') },
@@ -398,7 +400,7 @@ function CustomerModal({
     });
   }, [open, customer]);
 
-  const submit = async () => {
+  const submit = async (post = true) => {
     setBusy(true);
     setError(null);
     try {
@@ -443,7 +445,7 @@ function CustomerModal({
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy} onClick={submit} data-testid="save-customer">
+          <Button variant="primary" disabled={busy} onClick={() => void submit()} data-testid="save-customer">
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </>
@@ -813,6 +815,11 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
+  const [autoPreviewId, setAutoPreviewId] = useState<string | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<SalesDocumentDto | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [creditNoteSource, setCreditNoteSource] = useState<SalesDocumentDto | null>(null);
   const list = useAsync(() => api.salesInvoices({ page: 1 }), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
@@ -824,13 +831,14 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.sales.invoices')}</p>
         {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-invoice">
+          <Button variant="primary" size="sm" onClick={() => { setEditingInvoice(null); setOpen(true); }} data-testid="new-invoice">
             <Icon name="plus" size={16} />
             {t('erp.sales.newInvoice')}
           </Button>
         ) : null}
       </div>
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
+      {actionError ? <div className="p-4"><ErrorBanner message={actionError} /></div> : null}
       {list.loading ? (
         <div className="flex flex-col gap-3 p-4">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} height={34} />)}</div>
       ) : (list.data?.items.length ?? 0) === 0 ? (
@@ -858,12 +866,51 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px]">{money(inv.outstandingMinor ?? 0, inv.currency)}</td>
                 <td><StatusBadge status={inv.status} label={inv.status} /></td>
                 <td>
-                  <DocumentActions
-                    sourceType="SalesInvoice"
-                    sourceId={inv.id}
-                    type="SALES_INVOICE"
-                    permissions={['erp.sales.read', 'erp.accounting.read']}
-                  />
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {canManage && inv.status === 'DRAFT' ? (
+                      <>
+                        <Button size="sm" variant="ghost" onClick={() => { setEditingInvoice(inv); setOpen(true); }} data-testid={`edit-invoice-${inv.invoiceNumber}`}>
+                          <Icon name="edit" size={14} />
+                          {t('common.edit')}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            if (!window.confirm(t('common.confirm'))) return;
+                            setActionError(null);
+                            void api.deleteSalesInvoice(inv.id)
+                              .then(() => list.reload())
+                              .catch((e) => setActionError(e instanceof Error ? e.message : t('common.error')));
+                          }}
+                          data-testid={`delete-invoice-${inv.invoiceNumber}`}
+                        >
+                          <Icon name="trash" size={14} />
+                          {t('common.delete')}
+                        </Button>
+                      </>
+                    ) : null}
+                    {canManage && inv.status !== 'DRAFT' && inv.status !== 'VOID' ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setCreditNoteSource(inv)}
+                        data-testid={`credit-note-from-invoice-${inv.invoiceNumber}`}
+                      >
+                        <Icon name="scroll" size={14} />
+                        {t('erp.sales.newCreditNote')}
+                      </Button>
+                    ) : null}
+                    {inv.status !== 'DRAFT' ? (
+                      <DocumentActions
+                        sourceType="SalesInvoice"
+                        sourceId={inv.id}
+                        type="SALES_INVOICE"
+                        permissions={['erp.sales.read', 'erp.accounting.read']}
+                        autoOpenOnMount={autoPreviewId === inv.id}
+                      />
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -872,7 +919,9 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
       )}
       <DocumentModal
         open={open}
-        title={t('erp.sales.newInvoice')}
+        title={editingInvoice ? t('common.edit') + ' — ' + t('erp.sales.invoiceNumber') + ' ' + editingInvoice.invoiceNumber : t('erp.sales.newInvoice')}
+        initialDocument={editingInvoice}
+        allowDraft
         customers={customers.data?.items ?? []}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
@@ -881,12 +930,55 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         dueDateField="dueDate"
         settlement
         testIdPrefix="invoice"
+        dateField="invoiceDate"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
-          await api.createSalesInvoice(payload);
+          if (editingInvoice) {
+            await api.updateSalesInvoice(editingInvoice.id, payload);
+            if (payload.post !== false) setAutoPreviewId(editingInvoice.id);
+            setEditingInvoice(null);
+          } else {
+            const created = await api.createSalesInvoice(payload);
+            if (payload.post !== false) setAutoPreviewId(created.id);
+          }
           await list.reload();
         }}
       />
+      <DocumentModal
+        open={creditNoteSource !== null}
+        title={t('erp.sales.newCreditNote')}
+        initialDocument={creditNoteSource}
+        relatedInvoiceId={creditNoteSource?.id}
+        customers={customers.data?.items ?? []}
+        products={products.data?.items ?? []}
+        warehouses={warehouses.data?.items ?? []}
+        taxOptions={taxOptions}
+        showWarehouse
+        showRestock
+        reasonField
+        testIdPrefix="invoice-credit-note"
+        onClose={() => setCreditNoteSource(null)}
+        onSubmit={async (payload) => {
+          await api.createCreditNote(payload);
+          setCreditNoteSource(null);
+          await list.reload();
+        }}
+      />
+      <Modal
+        open={detail !== null}
+        title={`${t('erp.sales.invoiceNumber')} ${detail?.invoiceNumber ?? ''}`}
+        onClose={() => setDetail(null)}
+      >
+        {detail ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[13px] font-semibold">{detail.customerNameEn}</span>
+              <DocumentPrintActions kind="SALES_INVOICE" id={detail.id} />
+            </div>
+            <AttachmentsPanel entityType="SALES_INVOICE" entityId={detail.id} canManage={canManage} />
+          </div>
+        ) : null}
+      </Modal>
     </Card>
   );
 }
@@ -959,6 +1051,7 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
         taxOptions={taxOptions}
         showWarehouse
         testIdPrefix="order"
+        dateField="orderDate"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
           await api.createSalesOrder({ ...payload, confirm: true });
@@ -2072,6 +2165,9 @@ function LineEditor({
     setLines(next);
   };
 
+  // Columns: description (wide) | qty | unit price | discount % | tax % | amount | remove.
+  const cols = 'grid-cols-[minmax(0,1fr)_70px_100px_70px_70px_104px_32px]';
+
   return (
     <div className="flex flex-col gap-2">
       <div className="oryx-doc-form__grid oryx-doc-form__grid--head">
@@ -2227,6 +2323,9 @@ function MirrorField({ label, value }: { label: string; value: string | null | u
 function DocumentModal({
   open,
   title,
+  initialDocument,
+  relatedInvoiceId,
+  allowDraft,
   customers,
   products,
   warehouses,
@@ -2237,11 +2336,15 @@ function DocumentModal({
   dueDateField,
   settlement,
   testIdPrefix,
+  dateField = 'issueDate',
   onClose,
   onSubmit,
 }: {
   open: boolean;
   title: string;
+  initialDocument?: SalesDocumentDto | null;
+  relatedInvoiceId?: string;
+  allowDraft?: boolean;
   customers: CustomerDto[];
   products: Array<{ id: string; sku: string; nameEn: string; salesPriceMinor: number; taxRateBp: number }>;
   warehouses: WarehouseDto[];
@@ -2268,10 +2371,12 @@ function DocumentModal({
    */
   settlement?: boolean;
   testIdPrefix: string;
+  /** The single date property the target document DTO accepts. */
+  dateField?: 'issueDate' | 'invoiceDate' | 'orderDate';
   onClose: () => void;
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const { companyId, user } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -2294,7 +2399,29 @@ function DocumentModal({
 
   useEffect(() => {
     if (!open) return;
-    setDocumentDate(new Date().toISOString().slice(0, 10));
+    setError(null);
+    setDocumentDate(initialDocument?.invoiceDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10));
+    setCustomerId(initialDocument?.customerId ?? '');
+    setWarehouseId(initialDocument?.warehouseId ?? '');
+    setDueDate(initialDocument?.dueDate?.slice(0, 10) ?? '');
+    setNotes(reasonField ? '' : initialDocument?.notes ?? '');
+    setPaymentMethod(initialDocument?.paymentMethod ?? 'CASH');
+    setRestock(!(initialDocument && reasonField));
+    setSalespersonName(initialDocument?.salespersonName ?? user?.fullNameEn ?? user?.fullNameAr ?? user?.email ?? '');
+    setPaymentReference(initialDocument?.paymentReference ?? '');
+    setLines(
+      initialDocument?.lines?.length
+        ? initialDocument.lines.map((line) => ({
+            productId: typeof line.productId === 'string' ? line.productId : '',
+            description: typeof line.description === 'string' ? line.description : '',
+            quantity: qty(Number(line.quantity ?? 0)),
+            unitPrice: minorToInput(Number(line.unitPriceMinor ?? 0), initialDocument.currency),
+            discountPercent: String(Number(line.discountPercentBp ?? 0) / 100),
+            taxId: '',
+            taxPercent: String(Number(line.taxPercentBp ?? 0) / 100),
+          }))
+        : [emptyLine()],
+    );
     // Default the printed "Staf Name" to the signed-in operator. The server
     // applies the same fallback, so an untouched field still prints a real name;
     // prefilling it here shows the operator what the document will say.
@@ -2317,7 +2444,7 @@ function DocumentModal({
     return () => {
       cancelled = true;
     };
-  }, [open, companyId, user]);
+  }, [open, companyId, initialDocument, reasonField, user]);
 
   const currency = company?.currency;
   const selected = customers.find((c) => c.id === customerId) ?? null;
@@ -2327,12 +2454,21 @@ function DocumentModal({
     hint: c.phone ?? undefined,
   }));
 
-  const submit = async () => {
+  const submit = async (post = true) => {
     setBusy(true);
     setError(null);
     try {
-      await onSubmit({
+      // Each document DTO accepts exactly one date property and its own set of
+      // optional fields, so the payload is assembled per document rather than
+      // posting every field to every endpoint.
+      const payload: Record<string, unknown> = {
         customerId,
+        ...(relatedInvoiceId ? {
+          invoiceId: relatedInvoiceId,
+          branchId: initialDocument?.branchId ?? undefined,
+          currency: initialDocument?.currency,
+        } : {}),
+        ...(allowDraft ? { post } : {}),
         warehouseId: warehouseId || undefined,
         documentDate: documentDate ? new Date(documentDate).toISOString() : new Date().toISOString(),
         ...(dueDateField && dueDate ? { [dueDateField]: new Date(dueDate).toISOString() } : {}),
@@ -2340,7 +2476,7 @@ function DocumentModal({
         ...(settlement ? { paymentMethod } : {}),
         ...(settlement && salespersonName.trim() ? { salespersonName: salespersonName.trim() } : {}),
         ...(settlement && paymentReference.trim() ? { paymentReference: paymentReference.trim() } : {}),
-        ...(notes.trim() ? { notes: notes.trim() } : {}),
+        ...(!reasonField && notes.trim() ? { notes: notes.trim() } : {}),
         restockInventory: showRestock ? restock : undefined,
         lines: lines.map((l) => ({
           productId: l.productId || undefined,
@@ -2350,7 +2486,9 @@ function DocumentModal({
           discountPercentBp: Math.round((Number(l.discountPercent) || 0) * 100),
           taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
         })),
-      });
+      };
+
+      await onSubmit(payload);
       onClose();
       setLines([emptyLine()]);
       setCustomerId('');
@@ -2379,7 +2517,12 @@ function DocumentModal({
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy || !customerId} onClick={submit} data-testid={`save-${testIdPrefix}`}>
+          {allowDraft ? (
+            <Button disabled={busy || !customerId} onClick={() => void submit(false)} data-testid={`save-draft-${testIdPrefix}`}>
+              {locale === 'ar' ? 'حفظ كمسودة' : 'Save draft'}
+            </Button>
+          ) : null}
+          <Button variant="primary" disabled={busy || !customerId} onClick={() => void submit(true)} data-testid={`save-${testIdPrefix}`}>
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </>
