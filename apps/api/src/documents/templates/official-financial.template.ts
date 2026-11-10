@@ -518,7 +518,8 @@ export const OFFICIAL_FINANCIAL_CSS = `
      row (invoice has only the date). */
   .of-lgrid{ display:grid; grid-template-columns:1fr 1fr; gap:0 10pt; }
   .of-field-label{ display:block; font-size:7.3pt; color:#64748b; font-weight:700; }
-  .of-field-value{ display:block; font-size:8.8pt; color:#0f2b48; font-weight:700; }
+  .of-field-value{ display:block; font-size:8.8pt; color:#0f2b48; font-weight:700;
+    white-space:nowrap; }
   /* The reference customer column is a label/value grid whose labels are
      right-aligned (every label ends on the same x, ≈392) with the values on a
      common left edge (≈400), exactly as the approved sheet prints them. */
@@ -540,6 +541,9 @@ export const OFFICIAL_FINANCIAL_CSS = `
      numeric columns, so its text starts at x≈37.5 rather than the cell edge. */
   .of-table th.of-c-desc,.of-table td.of-c-desc{ padding-inline-start:12pt; }
   .of-table td.of-c-price,.of-table td.of-c-amt{ white-space:nowrap; }
+  /* The approved sheet prints the tax label on one line inside a body row
+     ("VAT 10%"); without this it wraps and the row doubles in height. */
+  .of-table td.of-c-tax{ white-space:nowrap; }
   /* The reference shades alternate body rows with the #0a4175 accent. */
   .of-table tbody tr:nth-child(odd) td{ background:#dbe3ec; }
   /* Column proportions are measured from the approved reference invoice: the

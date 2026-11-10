@@ -310,5 +310,5 @@ export const CHROME_CSS = `
   .sig-line{ border-bottom:1px solid var(--ink); height:22px; }
   .sig-name{ font-size:9.5pt; font-weight:700; margin-top:3px; }
   .sig-label-ar{ font-size:8.5pt; color:var(--ink); }
-  .sig-label-en{ font-size:7.5pt; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+  .sig-label-en{ font-size:7.5pt; color:var(--muted); letter-spacing:.2px; }
 `;

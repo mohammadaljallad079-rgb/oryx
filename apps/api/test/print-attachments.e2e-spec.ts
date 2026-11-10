@@ -29,6 +29,9 @@ interface PrintModel {
   documentNumber: string;
   titleEn: string;
   titleAr: string;
+  issueDateLabel: string;
+  issueDateValue: string;
+  secondaryDateLabel: string | null;
   party: { name: string; taxNumber: string | null };
   company: { taxNumber: string | null; crNumber: string | null };
   lines: Array<{ description: string; quantity: string; unitPrice: string; amount: string }>;
@@ -242,6 +245,11 @@ describe('print model and document attachments (e2e)', () => {
       expect(res.body.documentNumber).toMatch(/^S\d{5}$/);
       expect(res.body.titleEn).toBe('INVOICE');
       expect(res.body.titleAr).toBe('فاتورة');
+      // The approved invoice prints its date as "Order Date" with a weekday and
+      // a 12-hour clock, and carries no second (due) date row.
+      expect(res.body.issueDateLabel).toBe('Order Date');
+      expect(res.body.issueDateValue).toMatch(/^\w{3} \d{2}\/\d{2}\/\d{4}, \d{1,2}:\d{2} (AM|PM)$/);
+      expect(res.body.secondaryDateLabel).toBeNull();
       expect(res.body.party.name).toBe('Al Haddad Trading');
       expect(res.body.party.taxNumber).toBe('200001111222111');
       // The seller's registration number the navy band prints comes from the company.

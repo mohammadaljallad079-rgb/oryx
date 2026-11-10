@@ -33,6 +33,26 @@ const MUTED = '#64748B';
 const INK = '#0F2B48';
 const CONTACT = '#475569';
 
+/**
+ * Contact icons for the footer.
+ *
+ * Inline SVG sized to the footer's 7.2pt text. The approved form prints a phone
+ * and a globe before the matching detail; a vector icon renders on every host
+ * without depending on an emoji-bearing face.
+ */
+const CONTACT_ICON_PHONE =
+  '<svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" ' +
+  'stroke-linecap="round" stroke-linejoin="round">' +
+  '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 ' +
+  '2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.7 2.6a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.5-1.2a2 ' +
+  '2 0 0 1 2.1-.5c.8.3 1.7.6 2.6.7a2 2 0 0 1 1.7 2z"/></svg>';
+
+const CONTACT_ICON_GLOBE =
+  '<svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" ' +
+  'stroke-linecap="round" stroke-linejoin="round">' +
+  '<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/>' +
+  '<path d="M12 2a15.3 15.3 0 0 1 0 20 15.3 15.3 0 0 1 0-20z"/></svg>';
+
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
 
@@ -67,6 +87,24 @@ function esc(value: string | null | undefined): string {
 
 function dash(value: string | null | undefined): string {
   return value && String(value).trim().length > 0 ? esc(value) : '—';
+}
+
+/**
+ * The printed address shows the country name ("Bahrain"), not its code ("BH").
+ *
+ * The customer record stores an ISO code; the approved form prints the resolved
+ * name, so it is looked up rather than echoed. An unknown or absent code yields
+ * an empty string, which the caller drops.
+ */
+function countryName(code: string | null | undefined, locale: Locale): string {
+  if (!code) return '';
+  const normalized = code.trim().toUpperCase();
+  if (normalized.length !== 2) return code.trim();
+  try {
+    return new Intl.DisplayNames([locale === 'ar' ? 'ar' : 'en'], { type: 'region' }).of(normalized) ?? normalized;
+  } catch {
+    return normalized;
+  }
 }
 
 /** A run placed by its left edge and baseline. */
@@ -127,7 +165,7 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
   const titleAlt = doc.titleEn;
   const trn = company.taxNumber ?? doc.party.taxNumber ?? null;
 
-  const addressBlock = [doc.party.addressLine, doc.party.city, doc.party.countryCode].filter(
+  const addressBlock = [doc.party.addressLine, doc.party.city, countryName(doc.party.countryCode, locale)].filter(
     (x): x is string => Boolean(x && x.trim()),
   );
 
@@ -216,13 +254,20 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
 
   const totalTop = TOTAL_TOP[3];
   const CONTACT_TOP = 820.15;
+  // The reference prints small vector icons before the phone and the website.
+  // An emoji (U+1F4DE / U+1F310) is absent from every installed face and prints
+  // as a missing-glyph box, so the icons are inline SVG — a vector needs no font
+  // and renders identically on every host, exactly as the approved form does.
   const contactBits: Array<{ x: number; text: string }> = [];
+  const contactIcons: Array<{ x: number; svg: string }> = [];
   if (company.phone) {
-    contactBits.push({ x: 284.6, text: '\u{1F4DE}' }, { x: 294.4, text: company.phone });
+    contactIcons.push({ x: 284.6, svg: CONTACT_ICON_PHONE });
+    contactBits.push({ x: 294.4, text: company.phone });
   }
   if (company.email) contactBits.push({ x: 379.93, text: company.email });
   if (company.website) {
-    contactBits.push({ x: 471.6, text: '\u{1F310}' }, { x: 483.03, text: company.website });
+    contactIcons.push({ x: 471.6, svg: CONTACT_ICON_GLOBE });
+    contactBits.push({ x: 483.03, text: company.website });
   }
 
 
@@ -320,6 +365,8 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
   .foot-rule { position:absolute; left:13.67pt; top:815.28pt; width:566.01pt; border-top:0.75pt solid var(--border); }
   .page-no { font-size:6.5pt; color:var(--muted); font-weight:400; }
   .contact { font-size:7.2pt; color:var(--contact); }
+  .contact-icon { position:absolute; width:7pt; height:7pt; }
+  .contact-icon svg { display:block; width:7pt; height:7pt; }
   .legal { font-size:6.5pt; color:var(--muted); font-weight:400; }
 </style>
 </head>
@@ -374,6 +421,7 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
     <div class="foot-rule"></div>
     <div class="page-no" style="${at(42.54, 815.88, 6.5)}">Page 1 of 1 • 1</div>
     <div class="page-no" style="${at(94.0, 815.88, 6.5)}">صفحة 1 من 1</div>
+    ${contactIcons.map((c) => `<div class="contact-icon" style="left:${c.x}pt;top:${topFor(CONTACT_TOP)}pt">${c.svg}</div>`).join('\n    ')}
     ${contactBits.map((c) => `<div class="contact" style="${at(c.x, CONTACT_TOP, 7.2)}">${esc(c.text)}</div>`).join('\n    ')}
     <div class="legal" style="${rightAt(557.94, 830.51, 6.68)}">${esc([company.addressLine, company.crNumber ? `CR ${company.crNumber}` : null].filter(Boolean).join(' | '))}</div>
   </div>

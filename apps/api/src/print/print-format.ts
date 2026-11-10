@@ -1,4 +1,4 @@
-import { currencyScale, fromMinor, fromQuantity } from '@oryx/shared';
+import { currencyScale, currencySymbol, fromMinor, fromQuantity } from '@oryx/shared';
 import { computeDocumentTotals, type PricedLineInput } from '../common/document-totals';
 
 /**
@@ -108,6 +108,13 @@ export interface PrintTotalsSource {
   taxMinor: number;
   totalMinor: number;
   currency: string;
+  /**
+   * The rate the document actually charged, in basis points, taken from its
+   * lines. The approved form prints the stated rate ("Tax 10%"), not the ratio
+   * the tax amount happens to work out to after a discount — the two differ
+   * whenever a discount reduces the taxable base.
+   */
+  taxRateBp?: number | null;
 }
 
 function rateLabel(bp: number): string {
@@ -120,6 +127,10 @@ function rateLabel(bp: number): string {
 /** Build the printable lines from a document's persisted lines. */
 export function toPrintLines(lines: PrintLineSource[], currency: string) {
   const scale = currencyScale(currency);
+  // The approved form prints the currency symbol ("BD"), not the ISO code
+  // ("BHD"), on every amount, so the DTO carries the symbol and the client
+  // renders it verbatim.
+  const symbol = currencySymbol(currency, 'en');
   const priced: PricedLineInput[] = lines.map((l) => ({
     quantity: l.quantity,
     unitPriceMinor: l.unitPriceMinor,
@@ -136,11 +147,14 @@ export function toPrintLines(lines: PrintLineSource[], currency: string) {
     return {
     description: name.trim() || line.description,
     subDescription: note.length > 0 ? note : null,
-    quantity: fromQuantity(line.quantity),
+    // A whole count must read "1", not "1.0000": the reference prints the bare
+    // integer. Trailing zeros are trimmed so a fractional quantity still shows
+    // its own precision.
+    quantity: fromQuantity(line.quantity).replace(/\.?0+$/, '') || '0',
     unitPrice: fromMinor(line.unitPriceMinor, scale),
     taxLabel: rateLabel(line.taxPercentBp),
     discountPercent: line.discountPercentBp > 0 ? `${line.discountPercentBp / 100}%` : '—',
-    amount: `${fromMinor(totals.lines[index].lineTotalMinor, scale)} ${currency}`,
+    amount: `${fromMinor(totals.lines[index].lineTotalMinor, scale)} ${symbol}`,
     };
   });
 }
@@ -148,12 +162,20 @@ export function toPrintLines(lines: PrintLineSource[], currency: string) {
 /** Build the printable totals block from a document's persisted totals. */
 export function toPrintTotals(source: PrintTotalsSource) {
   const scale = currencyScale(source.currency);
-  const taxRateBp = source.subtotalMinor > 0 ? Math.round((source.taxMinor * 10000) / source.subtotalMinor) : 0;
+  const symbol = currencySymbol(source.currency, 'en');
+  // Prefer the rate the document states on its lines; fall back to the ratio the
+  // tax amount implies only when no line carries a rate.
+  const taxRateBp =
+    source.taxRateBp && source.taxRateBp > 0
+      ? source.taxRateBp
+      : source.subtotalMinor > 0
+        ? Math.round((source.taxMinor * 10000) / source.subtotalMinor)
+        : 0;
   return {
-    untaxedAmount: `${fromMinor(source.subtotalMinor, scale)} ${source.currency}`,
-    taxLabel: taxRateBp > 0 ? `Tax ${(taxRateBp / 100).toFixed(2).replace(/\.00$/, '')}%` : 'Tax',
-    taxAmount: `${fromMinor(source.taxMinor, scale)} ${source.currency}`,
-    discount: `${fromMinor(source.discountMinor, scale)} ${source.currency}`,
-    total: `${fromMinor(source.totalMinor, scale)} ${source.currency}`,
+    untaxedAmount: `${fromMinor(source.subtotalMinor, scale)} ${symbol}`,
+    taxLabel: taxRateBp > 0 ? `Tax ${(taxRateBp / 100).toFixed(2).replace(/\.?0+$/, '')}%` : 'Tax',
+    taxAmount: `${fromMinor(source.taxMinor, scale)} ${symbol}`,
+    discount: `${fromMinor(source.discountMinor, scale)} ${symbol}`,
+    total: `${fromMinor(source.totalMinor, scale)} ${symbol}`,
   };
 }

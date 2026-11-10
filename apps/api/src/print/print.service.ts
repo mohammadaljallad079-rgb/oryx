@@ -1,21 +1,40 @@
 import { Injectable } from '@nestjs/common';
-import { fromMinor, currencyScale, type PrintDocumentDto, type PrintDocumentKind, type PrintPartyDto } from '@oryx/shared';
+import { fromMinor, currencyScale, currencySymbol, type PrintDocumentDto, type PrintDocumentKind, type PrintPartyDto } from '@oryx/shared';
 import { notFound, ERROR_CODES } from '../common/errors';
 import { ErpContextService } from '../common/erp-context.service';
 import { PrismaService } from '../common/prisma.service';
 import type { RequestPrincipal } from '../auth/auth.decorators';
 import { amountInWords, toPrintLines, toPrintTotals } from './print-format';
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-/** Format a date the way the approved forms do: `Sat 20/09/2026`. */
+/**
+ * Format a date the way the approved forms do: `Sat 20/09/2026, 3:30 PM`.
+ *
+ * The reference prints a weekday, a dd/mm/yyyy date and a 12-hour clock in
+ * Bahrain time, so the same shape is produced here rather than a bare date. The
+ * client renderer prints this string verbatim, so it must already carry the time
+ * the approved form shows.
+ */
 function formatDate(value: Date | null | undefined): string {
   if (!value) return '—';
   const d = new Date(value);
-  const dd = String(d.getUTCDate()).padStart(2, '0');
-  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const yyyy = d.getUTCFullYear();
-  return `${WEEKDAYS[d.getUTCDay()]} ${dd}/${mm}/${yyyy}`;
+  if (Number.isNaN(d.getTime())) return '—';
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: 'Asia/Bahrain',
+  }).formatToParts(d);
+  const pick = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
+  const time = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Bahrain',
+  })
+    .format(d)
+    .replace(/\u202f/g, ' ');
+  return `${pick('weekday')} ${pick('day')}/${pick('month')}/${pick('year')}, ${time}`;
 }
 
 interface TitleSpec {
@@ -26,7 +45,9 @@ interface TitleSpec {
 }
 
 const TITLES: Record<PrintDocumentKind, TitleSpec> = {
-  SALES_INVOICE: { titleEn: 'INVOICE', titleAr: 'فاتورة', dateLabel: 'Invoice Date', secondaryLabel: 'Due Date' },
+  // The approved invoice prints its date as "Order Date" and carries no second
+  // date row; only the quotation shows an "Expiration Date" (reference p1/p2).
+  SALES_INVOICE: { titleEn: 'INVOICE', titleAr: 'فاتورة', dateLabel: 'Order Date' },
   QUOTATION: { titleEn: 'QUOTATION', titleAr: 'تسعيرة', dateLabel: 'Quotation Date', secondaryLabel: 'Expiration Date' },
   SALES_ORDER: { titleEn: 'SALES ORDER', titleAr: 'أمر بيع', dateLabel: 'Order Date' },
   CREDIT_NOTE: { titleEn: 'CREDIT NOTE', titleAr: 'إشعار دائن', dateLabel: 'Issue Date' },
@@ -155,6 +176,7 @@ export class PrintService {
         taxMinor: invoice.taxMinor,
         totalMinor: invoice.totalMinor,
         currency: invoice.currency,
+        taxRateBp: invoice.lines.find((l) => (l.taxPercentBp ?? 0) > 0)?.taxPercentBp ?? 0,
       }),
       amountInWords: amountInWords(invoice.totalMinor, invoice.currency),
       notes: invoice.notes,
@@ -200,6 +222,7 @@ export class PrintService {
         taxMinor: quote.taxMinor,
         totalMinor: quote.totalMinor,
         currency: quote.currency,
+        taxRateBp: quote.lines.find((l) => (l.taxPercentBp ?? 0) > 0)?.taxPercentBp ?? 0,
       }),
       amountInWords: amountInWords(quote.totalMinor, quote.currency),
       notes: quote.notes,
@@ -245,6 +268,7 @@ export class PrintService {
         taxMinor: order.taxMinor,
         totalMinor: order.totalMinor,
         currency: order.currency,
+        taxRateBp: order.lines.find((l) => (l.taxPercentBp ?? 0) > 0)?.taxPercentBp ?? 0,
       }),
       amountInWords: amountInWords(order.totalMinor, order.currency),
       notes: order.notes,
@@ -290,6 +314,7 @@ export class PrintService {
         taxMinor: note.taxMinor,
         totalMinor: note.totalMinor,
         currency: note.currency,
+        taxRateBp: note.lines.find((l) => (l.taxPercentBp ?? 0) > 0)?.taxPercentBp ?? 0,
       }),
       amountInWords: amountInWords(note.totalMinor, note.currency),
       notes: note.reason,
@@ -325,8 +350,10 @@ export class PrintService {
     const spec = TITLES.RECEIPT;
     // The line must be rendered at the currency's own scale (BHD/KWD/OMR carry
     // three minor units), or a 10.000 BHD receipt would print a 100.00 BHD line
-    // beside a 10.000 BHD total.
+    // beside a 10.000 BHD total. The amount also carries the approved form's
+    // currency symbol ("BD"), not the ISO code.
     const scale = currencyScale(payment.currency);
+    const symbol = currencySymbol(payment.currency, 'en');
     const amount = fromMinor(payment.amountMinor, scale);
     const lines = [
       {
@@ -335,7 +362,7 @@ export class PrintService {
         unitPrice: amount,
         taxLabel: '—',
         discountPercent: '—',
-        amount: `${amount} ${payment.currency}`,
+        amount: `${amount} ${symbol}`,
       },
     ];
     return {
