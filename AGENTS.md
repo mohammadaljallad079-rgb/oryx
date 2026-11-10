@@ -1045,6 +1045,32 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   rule cannot express "one of these two". A missing name is stored as `''`, so
   reads across sales, accounting and reports need no null branch.
 
+### Printed-document gotchas
+
+- **The approved reference is `oryx 22 (1).pdf` (page 1 = invoice, page 2 =
+  quotation).** Every printed financial document must match it: date label
+  "Order Date" on the invoice (the quotation keeps "Quotation Date" +
+  "Expiration Date"; the invoice has no second date row), the weekday +
+  `dd/mm/yyyy` + 12-hour clock, whole quantities as `1` (not `1.0000`), the
+  currency **symbol** (`BD`, not the ISO code `BHD`), and the resolved country
+  **name** (`Bahrain`, not `BH`). The client renderer
+  (`apps/admin/src/lib/print-document.ts`) and the server template
+  (`apps/api/src/documents/templates/official-financial.template.ts`) must agree
+  — change both, then re-render and diff against the reference.
+- **The totals tax label states the charged rate, not the ratio.** The approved
+  form prints "Tax 10%" (the line rate), even when a discount makes the
+  tax/subtotal ratio 9.65%. `toPrintTotals` in `apps/api/src/print/print-format.ts`
+  takes `taxRateBp` from the document's lines for exactly this reason; do not
+  fall back to the ratio when a line carries a rate.
+- **Contact icons are inline SVG, never emoji.** The phone/globe glyphs
+  (`U+1F4DE`/`U+1F310`) are absent from the installed faces and print as
+  missing-glyph boxes, so the footer uses inline SVG (`CONTACT_ICON_PHONE`/
+  `CONTACT_ICON_GLOBE`) that renders on every host.
+- **`Intl.DateTimeFormat`/`Intl.DisplayNames` are the date and country source.**
+  Dates print in `Asia/Bahrain` (the reference is Bahrain time) and the country
+  code resolves to its display name; do not hard-code a name or a timezone
+  offset.
+
 ### Adding a new ERP module
 
 1. Add a `ModuleDefinition` to `packages/shared/src/modules.ts`.
