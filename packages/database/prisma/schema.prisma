@@ -302,6 +302,12 @@ enum Theme {
   light
 }
 
+enum FontScale {
+  SM
+  MD
+  LG
+}
+
 enum InvitationStatus {
   PENDING
   ACCEPTED
@@ -338,6 +344,12 @@ model User {
   isSuperAdmin              Boolean    @default(false)
   preferredLocale           Locale     @default(ar)
   preferredTheme            Theme      @default(dark)
+  /**
+   * UI text scale: `SM` (small), `MD` (medium, the default) or `LG` (large).
+   * Applied as a root font-size multiplier so the choice reaches every card,
+   * table and form without a per-screen override.
+   */
+  preferredFontScale        FontScale  @default(MD)
   lastLoginAt               DateTime?
   failedLoginCount          Int        @default(0)
   lockedUntil               DateTime?
@@ -2517,6 +2529,8 @@ enum ContractStatus {
 
 enum EmployeeDocumentCategory {
   IDENTITY
+  PASSPORT
+  VISA
   CONTRACT
   CERTIFICATE
   MEDICAL

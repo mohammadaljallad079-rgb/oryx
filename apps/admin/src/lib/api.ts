@@ -481,6 +481,7 @@ export const api = {
         isSuperAdmin: boolean;
         preferredLocale: 'ar' | 'en';
         preferredTheme: 'dark' | 'light';
+        preferredFontScale: 'SM' | 'MD' | 'LG';
       };
       memberships: unknown[];
       permissions: string[];

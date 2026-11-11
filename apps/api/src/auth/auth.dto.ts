@@ -80,6 +80,10 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsIn(['dark', 'light'])
   preferredTheme?: 'dark' | 'light';
+
+  @IsOptional()
+  @IsIn(['SM', 'MD', 'LG'])
+  preferredFontScale?: 'SM' | 'MD' | 'LG';
 }
 
 export class ChangePasswordDto {

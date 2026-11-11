@@ -18,6 +18,9 @@ export type SubscriptionStatus =
   | 'CANCELLED';
 export type BillingPeriod = 'MONTHLY' | 'ANNUAL';
 export type UserStatus = 'INVITED' | 'ACTIVE' | 'SUSPENDED' | 'DISABLED';
+/** UI text scale, persisted per user and applied at the document root. */
+export type FontScale = 'SM' | 'MD' | 'LG';
+export const FONT_SCALES: readonly FontScale[] = ['SM', 'MD', 'LG'];
 
 export interface ApiErrorBody {
   statusCode: number;
@@ -44,6 +47,7 @@ export interface SessionUser {
   kind: 'PLATFORM' | 'COMPANY';
   preferredLocale: 'ar' | 'en';
   preferredTheme: 'dark' | 'light';
+  preferredFontScale: FontScale;
   isSuperAdmin: boolean;
 }
 
@@ -303,6 +307,7 @@ export interface UserDto {
   isSuperAdmin: boolean;
   preferredLocale: 'ar' | 'en';
   preferredTheme: 'dark' | 'light';
+  preferredFontScale: FontScale;
   lastLoginAt: string | null;
   createdAt: string;
   memberships: MembershipSummary[];

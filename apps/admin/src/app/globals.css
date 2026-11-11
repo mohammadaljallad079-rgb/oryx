@@ -356,6 +356,24 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/*
+ * UI text scale.
+ *
+ * The interface is authored in absolute pixel sizes across many Tailwind
+ * utilities, so a root `font-size` change would only move the handful of
+ * `rem`-based values. `zoom` scales the whole shell — every card, table, badge
+ * and control — in one place, which is what a text-size preference is expected
+ * to do. The inline bootstrap script sets the same attribute before first paint
+ * so a reload never flashes the default size.
+ */
+html[data-font-scale='SM'] {
+  zoom: 0.92;
+}
+
+html[data-font-scale='LG'] {
+  zoom: 1.12;
+}
+
 /* Ambient navy/gold wash behind the app shell, as in the reference. */
 body::before {
   content: '';

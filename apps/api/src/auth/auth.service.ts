@@ -46,6 +46,7 @@ interface UserRecord {
   status: string;
   preferredLocale: string;
   preferredTheme: string;
+  preferredFontScale: string;
   isSuperAdmin: boolean;
 }
 
@@ -237,6 +238,7 @@ export class AuthService {
       status: string;
       preferredLocale: string;
       preferredTheme: string;
+      preferredFontScale: string;
       isSuperAdmin: boolean;
     },
     meta: { ip?: string; userAgent?: string },
@@ -690,7 +692,7 @@ export class AuthService {
   }
 
   private toSessionUser(
-    user: { id: string; email: string; fullNameEn: string; fullNameAr: string; status: string; preferredLocale: string; preferredTheme: string; isSuperAdmin: boolean },
+    user: { id: string; email: string; fullNameEn: string; fullNameAr: string; status: string; preferredLocale: string; preferredTheme: string; preferredFontScale: string; isSuperAdmin: boolean },
     kind: 'PLATFORM' | 'COMPANY',
   ): SessionUser {
     return {
@@ -702,6 +704,7 @@ export class AuthService {
       kind,
       preferredLocale: user.preferredLocale as 'ar' | 'en',
       preferredTheme: user.preferredTheme as 'dark' | 'light',
+      preferredFontScale: user.preferredFontScale as SessionUser['preferredFontScale'],
       isSuperAdmin: user.isSuperAdmin,
     };
   }

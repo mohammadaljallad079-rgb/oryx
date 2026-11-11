@@ -96,7 +96,7 @@ export class CreateContractDto {
 }
 
 export class CreateDocumentDto {
-  @IsIn(['IDENTITY', 'CONTRACT', 'CERTIFICATE', 'MEDICAL', 'OTHER']) category!: string;
+  @IsIn(['IDENTITY', 'PASSPORT', 'VISA', 'CONTRACT', 'CERTIFICATE', 'MEDICAL', 'OTHER']) category!: string;
   @IsString() @MinLength(1) @MaxLength(200) title!: string;
   @IsOptional() @IsString() @MaxLength(400) fileRef?: string;
   @IsOptional() @NormaliseIsoDate() @IsISO8601() issuedAt?: string;

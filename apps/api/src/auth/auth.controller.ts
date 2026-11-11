@@ -315,6 +315,7 @@ export class AuthController {
         isSuperAdmin: user.isSuperAdmin,
         preferredLocale: user.preferredLocale,
         preferredTheme: user.preferredTheme,
+        preferredFontScale: user.preferredFontScale,
       },
       memberships,
       permissions: principal.grantedPermissions,
@@ -386,6 +387,7 @@ export class AuthController {
     if (dto.fullNameAr !== undefined) data.fullNameAr = dto.fullNameAr;
     if (dto.preferredLocale !== undefined) data.preferredLocale = dto.preferredLocale;
     if (dto.preferredTheme !== undefined) data.preferredTheme = dto.preferredTheme;
+    if (dto.preferredFontScale !== undefined) data.preferredFontScale = dto.preferredFontScale;
     if (Object.keys(data).length === 0) {
       throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'No profile fields supplied.');
     }
@@ -403,6 +405,7 @@ export class AuthController {
       id: user.id,
       preferredLocale: user.preferredLocale,
       preferredTheme: user.preferredTheme,
+      preferredFontScale: user.preferredFontScale,
       fullNameEn: user.fullNameEn,
       fullNameAr: user.fullNameAr,
     };

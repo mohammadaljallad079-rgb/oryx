@@ -370,7 +370,7 @@ function EmployeeModal({
   );
 }
 
-const DOC_CATEGORIES = ['IDENTITY', 'CONTRACT', 'CERTIFICATE', 'MEDICAL', 'OTHER'] as const;
+const DOC_CATEGORIES = ['IDENTITY', 'PASSPORT', 'VISA', 'CONTRACT', 'CERTIFICATE', 'MEDICAL', 'OTHER'] as const;
 
 /**
  * Employee document list, upload and preview.
