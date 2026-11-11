@@ -155,7 +155,6 @@ export default function SalesPage() {
   const { t } = useUi();
   const { can } = useAuth();
   const [tab, setTab] = useState<Tab>('invoices');
-  const [actionError, setActionError] = useState<string | null>(null);
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'invoices', label: t('erp.sales.invoices') },
@@ -416,7 +415,7 @@ function CustomerModal({
     });
   }, [open, customer]);
 
-  const submit = async (post = true) => {
+  const submit = async () => {
     setBusy(true);
     setError(null);
     try {
@@ -958,7 +957,6 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         dueDateField="dueDate"
         settlement
         testIdPrefix="invoice"
-        dateField="invoiceDate"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
           if (editingInvoice) {
@@ -1079,7 +1077,6 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
         taxOptions={taxOptions}
         showWarehouse
         testIdPrefix="order"
-        dateField="orderDate"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
           await api.createSalesOrder({ ...payload, confirm: true });
@@ -2193,9 +2190,6 @@ function LineEditor({
     setLines(next);
   };
 
-  // Columns: description (wide) | qty | unit price | discount % | tax % | amount | remove.
-  const cols = 'grid-cols-[minmax(0,1fr)_70px_100px_70px_70px_104px_32px]';
-
   return (
     <div className="flex flex-col gap-2">
       <div className="oryx-doc-form__grid oryx-doc-form__grid--head">
@@ -2364,7 +2358,6 @@ function DocumentModal({
   dueDateField,
   settlement,
   testIdPrefix,
-  dateField = 'issueDate',
   onClose,
   onSubmit,
 }: {
@@ -2400,7 +2393,6 @@ function DocumentModal({
   settlement?: boolean;
   testIdPrefix: string;
   /** The single date property the target document DTO accepts. */
-  dateField?: 'issueDate' | 'invoiceDate' | 'orderDate';
   onClose: () => void;
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
 }) {

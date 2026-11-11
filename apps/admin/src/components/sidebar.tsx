@@ -71,6 +71,10 @@ export function Sidebar({
     }
   }
 
+  // Tracks destinations already rendered so a href shared by two groups is
+  // listed once.
+  const seenHrefs = new Set<string>();
+
   return (
     <aside
       className="oryx-sidebar"
@@ -92,9 +96,18 @@ export function Sidebar({
       </Link>
 
       {ALL_NAV_GROUPS.map((group) => {
-        const items = group.items.filter((i) => visible(i, ctx));
-        if (items.length === 0) return null;
         if (group.platformOnly && !isPlatform) return null;
+        const items = group.items.filter((i) => {
+          if (!visible(i, ctx)) return false;
+          // A destination can appear in more than one group — the Super Admin
+          // sees the platform governance entry and the derived ERP core entry
+          // both point at /companies. Keep the first occurrence so each
+          // destination is listed once.
+          if (seenHrefs.has(i.href)) return false;
+          seenHrefs.add(i.href);
+          return true;
+        });
+        if (items.length === 0) return null;
         const isCollapsible = group.items.length > 6;
         const isOpen = expanded[group.key] !== false;
 

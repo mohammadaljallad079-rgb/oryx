@@ -780,7 +780,7 @@ function PeriodsTab({ canManage }: { canManage: boolean }) {
   const years = useAsync<FiscalYearDto[]>(() => api.fiscalYears(), []);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const removeYear = async (id: string, code: string) => {
+  const removeYear = async (id: string, _code: string) => {
     if (!window.confirm(t('erp.accounting.confirmDeleteFiscalYear'))) return;
     setBusyId(id);
     try {

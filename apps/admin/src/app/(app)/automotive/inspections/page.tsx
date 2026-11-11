@@ -173,6 +173,7 @@ function JobsTab({ canWrite }: { canWrite: boolean }) {
                           <Button
                             size="sm"
                             variant="danger"
+                            disabled={busyId === j.id}
                             onClick={() => void remove(j.id)}
                             data-testid={`delete-job-${j.id}`}
                           >
