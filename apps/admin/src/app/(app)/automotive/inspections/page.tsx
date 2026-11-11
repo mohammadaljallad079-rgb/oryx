@@ -5,7 +5,7 @@ import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync, useDebounced } from '@/lib/hooks';
-import { money, toMinorInput } from '@/lib/erp-format';
+import { minorToInput, money, toMinorInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -1420,7 +1420,7 @@ function ServiceModal({
       code: service?.code ?? '',
       nameEn: service?.nameEn ?? '',
       nameAr: service?.nameAr ?? '',
-      price: (service ? service.priceMinor / 1000 : 0).toFixed(3),
+      price: minorToInput(service?.priceMinor ?? 0),
       taxRate: ((service?.taxPercentBp ?? 1000) / 100).toString(),
       duration: (service?.durationMinutes ?? 60).toString(),
     });
