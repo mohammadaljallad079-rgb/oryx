@@ -2834,6 +2834,11 @@ model Employee {
   fullNameAr      String
   email           String?
   phone           String?
+  /**
+   * A second reachable number (home or emergency contact). The primary `phone`
+   * stays the first line of contact; this one is printed beside it.
+   */
+  secondaryPhone  String?
   nationalId      String?
   /**
    * Optional link to a platform user account.
@@ -2915,6 +2920,12 @@ model EmployeeDocument {
   category       EmployeeDocumentCategory @default(OTHER)
   title          String
   fileRef        String?
+  /**
+   * The stored upload backing this document, if one was attached. The binary is
+   * held by the attachment store; `fileRef` remains a free-text reference for a
+   * document that only has a physical copy.
+   */
+  fileAssetId    String?
   issuedAt       DateTime?
   expiresAt      DateTime?
   /**

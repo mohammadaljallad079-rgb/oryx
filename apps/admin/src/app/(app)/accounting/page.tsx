@@ -327,7 +327,7 @@ function AccountModal({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -336,7 +336,10 @@ function AccountModal({
     nameAr: '',
     type: 'ASSET',
     normalBalance: 'DEBIT',
+    parentId: '',
   });
+
+  const allAccounts = useAsync(() => api.accountingAccounts({}), [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -347,8 +350,29 @@ function AccountModal({
       nameAr: account?.nameAr ?? '',
       type: account?.type ?? 'ASSET',
       normalBalance: account?.normalBalance ?? 'DEBIT',
+      parentId: account?.parentId ?? '',
     });
   }, [open, account]);
+
+  // The parent choices exclude the account itself and anything beneath it, so
+  // the dropdown can never offer a move that would create a cycle.
+  const descendants = new Set<string>();
+  if (account && allAccounts.data) {
+    const byParent = new Map<string | null, ErpAccountDto[]>();
+    for (const a of allAccounts.data.items) {
+      const key = a.parentId ?? null;
+      byParent.set(key, [...(byParent.get(key) ?? []), a]);
+    }
+    const walk = (id: string) => {
+      for (const child of byParent.get(id) ?? []) {
+        if (descendants.has(child.id)) continue;
+        descendants.add(child.id);
+        walk(child.id);
+      }
+    };
+    walk(account.id);
+  }
+  const parentOptions = (allAccounts.data?.items ?? []).filter((a) => a.id !== account?.id && !descendants.has(a.id));
 
   // A new account is numbered automatically: whenever the type changes, ask the
   // API for the next free code in that type's block. The field stays editable,
@@ -374,9 +398,22 @@ function AccountModal({
     setError(null);
     try {
       if (account) {
-        await api.updateAccount(account.id, { nameEn: form.nameEn, nameAr: form.nameAr });
+        await api.updateAccount(account.id, {
+          nameEn: form.nameEn,
+          nameAr: form.nameAr,
+          parentId: form.parentId || null,
+          type: form.type,
+          normalBalance: form.normalBalance,
+        });
       } else {
-        await api.createAccount(form);
+        await api.createAccount({
+          code: form.code,
+          nameEn: form.nameEn,
+          nameAr: form.nameAr,
+          type: form.type,
+          normalBalance: form.normalBalance,
+          parentId: form.parentId || undefined,
+        });
       }
       await onSaved();
       onClose();
@@ -412,10 +449,31 @@ function AccountModal({
           <input className="oryx-input" value={form.code} disabled={Boolean(account)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="account-code" />
         </Field>
         <Field label={t('erp.accounting.type')} required>
-          <select className="oryx-select" value={form.type} disabled={Boolean(account)} onChange={(e) => setForm({ ...form, type: e.target.value })} data-testid="account-type">
-            {['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'].map((x) => (
+          <select
+            className="oryx-select"
+            value={form.type}
+            onChange={(e) => {
+              const type = e.target.value;
+              // Follow the conventional balance so the operator rarely has to
+              // change it: assets and expenses are debit, the rest credit.
+              const normalBalance = type === 'ASSET' || type === 'EXPENSE' ? 'DEBIT' : 'CREDIT';
+              setForm({ ...form, type, normalBalance });
+            }}
+            data-testid="account-type"
+          >
+            {(['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'] as const).map((x) => (
               <option key={x} value={x}>
-                {x}
+                {t(`erp.accounting.typeValue.${x}`)}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={t('erp.accounting.parentAccount')}>
+          <select className="oryx-select" value={form.parentId} onChange={(e) => setForm({ ...form, parentId: e.target.value })} data-testid="account-parent">
+            <option value="">{t('erp.accounting.noParent')}</option>
+            {parentOptions.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.code} — {locale === 'ar' ? a.nameAr : a.nameEn}
               </option>
             ))}
           </select>
@@ -427,7 +485,7 @@ function AccountModal({
           <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="account-name-ar" />
         </Field>
         <Field label={t('erp.accounting.normalBalance')}>
-          <select className="oryx-select" value={form.normalBalance} disabled={Boolean(account)} onChange={(e) => setForm({ ...form, normalBalance: e.target.value })} data-testid="account-normal-balance">
+          <select className="oryx-select" value={form.normalBalance} onChange={(e) => setForm({ ...form, normalBalance: e.target.value })} data-testid="account-normal-balance">
             <option value="DEBIT">{t('erp.accounting.debit')}</option>
             <option value="CREDIT">{t('erp.accounting.credit')}</option>
           </select>

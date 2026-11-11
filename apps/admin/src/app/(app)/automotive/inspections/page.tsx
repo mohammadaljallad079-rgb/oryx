@@ -23,7 +23,7 @@ import {
   TableShell,
 } from '@/components/ui';
 import type { InspectionBookingDto, InspectionServiceDto, VehicleDto, VehicleDocumentDto, VehicleDocumentOcrResultDto, CustomerDto } from '@oryx/shared';
-import { INSPECTION_SECTION_SPECS, VEHICLE_DOCUMENT_CATEGORIES, type InspectionSectionKey } from '@oryx/shared';
+import { basisPointsOfMinor, INSPECTION_SECTION_SPECS, VEHICLE_DOCUMENT_CATEGORIES, type InspectionSectionKey } from '@oryx/shared';
 import { useRouter } from 'next/navigation';
 import { inspectionFieldLabelParts, INSPECTION_COVER_ROWS, INSPECTION_VEHICLE_INFO } from '@/lib/inspection-fields';
 
@@ -1272,8 +1272,10 @@ function ServicesTab({ canManage }: { canManage: boolean }) {
             <tr>
               <th>{t('common.code')}</th>
               <th>{t('common.name')}</th>
-              <th>{t('erp.automotive.price')}</th>
+              <th>{t('erp.automotive.basePrice')}</th>
               <th>{t('erp.inventory.taxRate')}</th>
+              <th>{t('erp.automotive.vatAmount')}</th>
+              <th>{t('erp.automotive.totalInclVat')}</th>
               <th>{t('common.actions')}</th>
             </tr>
           </thead>
@@ -1284,6 +1286,8 @@ function ServicesTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{s.nameEn}</td>
                 <td className="tabular-nums text-[12.5px]">{money(s.priceMinor)}</td>
                 <td className="text-[12.5px]">{(s.taxPercentBp / 100).toFixed(2)}%</td>
+                <td className="tabular-nums text-[12.5px]" data-testid={`service-vat-${s.code}`}>{money(basisPointsOfMinor(s.priceMinor, s.taxPercentBp))}</td>
+                <td className="tabular-nums text-[12.5px] font-semibold" data-testid={`service-total-${s.code}`}>{money(s.priceMinor + basisPointsOfMinor(s.priceMinor, s.taxPercentBp))}</td>
                 <td>
                   {canManage ? (
                     <Button

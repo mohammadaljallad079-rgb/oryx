@@ -1174,8 +1174,10 @@ export interface EmployeeDto {
   fullNameAr: string;
   email: string | null;
   phone: string | null;
+  secondaryPhone: string | null;
   status: string;
   hireDate: string;
+  terminationDate: string | null;
   departmentId: string | null;
   departmentNameEn: string | null;
   departmentNameAr: string | null;
@@ -1194,6 +1196,26 @@ export interface LeaveTypeDto {
   annualEntitlementDays: number;
   isPaid: boolean;
   requiresApproval: boolean;
+}
+
+/** An HR document record; `fileName`/`sizeBytes` describe the stored upload when present. */
+export interface EmployeeDocumentDto {
+  id: string;
+  employeeId: string;
+  category: string;
+  title: string;
+  fileRef: string | null;
+  fileAssetId: string | null;
+  issuedAt: string | null;
+  expiresAt: string | null;
+  isConfidential: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  hasFile: boolean;
+  fileName: string | null;
+  mimeType: string | null;
+  sizeBytes: number | null;
 }
 
 export interface LeaveRequestDto {

@@ -238,16 +238,62 @@ export class AccountingService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const account = await this.prisma.account.findFirst({ where: { id, companyId } });
     if (!account) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Account not found.');
-    const updated = await this.prisma.account.update({
-      where: { id },
-      data: {
-        ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
-        ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
-        ...(dto.isPostable !== undefined ? { isPostable: dto.isPostable } : {}),
-        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
-        ...(dto.systemRole !== undefined ? { systemRole: dto.systemRole } : {}),
-      },
+
+    // A type change on an account that already carries postings or children
+    // would contradict the statements and the child hierarchy, so it is
+    // refused; an account still being set up may be reclassified.
+    const typeChanging = dto.type !== undefined && dto.type !== account.type;
+    const balanceChanging = dto.normalBalance !== undefined && dto.normalBalance !== account.normalBalance;
+    if (typeChanging || balanceChanging) {
+      const [children, lines] = await Promise.all([
+        this.prisma.account.count({ where: { companyId, parentId: id } }),
+        this.prisma.journalLine.count({ where: { companyId, accountId: id } }),
+      ]);
+      if (children > 0 || lines > 0) {
+        throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'The account type or normal balance cannot be changed once the account has children or ledger postings.');
+      }
+    }
+
+    // Re-parenting must not create a cycle. The parent has to exist in the same
+    // company and may not be the account itself or one of its descendants,
+    // otherwise the chart becomes a loop that no tree walk can terminate on.
+    let level = account.level;
+    if (dto.parentId !== undefined && dto.parentId !== account.parentId) {
+      if (dto.parentId === null) {
+        level = 1;
+      } else {
+        const parent = await this.prisma.account.findFirst({ where: { id: dto.parentId, companyId } });
+        if (!parent) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Parent account not found.');
+        if (parent.id === id) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'An account cannot be its own parent.');
+        if (await this.isDescendant(companyId, parent.id, id)) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'An account cannot be moved under one of its own descendants.');
+        }
+        level = parent.level + 1;
+      }
+    }
+
+    const updated = await this.posting.withTransaction(async (tx) => {
+      const row = await tx.account.update({
+        where: { id },
+        data: {
+          ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
+          ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
+          ...(dto.type !== undefined ? { type: dto.type } : {}),
+          ...(dto.normalBalance !== undefined ? { normalBalance: dto.normalBalance } : {}),
+          ...(dto.parentId !== undefined ? { parentId: dto.parentId, level } : {}),
+          ...(dto.isPostable !== undefined ? { isPostable: dto.isPostable } : {}),
+          ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+          ...(dto.systemRole !== undefined ? { systemRole: dto.systemRole } : {}),
+        },
+      });
+      // A move shifts the whole subtree, so the descendants' levels are
+      // recomputed from the new parent depth.
+      if (dto.parentId !== undefined && dto.parentId !== account.parentId) {
+        await this.relevelDescendants(tx, companyId, id, level);
+      }
+      return row;
     });
+
     await this.audit.record({
       actorUserId: actor.userId,
       companyId,
@@ -257,6 +303,37 @@ export class AccountingService {
       summary: `Updated account ${updated.code}`,
     });
     return toAccountDto(updated);
+  }
+
+  /** True when `candidateId` sits anywhere below `rootId` in the chart. */
+  private async isDescendant(companyId: string, candidateId: string, rootId: string): Promise<boolean> {
+    let current: string | null = candidateId;
+    const seen = new Set<string>();
+    while (current) {
+      if (current === rootId) return true;
+      if (seen.has(current)) return false;
+      seen.add(current);
+      const row: { parentId: string | null } | null = await this.prisma.account.findFirst({
+        where: { id: current, companyId },
+        select: { parentId: true },
+      });
+      current = row?.parentId ?? null;
+    }
+    return false;
+  }
+
+  /** Rewrites `level` for every descendant so it stays `parent.level + 1`. */
+  private async relevelDescendants(
+    tx: Pick<PrismaService, 'account'>,
+    companyId: string,
+    parentId: string,
+    parentLevel: number,
+  ): Promise<void> {
+    const children = await tx.account.findMany({ where: { companyId, parentId }, select: { id: true } });
+    for (const child of children) {
+      await tx.account.update({ where: { id: child.id }, data: { level: parentLevel + 1 } });
+      await this.relevelDescendants(tx, companyId, child.id, parentLevel + 1);
+    }
   }
 
   /**

@@ -64,6 +64,7 @@ import type {
   DepartmentDto,
   JobTitleDto,
   EmployeeDto,
+  EmployeeDocumentDto,
   LeaveTypeDto,
   LeaveRequestDto,
   ShiftDto,
@@ -1056,15 +1057,42 @@ export const api = {
   createContract: (employeeId: string, body: Record<string, unknown>) =>
     request<Record<string, unknown>>(`/hr/employees/${employeeId}/contracts`, { method: 'POST', body }),
   employeeDocuments: (employeeId: string) =>
-    request<Paginated<Record<string, unknown>>>(`/hr/employees/${employeeId}/documents`),
-  createEmployeeDocument: (employeeId: string, body: Record<string, unknown>) =>
-    request<Record<string, unknown>>(`/hr/employees/${employeeId}/documents`, { method: 'POST', body }),
+    request<Paginated<EmployeeDocumentDto>>(`/hr/employees/${employeeId}/documents`),
+  createEmployeeDocument: (employeeId: string, body: Record<string, unknown> | FormData) =>
+    request<EmployeeDocumentDto>(`/hr/employees/${employeeId}/documents`, { method: 'POST', body }),
+  deleteEmployeeDocument: (employeeId: string, documentId: string) =>
+    request<{ deleted: boolean }>(`/hr/employees/${employeeId}/documents/${documentId}`, {
+      method: 'DELETE',
+    }),
+  /**
+   * Fetch an employee document as a blob so it can be previewed or downloaded
+   * without leaking the bearer token into a URL. The access token comes from the
+   * same in-memory store the request helper uses.
+   */
+  fetchEmployeeDocumentBlob: async (employeeId: string, documentId: string): Promise<Blob> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    const branchId = tokenStore.branchId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    if (branchId) headers['x-oryx-branch-id'] = branchId;
+    const res = await fetch(`${API_BASE}/v1/hr/employees/${employeeId}/documents/${documentId}/file`, {
+      headers,
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new ApiError(res.status, 'document_fetch_failed', 'Could not load the document.');
+    return res.blob();
+  },
   leaveTypes: (params: { companyId?: string } = {}) =>
     request<Paginated<LeaveTypeDto>>(`/hr/leave-types?${toQuery(params)}`),
   createLeaveType: (body: Record<string, unknown>) => request<LeaveTypeDto>('/hr/leave-types', { method: 'POST', body }),
   leaveRequests: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<LeaveRequestDto>>(`/hr/leave-requests?${toQuery(params)}`),
   requestLeave: (body: Record<string, unknown>) => request<LeaveRequestDto>('/hr/leave-requests', { method: 'POST', body }),
+  updateLeaveRequest: (id: string, body: Record<string, unknown>) =>
+    request<LeaveRequestDto>(`/hr/leave-requests/${id}`, { method: 'PATCH', body }),
   decideLeave: (id: string, decision: string, note?: string) =>
     request<LeaveRequestDto>(`/hr/leave-requests/${id}/decide`, { method: 'POST', body: { decision, note } }),
   hrShifts: (params: { companyId?: string } = {}) => request<Paginated<ShiftDto>>(`/hr/shifts?${toQuery(params)}`),

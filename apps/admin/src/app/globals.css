@@ -113,6 +113,16 @@
    * theme needs a softer ring and a lighter scrim than a navy page does. */
   --focus-ring: rgba(212, 175, 55, 0.18);
   --backdrop: rgba(0, 10, 20, 0.66);
+  /* Compatibility aliases. Several screens reference these names directly, so
+   * they are defined here rather than left to fall back to nothing: an
+   * unresolved custom property drops the declaration, which made muted text
+   * render at full strength and a hovered option lose its background. */
+  --muted: var(--text-muted);
+  --surface-2: var(--surface-hover);
+  --accent: var(--gold);
+  --accent-strong: var(--gold);
+  --brand-primary: var(--primary);
+  --brand-primary-foreground: var(--on-primary);
   /* The shade a company brand colour is mixed toward to derive its pressed and
    * hover states. It is a token rather than a literal so the branded shell has
    * no colour value that a theme switch cannot reach. */
@@ -265,6 +275,16 @@
   --shadow-modal: 0 40px 80px -40px rgba(58, 48, 30, 0.4);
   --focus-ring: color-mix(in srgb, var(--gold) 20%, transparent);
   --backdrop: rgba(26, 22, 14, 0.5);
+  /* Compatibility aliases. Several screens reference these names directly, so
+   * they are defined here rather than left to fall back to nothing: an
+   * unresolved custom property drops the declaration, which made muted text
+   * render at full strength and a hovered option lose its background. */
+  --muted: var(--text-muted);
+  --surface-2: var(--surface-hover);
+  --accent: var(--gold);
+  --accent-strong: var(--gold);
+  --brand-primary: var(--primary);
+  --brand-primary-foreground: var(--on-primary);
   /* Photo surfaces keep the dark-theme ink: the scrim behind them is navy in
    * both themes, so white type over artwork stays correct on ivory too. */
   --on-media: #ffffff;

@@ -1,4 +1,5 @@
 import { Type } from 'class-transformer';
+import { NormaliseIsoDate } from '../common/transformers';
 import {
   ArrayMinSize,
   IsArray,
@@ -25,8 +26,8 @@ export class ListQueryDto {
   @IsOptional() @IsString() branchId?: string;
   @IsOptional() @IsString() departmentId?: string;
   @IsOptional() @IsString() employeeId?: string;
-  @IsOptional() @IsISO8601() from?: string;
-  @IsOptional() @IsISO8601() to?: string;
+  @IsOptional() @NormaliseIsoDate() @IsISO8601() from?: string;
+  @IsOptional() @NormaliseIsoDate() @IsISO8601() to?: string;
 }
 
 // ------------------------------------------------------------- departments
@@ -54,13 +55,14 @@ export class CreateEmployeeDto {
   @IsString() @MinLength(2) @MaxLength(200) fullNameAr!: string;
   @IsOptional() @IsString() @MaxLength(160) email?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
+  @IsOptional() @IsString() @MaxLength(40) secondaryPhone?: string;
   @IsOptional() @IsString() @MaxLength(40) nationalId?: string;
   @IsOptional() @IsString() departmentId?: string;
   @IsOptional() @IsString() jobTitleId?: string;
   @IsOptional() @IsString() branchId?: string;
   @IsOptional() @IsString() managerId?: string;
-  @IsISO8601() hireDate!: string;
-  @IsOptional() @IsISO8601() dateOfBirth?: string;
+  @NormaliseIsoDate() @IsISO8601() hireDate!: string;
+  @IsOptional() @NormaliseIsoDate() @IsISO8601() dateOfBirth?: string;
   @IsOptional() @IsString() @MaxLength(20) gender?: string;
   @IsOptional() @IsString() @MaxLength(240) addressLine?: string;
   @IsOptional() @IsString() @MaxLength(600) notes?: string;
@@ -71,12 +73,13 @@ export class UpdateEmployeeDto {
   @IsOptional() @IsString() @MaxLength(200) fullNameAr?: string;
   @IsOptional() @IsString() @MaxLength(160) email?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
+  @IsOptional() @IsString() @MaxLength(40) secondaryPhone?: string;
   @IsOptional() @IsString() departmentId?: string;
   @IsOptional() @IsString() jobTitleId?: string;
   @IsOptional() @IsString() branchId?: string;
   @IsOptional() @IsString() managerId?: string;
   @IsOptional() @IsIn(['ACTIVE', 'ON_LEAVE', 'SUSPENDED', 'TERMINATED']) status?: string;
-  @IsOptional() @IsISO8601() terminationDate?: string;
+  @IsOptional() @NormaliseIsoDate() @IsISO8601() terminationDate?: string;
   @IsOptional() @IsString() @MaxLength(240) addressLine?: string;
   @IsOptional() @IsString() @MaxLength(600) notes?: string;
 }
@@ -84,8 +87,8 @@ export class UpdateEmployeeDto {
 export class CreateContractDto {
   @IsString() @MinLength(1) @MaxLength(60) contractNumber!: string;
   @IsOptional() @IsIn(['PERMANENT', 'FIXED_TERM', 'PART_TIME', 'CONTRACTOR']) type?: string;
-  @IsISO8601() startDate!: string;
-  @IsOptional() @IsISO8601() endDate?: string;
+  @NormaliseIsoDate() @IsISO8601() startDate!: string;
+  @IsOptional() @NormaliseIsoDate() @IsISO8601() endDate?: string;
   @Type(() => Number) @IsInt() @Min(0) baseSalaryMinor!: number;
   @IsOptional() @IsString() @MaxLength(3) currency?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) probationDays?: number;
@@ -96,8 +99,8 @@ export class CreateDocumentDto {
   @IsIn(['IDENTITY', 'CONTRACT', 'CERTIFICATE', 'MEDICAL', 'OTHER']) category!: string;
   @IsString() @MinLength(1) @MaxLength(200) title!: string;
   @IsOptional() @IsString() @MaxLength(400) fileRef?: string;
-  @IsOptional() @IsISO8601() issuedAt?: string;
-  @IsOptional() @IsISO8601() expiresAt?: string;
+  @IsOptional() @NormaliseIsoDate() @IsISO8601() issuedAt?: string;
+  @IsOptional() @NormaliseIsoDate() @IsISO8601() expiresAt?: string;
   @IsOptional() @IsBoolean() isConfidential?: boolean;
   @IsOptional() @IsString() @MaxLength(400) notes?: string;
 }
@@ -126,8 +129,15 @@ export class CreateLeaveTypeDto {
 export class RequestLeaveDto {
   @IsString() employeeId!: string;
   @IsString() leaveTypeId!: string;
-  @IsISO8601() startDate!: string;
-  @IsISO8601() endDate!: string;
+  @NormaliseIsoDate() @IsISO8601() startDate!: string;
+  @NormaliseIsoDate() @IsISO8601() endDate!: string;
+  @IsOptional() @IsString() @MaxLength(400) reason?: string;
+}
+
+export class UpdateLeaveRequestDto {
+  @IsOptional() @IsString() leaveTypeId?: string;
+  @IsOptional() @NormaliseIsoDate() @IsISO8601() startDate?: string;
+  @IsOptional() @NormaliseIsoDate() @IsISO8601() endDate?: string;
   @IsOptional() @IsString() @MaxLength(400) reason?: string;
 }
 
@@ -157,9 +167,9 @@ export class CreateShiftDto {
 
 export class RecordAttendanceDto {
   @IsString() employeeId!: string;
-  @IsISO8601() workDate!: string;
-  @IsOptional() @IsISO8601() checkInAt?: string;
-  @IsOptional() @IsISO8601() checkOutAt?: string;
+  @NormaliseIsoDate() @IsISO8601() workDate!: string;
+  @IsOptional() @NormaliseIsoDate() @IsISO8601() checkInAt?: string;
+  @IsOptional() @NormaliseIsoDate() @IsISO8601() checkOutAt?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) overtimeMinutes?: number;
   @IsOptional() @IsIn(['PRESENT', 'ABSENT', 'LATE', 'HALF_DAY', 'LEAVE', 'HOLIDAY']) status?: string;
   @IsOptional() @IsString() shiftId?: string;
@@ -225,7 +235,7 @@ export class PunchLocationDto {
 
 export class SelfCheckInDto {
   @IsOptional() @IsString() employeeId?: string;
-  @IsOptional() @IsISO8601() at?: string;
+  @IsOptional() @NormaliseIsoDate() @IsISO8601() at?: string;
   @IsOptional() @IsString() shiftId?: string;
   @IsOptional() @ValidateNested() @Type(() => PunchLocationDto) location?: PunchLocationDto;
   @IsOptional() @IsString() @MaxLength(400) notes?: string;
@@ -233,14 +243,14 @@ export class SelfCheckInDto {
 
 export class SelfCheckOutDto {
   @IsOptional() @IsString() employeeId?: string;
-  @IsOptional() @IsISO8601() at?: string;
+  @IsOptional() @NormaliseIsoDate() @IsISO8601() at?: string;
   @IsOptional() @ValidateNested() @Type(() => PunchLocationDto) location?: PunchLocationDto;
   @IsOptional() @IsString() @MaxLength(400) notes?: string;
 }
 
 export class SelfBreakDto {
   @IsOptional() @IsString() employeeId?: string;
-  @IsOptional() @IsISO8601() at?: string;
+  @IsOptional() @NormaliseIsoDate() @IsISO8601() at?: string;
 }
 
 export class QrTokenQueryDto {
@@ -261,8 +271,8 @@ export class SalaryComponentDto {
 
 export class CreateSalaryStructureDto {
   @IsString() employeeId!: string;
-  @IsISO8601() effectiveFrom!: string;
-  @IsOptional() @IsISO8601() effectiveTo?: string;
+  @NormaliseIsoDate() @IsISO8601() effectiveFrom!: string;
+  @IsOptional() @NormaliseIsoDate() @IsISO8601() effectiveTo?: string;
   @Type(() => Number) @IsInt() @Min(0) basicMinor!: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) overtimeRateMinor?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(100) @Max(2400) dailyHours?: number;
@@ -279,8 +289,8 @@ export class CreatePayrollPeriodDto {
   @IsString() @MinLength(1) @MaxLength(40) code!: string;
   @IsString() @MinLength(2) @MaxLength(120) nameEn!: string;
   @IsString() @MinLength(2) @MaxLength(120) nameAr!: string;
-  @IsISO8601() startDate!: string;
-  @IsISO8601() endDate!: string;
+  @NormaliseIsoDate() @IsISO8601() startDate!: string;
+  @NormaliseIsoDate() @IsISO8601() endDate!: string;
 }
 
 export class CreatePayrollRunDto {
@@ -293,7 +303,7 @@ export class CreateAdvanceDto {
   @IsString() employeeId!: string;
   @Type(() => Number) @IsInt() @Min(1) amountMinor!: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) installments?: number;
-  @IsISO8601() issuedAt!: string;
+  @NormaliseIsoDate() @IsISO8601() issuedAt!: string;
   @IsOptional() @IsString() @MaxLength(400) reason?: string;
 }
 
