@@ -70,7 +70,7 @@ export default function HrPage() {
       {tab === 'employees' ? <EmployeesTab canManage={can('erp.hr.employee.manage')} /> : null}
       {tab === 'leave' ? <LeaveTab canRequest={can('erp.hr.leave.request')} canApprove={can('erp.hr.leave.approve')} /> : null}
       {tab === 'attendance' ? <AttendanceTab canManage={can('erp.hr.attendance.manage')} canSelf={can('erp.hr.attendance.self')} /> : null}
-      {tab === 'policy' ? <PolicyTab canManage={can('erp.hr.attendance.policy') || can('erp.hr.worksite.manage')} /> : null}
+      {tab === 'policy' ? <PolicyTab canManagePolicy={can('erp.hr.attendance.policy')} canViewWorkSites={can('erp.hr.read') || can('erp.hr.worksite.manage') || can('erp.hr.attendance.manage')} canManageWorkSites={can('erp.hr.worksite.manage')} /> : null}
       {tab === 'payroll' ? <PayrollTab canRun={can('erp.hr.payroll.run')} canApprove={can('erp.hr.payroll.approve')} /> : null}
       {tab === 'reports' ? <ReportsTab /> : null}
       {tab === 'advances' ? <AdvancesTab canManage={can('erp.hr.advance.manage')} /> : null}
@@ -1070,30 +1070,34 @@ function PayslipPdfButton({ payslipId, code }: { payslipId: string; code: string
   );
 }
 
-function PolicyTab({ canManage }: { canManage: boolean }) {
+function PolicyTab({ canManagePolicy, canViewWorkSites, canManageWorkSites }: { canManagePolicy: boolean; canViewWorkSites: boolean; canManageWorkSites: boolean }) {
   const { t } = useUi();
   const policy = useAsync(() => api.hrAttendancePolicy(), []);
-  const sites = useAsync(() => api.hrWorkSites(), []);
+  const sites = useAsync(() => canViewWorkSites ? api.hrWorkSites() : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 0 }), [canViewWorkSites]);
   const [form, setForm] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (policy.data && !form) setForm(policy.data);
-  }, [policy.data, form]);
+    if (policy.data) setForm((current) => current ?? policy.data);
+  }, [policy.data]);
 
   const save = async () => {
-    if (!form) return;
+    if (!form || !canManagePolicy) return;
     setBusy(true);
+    setSaveError(null);
     try {
       await api.updateAttendancePolicy({
         graceMinutes: Number(form.graceMinutes),
-        standardDailyHours: Number(form.standardDailyHours),
+        standardDailyHours: Math.round(Number(form.standardDailyHours) * 100),
         overtimeMultiplierBp: Number(form.overtimeMultiplierBp),
         deductLate: Boolean(form.deductLate),
         deductAbsence: Boolean(form.deductAbsence),
       });
       await policy.reload();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : t('common.error'));
     } finally {
       setBusy(false);
     }
@@ -1103,45 +1107,57 @@ function PolicyTab({ canManage }: { canManage: boolean }) {
     <div className="flex flex-col gap-4">
       <Card className="p-4" data-testid="attendance-policy">
         <p className="oryx-panel-title mb-3">{t('erp.hr.attendancePolicy')}</p>
-        {policy.loading || !form ? <Skeleton height={120} /> : (
+        {policy.error ? (
+          <ErrorBanner message={policy.error} onRetry={policy.reload} />
+        ) : policy.loading || !form ? (
+          <Skeleton height={120} />
+        ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Field label={t('erp.hr.graceMinutes')}>
-              <input type="number" className="oryx-input" value={String(form.graceMinutes ?? 0)} disabled={!canManage} onChange={(e) => setForm({ ...form, graceMinutes: e.target.value })} data-testid="policy-grace" />
+              <input type="number" min="0" max="120" className="oryx-input" value={String(form.graceMinutes ?? 0)} disabled={!canManagePolicy} onChange={(e) => setForm({ ...form, graceMinutes: e.target.value })} data-testid="policy-grace" />
             </Field>
             <Field label={t('erp.hr.standardDailyHours')}>
-              <input type="number" className="oryx-input" value={String(form.standardDailyHours ?? 8)} disabled={!canManage} onChange={(e) => setForm({ ...form, standardDailyHours: e.target.value })} data-testid="policy-hours" />
+              <input type="number" min="1" max="24" step="0.01" className="oryx-input" value={String(Number(form.standardDailyHours ?? 800) / 100)} disabled={!canManagePolicy} onChange={(e) => setForm({ ...form, standardDailyHours: e.target.value })} data-testid="policy-hours" />
             </Field>
             <Field label={t('erp.hr.overtimeMultiplier')} hint={t('erp.hr.overtimeHint')}>
-              <input type="number" className="oryx-input" value={String(form.overtimeMultiplierBp ?? 15000)} disabled={!canManage} onChange={(e) => setForm({ ...form, overtimeMultiplierBp: e.target.value })} data-testid="policy-ot" />
+              <input type="number" min="0" max="50000" className="oryx-input" value={String(form.overtimeMultiplierBp ?? 15000)} disabled={!canManagePolicy} onChange={(e) => setForm({ ...form, overtimeMultiplierBp: e.target.value })} data-testid="policy-ot" />
             </Field>
             <label className="flex items-center gap-2 text-[13px]">
-              <input type="checkbox" checked={Boolean(form.deductLate)} disabled={!canManage} onChange={(e) => setForm({ ...form, deductLate: e.target.checked })} data-testid="policy-deduct-late" />
+              <input type="checkbox" checked={Boolean(form.deductLate)} disabled={!canManagePolicy} onChange={(e) => setForm({ ...form, deductLate: e.target.checked })} data-testid="policy-deduct-late" />
               {t('erp.hr.deductLate')}
             </label>
             <label className="flex items-center gap-2 text-[13px]">
-              <input type="checkbox" checked={Boolean(form.deductAbsence)} disabled={!canManage} onChange={(e) => setForm({ ...form, deductAbsence: e.target.checked })} data-testid="policy-deduct-absence" />
+              <input type="checkbox" checked={Boolean(form.deductAbsence)} disabled={!canManagePolicy} onChange={(e) => setForm({ ...form, deductAbsence: e.target.checked })} data-testid="policy-deduct-absence" />
               {t('erp.hr.deductAbsence')}
             </label>
           </div>
         )}
-        {canManage ? (
+        {saveError ? <div className="mt-3"><ErrorBanner message={saveError} /></div> : null}
+        {canManagePolicy && !policy.error ? (
           <div className="mt-4">
-            <Button variant="primary" size="sm" disabled={busy} onClick={save} data-testid="save-policy">{t('common.save')}</Button>
+            <Button variant="primary" size="sm" disabled={busy || !form} onClick={save} data-testid="save-policy">
+              {busy ? t('common.loading') : t('common.save')}
+            </Button>
           </div>
         ) : null}
       </Card>
 
+      {canViewWorkSites ? (
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
           <p className="oryx-panel-title m-0">{t('erp.hr.workSites')}</p>
-          {canManage ? (
+          {canManageWorkSites ? (
             <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-work-site">
               <Icon name="plus" size={16} />
               {t('erp.hr.newWorkSite')}
             </Button>
           ) : null}
         </div>
-        {sites.loading ? <div className="p-4"><Skeleton height={100} /></div> : (sites.data?.items.length ?? 0) === 0 ? (
+        {sites.error ? (
+          <div className="p-4"><ErrorBanner message={sites.error} onRetry={sites.reload} /></div>
+        ) : sites.loading ? (
+          <div className="p-4"><Skeleton height={100} /></div>
+        ) : (sites.data?.items.length ?? 0) === 0 ? (
           <EmptyState title={t('common.empty')} hint={t('erp.hr.workSites')} />
         ) : (
           <TableShell>
@@ -1171,6 +1187,7 @@ function PolicyTab({ canManage }: { canManage: boolean }) {
         )}
         <CreateWorkSiteModal open={open} onClose={() => setOpen(false)} onSaved={sites.reload} />
       </Card>
+      ) : null}
     </div>
   );
 }
