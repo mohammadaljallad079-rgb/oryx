@@ -1552,9 +1552,14 @@ export interface InspectionServiceDto {
   code: string;
   nameEn: string;
   nameAr: string;
+  description: string | null;
   priceMinor: number;
   taxPercentBp: number;
   durationMinutes: number;
+  isActive: boolean;
+  /** Public media-library URL for the service picture, or null when none. */
+  imageUrl: string | null;
+  items: Array<{ id: string; code: string; labelEn: string; labelAr: string; category: string; sortOrder: number }>;
 }
 
 export interface InspectionBookingDto {

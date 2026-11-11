@@ -29,6 +29,14 @@
   --oryx-font-sans: Verdana, 'Segoe UI', 'Noto Sans Arabic', Arial, system-ui, -apple-system,
     'Helvetica Neue', sans-serif;
 
+  /*
+   * Tell the browser which scheme the native widgets belong to. Without this the
+   * date/time picker popup and the calendar indicator keep the operating
+   * system's default (usually light), so a dark-theme field renders a bright
+   * white panel over the navy page. It flips with the theme below.
+   */
+  color-scheme: dark;
+
   /* The official brand colours. */
   --brand-navy: #0f2b48;
   --brand-gray: #64748b;
@@ -194,6 +202,7 @@
  * fails the build when a future edit breaks contrast.
  */
 :root[data-theme='light'] {
+  color-scheme: light;
   --bg: #f7f4ed;
   --bg-deep: #efeae0;
   --surface: #ffffff;
@@ -1021,6 +1030,45 @@ body::before {
 .oryx-textarea {
   min-height: 110px;
   resize: vertical;
+}
+
+/*
+ * Native date and time fields.
+ *
+ * The calendar/clock glyph the browser paints on a date field is a native
+ * control: at the shared control height it is drawn small and sits hard against
+ * the field edge, which is what made the inspection booking picker awkward to
+ * hit. Enlarging the indicator and giving it a consistent box keeps it usable on
+ * a touch screen, and `color-scheme` (set on `:root` per theme) keeps the popup
+ * itself legible instead of always light.
+ */
+.oryx-input--date,
+input[type='date'].oryx-input,
+input[type='time'].oryx-input,
+input[type='datetime-local'].oryx-input {
+  min-height: var(--control-h);
+  padding-inline-end: 8px;
+}
+
+.oryx-input--date::-webkit-calendar-picker-indicator,
+input[type='date'].oryx-input::-webkit-calendar-picker-indicator,
+input[type='time'].oryx-input::-webkit-calendar-picker-indicator,
+input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator {
+  width: 20px;
+  height: 20px;
+  padding: 2px;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.oryx-input--date::-webkit-calendar-picker-indicator:hover,
+input[type='date'].oryx-input::-webkit-calendar-picker-indicator:hover,
+input[type='time'].oryx-input::-webkit-calendar-picker-indicator:hover,
+input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  background-color: var(--surface-hover);
 }
 
 /*

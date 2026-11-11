@@ -4052,14 +4052,22 @@ model InspectionService {
   taxPercentBp    Int      @default(0)
   durationMinutes Int      @default(60)
   isActive        Boolean  @default(true)
+  /**
+   * The picture shown beside the service on the booking screen and the
+   * catalogue. It references the shared media library, so the bytes are
+   * re-encoded and stored once rather than a second image store being created.
+   */
+  imageAssetId    String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  company  Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  items    InspectionChecklistItem[]
-  bookings InspectionBooking[]
+  company    Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  imageAsset CmsMediaAsset?            @relation(fields: [imageAssetId], references: [id], onDelete: SetNull)
+  items      InspectionChecklistItem[]
+  bookings   InspectionBooking[]
 
   @@unique([companyId, code])
+  @@index([imageAssetId])
 }
 
 model InspectionChecklistItem {
@@ -6014,6 +6022,8 @@ model CmsMediaAsset {
   inspectionPhotos CustomerInspectionPhoto[]
   /// Provider storefront photographs that reference this asset.
   providerImages   MarketplaceProvider[]     @relation("ProviderImage")
+  /// Inspection services that show this asset as their catalogue picture.
+  inspectionServices InspectionService[]
   id               String                    @id @default(cuid())
   folderId         String?
   /**

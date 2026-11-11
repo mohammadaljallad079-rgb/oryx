@@ -1294,6 +1294,11 @@ export const api = {
     request<Paginated<InspectionServiceDto>>(`/automotive/inspection-services?${toQuery(params)}`),
   createInspectionService: (body: Record<string, unknown>) =>
     request<InspectionServiceDto>('/automotive/inspection-services', { method: 'POST', body }),
+  updateInspectionService: (id: string, body: Record<string, unknown>) =>
+    request<InspectionServiceDto>(`/automotive/inspection-services/${id}`, { method: 'PATCH', body }),
+  /** Upload a service picture. Multipart, so no JSON content type may be set. */
+  uploadInspectionServiceImage: (id: string, form: FormData) =>
+    request<InspectionServiceDto>(`/automotive/inspection-services/${id}/image`, { method: 'POST', body: form, raw: true }),
   deleteInspectionService: (id: string) =>
     request<{ id: string; deleted: boolean }>(`/automotive/inspection-services/${id}`, { method: 'DELETE' }),
   inspectionBookings: (params: { companyId?: string; status?: string; page?: number } = {}) =>
