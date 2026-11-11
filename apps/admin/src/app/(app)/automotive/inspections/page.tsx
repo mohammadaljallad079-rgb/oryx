@@ -1329,6 +1329,7 @@ function ServicesTab({ canManage }: { canManage: boolean }) {
               <tr key={s.id} data-testid={`service-row-${s.code}`}>
                 <td>
                   {s.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={api.resolveImage(s.imageUrl) ?? ''}
                       alt={s.nameEn}
@@ -1478,6 +1479,7 @@ function ServiceModal({
         <p className="oryx-muted m-0 mb-2 text-[11.5px]">{t('erp.automotive.serviceImageHint')}</p>
         <div className="flex items-center gap-3">
           {service?.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img src={api.resolveImage(service.imageUrl) ?? ''} alt={service.nameEn} className="h-14 w-14 rounded-lg object-cover" data-testid="service-image-current" />
           ) : null}
           <input

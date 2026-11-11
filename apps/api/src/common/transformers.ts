@@ -31,3 +31,19 @@ export const NormaliseIsoDate = (): PropertyDecorator =>
     const trimmed = value.trim();
     return BARE_DATE.test(trimmed) ? `${trimmed}T00:00:00.000Z` : value;
   });
+
+/**
+ * Coerce a multipart string into a boolean before validation.
+ *
+ * `multipart/form-data` has no scalar types: every field arrives as a string,
+ * so a `FormData` checkbox posts `"true"` / `"false"` and `@IsBoolean()` rejects
+ * it with a 400 before the handler runs. A real boolean and the two string
+ * spellings are accepted; anything else is left untouched so a genuinely bad
+ * value still fails validation rather than silently becoming `false`.
+ */
+export const ToBoolean = (): PropertyDecorator =>
+  Transform(({ value }) => {
+    if (value === true || value === 'true') return true;
+    if (value === false || value === 'false') return false;
+    return value;
+  });

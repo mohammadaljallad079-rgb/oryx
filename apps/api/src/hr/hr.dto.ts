@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { NormaliseIsoDate } from '../common/transformers';
+import { NormaliseIsoDate, ToBoolean } from '../common/transformers';
 import {
   ArrayMinSize,
   IsArray,
@@ -101,7 +101,9 @@ export class CreateDocumentDto {
   @IsOptional() @IsString() @MaxLength(400) fileRef?: string;
   @IsOptional() @NormaliseIsoDate() @IsISO8601() issuedAt?: string;
   @IsOptional() @NormaliseIsoDate() @IsISO8601() expiresAt?: string;
-  @IsOptional() @IsBoolean() isConfidential?: boolean;
+  // The document form is multipart, so the checkbox arrives as the string
+  // "true"/"false"; coerce it before `@IsBoolean()` sees it.
+  @IsOptional() @ToBoolean() @IsBoolean() isConfidential?: boolean;
   @IsOptional() @IsString() @MaxLength(400) notes?: string;
 }
 

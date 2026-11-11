@@ -469,13 +469,6 @@ function CreateBranchModal({
             data-testid="branch-code"
           />
         </Field>
-        <Field label={t('common.city')}>
-          <input
-            className="oryx-input"
-            value={form.city}
-            onChange={(e) => setForm({ ...form, city: e.target.value })}
-          />
-        </Field>
         <Field label={`${t('common.name')} (EN)`} required>
           <input
             className="oryx-input"
@@ -490,6 +483,14 @@ function CreateBranchModal({
             value={form.nameAr}
             onChange={(e) => setForm({ ...form, nameAr: e.target.value })}
             data-testid="branch-name-ar"
+          />
+        </Field>
+        <Field label={t('common.city')}>
+          <input
+            className="oryx-input"
+            value={form.city}
+            onChange={(e) => setForm({ ...form, city: e.target.value })}
+            data-testid="branch-city"
           />
         </Field>
         <Field label={t('branches.phone')}>
