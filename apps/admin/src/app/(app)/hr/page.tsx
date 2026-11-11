@@ -70,7 +70,7 @@ export default function HrPage() {
       {tab === 'employees' ? <EmployeesTab canManage={can('erp.hr.employee.manage')} /> : null}
       {tab === 'leave' ? <LeaveTab canRequest={can('erp.hr.leave.request')} canApprove={can('erp.hr.leave.approve')} /> : null}
       {tab === 'attendance' ? <AttendanceTab canManage={can('erp.hr.attendance.manage')} canSelf={can('erp.hr.attendance.self')} /> : null}
-      {tab === 'policy' ? <PolicyTab canManagePolicy={can('erp.hr.attendance.policy')} canManageWorkSites={can('erp.hr.worksite.manage')} /> : null}
+      {tab === 'policy' ? <PolicyTab canManagePolicy={can('erp.hr.attendance.policy')} canViewWorkSites={can('erp.hr.read') || can('erp.hr.worksite.manage') || can('erp.hr.attendance.manage')} canManageWorkSites={can('erp.hr.worksite.manage')} /> : null}
       {tab === 'payroll' ? <PayrollTab canRun={can('erp.hr.payroll.run')} canApprove={can('erp.hr.payroll.approve')} /> : null}
       {tab === 'reports' ? <ReportsTab /> : null}
       {tab === 'advances' ? <AdvancesTab canManage={can('erp.hr.advance.manage')} /> : null}
@@ -1070,10 +1070,10 @@ function PayslipPdfButton({ payslipId, code }: { payslipId: string; code: string
   );
 }
 
-function PolicyTab({ canManagePolicy, canManageWorkSites }: { canManagePolicy: boolean; canManageWorkSites: boolean }) {
+function PolicyTab({ canManagePolicy, canViewWorkSites, canManageWorkSites }: { canManagePolicy: boolean; canViewWorkSites: boolean; canManageWorkSites: boolean }) {
   const { t } = useUi();
   const policy = useAsync(() => api.hrAttendancePolicy(), []);
-  const sites = useAsync(() => api.hrWorkSites(), []);
+  const sites = useAsync(() => canViewWorkSites ? api.hrWorkSites() : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 0 }), [canViewWorkSites]);
   const [form, setForm] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -1142,6 +1142,7 @@ function PolicyTab({ canManagePolicy, canManageWorkSites }: { canManagePolicy: b
         ) : null}
       </Card>
 
+      {canViewWorkSites ? (
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
           <p className="oryx-panel-title m-0">{t('erp.hr.workSites')}</p>
@@ -1186,6 +1187,7 @@ function PolicyTab({ canManagePolicy, canManageWorkSites }: { canManagePolicy: b
         )}
         <CreateWorkSiteModal open={open} onClose={() => setOpen(false)} onSaved={sites.reload} />
       </Card>
+      ) : null}
     </div>
   );
 }
