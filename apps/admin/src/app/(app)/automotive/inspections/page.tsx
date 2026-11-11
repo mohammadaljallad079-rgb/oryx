@@ -1272,34 +1272,42 @@ function ServicesTab({ canManage }: { canManage: boolean }) {
             <tr>
               <th>{t('common.code')}</th>
               <th>{t('common.name')}</th>
-              <th>{t('erp.automotive.price')}</th>
+              <th>{t('erp.automotive.priceBeforeTax')}</th>
               <th>{t('erp.inventory.taxRate')}</th>
+              <th>{t('erp.automotive.taxAmount')}</th>
+              <th>{t('erp.automotive.totalIncludingTax')}</th>
               <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
-            {list.data!.items.map((s: InspectionServiceDto) => (
-              <tr key={s.id} data-testid={`service-row-${s.code}`}>
-                <td className="font-mono text-[12px]">{s.code}</td>
-                <td className="text-[12.5px]">{s.nameEn}</td>
-                <td className="tabular-nums text-[12.5px]">{money(s.priceMinor)}</td>
-                <td className="text-[12.5px]">{(s.taxPercentBp / 100).toFixed(2)}%</td>
-                <td>
-                  {canManage ? (
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      disabled={busyId === s.id}
-                      aria-label={`${t('common.delete')} ${s.code}`}
-                      onClick={() => void removeService(s.id)}
-                      data-testid={`service-delete-${s.code}`}
-                    >
-                      <Icon name="trash" size={14} />
-                    </Button>
-                  ) : null}
-                </td>
-              </tr>
-            ))}
+            {list.data!.items.map((s: InspectionServiceDto) => {
+              const taxMinor = Math.round((s.priceMinor * s.taxPercentBp) / 10_000);
+              const totalMinor = s.priceMinor + taxMinor;
+              return (
+                <tr key={s.id} data-testid={'service-row-' + s.code}>
+                  <td className="font-mono text-[12px]">{s.code}</td>
+                  <td className="text-[12.5px]">{s.nameEn}</td>
+                  <td className="tabular-nums text-[12.5px]">{money(s.priceMinor)}</td>
+                  <td className="text-[12.5px]">{(s.taxPercentBp / 100).toFixed(2)}%</td>
+                  <td className="tabular-nums text-[12.5px]">{money(taxMinor)}</td>
+                  <td className="tabular-nums text-[12.5px] font-bold" data-testid={'service-total-' + s.code}>{money(totalMinor)}</td>
+                  <td>
+                    {canManage ? (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={busyId === s.id}
+                        aria-label={t('common.delete') + ' ' + s.code}
+                        onClick={() => void removeService(s.id)}
+                        data-testid={'service-delete-' + s.code}
+                      >
+                        <Icon name="trash" size={14} />
+                      </Button>
+                    ) : null}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </TableShell>
       )}
@@ -1312,7 +1320,7 @@ function CreateServiceModal({ open, onClose, onCreated }: { open: boolean; onClo
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', price: '0.00', taxRate: '15' });
+  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', price: '0.00', taxRate: '10' });
   const submit = async () => {
     setBusy(true); setError(null);
     try {
@@ -1335,8 +1343,13 @@ function CreateServiceModal({ open, onClose, onCreated }: { open: boolean; onClo
         <Field label={t('common.code')} required><input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="service-code" /></Field>
         <Field label={`${t('common.name')} (EN)`} required><input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="service-name-en" /></Field>
         <Field label={`${t('common.name')} (AR)`} required><input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="service-name-ar" /></Field>
-        <Field label={t('erp.automotive.price')}><input className="oryx-input" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></Field>
-        <Field label={t('erp.inventory.taxRate')}><input className="oryx-input" value={form.taxRate} onChange={(e) => setForm({ ...form, taxRate: e.target.value })} /></Field>
+        <Field label={t('erp.automotive.priceBeforeTax')}><input className="oryx-input" type="number" min="0" step="0.001" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></Field>
+        <Field label={t('erp.inventory.taxRate')}><input className="oryx-input" type="number" min="0" step="0.01" value={form.taxRate} onChange={(e) => setForm({ ...form, taxRate: e.target.value })} /></Field>
+      </div>
+      <div className="rounded-xl border border-[var(--border)] p-3 text-sm" data-testid="inspection-service-price-preview">
+        <div className="flex justify-between gap-3"><span>{t('erp.automotive.priceBeforeTax')}</span><span className="tabular-nums">{money(toMinorInput(form.price))}</span></div>
+        <div className="mt-1 flex justify-between gap-3"><span>{t('erp.automotive.taxAmount')} ({(Number(form.taxRate) || 0).toFixed(2)}%)</span><span className="tabular-nums">{money(Math.round((toMinorInput(form.price) * (Number(form.taxRate) || 0)) / 100))}</span></div>
+        <div className="mt-2 flex justify-between gap-3 border-t border-[var(--border)] pt-2 font-bold"><span>{t('erp.automotive.totalIncludingTax')}</span><span className="tabular-nums">{money(toMinorInput(form.price) + Math.round((toMinorInput(form.price) * (Number(form.taxRate) || 0)) / 100))}</span></div>
       </div>
     </Modal>
   );
