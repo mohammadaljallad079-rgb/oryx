@@ -1090,7 +1090,7 @@ function PolicyTab({ canManagePolicy, canManageWorkSites }: { canManagePolicy: b
     try {
       await api.updateAttendancePolicy({
         graceMinutes: Number(form.graceMinutes),
-        standardDailyHours: Number(form.standardDailyHours),
+        standardDailyHours: Math.round(Number(form.standardDailyHours) * 100),
         overtimeMultiplierBp: Number(form.overtimeMultiplierBp),
         deductLate: Boolean(form.deductLate),
         deductAbsence: Boolean(form.deductAbsence),
@@ -1117,7 +1117,7 @@ function PolicyTab({ canManagePolicy, canManageWorkSites }: { canManagePolicy: b
               <input type="number" min="0" max="120" className="oryx-input" value={String(form.graceMinutes ?? 0)} disabled={!canManagePolicy} onChange={(e) => setForm({ ...form, graceMinutes: e.target.value })} data-testid="policy-grace" />
             </Field>
             <Field label={t('erp.hr.standardDailyHours')}>
-              <input type="number" min="1" max="24" step="0.01" className="oryx-input" value={String(form.standardDailyHours ?? 8)} disabled={!canManagePolicy} onChange={(e) => setForm({ ...form, standardDailyHours: e.target.value })} data-testid="policy-hours" />
+              <input type="number" min="1" max="24" step="0.01" className="oryx-input" value={String(Number(form.standardDailyHours ?? 800) / 100)} disabled={!canManagePolicy} onChange={(e) => setForm({ ...form, standardDailyHours: e.target.value })} data-testid="policy-hours" />
             </Field>
             <Field label={t('erp.hr.overtimeMultiplier')} hint={t('erp.hr.overtimeHint')}>
               <input type="number" min="0" max="50000" className="oryx-input" value={String(form.overtimeMultiplierBp ?? 15000)} disabled={!canManagePolicy} onChange={(e) => setForm({ ...form, overtimeMultiplierBp: e.target.value })} data-testid="policy-ot" />
