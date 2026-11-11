@@ -62,7 +62,8 @@ let receiptNumber: string;
 test.describe('print preview and document attachments', () => {
   // The suite reads the seeded ORYX-AUTO documents rather than creating any, so
   // it leaves the tenant exactly as it found it (the only mutation is an
-  // attachment the last test uploads and then removes).
+  // attachment the last test uploads and then removes). A receipt is the one
+  // document the seed does not carry, so it is created on demand — see below.
   test.beforeAll(async () => {
     const superToken = await tokenFor(SUPER_ADMIN.email, SUPER_ADMIN.password);
     const companyId = await autoCompanyId(superToken);
@@ -81,12 +82,34 @@ test.describe('print preview and document attachments', () => {
 
       const payments = await ctx.get(`${API}/accounting/payments`, { headers });
       expect(payments.ok(), `payment list failed with ${payments.status()}`).toBe(true);
-      const receipt = (
+      let receipt = (
         (await payments.json()) as { items: Array<{ id: string; paymentNumber: string; direction: string }> }
       ).items.find((p) => p.direction === 'RECEIPT');
-      expect(receipt, 'a seeded receipt is required').toBeTruthy();
-      receiptId = receipt!.id;
-      receiptNumber = receipt!.paymentNumber;
+      if (!receipt) {
+        // The seed carries no financial documents and the API suite removes the
+        // payments it posts, so a receipt is created here instead of assumed.
+        // It is a cash receipt against the seeded customer, posted to the
+        // ledger by the accounting service exactly as an operator entry is.
+        const customers = await ctx.get(`${API}/sales/customers?pageSize=1`, { headers });
+        expect(customers.ok(), `customer list failed with ${customers.status()}`).toBe(true);
+        const customerId = ((await customers.json()) as { items: Array<{ id: string }> }).items[0]?.id;
+        expect(customerId, 'a seeded customer is required').toBeTruthy();
+        const created = await ctx.post(`${API}/accounting/payments`, {
+          headers,
+          data: {
+            direction: 'RECEIPT',
+            partyType: 'CUSTOMER',
+            customerId,
+            method: 'CASH',
+            amountMinor: 1000,
+            paidAt: '2026-05-03',
+          },
+        });
+        expect(created.ok(), `receipt creation failed with ${created.status()} ${await created.text()}`).toBe(true);
+        receipt = (await created.json()) as { id: string; paymentNumber: string; direction: string };
+      }
+      receiptId = receipt.id;
+      receiptNumber = receipt.paymentNumber;
     } finally {
       await ctx.dispose();
     }
