@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { inspectionSectionSpec, type InspectionSectionKey } from '@oryx/shared';
+import { inspectionSectionSpec, sectionsForReportPage, type InspectionSectionKey } from '@oryx/shared';
 import type {
   InspectionSessionDto,
   InspectionProgressDto,
@@ -17,6 +17,16 @@ import { Icon } from '@/components/icons';
 import { Badge, Button, Card, ErrorBanner, Field, Modal, SectionHeader, Skeleton, StatusBadge } from '@/components/ui';
 import { BodyDiagram, ChassisDiagram, type ChassisRegionValue, type PaintMarker } from '@/components/inspection/diagrams';
 import { DocumentsPanel } from '@/components/documents-panel';
+import { inspectionFieldLabelParts, INSPECTION_COVER_ROWS, INSPECTION_VEHICLE_INFO, type InspectionIdentityKey } from '@/lib/inspection-fields';
+
+/**
+ * The sections the report's shared interior/exterior/engine/road page carries.
+ *
+ * Derived from the report's own page plan rather than a second list, so the
+ * general-remarks input appears exactly when the printed document carries the
+ * remarks block it feeds.
+ */
+const GROUP_PAGE_AREAS = sectionsForReportPage(4).map((s) => s.key);
 
 /**
  * The inspection workspace.
@@ -129,6 +139,18 @@ export default function InspectionWorkspacePage() {
           ) : (
             <Card>{t('inspection.noSections')}</Card>
           )}
+          {/* The report prints the general remarks block on its inspection-group
+              page, so the input is offered whenever a section that page carries
+              was selected — the same rule the printed document follows. */}
+          {session.selectedAreas.some((a) => GROUP_PAGE_AREAS.includes(a)) ? (
+            <GeneralRemarksCard
+              sessionId={id}
+              session={session}
+              editable={editable && canWrite}
+              onSaved={applySession}
+              onError={setError}
+            />
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-4">
@@ -207,30 +229,131 @@ export default function InspectionWorkspacePage() {
   );
 }
 
-/** The identification header, repeated on every printed section. */
+/**
+ * The identification panel, laid out as the report's cover prints it.
+ *
+ * The report's cover is the source of truth for this block: it carries eleven
+ * fields (Customer Name, Contact No., Date & Time, Job No., Plate No., Car
+ * Make, Car Model, Car Year, ODO Meter, Car Color, VIN Number). The workspace
+ * shows the same eleven values under the same bilingual labels, so an operator
+ * reads on screen exactly the identification the issued report will carry.
+ */
 function IdentityCard({ session }: { session: InspectionSessionDto }) {
-  const { t } = useUi();
-  const rows: Array<[string, string]> = [
-    [t('inspection.customer'), session.customerName],
-    [t('inspection.contact'), session.contactNumber ?? '—'],
-    [t('inspection.plate'), session.plateNumber ?? '—'],
-    [t('inspection.vin'), session.vin],
-    [t('inspection.year'), String(session.modelYear)],
-    [t('inspection.odometer'), session.odometer !== null ? `${session.odometer.toLocaleString()} km` : '—'],
-    [t('inspection.inspectedAt'), new Date(session.inspectedAt).toLocaleString()],
-  ];
+  const values: Record<InspectionIdentityKey, string> = {
+    customerName: session.customerName,
+    contactNumber: session.contactNumber ?? '—',
+    inspectedAt: new Date(session.inspectedAt).toLocaleString(),
+    jobNumber: session.jobNumber,
+    plateNumber: session.plateNumber ?? '—',
+    make: session.make,
+    model: session.model,
+    modelYear: String(session.modelYear),
+    odometer: session.odometer !== null ? `${session.odometer.toLocaleString()} km` : '—',
+    color: session.color ?? '—',
+    vin: session.vin,
+  };
   return (
-    <Card>
-      <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-4" data-testid="inspection-identity">
-        {rows.map(([label, value]) => (
-          <div key={label} className="min-w-0">
-            <div className="oryx-label">{label}</div>
-            <div className="truncate text-[13.5px] font-medium" title={value}>
-              {value}
-            </div>
-          </div>
-        ))}
+    <div className="oryx-doc-form__cover">
+      <div className="oryx-doc-form__cover-band">
+        <span>
+          {INSPECTION_VEHICLE_INFO.ar}
+          <span className="ltr">{INSPECTION_VEHICLE_INFO.en}</span>
+        </span>
       </div>
+      <div className="oryx-doc-form__cover-grid" data-testid="inspection-identity">
+        {INSPECTION_COVER_ROWS.flat().map(({ key, span }) => {
+          const label = inspectionFieldLabelParts(key);
+          const wide = span === 2 ? ' oryx-doc-form__cover-cell--wide' : '';
+          const value = values[key];
+          return (
+            <div key={key} className={`oryx-doc-form__cover-cell${wide}`}>
+              <span className="oryx-doc-form__cover-label">
+                <span className="ltr">{label.en}</span>
+                <span className="var">{label.ar}</span>
+              </span>
+              <span className="truncate text-[13.5px] font-semibold" title={value}>
+                {value}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The general remarks the report prints on its inspection-group page.
+ *
+ * The printed document carries a "General Inspection Remarks" block after the
+ * checklist tables, composed from the session's general remarks and its final
+ * assessment. This card is that block's input: both fields map to the exact
+ * lines the report renders, so nothing the report prints is left without a
+ * source, and the screen carries no field the document would drop.
+ */
+function GeneralRemarksCard({
+  sessionId,
+  session,
+  editable,
+  onSaved,
+  onError,
+}: {
+  sessionId: string;
+  session: InspectionSessionDto;
+  editable: boolean;
+  onSaved: (s: InspectionSessionDto) => void;
+  onError: (message: string) => void;
+}) {
+  const { t, locale } = useUi();
+  const [busy, setBusy] = useState(false);
+  const [remarks, setRemarks] = useState(session.generalRemarks ?? '');
+  const [assessment, setAssessment] = useState(session.finalAssessment ?? '');
+
+  useEffect(() => {
+    setRemarks(session.generalRemarks ?? '');
+    setAssessment(session.finalAssessment ?? '');
+  }, [session.generalRemarks, session.finalAssessment]);
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      onSaved(await api.updateInspectionSession(sessionId, { generalRemarks: remarks, finalAssessment: assessment }));
+    } catch (e) {
+      onError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card data-testid="inspection-general-remarks">
+      <Field label={locale === 'ar' ? 'الملاحظات والتعليقات العامة' : 'General Inspection Remarks'}>
+        <textarea
+          className="oryx-input"
+          rows={3}
+          value={remarks}
+          disabled={!editable}
+          onChange={(e) => setRemarks(e.target.value)}
+          data-testid="general-remarks"
+        />
+      </Field>
+      <Field label={locale === 'ar' ? 'التقييم النهائي' : 'Final Assessment'}>
+        <textarea
+          className="oryx-input"
+          rows={2}
+          value={assessment}
+          disabled={!editable}
+          onChange={(e) => setAssessment(e.target.value)}
+          data-testid="final-assessment"
+        />
+      </Field>
+      {editable ? (
+        <div className="mt-2 flex justify-end">
+          <Button size="sm" variant="primary" disabled={busy} onClick={() => void save()} data-testid="save-general-remarks">
+            {busy ? t('common.loading') : t('common.save')}
+          </Button>
+        </div>
+      ) : null}
     </Card>
   );
 }

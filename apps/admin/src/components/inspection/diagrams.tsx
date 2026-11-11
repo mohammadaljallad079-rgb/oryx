@@ -3,12 +3,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   BODY_DIAGRAM_ID,
-  BODY_GLASS_PATHS,
-  BODY_PANELS,
-  BODY_SEAM_PATHS,
-  BODY_SILHOUETTE,
-  BODY_VIEWBOX,
-  BODY_WHEELS,
   CHASSIS_DIAGRAM_ID,
   CHASSIS_OUTLINE,
   CHASSIS_REGIONS,
@@ -119,28 +113,46 @@ function useHistory<T>(value: T, apply: (next: T) => void) {
   return { commit, begin, end, undo, redo, canUndo: past.current.length > 0, canRedo: future.current.length > 0 };
 }
 
-/** The drawn vehicle elevation, shared with the printed report. */
+/**
+ * The approved ORYX body-panel diagnostic scheme, from the owner's reference
+ * form (`oryx out put.pdf` page 2).
+ *
+ * This is the authentic artwork itself, not a reconstruction: the file is the
+ * approved image extracted from the reference PDF (with its alpha mask), so the
+ * form and the reference document show the same vehicle. It is served from
+ * `/inspection/body-scheme.png` and drawn with `object-fit: contain`, which
+ * keeps the approved proportions at any screen size.
+ */
+const BODY_SCHEME_SRC = '/inspection/body-scheme.png';
+
 function BodyArt() {
   return (
-    <svg viewBox={`0 0 ${BODY_VIEWBOX.width} ${BODY_VIEWBOX.height}`} className="oryx-diagram__svg" aria-hidden="true">
-      <path className="oryx-diagram__body" d={BODY_SILHOUETTE} />
-      {BODY_GLASS_PATHS.map((d) => (
-        <path key={d} className="oryx-diagram__glass" d={d} />
-      ))}
-      {BODY_PANELS.map((p) => (
-        <path key={p.key} className="oryx-diagram__panel" d={p.d} />
-      ))}
-      {BODY_WHEELS.map((w) => (
-        <g key={`${w.cx}-${w.cy}`}>
-          <circle className="oryx-diagram__wheel" cx={w.cx} cy={w.cy} r={w.r} />
-          <circle className="oryx-diagram__rim" cx={w.cx} cy={w.cy} r={w.r * 0.45} />
-        </g>
-      ))}
-      {BODY_SEAM_PATHS.map((d) => (
-        <path key={d} className="oryx-diagram__seam" d={d} />
-      ))}
-    </svg>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img className="oryx-diagram__art" src={BODY_SCHEME_SRC} alt="" aria-hidden="true" draggable={false} />
   );
+}
+
+/**
+ * Map a point on the authentic artwork to the shared panel geometry.
+ *
+ * The canvas shows the approved drawing edge to edge, so a normalised point is
+ * a fraction of the artwork. `bodyPanelAt` was authored against the older
+ * `BODY_VIEWBOX`, where the vehicle sat inside a margin, so the point is remapped
+ * from the artwork's vehicle box onto that viewBox's vehicle box before the hit
+ * test. The marker itself keeps its artwork coordinates, so it reopens exactly
+ * where the inspector dropped it.
+ */
+const ART_VEHICLE = { x0: 0.0186, x1: 0.9783, y0: 0.0138, y1: 0.9839 } as const;
+const VB_VEHICLE = { x0: 0.0885, x1: 0.9038, y0: 0.058, y1: 0.858 } as const;
+
+function artworkToPanelSpace(x: number, y: number): { x: number; y: number } {
+  const mx =
+    VB_VEHICLE.x0 +
+    ((x - ART_VEHICLE.x0) / (ART_VEHICLE.x1 - ART_VEHICLE.x0)) * (VB_VEHICLE.x1 - VB_VEHICLE.x0);
+  const my =
+    VB_VEHICLE.y0 +
+    ((y - ART_VEHICLE.y0) / (ART_VEHICLE.y1 - ART_VEHICLE.y0)) * (VB_VEHICLE.y1 - VB_VEHICLE.y0);
+  return { x: mx, y: my };
 }
 
 export function BodyDiagram({
@@ -181,7 +193,8 @@ export function BodyDiagram({
   const addAt = (clientX: number, clientY: number) => {
     if (disabled) return;
     const { x, y } = pointFrom(clientX, clientY);
-    const panel = bodyPanelAt(x, y);
+    const p = artworkToPanelSpace(x, y);
+    const panel = bodyPanelAt(p.x, p.y);
     const next = [...valueRef.current, { condition: tool, x, y, panelKey: panel?.key ?? null }];
     commit(next);
     setSelected(next.length - 1);
@@ -195,7 +208,8 @@ export function BodyDiagram({
     const before = begin();
     const onMove = (ev: PointerEvent) => {
       const { x, y } = pointFrom(ev.clientX, ev.clientY);
-      const panel = bodyPanelAt(x, y);
+      const p = artworkToPanelSpace(x, y);
+      const panel = bodyPanelAt(p.x, p.y);
       onChange(valueRef.current.map((m, i) => (i === index ? { ...m, x, y, panelKey: panel?.key ?? null } : m)));
     };
     const onUp = () => {

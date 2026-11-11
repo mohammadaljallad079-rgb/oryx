@@ -341,6 +341,24 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   attached to rather than image drift. `test-ui` in `ci.yml` and `verify` in
   `preview.yml` are pinned; lift the pin when Playwright supports 26.04.
 
+### Vehicle inspection gotchas
+
+- **The approved body-panel artwork is an image, not vector geometry.** The
+  inspection form's paint diagram (`apps/admin/src/components/inspection/diagrams.tsx`)
+  now draws the owner's reference artwork itself, extracted from `oryx out put.pdf`
+  page 2 (embedded image xref 1816 + its alpha mask xref 2408) and served from
+  `apps/admin/public/inspection/body-scheme.png` (323×436, portrait). Do not
+  reintroduce the reconstructed `BODY_SILHOUETTE`/`BODY_PANELS` SVG: it is a
+  different vehicle and does not match the approved form.
+- **Marker panel tagging is remapped, not raw.** The canvas shows the artwork
+  edge to edge, so `artworkToPanelSpace` maps a normalised point from the
+  artwork's vehicle box onto the older `BODY_VIEWBOX` vehicle box before calling
+  `bodyPanelAt`. If the artwork crop or canvas aspect changes, update
+  `ART_VEHICLE`/`VB_VEHICLE` in the same file, or a marker lands on the wrong
+  panel.
+- **The body canvas is portrait** (`aspect-ratio: 323 / 436`, `max-width: 420px`).
+  The old `1000 / 420` landscape ratio stretched the drawing.
+
 ### Execution 05 gotchas
 
 - **A Prisma `upsert` on a sequence row races when the row does not exist yet.**

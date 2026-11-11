@@ -384,6 +384,115 @@ body::before {
   font-weight: 700;
 }
 
+/*
+ * The inspection cover form.
+ *
+ * The printed vehicle-inspection report opens with a "Vehicle Information"
+ * table: a navy title band over a bordered four-column grid, each cell carrying
+ * a small bilingual label above its value. This block is that table's input
+ * mirror — the same title band, the same four-column rhythm and the same
+ * label-above-field cell — so the screen an operator fills and the sheet the
+ * customer receives present the identification identically.
+ */
+.oryx-doc-form__cover {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-raised);
+}
+
+.oryx-doc-form__cover-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--navy);
+  color: var(--on-media);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.oryx-doc-form__cover-band .ltr {
+  margin-inline-start: 8px;
+  color: var(--gold-soft);
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.oryx-doc-form__cover-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gold-soft);
+}
+
+.oryx-doc-form__cover-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.oryx-doc-form__cover-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-inline-end: 1px solid var(--border);
+  border-block-end: 1px solid var(--border);
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+/* VIN spans the final two columns, exactly as the report prints it. */
+.oryx-doc-form__cover-cell--wide {
+  grid-column: span 2;
+}
+
+.oryx-doc-form__cover-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+.oryx-doc-form__cover-label .ltr {
+  color: var(--text);
+}
+
+.oryx-doc-form__cover-label .var {
+  direction: rtl;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.oryx-doc-form__cover-cell .oryx-input {
+  height: 34px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.oryx-doc-form__cover-cell .oryx-input:disabled {
+  opacity: 0.75;
+}
+
+@media (max-width: 860px) {
+  .oryx-doc-form__cover-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .oryx-doc-form__cover-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .oryx-doc-form__cover-cell--wide {
+    grid-column: span 1;
+  }
+}
+
 /* The mirror of the printed five-column table (Description, Quantity, Unit
    Price, Taxes, Amount) plus the per-line discount input that feeds the printed
    "Discount" totals row and a narrow row-action column. Description leads and
@@ -414,6 +523,82 @@ body::before {
 }
 
 /*
+ * The POS terminal. A till is read at arm's length across a counter, so the
+ * layout is dense, high-contrast and touch-first: a product grid that fills the
+ * width, a fixed-width order rail, and a wide always-visible tender block. The
+ * whole terminal is scoped under `.oryx-pos` so no rule leaks into other screens.
+ */
+.oryx-pos {
+  --pos-ink: var(--text);
+  --pos-soft: var(--muted);
+  --pos-line: var(--border);
+  --pos-raised: var(--surface-raised);
+  --pos-panel: var(--surface);
+  padding: 14px;
+  overflow: hidden;
+}
+
+.oryx-pos__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--pos-line);
+  border-radius: 14px;
+  background: var(--pos-panel);
+  flex: 0 0 auto;
+}
+
+.oryx-pos__search {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.oryx-pos__search .oryx-input {
+  height: 46px;
+  padding-inline-start: 42px;
+  font-size: 15px;
+}
+
+.oryx-pos__search-icon {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 14px;
+  display: grid;
+  place-items: center;
+  color: var(--pos-soft);
+  pointer-events: none;
+}
+
+.oryx-pos__chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-block: 2px;
+  scrollbar-width: thin;
+}
+
+.oryx-pos__chips .oryx-chip {
+  flex: 0 0 auto;
+  height: 34px;
+  padding-inline: 14px;
+  font-size: 12.5px;
+}
+
+/* The product grid: as many columns as the width allows, each tile square-ish. */
+.oryx-pos__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+  gap: 12px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-inline-end: 4px;
+  align-content: start;
+}
+
+/*
  * A product tile in the POS grid. The media box keeps a fixed aspect so a row
  * of tiles lines up whether or not each product has a photograph, and the whole
  * tile is the hit target so a mis-aimed tap still adds the product.
@@ -423,9 +608,9 @@ body::before {
   flex-direction: column;
   gap: 0;
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--surface);
+  border: 1px solid var(--pos-line);
+  border-radius: 16px;
+  background: var(--pos-panel);
   padding: 0;
   text-align: start;
   cursor: pointer;
@@ -435,11 +620,15 @@ body::before {
 .oryx-pos-tile:hover:not(:disabled) {
   border-color: var(--accent);
   box-shadow: var(--shadow-card);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+}
+
+.oryx-pos-tile:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .oryx-pos-tile:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
@@ -449,7 +638,7 @@ body::before {
   aspect-ratio: 4 / 3;
   width: 100%;
   overflow: hidden;
-  background: var(--surface-raised);
+  background: var(--pos-raised);
 }
 
 .oryx-pos-tile__media img {
@@ -483,7 +672,7 @@ body::before {
 
 .oryx-pos-tile__price {
   margin-block-start: 3px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--accent-strong, var(--text));
 }
@@ -491,7 +680,143 @@ body::before {
 /* The on-hand figure under the price, so a cashier reads availability at a glance. */
 .oryx-pos-tile__stock {
   font-size: 10.5px;
-  color: var(--muted);
+  color: var(--pos-soft);
+}
+
+/* The order rail that holds the live cart and the tender controls. */
+.oryx-pos__rail {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--pos-line);
+  border-radius: 16px;
+  background: var(--pos-panel);
+  overflow: hidden;
+  min-height: 0;
+}
+
+.oryx-pos__rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--pos-line);
+  background: var(--pos-raised);
+}
+
+.oryx-pos__rail-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.oryx-pos__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 12px;
+}
+
+.oryx-pos__empty {
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--pos-soft);
+  font-size: 12.5px;
+}
+
+.oryx-pos__line {
+  border: 1px solid var(--pos-line);
+  border-radius: 12px;
+  background: var(--pos-raised);
+  padding: 10px;
+}
+
+.oryx-pos__line-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.oryx-pos__line-name {
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.oryx-pos__line-remove {
+  flex: 0 0 auto;
+}
+
+/* The tender block: totals plus the payment controls, always at the foot. */
+.oryx-pos__tender {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--pos-line);
+  background: var(--pos-raised);
+  padding: 12px 14px;
+}
+
+.oryx-pos__totals {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.oryx-pos__grand {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--pos-line);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.oryx-pos__change {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.oryx-pos__pay {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.oryx-pos__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.oryx-pos__complete {
+  grid-column: 1 / -1;
+  height: 52px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+@media (min-width: 1024px) {
+  .oryx-pos__pay {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 /*
@@ -1147,6 +1472,30 @@ body::before {
 }
 
 /*
+ * The POS terminal takes the whole viewport. A till is operated at speed behind
+ * a counter, and a centred dialog wastes the edges of a wide screen that the
+ * product grid needs. The dialog becomes a full-height flex column so the grid
+ * and the cart scroll on their own while the header and the tender bar stay
+ * pinned. Declared after `.oryx-modal` so it wins on equal specificity.
+ */
+.oryx-modal-backdrop--pos {
+  padding: 0;
+  place-items: stretch;
+}
+
+.oryx-modal--pos {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  border-radius: 0;
+  border: none;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/*
  * A document preview needs the full width and height of the viewport: an A4
  * page rendered into a 720px modal is illegible, and the point of a preview is
  * to read the page before printing it. The frame holds the browser's own PDF
@@ -1608,14 +1957,29 @@ body::before {
   cursor: crosshair;
 }
 
+/* The body canvas takes the approved artwork's own proportions, so the drawing
+ * is never stretched: the top-view scheme is taller than it is wide. */
 .oryx-diagram__canvas--body {
-  aspect-ratio: 1000 / 420;
+  aspect-ratio: 323 / 436;
+  max-width: 420px;
+  margin: 0 auto;
 }
 
 .oryx-diagram__svg {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* The approved ORYX body-panel drawing, served as an image. `contain` keeps its
+ * aspect inside the canvas, which is authored at the same ratio. */
+.oryx-diagram__art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
 }
 
 .oryx-diagram__body {

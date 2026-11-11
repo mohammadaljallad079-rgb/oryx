@@ -148,15 +148,15 @@ function jobStrip(p: InspectionReportPayload): string {
       }).format(when);
   const car = `${v.make} ${v.model} (${v.modelYear})`;
   return `
-  <div class="job-line">
-    <span class="job-no num">JOB #${esc(p.jobNumber)}</span>
+  <div class="job-head">
     <span class="job-date num">${esc(stamp)}</span>
+    <span class="job-no num">JOB #${esc(p.jobNumber)}</span>
   </div>
   <div class="vstrip">
-    <div class="vcell"><span class="vcell-lab">رقم القاعدة (الشاصي)<br><span class="ltr">VIN Number</span></span><span class="vcell-val num">${esc(v.vin)}</span></div>
-    <div class="vcell"><span class="vcell-lab">رقم اللوحة<br><span class="ltr">Plate No.</span></span><span class="vcell-val num">${esc(orDash(v.plateNumber))}</span></div>
-    <div class="vcell"><span class="vcell-lab">السيارة<br><span class="ltr">Car</span></span><span class="vcell-val">${esc(car)}</span></div>
-    <div class="vcell"><span class="vcell-lab">عداد المسافات<br><span class="ltr">ODO Meter</span></span><span class="vcell-val num">${esc(grouped(v.odometer))} km</span></div>
+    <div class="vcell"><span class="vcell-lab"><span class="ltr">Car</span> السيارة</span><span class="vcell-val">${esc(car)}</span></div>
+    <div class="vcell"><span class="vcell-lab"><span class="ltr">Plate No.</span> رقم اللوحة</span><span class="vcell-val num">${esc(orDash(v.plateNumber))}</span></div>
+    <div class="vcell"><span class="vcell-lab"><span class="ltr">VIN Number</span> رقم القاعدة (الشاصي)</span><span class="vcell-val num">${esc(v.vin)}</span></div>
+    <div class="vcell"><span class="vcell-lab"><span class="ltr">ODO Meter</span> عداد المسافات</span><span class="vcell-val num">${esc(grouped(v.odometer))} km</span></div>
   </div>`;
 }
 
@@ -251,17 +251,23 @@ export function identificationPage(input: InspectionReportInput, chrome: Documen
       <div class="cover-info">
         <div class="cover-sec-title">معلومات المركبة<span class="ltr">Vehicle Information</span></div>
         <table class="vinfo">
-          <tr><th>اسم العميل<span class="ltr">Customer Name</span></th><td>${esc(p.customerName)}</td>
-              <th>رقم التواصل<span class="ltr">Contact No.</span></th><td class="num">${esc(orDash(p.contactNumber))}</td></tr>
-          <tr><th>رقم العمل<span class="ltr">Job No.</span></th><td class="num">${esc(p.jobNumber)}</td>
-              <th>التاريخ والوقت<span class="ltr">Date &amp; Time</span></th><td class="num">${esc(stamp)}</td></tr>
-          <tr><th>رقم اللوحة<span class="ltr">Plate No.</span></th><td class="num">${esc(orDash(v.plateNumber))}</td>
-              <th>نوع السيارة<span class="ltr">Car Make</span></th><td>${esc(v.make)}</td></tr>
-          <tr><th>طراز السيارة<span class="ltr">Car Model</span></th><td>${esc(v.model)}</td>
-              <th>سنة الصنع<span class="ltr">Car Year</span></th><td class="num">${esc(v.modelYear)}</td></tr>
-          <tr><th>عداد المسافات<span class="ltr">ODO Meter</span></th><td class="num">${esc(grouped(v.odometer))} km</td>
-              <th>لون السيارة<span class="ltr">Car Color</span></th><td>${esc(orDash(v.color))}</td></tr>
-          <tr><th>رقم القاعدة (الشاصي)<span class="ltr">VIN Number</span></th><td class="num" colspan="3">${esc(v.vin)}</td></tr>
+          <tr>
+            <td><span class="vlab"><span class="ltr">Customer Name</span><span class="var">اسم العميل</span></span><span class="vval">${esc(p.customerName)}</span></td>
+            <td><span class="vlab"><span class="ltr">Contact No.</span><span class="var">رقم التواصل</span></span><span class="vval num">${esc(orDash(p.contactNumber))}</span></td>
+            <td><span class="vlab"><span class="ltr">Date &amp; Time</span><span class="var">التاريخ والوقت</span></span><span class="vval num">${esc(stamp)}</span></td>
+            <td><span class="vlab"><span class="ltr">Job No.</span><span class="var">رقم العمل</span></span><span class="vval num">${esc(p.jobNumber)}</span></td>
+          </tr>
+          <tr>
+            <td><span class="vlab"><span class="ltr">Plate No.</span><span class="var">رقم اللوحة</span></span><span class="vval num">${esc(orDash(v.plateNumber))}</span></td>
+            <td><span class="vlab"><span class="ltr">Car Make</span><span class="var">نوع السيارة</span></span><span class="vval">${esc(v.make)}</span></td>
+            <td><span class="vlab"><span class="ltr">Car Model</span><span class="var">طراز السيارة</span></span><span class="vval">${esc(v.model)}</span></td>
+            <td><span class="vlab"><span class="ltr">Car Year</span><span class="var">سنة الصنع</span></span><span class="vval num">${esc(v.modelYear)}</span></td>
+          </tr>
+          <tr>
+            <td><span class="vlab"><span class="ltr">ODO Meter</span><span class="var">عداد المسافات</span></span><span class="vval num">${esc(grouped(v.odometer))} km</span></td>
+            <td><span class="vlab"><span class="ltr">Car Color</span><span class="var">لون السيارة</span></span><span class="vval">${esc(orDash(v.color))}</span></td>
+            <td colspan="2"><span class="vlab"><span class="ltr">VIN Number</span><span class="var">رقم القاعدة (الشاصي)</span></span><span class="vval num">${esc(v.vin)}</span></td>
+          </tr>
         </table>
         ${vehiclePhoto(p)}
       </div>
@@ -595,28 +601,32 @@ function diagnosticSection(section: InspectionReportSection | undefined): string
 
 export const INSPECTION_REPORT_CSS = `
   /* ---- brand band ---- */
-  .report-head{ display:flex; justify-content:space-between; align-items:center;
-    border-bottom:2.5px solid var(--navy); padding-bottom:4px; margin-bottom:5px; }
-  .rh-left{ display:flex; align-items:center; gap:8px; }
-  .rh-logo{ height:34px; width:auto; }
-  .rh-monogram{ width:34px; height:34px; border-radius:7px; background:var(--navy); color:var(--gold);
-    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13pt; letter-spacing:.5px; }
-  .rh-name{ display:flex; flex-direction:column; line-height:1.1; }
-  .rh-name-ar{ font-size:12pt; font-weight:700; color:var(--navy); }
-  .rh-name-en{ font-size:8pt; font-weight:700; color:var(--muted); letter-spacing:.5px; text-transform:uppercase; }
-  .rh-right{ display:flex; flex-direction:column; align-items:flex-end; line-height:1.15; text-align:end; }
-  .rh-tag-ar{ font-size:8.5pt; color:var(--navy-soft); }
-  .rh-tag-en{ font-size:7pt; font-weight:700; color:var(--gold); letter-spacing:.6px; }
+  /* The approved form prints the brand lockup on the visual left and the
+   * "inspection experts" tagline on the visual right. The document is RTL, so
+   * the band itself is forced LTR to keep that arrangement. */
+  .report-head{ display:flex; direction:ltr; justify-content:space-between; align-items:center;
+    padding-bottom:4px; margin-bottom:2px; }
+  .rh-left{ display:flex; align-items:center; gap:9px; }
+  .rh-logo{ height:38px; width:auto; }
+  .rh-monogram{ width:38px; height:38px; border-radius:8px; background:var(--navy); color:var(--gold);
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14pt; letter-spacing:.5px; }
+  .rh-name{ display:flex; flex-direction:column; line-height:1.12; }
+  .rh-name-ar{ font-size:14pt; font-weight:700; color:var(--navy); }
+  .rh-name-en{ font-size:8.5pt; font-weight:700; color:var(--muted); letter-spacing:.6px; text-transform:uppercase; }
+  .rh-right{ display:flex; flex-direction:column; align-items:flex-end; line-height:1.2; text-align:right; }
+  .rh-tag-ar{ font-size:11pt; font-weight:700; color:var(--navy); }
+  .rh-tag-en{ font-size:7.6pt; font-weight:700; color:var(--gold); letter-spacing:.6px; }
   /* ---- shared page furniture ---- */
   .p-title{ display:flex; flex-direction:column; align-items:center; margin:0 0 6px; }
   .p-title-ar{ font-size:15pt; font-weight:700; color:var(--navy); }
   .p-title-en{ font-size:9.5pt; font-weight:700; color:var(--muted); letter-spacing:.6px; text-transform:uppercase; }
-  .job-line{ display:flex; justify-content:space-between; align-items:baseline; background:var(--navy); color:#fff;
-    padding:4px 10px; border-radius:5px 5px 0 0; font-size:9.5pt; font-weight:700; }
-  .vstrip{ display:flex; border:1px solid var(--line); border-top:none; border-radius:0 0 5px 5px; overflow:hidden; }
+  .job-head{ display:flex; direction:ltr; justify-content:space-between; align-items:baseline;
+    font-size:8.4pt; font-weight:700; color:var(--navy); padding:1px 2px 3px; }
+  .vstrip{ display:flex; direction:ltr; border:1px solid var(--line); border-radius:5px; overflow:hidden; }
   .vcell{ flex:1 1 0; padding:4px 8px; border-inline-end:1px solid var(--line); }
   .vcell:last-child{ border-inline-end:none; }
-  .vcell-lab{ display:block; font-size:7pt; color:var(--muted); line-height:1.15; }
+  .vcell-lab{ display:block; font-size:7pt; color:var(--muted); line-height:1.2; }
+  .vcell-lab .ltr{ font-weight:700; color:var(--navy-soft); }
   .vcell-val{ display:block; font-size:9.5pt; font-weight:700; color:var(--ink); }
   .ltr{ direction:ltr; unicode-bidi:isolate; }
   .lg-chip{ display:inline-flex; align-items:center; gap:4px; font-size:8pt; color:var(--ink); margin-inline-start:10px; }
@@ -626,11 +636,12 @@ export const INSPECTION_REPORT_CSS = `
   .cover-info{ flex:1 1 auto; }
   .cover-sec-title{ background:var(--navy); color:#fff; font-size:9.5pt; font-weight:700; padding:3px 10px; border-radius:5px 5px 0 0; }
   .cover-sec-title .ltr{ margin-inline-start:8px; color:var(--gold-soft); font-size:8pt; font-weight:400; }
-  .vinfo{ border:1px solid var(--line); border-top:none; }
-  .vinfo th,.vinfo td{ border:1px solid var(--line); padding:3px 7px; font-size:8pt; text-align:start; vertical-align:middle; }
-  .vinfo th{ width:16%; background:#f7f9fc; color:var(--muted); font-weight:400; font-size:7.5pt; line-height:1.15; }
-  .vinfo th .ltr{ display:block; }
-  .vinfo td{ width:34%; font-weight:700; color:var(--ink); }
+  .vinfo{ border:1px solid var(--line); border-top:none; border-collapse:collapse; direction:ltr; }
+  .vinfo td{ border:1px solid var(--line); padding:3px 8px; width:25%; vertical-align:top; }
+  .vlab{ display:flex; align-items:baseline; gap:6px; font-size:7.3pt; color:var(--muted); line-height:1.2; }
+  .vlab .ltr{ font-weight:700; color:var(--navy-soft); }
+  .vlab .var{ direction:rtl; color:var(--muted); }
+  .vval{ display:block; margin-top:1px; font-size:8.8pt; font-weight:700; color:var(--ink); }
   .cover-verify{ flex:0 0 250px; }
   .cover-verify .verify{ margin-top:0; flex-direction:column; align-items:stretch; }
   .cover-verify .verify-qr{ display:flex; justify-content:center; }

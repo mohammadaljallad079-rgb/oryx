@@ -132,11 +132,12 @@ export function Modal({
   children: ReactNode;
   footer?: ReactNode;
   /**
-   * `full` widens the dialog for a workspace such as the POS terminal and
+   * `full` widens the dialog for a workspace such as the POS terminal,
    * `document` for the invoice/quotation form, which lays out two information
-   * panels and a five-column item table to mirror the printed page.
+   * panels and a five-column item table to mirror the printed page, and `pos`
+   * for a true edge-to-edge terminal that owns the whole viewport.
    */
-  size?: 'default' | 'full' | 'document';
+  size?: 'default' | 'full' | 'document' | 'pos';
 }) {
   const { t } = useUi();
   const idRef = useRef<symbol>(Symbol('oryx-modal'));
@@ -163,7 +164,7 @@ export function Modal({
   if (!open) return null;
   return (
     <div
-      className="oryx-modal-backdrop"
+      className={`oryx-modal-backdrop${size === 'pos' ? ' oryx-modal-backdrop--pos' : ''}`}
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -174,11 +175,21 @@ export function Modal({
     >
       <div
         className={`oryx-modal ${
-          size === 'full' ? 'oryx-modal--full' : size === 'document' ? 'oryx-modal--document' : ''
+          size === 'full'
+            ? 'oryx-modal--full'
+            : size === 'document'
+              ? 'oryx-modal--document'
+              : size === 'pos'
+                ? 'oryx-modal--pos'
+                : ''
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
+        <div
+          className={`flex items-center justify-between border-b border-[var(--border)] px-5 ${
+            size === 'pos' ? 'flex-none py-3' : 'py-4'
+          }`}
+        >
           <h2 className="m-0 text-[16px] font-bold">{title}</h2>
           <button
             type="button"
@@ -189,9 +200,17 @@ export function Modal({
             <Icon name="close" size={16} />
           </button>
         </div>
-        <div className="px-5 py-4">{children}</div>
+        <div className={size === 'pos' ? 'flex min-h-0 flex-1 flex-col' : 'px-5 py-4'}>{children}</div>
         {footer ? (
-          <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--border)] px-5 py-4">{footer}</div>
+          <div
+            className={
+              size === 'pos'
+                ? 'flex flex-none flex-wrap justify-end gap-2 border-t border-[var(--border)] px-5 py-3'
+                : 'flex flex-wrap justify-end gap-2 border-t border-[var(--border)] px-5 py-4'
+            }
+          >
+            {footer}
+          </div>
         ) : null}
       </div>
     </div>

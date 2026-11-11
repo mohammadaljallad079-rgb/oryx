@@ -217,7 +217,7 @@ export const BASE_PRINT_CSS = `
   :root{
     --navy:#0F2B48;
     --navy-soft:#1c3f66;
-    --gold:#c9a227;
+    --gold:#c98a2c;
     --gold-soft:#e6cf7a;
     --ink:#111827;
     --muted:#5b6472;

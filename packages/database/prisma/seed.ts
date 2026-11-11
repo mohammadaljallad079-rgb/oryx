@@ -107,10 +107,30 @@ const STANDARD_CHART: Array<{
 
 /** Quantities are scaled by 10^4 (10000 = 1 unit). */
 const DEMO_PRODUCTS = [
-  { sku: 'OIL-5W30', nameEn: 'Engine oil 5W-30 (4L)', nameAr: 'زيت محرك 5W-30 (4 لتر)', unit: 'bottle', category: 'Oils & Fluids', salesPriceMinor: 12500, costPriceMinor: 8800, reorderLevel: 200000, reorderQuantity: 500000, openingQuantity: 1200000 },
-  { sku: 'FILTER-AIR', nameEn: 'Air filter', nameAr: 'فلتر هواء', unit: 'piece', category: 'Filters', salesPriceMinor: 6500, costPriceMinor: 4000, reorderLevel: 100000, reorderQuantity: 300000, openingQuantity: 450000 },
-  { sku: 'BRAKE-PAD-F', nameEn: 'Front brake pad set', nameAr: 'طقم فحمات فرامل أمامية', unit: 'set', category: 'Brakes', salesPriceMinor: 28000, costPriceMinor: 19000, reorderLevel: 80000, reorderQuantity: 200000, openingQuantity: 260000 },
-  { sku: 'SVC-INSPECT', nameEn: 'Vehicle inspection service', nameAr: 'خدمة فحص مركبة', unit: 'service', category: 'Services', salesPriceMinor: 35000, costPriceMinor: 0, reorderLevel: 0, reorderQuantity: 0, openingQuantity: 0 },
+  { sku: 'OIL-5W30', nameEn: 'Engine oil 5W-30 (4L)', nameAr: 'زيت محرك 5W-30 (4 لتر)', unit: 'bottle', category: 'Oils & Fluids', barcode: '6281000000001', salesPriceMinor: 12500, costPriceMinor: 8800, reorderLevel: 200000, reorderQuantity: 500000, openingQuantity: 1200000 },
+  { sku: 'FILTER-AIR', nameEn: 'Air filter', nameAr: 'فلتر هواء', unit: 'piece', category: 'Filters', barcode: '6281000000002', salesPriceMinor: 6500, costPriceMinor: 4000, reorderLevel: 100000, reorderQuantity: 300000, openingQuantity: 450000 },
+  { sku: 'BRAKE-PAD-F', nameEn: 'Front brake pad set', nameAr: 'طقم فحمات فرامل أمامية', unit: 'set', category: 'Brakes', barcode: '6281000000003', salesPriceMinor: 28000, costPriceMinor: 19000, reorderLevel: 80000, reorderQuantity: 200000, openingQuantity: 260000 },
+  { sku: 'SVC-INSPECT', nameEn: 'Vehicle inspection service', nameAr: 'خدمة فحص مركبة', unit: 'service', category: 'Services', barcode: '6281000000004', salesPriceMinor: 35000, costPriceMinor: 0, reorderLevel: 0, reorderQuantity: 0, openingQuantity: 0 },
+  { sku: 'OIL-10W40', nameEn: 'Engine oil 10W-40 (4L)', nameAr: 'زيت محرك 10W-40 (4 لتر)', unit: 'bottle', category: 'Oils & Fluids', barcode: '6281000000005', salesPriceMinor: 11000, costPriceMinor: 7600, reorderLevel: 200000, reorderQuantity: 500000, openingQuantity: 900000 },
+  { sku: 'OIL-GEAR-75W90', nameEn: 'Gear oil 75W-90 (1L)', nameAr: 'زيت جير 75W-90 (1 لتر)', unit: 'bottle', category: 'Oils & Fluids', barcode: '6281000000006', salesPriceMinor: 4800, costPriceMinor: 3100, reorderLevel: 120000, reorderQuantity: 300000, openingQuantity: 340000 },
+  { sku: 'COOLANT-GREEN', nameEn: 'Coolant green concentrate (4L)', nameAr: 'سائل تبريد أخضر مركز (4 لتر)', unit: 'bottle', category: 'Oils & Fluids', barcode: '6281000000007', salesPriceMinor: 7200, costPriceMinor: 4500, reorderLevel: 100000, reorderQuantity: 200000, openingQuantity: 260000 },
+  { sku: 'BRAKE-FLUID-DOT4', nameEn: 'Brake fluid DOT 4 (500ml)', nameAr: 'زيت فرامل DOT 4 (500 مل)', unit: 'bottle', category: 'Oils & Fluids', barcode: '6281000000008', salesPriceMinor: 3600, costPriceMinor: 2200, reorderLevel: 80000, reorderQuantity: 200000, openingQuantity: 180000 },
+  { sku: 'FILTER-OIL', nameEn: 'Engine oil filter', nameAr: 'فلتر زيت المحرك', unit: 'piece', category: 'Filters', barcode: '6281000000009', salesPriceMinor: 4200, costPriceMinor: 2500, reorderLevel: 120000, reorderQuantity: 300000, openingQuantity: 380000 },
+  { sku: 'FILTER-FUEL', nameEn: 'Fuel filter', nameAr: 'فلتر الوقود', unit: 'piece', category: 'Filters', barcode: '6281000000010', salesPriceMinor: 5800, costPriceMinor: 3400, reorderLevel: 100000, reorderQuantity: 250000, openingQuantity: 300000 },
+  { sku: 'FILTER-CABIN', nameEn: 'Cabin air filter', nameAr: 'فلتر مكيف المقصورة', unit: 'piece', category: 'Filters', barcode: '6281000000011', salesPriceMinor: 5200, costPriceMinor: 3000, reorderLevel: 90000, reorderQuantity: 200000, openingQuantity: 220000 },
+  { sku: 'BRAKE-DISC-F', nameEn: 'Front brake disc (pair)', nameAr: 'قرص فرامل أمامي (زوج)', unit: 'set', category: 'Brakes', barcode: '6281000000012', salesPriceMinor: 42000, costPriceMinor: 29000, reorderLevel: 40000, reorderQuantity: 100000, openingQuantity: 120000 },
+  { sku: 'BRAKE-PAD-R', nameEn: 'Rear brake pad set', nameAr: 'طقم فحمات فرامل خلفية', unit: 'set', category: 'Brakes', barcode: '6281000000013', salesPriceMinor: 24000, costPriceMinor: 16000, reorderLevel: 60000, reorderQuantity: 150000, openingQuantity: 180000 },
+  { sku: 'SPARK-PLUG', nameEn: 'Iridium spark plug', nameAr: 'بوجيه إيريديوم', unit: 'piece', category: 'Engine', barcode: '6281000000014', salesPriceMinor: 3400, costPriceMinor: 1900, reorderLevel: 200000, reorderQuantity: 400000, openingQuantity: 520000 },
+  { sku: 'BELT-TIMING', nameEn: 'Timing belt kit', nameAr: 'طقم سير التوقيت', unit: 'set', category: 'Engine', barcode: '6281000000015', salesPriceMinor: 32000, costPriceMinor: 21000, reorderLevel: 30000, reorderQuantity: 80000, openingQuantity: 90000 },
+  { sku: 'BATTERY-70AH', nameEn: 'Battery 70Ah maintenance-free', nameAr: 'بطارية 70 أمبير بدون صيانة', unit: 'piece', category: 'Electrical', barcode: '6281000000016', salesPriceMinor: 38000, costPriceMinor: 27000, reorderLevel: 40000, reorderQuantity: 100000, openingQuantity: 110000 },
+  { sku: 'WIPER-BLADE', nameEn: 'Wiper blade 24 inch', nameAr: 'مساحة زجاج 24 إنش', unit: 'piece', category: 'Accessories', barcode: '6281000000017', salesPriceMinor: 3800, costPriceMinor: 2100, reorderLevel: 100000, reorderQuantity: 250000, openingQuantity: 300000 },
+  { sku: 'BULB-H4', nameEn: 'Headlight bulb H4', nameAr: 'لمبة أمامية H4', unit: 'piece', category: 'Electrical', barcode: '6281000000018', salesPriceMinor: 2600, costPriceMinor: 1400, reorderLevel: 150000, reorderQuantity: 300000, openingQuantity: 400000 },
+  { sku: 'SHOCK-FRONT', nameEn: 'Front shock absorber', nameAr: 'ممتص صدمات أمامي', unit: 'piece', category: 'Suspension', barcode: '6281000000019', salesPriceMinor: 22000, costPriceMinor: 14500, reorderLevel: 40000, reorderQuantity: 100000, openingQuantity: 120000 },
+  { sku: 'TYRE-205-55', nameEn: 'Tyre 205/55 R16', nameAr: 'إطار 205/55 R16', unit: 'piece', category: 'Tires', barcode: '6281000000020', salesPriceMinor: 26000, costPriceMinor: 18500, reorderLevel: 40000, reorderQuantity: 100000, openingQuantity: 140000 },
+  { sku: 'AC-REFRIGERANT', nameEn: 'A/C refrigerant R134a (1kg)', nameAr: 'غاز مكيف R134a (1 كجم)', unit: 'can', category: 'Oils & Fluids', barcode: '6281000000021', salesPriceMinor: 6800, costPriceMinor: 4200, reorderLevel: 80000, reorderQuantity: 200000, openingQuantity: 160000 },
+  { sku: 'CARPET-SET', nameEn: 'Floor mat set (5 pcs)', nameAr: 'طقم دواسات أرضية (5 قطع)', unit: 'set', category: 'Accessories', barcode: '6281000000022', salesPriceMinor: 9500, costPriceMinor: 5200, reorderLevel: 50000, reorderQuantity: 120000, openingQuantity: 130000 },
+  { sku: 'SVC-OIL-CHANGE', nameEn: 'Oil change service', nameAr: 'خدمة تغيير الزيت', unit: 'service', category: 'Services', barcode: '6281000000023', salesPriceMinor: 4500, costPriceMinor: 0, reorderLevel: 0, reorderQuantity: 0, openingQuantity: 0 },
+  { sku: 'SVC-WHEEL-ALIGN', nameEn: 'Wheel alignment service', nameAr: 'خدمة ضبط زوايا', unit: 'service', category: 'Services', barcode: '6281000000024', salesPriceMinor: 15000, costPriceMinor: 0, reorderLevel: 0, reorderQuantity: 0, openingQuantity: 0 },
 ];
 
 const DEMO_CUSTOMERS = [
@@ -994,9 +1014,9 @@ async function seedErpBaseline(idByCode: Map<string, string>, superAdminId: stri
     for (const p of DEMO_PRODUCTS) {
       await prisma.product.upsert({
         where: { companyId_sku: { companyId: company.id, sku: p.sku } },
-        // Backfill the category so an existing demo tenant gains the POS chips
-        // on a re-seed without a manual data fix.
-        update: { category: p.category },
+        // Backfill the category and barcode so an existing demo tenant gains the
+        // POS chips and a scannable barcode on a re-seed without a manual fix.
+        update: { category: p.category, barcode: p.barcode },
         create: {
           companyId: company.id,
           sku: p.sku,
@@ -1004,6 +1024,7 @@ async function seedErpBaseline(idByCode: Map<string, string>, superAdminId: stri
           nameAr: p.nameAr,
           unit: p.unit,
           category: p.category,
+          barcode: p.barcode,
           salesPriceMinor: p.salesPriceMinor,
           costPriceMinor: p.costPriceMinor,
           taxRateBp: 1500,

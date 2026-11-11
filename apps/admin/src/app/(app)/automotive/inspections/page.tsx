@@ -25,6 +25,7 @@ import {
 import type { InspectionBookingDto, InspectionServiceDto, VehicleDto, VehicleDocumentDto, VehicleDocumentOcrResultDto, CustomerDto } from '@oryx/shared';
 import { INSPECTION_SECTION_SPECS, VEHICLE_DOCUMENT_CATEGORIES, type InspectionSectionKey } from '@oryx/shared';
 import { useRouter } from 'next/navigation';
+import { inspectionFieldLabelParts, INSPECTION_COVER_ROWS, INSPECTION_VEHICLE_INFO } from '@/lib/inspection-fields';
 
 type Tab = 'jobs' | 'vehicles' | 'bookings' | 'services';
 
@@ -196,14 +197,43 @@ function JobsTab({ canWrite }: { canWrite: boolean }) {
   );
 }
 
+/** The editable identification fields, mirroring the report's cover one for one. */
+type JobIdentity = {
+  customerName: string;
+  contactNumber: string;
+  plateNumber: string;
+  make: string;
+  model: string;
+  modelYear: string;
+  odometer: string;
+  color: string;
+  vin: string;
+};
+
+const EMPTY_IDENTITY: JobIdentity = {
+  customerName: '',
+  contactNumber: '',
+  plateNumber: '',
+  make: '',
+  model: '',
+  modelYear: '',
+  odometer: '',
+  color: '',
+  vin: '',
+};
+
 /**
  * Create an inspection.
  *
- * The vehicle list is filtered to the chosen customer's vehicles, because a
- * vehicle belongs to a customer and inspecting one customer's car under
- * another's name is a data-integrity error the server would reject anyway. The
- * identification fields are prefilled from the vehicle so the administrator
- * only confirms them.
+ * The input screen mirrors the report's cover: it carries the same eleven
+ * identification fields the issued document prints, under the same bilingual
+ * labels, so what the operator enters is exactly what the report shows. The
+ * vehicle list is filtered to the chosen customer's vehicles, because a vehicle
+ * belongs to a customer and inspecting one customer's car under another's name
+ * is a data-integrity error the server would reject anyway. The identification
+ * fields are prefilled from the customer and the vehicle so the operator
+ * confirms them rather than retyping them, and can correct any value before the
+ * report is issued.
  */
 function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => Promise<void> }) {
   const { t, locale } = useUi();
@@ -213,6 +243,7 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   const [vehicleId, setVehicleId] = useState('');
   const [areas, setAreas] = useState<InspectionSectionKey[]>([]);
   const [addVehicleOpen, setAddVehicleOpen] = useState(false);
+  const [identity, setIdentity] = useState<JobIdentity>(EMPTY_IDENTITY);
   const customers = useAsync(() => api.salesCustomers(), []);
 
   // The vehicle options are stored together with the customer they were loaded
@@ -252,16 +283,30 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 
   const vehiclesLoading = Boolean(customerId) && vehicleSource?.customerId !== customerId;
   const vehicleOptions = vehicleSource?.customerId === customerId ? vehicleSource.items : [];
+  const selectedCustomer = (customers.data?.items ?? []).find((c: CustomerDto) => c.id === customerId) ?? null;
 
-  // The identification fields are prefilled from the chosen vehicle so the
-  // operator confirms them rather than retyping them, and so the report's cover
-  // prints the same make/model/VIN the picker showed.
-  const [identity, setIdentity] = useState<{ make: string; model: string; modelYear: string; plate: string; vin: string } | null>(null);
+  // Prefill the cover fields from the customer and the chosen vehicle, so the
+  // report prints the same identification the picker showed without retyping.
+  // A field the operator has already edited is never overwritten: the prefill
+  // only supplies values the record carries.
   useEffect(() => {
     const v = vehicleOptions.find((x) => x.id === vehicleId);
-    setIdentity(v ? { make: v.make, model: v.model, modelYear: String(v.modelYear), plate: v.plateNumber ?? '', vin: v.vin } : null);
+    setIdentity((prev) => ({
+      customerName: selectedCustomer?.nameEn || selectedCustomer?.nameAr || selectedCustomer?.code || prev.customerName,
+      contactNumber: selectedCustomer?.phone ?? prev.contactNumber,
+      plateNumber: v ? v.plateNumber ?? '' : prev.plateNumber,
+      make: v?.make ?? prev.make,
+      model: v?.model ?? prev.model,
+      modelYear: v ? String(v.modelYear) : prev.modelYear,
+      odometer: v ? String(v.mileage) : prev.odometer,
+      color: v ? v.color ?? '' : prev.color,
+      vin: v?.vin ?? prev.vin,
+    }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicleId, vehicleSource]);
+  }, [vehicleId, vehicleSource, customerId]);
+
+  const setField = (key: keyof JobIdentity, value: string) =>
+    setIdentity((prev) => ({ ...prev, [key]: value }));
 
   const toggleArea = (key: InspectionSectionKey) =>
     setAreas((prev) => (prev.includes(key) ? prev.filter((a) => a !== key) : [...prev, key]));
@@ -274,7 +319,20 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
     setBusy(true);
     setError(null);
     try {
-      await api.createInspectionSession({ customerId, vehicleId, selectedAreas: areas });
+      await api.createInspectionSession({
+        customerId,
+        vehicleId,
+        selectedAreas: areas,
+        ...(identity.customerName.trim() ? { customerName: identity.customerName.trim() } : {}),
+        ...(identity.contactNumber.trim() ? { contactNumber: identity.contactNumber.trim() } : {}),
+        ...(identity.plateNumber.trim() ? { plateNumber: identity.plateNumber.trim() } : {}),
+        ...(identity.make.trim() ? { make: identity.make.trim() } : {}),
+        ...(identity.model.trim() ? { model: identity.model.trim() } : {}),
+        ...(identity.modelYear.trim() ? { modelYear: Number(identity.modelYear) } : {}),
+        ...(identity.odometer.trim() ? { odometer: Number(identity.odometer) } : {}),
+        ...(identity.color.trim() ? { color: identity.color.trim() } : {}),
+        ...(identity.vin.trim() ? { vin: identity.vin.trim() } : {}),
+      });
       await onCreated();
       onClose();
     } catch (e) {
@@ -289,6 +347,7 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
       open
       title={t('inspection.newJobTitle')}
       onClose={onClose}
+      size="document"
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
@@ -340,16 +399,51 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
             onSelect={setVehicleId}
             testId="job-vehicle"
           />
-          {identity ? (
-            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg border border-[var(--border)] p-2 text-[12px]" data-testid="job-vehicle-identity">
-              <span className="oryx-faint">{t('erp.automotive.make')}: <span className="text-[var(--text)] font-semibold">{identity.make}</span></span>
-              <span className="oryx-faint">{t('erp.automotive.model')}: <span className="text-[var(--text)] font-semibold">{identity.model}</span></span>
-              <span className="oryx-faint">{t('erp.automotive.modelYear')}: <span className="text-[var(--text)] font-semibold">{identity.modelYear}</span></span>
-              <span className="oryx-faint">{t('erp.automotive.plate')}: <span className="text-[var(--text)] font-semibold">{identity.plate || '—'}</span></span>
-              <span className="oryx-faint col-span-2">{t('erp.automotive.vin')}: <span className="font-mono text-[var(--text)]">{identity.vin}</span></span>
-            </div>
-          ) : null}
         </div>
+
+        {/* The identification block, mirroring the report's cover table: the
+            same navy title band, the same four-column cell rhythm and the same
+            eleven fields the printed document carries, with VIN closing the
+            table across two columns. Date & Time and Job No. are assigned by the
+            system at creation, so they are shown as read-only mirror values the
+            way the document renders them. */}
+        <section className="oryx-doc-form__cover" data-testid="job-vehicle-identity">
+          <div className="oryx-doc-form__cover-band">
+            <span>
+              {INSPECTION_VEHICLE_INFO.ar}
+              <span className="ltr">{INSPECTION_VEHICLE_INFO.en}</span>
+            </span>
+            <span className="oryx-doc-form__cover-tag">{t('inspection.autoAssigned')}</span>
+          </div>
+          <div className="oryx-doc-form__cover-grid">
+            {INSPECTION_COVER_ROWS.flat().map(({ key, span }) => {
+              const label = inspectionFieldLabelParts(key);
+              const wide = span === 2 ? ' oryx-doc-form__cover-cell--wide' : '';
+              return (
+                <div key={key} className={`oryx-doc-form__cover-cell${wide}`}>
+                  <span className="oryx-doc-form__cover-label">
+                    <span className="ltr">{label.en}</span>
+                    <span className="var">{label.ar}</span>
+                  </span>
+                  {key === 'inspectedAt' ? (
+                    <input className="oryx-input" value={new Date().toLocaleString()} readOnly disabled data-testid="job-inspected-at" />
+                  ) : key === 'jobNumber' ? (
+                    <input className="oryx-input" value="—" readOnly disabled data-testid="job-number" />
+                  ) : (
+                    <input
+                      className={`oryx-input${key === 'vin' ? ' font-mono' : ''}`}
+                      type={key === 'modelYear' || key === 'odometer' ? 'number' : undefined}
+                      min={key === 'modelYear' || key === 'odometer' ? 0 : undefined}
+                      value={identity[key]}
+                      onChange={(e) => setField(key, e.target.value)}
+                      data-testid={`job-field-${key}`}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
 
         <div>
           <span className="oryx-label">{t('inspection.selectTypes')}</span>

@@ -118,6 +118,91 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await expect(page.getByTestId('inspection-rail-COMPUTER_UNIT')).toHaveCount(0);
   });
 
+  test('the entry form carries the same fields the report cover prints', async ({ page }) => {
+    await page.goto('/automotive/inspections');
+    await setLocale(page, 'en');
+    await page.getByTestId('new-inspection-job').click();
+    await expect(page.locator('.oryx-modal')).toHaveCount(1);
+
+    // The report cover prints these eleven labels verbatim; the entry form must
+    // offer a matching input for every one of them, under the same wording, so
+    // the screen the operator fills mirrors the document the customer receives.
+    const identity = page.getByTestId('job-vehicle-identity');
+    await expect(identity).toContainText('Vehicle Information');
+    for (const label of [
+      'Customer Name',
+      'Contact No.',
+      'Date & Time',
+      'Job No.',
+      'Plate No.',
+      'Car Make',
+      'Car Model',
+      'Car Year',
+      'ODO Meter',
+      'Car Color',
+      'VIN Number',
+    ]) {
+      await expect(identity).toContainText(label);
+    }
+
+    // Date & Time and Job No. are assigned by the system, so they are read-only
+    // mirror values; the nine identification fields are editable inputs.
+    await expect(page.getByTestId('job-inspected-at')).toBeDisabled();
+    await expect(page.getByTestId('job-number')).toBeDisabled();
+    for (const key of [
+      'customerName',
+      'contactNumber',
+      'plateNumber',
+      'make',
+      'model',
+      'modelYear',
+      'odometer',
+      'color',
+      'vin',
+    ]) {
+      await expect(page.getByTestId(`job-field-${key}`)).toBeEditable();
+    }
+
+    // The block mirrors the report's cover *structure*, not only its wording:
+    // eleven cells laid out in a four-column grid whose last row closes with the
+    // VIN spanning two columns, exactly as the printed table is drawn. A drift
+    // in either the cell count or the VIN span would mean the screen and the
+    // document no longer agree on the identification layout.
+    const layout = await identity.evaluate((el) => {
+      const grid = el.querySelector('.oryx-doc-form__cover-grid') as HTMLElement | null;
+      const cells = [...(grid?.querySelectorAll('.oryx-doc-form__cover-cell') ?? [])] as HTMLElement[];
+      const rows = new Map<number, number>();
+      for (const cell of cells) {
+        const top = Math.round(cell.getBoundingClientRect().top);
+        rows.set(top, (rows.get(top) ?? 0) + 1);
+      }
+      const vin = el.querySelector('[data-testid="job-field-vin"]') as HTMLElement | null;
+      const vinCell = vin?.closest('.oryx-doc-form__cover-cell') as HTMLElement | null;
+      const vinBox = vinCell?.getBoundingClientRect();
+      const firstBox = cells[0]?.getBoundingClientRect();
+      return {
+        hasBand: Boolean(el.querySelector('.oryx-doc-form__cover-band')),
+        columns: grid ? getComputedStyle(grid).gridTemplateColumns.split(' ').length : 0,
+        cells: cells.length,
+        rowCounts: [...rows.entries()].sort((a, b) => a[0] - b[0]).map(([, n]) => n),
+        vinSpansTwo: Boolean(vinBox && firstBox && vinBox.width > firstBox.width * 1.5),
+      };
+    });
+    expect(layout.hasBand).toBe(true);
+    expect(layout.columns).toBe(4);
+    expect(layout.cells).toBe(11);
+    expect(layout.rowCounts).toEqual([4, 4, 3]);
+    expect(layout.vinSpansTwo).toBe(true);
+
+    // Choosing a vehicle prefills the cover fields from the vehicle record, so
+    // the report prints the same identification the picker showed.
+    await page.getByTestId('job-customer').selectOption({ label: 'Al Noor Trading Est.' });
+    await page.getByTestId('job-vehicle-input').click();
+    await page.getByTestId('job-vehicle-list').locator('[role="option"]').first().click();
+    await expect(page.getByTestId('job-field-make')).toHaveValue('Toyota');
+    await expect(page.getByTestId('job-field-vin')).toHaveValue('JTMHV05J204123456');
+  });
+
   test('records a checklist section and reports its progress', async ({ page }) => {
     const id = await seedJob(page, ['EXTERIOR']);
     await page.goto(`/automotive/inspections/${id}`);

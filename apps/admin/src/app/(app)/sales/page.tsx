@@ -1659,7 +1659,7 @@ function PosSaleModal({
       open={open}
       title={t('erp.sales.newPosSale')}
       onClose={onClose}
-      size="full"
+      size="pos"
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
@@ -1687,17 +1687,17 @@ function PosSaleModal({
         </p>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+      <div className="oryx-pos grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
         {/* ---------------------------------------------------- product grid */}
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <span className="pointer-events-none absolute inset-y-0 start-3 grid place-items-center text-[var(--muted)]">
-                <Icon name="search" size={16} />
+        <div className="flex min-h-0 min-w-0 flex-col gap-3">
+          <div className="oryx-pos__toolbar">
+            <div className="oryx-pos__search">
+              <span className="oryx-pos__search-icon">
+                <Icon name="search" size={18} />
               </span>
               <input
                 ref={scanRef}
-                className="oryx-input ps-9"
+                className="oryx-input"
                 value={search}
                 placeholder={t('erp.sales.pos.searchPlaceholder')}
                 onChange={(e) => setSearch(e.target.value)}
@@ -1712,14 +1712,14 @@ function PosSaleModal({
               />
             </div>
             <Button variant="ghost" onClick={() => void catalog.reload()} aria-label={t('common.refresh')}>
-              <Icon name="refresh" size={16} />
+              <Icon name="refresh" size={18} />
             </Button>
           </div>
 
           {catalog.error ? <ErrorBanner message={catalog.error} onRetry={catalog.reload} /> : null}
 
           {(categories.data?.items.length ?? 0) > 0 ? (
-            <div className="flex flex-wrap gap-2" data-testid="pos-categories">
+            <div className="oryx-pos__chips" data-testid="pos-categories">
               <button
                 type="button"
                 onClick={() => setCategory('')}
@@ -1743,18 +1743,15 @@ function PosSaleModal({
           ) : null}
 
           {catalog.loading ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+            <div className="oryx-pos__grid">
               {Array.from({ length: 8 }).map((_, i) => (
-                <Skeleton key={i} height={148} />
+                <Skeleton key={i} height={168} />
               ))}
             </div>
           ) : items.length === 0 ? (
             <EmptyState title={t('common.empty')} hint={t('erp.sales.pos.notFound')} />
           ) : (
-            <div
-              className="grid max-h-[46vh] grid-cols-2 gap-3 overflow-y-auto pe-1 sm:grid-cols-3 xl:grid-cols-4"
-              data-testid="pos-grid"
-            >
+            <div className="oryx-pos__grid" data-testid="pos-grid">
               {items.map((p) => (
                 <PosProductTile key={p.id} product={p} onAdd={() => addProduct(p)} />
               ))}
@@ -1762,11 +1759,11 @@ function PosSaleModal({
           )}
         </div>
 
-        {/* ---------------------------------------------------------- cart */}
-        <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-3">
-          <div className="flex items-center justify-between">
-            <p className="oryx-panel-title m-0 flex items-center gap-2">
-              <Icon name="cart" size={16} />
+        {/* ---------------------------------------------------- order rail */}
+        <div className="oryx-pos__rail">
+          <div className="oryx-pos__rail-head">
+            <p className="oryx-pos__rail-title">
+              <Icon name="cart" size={17} />
               {t('erp.sales.pos.cart')}
               <Badge tone="neutral">
                 {cart.reduce((n, l) => n + l.quantity, 0)} {t('erp.sales.pos.itemCount')}
@@ -1788,11 +1785,9 @@ function PosSaleModal({
           </div>
 
           {cart.length === 0 ? (
-            <p className="oryx-faint m-0 px-1 py-8 text-center text-[12.5px]">
-              {t('erp.sales.pos.emptyCart')}
-            </p>
+            <p className="oryx-pos__empty m-0">{t('erp.sales.pos.emptyCart')}</p>
           ) : (
-            <div className="flex max-h-[30vh] flex-col gap-2 overflow-y-auto pe-1">
+            <div className="oryx-pos__lines">
               {cart.map((l) => (
                 <CartRow
                   key={l.key}
@@ -1804,7 +1799,7 @@ function PosSaleModal({
             </div>
           )}
 
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-2 border-t border-[var(--border)] p-3 sm:grid-cols-2">
             <Field label={t('erp.sales.pos.customer')}>
               <select
                 className="oryx-select"
@@ -1837,30 +1832,24 @@ function PosSaleModal({
             </Field>
           </div>
 
-          <dl className="m-0 flex flex-col gap-1 border-t border-[var(--border)] pt-3 text-[12.5px]">
-            <Row label={t('erp.sales.pos.subtotal')} value={money(totals.subtotalMinor)} />
-            {totals.discountMinor !== 0 ? (
-              <Row label={t('erp.sales.pos.discountTotal')} value={`− ${money(totals.discountMinor)}`} />
-            ) : null}
-            <Row label={t('erp.sales.pos.tax')} value={money(totals.taxMinor)} />
-            {totals.roundingMinor !== 0 ? (
-              <Row label={t('erp.sales.rounding')} value={money(totals.roundingMinor)} testId="pos-rounding" />
-            ) : null}
-            <Row
-              label={t('erp.sales.total')}
-              value={money(totals.totalMinor)}
-              strong
-              testId="pos-total"
-            />
-          </dl>
+          <div className="oryx-pos__tender">
+            <dl className="oryx-pos__totals">
+              <Row label={t('erp.sales.pos.subtotal')} value={money(totals.subtotalMinor)} />
+              {totals.discountMinor !== 0 ? (
+                <Row label={t('erp.sales.pos.discountTotal')} value={`− ${money(totals.discountMinor)}`} />
+              ) : null}
+              <Row label={t('erp.sales.pos.tax')} value={money(totals.taxMinor)} />
+              {totals.roundingMinor !== 0 ? (
+                <Row label={t('erp.sales.rounding')} value={money(totals.roundingMinor)} testId="pos-rounding" />
+              ) : null}
+            </dl>
+            <div className="oryx-pos__grand" data-testid="pos-total">
+              <span>{t('erp.sales.total')}</span>
+              <span className="tabular-nums">{money(totals.totalMinor)}</span>
+            </div>
 
-          <div className="flex flex-col gap-2">
             <span className="oryx-label">{t('erp.sales.pos.payment')}</span>
-            <div
-              className="grid grid-cols-2 gap-2 sm:grid-cols-4"
-              role="group"
-              aria-label={t('erp.sales.pos.payment')}
-            >
+            <div className="oryx-pos__pay" role="group" aria-label={t('erp.sales.pos.payment')}>
               {POS_PAYMENT_METHODS.map((m) => (
                 <button
                   key={m}
@@ -1874,46 +1863,47 @@ function PosSaleModal({
                 </button>
               ))}
             </div>
-          </div>
 
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Field label={t('erp.sales.pos.paid')}>
-              <input
-                className="oryx-input text-end"
-                inputMode="decimal"
-                value={paid}
-                placeholder={fromMinor(totals.totalMinor, currencyScale)}
-                onChange={(e) => setPaid(e.target.value)}
-                data-testid="pos-paid"
-              />
-            </Field>
-            <div className="flex items-end gap-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setPaid(fromMinor(totals.totalMinor, currencyScale))}
-                data-testid="pos-paid-exact"
-              >
-                {t('erp.sales.pos.exact')}
-              </Button>
-              {paymentMethod === 'CASH' ? (
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Field label={t('erp.sales.pos.paid')}>
+                <input
+                  className="oryx-input text-end"
+                  inputMode="decimal"
+                  value={paid}
+                  placeholder={fromMinor(totals.totalMinor, currencyScale)}
+                  onChange={(e) => setPaid(e.target.value)}
+                  data-testid="pos-paid"
+                />
+              </Field>
+              <div className="flex items-end gap-2">
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => setPaid(fromMinor(roundCashUp(totals.totalMinor, currencyScale), currencyScale))}
-                  data-testid="pos-paid-round"
+                  onClick={() => setPaid(fromMinor(totals.totalMinor, currencyScale))}
+                  data-testid="pos-paid-exact"
                 >
-                  {t('erp.sales.pos.roundCash')}
+                  {t('erp.sales.pos.exact')}
                 </Button>
-              ) : null}
+                {paymentMethod === 'CASH' ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setPaid(fromMinor(roundCashUp(totals.totalMinor, currencyScale), currencyScale))}
+                    data-testid="pos-paid-round"
+                  >
+                    {t('erp.sales.pos.roundCash')}
+                  </Button>
+                ) : null}
+              </div>
             </div>
+
+            <p className="oryx-pos__change m-0" data-testid="pos-change">
+              <span>{t('erp.sales.pos.change')}</span>
+              <strong className={`tabular-nums ${changeMinor < 0 ? 'text-[var(--danger)]' : ''}`}>
+                {money(changeMinor)}
+              </strong>
+            </p>
           </div>
-          <p className="oryx-muted m-0 flex items-center justify-between text-[12.5px]" data-testid="pos-change">
-            <span>{t('erp.sales.pos.change')}</span>
-            <strong className={`tabular-nums ${changeMinor < 0 ? 'text-[var(--danger)]' : ''}`}>
-              {money(changeMinor)}
-            </strong>
-          </p>
         </div>
       </div>
     </Modal>
