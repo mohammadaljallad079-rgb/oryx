@@ -14,9 +14,11 @@ import {
   ApiError,
   customerApi,
   customerSession,
+  IS_STATIC_PREVIEW,
   restoreCustomerSession,
   type CustomerProfile,
 } from './api';
+import { PREVIEW_PROFILE } from './preview-data';
 
 export type SignInResult = { status: 'ok' } | { status: 'mfa'; challengeToken: string };
 
@@ -48,7 +50,14 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     try {
       const me = await customerApi.me();
       setProfile(me);
-    } catch {
+    } catch (error) {
+      // A transient outage must not drop a valid session. Only an explicit
+      // authentication rejection clears the profile.
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        setProfile(null);
+        return;
+      }
+      if (error instanceof ApiError && error.code === 'network.unavailable') return;
       setProfile(null);
     }
   }, []);
@@ -56,11 +65,21 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     (async () => {
+      // In the static preview there is no API to authenticate against, so the
+      // sample profile is presented and the header marks the session as a
+      // preview. Nothing is signed in and no token exists.
+      if (IS_STATIC_PREVIEW) {
+        setProfile(PREVIEW_PROFILE);
+        setLoading(false);
+        return;
+      }
       // A session may exist even though this tab has no token yet.
       customerSession.markHint();
-      const restored = await restoreCustomerSession();
+      const outcome = await restoreCustomerSession();
       if (!active) return;
-      if (restored) await loadProfile();
+      // Only a confirmed session loads the profile; `expired` means there is
+      // none, and `unavailable` must not be treated as a sign-out.
+      if (outcome === 'ok') await loadProfile();
       if (active) setLoading(false);
     })();
     return () => {

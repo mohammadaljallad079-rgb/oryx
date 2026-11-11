@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { MODULES, resolveEffectivePermissions, type DashboardResponse } from '@oryx/shared';
+import { MODULES, resolveEffectivePermissions, DEFAULT_CURRENCY, type DashboardResponse } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { EntitlementService } from '../common/entitlement.service';
 import { forbidden, ERROR_CODES } from '../common/errors';
@@ -130,7 +130,7 @@ export class DashboardService {
     const isDemoData = companyCount > 0 && demoCompanies === companyCount;
 
     const scopeCompany = companyId
-      ? await this.prisma.company.findUnique({ where: { id: companyId }, select: { nameEn: true, nameAr: true } })
+      ? await this.prisma.company.findUnique({ where: { id: companyId }, select: { nameEn: true, nameAr: true, currency: true } })
       : null;
 
     const effective = resolveEffectivePermissions(principal);
@@ -150,7 +150,7 @@ export class DashboardService {
         users: userCount,
         activeSubscriptions,
         monthlyRecurringRevenue: Number(revenueAgg._sum.price ?? 0),
-        currency: 'SAR',
+        currency: scopeCompany?.currency ?? DEFAULT_CURRENCY,
         openSupportSessions,
         modulesLicensed: licensedModules.length,
         planUtilisationPct,

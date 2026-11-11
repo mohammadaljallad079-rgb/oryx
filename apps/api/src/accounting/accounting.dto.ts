@@ -82,6 +82,16 @@ export class UpdateAccountDto {
   systemRole?: string;
 }
 
+/** The account type a suggested code is being generated for. */
+export class NextAccountCodeQueryDto {
+  @IsIn(ACCOUNT_TYPES)
+  type!: (typeof ACCOUNT_TYPES)[number];
+
+  @IsOptional()
+  @IsString()
+  parentId?: string;
+}
+
 export class ListQueryDto {
   @IsOptional()
   @Type(() => Number)
@@ -230,8 +240,27 @@ export class RecordPaymentDto {
   @MaxLength(300)
   notes?: string;
 
+  /**
+   * The name printed on the "المستلم / Received By" line. Optional: when it is
+   * absent the API records the operator's own name, so the printed receipt is
+   * never blank.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  receivedByName?: string;
+
   @IsISO8601()
   paidAt!: string;
+
+  /**
+   * ISO currency code. Optional: when absent the API records the tenant's own
+   * currency so a receipt never silently defaults to the launch-market one.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(3)
+  currency?: string;
 
   @IsOptional()
   @IsString()

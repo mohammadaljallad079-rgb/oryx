@@ -67,8 +67,15 @@ test.describe('Execution 02 — ERP core interfaces', () => {
     await expect(page.getByTestId('journal-balanced')).toBeVisible();
 
     // Fill two lines with unequal sides: the indicator must read "not balanced"
-    // and the post button must stay disabled.
-    const accountOptions = await page.getByTestId('journal-line-account-0').locator('option').all();
+    // and the post button must stay disabled. The chart of accounts loads
+    // asynchronously, so wait for the select to carry its options before
+    // reading them; a plain `.all()` on a still-empty select is a race that
+    // passes against a warm API and fails against a cold one.
+    const accountSelect = page.getByTestId('journal-line-account-0');
+    await expect
+      .poll(async () => accountSelect.locator('option').count(), { timeout: 20_000 })
+      .toBeGreaterThanOrEqual(3);
+    const accountOptions = await accountSelect.locator('option').all();
     const firstValue = await accountOptions[1].getAttribute('value');
     const secondValue = await accountOptions[2].getAttribute('value');
     await page.getByTestId('journal-line-account-0').selectOption(firstValue!);
@@ -136,5 +143,31 @@ test.describe('Execution 02 — ERP core interfaces', () => {
     expect(accounting).toBeTruthy();
     // Licensed here because the demo tenant is on the Enterprise plan.
     expect(accounting!.licensed).toBe(true);
+  });
+
+  test('9. whole-amount rounding is a persisted company setting', async ({ page }) => {
+    const me = await apiCall<{ context: { companyId: string | null } }>(page, '/auth/me');
+    const companyId = me.body.context.companyId!;
+    const before = await apiCall<{ roundingMode: string }>(page, `/companies/${companyId}`);
+    const original = before.body.roundingMode;
+
+    try {
+      await page.goto('/settings');
+      await expect(page.getByTestId('company-settings')).toBeVisible();
+      const select = page.getByTestId('company-rounding-mode');
+      await expect(select).toBeVisible({ timeout: 20_000 });
+      await select.selectOption('NEAREST_HALF');
+      await page.getByTestId('company-settings-save').click();
+      await expect(page.getByTestId('company-settings-saved')).toBeVisible({ timeout: 20_000 });
+
+      // The change is persisted, not just shown.
+      const after = await apiCall<{ roundingMode: string }>(page, `/companies/${companyId}`);
+      expect(after.body.roundingMode).toBe('NEAREST_HALF');
+    } finally {
+      await apiCall(page, `/companies/${companyId}`, {
+        method: 'PATCH',
+        body: { roundingMode: original },
+      });
+    }
   });
 });

@@ -67,6 +67,13 @@ describe('currency — minor-unit scale', () => {
   it('returns the code itself for an unknown currency symbol', () => {
     expect(currencySymbol('XYZ')).toBe('XYZ');
   });
+
+  it('prints the Bahraini Dinar with the approved form\'s symbol', () => {
+    // The approved invoice prints "8.250 BD", not "8.250 BHD", so the symbol is
+    // the Latin "BD" for an English document and the Arabic one otherwise.
+    expect(currencySymbol('BHD', 'en')).toBe('BD');
+    expect(currencySymbol('BHD', 'ar')).toBe('د.ب');
+  });
 });
 
 describe('currency — scale end to end through the money helpers', () => {

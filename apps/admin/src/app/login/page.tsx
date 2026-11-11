@@ -2,11 +2,37 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { useUi } from '@/lib/ui-context';
+import { useUi, type Translator } from '@/lib/ui-context';
 import { Icon } from '@/components/icons';
+import { PasswordField } from '@/components/password-field';
 import { Button, Card, Field } from '@/components/ui';
 import { LocaleToggle, ThemeToggle } from '@/components/topbar-controls';
+import { BrandLogo } from '@/components/brand-logo';
+
+/**
+ * Map a failed sign-in to a message the user can act on.
+ *
+ * The API answers a throttled login with 429 and a locked or inactive account
+ * with 403, so reporting every failure as "invalid email or password" is wrong:
+ * it sends a user with a correct password hunting for a typo while the real
+ * cause is the rate limiter. Only a 401 means the credentials were rejected.
+ */
+function signInErrorMessage(error: unknown, t: Translator): string {
+  if (error instanceof ApiError) {
+    if (error.status === 429) return t('auth.throttled');
+    if (error.code === 'auth.account_locked') return t('auth.locked');
+    if (error.code === 'auth.account_inactive') return t('auth.inactive');
+    // 400 is a request-shape problem (a stray space in the email, a password
+    // below the minimum length), never a credential rejection. Reporting it as
+    // "invalid email or password" sends the user hunting for a typo.
+    if (error.status === 400) return t('auth.badRequest');
+    if (error.status >= 500) return t('auth.unavailable');
+    return t('auth.invalid');
+  }
+  return t('auth.unavailable');
+}
 
 export default function LoginPage() {
   const { t } = useUi();
@@ -29,15 +55,15 @@ export default function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      const result = await login(email, password);
+      const result = await login(email.trim(), password);
       if (result && result.mfaRequired) {
         // Password accepted; a second factor is required before a session exists.
         setChallengeToken(result.challengeToken);
         return;
       }
       router.replace('/dashboard');
-    } catch {
-      setError(t('auth.invalid'));
+    } catch (err) {
+      setError(signInErrorMessage(err, t));
     } finally {
       setBusy(false);
     }
@@ -84,23 +110,9 @@ export default function LoginPage() {
               }}
             />
             <div className="relative">
-              <div className="flex items-center gap-3">
-                <span
-                  className="grid h-11 w-11 place-items-center rounded-xl"
-                  style={{
-                    background: 'linear-gradient(145deg, var(--gold-soft), var(--gold-deep))',
-                    color: 'var(--text-inverse)',
-                  }}
-                >
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M12 3 21 12 12 21 3 12Z" stroke="currentColor" strokeWidth="1.7" />
-                    <circle cx="12" cy="12" r="3.1" stroke="currentColor" strokeWidth="1.7" />
-                  </svg>
-                </span>
-                <div>
-                  <p className="m-0 text-[20px] font-extrabold tracking-[0.24em]">ORYX</p>
-                  <p className="oryx-muted m-0 text-[12px]">{t('brand.tagline')}</p>
-                </div>
+              <div className="flex flex-col items-start gap-3">
+                <BrandLogo height={38} />
+                <p className="oryx-muted m-0 text-[12px]">{t('brand.tagline')}</p>
               </div>
 
               <h2 className="mt-12 text-[30px] font-extrabold leading-tight">{t('dash.heroTitle')}</h2>
@@ -172,18 +184,14 @@ export default function LoginPage() {
                       data-testid="login-email"
                     />
                   </Field>
-                  <Field label={t('auth.password')} required>
-                    <input
-                      className="oryx-input"
-                      type="password"
-                      name="password"
-                      autoComplete="current-password"
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      data-testid="login-password"
-                    />
-                  </Field>
+                  <PasswordField
+                    label={t('auth.password')}
+                    value={password}
+                    onChange={setPassword}
+                    autoComplete="current-password"
+                    required
+                    testId="login-password"
+                  />
                 </>
               )}
 

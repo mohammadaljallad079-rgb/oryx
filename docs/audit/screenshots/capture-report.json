@@ -1,0 +1,401 @@
+[
+  {
+    "label": "01-super-admin-dashboard",
+    "route": "/dashboard",
+    "account": "superadmin",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/dashboard",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 3043,
+    "excerpt": "منصة موارد المؤسسات حوكمة المنصة الشركات والمستأجرون كتالوج الوحدات باقات الاشتراك الاشتراكات الأدوار والصلاحيات سجل التدقيق المصادقة الثنائية الدخول الدعم إدارة الموقع والتطبيق إدارة الموقع إدارة التطبيق مفاتيح الميزات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "02-companies",
+    "route": "/companies",
+    "account": "superadmin",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/companies",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 3043,
+    "excerpt": "منصة موارد المؤسسات حوكمة المنصة الشركات والمستأجرون كتالوج الوحدات باقات الاشتراك الاشتراكات الأدوار والصلاحيات سجل التدقيق المصادقة الثنائية الدخول الدعم إدارة الموقع والتطبيق إدارة الموقع إدارة التطبيق مفاتيح الميزات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "03-subscriptions",
+    "route": "/subscriptions",
+    "account": "superadmin",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/subscriptions",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 3043,
+    "excerpt": "منصة موارد المؤسسات حوكمة المنصة الشركات والمستأجرون كتالوج الوحدات باقات الاشتراك الاشتراكات الأدوار والصلاحيات سجل التدقيق المصادقة الثنائية الدخول الدعم إدارة الموقع والتطبيق إدارة الموقع إدارة التطبيق مفاتيح الميزات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "04-users-roles",
+    "route": "/users",
+    "account": "superadmin",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/users",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 3043,
+    "excerpt": "منصة موارد المؤسسات حوكمة المنصة الشركات والمستأجرون كتالوج الوحدات باقات الاشتراك الاشتراكات الأدوار والصلاحيات سجل التدقيق المصادقة الثنائية الدخول الدعم إدارة الموقع والتطبيق إدارة الموقع إدارة التطبيق مفاتيح الميزات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "05-audit-trail",
+    "route": "/audit",
+    "account": "superadmin",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/audit",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 3043,
+    "excerpt": "منصة موارد المؤسسات حوكمة المنصة الشركات والمستأجرون كتالوج الوحدات باقات الاشتراك الاشتراكات الأدوار والصلاحيات سجل التدقيق المصادقة الثنائية الدخول الدعم إدارة الموقع والتطبيق إدارة الموقع إدارة التطبيق مفاتيح الميزات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "06-integrations-center",
+    "route": "/integrations",
+    "account": "superadmin",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/integrations",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 3043,
+    "excerpt": "منصة موارد المؤسسات حوكمة المنصة الشركات والمستأجرون كتالوج الوحدات باقات الاشتراك الاشتراكات الأدوار والصلاحيات سجل التدقيق المصادقة الثنائية الدخول الدعم إدارة الموقع والتطبيق إدارة الموقع إدارة التطبيق مفاتيح الميزات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "07-erp-dashboard",
+    "route": "/dashboard",
+    "account": "enterprise",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/dashboard",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 1980,
+    "excerpt": "منصة موارد المؤسسات النظام الأساسي الرئيسية لوحة المعلومات الشركات والمستأجرون الفروع المالية المحاسبة المالية المدفوعات والتسويات التجارة المبيعات ونقاط البيع المشتريات والتوريد إدارة علاقات العملاء العمليات المستودعات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "08-accounting",
+    "route": "/accounting",
+    "account": "enterprise",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/accounting",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 1980,
+    "excerpt": "منصة موارد المؤسسات النظام الأساسي الرئيسية لوحة المعلومات الشركات والمستأجرون الفروع المالية المحاسبة المالية المدفوعات والتسويات التجارة المبيعات ونقاط البيع المشتريات والتوريد إدارة علاقات العملاء العمليات المستودعات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "09-sales-pos",
+    "route": "/sales",
+    "account": "enterprise",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/sales",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 1980,
+    "excerpt": "منصة موارد المؤسسات النظام الأساسي الرئيسية لوحة المعلومات الشركات والمستأجرون الفروع المالية المحاسبة المالية المدفوعات والتسويات التجارة المبيعات ونقاط البيع المشتريات والتوريد إدارة علاقات العملاء العمليات المستودعات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "10-inventory",
+    "route": "/inventory",
+    "account": "enterprise",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/inventory",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 1980,
+    "excerpt": "منصة موارد المؤسسات النظام الأساسي الرئيسية لوحة المعلومات الشركات والمستأجرون الفروع المالية المحاسبة المالية المدفوعات والتسويات التجارة المبيعات ونقاط البيع المشتريات والتوريد إدارة علاقات العملاء العمليات المستودعات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "11-procurement",
+    "route": "/purchasing",
+    "account": "enterprise",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/purchasing",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 1980,
+    "excerpt": "منصة موارد المؤسسات النظام الأساسي الرئيسية لوحة المعلومات الشركات والمستأجرون الفروع المالية المحاسبة المالية المدفوعات والتسويات التجارة المبيعات ونقاط البيع المشتريات والتوريد إدارة علاقات العملاء العمليات المستودعات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "12-hr-payroll",
+    "route": "/hr",
+    "account": "enterprise",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/hr",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 1980,
+    "excerpt": "منصة موارد المؤسسات النظام الأساسي الرئيسية لوحة المعلومات الشركات والمستأجرون الفروع المالية المحاسبة المالية المدفوعات والتسويات التجارة المبيعات ونقاط البيع المشتريات والتوريد إدارة علاقات العملاء العمليات المستودعات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "13-crm",
+    "route": "/crm",
+    "account": "enterprise",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/crm",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 1980,
+    "excerpt": "منصة موارد المؤسسات النظام الأساسي الرئيسية لوحة المعلومات الشركات والمستأجرون الفروع المالية المحاسبة المالية المدفوعات والتسويات التجارة المبيعات ونقاط البيع المشتريات والتوريد إدارة علاقات العملاء العمليات المستودعات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "14-automotive-maintenance",
+    "route": "/automotive/maintenance",
+    "account": "enterprise",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/automotive/maintenance",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 1980,
+    "excerpt": "منصة موارد المؤسسات النظام الأساسي الرئيسية لوحة المعلومات الشركات والمستأجرون الفروع المالية المحاسبة المالية المدفوعات والتسويات التجارة المبيعات ونقاط البيع المشتريات والتوريد إدارة علاقات العملاء العمليات المستودعات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "15-workshop-inspections",
+    "route": "/automotive/inspections",
+    "account": "enterprise",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/automotive/inspections",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 1980,
+    "excerpt": "منصة موارد المؤسسات النظام الأساسي الرئيسية لوحة المعلومات الشركات والمستأجرون الفروع المالية المحاسبة المالية المدفوعات والتسويات التجارة المبيعات ونقاط البيع المشتريات والتوريد إدارة علاقات العملاء العمليات المستودعات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "16-spare-parts",
+    "route": "/automotive/spare-parts",
+    "account": "enterprise",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/automotive/spare-parts",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 1980,
+    "excerpt": "منصة موارد المؤسسات النظام الأساسي الرئيسية لوحة المعلومات الشركات والمستأجرون الفروع المالية المحاسبة المالية المدفوعات والتسويات التجارة المبيعات ونقاط البيع المشتريات والتوريد إدارة علاقات العملاء العمليات المستودعات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "17-provider-portal",
+    "route": "/providers",
+    "account": "enterprise",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/providers",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 1980,
+    "excerpt": "منصة موارد المؤسسات النظام الأساسي الرئيسية لوحة المعلومات الشركات والمستأجرون الفروع المالية المحاسبة المالية المدفوعات والتسويات التجارة المبيعات ونقاط البيع المشتريات والتوريد إدارة علاقات العملاء العمليات المستودعات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "18-bookings",
+    "route": "/bookings",
+    "account": "enterprise",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/bookings",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 1980,
+    "excerpt": "منصة موارد المؤسسات النظام الأساسي الرئيسية لوحة المعلومات الشركات والمستأجرون الفروع المالية المحاسبة المالية المدفوعات والتسويات التجارة المبيعات ونقاط البيع المشتريات والتوريد إدارة علاقات العملاء العمليات المستودعات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "19-payments",
+    "route": "/payments",
+    "account": "enterprise",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/payments",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 1980,
+    "excerpt": "منصة موارد المؤسسات النظام الأساسي الرئيسية لوحة المعلومات الشركات والمستأجرون الفروع المالية المحاسبة المالية المدفوعات والتسويات التجارة المبيعات ونقاط البيع المشتريات والتوريد إدارة علاقات العملاء العمليات المستودعات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "20-operations",
+    "route": "/operations",
+    "account": "enterprise",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/operations",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 1980,
+    "excerpt": "منصة موارد المؤسسات النظام الأساسي الرئيسية لوحة المعلومات الشركات والمستأجرون الفروع المالية المحاسبة المالية المدفوعات والتسويات التجارة المبيعات ونقاط البيع المشتريات والتوريد إدارة علاقات العملاء العمليات المستودعات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  },
+  {
+    "label": "21-reports",
+    "route": "/reports",
+    "account": "enterprise",
+    "ok": true,
+    "url": "https://work-1-cpaunenxhadbkkef.prod-runtime.all-hands.dev/reports",
+    "title": "ORYX — Enterprise Resource Platform",
+    "dir": "rtl",
+    "theme": "dark",
+    "textLength": 1980,
+    "excerpt": "منصة موارد المؤسسات النظام الأساسي الرئيسية لوحة المعلومات الشركات والمستأجرون الفروع المالية المحاسبة المالية المدفوعات والتسويات التجارة المبيعات ونقاط البيع المشتريات والتوريد إدارة علاقات العملاء العمليات المستودعات ",
+    "sidebarLogoutVisible": true,
+    "failures": [
+      "401 POST /api/v1/auth/refresh"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ]
+  }
+]

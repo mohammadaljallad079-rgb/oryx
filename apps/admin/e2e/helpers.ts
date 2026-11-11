@@ -143,26 +143,92 @@ export async function signIn(page: Page, credentials = SUPER_ADMIN): Promise<voi
   await expect(page.getByTestId('dashboard')).toBeVisible();
 }
 
-/** Switches the theme and waits for the attribute to settle. */
+/**
+ * Switches the theme and waits for the attribute to settle.
+ *
+ * The stored preference is read by an inline bootstrap script before first
+ * paint, so the write has to survive the reload. Under a loaded CI runner a
+ * single reload occasionally re-runs the bootstrap against the previous value,
+ * so the write and reload are retried once. The assertion still runs on every
+ * attempt, so an app that cannot honour the requested theme still fails.
+ */
 export async function setTheme(page: Page, theme: 'dark' | 'light'): Promise<void> {
-  await page.evaluate((value) => {
-    window.localStorage.setItem('oryx.theme', value);
-  }, theme);
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+  await applyPreferenceAndReload(page, 'oryx.theme', theme, () =>
+    expect(page.locator('html')).toHaveAttribute('data-theme', theme),
+  );
 }
 
 /** Switches locale/direction and waits for the attribute to settle. */
 export async function setLocale(page: Page, locale: 'ar' | 'en'): Promise<void> {
-  await page.evaluate((value) => {
-    window.localStorage.setItem('oryx.locale', value);
-  }, locale);
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-dir', locale === 'ar' ? 'rtl' : 'ltr');
+  await applyPreferenceAndReload(page, 'oryx.locale', locale, () =>
+    expect(page.locator('html')).toHaveAttribute('data-dir', locale === 'ar' ? 'rtl' : 'ltr'),
+  );
+}
+
+async function applyPreferenceAndReload(
+  page: Page,
+  key: string,
+  value: string,
+  assertSettled: () => Promise<unknown>,
+): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    await page.evaluate(([k, v]) => window.localStorage.setItem(k, v), [key, value]);
+    await page.reload();
+    try {
+      await assertSettled();
+      return;
+    } catch (error) {
+      if (attempt >= 1) throw error;
+    }
+  }
 }
 
 export async function expectNoServerError(page: Page): Promise<void> {
   const body = await page.locator('body').innerText();
   expect(body).not.toContain('Application error');
   expect(body).not.toContain('Internal Server Error');
+}
+
+/**
+ * Top a product's on-hand stock back up before an invoice is issued.
+ *
+ * A suite that picks `products.items[0]` and sells from it drains the seeded
+ * quantity; once the level reaches zero the next run is refused by the real
+ * `inventory.insufficient_stock` rule and the test fails on a stock assertion
+ * rather than the document it means to check. Posting a positive adjustment
+ * restores the level through the same stock ledger the invoice consumes, so the
+ * scenario stays about the document. The adjustment is posted, not left as a
+ * draft, because only a posted adjustment moves the level.
+ */
+export async function ensureStock(
+  page: Page,
+  token: string,
+  productId: string,
+  warehouseId: string,
+  quantityDelta = 1_000_000,
+): Promise<void> {
+  await page.evaluate(
+    async ({ api, bearer, productId: pid, warehouseId: wid, delta }) => {
+      const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` };
+      const created = (await (
+        await fetch(`${api}/inventory/adjustments`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            warehouseId: wid,
+            reason: 'e2e stock top-up',
+            lines: [{ productId: pid, quantityDelta: delta, unitCostMinor: 10000 }],
+          }),
+        })
+      ).json()) as { id?: string };
+      if (!created.id) throw new Error('stock top-up: adjustment was not created');
+      const posted = await fetch(`${api}/inventory/adjustments/${created.id}/post`, {
+        method: 'POST',
+        headers,
+        body: '{}',
+      });
+      if (!posted.ok) throw new Error(`stock top-up: post failed (${posted.status})`);
+    },
+    { api: API, bearer: token, productId, warehouseId, delta: quantityDelta },
+  );
 }

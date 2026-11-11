@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
+import { money } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -36,7 +37,7 @@ export default function SparePartsPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5" data-testid="spare-parts-page">
+    <div className="flex flex-col gap-4" data-testid="spare-parts-page">
       <SectionHeader
         title={t('nav.spare_parts')}
         subtitle={t('erp.parts.subtitle')}
@@ -98,8 +99,8 @@ function CatalogTab() {
               <tr key={p.id} data-testid={`part-catalog-${p.sku}`}>
                 <td className="font-mono text-[12px]">{p.sku}</td>
                 <td className="text-[12.5px]">{p.nameEn}</td>
-                <td className="tabular-nums text-[12.5px]">{(p.salesPriceMinor / 100).toFixed(2)}</td>
-                <td className="tabular-nums text-[12.5px]">{(p.costPriceMinor / 100).toFixed(2)}</td>
+                <td className="tabular-nums text-[12.5px]">{money(p.salesPriceMinor)}</td>
+                <td className="tabular-nums text-[12.5px]">{money(p.costPriceMinor)}</td>
                 <td className="tabular-nums text-[12.5px]">{(p.reorderLevel / 10000).toFixed(0)}</td>
               </tr>
             ))}
@@ -258,7 +259,7 @@ function CompatibilityTab({ canManage }: { canManage: boolean }) {
                   {matches.data.items.map((m, i) => {
                     const prod = (m.product ?? {}) as { sku?: string; nameEn?: string; salesPriceMinor?: number };
                     return (
-                      <tr key={i}><td className="font-mono text-[12px]">{prod.sku}</td><td className="text-[12.5px]">{prod.nameEn}</td><td className="tabular-nums text-[12.5px]">{((prod.salesPriceMinor ?? 0) / 100).toFixed(2)}</td></tr>
+                      <tr key={i}><td className="font-mono text-[12px]">{prod.sku}</td><td className="text-[12.5px]">{prod.nameEn}</td><td className="tabular-nums text-[12.5px]">{money(prod.salesPriceMinor ?? 0)}</td></tr>
                     );
                   })}
                 </tbody>

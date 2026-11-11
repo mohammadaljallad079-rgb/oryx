@@ -1,3 +1,5 @@
+import { currencyScale, DEFAULT_CURRENCY } from './currency';
+
 /**
  * ORYX monetary arithmetic.
  *
@@ -15,6 +17,14 @@
 /** Number of decimal places a quantity may carry (1/10000 of a unit). */
 export const QUANTITY_SCALE = 4;
 const QUANTITY_FACTOR = 10n ** BigInt(QUANTITY_SCALE);
+
+/**
+ * Decimal places a labour duration carries. The HR and workshop data model
+ * stores hours in hundredths (`250` = 2.50 h), which is a different scale from
+ * `QUANTITY_SCALE`, so a duration must never be priced with `lineAmountMinor`.
+ */
+export const HOURS_SCALE = 2;
+const HOURS_FACTOR = 10n ** BigInt(HOURS_SCALE);
 
 export class MoneyError extends Error {
   constructor(message: string) {
@@ -124,6 +134,35 @@ export function lineAmountMinor(quantity: number, unitPriceMinor: number): numbe
   return assertSafeInteger(divRoundHalfUp(BigInt(quantity) * BigInt(unitPriceMinor), QUANTITY_FACTOR), 'Line amount');
 }
 
+/** Parse a labour duration ("2.5") into hundredths of an hour. */
+export function toHours(value: string | number): number {
+  return toMinor(value, HOURS_SCALE);
+}
+
+/** Render hundredths of an hour back to a decimal string. */
+export function fromHours(value: number): string {
+  return fromMinor(value, HOURS_SCALE);
+}
+
+/**
+ * Labour amount = hours × hourly rate, rounded half-up exactly once.
+ * `hours` is scaled by `HOURS_SCALE` (hundredths), `rateMinor` is minor units
+ * per hour. Using `lineAmountMinor` here would divide by 10^4 and under-price
+ * the labour by a factor of 100.
+ */
+export function hoursAmountMinor(hours: number, rateMinor: number): number {
+  if (!Number.isInteger(hours) || !Number.isInteger(rateMinor)) {
+    throw new MoneyError('hoursAmountMinor requires integer operands.');
+  }
+  return assertSafeInteger(divRoundHalfUp(BigInt(hours) * BigInt(rateMinor), HOURS_FACTOR), 'Labour amount');
+}
+
+/** Rescale hundredths of an hour onto `QUANTITY_SCALE` units. */
+export function hoursToQuantity(hours: number): number {
+  if (!Number.isInteger(hours)) throw new MoneyError('hoursToQuantity requires integer operands.');
+  return assertSafeInteger(BigInt(hours) * 10n ** BigInt(QUANTITY_SCALE - HOURS_SCALE), 'Hours as quantity');
+}
+
 /**
  * Apply a percentage rate to an amount, rounded half-up exactly once.
  * `ratePercent` is scaled by `rateScale` (default 2, i.e. 1500 = 15.00%).
@@ -181,6 +220,43 @@ export function allocateMinor(total: number, weights: number[]): number[] {
   return parts.map((p) => assertSafeInteger(negative ? -p : p, 'Allocation part'));
 }
 
+/**
+ * How a document total may be rounded for cash settlement.
+ *
+ * `NONE` leaves the exact total. `NEAREST_WHOLE` rounds to the nearest whole
+ * major unit (1.000 BHD, 1.00 USD) and `NEAREST_HALF` to the nearest half unit
+ * (0.500 BHD). Both are half-up, matching every other rounding in this module.
+ */
+export const ROUNDING_MODES = ['NONE', 'NEAREST_WHOLE', 'NEAREST_HALF'] as const;
+export type RoundingMode = (typeof ROUNDING_MODES)[number];
+
+/** The minor-unit increment a rounding mode snaps to, given a currency scale. */
+export function roundingIncrementMinor(mode: RoundingMode, scale = 2): number {
+  if (mode === 'NONE') return 1;
+  const whole = 10 ** scale;
+  return mode === 'NEAREST_HALF' ? whole / 2 : whole;
+}
+
+/**
+ * Round a total to the increment of `mode` and report the signed adjustment.
+ *
+ * The adjustment is `rounded - total`: positive when the customer pays a little
+ * more than the exact total, negative when less. It is posted to a rounding
+ * account so the ledger still balances against the rounded receivable.
+ */
+export function roundMinor(
+  total: number,
+  mode: RoundingMode,
+  scale = 2,
+): { rounded: number; adjustment: number } {
+  if (!Number.isInteger(total)) throw new MoneyError('Minor units must be an integer.');
+  const increment = roundingIncrementMinor(mode, scale);
+  if (increment <= 1) return { rounded: total, adjustment: 0 };
+  const rounded = divRoundHalfUp(BigInt(total), BigInt(increment)) * BigInt(increment);
+  const value = assertSafeInteger(rounded, 'Rounded amount');
+  return { rounded: value, adjustment: value - total };
+}
+
 /** Sum of a list of minor-unit amounts. */
 export function sumMinor(amounts: number[]): number {
   return addMinor(...amounts);
@@ -194,9 +270,9 @@ export function isBalanced(amounts: number[]): boolean {
 /** Format minor units for display with a currency code. */
 export function formatMinor(
   minor: number,
-  currency = 'SAR',
+  currency = DEFAULT_CURRENCY,
   locale: 'ar' | 'en' = 'en',
-  scale = 2,
+  scale = currencyScale(currency),
 ): string {
   const major = toMajor(minor, scale);
   try {

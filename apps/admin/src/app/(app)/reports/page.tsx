@@ -14,16 +14,19 @@ import {
   Field,
   SectionHeader,
   Skeleton,
+  StatCard,
+  StatGrid,
   TableShell,
 } from '@/components/ui';
 import type {
   AccountingReportDto,
+  AgingRowDto,
   InventoryReportDto,
   PurchasingReportDto,
   SalesReportDto,
 } from '@oryx/shared';
 
-type Tab = 'accounting' | 'sales' | 'purchasing' | 'inventory';
+type Tab = 'accounting' | 'sales' | 'purchasing' | 'inventory' | 'aging';
 
 export default function ReportsPage() {
   const { t } = useUi();
@@ -37,12 +40,15 @@ export default function ReportsPage() {
   const sales = useAsync<SalesReportDto>(() => api.reportSales(params), [from, to]);
   const purchasing = useAsync<PurchasingReportDto>(() => api.reportPurchasing(params), [from, to]);
   const inventory = useAsync<InventoryReportDto>(() => api.reportInventory(params), [from, to]);
+  const receivables = useAsync<AgingRowDto[]>(() => api.receivablesAging(), []);
+  const payables = useAsync<AgingRowDto[]>(() => api.payablesAging(), []);
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'sales', label: t('erp.reports.sales') },
     { key: 'purchasing', label: t('erp.reports.purchasing') },
     { key: 'inventory', label: t('erp.reports.inventory') },
     { key: 'accounting', label: t('erp.reports.accounting') },
+    { key: 'aging', label: t('erp.reports.aging') },
   ];
 
   const reloadAll = () => {
@@ -50,10 +56,12 @@ export default function ReportsPage() {
     void purchasing.reload();
     void inventory.reload();
     void accounting.reload();
+    void receivables.reload();
+    void payables.reload();
   };
 
   return (
-    <div className="flex flex-col gap-5" data-testid="reports-page">
+    <div className="flex flex-col gap-4" data-testid="reports-page">
       <SectionHeader
         title={t('nav.reports_analytics')}
         subtitle={t('erp.reports.subtitle')}
@@ -99,11 +107,13 @@ export default function ReportsPage() {
             <EmptyState title={t('common.empty')} />
           ) : (
             <>
-              <div className="grid gap-4 border-b border-[var(--border)] p-4 sm:grid-cols-4">
-                <Kpi label={t('erp.reports.totalSales')} value={money(sales.data.totalSalesMinor)} testId="kpi-sales-total" />
-                <Kpi label={t('erp.reports.totalTax')} value={money(sales.data.totalTaxMinor)} />
-                <Kpi label={t('erp.reports.collected')} value={money(sales.data.totalPaidMinor)} />
-                <Kpi label={t('erp.reports.outstanding')} value={money(sales.data.totalOutstandingMinor)} />
+              <div className="border-b border-[var(--border)] p-4">
+                <StatGrid>
+                  <StatCard tone="gold" icon="cart" label={t('erp.reports.totalSales')} value={money(sales.data.totalSalesMinor)} data-testid="kpi-sales-total" />
+                  <StatCard icon="scroll" label={t('erp.reports.totalTax')} value={money(sales.data.totalTaxMinor)} />
+                  <StatCard tone="success" icon="wallet" label={t('erp.reports.collected')} value={money(sales.data.totalPaidMinor)} />
+                  <StatCard tone="danger" icon="clock" label={t('erp.reports.outstanding')} value={money(sales.data.totalOutstandingMinor)} />
+                </StatGrid>
               </div>
               <div className="border-b border-[var(--border)] p-4">
                 <p className="oryx-panel-title m-0 mb-3">{t('erp.reports.byCustomer')}</p>
@@ -161,6 +171,33 @@ export default function ReportsPage() {
                   </TableShell>
                 )}
               </div>
+              <div className="border-t border-[var(--border)] p-4">
+                <p className="oryx-panel-title m-0 mb-3">{t('erp.reports.bySalesperson')}</p>
+                {(sales.data.bySalesperson ?? []).length === 0 ? (
+                  <p className="oryx-muted m-0 text-[12.5px]">{t('common.empty')}</p>
+                ) : (
+                  <TableShell>
+                    <thead>
+                      <tr>
+                        <th>{t('erp.reports.salesperson')}</th>
+                        <th>{t('erp.reports.invoices')}</th>
+                        <th>{t('erp.sales.total')}</th>
+                        <th>{t('erp.reports.collected')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(sales.data.bySalesperson ?? []).map((s) => (
+                        <tr key={s.salespersonName} data-testid={`report-salesperson-${s.salespersonName}`}>
+                          <td>{s.salespersonName}</td>
+                          <td className="tabular-nums text-[12.5px]">{s.invoiceCount}</td>
+                          <td className="tabular-nums text-[12.5px] font-semibold">{money(s.totalMinor)}</td>
+                          <td className="tabular-nums text-[12.5px]">{money(s.paidMinor)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </TableShell>
+                )}
+              </div>
             </>
           )}
         </Card>
@@ -173,11 +210,13 @@ export default function ReportsPage() {
             <EmptyState title={t('common.empty')} />
           ) : (
             <>
-              <div className="grid gap-4 border-b border-[var(--border)] p-4 sm:grid-cols-4">
-                <Kpi label={t('erp.reports.ordered')} value={money(purchasing.data.totalOrderedMinor)} testId="kpi-purchasing-ordered" />
-                <Kpi label={t('erp.reports.invoiced')} value={money(purchasing.data.totalInvoicedMinor)} />
-                <Kpi label={t('erp.reports.paid')} value={money(purchasing.data.totalPaidMinor)} />
-                <Kpi label={t('erp.reports.outstanding')} value={money(purchasing.data.totalOutstandingMinor)} />
+              <div className="border-b border-[var(--border)] p-4">
+                <StatGrid>
+                  <StatCard icon="truck" label={t('erp.reports.ordered')} value={money(purchasing.data.totalOrderedMinor)} data-testid="kpi-purchasing-ordered" />
+                  <StatCard icon="scroll" label={t('erp.reports.invoiced')} value={money(purchasing.data.totalInvoicedMinor)} />
+                  <StatCard tone="success" icon="wallet" label={t('erp.reports.paid')} value={money(purchasing.data.totalPaidMinor)} />
+                  <StatCard tone="danger" icon="clock" label={t('erp.reports.outstanding')} value={money(purchasing.data.totalOutstandingMinor)} />
+                </StatGrid>
               </div>
               <div className="p-4">
                 <p className="oryx-panel-title m-0 mb-3">{t('erp.reports.bySupplier')}</p>
@@ -220,10 +259,12 @@ export default function ReportsPage() {
             <EmptyState title={t('common.empty')} />
           ) : (
             <>
-              <div className="grid gap-4 border-b border-[var(--border)] p-4 sm:grid-cols-3">
-                <Kpi label={t('erp.inventory.totalValue')} value={money(inventory.data.totalValueMinor)} testId="kpi-inventory-value" />
-                <Kpi label={t('erp.inventory.totalQty')} value={qty(inventory.data.totalQuantity)} />
-                <Kpi label={t('erp.inventory.reorder')} value={String(inventory.data.reorderAlerts.length)} />
+              <div className="border-b border-[var(--border)] p-4">
+                <StatGrid>
+                  <StatCard tone="gold" icon="warehouse" label={t('erp.inventory.totalValue')} value={money(inventory.data.totalValueMinor)} data-testid="kpi-inventory-value" />
+                  <StatCard icon="package" label={t('erp.inventory.totalQty')} value={qty(inventory.data.totalQuantity)} />
+                  <StatCard tone="danger" icon="alert" label={t('erp.inventory.reorder')} value={String(inventory.data.reorderAlerts.length)} />
+                </StatGrid>
               </div>
               <div className="border-b border-[var(--border)] p-4">
                 <p className="oryx-panel-title m-0 mb-3">{t('erp.inventory.valuation')}</p>
@@ -291,16 +332,22 @@ export default function ReportsPage() {
             <EmptyState title={t('common.empty')} />
           ) : (
             <>
-              <div className="grid gap-4 border-b border-[var(--border)] p-4 sm:grid-cols-4">
-                <Kpi label={t('erp.reports.journals')} value={String(accounting.data.journalCount)} testId="kpi-journal-count" />
-                <Kpi label={t('erp.accounting.debit')} value={money(accounting.data.totalDebitMinor)} />
-                <Kpi label={t('erp.accounting.credit')} value={money(accounting.data.totalCreditMinor)} />
-                <div>
-                  <p className="oryx-label">{t('erp.accounting.balanced')}</p>
-                  <Badge tone={accounting.data.balanced ? 'success' : 'danger'} data-testid="report-accounting-balanced">
-                    {accounting.data.balanced ? t('erp.accounting.balanced') : t('erp.accounting.unbalanced')}
-                  </Badge>
-                </div>
+              <div className="border-b border-[var(--border)] p-4">
+                <StatGrid>
+                  <StatCard icon="scroll" label={t('erp.reports.journals')} value={String(accounting.data.journalCount)} data-testid="kpi-journal-count" />
+                  <StatCard icon="calculator" label={t('erp.accounting.debit')} value={money(accounting.data.totalDebitMinor)} />
+                  <StatCard icon="calculator" label={t('erp.accounting.credit')} value={money(accounting.data.totalCreditMinor)} />
+                  <StatCard
+                    icon="shield"
+                    tone={accounting.data.balanced ? 'success' : 'danger'}
+                    label={t('erp.accounting.balanced')}
+                    value={
+                      <Badge tone={accounting.data.balanced ? 'success' : 'danger'} data-testid="report-accounting-balanced">
+                        {accounting.data.balanced ? t('erp.accounting.balanced') : t('erp.accounting.unbalanced')}
+                      </Badge>
+                    }
+                  />
+                </StatGrid>
               </div>
               <div className="p-4">
                 <p className="oryx-panel-title m-0 mb-3">{t('erp.reports.bySource')}</p>
@@ -330,6 +377,31 @@ export default function ReportsPage() {
         </Card>
       ) : null}
 
+      {tab === 'aging' ? (
+        <Card>
+          <div className="border-b border-[var(--border)] p-4">
+            <p className="oryx-panel-title m-0 mb-3">{t('erp.reports.receivablesAging')}</p>
+            <AgingTable
+              rows={receivables.data}
+              loading={receivables.loading}
+              error={receivables.error}
+              onRetry={receivables.reload}
+              partyLabel={t('erp.sales.customer')}
+            />
+          </div>
+          <div className="p-4">
+            <p className="oryx-panel-title m-0 mb-3">{t('erp.reports.payablesAging')}</p>
+            <AgingTable
+              rows={payables.data}
+              loading={payables.loading}
+              error={payables.error}
+              onRetry={payables.reload}
+              partyLabel={t('erp.purchasing.supplier')}
+            />
+          </div>
+        </Card>
+      ) : null}
+
       <span className="hidden">
         <Field label="hidden">
           <input className="oryx-input" readOnly />
@@ -339,11 +411,57 @@ export default function ReportsPage() {
   );
 }
 
-function Kpi({ label, value, testId }: { label: string; value: string; testId?: string }) {
+/** Outstanding balances grouped by how far past due they are. */
+function AgingTable({
+  rows,
+  loading,
+  error,
+  onRetry,
+  partyLabel,
+}: {
+  rows: AgingRowDto[] | null;
+  loading: boolean;
+  error: string | null;
+  onRetry: () => Promise<void>;
+  partyLabel: string;
+}) {
+  const { t } = useUi();
+  if (error) return <ErrorBanner message={error} onRetry={onRetry} />;
+  if (loading) return <Skeleton height={160} />;
+  if (!rows || rows.length === 0) return <p className="oryx-muted m-0 text-[12.5px]">{t('common.empty')}</p>;
+  const total = rows.reduce((s, r) => s + r.outstandingMinor, 0);
   return (
-    <div data-testid={testId}>
-      <p className="oryx-label">{label}</p>
-      <p className="m-0 text-[19px] font-extrabold tabular-nums">{value}</p>
-    </div>
+    <>
+      <p className="oryx-faint m-0 mb-2 text-[12px]">
+        {t('erp.reports.outstandingTotal')}: <span className="tabular-nums font-semibold">{money(total)}</span>
+      </p>
+      <TableShell>
+        <thead>
+          <tr>
+            <th>{t('erp.sales.invoiceNumber')}</th>
+            <th>{partyLabel}</th>
+            <th>{t('common.date')}</th>
+            <th>{t('erp.sales.dueDate')}</th>
+            <th>{t('erp.reports.daysOverdue')}</th>
+            <th>{t('erp.sales.outstanding')}</th>
+            <th>{t('erp.reports.bucket')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id} data-testid={`aging-row-${r.invoiceNumber}`}>
+              <td className="font-mono text-[12px]">{r.invoiceNumber}</td>
+              <td className="text-[12.5px]">{r.customerNameEn ?? r.supplierNameEn ?? '—'}</td>
+              <td className="text-[12.5px]">{r.invoiceDate.slice(0, 10)}</td>
+              <td className="text-[12.5px]">{r.dueDate ? r.dueDate.slice(0, 10) : '—'}</td>
+              <td className="tabular-nums text-[12.5px]">{r.daysOverdue > 0 ? r.daysOverdue : 0}</td>
+              <td className="tabular-nums text-[12.5px] font-semibold">{money(r.outstandingMinor)}</td>
+              <td><Badge tone={r.bucket === 'CURRENT' ? 'success' : 'warning'}>{t(`erp.reports.bucket.${r.bucket}`)}</Badge></td>
+            </tr>
+          ))}
+        </tbody>
+      </TableShell>
+    </>
   );
 }
+

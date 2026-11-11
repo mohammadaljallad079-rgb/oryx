@@ -101,6 +101,7 @@ export class BookingService {
     resourceKey: string,
     dayStart: Date,
     dayEnd: Date,
+    excludeSlotId?: string,
   ): Promise<BusyInterval[]> {
     const rows = await this.prisma.bookingSlot.findMany({
       where: {
@@ -108,6 +109,9 @@ export class BookingService {
         status: { notIn: ['CANCELLED', 'NO_SHOW'] },
         startsAt: { lt: dayEnd },
         endsAt: { gt: dayStart },
+        // A reschedule must not see the booking it is moving as a conflict with
+        // itself; every other booking on the resource still blocks the time.
+        ...(excludeSlotId ? { id: { not: excludeSlotId } } : {}),
       },
       select: { startsAt: true, endsAt: true },
     });
@@ -341,6 +345,7 @@ export class BookingService {
     serviceRef?: string | null;
     startsAt: Date;
     durationMinutes: number;
+    excludeSlotId?: string;
   }): Promise<{ resourceId: string | null }> {
     const dayStart = new Date(
       Date.UTC(
@@ -397,6 +402,7 @@ export class BookingService {
       serviceRef?: string | null;
       startsAt: Date;
       durationMinutes: number;
+      excludeSlotId?: string;
     },
     dayStart: Date,
     dayEnd: Date,
@@ -413,7 +419,7 @@ export class BookingService {
       branchId: input.branchId,
       serviceRef: input.serviceRef,
     });
-    const busy = await this.busyIntervals(resourceKey, dayStart, dayEnd);
+    const busy = await this.busyIntervals(resourceKey, dayStart, dayEnd, input.excludeSlotId);
 
     const startMinute = Math.round((input.startsAt.getTime() - dayStart.getTime()) / 60_000);
     const result = validateSlot({
@@ -450,6 +456,147 @@ export class BookingService {
       throw conflict(ERROR_CODES.BOOKING_HOLD_EXPIRED, 'This hold has expired. Please book again.');
     }
     return this.transition(slot, 'CONFIRMED', actorId, 'Booking confirmed.');
+  }
+
+  /**
+   * Confirm a held slot the customer owns.
+   *
+   * A customer booking is always created as a hold, so without this the slot
+   * would expire after the hold window and never become a real appointment.
+   * Ownership is asserted before the transition, exactly as cancellation is, so
+   * a customer cannot confirm someone else's booking by id.
+   */
+  async confirmCustomerBooking(accountId: string, slotId: string) {
+    const slot = await this.prisma.bookingSlot.findFirst({
+      where: { id: slotId, customerAccountId: accountId },
+    });
+    if (!slot) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Booking not found.');
+    if (slot.status === 'CONFIRMED' || slot.status === 'RESCHEDULED') return slot;
+    if (slot.status !== 'HELD') {
+      throw conflict(ERROR_CODES.BOOKING_STATE, `A ${slot.status} booking cannot be confirmed.`);
+    }
+    if (slot.holdExpiresAt && slot.holdExpiresAt < new Date()) {
+      throw conflict(ERROR_CODES.BOOKING_HOLD_EXPIRED, 'This hold has expired. Please book again.');
+    }
+
+    const updated = await this.prisma.bookingSlot.update({
+      where: { id: slot.id },
+      data: {
+        status: 'CONFIRMED',
+        holdExpiresAt: null,
+        events: {
+          create: {
+            companyId: slot.companyId,
+            kind: 'CONFIRMED',
+            fromStatus: slot.status as never,
+            toStatus: 'CONFIRMED' as never,
+            message: 'Booking confirmed by the customer.',
+            actorKind: 'CUSTOMER',
+            actorId: accountId,
+          },
+        },
+      },
+    });
+
+    await this.audit.record({
+      action: 'booking.confirmed',
+      companyId: slot.companyId,
+      targetType: 'BOOKING_SLOT',
+      targetId: slot.id,
+      summary: `Customer confirmed booking ${slot.reference}.`,
+    });
+
+    return updated;
+  }
+
+  /** Read a booking the customer owns, with its resource and branch. */
+  async getCustomerBooking(accountId: string, slotId: string) {
+    const slot = await this.prisma.bookingSlot.findFirst({
+      where: { id: slotId, customerAccountId: accountId },
+      include: {
+        resource: { select: { id: true, code: true, nameEn: true, nameAr: true } },
+        branch: { select: { id: true, code: true, nameEn: true, nameAr: true, phone: true } },
+        events: { orderBy: { createdAt: 'asc' } },
+      },
+    });
+    if (!slot) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Booking not found.');
+    return slot;
+  }
+
+  /**
+   * Move a booking the customer owns to a new time.
+   *
+   * Ownership is asserted from the token's account before anything moves, so a
+   * customer cannot reschedule someone else's appointment by id. The new time is
+   * checked against the engine exactly as a fresh booking is — working hours,
+   * buffers and every other booking on the resource — while the booking being
+   * moved is excluded from its own conflict test. The unique index remains the
+   * final authority, so a race that slips past the check is still refused.
+   */
+  async rescheduleCustomerBooking(
+    accountId: string,
+    slotId: string,
+    startsAt: Date,
+    durationMinutes: number,
+  ) {
+    const slot = await this.prisma.bookingSlot.findFirst({
+      where: { id: slotId, customerAccountId: accountId },
+    });
+    if (!slot) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Booking not found.');
+    if (['CANCELLED', 'COMPLETED', 'NO_SHOW'].includes(slot.status)) {
+      throw conflict(ERROR_CODES.BOOKING_STATE, `A ${slot.status} booking cannot be rescheduled.`);
+    }
+
+    await this.assertSlotBookable({
+      companyId: slot.companyId,
+      branchId: slot.branchId,
+      resourceId: slot.resourceId,
+      serviceRef: slot.serviceRef,
+      startsAt,
+      durationMinutes,
+      excludeSlotId: slot.id,
+    });
+
+    const endsAt = new Date(startsAt.getTime() + durationMinutes * 60_000);
+    try {
+      const updated = await this.prisma.bookingSlot.update({
+        where: { id: slot.id },
+        data: {
+          startsAt,
+          endsAt,
+          durationMinutes,
+          status: 'RESCHEDULED',
+          holdExpiresAt: null,
+          events: {
+            create: {
+              companyId: slot.companyId,
+              kind: 'RESCHEDULED',
+              fromStatus: slot.status,
+              toStatus: 'RESCHEDULED',
+              message: `Rescheduled to ${startsAt.toISOString()} by the customer.`,
+              actorKind: 'CUSTOMER',
+              actorId: accountId,
+            },
+          },
+        },
+      });
+      await this.audit.record({
+        action: 'booking.rescheduled_by_customer',
+        companyId: slot.companyId,
+        targetType: 'BOOKING_SLOT',
+        targetId: slot.id,
+        summary: `Booking ${slot.reference} rescheduled by the customer to ${startsAt.toISOString()}.`,
+      });
+      return updated;
+    } catch (error) {
+      if (this.isUniqueViolation(error)) {
+        throw conflict(
+          ERROR_CODES.BOOKING_SLOT_UNAVAILABLE,
+          'That time is already booked. Please choose another slot.',
+        );
+      }
+      throw error;
+    }
   }
 
   /**
@@ -965,6 +1112,62 @@ export class BookingService {
     });
   }
 
+  /**
+   * Delete a booking that carries no settled work.
+   *
+   * A HELD, CANCELLED or NO_SHOW booking reserves no time and represents no
+   * delivered service, so removing it is safe. A booking that was confirmed,
+   * started or completed is part of the service record and must be cancelled
+   * instead of deleted.
+   */
+  async deleteBooking(companyId: string, slotId: string, actorId?: string) {
+    const slot = await this.findSlot(companyId, slotId);
+    if (!['HELD', 'CANCELLED', 'NO_SHOW'].includes(slot.status)) {
+      throw conflict(
+        ERROR_CODES.BOOKING_STATE,
+        'Only a held, cancelled or no-show booking can be deleted. Cancel it first.',
+      );
+    }
+    await this.prisma.bookingSlot.delete({ where: { id: slot.id } });
+    await this.audit.record({
+      action: 'booking.deleted',
+      companyId,
+      targetType: 'BOOKING_SLOT',
+      targetId: slot.id,
+      summary: `Booking ${slot.reference} deleted.`,
+      actorUserId: actorId ?? null,
+    });
+    return { id: slot.id, deleted: true as const };
+  }
+
+  /**
+   * Delete a resource that has never been booked. A resource with slots is
+   * retained so historical bookings still resolve to a name; deactivate it
+   * instead.
+   */
+  async deleteResource(companyId: string, resourceId: string) {
+    const resource = await this.prisma.bookingResource.findFirst({
+      where: { id: resourceId, companyId },
+      include: { _count: { select: { slots: true } } },
+    });
+    if (!resource) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Resource not found.');
+    if (resource._count.slots > 0) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This resource has bookings and cannot be deleted. Deactivate it instead.',
+      );
+    }
+    await this.prisma.bookingResource.delete({ where: { id: resourceId } });
+    await this.audit.record({
+      action: 'booking.resource_deleted',
+      companyId,
+      targetType: 'BOOKING_RESOURCE',
+      targetId: resourceId,
+      summary: `Resource ${resource.code} deleted.`,
+    });
+    return { id: resourceId, deleted: true as const };
+  }
+
   // ------------------------------------------------------------------ helpers
 
   /**
@@ -978,18 +1181,21 @@ export class BookingService {
     companyId: string,
     bookingType: 'INSPECTION' | 'MAINTENANCE' | 'PROVIDER_SERVICE',
   ): Promise<string> {
+    // One leading letter, then digits, as every other document number on the
+    // platform. The three booking types keep independent counters, so the
+    // letters only have to be distinct within their own sequence.
     const prefix =
-      bookingType === 'INSPECTION' ? 'BK-I' : bookingType === 'MAINTENANCE' ? 'BK-M' : 'BK-P';
+      bookingType === 'INSPECTION' ? 'H' : bookingType === 'MAINTENANCE' ? 'M' : 'V';
     const count = await this.prisma.bookingSlot.count({ where: { companyId, bookingType } });
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const candidate = `${prefix}-${String(count + 1 + attempt).padStart(6, '0')}`;
+      const candidate = `${prefix}${String(count + 1 + attempt).padStart(6, '0')}`;
       const clash = await this.prisma.bookingSlot.findFirst({
         where: { companyId, reference: candidate },
         select: { id: true },
       });
       if (!clash) return candidate;
     }
-    return `${prefix}-${Date.now().toString(36).toUpperCase()}`;
+    return `${prefix}${Date.now().toString(36).toUpperCase()}`;
   }
 
   /** Prisma reports a unique-constraint failure as P2002. */

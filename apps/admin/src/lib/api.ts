@@ -1,17 +1,29 @@
 import type {
   AccountingReportDto,
   AgingRowDto,
+  AiSuggestionDto,
   AppVersionDto,
+  AttachmentDto,
+  AttachmentEntityType,
   AuditLogDto,
   BalanceSheetDto,
   BranchDto,
   CashierSessionDto,
   CmsBannerDto,
+  CmsMediaAssetDto,
+  CmsMediaFolderDto,
   CmsPageDto,
   CompanyDto,
+  CompanyBrandingDto,
   ContextResponse,
+  CouponDto,
+  CouponValidationResponse,
   CustomerDto,
+  CustomerDetailDto,
+  CustomerAttachmentDto,
+  CustomerReturnDto,
   DashboardResponse,
+  EcosystemOverviewResponse,
   ErpAccountDto,
   FeatureFlagDto,
   FiscalYearDto,
@@ -25,14 +37,18 @@ import type {
   LoginResponse,
   LoginResult,
   ModuleDto,
+  NotificationDeliveryDto,
   Paginated,
   PaymentDto,
   PlanDto,
   PosSaleDto,
   ProductDto,
+  ProductImageDto,
   PurchaseDocumentDto,
   PurchasingReportDto,
+  RecoveryRequestDto,
   ReorderAlertDto,
+  PosProductDto,
   RequisitionDto,
   RoleDto,
   SalesDocumentDto,
@@ -64,10 +80,22 @@ import type {
   CrmDashboardDto,
   ProjectDto,
   ProjectTaskDto,
+  LeadSourceDto,
+  TaxRateDto,
   WorkOrderDto,
   WorkOrderChecklistItemDto,
   OperationsDashboardDto,
+  InspectionSessionDto,
+  InspectionSessionSummaryDto,
+  InspectionProgressDto,
+  InspectionBodyMarkerDto,
+  InspectionChassisRegionDto,
+  InspectionDiagnosticEntryDto,
+  InspectionAttachmentDto,
+  InspectionAreaKey,
   VehicleDto,
+  VehicleDocumentDto,
+  VehicleDocumentOcrResultDto,
   InspectionServiceDto,
   InspectionBookingDto,
   JobCardDto,
@@ -76,9 +104,27 @@ import type {
   ServiceRequestDto,
   ProviderSettlementDto,
   WarehouseDto,
+  OfficialDocumentType,
+  OfficialDocumentStatus,
+  PrintDocumentDto,
+  PrintDocumentKind,
 } from '@oryx/shared';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api';
+/**
+ * Base URL every admin request is built from. Callers append `/v1/<path>`.
+ *
+ * A value that already ends in `/v1` would produce `/api/v1/v1/auth/login` — a
+ * 404 that reads like a routing bug. That is a pure configuration mistake (the
+ * documented value is the origin plus `/api`), so it is normalised here rather
+ * than left to fail at runtime. Trailing slashes are trimmed for the same
+ * reason.
+ */
+const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api')
+  .replace(/\/+$/, '')
+  .replace(/\/v1$/, '');
+
+/** The API origin, without the `/api` suffix `API_BASE` carries. */
+const API_ORIGIN = API_BASE.replace(/\/api\/?$/, '');
 
 /**
  * Only non-secret UI preferences are persisted.
@@ -136,6 +182,13 @@ let sessionHinted = false;
 /** Subscribers notified when the session is lost, so the UI can redirect. */
 const sessionLossListeners = new Set<() => void>();
 
+/**
+ * Subscribers notified when the API is unreachable but the session may still be
+ * valid. Distinct from session loss on purpose: a transient outage must not
+ * redirect the user to sign-in.
+ */
+const offlineListeners = new Set<() => void>();
+
 export const tokenStore = {
   get access(): string | null {
     return accessToken;
@@ -187,6 +240,18 @@ export const tokenStore = {
     accessToken = null;
     for (const listener of sessionLossListeners) listener();
   },
+  /**
+   * Report a transient outage. Unlike `notifySessionLost` this deliberately
+   * keeps the in-memory token and the session hint: the session is probably
+   * still valid and the next successful request should continue seamlessly.
+   */
+  onOffline(listener: () => void): () => void {
+    offlineListeners.add(listener);
+    return () => offlineListeners.delete(listener);
+  },
+  notifyOffline() {
+    for (const listener of offlineListeners) listener();
+  },
 };
 
 interface RequestOptions {
@@ -196,6 +261,11 @@ interface RequestOptions {
   anonymous?: boolean;
   /** Do not attempt a refresh-and-retry on 401. */
   noRetry?: boolean;
+  /**
+   * Send the body as-is (a `FormData` upload) instead of JSON-encoding it. The
+   * browser must set the multipart boundary itself, so no Content-Type is set.
+   */
+  raw?: boolean;
 }
 
 /**
@@ -204,16 +274,34 @@ interface RequestOptions {
  * Every caller that needs a new access token awaits the same promise, so
  * concurrent 401s across widgets produce exactly one rotation request. This is
  * what prevents a refresh storm and the token-family revocation it would cause.
+ *
+ * The result distinguishes three outcomes:
+ *   - `ok`          a new access token was obtained;
+ *   - `expired`     the API rejected the refresh token (401/403), so the
+ *                   session really is over and the shell should sign out;
+ *   - `unavailable` the refresh could not be attempted or answered — an offline
+ *                   network, a timeout, a 5xx or a 429. The session may still be
+ *                   perfectly valid, so it must NOT be torn down.
+ *
+ * Collapsing `unavailable` into `expired` was the defect behind the iPad
+ * incident: one transient failure signed the user out and, because the stale
+ * HttpOnly cookie could not be cleared from script, the guard then blocked
+ * every subsequent sign-in.
  */
-let refreshInFlight: Promise<boolean> | null = null;
+export type RefreshOutcome = 'ok' | 'expired' | 'unavailable';
 
-/**
- * Rotate the session using the HttpOnly refresh cookie. The CSRF header must
- * accompany the request, which is why it is read from the readable cookie.
- */
-async function refreshSession(): Promise<boolean> {
+let refreshInFlight: Promise<RefreshOutcome> | null = null;
+
+/** Only an explicit rejection by the API means the session is over. */
+function isTerminalRefreshStatus(status: number): boolean {
+  return status === 401 || status === 403;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function refreshSession(): Promise<RefreshOutcome> {
   if (!refreshInFlight) {
-    refreshInFlight = (async () => {
+    refreshInFlight = (async (): Promise<RefreshOutcome> => {
       try {
         const csrf = readCookie(CSRF_COOKIE);
         const res = await fetch(`${API_BASE}/v1/auth/refresh`, {
@@ -226,15 +314,20 @@ async function refreshSession(): Promise<boolean> {
           },
           body: JSON.stringify({}),
         });
-        if (!res.ok) {
-          tokenStore.clear();
-          return false;
+        if (res.ok) {
+          const data = (await res.json()) as LoginResponse;
+          tokenStore.setAccessToken(data.accessToken);
+          return 'ok';
         }
-        const data = (await res.json()) as LoginResponse;
-        tokenStore.setAccessToken(data.accessToken);
-        return true;
+        if (isTerminalRefreshStatus(res.status)) {
+          tokenStore.clear();
+          return 'expired';
+        }
+        // 5xx, 429 or any other unexpected status: retryable, not terminal.
+        return 'unavailable';
       } catch {
-        return false;
+        // A thrown fetch is a network/DNS/offline failure, never a rejection.
+        return 'unavailable';
       } finally {
         refreshInFlight = null;
       }
@@ -243,21 +336,35 @@ async function refreshSession(): Promise<boolean> {
   return refreshInFlight;
 }
 
+/** Bounded retries so a brief outage does not look like a lost session. */
+const RESTORE_ATTEMPTS = 3;
+const RESTORE_BACKOFF_MS = 600;
+
 /**
  * Restore a session after a reload.
  *
- * Called once when the app mounts. It performs a single refresh so the tab has
- * an access token again; a failure simply means there is no session.
+ * Called once when the app mounts. A `401`/`403` means there is genuinely no
+ * session; a transient failure is retried a bounded number of times before it
+ * is reported, so a flaky network at boot does not bounce the user to sign-in.
  */
-export async function restoreSession(): Promise<boolean> {
-  if (accessToken) return true;
-  return refreshSession();
+export async function restoreSession(): Promise<RefreshOutcome> {
+  if (accessToken) return 'ok';
+  let outcome: RefreshOutcome = 'unavailable';
+  for (let attempt = 0; attempt < RESTORE_ATTEMPTS; attempt += 1) {
+    outcome = await refreshSession();
+    if (outcome !== 'unavailable') return outcome;
+    if (attempt < RESTORE_ATTEMPTS - 1) await sleep(RESTORE_BACKOFF_MS * (attempt + 1));
+  }
+  return outcome;
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? 'GET';
   const headers: Record<string, string> = {};
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+  if (options.body !== undefined && !options.raw && !isFormData) {
+    headers['Content-Type'] = 'application/json';
+  }
   if (!options.anonymous) {
     const token = tokenStore.access;
     if (token) headers.Authorization = `Bearer ${token}`;
@@ -276,15 +383,29 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     method,
     headers,
     credentials: 'include',
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body:
+      options.body === undefined
+        ? undefined
+        : options.raw
+          ? (options.body as BodyInit)
+          : isFormData
+            ? (options.body as FormData)
+            : JSON.stringify(options.body),
     cache: 'no-store',
   });
 
   if (res.status === 401 && !options.anonymous && !options.noRetry) {
-    const refreshed = await refreshSession();
-    if (refreshed) return request<T>(path, { ...options, noRetry: true });
-    // The session is genuinely gone: tell the shell so it can redirect.
-    tokenStore.notifySessionLost();
+    const outcome = await refreshSession();
+    if (outcome === 'ok') return request<T>(path, { ...options, noRetry: true });
+    if (outcome === 'expired') {
+      // The API explicitly rejected the refresh token: the session is gone.
+      tokenStore.notifySessionLost();
+    } else {
+      // Transient failure. The session may still be valid, so surface the
+      // problem instead of signing the user out. `noRetry` prevents a loop.
+      tokenStore.notifyOffline();
+      throw new ApiError(503, 'network.unavailable', 'The service is temporarily unavailable.');
+    }
   }
 
   if (!res.ok) {
@@ -302,6 +423,40 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+/** One issued official document, as the API projects it. */
+export interface OfficialDocumentDto {
+  id: string;
+  type: OfficialDocumentType;
+  documentNumber: string;
+  status: OfficialDocumentStatus;
+  version: number;
+  verificationToken: string;
+  verificationUrl: string;
+  sourceType: string;
+  sourceId: string;
+  pageCount: number | null;
+  byteSize: number | null;
+  issuedAt: string;
+  issuerNameEn: string;
+  issuerNameAr: string;
+  issuerCode: string;
+  supersededAt: string | null;
+  revokedAt: string | null;
+  revokeReason: string | null;
+  downloadable: boolean;
+}
+
+/** A document plus its append-only event trail. */
+export interface OfficialDocumentDetailDto extends OfficialDocumentDto {
+  events: Array<{
+    id: string;
+    event: string;
+    detail: string | null;
+    actorId: string | null;
+    createdAt: string;
+  }>;
 }
 
 export const api = {
@@ -353,6 +508,8 @@ export const api = {
     fullNameAr: string;
     password: string;
   }) => request<LoginResult>('/auth/accept-invitation', { method: 'POST', body, anonymous: true }),
+  changePassword: (body: { currentPassword: string; newPassword: string }) =>
+    request<{ ok: boolean }>('/auth/change-password', { method: 'POST', body }),
 
   // -------------------------------------------------------------------- MFA
   mfaStatus: () =>
@@ -392,6 +549,51 @@ export const api = {
     request<CompanyDto>(`/companies/${id}`, { method: 'PATCH', body }),
   setCompanyStatus: (id: string, status: string, reason?: string) =>
     request<CompanyDto>(`/companies/${id}/status`, { method: 'PATCH', body: { status, reason } }),
+  /**
+   * Archive a company (soft delete).
+   *
+   * A tenant carries accounting, stock and payroll history, so it is never
+   * physically deleted — the row is moved to `ARCHIVED`, which hides it from the
+   * working lists while every linked record stays intact and the action stays in
+   * the audit trail. Restoring is the same call with `ACTIVE`.
+   */
+  archiveCompany: (id: string, reason?: string) =>
+    request<CompanyDto>(`/companies/${id}/status`, { method: 'PATCH', body: { status: 'ARCHIVED', reason } }),
+  /**
+   * Permanently delete a company and everything it owns (platform only).
+   *
+   * Unlike `archiveCompany`, this cannot be undone: the tenant, its branches,
+   * memberships, documents and ledger are removed. The `confirm: true` flag is
+   * required by the API so an accidental call can never erase a tenant. The
+   * audit trail survives the delete.
+   */
+  deleteCompany: (id: string) =>
+    request<{ ok: boolean; code: string; childrenDetached: number }>(`/companies/${id}`, {
+      method: 'DELETE',
+      body: { confirm: true },
+    }),
+
+  // ---------------------------------------------------------------- branding
+  /**
+   * The resolved identity for a company.
+   *
+   * The API applies the platform default field by field, so a company that has
+   * set nothing still returns a complete identity rather than nulls.
+   */
+  getBranding: (companyId: string) =>
+    request<CompanyBrandingDto>(`/companies/${companyId}/branding`),
+  /**
+   * Update a company's identity.
+   *
+   * The tri-state is preserved on the wire: an omitted key leaves the stored
+   * value alone, an explicit `null` clears it back to the platform default, and
+   * a value sets it. `JSON.stringify` drops `undefined`, so an omitted key is
+   * genuinely absent from the body.
+   */
+  updateBranding: (companyId: string, body: Record<string, unknown>) =>
+    request<CompanyBrandingDto>(`/companies/${companyId}/branding`, { method: 'PATCH', body }),
+  resetBranding: (companyId: string) =>
+    request<CompanyBrandingDto>(`/companies/${companyId}/branding`, { method: 'DELETE' }),
 
   // ---------------------------------------------------------------- branches
   listBranches: (companyId: string, params: { page?: number; pageSize?: number; search?: string } = {}) =>
@@ -467,6 +669,7 @@ export const api = {
   createPlan: (body: Record<string, unknown>) => request<PlanDto>('/plans', { method: 'POST', body }),
   updatePlan: (id: string, body: Record<string, unknown>) =>
     request<PlanDto>(`/plans/${id}`, { method: 'PATCH', body }),
+  deletePlan: (id: string) => request<{ id: string; deleted: boolean }>(`/plans/${id}`, { method: 'DELETE' }),
   listSubscriptions: (params: { companyId?: string; status?: string } = {}) =>
     request<Array<SubscriptionDto & { events: Array<Record<string, unknown>> }>>(
       `/subscriptions?${toQuery(params)}`,
@@ -481,10 +684,22 @@ export const api = {
       method: 'PATCH',
       body: { status, note },
     }),
+  deleteSubscription: (id: string) => request<{ id: string; deleted: boolean }>(`/subscriptions/${id}`, { method: 'DELETE' }),
 
   // ------------------------------------------------------------------- audit
-  listAuditLogs: (params: { page?: number; pageSize?: number; companyId?: string; action?: string } = {}) =>
-    request<Paginated<AuditLogDto>>(`/audit-logs?${toQuery(params)}`),
+  listAuditLogs: (
+    params: {
+      page?: number;
+      pageSize?: number;
+      companyId?: string;
+      action?: string;
+      targetType?: string;
+      actorUserId?: string;
+      search?: string;
+      from?: string;
+      to?: string;
+    } = {},
+  ) => request<Paginated<AuditLogDto>>(`/audit-logs?${toQuery(params)}`),
 
   // --------------------------------------------------------------------- cms
   cmsPages: (locale?: string) => request<CmsPageDto[]>(`/cms/pages${locale ? `?locale=${locale}` : ''}`),
@@ -500,6 +715,44 @@ export const api = {
   upsertAppVersion: (body: Record<string, unknown>) =>
     request<Record<string, unknown>>('/cms/app-versions', { method: 'PUT', body }),
   serviceCategories: () => request<Array<Record<string, unknown>>>('/cms/service-categories'),
+
+  // ------------------------------------------------------------ media library
+  mediaFolders: () => request<CmsMediaFolderDto[]>('/cms/media/folders'),
+  upsertMediaFolder: (body: Record<string, unknown>) =>
+    request<CmsMediaFolderDto>('/cms/media/folders', { method: 'PUT', body }),
+  deleteMediaFolder: (id: string) =>
+    request<{ ok: boolean }>(`/cms/media/folders/${id}`, { method: 'DELETE' }),
+  mediaAssets: (params: { folderId?: string; search?: string; page?: number; pageSize?: number } = {}) =>
+    request<Paginated<CmsMediaAssetDto>>(`/cms/media?${toQuery(params)}`),
+  mediaAsset: (id: string) => request<CmsMediaAssetDto>(`/cms/media/${id}`),
+  /**
+   * Upload an image. Sent as multipart/form-data so the browser streams the
+   * file; `request` must not set a JSON content type here.
+   */
+  uploadMedia: (form: FormData) =>
+    request<CmsMediaAssetDto>('/cms/media', { method: 'POST', body: form, raw: true }),
+  updateMedia: (id: string, body: Record<string, unknown>) =>
+    request<CmsMediaAssetDto>(`/cms/media/${id}`, { method: 'PATCH', body }),
+  deleteMedia: (id: string) => request<{ ok: boolean }>(`/cms/media/${id}`, { method: 'DELETE' }),
+  /** The servable URL of an image variant (`card` by default). */
+  mediaFileUrl: (id: string, variant = 'card') => `${API_BASE}/v1/cms/media/${id}/file?variant=${variant}`,
+
+  /**
+   * Resolve an image path the API returned into a URL the browser can load.
+   *
+   * Inventory and CMS endpoints return media as `/api/v1/cms/media/<id>/file`,
+   * a path relative to the API origin. The admin app is served from its own
+   * origin, so rendering that path verbatim asks the admin host for an API
+   * route and 404s, and the thumbnail silently disappears. An absolute URL is
+   * returned unchanged.
+   */
+  resolveImage: (path: string | null | undefined): string | null => {
+    if (!path) return null;
+    if (/^https?:\/\//i.test(path)) return path;
+    if (path.startsWith('/api/')) return `${API_ORIGIN}${path}`;
+    return path;
+  },
+
   notificationTemplates: () => request<Array<Record<string, unknown>>>('/cms/notification-templates'),
   apiClients: () => request<Array<Record<string, unknown>>>('/cms/api-clients'),
   createApiClient: (body: Record<string, unknown>) =>
@@ -519,14 +772,20 @@ export const api = {
     request<Paginated<ErpAccountDto>>(`/accounting/accounts?${toQuery(params)}`),
   createAccount: (body: Record<string, unknown>) =>
     request<ErpAccountDto>('/accounting/accounts', { method: 'POST', body }),
+  nextAccountCode: (params: { type: string; parentId?: string }) =>
+    request<{ code: string }>(`/accounting/accounts/next-code?${toQuery(params)}`),
   updateAccount: (id: string, body: Record<string, unknown>) =>
     request<ErpAccountDto>(`/accounting/accounts/${id}`, { method: 'PATCH', body }),
+  deleteAccount: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/accounting/accounts/${id}`, { method: 'DELETE' }),
   seedStandardChart: () =>
     request<{ created: number }>('/accounting/accounts/seed-standard-chart', { method: 'POST', body: {} }),
   fiscalYears: (companyId?: string) =>
     request<FiscalYearDto[]>(`/accounting/fiscal-years${companyId ? `?companyId=${companyId}` : ''}`),
   createFiscalYear: (body: Record<string, unknown>) =>
     request<{ id: string; code: string; periods: number }>('/accounting/fiscal-years', { method: 'POST', body }),
+  deleteFiscalYear: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/accounting/fiscal-years/${id}`, { method: 'DELETE' }),
   setPeriodStatus: (id: string, status: string) =>
     request<{ id: string; status: string }>(`/accounting/fiscal-periods/${id}/status`, {
       method: 'PATCH',
@@ -536,10 +795,10 @@ export const api = {
     request<Paginated<JournalEntryDto>>(`/accounting/journals?${toQuery(params)}`),
   createJournal: (body: Record<string, unknown>) =>
     request<{ id: string; entryNumber: string }>('/accounting/journals', { method: 'POST', body }),
-  reverseJournal: (id: string, reason?: string) =>
+  reverseJournal: (id: string, reason?: string, reversalDate?: string) =>
     request<{ entryNumber: string }>(`/accounting/journals/${id}/reverse`, {
       method: 'POST',
-      body: { reason },
+      body: { reason, reversalDate },
     }),
   generalLedger: (params: { accountId?: string; from?: string; to?: string; companyId?: string } = {}) =>
     request<{ accounts: LedgerAccountDto[] }>(`/accounting/general-ledger?${toQuery(params)}`),
@@ -565,12 +824,48 @@ export const api = {
     request<WarehouseDto>('/inventory/warehouses', { method: 'POST', body }),
   updateWarehouse: (id: string, body: Record<string, unknown>) =>
     request<WarehouseDto>(`/inventory/warehouses/${id}`, { method: 'PATCH', body }),
-  products: (params: { companyId?: string; search?: string } = {}) =>
-    request<Paginated<ProductDto>>(`/inventory/products?${toQuery(params)}`),
+  deleteWarehouse: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/inventory/warehouses/${id}`, { method: 'DELETE' }),
+  products: (
+    params: {
+      companyId?: string;
+      search?: string;
+      category?: string;
+      barcode?: string;
+      type?: 'PRODUCT' | 'SERVICE';
+      isActive?: boolean;
+      hasBarcode?: boolean;
+      stockStatus?: 'in' | 'low' | 'out';
+      warehouseId?: string;
+      minPriceMinor?: number;
+      maxPriceMinor?: number;
+      page?: number;
+      pageSize?: number;
+    } = {},
+  ) => request<Paginated<ProductDto>>(`/inventory/products?${toQuery(params)}`),
+  productCategories: (companyId?: string) =>
+    request<{ items: string[] }>(`/inventory/product-categories${companyId ? `?companyId=${companyId}` : ''}`),
   createProduct: (body: Record<string, unknown>) =>
     request<ProductDto>('/inventory/products', { method: 'POST', body }),
   updateProduct: (id: string, body: Record<string, unknown>) =>
     request<ProductDto>(`/inventory/products/${id}`, { method: 'PATCH', body }),
+  deleteProduct: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/inventory/products/${id}`, { method: 'DELETE' }),
+  /**
+   * A product's photographs, primary first.
+   *
+   * The API resolves each `url` to a served media route; the client renders that
+   * value directly rather than composing a storage path.
+   */
+  productImages: (productId: string) =>
+    request<ProductImageDto[]>(`/inventory/products/${productId}/images`),
+  /** Upload a photograph. Multipart, so no JSON content type may be set. */
+  uploadProductImage: (productId: string, form: FormData) =>
+    request<ProductImageDto>(`/inventory/products/${productId}/images`, { method: 'POST', body: form, raw: true }),
+  updateProductImage: (productId: string, imageId: string, body: Record<string, unknown>) =>
+    request<ProductImageDto>(`/inventory/products/${productId}/images/${imageId}`, { method: 'PATCH', body }),
+  deleteProductImage: (productId: string, imageId: string) =>
+    request<{ removed: boolean }>(`/inventory/products/${productId}/images/${imageId}`, { method: 'DELETE' }),
   stockMovements: (params: { companyId?: string; page?: number } = {}) =>
     request<Paginated<StockMovementDto>>(`/inventory/movements?${toQuery(params)}`),
   recordStockMovement: (body: Record<string, unknown>) =>
@@ -593,14 +888,31 @@ export const api = {
     ),
   reorderAlerts: (companyId?: string) =>
     request<{ items: ReorderAlertDto[] }>(`/inventory/reorder-alerts${companyId ? `?companyId=${companyId}` : ''}`),
+  /**
+   * The POS product grid: active products with their lead image and on-hand
+   * position. `search` matches a scanned barcode as well as a name or SKU.
+   */
+  posCatalog: (params: { companyId?: string; search?: string; category?: string } = {}) =>
+    request<{ items: PosProductDto[]; total: number }>(`/inventory/pos-catalog?${toQuery(params)}`),
+  posCategories: (companyId?: string) =>
+    request<{ items: string[] }>(`/inventory/pos-categories${companyId ? `?companyId=${companyId}` : ''}`),
 
   // ------------------------------------------------------------ sales (E02)
   salesCustomers: (params: { companyId?: string; search?: string } = {}) =>
     request<Paginated<CustomerDto>>(`/sales/customers?${toQuery(params)}`),
+  customer: (id: string) => request<CustomerDetailDto>(`/sales/customers/${id}`),
   createCustomer: (body: Record<string, unknown>) =>
     request<CustomerDto>('/sales/customers', { method: 'POST', body }),
   updateCustomer: (id: string, body: Record<string, unknown>) =>
     request<CustomerDto>(`/sales/customers/${id}`, { method: 'POST', body }),
+  deleteCustomer: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/sales/customers/${id}`, { method: 'DELETE' }),
+  customerAttachments: (id: string) =>
+    request<Paginated<CustomerAttachmentDto>>(`/sales/customers/${id}/attachments`),
+  addCustomerAttachment: (id: string, body: Record<string, unknown>) =>
+    request<CustomerAttachmentDto>(`/sales/customers/${id}/attachments`, { method: 'POST', body }),
+  removeCustomerAttachment: (id: string, attachmentId: string) =>
+    request<{ removed: boolean }>(`/sales/customers/${id}/attachments/${attachmentId}`, { method: 'DELETE' }),
   quotations: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<SalesDocumentDto>>(`/sales/quotations?${toQuery(params)}`),
   createQuotation: (body: Record<string, unknown>) =>
@@ -611,15 +923,61 @@ export const api = {
     request<Paginated<SalesDocumentDto>>(`/sales/orders?${toQuery(params)}`),
   createSalesOrder: (body: Record<string, unknown>) =>
     request<SalesDocumentDto>('/sales/orders', { method: 'POST', body }),
-  salesInvoices: (params: { companyId?: string; status?: string; page?: number } = {}) =>
+  salesInvoices: (params: { companyId?: string; status?: string; customerId?: string; page?: number; pageSize?: number } = {}) =>
     request<Paginated<SalesDocumentDto>>(`/sales/invoices?${toQuery(params)}`),
   getSalesInvoice: (id: string) => request<SalesDocumentDto>(`/sales/invoices/${id}`),
   createSalesInvoice: (body: Record<string, unknown>) =>
     request<SalesDocumentDto>('/sales/invoices', { method: 'POST', body }),
+  updateSalesInvoice: (id: string, body: Record<string, unknown>) =>
+    request<SalesDocumentDto>(`/sales/invoices/${id}`, { method: 'POST', body }),
+  deleteSalesInvoice: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/sales/invoices/${id}`, { method: 'DELETE' }),
   creditNotes: (params: { companyId?: string } = {}) =>
     request<Paginated<SalesDocumentDto>>(`/sales/credit-notes?${toQuery(params)}`),
   createCreditNote: (body: Record<string, unknown>) =>
     request<SalesDocumentDto>('/sales/credit-notes', { method: 'POST', body }),
+
+  // ------------------------------------------------------ print (documents)
+  printDocument: (kind: PrintDocumentKind, id: string) =>
+    request<PrintDocumentDto>(`/print/${kind}/${id}`),
+
+  // ----------------------------------------------------------- attachments
+  attachments: (entityType: string, entityId: string) =>
+    request<AttachmentDto[]>(`/attachments/${entityType}/${entityId}`),
+  uploadAttachment: (entityType: string, entityId: string, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return request<AttachmentDto>(`/attachments/${entityType}/${entityId}`, {
+      method: 'POST',
+      body: form,
+    });
+  },
+  deleteAttachment: (entityType: string, entityId: string, attachmentId: string) =>
+    request<{ deleted: true }>(`/attachments/${entityType}/${entityId}/${attachmentId}`, {
+      method: 'DELETE',
+    }),
+  attachmentDownloadUrl: (entityType: string, entityId: string, attachmentId: string) =>
+    `${API_BASE}/v1/attachments/${entityType}/${entityId}/${attachmentId}/download`,
+  /**
+   * Fetch an attachment as a blob so a preview can be shown without exposing the
+   * bearer token in a URL. The access token is read from the same in-memory
+   * store the request helper uses, and the tenant context headers ride along.
+   */
+  fetchAttachmentBlob: async (entityType: string, entityId: string, attachmentId: string): Promise<Blob> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    const branchId = tokenStore.branchId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    if (branchId) headers['x-oryx-branch-id'] = branchId;
+    const res = await fetch(
+      `${API_BASE}/v1/attachments/${entityType}/${entityId}/${attachmentId}/download`,
+      { headers, credentials: 'include', cache: 'no-store' },
+    );
+    if (!res.ok) throw new ApiError(res.status, 'attachment_fetch_failed', 'Could not load the attachment.');
+    return res.blob();
+  },
   cashierSessions: (params: { companyId?: string } = {}) =>
     request<Paginated<CashierSessionDto>>(`/sales/cashier-sessions?${toQuery(params)}`),
   openCashierSession: (body: Record<string, unknown>) =>
@@ -641,6 +999,8 @@ export const api = {
     request<SupplierDto>('/purchasing/suppliers', { method: 'POST', body }),
   updateSupplier: (id: string, body: Record<string, unknown>) =>
     request<SupplierDto>(`/purchasing/suppliers/${id}`, { method: 'POST', body }),
+  deleteSupplier: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/purchasing/suppliers/${id}`, { method: 'DELETE' }),
   requisitions: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<RequisitionDto>>(`/purchasing/requisitions?${toQuery(params)}`),
   createRequisition: (body: Record<string, unknown>) =>
@@ -659,7 +1019,7 @@ export const api = {
     request<Paginated<PurchaseDocumentDto>>(`/purchasing/receipts?${toQuery(params)}`),
   createGoodsReceipt: (body: Record<string, unknown>) =>
     request<PurchaseDocumentDto>('/purchasing/receipts', { method: 'POST', body }),
-  supplierInvoices: (params: { companyId?: string; status?: string } = {}) =>
+  supplierInvoices: (params: { companyId?: string; status?: string; supplierId?: string } = {}) =>
     request<Paginated<PurchaseDocumentDto>>(`/purchasing/supplier-invoices?${toQuery(params)}`),
   createSupplierInvoice: (body: Record<string, unknown>) =>
     request<PurchaseDocumentDto>('/purchasing/supplier-invoices', { method: 'POST', body }),
@@ -691,6 +1051,8 @@ export const api = {
   createEmployee: (body: Record<string, unknown>) => request<EmployeeDto>('/hr/employees', { method: 'POST', body }),
   updateEmployee: (id: string, body: Record<string, unknown>) =>
     request<EmployeeDto>(`/hr/employees/${id}`, { method: 'PATCH', body }),
+  deleteEmployee: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/hr/employees/${id}`, { method: 'DELETE' }),
   createContract: (employeeId: string, body: Record<string, unknown>) =>
     request<Record<string, unknown>>(`/hr/employees/${employeeId}/contracts`, { method: 'POST', body }),
   employeeDocuments: (employeeId: string) =>
@@ -731,21 +1093,88 @@ export const api = {
     request<EmployeeAdvanceDto>(`/hr/advances/${id}/settle`, { method: 'POST', body: { amountMinor, note } }),
   hrDashboard: (companyId?: string) =>
     request<HrDashboardDto>(`/hr/dashboard${companyId ? `?companyId=${companyId}` : ''}`),
+  // Attendance policy & geofenced work sites (execution 06).
+  hrAttendancePolicy: () => request<Record<string, unknown>>('/hr/attendance-policy'),
+  updateAttendancePolicy: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/hr/attendance-policy', { method: 'PATCH', body }),
+  hrWorkSites: (params: { companyId?: string } = {}) =>
+    request<Paginated<Record<string, unknown>>>(`/hr/work-sites?${toQuery(params)}`),
+  createWorkSite: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/hr/work-sites', { method: 'POST', body }),
+  updateWorkSite: (id: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/hr/work-sites/${id}`, { method: 'PATCH', body }),
+  workSiteQrToken: (id: string) => request<Record<string, unknown>>(`/hr/work-sites/${id}/qr-token`),
+  salaryHistory: (employeeId: string) => request<Record<string, unknown>>(`/hr/employees/${employeeId}/salary-history`),
+  myPayslips: () => request<Paginated<Record<string, unknown>>>('/hr/payslips/me'),
+  // Employee self-service attendance.
+  myAttendance: () => request<Record<string, unknown>>('/hr/attendance/me'),
+  myAttendanceHistory: (params: Record<string, unknown> = {}) =>
+    request<Paginated<Record<string, unknown>>>(`/hr/attendance/me/history?${toQuery(params)}`),
+  selfCheckIn: (body: Record<string, unknown>) => request<Record<string, unknown>>('/hr/attendance/check-in', { method: 'POST', body }),
+  selfCheckOut: (body: Record<string, unknown>) => request<Record<string, unknown>>('/hr/attendance/check-out', { method: 'POST', body }),
+  selfBreakStart: (body: Record<string, unknown> = {}) => request<Record<string, unknown>>('/hr/attendance/break/start', { method: 'POST', body }),
+  selfBreakEnd: (body: Record<string, unknown> = {}) => request<Record<string, unknown>>('/hr/attendance/break/end', { method: 'POST', body }),
+  // Reports and their CSV exports.
+  hrReport: (kind: string, params: Record<string, unknown> = {}) =>
+    request<Record<string, unknown>>(`/hr/reports/${kind}?${toQuery(params)}`),
+  hrReportExportUrl: (kind: string, params: Record<string, unknown> = {}) =>
+    `/hr/reports/${kind}/export?${toQuery(params)}`,
+  payslipPdfUrl: (payslipId: string) => `/hr/payslips/${payslipId}/pdf`,
+  /** Fetch a payslip PDF as a blob URL (the route needs the bearer token). */
+  payslipPdfBlobUrl: async (payslipId: string): Promise<string> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    const res = await fetch(`${API_BASE}/v1/hr/payslips/${payslipId}/pdf`, { headers, credentials: 'include' });
+    if (!res.ok) throw new ApiError(res.status, 'payslip_download_failed', 'The payslip could not be opened.');
+    return URL.createObjectURL(await res.blob());
+  },
+  /** Download a report CSV (the route needs the bearer token). */
+  downloadHrReportCsv: async (kind: string, params: Record<string, unknown> = {}): Promise<void> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    const res = await fetch(`${API_BASE}/v1/hr/reports/${kind}/export?${toQuery(params)}`, { headers, credentials: 'include' });
+    if (!res.ok) throw new ApiError(res.status, 'report_export_failed', 'The report could not be exported.');
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hr-${kind}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
 
   // ------------------------------------------------------------ CRM (E03)
   crmLeadSources: (params: { companyId?: string } = {}) =>
-    request<Paginated<Record<string, unknown>>>(`/crm/lead-sources?${toQuery(params)}`),
-  createLeadSource: (body: Record<string, unknown>) => request<Record<string, unknown>>('/crm/lead-sources', { method: 'POST', body }),
+    request<Paginated<LeadSourceDto>>(`/crm/lead-sources?${toQuery(params)}`),
+  createLeadSource: (body: Record<string, unknown>) => request<LeadSourceDto>('/crm/lead-sources', { method: 'POST', body }),
+  deleteLeadSource: (id: string) => request<{ id: string; deleted: boolean }>(`/crm/lead-sources/${id}`, { method: 'DELETE' }),
+  // Tax management (§5 of the completion brief). A saved list the sales,
+  // purchasing and POS forms select from instead of a free-text percentage.
+  taxes: (params: { companyId?: string; scope?: string; search?: string; includeInactive?: string } = {}) =>
+    request<Paginated<TaxRateDto>>(`/tax?${toQuery(params)}`),
+  createTax: (body: Record<string, unknown>) => request<TaxRateDto>('/tax', { method: 'POST', body }),
+  updateTax: (id: string, body: Record<string, unknown>) => request<TaxRateDto>(`/tax/${id}`, { method: 'PATCH', body }),
+  setTaxActive: (id: string, isActive: boolean) =>
+    request<TaxRateDto>(`/tax/${id}/active`, { method: 'PATCH', body: { isActive } }),
+  deleteTax: (id: string) => request<{ deleted: boolean }>(`/tax/${id}`, { method: 'DELETE' }),
   crmLeads: (params: { companyId?: string; search?: string; status?: string; page?: number } = {}) =>
     request<Paginated<LeadDto>>(`/crm/leads?${toQuery(params)}`),
   createLead: (body: Record<string, unknown>) => request<LeadDto>('/crm/leads', { method: 'POST', body }),
   updateLead: (id: string, body: Record<string, unknown>) => request<LeadDto>(`/crm/leads/${id}`, { method: 'PATCH', body }),
+  deleteLead: (id: string) => request<{ id: string; deleted: boolean }>(`/crm/leads/${id}`, { method: 'DELETE' }),
   crmPipelines: (params: { companyId?: string } = {}) =>
     request<Paginated<PipelineDto>>(`/crm/pipelines?${toQuery(params)}`),
   createPipeline: (body: Record<string, unknown>) => request<PipelineDto>('/crm/pipelines', { method: 'POST', body }),
+  deletePipeline: (id: string) => request<{ id: string; deleted: boolean }>(`/crm/pipelines/${id}`, { method: 'DELETE' }),
   crmOpportunities: (params: { companyId?: string; status?: string; page?: number } = {}) =>
     request<Paginated<OpportunityDto>>(`/crm/opportunities?${toQuery(params)}`),
   createOpportunity: (body: Record<string, unknown>) => request<OpportunityDto>('/crm/opportunities', { method: 'POST', body }),
+  deleteOpportunity: (id: string) => request<{ id: string; deleted: boolean }>(`/crm/opportunities/${id}`, { method: 'DELETE' }),
   moveOpportunityStage: (id: string, stageId: string, note?: string) =>
     request<OpportunityDto>(`/crm/opportunities/${id}/stage`, { method: 'POST', body: { stageId, note } }),
   convertOpportunity: (id: string, body: Record<string, unknown> = {}) =>
@@ -758,33 +1187,40 @@ export const api = {
   addTicketMessage: (id: string, body: string, isInternal = false) =>
     request<Record<string, unknown>>(`/crm/tickets/${id}/messages`, { method: 'POST', body: { body, isInternal } }),
   updateTicket: (id: string, body: Record<string, unknown>) => request<SupportTicketDto>(`/crm/tickets/${id}`, { method: 'PATCH', body }),
+  deleteTicket: (id: string) => request<{ id: string; deleted: boolean }>(`/crm/tickets/${id}`, { method: 'DELETE' }),
   crmActivities: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<CrmActivityDto>>(`/crm/activities?${toQuery(params)}`),
   createActivity: (body: Record<string, unknown>) => request<CrmActivityDto>('/crm/activities', { method: 'POST', body }),
   completeActivity: (id: string) => request<CrmActivityDto>(`/crm/activities/${id}/complete`, { method: 'POST', body: {} }),
+  deleteActivity: (id: string) => request<{ id: string; deleted: boolean }>(`/crm/activities/${id}`, { method: 'DELETE' }),
   crmSlaPolicies: (params: { companyId?: string } = {}) =>
     request<Paginated<Record<string, unknown>>>(`/crm/sla-policies?${toQuery(params)}`),
   setSlaPolicy: (body: Record<string, unknown>) => request<Record<string, unknown>>('/crm/sla-policies', { method: 'POST', body }),
+  deleteSlaPolicy: (id: string) => request<{ id: string; deleted: boolean }>(`/crm/sla-policies/${id}`, { method: 'DELETE' }),
   crmSegments: (params: { companyId?: string } = {}) =>
     request<Paginated<Record<string, unknown>>>(`/crm/segments?${toQuery(params)}`),
   createSegment: (body: Record<string, unknown>) => request<Record<string, unknown>>('/crm/segments', { method: 'POST', body }),
+  deleteSegment: (id: string) => request<{ id: string; deleted: boolean }>(`/crm/segments/${id}`, { method: 'DELETE' }),
   crmDashboard: (companyId?: string) => request<CrmDashboardDto>(`/crm/dashboard${companyId ? `?companyId=${companyId}` : ''}`),
 
   // ----------------------------------------------------- Operations (E03)
   operationsProjects: (params: { companyId?: string; status?: string; page?: number } = {}) =>
     request<Paginated<ProjectDto>>(`/operations/projects?${toQuery(params)}`),
   createOperationsProject: (body: Record<string, unknown>) => request<ProjectDto>('/operations/projects', { method: 'POST', body }),
+  deleteOperationsProject: (id: string) => request<{ id: string; deleted: boolean }>(`/operations/projects/${id}`, { method: 'DELETE' }),
   updateOperationsProject: (id: string, body: Record<string, unknown>) =>
     request<ProjectDto>(`/operations/projects/${id}`, { method: 'PATCH', body }),
   operationsTasks: (params: { companyId?: string; status?: string; page?: number } = {}) =>
     request<Paginated<ProjectTaskDto>>(`/operations/tasks?${toQuery(params)}`),
   createOperationsTask: (body: Record<string, unknown>) => request<ProjectTaskDto>('/operations/tasks', { method: 'POST', body }),
+  deleteOperationsTask: (id: string) => request<{ id: string; deleted: boolean }>(`/operations/tasks/${id}`, { method: 'DELETE' }),
   updateOperationsTask: (id: string, body: Record<string, unknown>) =>
     request<ProjectTaskDto>(`/operations/tasks/${id}`, { method: 'PATCH', body }),
   workOrders: (params: { companyId?: string; status?: string; page?: number } = {}) =>
     request<Paginated<WorkOrderDto>>(`/operations/work-orders?${toQuery(params)}`),
   workOrder: (id: string) => request<WorkOrderDto>(`/operations/work-orders/${id}`),
   createWorkOrder: (body: Record<string, unknown>) => request<WorkOrderDto>('/operations/work-orders', { method: 'POST', body }),
+  deleteWorkOrder: (id: string) => request<{ id: string; deleted: boolean }>(`/operations/work-orders/${id}`, { method: 'DELETE' }),
   assignWorkOrder: (id: string, body: Record<string, unknown>) =>
     request<WorkOrderDto>(`/operations/work-orders/${id}/assign`, { method: 'POST', body }),
   updateWorkOrder: (id: string, body: Record<string, unknown>) =>
@@ -794,14 +1230,17 @@ export const api = {
   operationsApprovals: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<Record<string, unknown>>>(`/operations/approvals?${toQuery(params)}`),
   createApproval: (body: Record<string, unknown>) => request<Record<string, unknown>>('/operations/approvals', { method: 'POST', body }),
+  deleteApproval: (id: string) => request<{ id: string; deleted: boolean }>(`/operations/approvals/${id}`, { method: 'DELETE' }),
   decideApproval: (id: string, decision: string, note?: string) =>
     request<Record<string, unknown>>(`/operations/approvals/${id}/decide`, { method: 'POST', body: { decision, note } }),
   operationsCalendar: (params: { companyId?: string } = {}) =>
     request<Paginated<Record<string, unknown>>>(`/operations/calendar?${toQuery(params)}`),
   createCalendarEvent: (body: Record<string, unknown>) => request<Record<string, unknown>>('/operations/calendar', { method: 'POST', body }),
+  deleteCalendarEvent: (id: string) => request<{ id: string; deleted: boolean }>(`/operations/calendar/${id}`, { method: 'DELETE' }),
   operationsNotifications: (unreadOnly = false) =>
     request<Paginated<Record<string, unknown>>>(`/operations/notifications?unreadOnly=${unreadOnly}`),
   markNotificationsRead: () => request<{ updated: number }>('/operations/notifications/read', { method: 'POST', body: { all: true } }),
+  deleteOperationNotification: (id: string) => request<{ id: string; deleted: boolean }>(`/operations/notifications/${id}`, { method: 'DELETE' }),
   operationsDashboard: (companyId?: string) =>
     request<OperationsDashboardDto>(`/operations/dashboard${companyId ? `?companyId=${companyId}` : ''}`),
 
@@ -811,18 +1250,32 @@ export const api = {
   vehicle: (id: string) => request<Record<string, unknown>>(`/automotive/vehicles/${id}`),
   createVehicle: (body: Record<string, unknown>) => request<VehicleDto>('/automotive/vehicles', { method: 'POST', body }),
   updateVehicle: (id: string, body: Record<string, unknown>) => request<VehicleDto>(`/automotive/vehicles/${id}`, { method: 'PATCH', body }),
+  deleteVehicle: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/automotive/vehicles/${id}`, { method: 'DELETE' }),
   recordMileage: (id: string, mileage: number) =>
     request<Record<string, unknown>>(`/automotive/vehicles/${id}/mileage`, { method: 'POST', body: { mileage } }),
+  vehicleDocuments: (id: string) =>
+    request<Paginated<VehicleDocumentDto>>(`/automotive/vehicles/${id}/documents`),
+  addVehicleDocument: (id: string, form: FormData) =>
+    request<VehicleDocumentDto>(`/automotive/vehicles/${id}/documents`, { method: 'POST', body: form, raw: true }),
+  extractVehicleDocument: (id: string, form: FormData) =>
+    request<VehicleDocumentOcrResultDto>(`/automotive/vehicles/${id}/documents/ocr`, { method: 'POST', body: form, raw: true }),
+  removeVehicleDocument: (id: string, documentId: string) =>
+    request<{ removed: boolean }>(`/automotive/vehicles/${id}/documents/${documentId}`, { method: 'DELETE' }),
   inspectionServices: (params: { companyId?: string } = {}) =>
     request<Paginated<InspectionServiceDto>>(`/automotive/inspection-services?${toQuery(params)}`),
   createInspectionService: (body: Record<string, unknown>) =>
     request<InspectionServiceDto>('/automotive/inspection-services', { method: 'POST', body }),
+  deleteInspectionService: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/automotive/inspection-services/${id}`, { method: 'DELETE' }),
   inspectionBookings: (params: { companyId?: string; status?: string; page?: number } = {}) =>
     request<Paginated<InspectionBookingDto>>(`/automotive/inspection-bookings?${toQuery(params)}`),
   createInspectionBooking: (body: Record<string, unknown>) =>
     request<InspectionBookingDto>('/automotive/inspection-bookings', { method: 'POST', body }),
   updateInspectionBooking: (id: string, body: Record<string, unknown>) =>
     request<InspectionBookingDto>(`/automotive/inspection-bookings/${id}`, { method: 'PATCH', body }),
+  deleteInspectionBooking: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/automotive/inspection-bookings/${id}`, { method: 'DELETE' }),
   recordInspectionFindings: (id: string, findings: Array<Record<string, unknown>>) =>
     request<Record<string, unknown>>(`/automotive/inspection-bookings/${id}/findings`, { method: 'POST', body: { findings } }),
   inspectionReport: (id: string) => request<Record<string, unknown>>(`/automotive/inspection-bookings/${id}/report`),
@@ -832,6 +1285,114 @@ export const api = {
     request<Record<string, unknown>>(`/automotive/inspection-bookings/${id}/report/decide`, { method: 'POST', body: { decision } }),
   invoiceInspection: (id: string, body: Record<string, unknown> = {}) =>
     request<{ invoiceNumber: string; totalMinor: number }>(`/automotive/inspection-bookings/${id}/invoice`, { method: 'POST', body }),
+
+  // ---- official documents (Execution Phase 3) ----
+  issueInspectionDocument: (sessionId: string) =>
+    request<OfficialDocumentDto>(`/documents/inspections/${sessionId}/issue`, { method: 'POST', body: {} }),
+  issueFinancialDocument: (type: OfficialDocumentType, sourceId: string) =>
+    request<OfficialDocumentDto>('/documents/issue', { method: 'POST', body: { type, sourceId } }),
+  documentsForSource: (sourceType: string, sourceId: string) =>
+    request<OfficialDocumentDto[]>(
+      `/documents?sourceType=${encodeURIComponent(sourceType)}&sourceId=${encodeURIComponent(sourceId)}`,
+    ),
+  /**
+   * The tenant-wide document register.
+   *
+   * Distinct from `documentsForSource`: that lists the documents of one record,
+   * this lists every document the company has issued with server-side search,
+   * type and status filters and pagination. The API scopes the result to the
+   * caller's company, so no company id is sent.
+   */
+  documentsRegister: (params: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    type?: string;
+    status?: string;
+  } = {}) => request<Paginated<OfficialDocumentDto>>(`/documents/register?${toQuery(params)}`),
+  officialDocument: (id: string) => request<OfficialDocumentDetailDto>(`/documents/${id}`),
+  revokeOfficialDocument: (id: string, reason: string) =>
+    request<OfficialDocumentDto>(`/documents/${id}/revoke`, { method: 'POST', body: { reason } }),
+
+  /**
+   * The stored PDF as a blob URL.
+   *
+   * Fetched rather than linked because the route needs the bearer token and the
+   * company header; an `<a href>` would arrive unauthenticated. The caller owns
+   * the URL and must revoke it.
+   */
+  officialDocumentBlobUrl: async (id: string): Promise<string> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    const res = await fetch(`${API_BASE}/v1/documents/${id}/file`, { headers, credentials: 'include' });
+    if (!res.ok) throw new ApiError(res.status, 'document_download_failed', 'The document could not be opened.');
+    return URL.createObjectURL(await res.blob());
+  },
+
+
+  // ---- document attachment actions ----
+  removeAttachment: (entityType: AttachmentEntityType, entityId: string, attachmentId: string) =>
+    request<{ deleted: true }>(`/attachments/${entityType}/${entityId}/${attachmentId}`, {
+      method: 'DELETE',
+    }),
+
+  attachmentBlobUrl: async (
+    entityType: AttachmentEntityType,
+    entityId: string,
+    attachmentId: string,
+  ): Promise<string> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+
+    const res = await fetch(
+      `${API_BASE}/v1/attachments/${entityType}/${entityId}/${attachmentId}/download`,
+      { headers, credentials: 'include' },
+    );
+
+    if (!res.ok) {
+      throw new ApiError(res.status, 'attachment_download_failed', 'The attachment could not be opened.');
+    }
+
+    return URL.createObjectURL(await res.blob());
+  },
+
+  // ---- inspection engine (Execution Phase 2) ----
+  inspectionSessions: (params: { search?: string; status?: string; customerId?: string; vehicleId?: string; page?: number } = {}) =>
+    request<Paginated<InspectionSessionSummaryDto>>(`/automotive/inspections?${toQuery(params)}`),
+  inspectionSession: (id: string) => request<InspectionSessionDto>(`/automotive/inspections/${id}`),
+  createInspectionSession: (body: Record<string, unknown>) =>
+    request<InspectionSessionDto>('/automotive/inspections', { method: 'POST', body }),
+  updateInspectionSession: (id: string, body: Record<string, unknown>) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}`, { method: 'PATCH', body }),
+  deleteInspectionSession: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/automotive/inspections/${id}`, { method: 'DELETE' }),
+  inspectionProgress: (id: string) => request<InspectionProgressDto>(`/automotive/inspections/${id}/progress`),
+  saveInspectionSection: (id: string, area: InspectionAreaKey, body: Record<string, unknown>) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/sections/${area}`, { method: 'PUT', body }),
+  saveInspectionMarkers: (id: string, markers: Array<Partial<InspectionBodyMarkerDto>>) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/paint-markers`, { method: 'PUT', body: { markers } }),
+  saveInspectionChassis: (id: string, regions: Array<Partial<InspectionChassisRegionDto>>) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/chassis-regions`, { method: 'PUT', body: { regions } }),
+  addInspectionDiagnostic: (id: string, body: Record<string, unknown>) =>
+    request<InspectionDiagnosticEntryDto>(`/automotive/inspections/${id}/diagnostics`, { method: 'POST', body }),
+  removeInspectionDiagnostic: (id: string, entryId: string) =>
+    request<{ removed: boolean }>(`/automotive/inspections/${id}/diagnostics/${entryId}`, { method: 'DELETE' }),
+  uploadInspectionAttachment: (id: string, form: FormData) =>
+    request<InspectionAttachmentDto>(`/automotive/inspections/${id}/attachments`, { method: 'POST', body: form, raw: true }),
+  removeInspectionAttachment: (id: string, attachmentId: string) =>
+    request<{ removed: boolean }>(`/automotive/inspections/${id}/attachments/${attachmentId}`, { method: 'DELETE' }),
+  submitInspectionSession: (id: string) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/submit`, { method: 'POST', body: {} }),
+  reviewInspectionSession: (id: string, decision: 'APPROVE' | 'REJECT', notes?: string) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/review`, { method: 'POST', body: { decision, notes } }),
+  cancelInspectionSession: (id: string) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/cancel`, { method: 'POST', body: {} }),
   workshopBays: (params: { companyId?: string } = {}) =>
     request<Paginated<Record<string, unknown>>>(`/automotive/bays?${toQuery(params)}`),
   createWorkshopBay: (body: Record<string, unknown>) => request<Record<string, unknown>>('/automotive/bays', { method: 'POST', body }),
@@ -873,12 +1434,24 @@ export const api = {
     request<Paginated<Record<string, unknown>>>(
       `/automotive/compatible-parts?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year=${year}${companyId ? `&companyId=${companyId}` : ''}`,
     ),
-  marketplaceProviders: (params: { status?: string } = {}) =>
+  marketplaceProviders: (params: { status?: string; categoryKey?: string; lat?: number; lng?: number; radiusKm?: number } = {}) =>
     request<Paginated<MarketplaceProviderDto>>(`/automotive/providers?${toQuery(params)}`),
   createProvider: (body: Record<string, unknown>) =>
     request<MarketplaceProviderDto>('/automotive/providers', { method: 'POST', body }),
   decideProvider: (id: string, decision: 'APPROVED' | 'SUSPENDED' | 'REJECTED', note?: string) =>
     request<MarketplaceProviderDto>(`/automotive/providers/${id}/decide`, { method: 'POST', body: { decision, note } }),
+  /**
+   * Set or clear a provider's Auto Map coordinates (P3).
+   *
+   * Both values must be supplied together, or both omitted to clear the
+   * location. The API rejects half a coordinate rather than storing a point the
+   * map cannot place.
+   */
+  setProviderLocation: (id: string, location: { latitude: number | null; longitude: number | null }) =>
+    request<MarketplaceProviderDto>(`/marketplace/admin/providers/${id}/location`, {
+      method: 'POST',
+      body: location,
+    }),
   providerListings: (providerId: string) =>
     request<Paginated<Record<string, unknown>>>(`/automotive/providers/${providerId}/listings`),
   createProviderListing: (providerId: string, body: Record<string, unknown>) =>
@@ -927,10 +1500,14 @@ export const api = {
     request<Record<string, unknown>>(`/bookings/${id}/reschedule`, { method: 'POST', body }),
   cancelBooking: (id: string, reason: string) =>
     request<Record<string, unknown>>(`/bookings/${id}/cancel`, { method: 'POST', body: { reason } }),
+  deleteBooking: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/bookings/${id}`, { method: 'DELETE' }),
   bookingResources: (branchId?: string) =>
     request<Array<Record<string, unknown>>>(`/bookings/resources/list${branchId ? `?branchId=${branchId}` : ''}`),
   createBookingResource: (body: Record<string, unknown>) =>
     request<Record<string, unknown>>('/bookings/resources', { method: 'POST', body }),
+  deleteBookingResource: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/bookings/resources/${id}`, { method: 'DELETE' }),
   setBookingResourceHours: (id: string, hours: Array<Record<string, unknown>>) =>
     request<Record<string, unknown>>(`/bookings/resources/${id}/hours`, { method: 'POST', body: { hours } }),
 
@@ -941,6 +1518,7 @@ export const api = {
   createPaymentIntent: (body: Record<string, unknown>) =>
     request<Record<string, unknown>>('/payments/intents', { method: 'POST', body }),
   paymentIntent: (id: string) => request<Record<string, unknown>>(`/payments/intents/${id}`),
+  deletePaymentIntent: (id: string) => request<{ id: string; deleted: boolean }>(`/payments/intents/${id}`, { method: 'DELETE' }),
   confirmPaymentIntent: (id: string, providerReference: string) =>
     request<Record<string, unknown>>(`/payments/intents/${id}/confirm`, { method: 'POST', body: { providerReference } }),
   cancelPaymentIntent: (id: string, reason: string) =>
@@ -953,6 +1531,7 @@ export const api = {
     request<Record<string, unknown>>('/payments/reconciliations', { method: 'POST', body }),
   paymentReconciliations: (onlyUnmatched = false) =>
     request<Array<Record<string, unknown>>>(`/payments/reconciliations?onlyUnmatched=${onlyUnmatched}`),
+  deletePaymentReconciliation: (id: string) => request<{ id: string; deleted: boolean }>(`/payments/reconciliations/${id}`, { method: 'DELETE' }),
 
   // ------------------------------------------------------- integrations center
   integrations: () => request<IntegrationCenterResponse>('/integrations'),
@@ -969,6 +1548,89 @@ export const api = {
     }),
   verifyIntegration: (key: string) =>
     request<IntegrationDetailResponse>(`/integrations/${key}/verify`, { method: 'POST', body: {} }),
+
+  // ------------------------------------- Execution 12: platform control panel
+  ecosystem: () => request<EcosystemOverviewResponse>('/platform/ecosystem'),
+
+  // --------------------------- Execution 20: planned ecosystem operations
+  /**
+   * Consumer order returns awaiting a staff decision (P4).
+   *
+   * The queue is scoped server-side to the active company, so an operator only
+   * ever sees their own tenant's returns.
+   */
+  ecosystemReturns: (status?: string) =>
+    request<CustomerReturnDto[]>(`/ecosystem/returns?${toQuery({ status })}`),
+  decideReturn: (id: string, decision: 'APPROVED' | 'REJECTED', note?: string) =>
+    request<CustomerReturnDto>(`/ecosystem/returns/${id}/decide`, { method: 'POST', body: { decision, note } }),
+  receiveReturn: (id: string) =>
+    request<CustomerReturnDto>(`/ecosystem/returns/${id}/receive`, { method: 'POST', body: {} }),
+  refundReturn: (id: string) =>
+    request<CustomerReturnDto>(`/ecosystem/returns/${id}/refund`, { method: 'POST', body: {} }),
+
+  /** Roadside recovery dispatch queue (P5). */
+  ecosystemRecovery: (status?: string) =>
+    request<RecoveryRequestDto[]>(`/ecosystem/recovery?${toQuery({ status })}`),
+  assignRecovery: (id: string, providerId: string) =>
+    request<RecoveryRequestDto>(`/ecosystem/recovery/${id}/assign`, { method: 'POST', body: { providerId } }),
+
+  /** SENSAGE AI suggestion review queue (P7). */
+  ecosystemSuggestions: (status?: string) =>
+    request<AiSuggestionDto[]>(`/ecosystem/sensage/suggestions?${toQuery({ status })}`),
+  reviewSuggestion: (id: string, decision: 'APPROVED' | 'REJECTED', note?: string) =>
+    request<AiSuggestionDto>(`/ecosystem/sensage/suggestions/${id}/review`, {
+      method: 'POST',
+      body: { decision, note },
+    }),
+  coupons: (params: { includeInactive?: boolean; companyId?: string } = {}) =>
+    request<{ items: CouponDto[] }>(`/coupons?${toQuery(params)}`),
+  coupon: (id: string) => request<CouponDto>(`/coupons/${id}`),
+  createCoupon: (body: Record<string, unknown>) =>
+    request<CouponDto>('/coupons', { method: 'POST', body }),
+  updateCoupon: (id: string, body: Record<string, unknown>) =>
+    request<CouponDto>(`/coupons/${id}`, { method: 'PATCH', body }),
+  deleteCoupon: (id: string) => request<{ deleted: boolean }>(`/coupons/${id}`, { method: 'DELETE' }),
+  validateCoupon: (body: { code: string; subtotalMinor: number; companyId?: string }) =>
+    request<CouponValidationResponse>('/coupons/validate', { method: 'POST', body }),
+  notificationDeliveries: (params: { companyId?: string; channel?: string; status?: string; page?: number; pageSize?: number } = {}) =>
+    request<Paginated<NotificationDeliveryDto>>(`/notifications/deliveries?${toQuery(params)}`),
+  notificationSummary: (companyId?: string) =>
+    request<{
+      byChannel: Array<{ key: string; count: number }>;
+      byStatus: Array<{ key: string; count: number }>;
+      templates: Array<{ id: string; key: string; channel: string; locale: string; subject: string | null; body: string; isActive: boolean }>;
+    }>(`/notifications/summary?${toQuery({ companyId })}`),
+  sendAnnouncement: (body: {
+    title: string;
+    body: string;
+    companyId?: string;
+    severity?: string;
+    userIds?: string[];
+    customerAccountIds?: string[];
+    allCustomers?: boolean;
+  }) =>
+    request<{ queued: number; recipients: string[]; customerRecipients: string[] }>(
+      '/notifications/announcements',
+      { method: 'POST', body },
+    ),
+  toggleNotificationTemplate: (id: string, active: boolean) =>
+    request<{ id: string; key: string; isActive: boolean }>(`/notifications/templates/${id}/toggle?active=${active}`, {
+      method: 'POST',
+      body: {},
+    }),
+  roleTemplates: (companyId?: string) =>
+    request<{
+      companyId: string;
+      templates: Array<{
+        code: string;
+        nameEn: string;
+        nameAr: string;
+        descriptionEn: string;
+        permissions: string[];
+        totalPermissions: number;
+        withheldPermissions: number;
+      }>;
+    }>(`/permissions/role-templates?${toQuery({ companyId })}`),
 };
 
 function toQuery(params: Record<string, unknown>): string {

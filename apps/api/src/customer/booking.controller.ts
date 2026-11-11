@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -21,6 +22,7 @@ import { BookingService } from './booking.service';
 import { CustomerAuthGuard, CurrentCustomer, type CustomerPrincipal } from './customer-auth.guard';
 import {
   AvailabilityQueryDto,
+  CalendarQueryDto,
   CancelBookingDto,
   CreateBookingDto,
   RescheduleBookingDto,
@@ -128,17 +130,14 @@ export class BookingController {
   @Get('calendar')
   @RequirePermissions('erp.booking.read')
   @ApiOperation({ summary: 'Bookings grouped by day for a date range' })
-  async calendar(
-    @CurrentPrincipal() principal: RequestPrincipal,
-    @Query('from') from: string,
-    @Query('to') to: string,
-    @Query('resourceId') resourceId?: string,
-  ) {
+  async calendar(@CurrentPrincipal() principal: RequestPrincipal, @Query() query: CalendarQueryDto) {
+    // `from`/`to` are validated by the global pipe, so a missing or malformed
+    // range is a 400 rather than an "Invalid Date" 500 deeper in the service.
     return this.bookings.calendar(
       principal.company?.companyId ?? '',
-      new Date(from),
-      new Date(to),
-      resourceId ?? null,
+      dayStartFrom(query.from),
+      dayStartFrom(query.to),
+      query.resourceId ?? null,
     );
   }
 
@@ -216,6 +215,17 @@ export class BookingController {
     return this.bookings.markNoShow(principal.company?.companyId ?? '', id, principal.userId);
   }
 
+  @Delete(':id')
+  @RequirePermissions('erp.booking.manage')
+  @ApiOperation({ summary: 'Delete a held, cancelled or no-show booking' })
+  async remove(@Param('id') id: string, @CurrentPrincipal() principal: RequestPrincipal) {
+    return this.bookings.deleteBooking(
+      principal.company?.companyId ?? '',
+      id,
+      principal.userId,
+    );
+  }
+
   // ---------------------------------------------------------------- resources
 
   @Get('resources/list')
@@ -266,6 +276,13 @@ export class BookingController {
       closesMinute: dto.closesMinute ?? null,
       reason: dto.reason,
     });
+  }
+
+  @Delete('resources/:id')
+  @RequirePermissions('erp.booking.resource.manage')
+  @ApiOperation({ summary: 'Delete a resource that has no bookings' })
+  async removeResource(@Param('id') id: string, @CurrentPrincipal() principal: RequestPrincipal) {
+    return this.bookings.deleteResource(principal.company?.companyId ?? '', id);
   }
 }
 
@@ -364,6 +381,35 @@ export class CustomerBookingController {
       page: Math.max(1, Number(page) || 1),
       pageSize: Math.min(50, Math.max(1, Number(pageSize) || 20)),
     });
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Read one of your own bookings' })
+  async detail(@Param('id') id: string, @CurrentCustomer() customer: CustomerPrincipal) {
+    return this.bookings.getCustomerBooking(customer.accountId, id);
+  }
+
+  @Post(':id/confirm')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Confirm your own held booking' })
+  async confirm(@Param('id') id: string, @CurrentCustomer() customer: CustomerPrincipal) {
+    return this.bookings.confirmCustomerBooking(customer.accountId, id);
+  }
+
+  @Post(':id/reschedule')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Move your own booking to a new time' })
+  async reschedule(
+    @Param('id') id: string,
+    @Body() dto: RescheduleBookingDto,
+    @CurrentCustomer() customer: CustomerPrincipal,
+  ) {
+    return this.bookings.rescheduleCustomerBooking(
+      customer.accountId,
+      id,
+      new Date(dto.startsAt),
+      dto.durationMinutes,
+    );
   }
 
   @Post(':id/cancel')

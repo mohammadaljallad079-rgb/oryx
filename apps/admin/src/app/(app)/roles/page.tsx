@@ -61,6 +61,13 @@ function RolesInner() {
   const [creating, setCreating] = useState(false);
 
   const delegableSet = useMemo(() => new Set(delegable.data?.permissions ?? []), [delegable.data]);
+  // Seeded system roles carry a bilingual description; custom roles fall back to
+  // the free-text English description the tenant supplied.
+  const roleDescription = (role: RoleDto): string => {
+    const key = `roles.description.${role.code}`;
+    const seeded = t(key);
+    return seeded === key ? role.descriptionEn ?? '' : seeded;
+  };
   const catalogByCode = useMemo(() => {
     const map = new Map<string, CatalogPermission>();
     for (const p of catalog.data?.permissions ?? []) map.set(p.code, p);
@@ -69,7 +76,7 @@ function RolesInner() {
 
   if (!scopeCompanyId) {
     return (
-      <div className="flex flex-col gap-5" data-testid="roles-page">
+      <div className="flex flex-col gap-4" data-testid="roles-page">
         <SectionHeader title={t('roles.title')} subtitle={t('roles.subtitle')} />
         <Card>
           <EmptyState title={t('common.selectCompany')} />
@@ -81,7 +88,7 @@ function RolesInner() {
   const canCreate = can('company.role.create') || can('platform.company.update');
 
   return (
-    <div className="flex flex-col gap-5" data-testid="roles-page">
+    <div className="flex flex-col gap-4" data-testid="roles-page">
       <SectionHeader
         title={t('roles.title')}
         subtitle={t('roles.subtitle')}
@@ -107,7 +114,7 @@ function RolesInner() {
         {roles.loading
           ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} height={170} />)
           : (roles.data ?? []).map((r) => (
-              <Card key={r.id} className="p-5" data-testid={`role-card-${r.code}`}>
+              <Card key={r.id} className="p-4" data-testid={`role-card-${r.code}`}>
                 <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <p className="oryx-panel-title m-0">{locale === 'ar' ? r.nameAr : r.nameEn}</p>
@@ -123,7 +130,7 @@ function RolesInner() {
                   </div>
                 </div>
 
-                <p className="oryx-muted m-0 mb-3 text-[12px]">{r.descriptionEn ?? ''}</p>
+                <p className="oryx-muted m-0 mb-3 text-[12px]">{roleDescription(r)}</p>
 
                 <div className="mb-3 flex flex-wrap gap-1">
                   {r.permissions.slice(0, 10).map((p) => {
@@ -162,8 +169,8 @@ function RolesInner() {
             ))}
       </div>
 
-      <Card className="p-5" data-testid="permission-catalog">
-        <p className="oryx-panel-title m-0 mb-1">Permission catalog</p>
+      <Card className="p-4" data-testid="permission-catalog">
+        <p className="oryx-panel-title m-0 mb-1">{t('roles.catalogTitle')}</p>
         <p className="oryx-muted m-0 mb-4 text-[12px]">
           {locale === 'ar'
             ? 'كل صلاحية تُقيَّم على الخادم. الصلاحيات المرتبطة بوحدة غير مرخصة تُعطَّل تلقائياً.'

@@ -11,6 +11,9 @@ import { BookingService } from './booking.service';
 import { BookingController, CustomerBookingController } from './booking.controller';
 import { CustomerPlatformController } from './customer-platform.controller';
 import { CustomerPlatformService } from './customer-platform.service';
+import { CustomerInspectionController } from './customer-inspection.controller';
+import { CustomerInspectionService } from './customer-inspection.service';
+import { CmsModule } from '../cms/cms.module';
 
 /**
  * The customer identity plane.
@@ -23,6 +26,7 @@ import { CustomerPlatformService } from './customer-platform.service';
   imports: [
     ConfigModule,
     AuthModule,
+    CmsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -38,6 +42,7 @@ import { CustomerPlatformService } from './customer-platform.service';
     BookingController,
     CustomerBookingController,
     CustomerPlatformController,
+    CustomerInspectionController,
   ],
   providers: [
     CustomerAuthService,
@@ -45,6 +50,7 @@ import { CustomerPlatformService } from './customer-platform.service';
     CustomerAuthGuard,
     BookingService,
     CustomerPlatformService,
+    CustomerInspectionService,
   ],
   exports: [
     CustomerAuthService,
@@ -52,6 +58,7 @@ import { CustomerPlatformService } from './customer-platform.service';
     CustomerAuthGuard,
     BookingService,
     CustomerPlatformService,
+    CustomerInspectionService,
     JwtModule,
   ],
 })

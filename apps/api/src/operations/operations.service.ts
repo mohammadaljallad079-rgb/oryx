@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccountingPostingService } from '../common/accounting-posting.service';
-import { DocumentSequenceService } from '../common/document-sequence.service';
+import { DocumentSequenceService, type Tx } from '../common/document-sequence.service';
 import { ErpContextService } from '../common/erp-context.service';
 import { badRequest, conflict, ERROR_CODES, notFound } from '../common/errors';
 import type { ActorContext } from '../organizations/organizations.service';
@@ -54,6 +54,108 @@ export class OperationsService {
     private readonly sequences: DocumentSequenceService,
     private readonly context: ErpContextService,
   ) {}
+
+  // ----------------------------------------------------------------- delete
+
+  /**
+   * Delete a project and its task breakdown.
+   *
+   * Tasks belong to the project and cascade away with it. A project that has
+   * work orders is refused, because those orders would lose the link that gives
+   * them context; cancel or complete the orders first.
+   */
+  async deleteProject(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const project = await this.prisma.project.findFirst({ where: { id, companyId } });
+    if (!project) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Project not found.');
+    const workOrders = await this.prisma.workOrder.count({ where: { projectId: id } });
+    if (workOrders > 0) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'This project has work orders and cannot be deleted. Remove or reassign them first.');
+    await this.posting.withTransaction(async (tx) => {
+      const taskIds = (await tx.projectTask.findMany({ where: { companyId, projectId: id }, select: { id: true } })).map((t) => t.id);
+      if (taskIds.length) {
+        await tx.entityComment.deleteMany({ where: { companyId, entityType: 'TASK', entityId: { in: taskIds } } });
+        await tx.entityAttachment.deleteMany({ where: { companyId, entityType: 'TASK', entityId: { in: taskIds } } });
+      }
+      await tx.project.delete({ where: { id } });
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'operations.project_deleted', targetType: 'PROJECT', targetId: id, summary: `Deleted project ${project.code}` });
+    return { id, deleted: true };
+  }
+
+  /** Delete a task and its subtasks, along with their comments and attachments. */
+  async deleteTask(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const task = await this.prisma.projectTask.findFirst({ where: { id, companyId } });
+    if (!task) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Task not found.');
+    await this.posting.withTransaction(async (tx) => {
+      const ids = await this.collectTaskTree(tx, companyId, id);
+      await tx.entityComment.deleteMany({ where: { companyId, entityType: 'TASK', entityId: { in: ids } } });
+      await tx.entityAttachment.deleteMany({ where: { companyId, entityType: 'TASK', entityId: { in: ids } } });
+      await tx.projectTask.delete({ where: { id } });
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'operations.task_deleted', targetType: 'PROJECT_TASK', targetId: id, summary: `Deleted task ${task.title}` });
+    return { id, deleted: true };
+  }
+
+  /**
+   * Delete a work order that is not completed. The checklist, comments,
+   * attachments and approval requests raised against it go with it.
+   */
+  async deleteWorkOrder(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const order = await this.prisma.workOrder.findFirst({ where: { id, companyId } });
+    if (!order) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Work order not found.');
+    if (order.status === 'COMPLETED') throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'A completed work order is a record of finished work and cannot be deleted.');
+    await this.posting.withTransaction(async (tx) => {
+      await tx.entityComment.deleteMany({ where: { companyId, entityType: 'WORK_ORDER', entityId: id } });
+      await tx.entityAttachment.deleteMany({ where: { companyId, entityType: 'WORK_ORDER', entityId: id } });
+      await tx.approvalRequest.deleteMany({ where: { companyId, entityType: 'WORK_ORDER', entityId: id } });
+      await tx.workOrder.delete({ where: { id } });
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'operations.work_order_deleted', targetType: 'WORK_ORDER', targetId: id, summary: `Deleted work order ${order.orderNumber}` });
+    return { id, deleted: true };
+  }
+
+  /** Delete an approval request. */
+  async deleteApproval(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const approval = await this.prisma.approvalRequest.findFirst({ where: { id, companyId } });
+    if (!approval) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Approval request not found.');
+    await this.prisma.approvalRequest.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'operations.approval_deleted', targetType: 'APPROVAL_REQUEST', targetId: id, summary: `Deleted approval for ${approval.entityType}` });
+    return { id, deleted: true };
+  }
+
+  /** Delete an operational calendar event. */
+  async deleteCalendarEvent(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const event = await this.prisma.operationalCalendarEvent.findFirst({ where: { id, companyId } });
+    if (!event) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Calendar event not found.');
+    await this.prisma.operationalCalendarEvent.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'operations.calendar_event_deleted', targetType: 'CALENDAR_EVENT', targetId: id, summary: `Deleted calendar event ${event.title}` });
+    return { id, deleted: true };
+  }
+
+  /** Delete one of the current user's notifications. */
+  async deleteNotification(id: string, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const notification = await this.prisma.notification.findFirst({ where: { id, companyId, userId: principal.userId } });
+    if (!notification) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Notification not found.');
+    await this.prisma.notification.delete({ where: { id } });
+    return { id, deleted: true };
+  }
+
+  /** Collect a task and every descendant id, so their side records are cleaned. */
+  private async collectTaskTree(tx: Tx, companyId: string, rootId: string): Promise<string[]> {
+    const ids = [rootId];
+    let frontier = [rootId];
+    while (frontier.length) {
+      const children = await tx.projectTask.findMany({ where: { companyId, parentTaskId: { in: frontier } }, select: { id: true } });
+      frontier = children.map((c) => c.id);
+      ids.push(...frontier);
+    }
+    return ids;
+  }
 
   // --------------------------------------------------------------- projects
 

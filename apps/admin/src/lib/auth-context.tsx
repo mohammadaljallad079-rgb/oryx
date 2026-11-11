@@ -10,12 +10,14 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  isLocale,
   resolveEffectivePermissions,
   type LoginResponse,
   type MembershipSummary,
   type SessionUser,
 } from '@oryx/shared';
 import { api, ApiError, restoreSession, tokenStore } from './api';
+import { useUi } from './ui-context';
 
 interface AuthState {
   user: SessionUser | null;
@@ -50,6 +52,11 @@ interface AuthContextValue extends AuthState {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // The account's saved language/theme live on the user record, so a signed-in
+  // operator keeps their preference across devices and reloads. The UI provider
+  // owns the live value; this effect pushes the account preference into it once
+  // the session is known (and after a preference change on the settings page).
+  const { setLocale, setTheme } = useUi();
   const [state, setState] = useState<AuthState>({
     user: null,
     memberships: [],
@@ -68,17 +75,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * case we attempt one cookie-based restore before concluding there is no
    * session. `api.me()` itself also retries through the refresh cookie on a 401,
    * so a stale in-memory token is recovered transparently.
+   *
+   * A transient failure (`unavailable`) is NOT a lost session. Only an explicit
+   * `expired` outcome, or a 401/403 from `me`, ends the session; anything else
+   * leaves the user signed in and retries on the next request. Treating an
+   * outage as a sign-out is what logged the iPad out.
    */
   const loadSession = useCallback(async () => {
     try {
       if (!tokenStore.access) {
-        const restored = await restoreSession();
-        if (!restored) {
+        const outcome = await restoreSession();
+        if (outcome === 'expired') {
           setState((p) => ({ ...p, ready: true, user: null, permissions: [], memberships: [] }));
           return;
         }
+        if (outcome === 'unavailable') {
+          // Keep whatever session state we already had; do not sign out.
+          setState((p) => ({ ...p, ready: true }));
+          return;
+        }
       }
-      const me = await api.me();
+      let me = await api.me();
+
+      // Platform super admin: no Membership is required.
+      // Resolve a tenant context from the platform company list.
+      if (me.user.isSuperAdmin && !me.context.companyId) {
+        const platformContext = await api.context();
+        const firstCompany = platformContext.companies.find(
+          (company) => company.status !== 'ARCHIVED',
+        );
+
+        if (firstCompany) {
+          tokenStore.setContext(firstCompany.id, null);
+          me = await api.me();
+        }
+      }
+
       setState((p) => ({
         ...p,
         ready: true,
@@ -100,7 +132,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         branchId: me.context.branchId ?? p.branchId,
         supportSessionCompanyId: me.context.supportSessionCompanyId,
       }));
-    } catch {
+    } catch (error) {
+      // A transient API failure must not end the session. Only an explicit
+      // authentication rejection does.
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        tokenStore.clear();
+        setState((p) => ({ ...p, ready: true, user: null, permissions: [], memberships: [] }));
+        return;
+      }
+      if (error instanceof ApiError && error.code === 'network.unavailable') {
+        setState((p) => ({ ...p, ready: true }));
+        return;
+      }
       tokenStore.clear();
       setState((p) => ({ ...p, ready: true, user: null, permissions: [], memberships: [] }));
     }
@@ -109,6 +152,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void loadSession();
   }, [loadSession]);
+
+  /**
+   * Seed the language and theme from the signed-in account on a fresh browser.
+   *
+   * `localStorage` is the operator's explicit, device-local choice and stays
+   * authoritative once it exists (the header toggle and the settings page both
+   * write it). The account's `preferredLocale`/`preferredTheme` are only a
+   * fallback for a browser that has never chosen, so a first visit opens in the
+   * operator's language instead of the Arabic server default. Applying them
+   * unconditionally would fight an explicit choice, which is why the stored
+   * value wins whenever it is present.
+   */
+  useEffect(() => {
+    const user = state.user;
+    if (!user) return;
+    const hasStoredLocale = window.localStorage.getItem('oryx.locale');
+    const hasStoredTheme = window.localStorage.getItem('oryx.theme');
+    if (!hasStoredLocale && isLocale(user.preferredLocale)) setLocale(user.preferredLocale);
+    if (!hasStoredTheme && (user.preferredTheme === 'dark' || user.preferredTheme === 'light')) {
+      setTheme(user.preferredTheme);
+    }
+  }, [state.user, setLocale, setTheme]);
 
   // When a request proves the session is gone (refresh failed), drop local state
   // so the shell redirects to sign-in rather than showing a broken screen.
@@ -163,6 +228,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
+      // Drop any leftover session first. A stale in-memory token or a stale
+      // `oryx_csrf` cookie from a previous session must not be presented to the
+      // login endpoint; the API clears its own cookies on a successful login.
+      tokenStore.clear();
       const res = await api.login(email, password);
       if ('mfaRequired' in res && res.mfaRequired) {
         // Password accepted but a second factor is required: no session yet.

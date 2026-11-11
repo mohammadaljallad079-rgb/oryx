@@ -148,7 +148,7 @@ function IntegrationsPageInner() {
   const summary = center.data?.summary;
 
   return (
-    <div className="flex flex-col gap-5" data-testid="integrations-page">
+    <div className="flex flex-col gap-4" data-testid="integrations-page">
       <SectionHeader
         title={t('integration.title')}
         subtitle={t('integration.subtitle')}

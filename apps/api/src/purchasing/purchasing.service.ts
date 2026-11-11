@@ -62,6 +62,11 @@ export class PurchasingService {
 
   async createSupplier(dto: CreateSupplierDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    // A new supplier inherits the tenant's own market, not a hard-coded one.
+    const [defaultCurrency, defaultCountry] = await Promise.all([
+      this.context.companyCurrency(companyId),
+      this.context.companyCountryCode(companyId),
+    ]);
     const dup = await this.prisma.supplier.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Supplier code ${dto.code} already exists.`);
     const supplier = await this.prisma.supplier.create({
@@ -75,9 +80,9 @@ export class PurchasingService {
         taxNumber: dto.taxNumber ?? null,
         addressLine: dto.addressLine ?? null,
         city: dto.city ?? null,
-        countryCode: dto.countryCode ?? 'SA',
+        countryCode: dto.countryCode ?? defaultCountry,
         paymentTermsDays: dto.paymentTermsDays ?? 0,
-        currency: dto.currency ?? 'SAR',
+        currency: dto.currency ?? defaultCurrency,
         notes: dto.notes ?? null,
       },
     });
@@ -120,6 +125,50 @@ export class PurchasingService {
       summary: `Updated supplier ${updated.code}`,
     });
     return toSupplierDto(updated);
+  }
+
+  /**
+   * Permanently delete a supplier.
+   *
+   * A supplier that appears on a purchase order, receipt, invoice or return is
+   * part of the procurement ledger and must not be erased; the caller is told to
+   * deactivate instead. A supplier with only a set-null link (a payment or an
+   * unconverted requisition) can be removed — those rows survive with a null
+   * supplier.
+   */
+  async deleteSupplier(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const supplier = await this.prisma.supplier.findFirst({ where: { id, companyId } });
+    if (!supplier) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Supplier not found.');
+
+    const [orders, receipts, invoices, returns] = await Promise.all([
+      this.prisma.purchaseOrder.count({ where: { supplierId: id } }),
+      this.prisma.goodsReceipt.count({ where: { supplierId: id } }),
+      this.prisma.supplierInvoice.count({ where: { supplierId: id } }),
+      this.prisma.purchaseReturn.count({ where: { supplierId: id } }),
+    ]);
+    if (orders + receipts + invoices + returns > 0) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This supplier appears on purchase documents and cannot be deleted. Deactivate it instead to keep its history.',
+      );
+    }
+
+    await this.posting.withTransaction(async (tx) => {
+      await tx.purchaseRequisition.updateMany({ where: { supplierId: id }, data: { supplierId: null } });
+      await tx.payment.updateMany({ where: { supplierId: id }, data: { supplierId: null } });
+      await tx.supplier.delete({ where: { id } });
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'purchasing.supplier_deleted',
+      targetType: 'SUPPLIER',
+      targetId: id,
+      summary: `Permanently deleted supplier ${supplier.code}`,
+    });
+    return { id, deleted: true };
   }
 
   // ------------------------------------------------------------ requisitions
@@ -200,6 +249,7 @@ export class PurchasingService {
   /** Convert an approved requisition into a purchase order. */
   async convertRequisition(id: string, supplierId: string, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
       const req = await tx.purchaseRequisition.findFirst({ where: { id, companyId }, include: { lines: true } });
       if (!req) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Requisition not found.');
@@ -231,7 +281,7 @@ export class PurchasingService {
           subtotalMinor: totals.subtotalMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
-          currency: 'SAR',
+          currency: companyCurrency,
           createdById: actor.userId,
           lines: {
             create: lineInputs.map((l, i) => ({
@@ -290,6 +340,7 @@ export class PurchasingService {
     await this.assertSupplier(companyId, dto.supplierId);
     if (dto.warehouseId) await this.assertWarehouse(companyId, dto.warehouseId);
 
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const totals = computePurchaseTotals(dto.lines);
     const order = await this.posting.withTransaction(async (tx) => {
       const orderNumber = await this.sequences.next(tx, companyId, 'purchaseOrder');
@@ -306,7 +357,7 @@ export class PurchasingService {
           subtotalMinor: totals.subtotalMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? companyCurrency,
           notes: dto.notes ?? null,
           approvedById: dto.approve ? actor.userId : null,
           approvedAt: dto.approve ? new Date() : null,
@@ -400,10 +451,21 @@ export class PurchasingService {
       const receivedAt = new Date(dto.receivedAt);
 
       // Determine received quantities: explicit lines, or the outstanding order.
+      // An explicit line is capped at what the order still owes, so a retried or
+      // duplicated receipt cannot move stock (and accrue AP) twice for the same
+      // ordered quantity.
       const receiptLines = dto.lines
         ? dto.lines.map((l) => {
             const orderLine = order.lines.find((ol) => ol.productId === l.productId);
             if (!orderLine) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Received product is not on the order.');
+            const outstanding = orderLine.quantity - orderLine.quantityReceived;
+            if (l.quantity > outstanding) {
+              throw badRequest(
+                ERROR_CODES.OVER_RECEIPT,
+                `Cannot receive ${l.quantity} of ${orderLine.description}: only ${outstanding} remains outstanding on this order.`,
+                { ordered: orderLine.quantity, received: orderLine.quantityReceived, outstanding },
+              );
+            }
             return {
               productId: l.productId,
               description: orderLine.description,
@@ -529,7 +591,11 @@ export class PurchasingService {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-    const where = { companyId, ...(query.status ? { status: query.status as never } : {}) };
+    const where = {
+      companyId,
+      ...(query.status ? { status: query.status as never } : {}),
+      ...(query.supplierId ? { supplierId: query.supplierId } : {}),
+    };
     const [rows, total] = await Promise.all([
       this.prisma.supplierInvoice.findMany({
         where,
@@ -555,6 +621,7 @@ export class PurchasingService {
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     await this.assertSupplier(companyId, dto.supplierId);
 
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
       const totals = computePurchaseTotals(dto.lines);
       const invoiceDate = new Date(dto.invoiceDate);
@@ -588,7 +655,7 @@ export class PurchasingService {
           subtotalMinor: totals.subtotalMinor,
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? companyCurrency,
           notes: dto.notes ?? null,
           createdById: actor.userId,
           lines: {
@@ -678,6 +745,7 @@ export class PurchasingService {
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     await this.assertSupplier(companyId, dto.supplierId);
 
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
       await this.assertWarehouseTx(tx, companyId, dto.warehouseId);
       const totals = computePurchaseTotals(dto.lines);
@@ -698,7 +766,7 @@ export class PurchasingService {
           taxMinor: totals.taxMinor,
           totalMinor: totals.totalMinor,
           reason: dto.reason ?? null,
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? companyCurrency,
           createdById: actor.userId,
           postedAt: new Date(),
           lines: {
@@ -749,10 +817,15 @@ export class PurchasingService {
       const variance = totals.totalMinor - returnedValue - totals.taxMinor;
       if (variance !== 0) {
         const varianceAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.PURCHASE_PRICE_VARIANCE);
+        // The debit is the payable at the invoiced value; the credits are the
+        // stock at moving-average cost and the input VAT. When the invoice
+        // exceeds the carrying value the credit side is short, so the variance
+        // must be credited to balance; the opposite holds when the stock is
+        // worth more than it was invoiced for.
         journalLines.push(
           variance > 0
-            ? { accountId: varianceAccount, debit: variance }
-            : { accountId: varianceAccount, credit: -variance },
+            ? { accountId: varianceAccount, credit: variance }
+            : { accountId: varianceAccount, debit: -variance },
         );
       }
       const journal = await this.posting.postJournal(tx, {

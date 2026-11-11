@@ -1,4 +1,5 @@
 import { Type } from 'class-transformer';
+import { VEHICLE_DOCUMENT_CATEGORIES } from '@oryx/shared';
 import {
   ArrayMinSize,
   IsArray,
@@ -8,6 +9,7 @@ import {
   IsISO8601,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -23,6 +25,29 @@ export class ListQueryDto {
   @IsOptional() @IsString() branchId?: string;
   @IsOptional() @IsString() customerId?: string;
   @IsOptional() @IsString() vehicleId?: string;
+  @IsOptional() @IsString() productId?: string;
+}
+
+/**
+ * Reserved-stock lookup. The base list query carries no warehouse filter, and
+ * `forbidNonWhitelisted` rejects any property a DTO does not declare, so the
+ * warehouse filter needs an explicit optional field here.
+ */
+export class ReservedStockQueryDto extends ListQueryDto {
+  @IsOptional() @IsString() warehouseId?: string;
+}
+
+/**
+ * Parts-compatibility lookup. The make, model and year all come from the query
+ * string, so each needs a validator: without one the handler coerced a missing
+ * or non-numeric `year` into `NaN` and handed it to a Prisma numeric filter,
+ * which raised a 500 instead of a 400.
+ */
+export class CompatiblePartsQueryDto {
+  @IsString() @MinLength(1) @MaxLength(80) make!: string;
+  @IsString() @MinLength(1) @MaxLength(80) model!: string;
+  @Type(() => Number) @IsInt() @Min(1900) @Max(2100) year!: number;
+  @IsOptional() @IsString() companyId?: string;
 }
 
 // ------------------------------------------------------------------ vehicles
@@ -58,10 +83,20 @@ export class RecordMileageDto {
 }
 
 export class VehicleDocumentDto {
-  @IsString() @MinLength(2) @MaxLength(80) category!: string;
+  @IsIn(VEHICLE_DOCUMENT_CATEGORIES as unknown as string[])
+  category!: string;
   @IsOptional() @IsString() @MaxLength(80) number?: string;
   @IsOptional() @IsISO8601() expiresAt?: string;
-  @IsOptional() @IsString() @MaxLength(400) fileRef?: string;
+}
+
+/**
+ * The OCR extraction request. It carries the same category the eventual
+ * document will hold, so the adapter knows what kind of paper it is reading,
+ * but no field values: extraction only suggests, it never saves.
+ */
+export class OcrExtractDto {
+  @IsIn(VEHICLE_DOCUMENT_CATEGORIES as unknown as string[])
+  category!: string;
 }
 
 // --------------------------------------------------------------- inspections

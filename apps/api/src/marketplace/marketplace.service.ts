@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { basisPointsOfMinor, currencyScale } from '@oryx/shared';
+import { basisPointsOfMinor, currencyScale, DEFAULT_COUNTRY_CODE, DEFAULT_CURRENCY, rankByDistance } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import {
@@ -45,6 +45,16 @@ export interface ProviderApplicationInput {
 export class MarketplaceService {
   private readonly logger = new Logger(MarketplaceService.name);
 
+  /**
+   * How many provider rows the public directory scans before de-duplicating.
+   *
+   * Every tenant carries a copy of the demo catalogue, so the raw row count is
+   * many times the number of distinct providers. The scan is bounded so a large
+   * platform does not read the whole table, and generous enough that the distinct
+   * providers in it comfortably exceed one page.
+   */
+  private static readonly DIRECTORY_SCAN_LIMIT = 500;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -84,7 +94,7 @@ export class MarketplaceService {
         contactPhone: input.contactPhone.trim(),
         registrationNumber: input.registrationNumber ?? null,
         taxNumber: input.taxNumber ?? null,
-        countryCode: (input.countryCode ?? 'BH').toUpperCase(),
+        countryCode: (input.countryCode ?? DEFAULT_COUNTRY_CODE).toUpperCase(),
         city: input.city ?? null,
         addressLine: input.addressLine ?? null,
         categoryKeys: input.categoryKeys ?? [],
@@ -214,49 +224,97 @@ export class MarketplaceService {
     categoryKey?: string;
     page: number;
     pageSize: number;
+    /**
+     * Auto Map discovery (P3). When supplied, providers without coordinates are
+     * dropped, the rest are ordered nearest-first and an optional radius keeps
+     * only those inside it. Pagination is applied *after* the distance sort, so
+     * page 1 is genuinely the closest providers rather than an alphabetical
+     * slice of them.
+     */
+    origin?: { latitude: number; longitude: number };
+    radiusKm?: number;
   }) {
     const where = {
       status: 'APPROVED' as never,
       ...(params.categoryKey ? { categoryKey: params.categoryKey } : {}),
+      // A proximity query must not return a provider we cannot place on a map.
+      ...(params.origin ? { latitude: { not: null }, longitude: { not: null } } : {}),
     };
-    const [items, total] = await Promise.all([
-      this.prisma.marketplaceProvider.findMany({
-        where,
-        orderBy: { nameEn: 'asc' },
-        skip: (params.page - 1) * params.pageSize,
-        take: params.pageSize,
-        select: {
-          id: true,
-          code: true,
-          nameEn: true,
-          nameAr: true,
-          categoryKey: true,
-          phone: true,
-          email: true,
-          listings: {
-            where: { isActive: true },
-            select: {
-              id: true,
-              categoryKey: true,
-              nameEn: true,
-              nameAr: true,
-              priceMinor: true,
-              currency: true,
-            },
+
+    // Every tenant seeds its own copy of the demo providers, so an unscoped
+    // query returns "Al Noor Parts" once per company — six identical cards in
+    // the customer directory. The rows are de-duplicated by display name before
+    // pagination, keeping the copy that carries a storefront photograph, so the
+    // page and its total describe distinct providers rather than tenant copies.
+    const rows = await this.prisma.marketplaceProvider.findMany({
+      where,
+      orderBy: [{ nameEn: 'asc' }, { id: 'asc' }],
+      take: MarketplaceService.DIRECTORY_SCAN_LIMIT,
+      select: {
+        id: true,
+        code: true,
+        nameEn: true,
+        nameAr: true,
+        categoryKey: true,
+        phone: true,
+        email: true,
+        latitude: true,
+        longitude: true,
+        imageAsset: { select: { id: true, variants: true } },
+        listings: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            categoryKey: true,
+            nameEn: true,
+            nameAr: true,
+            priceMinor: true,
+            currency: true,
           },
-          reviews: { where: { status: 'PUBLISHED' }, select: { rating: true } },
         },
-      }),
-      this.prisma.marketplaceProvider.count({ where }),
-    ]);
+        reviews: { where: { status: 'PUBLISHED' }, select: { rating: true } },
+      },
+    });
+
+    const unique = new Map<string, (typeof rows)[number]>();
+    for (const row of rows) {
+      const key = row.nameEn;
+      const incumbent = unique.get(key);
+      if (!incumbent || (!incumbent.imageAsset && row.imageAsset)) unique.set(key, row);
+    }
+    let deduped = [...unique.values()];
+
+    // Rank by distance before paging so "near me" is honoured across the whole
+    // result set, not just the current page.
+    let distances: Map<string, number> | null = null;
+    if (params.origin) {
+      const ranked = rankByDistance(
+        params.origin,
+        deduped,
+        (row) => ({
+          latitude: row.latitude === null ? null : Number(row.latitude),
+          longitude: row.longitude === null ? null : Number(row.longitude),
+        }),
+        params.radiusKm,
+      );
+      deduped = ranked.map((entry) => entry.provider);
+      distances = new Map(ranked.map((entry) => [entry.provider.id, entry.distanceKm]));
+    }
+
+    const start = (params.page - 1) * params.pageSize;
+    const page = deduped.slice(start, start + params.pageSize);
 
     // Aggregate the rating here so the directory shows a real average rather
     // than exposing individual reviews.
     return {
-      items: items.map(({ reviews, ...provider }) => {
+      items: page.map(({ reviews, imageAsset, latitude, longitude, ...provider }) => {
         const ratings = reviews.map((r) => r.rating);
         return {
           ...provider,
+          latitude: latitude === null ? null : Number(latitude),
+          longitude: longitude === null ? null : Number(longitude),
+          ...(distances ? { distanceKm: distances.get(provider.id) ?? null } : {}),
+          imageUrl: this.assetUrl(imageAsset, 'card'),
           reviewCount: ratings.length,
           averageRating:
             ratings.length > 0
@@ -264,7 +322,7 @@ export class MarketplaceService {
               : null,
         };
       }),
-      total,
+      total: deduped.length,
     };
   }
 
@@ -272,6 +330,7 @@ export class MarketplaceService {
     const provider = await this.prisma.marketplaceProvider.findFirst({
       where: { id: providerId, status: 'APPROVED' },
       include: {
+        imageAsset: { select: { id: true, variants: true } },
         listings: { where: { isActive: true }, orderBy: { nameEn: 'asc' } },
         availability: { orderBy: { dayOfWeek: 'asc' } },
         reviews: {
@@ -293,14 +352,34 @@ export class MarketplaceService {
     if (!provider) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Provider not found.');
 
     const ratings = provider.reviews.map((r) => r.rating);
+    const { imageAsset, ...rest } = provider;
     return {
-      ...provider,
+      ...rest,
+      imageUrl: this.assetUrl(imageAsset, 'card'),
       reviewCount: ratings.length,
       averageRating:
         ratings.length > 0
           ? Number((ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(2))
           : null,
     };
+  }
+
+  /**
+   * Builds a served URL for a media asset variant.
+   *
+   * The file route picks the variant from the query, so the URL is stable even
+   * if the stored object key changes. Mirrors the homepage service's helper so
+   * the directory and the rails agree on the shape.
+   */
+  private assetUrl(
+    asset: { id: string; variants: unknown } | null | undefined,
+    variant: string,
+  ): string | null {
+    if (!asset) return null;
+    const variants = (asset.variants ?? {}) as Record<string, unknown>;
+    const chosen = variants[variant] ?? variants.card ?? variants.hero ?? variants.wide;
+    if (!chosen) return null;
+    return `/api/v1/cms/media/${asset.id}/file?variant=${encodeURIComponent(variant)}`;
   }
 
   /**
@@ -346,17 +425,36 @@ export class MarketplaceService {
 
   async updateProviderProfile(
     providerId: string,
-    input: { nameEn?: string; nameAr?: string; phone?: string; email?: string; categoryKey?: string },
+    input: {
+      nameEn?: string;
+      nameAr?: string;
+      phone?: string;
+      email?: string;
+      categoryKey?: string;
+      imageAssetId?: string | null;
+    },
   ) {
     const provider = await this.prisma.marketplaceProvider.findUnique({
       where: { id: providerId },
     });
     if (!provider) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Provider not found.');
 
+    // A storefront photograph must name a real library asset; a cleared value is
+    // stored as null so the client falls back to the category art rather than a
+    // broken image.
+    if (input.imageAssetId) {
+      const asset = await this.prisma.cmsMediaAsset.findUnique({
+        where: { id: input.imageAssetId },
+        select: { id: true },
+      });
+      if (!asset) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Media asset not found.');
+    }
+
     const data: Record<string, unknown> = {};
     for (const key of ['nameEn', 'nameAr', 'phone', 'email', 'categoryKey'] as const) {
       if (input[key] !== undefined) data[key] = input[key];
     }
+    if (input.imageAssetId !== undefined) data.imageAssetId = input.imageAssetId || null;
     if (Object.keys(data).length === 0) return provider;
     return this.prisma.marketplaceProvider.update({ where: { id: providerId }, data });
   }
@@ -379,6 +477,86 @@ export class MarketplaceService {
       targetType: 'MARKETPLACE_PROVIDER',
       targetId: providerId,
       summary: `Provider ${provider.code} set to ${status}.`,
+    });
+
+    return updated;
+  }
+
+  /**
+   * Set (or clear) a provider's storefront photograph from the media library.
+   *
+   * The asset must exist, so a stale id cannot be stored and leave a broken
+   * image in the customer directory. Clearing is explicit (`null`), which the
+   * client renders as the bundled category art rather than as nothing.
+   */
+  async setProviderImage(providerId: string, imageAssetId: string | null, actorId: string) {
+    const provider = await this.prisma.marketplaceProvider.findUnique({
+      where: { id: providerId },
+      select: { id: true, code: true },
+    });
+    if (!provider) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Provider not found.');
+
+    if (imageAssetId) {
+      const asset = await this.prisma.cmsMediaAsset.findUnique({
+        where: { id: imageAssetId },
+        select: { id: true },
+      });
+      if (!asset) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Media asset not found.');
+    }
+
+    const updated = await this.prisma.marketplaceProvider.update({
+      where: { id: providerId },
+      data: { imageAssetId: imageAssetId || null },
+    });
+
+    await this.audit.record({
+      actorUserId: actorId,
+      action: 'marketplace.provider_image_changed',
+      targetType: 'MARKETPLACE_PROVIDER',
+      targetId: providerId,
+      summary: imageAssetId
+        ? `Provider ${provider.code} storefront photograph set.`
+        : `Provider ${provider.code} storefront photograph cleared.`,
+    });
+
+    return updated;
+  }
+
+  /**
+   * Set or clear a provider's Auto Map coordinates (P3).
+   *
+   * The admin chooses the point; the API only stores it. Passing `null` clears
+   * the location, which removes the provider from every proximity query rather
+   * than leaving a stale point on the map.
+   */
+  async setProviderLocation(
+    providerId: string,
+    location: { latitude: number | null; longitude: number | null },
+    actorId: string,
+  ) {
+    const provider = await this.prisma.marketplaceProvider.findUnique({
+      where: { id: providerId },
+      select: { id: true, code: true },
+    });
+    if (!provider) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Provider not found.');
+
+    const cleared = location.latitude === null || location.longitude === null;
+    const updated = await this.prisma.marketplaceProvider.update({
+      where: { id: providerId },
+      data: {
+        latitude: cleared ? null : location.latitude,
+        longitude: cleared ? null : location.longitude,
+      },
+    });
+
+    await this.audit.record({
+      actorUserId: actorId,
+      action: 'marketplace.provider_location_changed',
+      targetType: 'MARKETPLACE_PROVIDER',
+      targetId: providerId,
+      summary: cleared
+        ? `Provider ${provider.code} map location cleared.`
+        : `Provider ${provider.code} map location set.`,
     });
 
     return updated;
@@ -415,7 +593,7 @@ export class MarketplaceService {
         nameAr: input.nameAr.trim(),
         description: input.description ?? null,
         priceMinor: input.priceMinor,
-        currency: input.currency ?? 'BHD',
+        currency: input.currency ?? DEFAULT_CURRENCY,
       },
     });
   }
@@ -448,6 +626,118 @@ export class MarketplaceService {
     }
     if (Object.keys(data).length === 0) return listing;
     return this.prisma.providerServiceListing.update({ where: { id: listingId }, data });
+  }
+
+  // ------------------------------------------------------------------ offers
+
+  /**
+   * A provider's promotional offers.
+   *
+   * Scoped by `providerId`, which the controller resolves from the caller's
+   * `ProviderUser` membership, so a provider user can only ever read its own.
+   */
+  async listOffers(providerId: string, includeInactive = false) {
+    return this.prisma.providerOffer.findMany({
+      where: { providerId, ...(includeInactive ? {} : { isActive: true }) },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async createOffer(
+    providerId: string,
+    input: {
+      titleEn: string;
+      titleAr: string;
+      description?: string;
+      categoryKey?: string;
+      percentOffBp: number;
+      startsAt?: string;
+      endsAt?: string;
+    },
+  ) {
+    if (input.percentOffBp < 0 || input.percentOffBp > 10_000) {
+      throw badRequest(
+        ERROR_CODES.VALIDATION_FAILED,
+        'A discount must be between 0% and 100% (0–10000 basis points).',
+      );
+    }
+    const startsAt = input.startsAt ? new Date(input.startsAt) : null;
+    const endsAt = input.endsAt ? new Date(input.endsAt) : null;
+    if (startsAt && endsAt && endsAt <= startsAt) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'The offer must end after it starts.');
+    }
+    return this.prisma.providerOffer.create({
+      data: {
+        providerId,
+        titleEn: input.titleEn.trim(),
+        titleAr: input.titleAr.trim(),
+        description: input.description?.trim() || null,
+        categoryKey: input.categoryKey?.trim() || null,
+        percentOffBp: input.percentOffBp,
+        startsAt,
+        endsAt,
+      },
+    });
+  }
+
+  async updateOffer(
+    providerId: string,
+    offerId: string,
+    input: {
+      titleEn?: string;
+      titleAr?: string;
+      description?: string;
+      categoryKey?: string;
+      percentOffBp?: number;
+      isActive?: boolean;
+      startsAt?: string | null;
+      endsAt?: string | null;
+    },
+  ) {
+    const offer = await this.prisma.providerOffer.findFirst({ where: { id: offerId, providerId } });
+    if (!offer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Offer not found.');
+    if (input.percentOffBp !== undefined && (input.percentOffBp < 0 || input.percentOffBp > 10_000)) {
+      throw badRequest(
+        ERROR_CODES.VALIDATION_FAILED,
+        'A discount must be between 0% and 100% (0–10000 basis points).',
+      );
+    }
+
+    const data: Record<string, unknown> = {};
+    for (const key of ['titleEn', 'titleAr', 'description', 'categoryKey', 'isActive'] as const) {
+      if (input[key] !== undefined) data[key] = input[key];
+    }
+    if (input.percentOffBp !== undefined) data.percentOffBp = input.percentOffBp;
+    if (input.startsAt !== undefined) data.startsAt = input.startsAt ? new Date(input.startsAt) : null;
+    if (input.endsAt !== undefined) data.endsAt = input.endsAt ? new Date(input.endsAt) : null;
+    if (Object.keys(data).length === 0) return offer;
+    return this.prisma.providerOffer.update({ where: { id: offerId }, data });
+  }
+
+  /**
+   * The offers a customer may see right now.
+   *
+   * Only active offers from approved providers, and only inside their window:
+   * an offer with no window is always valid, one whose window has passed is not
+   * returned. This is the query behind the customer "special offers" rail, so
+   * the filter lives here rather than in the client.
+   */
+  async listPublicOffers(params: { categoryKey?: string; limit?: number } = {}) {
+    const now = new Date();
+    return this.prisma.providerOffer.findMany({
+      where: {
+        isActive: true,
+        provider: { status: 'APPROVED' },
+        ...(params.categoryKey ? { categoryKey: params.categoryKey } : {}),
+        AND: [
+          { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+          { OR: [{ endsAt: null }, { endsAt: { gte: now } }] },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(50, Math.max(1, params.limit ?? 20)),
+      include: { provider: { select: { id: true, code: true, nameEn: true, nameAr: true } } },
+    });
   }
 
   // ------------------------------------------------------------- availability
@@ -770,7 +1060,7 @@ export class MarketplaceService {
       where: { id: providerId },
     });
 
-    const currency = input.currency ?? 'BHD';
+    const currency = input.currency ?? DEFAULT_CURRENCY;
     const commissionMinor = basisPointsOfMinor(input.finalAmountMinor, provider.commissionPercentBp);
 
     return this.prisma.$transaction(async (tx) => {
@@ -1198,7 +1488,7 @@ export class MarketplaceService {
     const grossMinor = commissions.reduce((sum, row) => sum + row.baseMinor, 0);
     const commissionMinor = commissions.reduce((sum, row) => sum + row.commissionMinor, 0);
     const netMinor = grossMinor - commissionMinor;
-    const currency = commissions[0]?.currency ?? 'BHD';
+    const currency = commissions[0]?.currency ?? DEFAULT_CURRENCY;
 
     return this.prisma.$transaction(async (tx) => {
       const settlement = await tx.providerSettlement.create({
@@ -1430,40 +1720,40 @@ export class MarketplaceService {
   private async nextApplicationCode(): Promise<string> {
     const count = await this.prisma.marketplaceApplication.count();
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const candidate = `APP-${String(count + 1 + attempt).padStart(5, '0')}`;
+      const candidate = `A${String(count + 1 + attempt).padStart(5, '0')}`;
       const clash = await this.prisma.marketplaceApplication.findFirst({
         where: { code: candidate },
         select: { id: true },
       });
       if (!clash) return candidate;
     }
-    return `APP-${Date.now().toString(36).toUpperCase()}`;
+    return `A${Date.now().toString(36).toUpperCase()}`;
   }
 
   private async nextRequestNumber(companyId: string): Promise<string> {
     const count = await this.prisma.serviceRequest.count({ where: { companyId } });
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const candidate = `SR-${String(count + 1 + attempt).padStart(6, '0')}`;
+      const candidate = `E${String(count + 1 + attempt).padStart(6, '0')}`;
       const clash = await this.prisma.serviceRequest.findFirst({
         where: { companyId, requestNumber: candidate },
         select: { id: true },
       });
       if (!clash) return candidate;
     }
-    return `SR-${Date.now().toString(36).toUpperCase()}`;
+    return `E${Date.now().toString(36).toUpperCase()}`;
   }
 
   private async nextDisputeCode(): Promise<string> {
     const count = await this.prisma.marketplaceDispute.count();
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const candidate = `DSP-${String(count + 1 + attempt).padStart(5, '0')}`;
+      const candidate = `D${String(count + 1 + attempt).padStart(5, '0')}`;
       const clash = await this.prisma.marketplaceDispute.findFirst({
         where: { code: candidate },
         select: { id: true },
       });
       if (!clash) return candidate;
     }
-    return `DSP-${Date.now().toString(36).toUpperCase()}`;
+    return `D${Date.now().toString(36).toUpperCase()}`;
   }
 
   /** Currency scale for a provider's settlement currency. */

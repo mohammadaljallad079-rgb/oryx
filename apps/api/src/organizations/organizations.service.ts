@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { checkLimit, type PlanLimits } from '@oryx/shared';
+import { checkLimit, DEFAULT_COUNTRY_CODE, DEFAULT_CURRENCY, DEFAULT_TIMEZONE, type PlanLimits } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { EntitlementService } from '../common/entitlement.service';
 import { AuditService } from '../common/audit.service';
@@ -115,6 +115,17 @@ export class OrganizationsService {
       if (!parent) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Parent company not found.');
     }
 
+    // The two company models are distinct and must not be conflated. A SaaS
+    // tenant is provisioned against a plan; an ORYX internal company is owned by
+    // the group, governed by the Platform Super Admin, and is never
+    // subscription-limited, so attaching a plan to it is a modelling error.
+    if (dto.type === 'INTERNAL' && dto.planId) {
+      throw badRequest(
+        ERROR_CODES.VALIDATION_FAILED,
+        'An internal company is not subscription-limited and must not be given a plan.',
+      );
+    }
+
     if (dto.planId) {
       const plan = await this.prisma.plan.findUnique({ where: { id: dto.planId } });
       if (!plan) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Plan not found.');
@@ -131,8 +142,8 @@ export class OrganizationsService {
           type: dto.type,
           status: 'ACTIVE',
           industry: dto.industry ?? null,
-          countryCode: dto.countryCode ?? 'SA',
-          currency: dto.currency ?? 'SAR',
+          countryCode: dto.countryCode ?? DEFAULT_COUNTRY_CODE,
+          currency: dto.currency ?? DEFAULT_CURRENCY,
           parentCompanyId: dto.parentCompanyId ?? null,
           notes: dto.notes ?? null,
         },
@@ -221,7 +232,12 @@ export class OrganizationsService {
         ...(dto.industry !== undefined ? { industry: dto.industry } : {}),
         ...(dto.countryCode !== undefined ? { countryCode: dto.countryCode } : {}),
         ...(dto.currency !== undefined ? { currency: dto.currency } : {}),
+        ...(dto.functionalCurrency !== undefined ? { functionalCurrency: dto.functionalCurrency || null } : {}),
+        ...(dto.defaultTaxRateBp !== undefined ? { defaultTaxRateBp: dto.defaultTaxRateBp } : {}),
+        ...(dto.roundingMode !== undefined ? { roundingMode: dto.roundingMode } : {}),
+        ...(dto.documentLocale !== undefined ? { documentLocale: dto.documentLocale } : {}),
         ...(dto.taxNumber !== undefined ? { taxNumber: dto.taxNumber } : {}),
+        ...(dto.crNumber !== undefined ? { crNumber: dto.crNumber } : {}),
         ...(dto.parentCompanyId !== undefined ? { parentCompanyId: dto.parentCompanyId } : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
       },
@@ -258,6 +274,51 @@ export class OrganizationsService {
       metadata: { from: company.status, to: status, reason: reason ?? null },
     });
     return this.getCompany(id, actor);
+  }
+
+  /**
+   * Permanently remove a company and everything it owns.
+   *
+   * Platform-only and gated on an explicit confirmation flag, because the delete
+   * is irreversible: every branch, membership, document and ledger entry the
+   * tenant owns is removed with it. Two things are deliberately preserved:
+   * `AuditLog` rows are `SetNull`, so the record of who did what outlives the
+   * tenant, and child companies are detached (their `parentCompanyId` is
+   * `SetNull`) rather than cascaded, so deleting a group never silently destroys
+   * a separate tenant's data.
+   */
+  async deleteCompany(id: string, confirm: boolean, actor: ActorContext) {
+    if (actor.kind !== 'PLATFORM') {
+      throw forbidden(ERROR_CODES.FORBIDDEN_PLATFORM_ONLY, 'Only a platform administrator may delete a company.');
+    }
+    if (!confirm) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Deleting a company requires an explicit confirmation.');
+    }
+    const company = await this.prisma.company.findUnique({
+      where: { id },
+      include: { _count: { select: { children: true, branches: true, memberships: true } } },
+    });
+    if (!company) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Company not found.');
+
+    // Written before the row disappears and with no tenant scope, so the trail
+    // survives the delete instead of being nulled by the cascade.
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId: null,
+      action: 'company.deleted',
+      targetType: 'COMPANY',
+      targetId: id,
+      summary: `Deleted company ${company.nameEn} (${company.code})`,
+      metadata: {
+        code: company.code,
+        nameEn: company.nameEn,
+        branches: company._count.branches,
+        memberships: company._count.memberships,
+        childrenDetached: company._count.children,
+      },
+    });
+    await this.prisma.company.delete({ where: { id } });
+    return { ok: true, code: company.code, childrenDetached: company._count.children };
   }
 
   // -------------------------------------------------------------------- branches
@@ -328,10 +389,10 @@ export class OrganizationsService {
         nameEn: dto.nameEn,
         nameAr: dto.nameAr,
         city: dto.city ?? null,
-        countryCode: dto.countryCode ?? 'SA',
+        countryCode: dto.countryCode ?? DEFAULT_COUNTRY_CODE,
         addressLine: dto.addressLine ?? null,
         phone: dto.phone ?? null,
-        timezone: dto.timezone ?? 'Asia/Riyadh',
+        timezone: dto.timezone ?? DEFAULT_TIMEZONE,
       },
       include: { company: { select: { nameEn: true } }, _count: { select: { memberships: true } } },
     });
@@ -383,16 +444,19 @@ export class OrganizationsService {
     if (!branch) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Branch not found.');
     this.assertCompanyAccess(branch.companyId, actor);
 
-    // Soft delete preserves referential history.
-    const updated = await this.prisma.branch.update({ where: { id: branchId }, data: { isActive: false } });
+    // A real delete, not a deactivation. Documents that point at the branch keep
+    // their history: their `branchId` is `SetNull`, so the row survives with the
+    // branch detached. The audit entry is written first so the branch's identity
+    // is on record before the row disappears.
     await this.audit.record({
       actorUserId: actor.userId,
       companyId: branch.companyId,
-      action: 'branch.deactivated',
+      action: 'branch.deleted',
       targetType: 'BRANCH',
       targetId: branchId,
-      summary: `Deactivated branch ${updated.nameEn}`,
+      summary: `Deleted branch ${branch.nameEn} (${branch.code})`,
     });
+    await this.prisma.branch.delete({ where: { id: branchId } });
     return { ok: true };
   }
 
@@ -450,6 +514,13 @@ export class OrganizationsService {
     industry: string | null;
     countryCode: string | null;
     currency: string;
+    functionalCurrency: string | null;
+    defaultTaxRateBp: number;
+    roundingMode: string;
+    documentLocale: string;
+    taxNumber: string | null;
+    crNumber: string | null;
+    notes: string | null;
     parentCompanyId: string | null;
     createdAt: Date;
     parent?: { nameEn: string } | null;
@@ -480,6 +551,13 @@ export class OrganizationsService {
       industry: c.industry,
       countryCode: c.countryCode,
       currency: c.currency,
+      functionalCurrency: c.functionalCurrency,
+      defaultTaxRateBp: c.defaultTaxRateBp,
+      roundingMode: c.roundingMode as CompanyDto['roundingMode'],
+      documentLocale: c.documentLocale as CompanyDto['documentLocale'],
+      taxNumber: c.taxNumber,
+      crNumber: c.crNumber,
+      notes: c.notes,
       parentCompanyId: c.parentCompanyId,
       parentCompanyNameEn: c.parent?.nameEn ?? null,
       createdAt: c.createdAt.toISOString(),
@@ -514,6 +592,8 @@ export class OrganizationsService {
     nameEn: string;
     nameAr: string;
     city: string | null;
+    addressLine: string | null;
+    phone: string | null;
     countryCode: string | null;
     timezone: string;
     isActive: boolean;
@@ -529,6 +609,8 @@ export class OrganizationsService {
       nameEn: b.nameEn,
       nameAr: b.nameAr,
       city: b.city,
+      addressLine: b.addressLine,
+      phone: b.phone,
       countryCode: b.countryCode,
       timezone: b.timezone,
       isActive: b.isActive,

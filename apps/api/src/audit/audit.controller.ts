@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsISO8601, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import {
   CurrentPrincipal,
   RequireAnyPermission,
@@ -30,6 +30,26 @@ class AuditQueryDto {
   @IsOptional()
   @IsString()
   action?: string;
+
+  @IsOptional()
+  @IsString()
+  targetType?: string;
+
+  @IsOptional()
+  @IsString()
+  actorUserId?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  from?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  to?: string;
 }
 
 @ApiTags('audit')
@@ -55,6 +75,11 @@ export class AuditController {
     const { items, total } = await this.audit.list({
       companyId: companyId ?? null,
       action: query.action,
+      targetType: query.targetType,
+      actorUserId: query.actorUserId,
+      search: query.search,
+      from: query.from ? new Date(query.from) : undefined,
+      to: query.to ? new Date(query.to) : undefined,
       page,
       pageSize,
     });

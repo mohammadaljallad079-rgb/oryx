@@ -158,6 +158,15 @@ describe('ORYX Execution 03 (e2e)', () => {
       });
       expect(att.status).toBe(201);
 
+      // The attendance list must expose the clock times the admin console
+      // renders; without them the screen can only show a worked-minute count.
+      const attendanceList = await erp<{ items: Array<{ employeeId: string; checkInAt: string | null; checkOutAt: string | null }> }>(
+        '/hr/attendance',
+      );
+      const recorded = attendanceList.body.items.find((r) => r.employeeId === employeeId);
+      expect(recorded?.checkInAt).toBe('2026-04-02T08:00:00.000Z');
+      expect(recorded?.checkOutAt).toBe('2026-04-02T17:00:00.000Z');
+
       const period = await erp<{ id: string }>('/hr/payroll-periods', {
         method: 'POST',
         body: { code: '2026-04', nameEn: 'April 2026', nameAr: 'أبريل 2026', startDate: '2026-04-01', endDate: '2026-04-30' },
@@ -171,6 +180,17 @@ describe('ORYX Execution 03 (e2e)', () => {
       // Basic 5000.00 + 25% housing (1250.00) + overtime => gross > 6250.00
       expect(run.body.grossMinor).toBeGreaterThan(625000);
       expect(run.body.netMinor).toBeLessThanOrEqual(run.body.grossMinor);
+
+      // Overtime is priced from the company policy at 150% (15000 bp). Basic
+      // 5000.00 over the standard 240 h month gives an hourly rate of 20.83;
+      // 120 minutes (2.00 h) is 41.66, and 150% of that is 62.49 — the figure
+      // the policy-driven run must print, not the flat 1.0x of the old engine.
+      const slips = await erp<{ items: Array<{ employeeId: string; lines: Array<{ code: string; amountMinor: number }> }> }>(
+        `/hr/payroll-runs/${run.body.id}/payslips`,
+      );
+      const slip = slips.body.items.find((s) => s.employeeId === employeeId);
+      const overtime = slip?.lines.find((l) => l.code === 'OVERTIME');
+      expect(overtime?.amountMinor).toBe(6249);
     });
 
     it('posts payroll to the ledger exactly once (atomic and idempotent)', async () => {
@@ -236,6 +256,91 @@ describe('ORYX Execution 03 (e2e)', () => {
       expect(res.status).toBe(403);
       expect((res.body as { code?: string }).code).toBe('authz.cross_tenant_denied');
     });
+
+    it('round-trips the attendance policy and a work site', async () => {
+      const policy = await erp<{ graceMinutes: number; standardDailyHours: number }>('/hr/attendance-policy');
+      expect(policy.status).toBe(200);
+
+      const updated = await erp<{ graceMinutes: number; deductAbsence: boolean }>('/hr/attendance-policy', {
+        method: 'PATCH',
+        body: { graceMinutes: 15, standardDailyHours: 800, overtimeMultiplierBp: 15000, deductLate: false, deductAbsence: true },
+      });
+      expect(updated.status).toBe(200);
+      expect(updated.body.graceMinutes).toBe(15);
+
+      const site = await erp<{ id: string; code: string }>('/hr/work-sites', {
+        method: 'POST',
+        body: { code: 'HQ', nameEn: 'Head office', nameAr: 'المكتب الرئيسي', latitude: 26.2285, longitude: 50.586, radiusMeters: 200 },
+      });
+      expect(site.status).toBe(201);
+      const list = await erp<{ items: Array<{ code: string }> }>('/hr/work-sites');
+      expect(list.body.items.some((s) => s.code === 'HQ')).toBe(true);
+    });
+
+    it('records a self check-in with GPS and computes the worked time', async () => {
+      // Link the fixture employee to the signed-in user so the self-service path
+      // (which resolves the employee from the principal) can be exercised.
+      const adminUser = await ctx.prisma.user.findUniqueOrThrow({ where: { email: SEED_COMPANY_ADMIN.email } });
+      await ctx.prisma.employee.update({ where: { id: employeeId }, data: { userId: adminUser.id } });
+
+      const site = await erp<{ id: string }>('/hr/work-sites', {
+        method: 'POST',
+        body: { code: 'FIELD', nameEn: 'Field', nameAr: 'ميداني', latitude: 26.2, longitude: 50.58, radiusMeters: 500 },
+      });
+      expect(site.status).toBe(201);
+      const checkIn = await erp<{ id: string; status: string; checkInAt: string | null }>('/hr/attendance/check-in', {
+        method: 'POST',
+        body: { location: { latitude: 26.2005, longitude: 50.5805, accuracy: 8 } },
+      });
+      expect(checkIn.status).toBe(201);
+      expect(checkIn.body.checkInAt).not.toBeNull();
+
+      const checkOut = await erp<{ checkOutAt: string | null; netMinutes: number }>('/hr/attendance/check-out', {
+        method: 'POST',
+        body: { location: { latitude: 26.2005, longitude: 50.5805, accuracy: 8 } },
+      });
+      expect(checkOut.status).toBe(201);
+      expect(checkOut.body.checkOutAt).not.toBeNull();
+      // Self-service clock times are exposed on the employee's own record.
+      const mine = await erp<{ status: string }>('/hr/attendance/me');
+      expect(mine.status).toBe(200);
+    });
+
+    it('serves the payslip PDF for a posted run', async () => {
+      const runs = await erp<{ items: Array<{ id: string; status: string }> }>('/hr/payroll-runs');
+      const runId = runs.body.items[0].id;
+      const slips = await erp<{ items: Array<{ id: string; employeeId: string }> }>(`/hr/payroll-runs/${runId}/payslips`);
+      const slip = slips.body.items.find((s) => s.employeeId === employeeId)!;
+
+      const res = await fetch(`${ctx.base}/api/v1/hr/payslips/${slip.id}/pdf`, {
+        headers: { Authorization: `Bearer ${token}`, 'x-oryx-company-id': tenantId },
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toContain('application/pdf');
+      const bytes = Buffer.from(await res.arrayBuffer());
+      expect(bytes.subarray(0, 4).toString()).toBe('%PDF');
+      expect(bytes.length).toBeGreaterThan(10_000);
+    });
+
+    it('exports every HR report as CSV and renders each report payload', async () => {
+      const kinds = ['attendance', 'late-absence', 'overtime', 'worked-hours', 'payroll', 'deductions-allowances', 'employee-payroll', 'payroll-cost'];
+      for (const kind of kinds) {
+        const report = await erp<Record<string, unknown>>(`/hr/reports/${kind}`);
+        expect(report.status).toBe(200);
+        const csv = await fetch(`${ctx.base}/api/v1/hr/reports/${kind}/export`, {
+          headers: { Authorization: `Bearer ${token}`, 'x-oryx-company-id': tenantId },
+        });
+        expect(csv.status).toBe(200);
+        expect(csv.headers.get('content-type')).toContain('text/csv');
+      }
+    });
+
+    it('returns the HR dashboard KPIs', async () => {
+      const dash = await erp<{ totalEmployees: number; attendanceToday: Record<string, number> }>('/hr/dashboard');
+      expect(dash.status).toBe(200);
+      expect(typeof dash.body.totalEmployees).toBe('number');
+      expect(dash.body.attendanceToday).toBeDefined();
+    });
   });
 
   // ------------------------------------------------------------------ CRM
@@ -272,7 +377,7 @@ describe('ORYX Execution 03 (e2e)', () => {
 
       const converted = await erp<{ quoteNumber: string; totalMinor: number }>(`/crm/opportunities/${opportunityId}/convert`, { method: 'POST', body: {} });
       expect(converted.status).toBe(201);
-      expect(converted.body.quoteNumber).toMatch(/^QT-/);
+      expect(converted.body.quoteNumber).toMatch(/^Q\d{5}$/);
       expect(converted.body.totalMinor).toBe(500000);
 
       // The quotation is a real sales quotation, visible through the sales module.
@@ -524,6 +629,89 @@ describe('ORYX Execution 03 (e2e)', () => {
       const invoice = await erp<{ invoiceNumber: string; totalMinor: number }>(`/automotive/job-cards/${jobId}/invoice`, { method: 'POST', body: {} });
       expect(invoice.status).toBe(201);
       expect(invoice.body.totalMinor).toBe(46000);
+    });
+
+    it('cancels an un-issued parts reservation and releases the reserved quantity', async () => {
+      const job = await erp<{ id: string }>('/automotive/job-cards', {
+        method: 'POST',
+        body: { vehicleId, complaint: 'Reservation cancel' },
+      });
+      const jobId = job.body.id;
+
+      const reservation = await erp<{ id: string; status: string }>('/automotive/reservations', {
+        method: 'POST',
+        body: { jobCardId: jobId, warehouseId, lines: [{ productId, quantity: 10000 }] },
+      });
+      expect(reservation.status).toBe(201);
+
+      const reserved = await erp<{ items: Array<{ productId: string; warehouseId: string; reservedQuantity: number }> }>(
+        `/automotive/reservations/reserved-stock?warehouseId=${warehouseId}`,
+      );
+      expect(reserved.status).toBe(200);
+      const entry = reserved.body.items.find((i) => i.productId === productId);
+      expect(entry?.reservedQuantity).toBeGreaterThanOrEqual(10000);
+
+      const cancelled = await erp<{ status: string }>(`/automotive/reservations/${reservation.body.id}/cancel`, {
+        method: 'POST',
+        body: {},
+      });
+      expect(cancelled.status).toBe(201);
+      expect(cancelled.body.status).toBe('CANCELLED');
+
+      // A cancelled reservation no longer holds stock, so it must not be
+      // reported as outstanding.
+      const after = await erp<{ items: Array<{ productId: string }> }>(
+        `/automotive/reservations/reserved-stock?warehouseId=${warehouseId}`,
+      );
+      expect(after.body.items.filter((i) => i.productId === productId)).toHaveLength(0);
+
+      // Cancelling twice, and cancelling an issued reservation, are both refused.
+      const again = await erp<{ code: string }>(`/automotive/reservations/${reservation.body.id}/cancel`, { method: 'POST', body: {} });
+      expect(again.status).toBe(400);
+
+      const issuedJob = await erp<{ id: string }>('/automotive/job-cards', { method: 'POST', body: { vehicleId, complaint: 'Issued reservation' } });
+      const issuedRes = await erp<{ id: string }>('/automotive/reservations', {
+        method: 'POST',
+        body: { jobCardId: issuedJob.body.id, warehouseId, lines: [{ productId, quantity: 10000 }] },
+      });
+      await erp(`/automotive/reservations/${issuedRes.body.id}/issue`, { method: 'POST', body: {} });
+      const tooLate = await erp<{ code: string }>(`/automotive/reservations/${issuedRes.body.id}/cancel`, { method: 'POST', body: {} });
+      expect(tooLate.status).toBe(400);
+    });
+
+    it('prices labour hours at hundredths scale when invoicing a job card', async () => {
+      const job = await erp<{ id: string; jobNumber: string }>('/automotive/job-cards', {
+        method: 'POST',
+        body: { vehicleId, odometer: 52000, complaint: 'Front pads worn' },
+      });
+      expect(job.status).toBe(201);
+      const jobId = job.body.id;
+
+      // 2.5 h at 25.000 BHD/h must be 62.500 BHD (62500 fils), not the 0.625 BHD
+      // the quantity-scaled helper produced. `hours` is hundredths (250).
+      const labour = await erp<{ items: Array<{ amountMinor: number }> }>(`/automotive/job-cards/${jobId}/labour`, {
+        method: 'POST',
+        body: { operations: [{ description: 'Replace front pads', hours: 250, rateMinor: 25000 }] },
+      });
+      expect(labour.status).toBe(201);
+      expect(labour.body.items[0].amountMinor).toBe(62500);
+
+      // The estimate line carries the same 2.5 h rescaled onto quantity units
+      // (25000 in 10^4), which must also price to 62.500 BHD.
+      const estimate = await erp<{ id: string; subtotalMinor: number; totalMinor: number }>(
+        `/automotive/job-cards/${jobId}/estimates`,
+        { method: 'POST', body: { lines: [{ type: 'LABOUR', description: 'Replace front pads', quantity: 25000, unitPriceMinor: 25000, taxPercentBp: 0 }] } },
+      );
+      expect(estimate.status).toBe(201);
+      expect(estimate.body.subtotalMinor).toBe(62500);
+      expect(estimate.body.totalMinor).toBe(62500);
+      await erp(`/automotive/estimates/${estimate.body.id}/approve`, { method: 'POST', body: {} });
+
+      await erp(`/automotive/job-cards/${jobId}`, { method: 'PATCH', body: { status: 'IN_PROGRESS' } });
+      await erp(`/automotive/job-cards/${jobId}`, { method: 'PATCH', body: { status: 'COMPLETED' } });
+      const invoice = await erp<{ totalMinor: number }>(`/automotive/job-cards/${jobId}/invoice`, { method: 'POST', body: {} });
+      expect(invoice.status).toBe(201);
+      expect(invoice.body.totalMinor).toBe(62500);
     });
 
     it('keeps the shared ledger and stock balanced after the workshop flow', async () => {

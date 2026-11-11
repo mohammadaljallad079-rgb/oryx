@@ -27,7 +27,7 @@ function FeatureFlagsPageInner() {
   const [creating, setCreating] = useState(false);
 
   return (
-    <div className="flex flex-col gap-5" data-testid="feature-flags-page">
+    <div className="flex flex-col gap-4" data-testid="feature-flags-page">
       <SectionHeader
         title={t('app.flags')}
         subtitle={t('app.subtitle')}

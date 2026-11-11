@@ -42,7 +42,7 @@ test.describe('themes and locales', () => {
     await signIn(page);
     await setTheme(page, 'light');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-    await expect(page.getByTestId('kpi-row')).toBeVisible();
+    await expect(page.getByTestId('dashboard-hero')).toBeVisible();
     await setTheme(page, 'dark');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await expect(page.getByTestId('module-tiles')).toBeVisible();
@@ -55,6 +55,50 @@ test.describe('themes and locales', () => {
     await setLocale(page, 'en');
     await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
     await expect(page.getByTestId('module-tiles')).toBeVisible();
+  });
+
+  test('the stored theme is applied before the first paint and is not reverted', async ({ page }) => {
+    // The layout ships a blocking bootstrap script that reads the stored theme
+    // and sets `data-theme` before paint. This guards the regression where the
+    // hydration pass wrote the server default back over the stored value and a
+    // light-theme user briefly saw dark.
+    await page.addInitScript(() => {
+      (window as unknown as { __firstTheme: string | null }).__firstTheme = null;
+      const record = () => {
+        const el = document.documentElement;
+        const holder = window as unknown as { __firstTheme: string | null };
+        if (holder.__firstTheme === null && el.getAttribute('data-theme')) {
+          holder.__firstTheme = el.getAttribute('data-theme');
+        }
+      };
+      const start = () => {
+        record();
+        new MutationObserver(record).observe(document, {
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['data-theme'],
+        });
+      };
+      if (document.documentElement) start();
+      else document.addEventListener('readystatechange', start, { once: true });
+    });
+
+    await signIn(page);
+    for (const theme of ['light', 'dark'] as const) {
+      await page.evaluate((value) => window.localStorage.setItem('oryx.theme', value), theme);
+      await page.reload();
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      // The stored preference must survive the reload; the mount write used to
+      // clobber it with the server default.
+      expect(await page.evaluate(() => window.localStorage.getItem('oryx.theme'))).toBe(theme);
+      // The attribute must already be correct at the first observation, not
+      // only after hydration.
+      expect(
+        await page.evaluate(
+          () => (window as unknown as { __firstTheme: string | null }).__firstTheme,
+        ),
+      ).toBe(theme);
+    }
   });
 });
 
@@ -93,6 +137,85 @@ test.describe('company and branch management', () => {
     // than assuming it lands on the first page.
     await page.getByTestId('company-search').fill(code);
     await expect(page.getByTestId(`company-row-${code}`)).toBeVisible({ timeout: 20_000 });
+  });
+
+  test('super admin can edit, archive and restore a company', async ({ page }) => {
+    await signIn(page);
+    await setLocale(page, 'en');
+
+    // Provision a dedicated tenant so the assertions are independent of other
+    // data and safe to re-run.
+    const suffix = Date.now().toString().slice(-6);
+    const code = `E2EE-${suffix}`;
+    await page.goto('/companies');
+    await page.getByTestId('new-company').click();
+    await page.getByTestId('company-code').fill(code);
+    await page.getByTestId('company-name-en').fill(`E2E Edit ${suffix}`);
+    await page.getByTestId('company-name-ar').fill(`شركة تعديل ${suffix}`);
+    await page.getByTestId('create-company-submit').click();
+    await expect(page.getByTestId('new-company')).toBeVisible({ timeout: 20_000 });
+
+    await page.getByTestId('company-search').fill(code);
+    await expect(page.getByTestId(`company-row-${code}`)).toBeVisible({ timeout: 20_000 });
+
+    // --- Edit: change the Arabic name and the default tax, then re-open and
+    // confirm the values were persisted and reloaded from the API.
+    await page.getByTestId(`company-edit-${code}`).click();
+    await expect(page.getByTestId('edit-company-name-ar')).toBeVisible();
+    await page.getByTestId('edit-company-name-ar').fill(`شركة تعديل محدّثة ${suffix}`);
+    await page.getByTestId('edit-company-tax-percent').fill('7.5');
+    await page.getByTestId('edit-company-submit').click();
+    await expect(page.locator('.oryx-modal')).toHaveCount(0, { timeout: 20_000 });
+
+    await page.getByTestId(`company-edit-${code}`).click();
+    await expect(page.getByTestId('edit-company-name-ar')).toHaveValue(`شركة تعديل محدّثة ${suffix}`);
+    await expect(page.getByTestId('edit-company-tax-percent')).toHaveValue('7.5');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.oryx-modal')).toHaveCount(0, { timeout: 20_000 });
+
+    // --- Archive (safe delete): confirm dialog, then the row shows Archived and
+    // offers Restore instead of Delete.
+    page.once('dialog', (d) => void d.accept());
+    await page.getByTestId(`company-archive-${code}`).click();
+    await expect(page.getByTestId(`company-restore-${code}`)).toBeVisible({ timeout: 20_000 });
+
+    // --- Restore: back to Active.
+    page.once('dialog', (d) => void d.accept());
+    await page.getByTestId(`company-restore-${code}`).click();
+    await expect(page.getByTestId(`company-archive-${code}`)).toBeVisible({ timeout: 20_000 });
+  });
+
+  test('company status filter narrows the list to archived tenants', async ({ page }) => {
+    await signIn(page);
+    await setLocale(page, 'en');
+    await page.goto('/companies');
+
+    // Archive a dedicated tenant through the API so the filter has a known row.
+    const suffix = Date.now().toString().slice(-6);
+    const code = `E2EF-${suffix}`;
+    const bearer = await apiToken(page);
+    await page.evaluate(
+      async ({ sfx, token }) => {
+        const base = 'http://localhost:3001/api/v1';
+        const res = await fetch(`${base}/companies`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: sfx, nameEn: `E2E Filter ${sfx}`, nameAr: `شركة تصفية ${sfx}`, type: 'SAAS_TENANT' }),
+        });
+        const body = (await res.json()) as { company: { id: string } };
+        await fetch(`${base}/companies/${body.company.id}/status`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'ARCHIVED' }),
+        });
+      },
+      { sfx: code, token: bearer },
+    );
+
+    await page.getByTestId('company-status-filter').selectOption('ARCHIVED');
+    await page.getByTestId('company-search').fill(code);
+    await expect(page.getByTestId(`company-row-${code}`)).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId(`company-restore-${code}`)).toBeVisible();
   });
 
   test('branch creation is enforced by plan limits and persists', async ({ page }) => {
@@ -295,6 +418,8 @@ test.describe('dashboard integrity', () => {
   test('dashboard metrics come from the API and support company scoping', async ({ page }) => {
     await signIn(page);
     await setLocale(page, 'en');
+    // Statistics live on لوحة المعلومات, not on the homepage.
+    await page.goto('/dashboard/overview');
     await expect(page.getByTestId('kpi-row')).toBeVisible();
     await expect(page.getByTestId('chart-branches')).toBeVisible();
 

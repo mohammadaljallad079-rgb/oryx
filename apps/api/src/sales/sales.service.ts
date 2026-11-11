@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { fromQuantity, sumMinor } from '@oryx/shared';
+import { fromQuantity, sumMinor, type RoundingMode } from '@oryx/shared';
+import type { PaymentMethod } from '@oryx/database';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccountingPostingService, SYSTEM_ROLES } from '../common/accounting-posting.service';
@@ -10,6 +11,7 @@ import { computeDocumentTotals, type PricedLineInput } from '../common/document-
 import { badRequest, conflict, ERROR_CODES, forbidden, notFound } from '../common/errors';
 import type { ActorContext } from '../organizations/organizations.service';
 import type { RequestPrincipal } from '../auth/auth.decorators';
+import { resolveDocumentDate } from './sales.dto';
 import type {
   ConvertQuotationDto,
   CreateCashierSessionDto,
@@ -23,6 +25,7 @@ import type {
   PosSaleLineDto,
   SalesLineDto,
   UpdateCustomerDto,
+  UpdateInvoiceDto,
 } from './sales.dto';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -41,6 +44,9 @@ interface InvoiceSource {
   actorUserId: string;
   /** When false, stock is not issued (services / untracked items). */
   issueStock: boolean;
+  /** Company whole-amount cash rounding applied to the document total. */
+  roundingMode?: RoundingMode;
+  roundingScale?: number;
 }
 
 /**
@@ -96,33 +102,90 @@ export class SalesService {
         : {}),
     };
     const [rows, total] = await Promise.all([
-      this.prisma.customer.findMany({ where, orderBy: { code: 'asc' }, skip: (page - 1) * pageSize, take: pageSize }),
+      this.prisma.customer.findMany({
+        where,
+        orderBy: { code: 'asc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: { source: true, department: true },
+      }),
       this.prisma.customer.count({ where }),
     ]);
     return { items: rows.map(toCustomerDto), total, page, pageSize };
   }
 
+  /**
+   * Resolve the optional attribution catalogues, refusing an id that belongs to
+   * another tenant. A foreign id would otherwise let a caller attach its
+   * customer to a catalogue row it cannot read, and the relation would leak the
+   * other tenant's source name through `include`.
+   */
+  private async resolveAttribution(companyId: string, sourceId?: string, departmentId?: string) {
+    const [source, department] = await Promise.all([
+      sourceId ? this.prisma.leadSource.findFirst({ where: { id: sourceId, companyId } }) : null,
+      departmentId ? this.prisma.department.findFirst({ where: { id: departmentId, companyId } }) : null,
+    ]);
+    if (sourceId && !source) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer source not found in this company.');
+    if (departmentId && !department) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Department not found in this company.');
+    return { source, department };
+  }
+
+  /**
+   * The "Staf Name" printed on a document: the salesperson the caller named, or
+   * failing that the signed-in operator. Resolving the operator's own name keeps
+   * the field truthful and never blank without asking the form for a value the
+   * session already knows.
+   */
+  private async resolveSalespersonName(
+    explicit: string | undefined,
+    actorUserId: string,
+  ): Promise<string | null> {
+    const trimmed = explicit?.trim();
+    if (trimmed) return trimmed;
+    const user = await this.prisma.user.findUnique({
+      where: { id: actorUserId },
+      select: { fullNameEn: true, fullNameAr: true, email: true },
+    });
+    return user?.fullNameEn ?? user?.fullNameAr ?? user?.email ?? null;
+  }
+
   async createCustomer(dto: CreateCustomerDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    // A new customer inherits the tenant's own market, not a hard-coded one.
+    const [defaultCurrency, defaultCountry] = await Promise.all([
+      this.context.companyCurrency(companyId),
+      this.context.companyCountryCode(companyId),
+    ]);
     const dup = await this.prisma.customer.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Customer code ${dto.code} already exists.`);
+    // The two names are independent, but a customer with no name at all would be
+    // unidentifiable in a list, so at least one is required.
+    const nameEn = (dto.nameEn ?? '').trim();
+    const nameAr = (dto.nameAr ?? '').trim();
+    if (!nameEn && !nameAr) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide the customer name in English, Arabic, or both.');
+    }
+    await this.resolveAttribution(companyId, dto.sourceId, dto.departmentId);
     const customer = await this.prisma.customer.create({
       data: {
         companyId,
         code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        nameEn,
+        nameAr,
         email: dto.email ?? null,
         phone: dto.phone ?? null,
         taxNumber: dto.taxNumber ?? null,
         addressLine: dto.addressLine ?? null,
         city: dto.city ?? null,
-        countryCode: dto.countryCode ?? 'SA',
+        countryCode: dto.countryCode ?? defaultCountry,
+        sourceId: dto.sourceId ?? null,
+        departmentId: dto.departmentId ?? null,
         creditLimitMinor: dto.creditLimitMinor ?? 0,
         paymentTermsDays: dto.paymentTermsDays ?? 0,
-        currency: dto.currency ?? 'SAR',
+        currency: dto.currency ?? defaultCurrency,
         notes: dto.notes ?? null,
       },
+      include: { source: true, department: true },
     });
     await this.audit.record({
       actorUserId: actor.userId,
@@ -130,7 +193,7 @@ export class SalesService {
       action: 'sales.customer_created',
       targetType: 'CUSTOMER',
       targetId: customer.id,
-      summary: `Created customer ${customer.code} ${customer.nameEn}`,
+      summary: `Created customer ${customer.code} ${customer.nameEn || customer.nameAr}`,
     });
     return toCustomerDto(customer);
   }
@@ -139,6 +202,7 @@ export class SalesService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const customer = await this.prisma.customer.findFirst({ where: { id, companyId } });
     if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+    await this.resolveAttribution(companyId, dto.sourceId, dto.departmentId);
     const updated = await this.prisma.customer.update({
       where: { id },
       data: {
@@ -149,11 +213,15 @@ export class SalesService {
         ...(dto.taxNumber !== undefined ? { taxNumber: dto.taxNumber } : {}),
         ...(dto.addressLine !== undefined ? { addressLine: dto.addressLine } : {}),
         ...(dto.city !== undefined ? { city: dto.city } : {}),
+        ...(dto.countryCode !== undefined ? { countryCode: dto.countryCode } : {}),
+        ...(dto.sourceId !== undefined ? { sourceId: dto.sourceId || null } : {}),
+        ...(dto.departmentId !== undefined ? { departmentId: dto.departmentId || null } : {}),
         ...(dto.creditLimitMinor !== undefined ? { creditLimitMinor: dto.creditLimitMinor } : {}),
         ...(dto.paymentTermsDays !== undefined ? { paymentTermsDays: dto.paymentTermsDays } : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
       },
+      include: { source: true, department: true },
     });
     await this.audit.record({
       actorUserId: actor.userId,
@@ -164,6 +232,181 @@ export class SalesService {
       summary: `Updated customer ${updated.code}`,
     });
     return toCustomerDto(updated);
+  }
+
+  /**
+   * A customer's full profile for the customer screen: the record plus the
+   * history counts, recent invoices and registered vehicles, all scoped to the
+   * customer's own company. The vehicle relation is the Execution 03 registry,
+   * not the consumer garage.
+   */
+  async getCustomer(id: string, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const customer = await this.prisma.customer.findFirst({
+      where: { id, companyId },
+      include: { source: true, department: true },
+    });
+    if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+
+    const [quotations, orders, invoices, payments, creditNotes, vehicles, recentInvoices, vehicleRows] = await Promise.all([
+      this.prisma.quotation.count({ where: { companyId, customerId: id } }),
+      this.prisma.salesOrder.count({ where: { companyId, customerId: id } }),
+      this.prisma.salesInvoice.count({ where: { companyId, customerId: id } }),
+      this.prisma.payment.count({ where: { companyId, customerId: id } }),
+      this.prisma.creditNote.count({ where: { companyId, customerId: id } }),
+      this.prisma.vehicle.count({ where: { companyId, customerId: id } }),
+      this.prisma.salesInvoice.findMany({
+        where: { companyId, customerId: id },
+        orderBy: { invoiceDate: 'desc' },
+        take: 10,
+      }),
+      this.prisma.vehicle.findMany({
+        where: { companyId, customerId: id },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      }),
+    ]);
+
+    return {
+      ...toCustomerDto(customer),
+      history: { quotations, orders, invoices, payments, creditNotes, vehicles },
+      recentInvoices: recentInvoices.map((inv) => ({
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        invoiceDate: inv.invoiceDate.toISOString(),
+        status: inv.status,
+        totalMinor: inv.totalMinor,
+        balanceMinor: inv.totalMinor - inv.amountPaidMinor,
+        currency: inv.currency,
+      })),
+      vehicles: vehicleRows.map((v) => ({
+        id: v.id,
+        vin: v.vin,
+        plateNumber: v.plateNumber,
+        make: v.make,
+        model: v.model,
+        modelYear: v.modelYear,
+      })),
+    };
+  }
+
+  // ------------------------------------------------------ customer attachments
+
+  async listCustomerAttachments(customerId: string, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const customer = await this.prisma.customer.findFirst({ where: { id: customerId, companyId }, select: { id: true } });
+    if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+    const rows = await this.prisma.entityAttachment.findMany({
+      where: { companyId, entityType: 'CUSTOMER', entityId: customerId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return { items: rows, total: rows.length, page: 1, pageSize: rows.length };
+  }
+
+  async addCustomerAttachment(customerId: string, body: { fileName: string; mimeType?: string; sizeBytes?: number; storageRef?: string }, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const customer = await this.prisma.customer.findFirst({ where: { id: customerId, companyId }, select: { id: true } });
+    if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+    const attachment = await this.prisma.entityAttachment.create({
+      data: {
+        companyId,
+        entityType: 'CUSTOMER',
+        entityId: customerId,
+        fileName: body.fileName,
+        mimeType: body.mimeType ?? null,
+        sizeBytes: body.sizeBytes ?? 0,
+        storageRef: body.storageRef ?? null,
+        uploadedById: actor.userId,
+      },
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'sales.customer_attachment_added', targetType: 'CUSTOMER', targetId: customerId, summary: `Attached ${body.fileName}` });
+    return attachment;
+  }
+
+  async removeCustomerAttachment(customerId: string, attachmentId: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const attachment = await this.prisma.entityAttachment.findFirst({
+      where: { id: attachmentId, companyId, entityType: 'CUSTOMER', entityId: customerId },
+    });
+    if (!attachment) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Attachment not found.');
+    await this.prisma.entityAttachment.delete({ where: { id: attachmentId } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'sales.customer_attachment_removed', targetType: 'CUSTOMER', targetId: customerId, summary: `Removed ${attachment.fileName}` });
+    return { removed: true };
+  }
+
+  /**
+   * Permanently delete a customer.
+   *
+   * A customer with any commercial history — a quotation, order, invoice, credit
+   * note, payment, vehicle or inspection — is refused, because deleting it would
+   * either violate the ledger's referential integrity or silently drop the
+   * counterparty from issued documents. The generated "Walk-in customer" row is
+   * also protected: the POS recreates it on demand and the seeded invoices point
+   * at it. Only a customer whose own detail rows are the sole references is
+   * removed, and those detail rows go with it.
+   */
+  async deleteCustomer(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const customer = await this.prisma.customer.findFirst({ where: { id, companyId } });
+    if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+    if (customer.code === 'WALK-IN') {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'The walk-in customer cannot be deleted.');
+    }
+
+    const [
+      quotations,
+      orders,
+      invoices,
+      creditNotes,
+      posSales,
+      payments,
+      vehicles,
+      inspections,
+      bookingSlots,
+      paymentIntents,
+      contactCount,
+      segmentCount,
+    ] = await Promise.all([
+      this.prisma.quotation.count({ where: { customerId: id } }),
+      this.prisma.salesOrder.count({ where: { customerId: id } }),
+      this.prisma.salesInvoice.count({ where: { customerId: id } }),
+      this.prisma.creditNote.count({ where: { customerId: id } }),
+      this.prisma.posSale.count({ where: { customerId: id } }),
+      this.prisma.payment.count({ where: { customerId: id } }),
+      this.prisma.vehicle.count({ where: { customerId: id } }),
+      this.prisma.inspectionSession.count({ where: { customerId: id } }),
+      this.prisma.bookingSlot.count({ where: { customerId: id } }),
+      this.prisma.paymentIntent.count({ where: { customerId: id } }),
+      this.prisma.customerContact.count({ where: { customerId: id } }),
+      this.prisma.customerSegmentMember.count({ where: { customerId: id } }),
+    ]);
+
+    if (
+      quotations + orders + invoices + creditNotes + posSales + payments + vehicles + inspections + bookingSlots + paymentIntents >
+      0
+    ) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This customer has documents, payments or vehicles on file and cannot be deleted. Deactivate it instead to keep its history.',
+      );
+    }
+
+    await this.posting.withTransaction(async (tx) => {
+      await tx.entityAttachment.deleteMany({ where: { companyId, entityType: 'CUSTOMER', entityId: id } });
+      await tx.customerContact.deleteMany({ where: { customerId: id } });
+      await tx.customerSegmentMember.deleteMany({ where: { customerId: id } });
+      await tx.customer.delete({ where: { id } });
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'sales.customer_deleted',
+      targetType: 'CUSTOMER',
+      targetId: id,
+      summary: `Permanently deleted customer ${customer.code} (${contactCount} contacts, ${segmentCount} segment memberships removed)`,
+    });
+    return { id, deleted: true };
   }
 
   // -------------------------------------------------------------- quotations
@@ -191,7 +434,10 @@ export class SalesService {
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     await this.assertCustomer(companyId, dto.customerId);
 
-    const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })));
+    const currency = dto.currency ?? (await this.context.companyCurrency(companyId));
+    const rounding = await this.context.companyRoundingMode(companyId);
+    const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })), rounding.mode, rounding.scale);
+    const salespersonName = await this.resolveSalespersonName(dto.salespersonName, actor.userId);
     const quotation = await this.posting.withTransaction(async (tx) => {
       const quoteNumber = await this.sequences.next(tx, companyId, 'quotation');
       return tx.quotation.create({
@@ -201,13 +447,17 @@ export class SalesService {
           quoteNumber,
           customerId: dto.customerId,
           status: 'DRAFT',
-          issueDate: new Date(dto.issueDate),
+          issueDate: new Date(resolveDocumentDate(dto)!),
           validUntil: dto.validUntil ? new Date(dto.validUntil) : null,
           subtotalMinor: totals.subtotalMinor,
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
-          currency: dto.currency ?? 'SAR',
+          currency,
+          paymentMethod: (dto.paymentMethod as PaymentMethod | undefined) ?? 'CASH',
+          salespersonName,
+          paymentReference: dto.paymentReference ?? null,
           notes: dto.notes ?? null,
           createdById: actor.userId,
           lines: { create: buildSimpleLineRows(totals, dto.lines) },
@@ -249,6 +499,7 @@ export class SalesService {
           subtotalMinor: quote.subtotalMinor,
           discountMinor: quote.discountMinor,
           taxMinor: quote.taxMinor,
+          roundingMinor: quote.roundingMinor,
           totalMinor: quote.totalMinor,
           currency: quote.currency,
           createdById: actor.userId,
@@ -307,7 +558,10 @@ export class SalesService {
     await this.assertCustomer(companyId, dto.customerId);
     if (dto.warehouseId) await this.assertWarehouse(companyId, dto.warehouseId);
 
-    const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })));
+    const currency = dto.currency ?? (await this.context.companyCurrency(companyId));
+    const rounding = await this.context.companyRoundingMode(companyId);
+    const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })), rounding.mode, rounding.scale);
+    const salespersonName = await this.resolveSalespersonName(dto.salespersonName, actor.userId);
     const order = await this.posting.withTransaction(async (tx) => {
       const orderNumber = await this.sequences.next(tx, companyId, 'salesOrder');
       return tx.salesOrder.create({
@@ -318,12 +572,15 @@ export class SalesService {
           customerId: dto.customerId,
           warehouseId: dto.warehouseId ?? null,
           status: dto.confirm ? 'CONFIRMED' : 'DRAFT',
-          orderDate: new Date(dto.orderDate),
+          orderDate: new Date(resolveDocumentDate(dto)!),
           subtotalMinor: totals.subtotalMinor,
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
-          currency: dto.currency ?? 'SAR',
+          currency,
+          paymentMethod: (dto.paymentMethod as PaymentMethod | undefined) ?? 'CASH',
+          salespersonName,
           notes: dto.notes ?? null,
           createdById: actor.userId,
           lines: { create: buildSimpleLineRows(totals, dto.lines) },
@@ -352,6 +609,7 @@ export class SalesService {
       companyId,
       ...(query.status ? { status: query.status as never } : {}),
       ...(query.branchId ? { branchId: query.branchId } : {}),
+      ...(query.customerId ? { customerId: query.customerId } : {}),
     };
     const [rows, total] = await Promise.all([
       this.prisma.salesInvoice.findMany({
@@ -381,6 +639,166 @@ export class SalesService {
   }
 
   /**
+   * Update a draft invoice only. Posted invoices are immutable: changing them
+   * would invalidate the posted journal, stock issue and any allocations.
+   */
+  async updateInvoice(id: string, dto: UpdateInvoiceDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const salespersonName = await this.resolveSalespersonName(dto.salespersonName, actor.userId);
+    const result = await this.posting.withTransaction(async (tx) => {
+      const current = await tx.salesInvoice.findFirst({
+        where: { id, companyId },
+        include: { lines: true, allocations: true },
+      });
+      if (!current) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Sales invoice not found.');
+      if (
+        current.status !== 'DRAFT' ||
+        current.journalEntryId ||
+        current.amountPaidMinor > 0 ||
+        current.allocations.length > 0
+      ) {
+        throw badRequest(
+          ERROR_CODES.DOCUMENT_ALREADY_POSTED,
+          'Only an unposted draft invoice without payments can be edited. Use a credit note to correct a posted invoice.',
+        );
+      }
+      const [officialDocument, attachment] = await Promise.all([
+        tx.officialDocument.findFirst({
+          where: { companyId, sourceType: 'SalesInvoice', sourceId: id, status: { notIn: ['CANCELLED', 'REVOKED'] } },
+          select: { id: true },
+        }),
+        tx.entityAttachment.findFirst({
+          where: { companyId, entityType: 'SALES_INVOICE', entityId: id },
+          select: { id: true },
+        }),
+      ]);
+      if (officialDocument || attachment) {
+        throw badRequest(
+          ERROR_CODES.DOCUMENT_ALREADY_POSTED,
+          'This draft has an issued document or attachments. Revoke/remove them before editing.',
+        );
+      }
+      await this.assertCustomerTx(tx, companyId, dto.customerId);
+      const lineInputs = dto.lines.map((line) => ({
+        productId: line.productId ?? null,
+        description: line.description,
+        quantity: line.quantity,
+        unitPriceMinor: line.unitPriceMinor,
+        discountPercentBp: line.discountPercentBp,
+        taxPercentBp: line.taxPercentBp,
+      }));
+      const rounding = await this.context.companyRoundingMode(companyId, tx);
+      const totals = computeDocumentTotals(lineInputs, rounding.mode, rounding.scale);
+      const invoiceDate = new Date(resolveDocumentDate(dto)!);
+      const dueDate = dto.dueDate ? new Date(dto.dueDate) : current.dueDate;
+      const willPost = dto.post === true;
+      if (willPost) await this.assertCreditLimit(tx, companyId, dto.customerId, totals.totalMinor);
+      const updated = await tx.salesInvoice.update({
+        where: { id },
+        data: {
+          customerId: dto.customerId,
+          warehouseId: dto.warehouseId ?? current.warehouseId,
+          invoiceDate,
+          dueDate,
+          subtotalMinor: totals.subtotalMinor,
+          discountMinor: totals.discountMinor,
+          taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
+          totalMinor: totals.totalMinor,
+          paymentMethod: (dto.paymentMethod as PaymentMethod | undefined) ?? current.paymentMethod,
+          salespersonName,
+          paymentReference: dto.paymentReference ?? null,
+          notes: dto.notes ?? null,
+          lines: { deleteMany: {}, create: buildLineRows(totals, lineInputs) },
+        },
+        include: { customer: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
+      });
+      if (!willPost) return toInvoiceDto(updated);
+      const posted = await this.postSalesInvoice(tx, {
+        companyId,
+        branchId: current.branchId,
+        customerId: dto.customerId,
+        warehouseId: dto.warehouseId ?? current.warehouseId,
+        currency: current.currency,
+        lines: lineInputs,
+        entryDate: invoiceDate,
+        sourceType: 'SALES_INVOICE',
+        sourceId: id,
+        actorUserId: actor.userId,
+        issueStock: dto.issueStock ?? true,
+        roundingMode: rounding.mode,
+        roundingScale: rounding.scale,
+      });
+      if (current.orderId) {
+        const orderLines = await tx.salesOrderLine.findMany({ where: { orderId: current.orderId } });
+        for (const line of orderLines) {
+          await tx.salesOrderLine.update({
+            where: { id: line.id },
+            data: { quantityInvoiced: line.quantity },
+          });
+        }
+        await tx.salesOrder.update({ where: { id: current.orderId }, data: { status: 'INVOICED' } });
+      }
+      return posted;
+    });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'sales.invoice_updated',
+      targetType: 'SALES_INVOICE',
+      targetId: id,
+      summary: `Updated draft sales invoice ${result.invoiceNumber}`,
+    });
+    return result;
+  }
+
+  /** Permanently remove a draft invoice only when nothing has been issued against it. */
+  async deleteInvoice(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const deleted = await this.posting.withTransaction(async (tx) => {
+      const invoice = await tx.salesInvoice.findFirst({
+        where: { id, companyId },
+        include: { allocations: true },
+      });
+      if (!invoice) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Sales invoice not found.');
+      if (
+        invoice.status !== 'DRAFT' ||
+        invoice.journalEntryId ||
+        invoice.amountPaidMinor > 0 ||
+        invoice.allocations.length > 0
+      ) {
+        throw badRequest(
+          ERROR_CODES.DOCUMENT_ALREADY_POSTED,
+          'Only an unposted draft invoice without payments can be permanently deleted. Posted invoices must be reversed with a credit note.',
+        );
+      }
+      const [officialDocument, attachment, comment, approval] = await Promise.all([
+        tx.officialDocument.findFirst({ where: { companyId, sourceType: 'SalesInvoice', sourceId: id }, select: { id: true } }),
+        tx.entityAttachment.findFirst({ where: { companyId, entityType: 'SALES_INVOICE', entityId: id }, select: { id: true } }),
+        tx.entityComment.findFirst({ where: { companyId, entityType: 'SALES_INVOICE', entityId: id }, select: { id: true } }),
+        tx.approvalRequest.findFirst({ where: { companyId, entityType: 'SALES_INVOICE', entityId: id }, select: { id: true } }),
+      ]);
+      if (officialDocument || attachment || comment || approval) {
+        throw badRequest(
+          ERROR_CODES.DOCUMENT_ALREADY_POSTED,
+          'This invoice has related official documents, attachments, comments or approvals and cannot be deleted.',
+        );
+      }
+      await tx.salesInvoice.delete({ where: { id } });
+      return invoice.invoiceNumber;
+    });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'sales.invoice_deleted',
+      targetType: 'SALES_INVOICE',
+      targetId: id,
+      summary: `Permanently deleted draft sales invoice ${deleted}`,
+    });
+    return { id, deleted: true };
+  }
+
+  /**
    * Create a sales invoice, optionally from a sales order.
    *
    * Posting is atomic: the invoice header/lines, the ledger entry, the stock
@@ -391,11 +809,13 @@ export class SalesService {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
 
+    const companyCurrency = await this.context.companyCurrency(companyId);
+    const salespersonName = await this.resolveSalespersonName(dto.salespersonName, actor.userId);
     const result = await this.posting.withTransaction(async (tx) => {
       let customerId = dto.customerId ?? null;
       let orderId: string | null = null;
       let warehouseId = dto.warehouseId ?? null;
-      let currency = dto.currency ?? 'SAR';
+      let currency = dto.currency ?? companyCurrency;
       let lineInputs: Array<PricedLineInput & { productId: string | null; description: string }>;
 
       if (dto.orderId) {
@@ -439,7 +859,8 @@ export class SalesService {
       }
 
       await this.assertCustomerTx(tx, companyId, customerId!);
-      const totals = computeDocumentTotals(lineInputs);
+      const rounding = await this.context.companyRoundingMode(companyId, tx);
+      const totals = computeDocumentTotals(lineInputs, rounding.mode, rounding.scale);
 
       // Credit limit check for a posted (non-draft) invoice.
       const willPost = dto.post !== false;
@@ -448,7 +869,7 @@ export class SalesService {
       }
 
       const invoiceNumber = await this.sequences.next(tx, companyId, 'salesInvoice');
-      const invoiceDate = new Date(dto.invoiceDate);
+      const invoiceDate = new Date(resolveDocumentDate(dto)!);
       const dueDate = dto.dueDate
         ? new Date(dto.dueDate)
         : await computeDueDate(tx, companyId, customerId!, invoiceDate);
@@ -467,8 +888,12 @@ export class SalesService {
           subtotalMinor: totals.subtotalMinor,
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
           currency,
+          paymentMethod: (dto.paymentMethod as PaymentMethod | undefined) ?? 'CASH',
+          salespersonName,
+          paymentReference: dto.paymentReference ?? null,
           notes: dto.notes ?? null,
           createdById: actor.userId,
           lines: { create: buildLineRows(totals, lineInputs) },
@@ -489,6 +914,8 @@ export class SalesService {
           sourceId: invoice.id,
           actorUserId: actor.userId,
           issueStock: dto.issueStock ?? true,
+          roundingMode: rounding.mode,
+          roundingScale: rounding.scale,
         });
 
         // Mark the source order invoiced and update its lines.
@@ -530,10 +957,17 @@ export class SalesService {
    * moving-average cost captured by the stock ledger.
    */
   private async postSalesInvoice(tx: Tx, src: InvoiceSource) {
-    const totals = computeDocumentTotals(src.lines);
+    const totals = computeDocumentTotals(src.lines, src.roundingMode ?? 'NONE', src.roundingScale ?? 2);
     const arAccount = await this.posting.systemAccount(tx, src.companyId, SYSTEM_ROLES.AR_CONTROL);
     const revenueAccount = await this.posting.systemAccount(tx, src.companyId, SYSTEM_ROLES.SALES_REVENUE);
 
+    // A cash-rounding difference is a small gain (credit) when the total rounds
+    // up and a loss (debit) when it rounds down, so AR always settles the exact
+    // rounded total while revenue and VAT keep their exact figures.
+    const roundingAccount =
+      totals.roundingMinor !== 0
+        ? await this.posting.systemAccount(tx, src.companyId, SYSTEM_ROLES.ROUNDING_GAIN_LOSS)
+        : null;
     const lines = [
       { accountId: arAccount, debit: totals.totalMinor },
       ...(totals.discountMinor > 0
@@ -542,6 +976,12 @@ export class SalesService {
       { accountId: revenueAccount, credit: totals.subtotalMinor },
       ...(totals.taxMinor > 0
         ? [{ accountId: await this.posting.systemAccount(tx, src.companyId, SYSTEM_ROLES.VAT_OUTPUT), credit: totals.taxMinor }]
+        : []),
+      ...(roundingAccount && totals.roundingMinor > 0
+        ? [{ accountId: roundingAccount, credit: totals.roundingMinor }]
+        : []),
+      ...(roundingAccount && totals.roundingMinor < 0
+        ? [{ accountId: roundingAccount, debit: -totals.roundingMinor }]
         : []),
     ];
 
@@ -615,8 +1055,11 @@ export class SalesService {
    * commit or roll back together. Posting is idempotent per source document.
    */
   async issueInvoice(tx: Tx, input: IssueInvoiceInput) {
-    const totals = computeDocumentTotals(input.lines);
+    const rounding = await this.context.companyRoundingMode(input.companyId, tx);
+    const totals = computeDocumentTotals(input.lines, rounding.mode, rounding.scale);
     const invoiceNumber = await this.sequences.next(tx, input.companyId, 'salesInvoice');
+    // A module-issued invoice follows the tenant's currency unless told otherwise.
+    const currency = input.currency ?? (await this.context.companyCurrency(input.companyId, tx));
     const invoice = await tx.salesInvoice.create({
       data: {
         companyId: input.companyId,
@@ -629,8 +1072,9 @@ export class SalesService {
         subtotalMinor: totals.subtotalMinor,
         discountMinor: totals.discountMinor,
         taxMinor: totals.taxMinor,
+        roundingMinor: totals.roundingMinor,
         totalMinor: totals.totalMinor,
-        currency: input.currency ?? 'SAR',
+        currency,
         notes: input.notes ?? null,
         createdById: input.actorUserId,
         lines: { create: buildLineRows(totals, input.lines) },
@@ -642,13 +1086,15 @@ export class SalesService {
       branchId: input.branchId ?? null,
       customerId: input.customerId,
       warehouseId: input.warehouseId ?? null,
-      currency: input.currency ?? 'SAR',
+      currency,
       lines: input.lines,
       entryDate: input.entryDate,
       sourceType: input.sourceType,
       sourceId: invoice.id,
       actorUserId: input.actorUserId,
       issueStock: input.issueStock,
+      roundingMode: rounding.mode,
+      roundingScale: rounding.scale,
     });
     return posted;
   }
@@ -677,6 +1123,7 @@ export class SalesService {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
 
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
       await this.assertCustomerTx(tx, companyId, dto.customerId);
       let invoiceId: string | null = dto.invoiceId ?? null;
@@ -687,9 +1134,10 @@ export class SalesService {
         warehouseId = warehouseId ?? invoice.warehouseId;
       }
 
-      const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })));
+      const rounding = await this.context.companyRoundingMode(companyId, tx);
+      const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })), rounding.mode, rounding.scale);
       const creditNoteNumber = await this.sequences.next(tx, companyId, 'creditNote');
-      const issueDate = new Date(dto.issueDate);
+      const issueDate = new Date(resolveDocumentDate(dto)!);
 
       const note = await tx.creditNote.create({
         data: {
@@ -703,9 +1151,10 @@ export class SalesService {
           issueDate,
           subtotalMinor: totals.subtotalMinor,
           taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
           reason: dto.reason ?? null,
-          currency: dto.currency ?? 'SAR',
+          currency: dto.currency ?? companyCurrency,
           restockInventory: dto.restockInventory ?? false,
           createdById: actor.userId,
           postedAt: new Date(),
@@ -726,10 +1175,20 @@ export class SalesService {
 
       const revenueAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.SALES_REVENUE);
       const arAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.AR_CONTROL);
+      const roundingAccount =
+        totals.roundingMinor !== 0
+          ? await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.ROUNDING_GAIN_LOSS)
+          : null;
       const journalLines = [
         { accountId: revenueAccount, debit: totals.subtotalMinor },
         ...(totals.taxMinor > 0
           ? [{ accountId: await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.VAT_OUTPUT), debit: totals.taxMinor }]
+          : []),
+        ...(roundingAccount && totals.roundingMinor > 0
+          ? [{ accountId: roundingAccount, debit: totals.roundingMinor }]
+          : []),
+        ...(roundingAccount && totals.roundingMinor < 0
+          ? [{ accountId: roundingAccount, credit: -totals.roundingMinor }]
           : []),
         { accountId: arAccount, credit: totals.totalMinor },
       ];
@@ -953,6 +1412,7 @@ export class SalesService {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
 
+    const companyCurrency = await this.context.companyCurrency(companyId);
     const result = await this.posting.withTransaction(async (tx) => {
       const session = await tx.cashierSession.findFirst({
         where: { id: dto.cashierSessionId, companyId },
@@ -968,10 +1428,11 @@ export class SalesService {
         description: l.description,
         quantity: l.quantity,
         unitPriceMinor: l.unitPriceMinor,
-        discountPercentBp: 0,
+        discountPercentBp: l.discountPercentBp ?? 0,
         taxPercentBp: l.taxPercentBp ?? 0,
       }));
-      const totals = computeDocumentTotals(lineInputs);
+      const rounding = await this.context.companyRoundingMode(companyId, tx);
+      const totals = computeDocumentTotals(lineInputs, rounding.mode, rounding.scale);
       const paidMinor = dto.paidMinor ?? totals.totalMinor;
       if (paidMinor < totals.totalMinor) {
         throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Paid amount is less than the sale total.');
@@ -994,8 +1455,9 @@ export class SalesService {
           subtotalMinor: totals.subtotalMinor,
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
-          currency: 'SAR',
+          currency: companyCurrency,
           notes: `POS sale in session ${session.sessionNumber}`,
           createdById: actor.userId,
           lines: { create: buildLineRows(totals, lineInputs) },
@@ -1008,13 +1470,15 @@ export class SalesService {
         branchId: dto.branchId,
         customerId,
         warehouseId,
-        currency: 'SAR',
+        currency: companyCurrency,
         lines: lineInputs,
         entryDate: invoiceDate,
         sourceType: 'POS_SALE',
         sourceId: invoice.id,
         actorUserId: actor.userId,
         issueStock: true,
+        roundingMode: rounding.mode,
+        roundingScale: rounding.scale,
       });
 
       // Settle the invoice immediately with a receipt.
@@ -1036,11 +1500,12 @@ export class SalesService {
           subtotalMinor: totals.subtotalMinor,
           discountMinor: totals.discountMinor,
           taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
           paidMinor,
           changeMinor,
           paymentMethod: dto.paymentMethod,
-          currency: 'SAR',
+          currency: companyCurrency,
           salesInvoiceId: invoice.id,
           journalEntryId: posted.journalEntryId ?? null,
           createdById: actor.userId,
@@ -1197,13 +1662,24 @@ function toCustomerDto(c: {
   addressLine: string | null;
   city: string | null;
   countryCode: string | null;
+  sourceId?: string | null;
+  departmentId?: string | null;
   creditLimitMinor: number;
   paymentTermsDays: number;
   currency: string;
   isActive: boolean;
   notes: string | null;
+  source?: { id: string; code: string; nameEn: string; nameAr: string } | null;
+  department?: { id: string; code: string; nameEn: string; nameAr: string } | null;
 }) {
-  return { ...c };
+  const { source, department, ...rest } = c;
+  return {
+    ...rest,
+    sourceNameEn: source?.nameEn ?? null,
+    sourceNameAr: source?.nameAr ?? null,
+    departmentNameEn: department?.nameEn ?? null,
+    departmentNameAr: department?.nameAr ?? null,
+  };
 }
 
 function toQuotationDto(q: {
@@ -1216,8 +1692,12 @@ function toQuotationDto(q: {
   subtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
+  roundingMinor: number;
   totalMinor: number;
   currency: string;
+  paymentMethod: string;
+  salespersonName: string | null;
+  paymentReference: string | null;
   notes: string | null;
   convertedOrderId: string | null;
   customer: { nameEn: string; nameAr: string; code: string };
@@ -1235,8 +1715,12 @@ function toQuotationDto(q: {
     subtotalMinor: q.subtotalMinor,
     discountMinor: q.discountMinor,
     taxMinor: q.taxMinor,
+    roundingMinor: q.roundingMinor,
     totalMinor: q.totalMinor,
     currency: q.currency,
+    paymentMethod: q.paymentMethod,
+    salespersonName: q.salespersonName,
+    paymentReference: q.paymentReference,
     notes: q.notes,
     convertedOrderId: q.convertedOrderId,
     lines: q.lines,
@@ -1252,8 +1736,11 @@ function toSalesOrderDto(o: {
   subtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
+  roundingMinor: number;
   totalMinor: number;
   currency: string;
+  paymentMethod: string;
+  salespersonName: string | null;
   notes: string | null;
   customer: { nameEn: string; nameAr: string; code: string };
   lines: Array<Record<string, unknown>>;
@@ -1269,8 +1756,11 @@ function toSalesOrderDto(o: {
     subtotalMinor: o.subtotalMinor,
     discountMinor: o.discountMinor,
     taxMinor: o.taxMinor,
+    roundingMinor: o.roundingMinor,
     totalMinor: o.totalMinor,
     currency: o.currency,
+    paymentMethod: o.paymentMethod,
+    salespersonName: o.salespersonName,
     notes: o.notes,
     lines: o.lines,
   };
@@ -1279,6 +1769,7 @@ function toSalesOrderDto(o: {
 function toInvoiceDto(inv: {
   id: string;
   invoiceNumber: string;
+  branchId: string | null;
   customerId: string;
   orderId: string | null;
   status: string;
@@ -1287,9 +1778,13 @@ function toInvoiceDto(inv: {
   subtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
+  roundingMinor: number;
   totalMinor: number;
   amountPaidMinor: number;
   currency: string;
+  paymentMethod: string;
+  salespersonName: string | null;
+  paymentReference: string | null;
   notes: string | null;
   journalEntryId: string | null;
   customer: { nameEn: string; nameAr: string; code: string };
@@ -1298,6 +1793,7 @@ function toInvoiceDto(inv: {
   return {
     id: inv.id,
     invoiceNumber: inv.invoiceNumber,
+    branchId: inv.branchId,
     customerId: inv.customerId,
     customerNameEn: inv.customer.nameEn,
     customerNameAr: inv.customer.nameAr,
@@ -1308,10 +1804,14 @@ function toInvoiceDto(inv: {
     subtotalMinor: inv.subtotalMinor,
     discountMinor: inv.discountMinor,
     taxMinor: inv.taxMinor,
+    roundingMinor: inv.roundingMinor,
     totalMinor: inv.totalMinor,
     amountPaidMinor: inv.amountPaidMinor,
     outstandingMinor: inv.totalMinor - inv.amountPaidMinor,
     currency: inv.currency,
+    paymentMethod: inv.paymentMethod,
+    salespersonName: inv.salespersonName,
+    paymentReference: inv.paymentReference,
     notes: inv.notes,
     journalEntryId: inv.journalEntryId,
     lines: inv.lines,
@@ -1327,6 +1827,7 @@ function toCreditNoteDto(n: {
   issueDate: Date;
   subtotalMinor: number;
   taxMinor: number;
+  roundingMinor: number;
   totalMinor: number;
   reason: string | null;
   currency: string;
@@ -1345,6 +1846,7 @@ function toCreditNoteDto(n: {
     issueDate: n.issueDate.toISOString(),
     subtotalMinor: n.subtotalMinor,
     taxMinor: n.taxMinor,
+    roundingMinor: n.roundingMinor,
     totalMinor: n.totalMinor,
     reason: n.reason,
     currency: n.currency,
@@ -1395,6 +1897,7 @@ function toPosSaleDto(s: {
   subtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
+  roundingMinor: number;
   totalMinor: number;
   paidMinor: number;
   changeMinor: number;
@@ -1410,6 +1913,7 @@ function toPosSaleDto(s: {
     subtotalMinor: s.subtotalMinor,
     discountMinor: s.discountMinor,
     taxMinor: s.taxMinor,
+    roundingMinor: s.roundingMinor,
     totalMinor: s.totalMinor,
     paidMinor: s.paidMinor,
     changeMinor: s.changeMinor,

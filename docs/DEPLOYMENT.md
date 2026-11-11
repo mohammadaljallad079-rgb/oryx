@@ -93,24 +93,72 @@ Rules:
   database.
 - `pnpm db:reset` **destroys all data**. It exists for local development only.
 - Take a backup immediately before applying migrations.
-- The seed script (`pnpm db:seed`) is idempotent and safe to re-run, but review
-  what it creates before running it against production: it inserts the module
-  catalog, three example plans, ORYX internal companies, roles and CMS
-  baseline records. It also creates a Super Admin from
-  `SEED_SUPER_ADMIN_EMAIL` / `SEED_SUPER_ADMIN_PASSWORD`.
+- **Never run `pnpm db:seed` against production.** It inserts demo tenants,
+  example companies, sample ERP records and a seeded Super Admin with a known
+  password — the exact fictional data correction #8 exists to keep out. It is a
+  development and test fixture. Use `pnpm production:init` (below) instead.
 
 ### First production deploy
 
 1. Apply migrations.
-2. Run the seed to install the module catalog and roles, but set
-   `SEED_SUPER_ADMIN_EMAIL` to the real owner address and
-   `SEED_SUPER_ADMIN_PASSWORD` to a strong, unique password.
+2. Bootstrap the production catalogue and the first principal:
+
+   ```bash
+   DATABASE_URL=postgresql://… \
+     node packages/database/scripts/production-init.mjs \
+       --email owner@example.com \
+       --name-en "Owner" \
+       --name-ar "المالك" \
+       --authorize \
+       --password-file /root/oryx-owner-password.txt
+   ```
+
+   `production:init` writes **only** the platform catalogue (modules, plans,
+   the platform role, service areas, market settings) and one real Super Admin.
+   It writes no tenants, branches, staff, invoices or CMS content, and it is
+   idempotent — re-running it updates the catalogue and leaves the existing
+   Super Admin's password alone unless `--rotate-password` is given. It refuses
+   to run without `--authorize`.
+
+   On a Docker deployment, run it **inside the API container** instead, so it
+   reaches PostgreSQL over the internal network and the shipped script and its
+   workspace links are used:
+
+   ```bash
+   docker compose -p oryx -f deploy/docker-compose.production.yml \
+     --env-file .env.production \
+     exec -T api node packages/database/scripts/production-init.mjs \
+       --email owner@example.com \
+       --name-en "Owner" \
+       --name-ar "المالك" \
+       --authorize \
+       --password-file /tmp/oryx-owner-password.txt
+   ```
+
+   The file lands inside the container at `/tmp/oryx-owner-password.txt`. Copy
+   it out, store it in the secret manager, then remove it:
+
+   ```bash
+   docker compose -p oryx -f deploy/docker-compose.production.yml \
+     --env-file .env.production \
+     exec -T api cat /tmp/oryx-owner-password.txt > /root/oryx-owner-password.txt
+   docker compose -p oryx -f deploy/docker-compose.production.yml \
+     --env-file .env.production exec -T api rm -f /tmp/oryx-owner-password.txt
+   ```
+
+   Keep `MFA_REQUIRE_SUPER_ADMIN=false` for this first sign-in, enrol TOTP at
+   **Security → Two-factor authentication**, then set it to `true` and restart
+   the API. The enrollment routes stay reachable while the account still owes a
+   second factor, so the requirement never locks the owner out; every other
+   platform route is refused until enrollment completes.
+
 3. Sign in as that Super Admin and immediately:
    - change the password,
    - enroll TOTP MFA,
    - store the recovery codes in the secret manager,
-   - create the real companies and plans,
-   - deactivate or delete the demo tenants (they are flagged `SEED_DEMO_DATA`).
+   - create the real companies and plans.
+
+   There are no demo tenants to delete: `production:init` never creates one.
 
 ---
 
@@ -193,7 +241,10 @@ Notes:
 
 ## 6. Removing development defaults
 
-Before the first real use:
+A database bootstrapped with `production:init` has no development defaults to
+remove — it never creates a demo tenant, an example company or a seeded
+password. The table below applies **only** if a database was created with the
+development seed (`pnpm db:seed`) by mistake, which section 3 forbids.
 
 | Item | Action |
 | --- | --- |
@@ -202,6 +253,13 @@ Before the first real use:
 | Demo tenants (`DEMO-ALNOOR`, `DEMO-GULFAUTO`) | Archive them; they are flagged `SEED_DEMO_DATA` |
 | Swagger UI (`/api/docs`) | Restrict to an internal network or disable |
 | `.env` | Must never be committed. Verify with `git check-ignore -v .env` |
+
+Confirm the database is production-shaped:
+
+```bash
+# Expect 0 rows. Any other number means a development seed was run.
+psql "$DATABASE_URL" -tAc 'SELECT count(*) FROM "Company" WHERE "code" LIKE '\''DEMO-%'\'';'
+```
 
 Confirm no secret is tracked:
 
@@ -219,7 +277,6 @@ git ls-files | grep -E '(^|/)\.env$' && echo 'SECRET FILE TRACKED' || echo 'clea
 | `JWT_ACCESS_SECRET` | Secret manager | Every access token is invalidated; users re-authenticate silently via refresh |
 | `JWT_REFRESH_SECRET` | Secret manager | Every session ends; all users sign in again |
 | `MFA_ENCRYPTION_KEY` | Secret manager | **Every MFA enrollment becomes unreadable.** Users must re-enroll. Rotate only during a maintenance window, and keep the previous key available for a transition period if you implement key versioning |
-| `SEED_SUPER_ADMIN_PASSWORD` | Use once, then remove | None |
 
 Guidance:
 
@@ -285,8 +342,8 @@ Run through this after every deployment.
       company
 - [ ] `GET /api/v1/audit-logs?companyId=<other tenant>` as a company admin
       returns 403
-- [ ] The dashboard shows real figures, and no demo notice once demo tenants are
-      archived
+- [ ] The dashboard shows real figures and no demo notice (a `production:init`
+      database has no demo tenants)
 - [ ] Both themes and both languages render without layout breakage at 390 px
 - [ ] The audit log contains an entry for the sign-in above
 - [ ] No `.env` file and no secret appears in `git ls-files`

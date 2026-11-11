@@ -245,6 +245,151 @@ export const Icons = {
       <circle cx="16.5" cy="14.5" r="1.2" />
     </Base>
   ),
+  chevronsLeft: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M11 17l-5-5 5-5" />
+      <path d="M18 17l-5-5 5-5" />
+    </Base>
+  ),
+  chevronsRight: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M13 7l5 5-5 5" />
+      <path d="M6 7l5 5-5 5" />
+    </Base>
+  ),
+  calendar: (p: IconProps) => (
+    <Base {...p}>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </Base>
+  ),
+  store: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M4 10v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9" />
+      <path d="M3 6.5 4.6 3h14.8L21 6.5a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0Z" />
+      <path d="M9 20v-5h6v5" />
+    </Base>
+  ),
+  eye: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </Base>
+  ),
+  eyeOff: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M10.6 6.1A9.7 9.7 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-3 3.7" />
+      <path d="M6.3 7.6A17 17 0 0 0 2.5 12S6 18 12 18a9.6 9.6 0 0 0 4-.9" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+      <path d="m3 3 18 18" />
+    </Base>
+  ),
+  tag: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M3.5 11.5V4.5a1 1 0 0 1 1-1h7l9 9a1 1 0 0 1 0 1.4l-6.6 6.6a1 1 0 0 1-1.4 0Z" />
+      <circle cx="7.5" cy="7.5" r="1.4" />
+    </Base>
+  ),
+  bell: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z" />
+      <path d="M10 19a2 2 0 0 0 4 0" />
+    </Base>
+  ),
+  clock: (p: IconProps) => (
+    <Base {...p}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </Base>
+  ),
+  star: (p: IconProps) => (
+    <Base {...p}>
+      <path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1.1 5.9L12 16.9l-5.3 2.8 1.1-5.9L3.5 9.7l5.9-.8Z" />
+    </Base>
+  ),
+  target: (p: IconProps) => (
+    <Base {...p}>
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="4.5" />
+      <circle cx="12" cy="12" r="1" />
+    </Base>
+  ),
+  trend: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M3.5 16.5 9 11l3.5 3.5L20.5 6.5" />
+      <path d="M15 6.5h5.5V12" />
+    </Base>
+  ),
+  wallet: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h11a2 2 0 0 1 2 2v.5" />
+      <rect x="3.5" y="7.5" width="17" height="11" rx="2" />
+      <path d="M16 13h1.5" />
+    </Base>
+  ),
+  folder: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M3.5 6.5a1.5 1.5 0 0 1 1.5-1.5h4l2 2.5h8a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5Z" />
+    </Base>
+  ),
+  paperclip: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M20 11.5 12.2 19.3a4.2 4.2 0 0 1-6-6l7.6-7.6a2.8 2.8 0 0 1 4 4l-7.6 7.6a1.4 1.4 0 0 1-2-2l7-7" />
+    </Base>
+  ),
+  list: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M8.5 6.5h11M8.5 12h11M8.5 17.5h11" />
+      <path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01" />
+    </Base>
+  ),
+  refresh: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M20 11a8 8 0 1 0-.6 4" />
+      <path d="M20 4.5V11h-6.5" />
+    </Base>
+  ),
+  download: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M12 3.5v11" />
+      <path d="m7.5 10 4.5 4.5 4.5-4.5" />
+      <path d="M4.5 19.5h15" />
+    </Base>
+  ),
+  print: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M7 9V3.5h10V9" />
+      <rect x="4" y="9" width="16" height="7.5" rx="1.5" />
+      <path d="M7 16.5h10V21H7z" />
+    </Base>
+  ),
+  edit: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M4 20h4l10-10-4-4L4 16z" />
+      <path d="m14 6 4 4" />
+    </Base>
+  ),
+  trash: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M4.5 6.5h15" />
+      <path d="M9.5 6.5V4h5v2.5" />
+      <path d="M6.5 6.5 7.5 20h9l1-13.5" />
+      <path d="M10.5 10v6M13.5 10v6" />
+    </Base>
+  ),
+  sparkles: (p: IconProps) => (
+    <Base {...p}>
+      <path d="m12 3.5 1.6 4.4 4.4 1.6-4.4 1.6L12 15.5l-1.6-4.4L6 9.5l4.4-1.6Z" />
+      <path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8Z" />
+    </Base>
+  ),
+  archive: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M4 7.5h16v12H4z" />
+      <path d="M3 4.5h18v3H3z" />
+      <path d="M9.5 12h5" />
+    </Base>
+  ),
 } as const;
 
 export type IconName = keyof typeof Icons;

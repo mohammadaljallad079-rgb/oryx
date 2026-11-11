@@ -15,7 +15,7 @@ function ApplicationCmsPageInner() {
   const templates = useAsync(() => api.notificationTemplates(), []);
 
   return (
-    <div className="flex flex-col gap-5" data-testid="application-page">
+    <div className="flex flex-col gap-4" data-testid="application-page">
       <SectionHeader title={t('app.title')} subtitle={t('app.subtitle')} />
 
       <div

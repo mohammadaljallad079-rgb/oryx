@@ -40,7 +40,7 @@ test.describe('responsive dashboard', () => {
       await expect(page.getByTestId('dashboard')).toBeVisible();
 
       expect(await hasHorizontalOverflow(page), `${vp.name} must not overflow horizontally`).toBe(false);
-      await expect(page.getByTestId('kpi-row')).toBeVisible();
+      await expect(page.getByTestId('dashboard-hero')).toBeVisible();
       await expect(page.getByTestId('module-tiles')).toBeVisible();
     });
   }
@@ -111,12 +111,14 @@ test.describe('bilingual and themed rendering', () => {
 
       await expect(page.locator('html')).toHaveAttribute('data-dir', combo.locale === 'ar' ? 'rtl' : 'ltr');
       await expect(page.locator('html')).toHaveAttribute('data-theme', combo.theme);
-      await expect(page.getByTestId('kpi-row')).toBeVisible();
+      await expect(page.getByTestId('dashboard-hero')).toBeVisible();
       await expect(page.getByTestId('module-tiles')).toBeVisible();
 
-      // Charts must remain rendered (not blank) in every combination. The
-      // branch chart is a div-based bar chart; the module chart is SVG. The data
-      // arrives asynchronously, so poll rather than sampling immediately.
+      // Charts must remain rendered (not blank) in every combination. They live
+      // on لوحة المعلومات; the branch chart is a div-based bar chart and the
+      // module chart is SVG. The data arrives asynchronously, so poll rather
+      // than sampling immediately.
+      await page.goto('/dashboard/overview');
       await expect
         .poll(
           async () => {

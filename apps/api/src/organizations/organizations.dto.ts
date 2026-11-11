@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -113,8 +114,52 @@ export class UpdateCompanyDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(3)
+  functionalCurrency?: string;
+
+  /**
+   * Default tax rate in basis points (1500 = 15%). Bounded to 0–10000 so a
+   * mistyped percentage cannot be stored as 150000 basis points.
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(10000)
+  defaultTaxRateBp?: number;
+
+  /**
+   * Optional whole-amount cash rounding for issued documents. `NONE` keeps the
+   * exact total; the other modes snap it to the nearest whole or half unit and
+   * post the small difference to the rounding account.
+   */
+  @IsOptional()
+  @IsIn(['NONE', 'NEAREST_WHOLE', 'NEAREST_HALF'])
+  roundingMode?: 'NONE' | 'NEAREST_WHOLE' | 'NEAREST_HALF';
+
+  /**
+   * The language an issued document is written in, which sets its reading
+   * direction: `ar` prints right-to-left, `en` left-to-right. Both languages'
+   * labels are always printed; this only chooses the flow.
+   */
+  @IsOptional()
+  @IsIn(['ar', 'en'])
+  documentLocale?: 'ar' | 'en';
+
+  @IsOptional()
+  @IsString()
   @MaxLength(40)
   taxNumber?: string;
+
+  /**
+   * The commercial-registration number printed on issued documents' footer
+   * (the reference invoice prints "CR 146375-2"). Stored on the company so a
+   * document reprint carries the same registration the approved sheet does.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  crNumber?: string;
 
   @IsOptional()
   @IsString()
@@ -134,6 +179,15 @@ export class SetCompanyStatusDto {
   @IsString()
   @MaxLength(300)
   reason?: string;
+}
+
+/**
+ * Body for the irreversible company delete. The confirmation flag is required
+ * and must be `true`, so an accidental `DELETE` cannot erase a tenant.
+ */
+export class DeleteCompanyDto {
+  @IsBoolean()
+  confirm!: boolean;
 }
 
 export class CreateBranchDto {

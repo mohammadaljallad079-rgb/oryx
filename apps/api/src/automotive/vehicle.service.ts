@@ -5,9 +5,11 @@ import { AuditService } from '../common/audit.service';
 import { AccountingPostingService } from '../common/accounting-posting.service';
 import { DocumentSequenceService } from '../common/document-sequence.service';
 import { ErpContextService } from '../common/erp-context.service';
+import { MediaStorageService, sniffMime } from '../cms/media-storage.service';
 import { SalesService } from '../sales/sales.service';
 import { computeDocumentTotals } from '../common/document-totals';
 import { badRequest, conflict, ERROR_CODES, forbidden, notFound } from '../common/errors';
+import { VehicleOcrService } from './vehicle-ocr.service';
 import type { ActorContext } from '../organizations/organizations.service';
 import type { RequestPrincipal } from '../auth/auth.decorators';
 import type {
@@ -47,7 +49,9 @@ export class VehicleService {
     private readonly posting: AccountingPostingService,
     private readonly sequences: DocumentSequenceService,
     private readonly context: ErpContextService,
+    private readonly storage: MediaStorageService,
     private readonly sales: SalesService,
+    private readonly ocr: VehicleOcrService,
   ) {}
 
   // ------------------------------------------------------------------ vehicles
@@ -153,6 +157,52 @@ export class VehicleService {
     return toVehicleDto(updated);
   }
 
+  /**
+   * Permanently delete a vehicle and its own records.
+   *
+   * A vehicle is only removable while nothing financial or historical depends on
+   * it. An inspection session, job card, warranty, booking or RFQ is a record of
+   * work done against that chassis, so a vehicle carrying any of them must be
+   * deactivated (status `INACTIVE`/`SOLD`) rather than deleted — deleting would
+   * destroy the linked history. Mileage records, documents and customer-app
+   * photographs are the vehicle's own and cascade away with it.
+   */
+  async deleteVehicle(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const vehicle = await this.prisma.vehicle.findFirst({ where: { id, companyId } });
+    if (!vehicle) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Vehicle not found.');
+
+    const [sessions, jobCards, warranties, bookings, maintenance, rfqs, recovery, fleet] = await Promise.all([
+      this.prisma.inspectionSession.count({ where: { vehicleId: id } }),
+      this.prisma.jobCard.count({ where: { vehicleId: id } }),
+      this.prisma.warrantyRecord.count({ where: { vehicleId: id } }),
+      this.prisma.inspectionBooking.count({ where: { vehicleId: id } }),
+      this.prisma.maintenanceBooking.count({ where: { vehicleId: id } }),
+      this.prisma.customerRfq.count({ where: { vehicleId: id } }),
+      this.prisma.recoveryRequest.count({ where: { vehicleId: id } }),
+      this.prisma.fleetVehicle.count({ where: { vehicleId: id } }),
+    ]);
+    const blockers = sessions + jobCards + warranties + bookings + maintenance + rfqs + recovery + fleet;
+    if (blockers > 0) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This vehicle has inspections, job cards, warranties, bookings or requests and cannot be deleted. Set its status to inactive or sold instead so the history is preserved.',
+      );
+    }
+
+    await this.prisma.vehicle.delete({ where: { id } });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'automotive.vehicle_deleted',
+      targetType: 'VEHICLE',
+      targetId: id,
+      summary: `Deleted vehicle ${vehicle.vin}`,
+      metadata: { vin: vehicle.vin, plateNumber: vehicle.plateNumber ?? null },
+    });
+    return { id, deleted: true };
+  }
+
   /** Record mileage; the vehicle's current mileage only ever increases. */
   async recordMileage(id: string, dto: RecordMileageDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
@@ -174,17 +224,120 @@ export class VehicleService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     await this.assertVehicle(companyId, id);
     const rows = await this.prisma.vehicleDocument.findMany({ where: { companyId, vehicleId: id }, orderBy: { createdAt: 'desc' } });
-    return { items: rows, total: rows.length, page: 1, pageSize: rows.length };
+    return { items: rows.map((r) => this.documentDto(r)), total: rows.length, page: 1, pageSize: rows.length };
   }
 
-  async addVehicleDocument(id: string, dto: VehicleDocumentDto, principal: RequestPrincipal, actor: ActorContext) {
+  /**
+   * Attach a document to a vehicle, optionally with a scanned image.
+   *
+   * A `fileRef` the caller supplies is rejected: the only value that may sit
+   * there is a `CmsMediaAsset` id this service just created from a re-encoded
+   * upload, so a client cannot point the row at an arbitrary asset or path.
+   */
+  async addVehicleDocument(
+    id: string,
+    dto: VehicleDocumentDto,
+    principal: RequestPrincipal,
+    actor: ActorContext,
+    file?: { buffer: Buffer; originalname: string },
+  ) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     await this.assertVehicle(companyId, id);
-    const doc = await this.prisma.vehicleDocument.create({
-      data: { companyId, vehicleId: id, category: dto.category, number: dto.number ?? null, expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null, fileRef: dto.fileRef ?? null },
+
+    const stored = file && file.buffer.length > 0 ? await this.storage.store(file.buffer) : null;
+
+    const doc = await this.prisma.$transaction(async (tx) => {
+      let fileRef: string | null = null;
+      if (stored) {
+        const asset = await tx.cmsMediaAsset.create({
+          data: {
+            originalName: file!.originalname.slice(0, 255),
+            storageKey: stored.storageKey,
+            mimeType: stored.mimeType,
+            byteSize: stored.byteSize,
+            width: stored.width,
+            height: stored.height,
+            dominantColor: stored.dominantColor,
+            blurDataUrl: stored.blurDataUrl,
+            variants: stored.variants as never,
+            caption: `${dto.category} — vehicle document`,
+          },
+        });
+        fileRef = asset.id;
+      }
+      return tx.vehicleDocument.create({
+        data: {
+          companyId,
+          vehicleId: id,
+          category: dto.category,
+          number: dto.number ?? null,
+          expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+          fileRef,
+        },
+      });
     });
+
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.vehicle_document_added', targetType: 'VEHICLE', targetId: id, summary: `Added vehicle document ${dto.category}` });
-    return doc;
+    return this.documentDto(doc);
+  }
+
+  async removeVehicleDocument(id: string, documentId: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    await this.assertVehicle(companyId, id);
+    const doc = await this.prisma.vehicleDocument.findFirst({ where: { id: documentId, vehicleId: id, companyId } });
+    if (!doc) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Vehicle document not found.');
+    await this.prisma.vehicleDocument.delete({ where: { id: documentId } });
+    // The media asset stays in the library: it may be referenced elsewhere.
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.vehicle_document_removed', targetType: 'VEHICLE', targetId: id, summary: `Removed vehicle document ${doc.category}` });
+    return { removed: true };
+  }
+
+  /**
+   * Read a registration-card or insurance scan and return suggested fields.
+   *
+   * Nothing is persisted. The suggestion is returned to the form, where an
+   * operator reviews and edits it before saving through `addVehicleDocument` —
+   * the only path that writes a document. The scan bytes are held in memory for
+   * the duration of the call and are never stored by this method, so a
+   * discarded extraction leaves no orphan asset behind.
+   */
+  async extractVehicleDocument(
+    id: string,
+    dto: { category: string },
+    principal: RequestPrincipal,
+    file?: { buffer: Buffer; originalname: string; mimetype: string },
+  ) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    await this.assertVehicle(companyId, id);
+
+    if (!file || file.buffer.length === 0) {
+      throw badRequest(ERROR_CODES.AI_INPUT_INVALID, 'Attach a scan to extract its fields.');
+    }
+    const mime = sniffMime(file.buffer);
+    if (!mime) {
+      throw badRequest(
+        ERROR_CODES.AI_INPUT_INVALID,
+        'The scan must be a JPEG, PNG, WebP or AVIF image.',
+      );
+    }
+
+    const result = await this.ocr.extract(
+      { buffer: file.buffer, mimeType: mime, category: dto.category },
+      companyId,
+    );
+
+    // The extraction is a read, but it is recorded so an operator can see who
+    // read which scan; the suggestion itself is never stored.
+    await this.audit.record({
+      actorUserId: principal.userId,
+      companyId,
+      action: 'automotive.vehicle_document_ocr',
+      targetType: 'VEHICLE',
+      targetId: id,
+      summary: `OCR extraction on a ${dto.category} scan (${result.configured ? `${result.fields.length} field(s)` : 'provider unconfigured'})`,
+    });
+
+    return result;
   }
 
   // -------------------------------------------------------------- inspections
@@ -213,6 +366,30 @@ export class VehicleService {
     });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.inspection_service_created', targetType: 'INSPECTION_SERVICE', targetId: service.id, summary: `Created inspection service ${service.code}` });
     return service;
+  }
+
+  /**
+   * Delete an inspection service that nothing has booked yet.
+   *
+   * A service is a catalogue entry: once a booking references it, deleting it
+   * would break that booking's history, so it is deactivated (`isActive: false`)
+   * instead. The check is explicit because the foreign key is `Restrict`, which
+   * would otherwise surface as an opaque database error.
+   */
+  async deleteInspectionService(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const service = await this.prisma.inspectionService.findFirst({ where: { id, companyId } });
+    if (!service) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection service not found.');
+    const bookings = await this.prisma.inspectionBooking.count({ where: { serviceId: id } });
+    if (bookings > 0) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'This service has bookings and cannot be deleted. Deactivate it instead so past bookings keep their record.',
+      );
+    }
+    await this.prisma.inspectionService.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.inspection_service_deleted', targetType: 'INSPECTION_SERVICE', targetId: id, summary: `Deleted inspection service ${service.code}` });
+    return { id, deleted: true };
   }
 
   async addChecklistItem(dto: CreateChecklistItemDto, principal: RequestPrincipal, actor: ActorContext) {
@@ -291,6 +468,40 @@ export class VehicleService {
     }
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.inspection_updated', targetType: 'INSPECTION_BOOKING', targetId: id, summary: `Inspection ${updated.bookingNumber} -> ${updated.status}` });
     return toInspectionBookingDto(updated);
+  }
+
+  /**
+   * Delete an inspection booking that produced nothing.
+   *
+   * A booking that was invoiced, completed, has recorded findings, an approved
+   * report, or a structured inspection session created from it is history and
+   * must be cancelled rather than deleted. A booking with none of those is a
+   * scheduling entry that was created by mistake, so it can go.
+   */
+  async deleteInspectionBooking(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const booking = await this.prisma.inspectionBooking.findFirst({
+      where: { id, companyId },
+      include: { report: true, session: { select: { id: true } }, _count: { select: { findings: true } } },
+    });
+    if (!booking) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection booking not found.');
+    const reportStatus = booking.report?.status ?? null;
+    const locked =
+      booking.status === 'COMPLETED' ||
+      booking.status === 'CANCELLED' ||
+      Boolean(booking.report) ||
+      Boolean(booking.session) ||
+      booking._count.findings > 0;
+    if (locked) {
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        `This booking cannot be deleted (status ${booking.status}${reportStatus ? `, report ${reportStatus}` : ''}). Cancel it instead so the history is preserved.`,
+      );
+    }
+
+    await this.prisma.inspectionBooking.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.inspection_booking_deleted', targetType: 'INSPECTION_BOOKING', targetId: id, summary: `Deleted inspection booking ${booking.bookingNumber}` });
+    return { id, deleted: true };
   }
 
   /** Record findings for a booking, replacing any previous set. */
@@ -435,6 +646,34 @@ export class VehicleService {
     const vehicle = await this.prisma.vehicle.findFirst({ where: { id: vehicleId, companyId } });
     if (!vehicle) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Vehicle not found in this company.');
     return vehicle;
+  }
+
+  /**
+   * The document shape the admin client reads.
+   *
+   * `fileRef` is the `CmsMediaAsset` id, and the servable URL is derived from it
+   * here rather than stored, so a re-rendered or re-cropped asset is picked up
+   * without a data migration and a caller never receives a raw storage path.
+   */
+  private documentDto(row: {
+    id: string;
+    vehicleId: string;
+    category: string;
+    number: string | null;
+    expiresAt: Date | null;
+    fileRef: string | null;
+    createdAt: Date;
+  }) {
+    return {
+      id: row.id,
+      vehicleId: row.vehicleId,
+      category: row.category,
+      number: row.number,
+      expiresAt: row.expiresAt,
+      fileRef: row.fileRef,
+      fileUrl: row.fileRef ? `/api/v1/cms/media/${row.fileRef}/file?variant=card` : null,
+      createdAt: row.createdAt,
+    };
   }
 
   private async assertCustomer(companyId: string, customerId: string) {

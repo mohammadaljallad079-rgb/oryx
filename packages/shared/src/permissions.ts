@@ -54,6 +54,7 @@ export const PERMISSIONS: PermissionDefinition[] = [
   P('platform.company.read', 'Platform', 'View all companies', 'عرض جميع الشركات', 'PLATFORM', false, 'Read every company across the platform.'),
   P('platform.company.update', 'Platform', 'Update company', 'تعديل الشركة', 'PLATFORM', false, 'Edit company profile and hierarchy.'),
   P('platform.company.suspend', 'Platform', 'Suspend/activate company', 'إيقاف/تنشيط الشركة', 'PLATFORM', false, 'Change company lifecycle status.'),
+  P('platform.company.delete', 'Platform', 'Delete company', 'حذف الشركة', 'PLATFORM', false, 'Permanently remove a company and every record it owns.'),
   P('platform.branch.manage', 'Platform', 'Manage all branches', 'إدارة جميع الفروع', 'PLATFORM', false, 'Create and edit branches for any company.'),
   P('platform.user.read', 'Platform', 'View all users', 'عرض جميع المستخدمين', 'PLATFORM', false, 'Read user accounts across tenants.'),
   P('platform.user.manage', 'Platform', 'Manage platform users', 'إدارة مستخدمي المنصة', 'PLATFORM', false, 'Invite and administer platform-level users.'),
@@ -68,6 +69,13 @@ export const PERMISSIONS: PermissionDefinition[] = [
   P('platform.integration.manage', 'Platform', 'Manage integrations', 'إدارة التكاملات', 'PLATFORM', false, 'Configure, enable and disable external provider credentials.'),
   P('platform.integration.verify', 'Platform', 'Verify integrations', 'التحقق من التكاملات', 'PLATFORM', false, 'Run a live connection test against an external provider.'),
   P('platform.support.access', 'Platform', 'Support access to a tenant', 'الدخول الدعم لشركة', 'PLATFORM', false, 'Open an explicit, audited, time-bounded support session into a tenant.'),
+  P('platform.settings.read', 'Platform', 'View platform settings', 'عرض إعدادات المنصة', 'PLATFORM', false, 'Read market configuration and the service-area catalogue.'),
+  P('platform.settings.manage', 'Platform', 'Manage platform settings', 'إدارة إعدادات المنصة', 'PLATFORM', false, 'Change market configuration and manage service areas.'),
+  P('platform.ecosystem.read', 'Platform', 'View ecosystem overview', 'عرض نظرة عامة على المنظومة', 'PLATFORM', false, 'Read platform-wide operational KPIs across every tenant.'),
+  P('platform.coupon.read', 'Platform', 'View coupons', 'عرض القسائم', 'PLATFORM', false, 'Read platform discount coupons.'),
+  P('platform.coupon.manage', 'Platform', 'Manage coupons', 'إدارة القسائم', 'PLATFORM', false, 'Create, edit and withdraw platform discount coupons.'),
+  P('platform.notification.read', 'Platform', 'View notification centre', 'عرض مركز الإشعارات', 'PLATFORM', false, 'Read the delivery log and notification templates.'),
+  P('platform.notification.manage', 'Platform', 'Manage notifications', 'إدارة الإشعارات', 'PLATFORM', false, 'Send announcements and manage notification templates.'),
 
   // ----------------------------------------------------------------- company
   P('company.read', 'Company', 'View company', 'عرض الشركة', 'COMPANY', true, 'Read own company profile.'),
@@ -172,6 +180,11 @@ export const PERMISSIONS: PermissionDefinition[] = [
   P('erp.hr.leave.request', 'ERP', 'Request leave', 'تقديم طلب إجازة', 'COMPANY', true, 'Submit a leave request.', 'human_resources'),
   P('erp.hr.leave.approve', 'ERP', 'Approve leave', 'اعتماد الإجازات', 'COMPANY', true, 'Approve or reject leave requests.', 'human_resources'),
   P('erp.hr.attendance.manage', 'ERP', 'Manage attendance & shifts', 'إدارة الحضور والورديات', 'COMPANY', true, 'Record attendance, overtime and shift assignments.', 'human_resources'),
+  P('erp.hr.attendance.self', 'ERP', 'Self check-in & out', 'تسجيل الحضور والانصراف الذاتي', 'COMPANY', true, 'Clock in and out for your own employee record.', 'human_resources'),
+  P('erp.hr.attendance.policy', 'ERP', 'Manage attendance policy & work sites', 'إدارة سياسة الحضور ومواقع العمل', 'COMPANY', true, 'Configure grace, overtime, deduction policy and geofenced work sites.', 'human_resources'),
+  P('erp.hr.worksite.manage', 'ERP', 'Manage work sites', 'إدارة مواقع العمل', 'COMPANY', true, 'Create and edit geofenced work sites and their verification methods.', 'human_resources'),
+  P('erp.hr.payslip.read', 'ERP', 'View payslips', 'عرض قسائم الرواتب', 'COMPANY', true, 'Read payslips and download the payslip PDF.', 'human_resources'),
+  P('erp.hr.payslip.self', 'ERP', 'View own payslips', 'عرض قسائم راتبي', 'COMPANY', true, 'View and download your own payslips.', 'human_resources'),
   P('erp.hr.salary.manage', 'ERP', 'Manage salary structures', 'إدارة هياكل الرواتب', 'COMPANY', true, 'Define salary structures, allowances and deductions.', 'human_resources'),
   P('erp.hr.payroll.run', 'ERP', 'Run payroll', 'تشغيل الرواتب', 'COMPANY', true, 'Create and calculate payroll runs.', 'human_resources'),
   P('erp.hr.payroll.approve', 'ERP', 'Approve & post payroll', 'اعتماد وترحيل الرواتب', 'COMPANY', true, 'Approve, post and lock payroll runs.', 'human_resources'),
@@ -252,6 +265,51 @@ export const DELEGABLE_PERMISSION_CODES: readonly string[] = PERMISSIONS.filter(
 export const PLATFORM_PERMISSION_CODES: readonly string[] = PERMISSIONS.filter(
   (p) => p.scope === 'PLATFORM',
 ).map((p) => p.code);
+
+/**
+ * The permission set the platform Super Admin role must hold: the whole
+ * catalogue.
+ *
+ * It is defined here, once, so the seed, the production bootstrap and the repair
+ * script cannot drift apart. A Super Admin is not "granted a handful of
+ * permissions" — it holds the catalogue — and `resolveEffectivePermissions` is
+ * what narrows that set to the PLATFORM-scope codes (plus, once a tenant is
+ * selected, the tenant's licensed company-scope codes). Seeding a partial set
+ * is what produced `Missing any of the required permissions` on the dashboard,
+ * because the dashboard is reachable through either `erp.dashboard.read`
+ * (COMPANY) or `platform.company.read` (PLATFORM) and a drifted role held
+ * neither.
+ */
+export const PLATFORM_SUPER_ADMIN_PERMISSION_CODES: readonly string[] = PERMISSION_CODES;
+
+export interface PermissionReconciliation {
+  /** Catalogue codes the role should hold but does not. */
+  grant: string[];
+  /** Stored codes the role should not hold, including codes the catalogue dropped. */
+  revoke: string[];
+  /** True when the stored set already equals the expected set. */
+  inSync: boolean;
+}
+
+/**
+ * Diff a stored role grant against the expected set.
+ *
+ * Reconciliation is deliberately two-directional. An upsert-only loop (add the
+ * missing codes, never remove anything) cannot repair a role that has already
+ * drifted, and it leaves codes from a permission the catalogue has since
+ * removed granting access that no longer has a definition. `revoke` is
+ * therefore as important as `grant`.
+ */
+export function reconcilePermissions(
+  current: readonly string[],
+  expected: readonly string[] = PERMISSION_CODES,
+): PermissionReconciliation {
+  const have = new Set(current);
+  const want = new Set(expected);
+  const grant = expected.filter((code) => !have.has(code));
+  const revoke = current.filter((code) => !want.has(code));
+  return { grant, revoke, inSync: grant.length === 0 && revoke.length === 0 };
+}
 
 export const PERMISSION_GROUPS: readonly string[] = Array.from(new Set(PERMISSIONS.map((p) => p.group)));
 

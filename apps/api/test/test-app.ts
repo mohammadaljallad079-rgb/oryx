@@ -306,7 +306,11 @@ export async function cleanupFixtures(prisma: PrismaService): Promise<void> {
   await prisma.payrollPeriod.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.salaryComponent.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.salaryStructure.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.salaryChangeLog.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.attendanceBreak.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.attendanceRecord.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.workSite.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.attendancePolicy.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.employeeShift.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.shift.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.leaveRequest.deleteMany({ where: { companyId: { in: ids } } });
@@ -348,6 +352,7 @@ export async function cleanupFixtures(prisma: PrismaService): Promise<void> {
   await prisma.providerSettlement.deleteMany({ where: { provider: { OR: [{ providerCompanyId: { in: ids } }, { code: { startsWith: FIXTURE_PREFIX } }] } } });
   await prisma.marketplaceCommission.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.serviceRequest.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.providerOffer.deleteMany({ where: { provider: { OR: [{ providerCompanyId: { in: ids } }, { code: { startsWith: FIXTURE_PREFIX } }] } } });
   await prisma.providerServiceListing.deleteMany({ where: { provider: { OR: [{ providerCompanyId: { in: ids } }, { code: { startsWith: FIXTURE_PREFIX } }] } } });
   await prisma.marketplaceProvider.deleteMany({ where: { OR: [{ providerCompanyId: { in: ids } }, { code: { startsWith: FIXTURE_PREFIX } }] } });
   await prisma.warrantyRecord.deleteMany({ where: { companyId: { in: ids } } });
@@ -375,6 +380,8 @@ export async function cleanupFixtures(prisma: PrismaService): Promise<void> {
   await prisma.product.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.warehouse.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.account.deleteMany({ where: { companyId: { in: ids } } });
+  // Tenant-managed taxes belong to the company and are removed with it.
+  await prisma.taxRate.deleteMany({ where: { companyId: { in: ids } } });
 
   // Execution 04 — payments, bookings and the marketplace. A refund restricts
   // the deletion of its intent, so the payment rows go before the company.
@@ -392,6 +399,11 @@ export async function cleanupFixtures(prisma: PrismaService): Promise<void> {
     where: { resource: { companyId: { in: ids } } },
   });
   await prisma.bookingResource.deleteMany({ where: { companyId: { in: ids } } });
+
+  // Execution Phase 3 — issued documents reference the company and are
+  // children of it, so they go before the company row.
+  await prisma.officialDocumentEvent.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.officialDocument.deleteMany({ where: { companyId: { in: ids } } });
 
   await prisma.branch.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.auditLog.deleteMany({ where: { companyId: { in: ids } } });
@@ -416,6 +428,9 @@ export async function cleanupFixtures(prisma: PrismaService): Promise<void> {
     where: { provider: { code: { startsWith: FIXTURE_PREFIX } } },
   });
   await prisma.providerAvailability.deleteMany({
+    where: { provider: { code: { startsWith: FIXTURE_PREFIX } } },
+  });
+  await prisma.providerOffer.deleteMany({
     where: { provider: { code: { startsWith: FIXTURE_PREFIX } } },
   });
   await prisma.providerServiceListing.deleteMany({

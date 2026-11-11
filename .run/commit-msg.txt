@@ -1,0 +1,28 @@
+fix(dashboard): stop using the approved design reference as artwork
+
+The dashboard module tile still rendered `hero-automotive.jpg`, a crop of
+`docs/assets/ORYX Auto Services Dashboard.png` — the owner's approved design
+reference, which must never be used as product artwork. The hero banner was
+already switched to purpose-drawn vector art in the interrupted session; the
+module catalog was not.
+
+- generate-tile-art.py: add an original `tile-dashboard` motif (gold telemetry
+  gauge over a KPI strip) and emit it as SVG plus the 900x560 JPG that
+  `tileImageUrl()` resolves.
+- modules.ts: point the dashboard module at `tile-dashboard`.
+- branding.spec.ts: guard that the banner is `banner-automotive.svg`, that no
+  dashboard element references `hero-automotive`, and that the dashboard tile
+  decodes to a real image. Also scope the lockup assertions to `.oryx-sidebar`,
+  which is what they always meant — the hero now carries a second lockup.
+
+Also commits the interrupted session's dashboard work: the hero home page at
+`/dashboard`, the statistics overview at `/dashboard/overview`, the new banner
+artwork and its scrim, and the navigation and icon mapping they need.
+
+Verified live through the public ingress: hero media is banner-automotive.svg,
+the dashboard tile is tile-dashboard.jpg (900x560), and no element on the
+dashboard references hero-automotive.
+
+Tests: 93 shared, 218 API, 130 browser, 20 mobile — all passing.
+
+Co-authored-by: openhands <openhands@all-hands.dev>

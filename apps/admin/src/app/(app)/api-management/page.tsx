@@ -29,7 +29,7 @@ function ApiManagementPageInner() {
   const [created, setCreated] = useState<{ clientId: string; secret: string } | null>(null);
 
   return (
-    <div className="flex flex-col gap-5" data-testid="api-management-page">
+    <div className="flex flex-col gap-4" data-testid="api-management-page">
       <SectionHeader
         title={t('nav.apiClients')}
         subtitle={t('app.subtitle')}
@@ -48,12 +48,11 @@ function ApiManagementPageInner() {
       />
 
       <Card className="p-4">
-        <p className="oryx-panel-title m-0 mb-1">Versioned API</p>
+        <p className="oryx-panel-title m-0 mb-1">{t('api.versionedTitle')}</p>
         <p className="oryx-muted m-0 text-[12.5px]">
-          All endpoints are served under <code className="font-mono">/api/v1</code>. Interactive
-          documentation is generated from the NestJS controllers at{' '}
-          <code className="font-mono">/api/docs</code>. Client secrets are hashed with SHA-256 and
-          returned exactly once at registration.
+          {t('api.versionedBodyPrefix')} <code className="font-mono">/api/v1</code>
+          {t('api.versionedBodyMid')} <code className="font-mono">/api/docs</code>
+          {t('api.versionedBodySuffix')}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Badge tone="gold">/api/v1/auth</Badge>
@@ -183,7 +182,7 @@ function ApiManagementPageInner() {
                 <dd className="m-0 font-mono">{created.clientId}</dd>
               </div>
               <div>
-                <dt className="oryx-faint">Secret</dt>
+                <dt className="oryx-faint">{t('app.secret')}</dt>
                 <dd
                   className="m-0 break-all rounded-lg px-3 py-2 font-mono"
                   style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-strong)' }}
@@ -223,7 +222,7 @@ function ApiManagementPageInner() {
                 />
               </Field>
               <div className="sm:col-span-2">
-                <Field label={t('app.scopes')} hint="Comma separated">
+                <Field label={t('app.scopes')} hint={t('api.scopesHint')}>
                   <input
                     className="oryx-input"
                     value={form.scopes}
