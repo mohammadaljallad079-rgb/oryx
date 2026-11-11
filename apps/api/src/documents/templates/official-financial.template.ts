@@ -353,7 +353,6 @@ function lineTable(
         <td class="of-c-desc">
           <span class="of-line-name">${esc(name)}</span>
           ${note ? `<span class="of-line-sub">${esc(note)}</span>` : ''}
-          ${line.sku ? `<span class="of-line-sku num">${esc(line.sku)}</span>` : ''}
         </td>
         <td class="of-c-qty num">${esc(quantity(line.quantity))}</td>
         <td class="of-c-price num">${esc(moneyPlain(line.unitPriceMinor, payload.currency))}</td>
@@ -590,7 +589,6 @@ export const OFFICIAL_FINANCIAL_CSS = `
   /* The line's note prints on its own line under the name, smaller and lighter,
      exactly as the approved sheet prints a product's warranty note. */
   .of-line-sub{ display:block; font-size:7.5pt; color:#64748b; font-weight:400; }
-  .of-line-sku{ display:block; font-size:7.5pt; color:#64748b; font-weight:400; }
   /* The reference totals block is a right-aligned table with only two rules:
      one above the first row and one above the grand Total. */
   .of-totals{ width:59.6%; margin-inline-start:auto; margin-top:6pt;
