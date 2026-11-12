@@ -438,6 +438,16 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   production now refuses to issue without it. Verify with
   `.run/verify-qr-in-pdf.mjs`, which decodes the printed code and opens the
   decoded URL in a session-less browser context.
+- **`/verify` lives in the customer app, not the admin app.** The public
+  verification page is `apps/customer/src/app/verify/[[...token]]/page.tsx`
+  (`:3002` in the preview). Pointing `DOCUMENT_VERIFY_BASE_URL` at the admin
+  origin (`:3000`) yields a 404 for every scan even though the API returns a
+  perfectly valid token. In the preview set it to the customer origin.
+- **A duplicate variable definition silently wins with the last value.** Both
+  `.env` and the tracked `.env.example` once declared `DOCUMENT_VERIFY_BASE_URL`
+  twice; the later `:3000` line overrode the correct `:3002` one, so the printed
+  QR was dead while the source "looked" right. When a printed-code or config
+  value misbehaves, `grep -n` the key in every env file before anything else.
 - **The verification page namespaces its keys under `verify.`.** The outcome
   key template must be `` `verify.${outcome}Title` ``, not `` `${outcome}Title` ``;
   without the prefix the page renders the raw key. `apps/customer/test/i18n-status.test.ts`
