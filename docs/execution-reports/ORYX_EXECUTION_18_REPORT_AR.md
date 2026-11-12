@@ -11,6 +11,42 @@
 
 ---
 
+## 0. روابط المعاينة المباشرة
+
+**تطبيق لوحة الإدارة (مباشر):**
+https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/login
+
+**موقع العملاء (مباشر):**
+https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/
+
+**روابط مباشرة داخل لوحة الإدارة** (تُفتح بعد تسجيل الدخول بحساب موظف):
+
+| البند | الرابط المباشر |
+| --- | --- |
+| المبيعات / الفواتير | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/sales |
+| الموارد البشرية | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/hr |
+| الفروع | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/branches |
+| دليل الحسابات | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/accounting |
+| فحوصات السيارات | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/automotive/inspections |
+| سجل المستندات الرسمية | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/documents |
+
+**ملفات وأدلة ثابتة تُفتح مباشرة بلا تسجيل دخول** (عبر مسار `/evidence`):
+
+| الدليل | الرابط المباشر |
+| --- | --- |
+| الفاتورة الصادرة (PDF) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/execution08/rendered-invoice.pdf |
+| الفاتورة مقابل المرجع المعتمد | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/execution08/e08-invoice-print-vs-reference.png |
+| معاينة طباعة الفاتورة | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/execution08/e08-invoice-print-preview-en.png |
+| نافذة الفرع (وضع فاتح) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/execution08/e08-branch-modal-light-en.png |
+| نافذة الفرع (وضع داكن) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/execution08/e08-branch-modal-dark-en.png |
+| خدمات الفحص مع الضريبة | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/execution08/e08-inspection-services-ar-light.png |
+| منتقي تاريخ حجز الفحص | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/execution08/e08-inspection-booking-date-en-light.png |
+
+> ملاحظة: هذه الروابط تخدمها حزمة المعاينة المحلية في بيئة العمل الحالية. عند
+> إعادة تشغيل البيئة قد يتغيّر اسم المضيف؛ تُولَّد المعاينة من `.run/start-stack.sh`.
+
+---
+
 ## 1. المشكلتان المُبلَّغ عنهما وحلّهما
 
 ### 1.1 «صور المقارنة مش طالع الصورة» — تم إصلاح السبب الجذري
