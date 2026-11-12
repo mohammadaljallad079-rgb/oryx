@@ -81,7 +81,7 @@ test.describe('Execution 06 — attendance, policy, work sites and HR reporting'
     await expect(grace).toHaveValue('12', { timeout: 20_000 });
   });
 
-  test('3. a work site can be created and appears in the list', async ({ page }) => {
+  test('3. a work site can be created, edited and deleted', async ({ page }) => {
     await page.goto('/hr');
     await page.getByTestId('hr-tab-policy').click();
     await expect(page.getByTestId('new-work-site')).toBeVisible({ timeout: 20_000 });
@@ -94,6 +94,18 @@ test.describe('Execution 06 — attendance, policy, work sites and HR reporting'
     await page.getByTestId('submit-work-site').click();
     await expect(page.locator('.oryx-modal')).toHaveCount(0, { timeout: 20_000 });
     await expect(page.getByText(code)).toBeVisible({ timeout: 20_000 });
+
+    // Edit renames the site and persists the change through the API.
+    await page.getByTestId(`edit-work-site-${code}`).click();
+    await page.getByTestId('work-site-name-en').fill('E2E Site (edited)');
+    await page.getByTestId('submit-work-site').click();
+    await expect(page.locator('.oryx-modal')).toHaveCount(0, { timeout: 20_000 });
+    await expect(page.getByText('E2E Site (edited)')).toBeVisible({ timeout: 20_000 });
+
+    // Delete removes it and leaves the seeded tenant as it was found.
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByTestId(`delete-work-site-${code}`).click();
+    await expect(page.getByText(code)).toHaveCount(0, { timeout: 20_000 });
   });
 
   test('4. every HR report renders and the CSV export downloads', async ({ page }) => {

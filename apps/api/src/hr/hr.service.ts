@@ -929,6 +929,15 @@ export class HrService {
     return site;
   }
 
+  async deleteWorkSite(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const existing = await this.prisma.workSite.findFirst({ where: { id, companyId } });
+    if (!existing) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Work site not found.');
+    await this.prisma.workSite.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.worksite_deleted', targetType: 'WORK_SITE', targetId: id, summary: `Deleted work site ${existing.code}` });
+    return { id, deleted: true };
+  }
+
   /** The current rotating QR token for a worksite, for a kiosk display. */
   async workSiteQrToken(siteId: string, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal);

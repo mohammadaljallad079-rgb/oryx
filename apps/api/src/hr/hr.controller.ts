@@ -423,6 +423,13 @@ export class HrController {
     return this.hr.updateWorkSite(id, dto, p, actorFrom(p, req));
   }
 
+  @Delete('work-sites/:id')
+  @RequirePermissions('erp.hr.worksite.manage')
+  @ApiOperation({ summary: 'Delete a work site' })
+  deleteWorkSite(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.deleteWorkSite(id, p, actorFrom(p, req));
+  }
+
   @Get('work-sites/:id/qr-token')
   @RequirePermissions('erp.hr.worksite.manage')
   @ApiOperation({ summary: 'Current rotating QR token for a work site kiosk' })

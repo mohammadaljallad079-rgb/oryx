@@ -1306,13 +1306,14 @@ function PayslipPdfButton({ payslipId, code }: { payslipId: string; code: string
 }
 
 function PolicyTab({ canManagePolicy, canViewWorkSites, canManageWorkSites }: { canManagePolicy: boolean; canViewWorkSites: boolean; canManageWorkSites: boolean }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const policy = useAsync(() => api.hrAttendancePolicy(), []);
   const sites = useAsync(() => canViewWorkSites ? api.hrWorkSites() : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 0 }), [canViewWorkSites]);
   const [form, setForm] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     if (policy.data) setForm((current) => current ?? policy.data);
@@ -1382,7 +1383,7 @@ function PolicyTab({ canManagePolicy, canViewWorkSites, canManageWorkSites }: { 
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
           <p className="oryx-panel-title m-0">{t('erp.hr.workSites')}</p>
           {canManageWorkSites ? (
-            <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-work-site">
+            <Button variant="primary" size="sm" onClick={() => { setEditTarget(null); setOpen(true); }} data-testid="new-work-site">
               <Icon name="plus" size={16} />
               {t('erp.hr.newWorkSite')}
             </Button>
@@ -1404,6 +1405,7 @@ function PolicyTab({ canManagePolicy, canViewWorkSites, canManageWorkSites }: { 
                 <th>{t('erp.hr.longitude')}</th>
                 <th>{t('erp.hr.radius')}</th>
                 <th>{t('erp.hr.wifi')}</th>
+                {canManageWorkSites ? <th>{t('common.actions')}</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -1415,43 +1417,94 @@ function PolicyTab({ canManagePolicy, canViewWorkSites, canManageWorkSites }: { 
                   <td className="tabular-nums text-[12.5px]">{String(s.longitude ?? '—')}</td>
                   <td className="tabular-nums text-[12.5px]">{String(s.radiusMeters ?? '—')}</td>
                   <td className="text-[12.5px]">{String(s.wifiSsids ?? '—')}</td>
+                  {canManageWorkSites ? (
+                    <td>
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" onClick={() => { setEditTarget(s); setOpen(true); }} data-testid={`edit-work-site-${String(s.code)}`}>
+                          {t('branches.edit')}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={async () => {
+                            const name = locale === 'ar' ? String(s.nameAr ?? s.nameEn) : String(s.nameEn);
+                            if (!window.confirm(t('erp.hr.confirmDeleteWorkSite').replace('{name}', name))) return;
+                            try {
+                              await api.deleteWorkSite(String(s.id));
+                              await sites.reload();
+                            } catch (err) {
+                              window.alert(err instanceof Error ? err.message : t('common.error'));
+                            }
+                          }}
+                          data-testid={`delete-work-site-${String(s.code)}`}
+                        >
+                          <Icon name="trash" size={14} />
+                          {t('common.delete')}
+                        </Button>
+                      </div>
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>
           </TableShell>
         )}
-        <CreateWorkSiteModal open={open} onClose={() => setOpen(false)} onSaved={sites.reload} />
+        <CreateWorkSiteModal open={open} site={editTarget} onClose={() => { setOpen(false); setEditTarget(null); }} onSaved={sites.reload} />
       </Card>
       ) : null}
     </div>
   );
 }
 
-function CreateWorkSiteModal({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: () => Promise<void> }) {
+function CreateWorkSiteModal({ open, site, onClose, onSaved }: { open: boolean; site?: Record<string, unknown> | null; onClose: () => void; onSaved: () => Promise<void> }) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', latitude: '', longitude: '', radiusMeters: '150', wifiSsids: '' });
+  const isEdit = Boolean(site?.id);
 
   useEffect(() => {
     if (!open) return;
     setError(null);
-    setForm({ code: '', nameEn: '', nameAr: '', latitude: '', longitude: '', radiusMeters: '150', wifiSsids: '' });
-  }, [open]);
+    if (site?.id) {
+      setForm({
+        code: String(site.code ?? ''),
+        nameEn: String(site.nameEn ?? ''),
+        nameAr: String(site.nameAr ?? ''),
+        latitude: site.latitude != null ? String(site.latitude) : '',
+        longitude: site.longitude != null ? String(site.longitude) : '',
+        radiusMeters: site.radiusMeters != null ? String(site.radiusMeters) : '150',
+        wifiSsids: String(site.wifiSsids ?? ''),
+      });
+    } else {
+      setForm({ code: '', nameEn: '', nameAr: '', latitude: '', longitude: '', radiusMeters: '150', wifiSsids: '' });
+    }
+  }, [open, site]);
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.createWorkSite({
-        code: form.code,
-        nameEn: form.nameEn,
-        nameAr: form.nameAr || form.nameEn,
-        latitude: form.latitude ? Number(form.latitude) : undefined,
-        longitude: form.longitude ? Number(form.longitude) : undefined,
-        radiusMeters: form.radiusMeters ? Number(form.radiusMeters) : undefined,
-        wifiSsids: form.wifiSsids || undefined,
-      });
+      if (isEdit) {
+        await api.updateWorkSite(String(site!.id), {
+          nameEn: form.nameEn,
+          nameAr: form.nameAr || form.nameEn,
+          latitude: form.latitude ? Number(form.latitude) : undefined,
+          longitude: form.longitude ? Number(form.longitude) : undefined,
+          radiusMeters: form.radiusMeters ? Number(form.radiusMeters) : undefined,
+          wifiSsids: form.wifiSsids,
+        });
+      } else {
+        await api.createWorkSite({
+          code: form.code,
+          nameEn: form.nameEn,
+          nameAr: form.nameAr || form.nameEn,
+          latitude: form.latitude ? Number(form.latitude) : undefined,
+          longitude: form.longitude ? Number(form.longitude) : undefined,
+          radiusMeters: form.radiusMeters ? Number(form.radiusMeters) : undefined,
+          wifiSsids: form.wifiSsids || undefined,
+        });
+      }
       await onSaved();
       onClose();
     } catch (e) {
@@ -1462,7 +1515,7 @@ function CreateWorkSiteModal({ open, onClose, onSaved }: { open: boolean; onClos
   };
 
   return (
-    <Modal open={open} title={t('erp.hr.newWorkSite')} onClose={onClose} footer={
+    <Modal open={open} title={isEdit ? t('erp.hr.editWorkSite') : t('erp.hr.newWorkSite')} onClose={onClose} footer={
       <>
         <Button size="sm" variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
         <Button size="sm" variant="primary" disabled={busy || !form.code || !form.nameEn} onClick={submit} data-testid="submit-work-site">{t('common.save')}</Button>
@@ -1470,7 +1523,7 @@ function CreateWorkSiteModal({ open, onClose, onSaved }: { open: boolean; onClos
     }>
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('erp.hr.code')}><input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="work-site-code" /></Field>
+        <Field label={t('erp.hr.code')}><input className="oryx-input" value={form.code} disabled={isEdit} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="work-site-code" /></Field>
         <Field label={t('erp.hr.radius')}><input type="number" className="oryx-input" value={form.radiusMeters} onChange={(e) => setForm({ ...form, radiusMeters: e.target.value })} data-testid="work-site-radius" /></Field>
         <Field label={`${t('common.name')} (EN)`}><input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="work-site-name-en" /></Field>
         <Field label={`${t('common.name')} (AR)`}><input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="work-site-name-ar" /></Field>

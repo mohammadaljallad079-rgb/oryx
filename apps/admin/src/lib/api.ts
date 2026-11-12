@@ -1132,6 +1132,7 @@ export const api = {
     request<Record<string, unknown>>('/hr/work-sites', { method: 'POST', body }),
   updateWorkSite: (id: string, body: Record<string, unknown>) =>
     request<Record<string, unknown>>(`/hr/work-sites/${id}`, { method: 'PATCH', body }),
+  deleteWorkSite: (id: string) => request<{ id: string; deleted: boolean }>(`/hr/work-sites/${id}`, { method: 'DELETE' }),
   workSiteQrToken: (id: string) => request<Record<string, unknown>>(`/hr/work-sites/${id}/qr-token`),
   salaryHistory: (employeeId: string) => request<Record<string, unknown>>(`/hr/employees/${employeeId}/salary-history`),
   myPayslips: () => request<Paginated<Record<string, unknown>>>('/hr/payslips/me'),
