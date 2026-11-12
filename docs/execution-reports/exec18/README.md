@@ -2,6 +2,9 @@
 
 This execution is a **verification pass with one focused fix**, not a rebuild.
 
+Every image below is **embedded**, so it renders directly on GitHub. Click an
+image to open it full size.
+
 ## What was inspected
 
 | Reference | What it is | Pages |
@@ -20,35 +23,85 @@ This execution is a **verification pass with one focused fix**, not a rebuild.
 - **The inspection report already renders the full five-page structure** when the
   operator selects the four approved inspection types: cover / liability, paint
   & body, chassis & undercarriage, interior-exterior-engine-road, computer unit.
-- **One real gap was found and fixed:** the report's brand band sat ~20 pt lower
-  than the reference, and its full-bleed cover photograph widened the printable
-  area and shifted the whole sheet sideways. See below.
+- **Two real gaps were found and fixed this execution:**
+  1. The brand band sat ~20 pt lower than the reference, and the full-bleed cover
+     photograph widened the printable area and shifted the whole sheet sideways
+     (fixed earlier on this branch).
+  2. The **vehicle-information band was only half width** — it shared a row with
+     the QR card, so the cover did not read like the reference, which prints a
+     **full-width** information band and places the verification QR **inside the
+     photograph band, bottom-right**. This execution restructures the cover to
+     match. See below.
 
 ## The fix
 
-`apps/api/src/documents/documents.service.ts`,
-`apps/api/src/documents/pdf/pdf-renderer.service.ts`,
 `apps/api/src/documents/templates/inspection-report.template.ts`
 
-1. A new `REPORT_PDF_MARGINS` lifts only the report's **top** edge to the
-   reference position. The side margins stay at the default because the cover
-   photograph's bleed cancels exactly that inset.
-2. The photograph is now painted with an absolutely positioned image that
-   overflows its in-flow figure. Absolute overflow is clipped by the paper edge;
-   it no longer enlarges the printable area, so the header stays on the paper
-   margin instead of drifting left.
+1. The cover's `Vehicle Information` block is now a **single full-width band**
+   (`width:100%`) instead of a flex row beside the QR card. The `cover-grid` /
+   `cover-verify` split is gone.
+2. The verification QR is now painted **inside the photograph band**, anchored to
+   the physical bottom-right over a white card so the modules stay scannable —
+   matching the reference. Physical `right`/`bottom` is used because the page is
+   RTL and the reference anchors the code to the visual right regardless of
+   direction.
+3. New tests: `prints the vehicle photograph as a full-width band on the cover`
+   and `overlays the verification QR on the cover photograph band`.
 
-Measured effect: the report's brand lockup moved from y≈36 pt to **y≈16 pt**,
-matching the reference's y≈16 pt. The cover photograph still bleeds to both paper
-edges.
+Measured effect: the information band now spans x≈33.5–561.5 pt (full content
+width, matching the reference's x≈25–570 band) and the QR sits at x≈479–549 pt,
+bottom-right over the photograph — instead of a 250 pt right-hand column.
 
-## Evidence in this folder
+## Reference vs our output
 
-| File | Shows |
-| --- | --- |
-| `cmp-p1.png`, `cmp-p2.png`, `cmp-p4.png` | reference (left) vs our report (right), pages 1, 2, 4 |
-| `report-p1..p5.png` | the five rendered report pages |
-| `inspection-report-5page.pdf` | the issued report, five pages |
+Each sheet is the approved reference (left, navy band) beside our rendered
+output (right, green band).
+
+### Page 1 — cover / vehicle information
+
+![Report page 1: reference vs ours](parity-p1.png)
+
+### Page 2 — paint and body
+
+![Report page 2: reference vs ours](parity-p2.png)
+
+### Page 3 — chassis and undercarriage
+
+![Report page 3: reference vs ours](parity-p3.png)
+
+### Page 4 — interior, exterior, engine, road test
+
+![Report page 4: reference vs ours](parity-p4.png)
+
+### Page 5 — computer unit
+
+![Report page 5: reference vs ours](parity-p5.png)
+
+## Tax invoice — reference `oryx 22.pdf` vs the issued invoice
+
+![Tax invoice: reference vs ours](invoice-ref-vs-ours.png)
+
+## The five rendered report pages on their own
+
+| Page 1 | Page 2 | Page 3 | Page 4 | Page 5 |
+| --- | --- | --- | --- | --- |
+| ![p1](report-p1.png) | ![p2](report-p2.png) | ![p3](report-p3.png) | ![p4](report-p4.png) | ![p5](report-p5.png) |
+
+## Modals and themes (area 2)
+
+| Light (EN) | Dark (EN) | Light (AR, RTL) |
+| --- | --- | --- |
+| ![modal light en](modal-branch-light-en.png) | ![modal dark en](modal-branch-dark-en.png) | ![modal light ar](modal-branch-light-ar.png) |
+
+## Live screens (areas 3–7)
+
+| HR employees | Branches | Leave | Chart of accounts |
+| --- | --- | --- | --- |
+| ![hr](live-hr-employees.png) | ![branches](live-branches.png) | ![leave](live-leave.png) | ![coa](live-chart-of-accounts.png) |
+
+| Inspections list | Inspection form (base/VAT/total) | Sales invoice list | Documents register |
+| --- | --- | --- | --- |
+| ![insp list](live-inspections-list.png) | ![insp form](inspection-create-modal-light-en.png) | ![invoices](live-sales-invoice-list.png) | ![docs](live-documents-register.png) |
 
 ## Seven requirement areas — current verified state
 

@@ -163,6 +163,29 @@ describe('inspection report template — font independence', () => {
     expect(html).toContain('vphoto--bleed');
     expect(html).toContain('class="vphoto-img"');
     expect(html).toContain('data:image/png;base64,AAAA');
+    // The vehicle information band spans the full content width, as in the
+    // reference, rather than sharing a row with the QR card.
+    expect(html).toContain('class="cover-info"');
+    expect(html).not.toContain('class="cover-grid"');
+  });
+
+  it('overlays the verification QR on the cover photograph band', () => {
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload: { ...payload, vehiclePhotoDataUri: 'data:image/png;base64,AAAA' },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: {
+        token: 'tok-1',
+        url: 'https://oryxbhr.com/verify/tok-1',
+        qrDataUri: 'data:image/png;base64,QRQR',
+      },
+      baseCss: '',
+    });
+    expect(html).toContain('class="cover-qr"');
+    expect(html).toContain('data:image/png;base64,QRQR');
+    expect(html).toContain('للتأكد من صحة التقرير');
   });
 
   it('prints a neutral placeholder when no photograph was attached', () => {

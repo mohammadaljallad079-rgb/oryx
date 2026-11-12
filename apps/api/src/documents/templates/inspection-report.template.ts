@@ -222,16 +222,30 @@ function liabilityBlock(): string {
  * placeholder rather than an empty frame, so the cover never shows a broken
  * image.
  */
-function vehiclePhoto(p: InspectionReportPayload): string {
+function vehiclePhoto(
+  p: InspectionReportPayload,
+  verification: DocumentVerification | null | undefined,
+): string {
+  // The approved cover prints the verification QR inside the photograph band,
+  // anchored to its lower right. A white quiet zone is kept around the modules
+  // so a scanner can still resolve it against the picture.
+  const qr = verification?.qrDataUri
+    ? `<div class="cover-qr">
+        <span class="cover-qr-cap">للتأكد من صحة التقرير<span class="ltr">Scan to verify</span></span>
+        <img src="${esc(verification.qrDataUri)}" alt="Document verification QR code">
+      </div>`
+    : '';
   if (p.vehiclePhotoDataUri) {
     return `
     <figure class="vphoto vphoto--bleed">
       <img class="vphoto-img" src="${esc(p.vehiclePhotoDataUri)}" alt="${esc(`${p.vehicle.make} ${p.vehicle.model}`)}">
+      ${qr}
     </figure>`;
   }
   return `
     <figure class="vphoto vphoto--bleed vphoto-empty">
       <div class="vphoto-ph">لا توجد صورة مرفقة للمركبة<span class="ltr">No vehicle photograph attached</span></div>
+      ${qr}
     </figure>`;
 }
 
@@ -255,34 +269,29 @@ export function identificationPage(input: InspectionReportInput, chrome: Documen
   <section class="doc-page">
     ${reportHeader(chrome.issuer)}
     ${pageTitleBar('تقرير فحص المركبة', 'VEHICLE INSPECTION REPORT')}
-    <div class="cover-grid">
-      <div class="cover-info">
-        <div class="cover-sec-title">معلومات المركبة<span class="ltr">Vehicle Information</span></div>
-        <table class="vinfo">
-          <tr>
-            <td><span class="vlab"><span class="ltr">Customer Name</span><span class="var">اسم العميل</span></span><span class="vval">${esc(p.customerName)}</span></td>
-            <td><span class="vlab"><span class="ltr">Contact No.</span><span class="var">رقم التواصل</span></span><span class="vval num">${esc(orDash(p.contactNumber))}</span></td>
-            <td><span class="vlab"><span class="ltr">Date &amp; Time</span><span class="var">التاريخ والوقت</span></span><span class="vval num">${esc(stamp)}</span></td>
-            <td><span class="vlab"><span class="ltr">Job No.</span><span class="var">رقم العمل</span></span><span class="vval num">${esc(p.jobNumber)}</span></td>
-          </tr>
-          <tr>
-            <td><span class="vlab"><span class="ltr">Plate No.</span><span class="var">رقم اللوحة</span></span><span class="vval num">${esc(orDash(v.plateNumber))}</span></td>
-            <td><span class="vlab"><span class="ltr">Car Make</span><span class="var">نوع السيارة</span></span><span class="vval">${esc(v.make)}</span></td>
-            <td><span class="vlab"><span class="ltr">Car Model</span><span class="var">طراز السيارة</span></span><span class="vval">${esc(v.model)}</span></td>
-            <td><span class="vlab"><span class="ltr">Car Year</span><span class="var">سنة الصنع</span></span><span class="vval num">${esc(v.modelYear)}</span></td>
-          </tr>
-          <tr>
-            <td><span class="vlab"><span class="ltr">ODO Meter</span><span class="var">عداد المسافات</span></span><span class="vval num">${esc(grouped(v.odometer))} km</span></td>
-            <td><span class="vlab"><span class="ltr">Car Color</span><span class="var">لون السيارة</span></span><span class="vval">${esc(orDash(v.color))}</span></td>
-            <td colspan="2"><span class="vlab"><span class="ltr">VIN Number</span><span class="var">رقم القاعدة (الشاصي)</span></span><span class="vval num">${esc(v.vin)}</span></td>
-          </tr>
-        </table>
-      </div>
-      <div class="cover-verify">
-        ${verificationBlock(input.verification)}
-      </div>
+    <div class="cover-info">
+      <div class="cover-sec-title">معلومات المركبة<span class="ltr">Vehicle Information</span></div>
+      <table class="vinfo">
+        <tr>
+          <td><span class="vlab"><span class="ltr">Customer Name</span><span class="var">اسم العميل</span></span><span class="vval">${esc(p.customerName)}</span></td>
+          <td><span class="vlab"><span class="ltr">Contact No.</span><span class="var">رقم التواصل</span></span><span class="vval num">${esc(orDash(p.contactNumber))}</span></td>
+          <td><span class="vlab"><span class="ltr">Date &amp; Time</span><span class="var">التاريخ والوقت</span></span><span class="vval num">${esc(stamp)}</span></td>
+          <td><span class="vlab"><span class="ltr">Job No.</span><span class="var">رقم العمل</span></span><span class="vval num">${esc(p.jobNumber)}</span></td>
+        </tr>
+        <tr>
+          <td><span class="vlab"><span class="ltr">Plate No.</span><span class="var">رقم اللوحة</span></span><span class="vval num">${esc(orDash(v.plateNumber))}</span></td>
+          <td><span class="vlab"><span class="ltr">Car Make</span><span class="var">نوع السيارة</span></span><span class="vval">${esc(v.make)}</span></td>
+          <td><span class="vlab"><span class="ltr">Car Model</span><span class="var">طراز السيارة</span></span><span class="vval">${esc(v.model)}</span></td>
+          <td><span class="vlab"><span class="ltr">Car Year</span><span class="var">سنة الصنع</span></span><span class="vval num">${esc(v.modelYear)}</span></td>
+        </tr>
+        <tr>
+          <td><span class="vlab"><span class="ltr">ODO Meter</span><span class="var">عداد المسافات</span></span><span class="vval num">${esc(grouped(v.odometer))} km</span></td>
+          <td><span class="vlab"><span class="ltr">Car Color</span><span class="var">لون السيارة</span></span><span class="vval">${esc(orDash(v.color))}</span></td>
+          <td colspan="2"><span class="vlab"><span class="ltr">VIN Number</span><span class="var">رقم القاعدة (الشاصي)</span></span><span class="vval num">${esc(v.vin)}</span></td>
+        </tr>
+      </table>
     </div>
-    ${vehiclePhoto(p)}
+    ${vehiclePhoto(p, input.verification)}
     ${liabilityBlock()}
     ${importantRemarks()}
     ${signatureBlock([
@@ -640,20 +649,25 @@ export const INSPECTION_REPORT_CSS = `
   .lg-chip{ display:inline-flex; align-items:center; gap:4px; font-size:8pt; color:var(--ink); margin-inline-start:10px; }
   .legend-row{ display:flex; gap:6px; margin-top:6px; }
   /* ---- cover ---- */
-  .cover-grid{ display:flex; gap:12px; align-items:flex-start; }
-  .cover-info{ flex:1 1 auto; }
+  .cover-info{ width:100%; }
   .cover-sec-title{ background:var(--navy); color:#fff; font-size:9.5pt; font-weight:700; padding:3px 10px; border-radius:5px 5px 0 0; }
   .cover-sec-title .ltr{ margin-inline-start:8px; color:var(--gold-soft); font-size:8pt; font-weight:400; }
-  .vinfo{ border:1px solid var(--line); border-top:none; border-collapse:collapse; direction:ltr; }
+  .vinfo{ width:100%; border:1px solid var(--line); border-top:none; border-collapse:collapse; direction:ltr; }
   .vinfo td{ border:1px solid var(--line); padding:3px 8px; width:25%; vertical-align:top; }
   .vlab{ display:flex; align-items:baseline; gap:6px; font-size:7.3pt; color:var(--muted); line-height:1.2; }
   .vlab .ltr{ font-weight:700; color:var(--navy-soft); }
   .vlab .var{ direction:rtl; color:var(--muted); }
   .vval{ display:block; margin-top:1px; font-size:8.8pt; font-weight:700; color:var(--ink); }
-  .cover-verify{ flex:0 0 250px; }
-  .cover-verify .verify{ margin-top:0; flex-direction:column; align-items:stretch; }
-  .cover-verify .verify-qr{ display:flex; justify-content:center; }
-  .cover-verify .verify-qr img{ width:130px; height:130px; }
+  /* The approved cover prints the verification QR inside the photograph band,
+   * bottom-right, over a white card so the modules stay scannable. Physical
+   * right/bottom is used because the page is RTL and the reference anchors the
+   * code to the visual right regardless of direction. */
+  .cover-qr{ position:absolute; bottom:8px; right:10px; z-index:2;
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    background:#fff; border:1px solid var(--line); border-radius:5px; padding:5px 6px; }
+  .cover-qr img{ width:92px; height:92px; display:block; }
+  .cover-qr-cap{ font-size:6.4pt; font-weight:700; color:var(--navy); line-height:1.15; text-align:center; }
+  .cover-qr-cap .ltr{ display:block; font-size:5.6pt; color:var(--muted); font-weight:400; letter-spacing:.2px; }
   /* The approved cover prints the vehicle photograph as a wide band across the
    * middle of the page, bleeding past the side margins. */
   .vphoto{ position:relative; margin:10px 0 0; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#f7f9fc; }
