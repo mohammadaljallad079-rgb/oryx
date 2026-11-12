@@ -50,6 +50,34 @@ edges.
 | `report-p1..p5.png` | the five rendered report pages |
 | `inspection-report-5page.pdf` | the issued report, five pages |
 
+## Seven requirement areas — current verified state
+
+Each area was inspected against the running system. Areas 2–7 were already
+implemented and DB-backed; this execution re-verified them with fresh evidence
+and left the working code unchanged.
+
+| # | Area | State | Evidence |
+| --- | --- | --- | --- |
+| 1 | Sales invoice layout, logo, company block, subtotal/discount/VAT/total, per-line pricing, QR | matches `oryx 22.pdf`; QR decodes out of the rendered PDF | `invoice-ref-vs-ours.png`, `our-sales-invoice.pdf` |
+| 2 | Modals: z-index, backdrop, light-theme colours, RTL/LTR, dark unchanged | scrim `z-index:60` over all chrome; opaque surface | `modal-branch-light-en.png`, `modal-branch-dark-en.png`, `modal-branch-light-ar.png` |
+| 3 | HR documents, extra phone, employment end date, preview/download under permission | multipart upload, persisted, permission-gated | `live-hr-employees.png` |
+| 4 | Branch create/edit field parity and persistence | create carries every edit field; API persists all | `live-branches.png` |
+| 5 | Leave ISO 8601 start/end date validation | bare dates normalised before `@IsISO8601()`; create/edit/approve work | `live-leave.png` |
+| 6 | Chart of accounts type and parent dropdowns, edit/save | reclassifies, refuses cycles, excludes self+descendants | `live-chart-of-accounts.png` |
+| 7 | Inspection base price, VAT rate, VAT amount, total incl. VAT, service images, booking form, date picker | full breakdown returned and shown | `inspection-create-modal-light-en.png`, `live-inspections-list.png` |
+
+## Verification
+
+| Check | Result |
+| --- | --- |
+| `pnpm --filter @oryx/shared test` | 235 passed |
+| `pnpm --filter @oryx/api test` | 82 passed |
+| `pnpm --filter @oryx/api test:e2e` | 746 passed, 41 suites, 0 failed |
+| `execution08-remediation` suite (areas 3–7) | 18 passed |
+| `pnpm --filter @oryx/admin build` | success |
+| `pnpm --filter @oryx/admin lint` | clean (0 warnings) |
+| QR decoded from rendered invoice PDF | `https://oryxbhr.com/verify/<token>` |
+
 ## Not done (honest status)
 
 - The reference uses the owner's licensed typefaces (CodecPro / TSSafaa). Those
