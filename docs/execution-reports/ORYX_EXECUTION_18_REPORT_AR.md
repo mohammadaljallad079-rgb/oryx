@@ -3,7 +3,8 @@
 **الفرع:** `fix/oryx-inspection-rebuild` · **الفرع الأساس (الإنتاج):** `release/oryx-latest`
 **فرع الإنتاج الحالي:** `release/oryx-latest` = `370a998`
 **المعاينة (لوحة الإدارة):** https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/login
-**معاينة صور المقارنة (تعمل مباشرة):** https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec18/parity-p1.png
+**معاينة صور المقارنة (تُعرض مباشرة على GitHub):** https://github.com/mohammadaljallad079-rgb/oryx/blob/fix/oryx-inspection-rebuild/docs/execution-reports/exec18/README.md
+**طلب السحب:** https://github.com/mohammadaljallad079-rgb/oryx/pull/16
 
 > هذا التقرير صادر عن وكيل ذكاء اصطناعي (OpenHands) نيابةً عن مالك المستودع.
 > لم يتم إعادة ضبط أو حذف أو إعادة بناء أي عمل، ولم يتم النشر إلى الإنتاج.

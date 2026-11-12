@@ -124,12 +124,17 @@ and left the working code unchanged.
 | Check | Result |
 | --- | --- |
 | `pnpm --filter @oryx/shared test` | 235 passed |
-| `pnpm --filter @oryx/api test` | 82 passed |
+| `pnpm --filter @oryx/api test` | 83 passed |
+| `pnpm --filter @oryx/api exec jest src/documents` | 73 passed |
 | `pnpm --filter @oryx/api test:e2e` | 746 passed, 41 suites, 0 failed |
 | `execution08-remediation` suite (areas 3–7) | 18 passed |
 | `pnpm --filter @oryx/admin build` | success |
 | `pnpm --filter @oryx/admin lint` | clean (0 warnings) |
-| QR decoded from rendered invoice PDF | `https://oryxbhr.com/verify/<token>` |
+| QR decoded from the rendered **invoice** PDF (jsQR) | `https://oryxbhr.com/verify/oX0zGQIF9OVkschLbbgTpXSCyAZ05DPByiwrJn0vaOo` |
+| QR decoded from the rendered **report** PDF (jsQR) | `https://oryxbhr.com/verify/bBCYjJXmv4gRHYd3qZ-ZX7QXQ_rhl4VdTrQKqTUS4PI` |
+
+The QR codes are decoded from the **rendered PDF**, not from the generator, using
+a real decoder (`jsQR` over `sharp`) — the same path a phone camera takes.
 
 ## Not done (honest status)
 
