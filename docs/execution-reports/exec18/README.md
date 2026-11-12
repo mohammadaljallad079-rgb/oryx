@@ -136,6 +136,27 @@ and left the working code unchanged.
 The QR codes are decoded from the **rendered PDF**, not from the generator, using
 a real decoder (`jsQR` over `sharp`) — the same path a phone camera takes.
 
+## Final logo-scale and interior-drawing verification
+
+Two measurement checks were added after the cover restructure, both comparing
+the rendered PDF against `oryx out put.pdf` / `oryx 22.pdf` directly:
+
+- **Footer logo lockup.** The issued invoice places both `334x72` marks at
+  `x14-254` and `x340-580`, `y756-808` — the same box the reference uses
+  (`y755-807`), a delta of ≤1 pt. The lockup box height is driven from the
+  reference mark height (51px invoice chrome, 56px report header) so the printed
+  result reads at the approved scale.
+- **Interior fittings drawing (page 4).** The reference embeds the drawing as a
+  `549x1200` PNG whose lower ~69% is a solid-black pad; only the top ~372px
+  (≈250×170 pt) is visible on the page. Our asset is trimmed to the visible art
+  (`549x361`), so it renders at `249x164` pt — matching the reference's visible
+  drawing box (`~250×170` pt). The drawing is placed out of flow behind the
+  lower-left checklist and anchored to the physical left, because the report is
+  RTL. A regression test
+  (`anchors the interior fittings drawing to the physical left inside the cabin block`)
+  locks the anchoring, and a companion test asserts the drawing is absent when
+  the cabin checklist is not part of the report.
+
 ## Not done (honest status)
 
 - The reference uses the owner's licensed typefaces (CodecPro / TSSafaa). Those
