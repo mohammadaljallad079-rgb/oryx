@@ -36,6 +36,15 @@ describe('Tax management', () => {
   afterAll(async () => {
     if (createdIds.length) await prisma.taxRate.deleteMany({ where: { id: { in: createdIds } } });
     await prisma.taxRate.deleteMany({ where: { companyId, code: { startsWith: 'TAXTEST' } } });
+    // Tests above promote a throwaway tax to the company default and mirror it
+    // onto the company row, so the seeded baseline is restored here. Without it
+    // the shared tenant is left with no default and a stale rate, which fails
+    // every later suite that reads the seeded taxes.
+    await prisma.$transaction([
+      prisma.taxRate.updateMany({ where: { companyId, isDefault: true }, data: { isDefault: false } }),
+      prisma.taxRate.updateMany({ where: { companyId, code: 'VAT10' }, data: { isDefault: true } }),
+      prisma.company.update({ where: { id: companyId }, data: { defaultTaxRateBp: 1000 } }),
+    ]);
     await cleanupFixtures(prisma);
     await ctx.app.close();
   });
@@ -62,6 +71,32 @@ describe('Tax management', () => {
     expect(res.body.total).toBeGreaterThanOrEqual(3);
     // A rate is a basis-point integer, never a float.
     for (const tax of res.body.items) expect(Number.isInteger(tax.rateBp)).toBe(true);
+  });
+
+  it('defaults the seeded tenant to Bahrain\'s standard 10% VAT rate', async () => {
+    // Bahrain's statutory standard rate is 10%, and the approved reference
+    // documents print VAT 10%. The seeded tenant must not sit on a different
+    // default, or a new line would be seeded with the wrong rate.
+    const seeded = await prisma.taxRate.findFirstOrThrow({
+      where: { companyId, code: 'VAT10' },
+      select: { rateBp: true, isDefault: true },
+    });
+    expect(seeded.rateBp).toBe(1000);
+    expect(seeded.isDefault).toBe(true);
+
+    const company = await prisma.company.findUniqueOrThrow({
+      where: { id: companyId },
+      select: { defaultTaxRateBp: true },
+    });
+    expect(company.defaultTaxRateBp).toBe(1000);
+
+    // The 15% row survives as a selectable rate; it is simply no longer default.
+    const higher = await prisma.taxRate.findFirstOrThrow({
+      where: { companyId, code: 'VAT15' },
+      select: { rateBp: true, isDefault: true },
+    });
+    expect(higher.rateBp).toBe(1500);
+    expect(higher.isDefault).toBe(false);
   });
 
   it('creates a tax, stores the rate in basis points and rejects a duplicate code', async () => {

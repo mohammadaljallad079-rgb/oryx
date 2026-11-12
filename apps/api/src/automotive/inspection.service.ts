@@ -3,12 +3,15 @@ import {
   CHASSIS_REGIONS,
   INSPECTION_SECTION_SPECS,
   INSPECTION_SECTION_KEYS,
+  areasForTypes,
   chassisRegionSpec,
   inspectionResultsFor,
   inspectionSectionSpec,
   isInspectionEditable,
   isInspectionSectionKey,
+  typesForAreas,
   type InspectionSectionKey,
+  type InspectionTypeKey,
 } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
@@ -222,7 +225,10 @@ export class InspectionService {
       }
     }
 
-    const areas = dedupeAreas(dto.selectedAreas);
+    const areas = resolveSelectedAreas(dto);
+    if (areas.length === 0) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Select at least one inspection type.');
+    }
 
     const session = await this.prisma.$transaction(async (tx) => {
       const jobNumber = await this.sequences.next(tx, companyId, 'inspectionSession');
@@ -278,7 +284,13 @@ export class InspectionService {
     const session = await this.requireSession(id, companyId);
     this.assertEditable(session.status);
 
-    const areas = dto.selectedAreas ? dedupeAreas(dto.selectedAreas) : null;
+    // Only recompute the areas when the caller actually changes the selection;
+    // an edit that touches only the header must not drop the recorded sections.
+    const areas =
+      dto.selectedTypes || dto.selectedAreas ? resolveSelectedAreas(dto) : null;
+    if (areas && areas.length === 0) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Select at least one inspection type.');
+    }
 
     const updated = await this.prisma.inspectionSession.update({
       where: { id },
@@ -834,6 +846,25 @@ function dedupeAreas(areas: string[]): InspectionSectionKey[] {
   return INSPECTION_SECTION_KEYS.filter((key) => areas.includes(key));
 }
 
+/**
+ * Resolve the stored areas from a request that names either the four selectable
+ * inspection types or the underlying areas.
+ *
+ * `selectedTypes` is the operator-facing vocabulary and is preferred; it expands
+ * to the areas each type records. `selectedAreas` is kept for the existing API
+ * clients and internal callers. An empty result is rejected by the caller, so a
+ * job can never be created with nothing to inspect.
+ */
+function resolveSelectedAreas(dto: {
+  selectedTypes?: string[];
+  selectedAreas?: string[];
+}): InspectionSectionKey[] {
+  if (dto.selectedTypes && dto.selectedTypes.length > 0) {
+    return areasForTypes(dto.selectedTypes as InspectionTypeKey[]);
+  }
+  return dedupeAreas(dto.selectedAreas ?? []);
+}
+
 interface SectionShape {
   id?: string;
   area: string;
@@ -947,6 +978,9 @@ function toSummaryDto(s: {
     plateNumber: s.plateNumber,
     vin: s.vin,
     selectedAreas: s.selectedAreas,
+    // The four operator-facing types the stored areas map back to, so the screen
+    // and the printed plan speak the report's own vocabulary.
+    selectedTypes: typesForAreas(s.selectedAreas as InspectionSectionKey[]),
     inspectorUserId: s.inspectorUserId,
     inspectedAt: s.inspectedAt.toISOString(),
     createdAt: s.createdAt.toISOString(),

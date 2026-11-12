@@ -9,6 +9,7 @@ import {
   login,
   type TestContext,
 } from './test-app';
+import { decodeQrCodesInPdf } from './pdf-qr';
 import * as argon2 from 'argon2';
 
 /**
@@ -41,6 +42,7 @@ interface PrintModel {
   paymentLabel: string | null;
   paymentValue: string | null;
   staffName: string;
+  verification: { url: string; qrDataUri: string } | null;
 }
 
 interface AttachmentRow {
@@ -308,6 +310,49 @@ describe('print model and document attachments (e2e)', () => {
       expect(res.body.lines).toHaveLength(1);
       expect(res.body.lines[0].amount).toBe(res.body.totals.total);
       expect(`${res.body.lines[0].unitPrice} ${res.body.currency}`).toBe(res.body.totals.total);
+    });
+
+    it('prints no verification code before the record is issued', async () => {
+      // The print form is reachable before issuing; a code minted here would
+      // scan to nothing, so the model must carry none.
+      const res = await erp<PrintModel>(`/print/SALES_INVOICE/${invoiceId}`);
+      expect(res.status).toBe(200);
+      expect(res.body.verification).toBeNull();
+    });
+
+    it('prints the issued verification code so the sheet scans to the same document', async () => {
+      // Issue the official invoice, then re-read the print model: the code on
+      // the printed sheet must be the token the public endpoint already
+      // resolves, so a reprint can never disagree with the issued PDF.
+      const issued = await erp<{ id: string; verificationToken: string; verificationUrl: string }>('/documents/issue', {
+        method: 'POST',
+        body: { type: 'SALES_INVOICE', sourceId: invoiceId },
+      });
+      expect(issued.status).toBe(201);
+      expect(issued.body.verificationToken.length).toBeGreaterThanOrEqual(32);
+
+      const res = await erp<PrintModel>(`/print/SALES_INVOICE/${invoiceId}`);
+      expect(res.body.verification).not.toBeNull();
+      expect(res.body.verification!.url).toBe(issued.body.verificationUrl);
+      expect(res.body.verification!.qrDataUri.startsWith('data:image/png;base64,')).toBe(true);
+
+      // The code in the print model is the same one a scanner reads out of the
+      // issued PDF, so the printed sheet and the stored document agree.
+      const pdf = await fetch(`${ctx.base}/api/v1/documents/${issued.body.id}/file`, {
+        headers: { Authorization: `Bearer ${token}`, 'x-oryx-company-id': tenantId },
+      });
+      expect(pdf.status).toBe(200);
+      const decoded = decodeQrCodesInPdf(Buffer.from(await pdf.arrayBuffer()));
+      expect(decoded[0]).toBe(res.body.verification!.url);
+
+      // And what the scanner read resolves at the public endpoint.
+      const verify = await call<{ found: boolean; document: { type: string } }>(
+        ctx.base,
+        `/documents/verify/${issued.body.verificationToken}`,
+      );
+      expect(verify.status).toBe(200);
+      expect(verify.body.found).toBe(true);
+      expect(verify.body.document.type).toBe('SALES_INVOICE');
     });
 
     it('refuses an unknown document id without a 500', async () => {

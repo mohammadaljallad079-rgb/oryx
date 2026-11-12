@@ -101,17 +101,21 @@ function reportHeader(issuer: DocumentIssuer): string {
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase() ?? '')
     .join('');
-  const mark = issuer.logoDataUri
+  // The approved header is the ORYX wordmark on the left and the tagline on the
+  // right — the wordmark already spells the Arabic name and "AUTO SERVICES", so
+  // repeating the company name beside it (as the fallback does) is not on the
+  // approved sheet. The name stack is therefore kept only for the no-logo case.
+  const left = issuer.logoDataUri
     ? `<img class="rh-logo" src="${esc(issuer.logoDataUri)}" alt="${esc(issuer.nameEn)}">`
-    : `<div class="rh-monogram">${esc(initials || 'OR')}</div>`;
-  return `
-  <header class="report-head">
-    <div class="rh-left">
-      ${mark}
+    : `<div class="rh-monogram">${esc(initials || 'OR')}</div>
       <div class="rh-name">
         <span class="rh-name-ar">${esc(issuer.nameAr || issuer.nameEn)}</span>
         <span class="rh-name-en">${esc(issuer.nameEn)}</span>
-      </div>
+      </div>`;
+  return `
+  <header class="report-head">
+    <div class="rh-left">
+      ${left}
     </div>
     <div class="rh-right">
       <span class="rh-tag-ar">خبراء فحص المركبات</span>
@@ -212,18 +216,40 @@ function liabilityBlock(): string {
   </div>`;
 }
 
-/** The vehicle photo, or a neutral placeholder when none was attached. */
-function vehiclePhoto(p: InspectionReportPayload): string {
+/**
+ * The vehicle photo band on the identification cover.
+ *
+ * The approved report prints the vehicle photograph as a wide band across the
+ * middle of the cover, bleeding past the side margins. The frame keeps that
+ * proportion (a wide band, not a thumbnail) so the printed sheet reads the same
+ * as the reference. A session with no attached photograph prints the neutral
+ * placeholder rather than an empty frame, so the cover never shows a broken
+ * image.
+ */
+function vehiclePhoto(
+  p: InspectionReportPayload,
+  verification: DocumentVerification | null | undefined,
+): string {
+  // The approved cover prints the verification QR inside the photograph band,
+  // anchored to its lower right. A white quiet zone is kept around the modules
+  // so a scanner can still resolve it against the picture.
+  const qr = verification?.qrDataUri
+    ? `<div class="cover-qr">
+        <span class="cover-qr-cap">للتأكد من صحة التقرير<span class="ltr">Scan to verify</span></span>
+        <img src="${esc(verification.qrDataUri)}" alt="Document verification QR code">
+      </div>`
+    : '';
   if (p.vehiclePhotoDataUri) {
     return `
-    <figure class="vphoto">
-      <img src="${esc(p.vehiclePhotoDataUri)}" alt="${esc(`${p.vehicle.make} ${p.vehicle.model}`)}">
-      <figcaption>صورة المركبة · Vehicle photograph</figcaption>
+    <figure class="vphoto vphoto--bleed">
+      <img class="vphoto-img" src="${esc(p.vehiclePhotoDataUri)}" alt="${esc(`${p.vehicle.make} ${p.vehicle.model}`)}">
+      ${qr}
     </figure>`;
   }
   return `
-    <figure class="vphoto vphoto-empty">
+    <figure class="vphoto vphoto--bleed vphoto-empty">
       <div class="vphoto-ph">لا توجد صورة مرفقة للمركبة<span class="ltr">No vehicle photograph attached</span></div>
+      ${qr}
     </figure>`;
 }
 
@@ -247,34 +273,29 @@ export function identificationPage(input: InspectionReportInput, chrome: Documen
   <section class="doc-page">
     ${reportHeader(chrome.issuer)}
     ${pageTitleBar('تقرير فحص المركبة', 'VEHICLE INSPECTION REPORT')}
-    <div class="cover-grid">
-      <div class="cover-info">
-        <div class="cover-sec-title">معلومات المركبة<span class="ltr">Vehicle Information</span></div>
-        <table class="vinfo">
-          <tr>
-            <td><span class="vlab"><span class="ltr">Customer Name</span><span class="var">اسم العميل</span></span><span class="vval">${esc(p.customerName)}</span></td>
-            <td><span class="vlab"><span class="ltr">Contact No.</span><span class="var">رقم التواصل</span></span><span class="vval num">${esc(orDash(p.contactNumber))}</span></td>
-            <td><span class="vlab"><span class="ltr">Date &amp; Time</span><span class="var">التاريخ والوقت</span></span><span class="vval num">${esc(stamp)}</span></td>
-            <td><span class="vlab"><span class="ltr">Job No.</span><span class="var">رقم العمل</span></span><span class="vval num">${esc(p.jobNumber)}</span></td>
-          </tr>
-          <tr>
-            <td><span class="vlab"><span class="ltr">Plate No.</span><span class="var">رقم اللوحة</span></span><span class="vval num">${esc(orDash(v.plateNumber))}</span></td>
-            <td><span class="vlab"><span class="ltr">Car Make</span><span class="var">نوع السيارة</span></span><span class="vval">${esc(v.make)}</span></td>
-            <td><span class="vlab"><span class="ltr">Car Model</span><span class="var">طراز السيارة</span></span><span class="vval">${esc(v.model)}</span></td>
-            <td><span class="vlab"><span class="ltr">Car Year</span><span class="var">سنة الصنع</span></span><span class="vval num">${esc(v.modelYear)}</span></td>
-          </tr>
-          <tr>
-            <td><span class="vlab"><span class="ltr">ODO Meter</span><span class="var">عداد المسافات</span></span><span class="vval num">${esc(grouped(v.odometer))} km</span></td>
-            <td><span class="vlab"><span class="ltr">Car Color</span><span class="var">لون السيارة</span></span><span class="vval">${esc(orDash(v.color))}</span></td>
-            <td colspan="2"><span class="vlab"><span class="ltr">VIN Number</span><span class="var">رقم القاعدة (الشاصي)</span></span><span class="vval num">${esc(v.vin)}</span></td>
-          </tr>
-        </table>
-        ${vehiclePhoto(p)}
-      </div>
-      <div class="cover-verify">
-        ${verificationBlock(input.verification)}
-      </div>
+    <div class="cover-info">
+      <div class="cover-sec-title">معلومات المركبة<span class="ltr">Vehicle Information</span></div>
+      <table class="vinfo">
+        <tr>
+          <td><span class="vlab"><span class="ltr">Customer Name</span><span class="var">اسم العميل</span></span><span class="vval">${esc(p.customerName)}</span></td>
+          <td><span class="vlab"><span class="ltr">Contact No.</span><span class="var">رقم التواصل</span></span><span class="vval num">${esc(orDash(p.contactNumber))}</span></td>
+          <td><span class="vlab"><span class="ltr">Date &amp; Time</span><span class="var">التاريخ والوقت</span></span><span class="vval num">${esc(stamp)}</span></td>
+          <td><span class="vlab"><span class="ltr">Job No.</span><span class="var">رقم العمل</span></span><span class="vval num">${esc(p.jobNumber)}</span></td>
+        </tr>
+        <tr>
+          <td><span class="vlab"><span class="ltr">Plate No.</span><span class="var">رقم اللوحة</span></span><span class="vval num">${esc(orDash(v.plateNumber))}</span></td>
+          <td><span class="vlab"><span class="ltr">Car Make</span><span class="var">نوع السيارة</span></span><span class="vval">${esc(v.make)}</span></td>
+          <td><span class="vlab"><span class="ltr">Car Model</span><span class="var">طراز السيارة</span></span><span class="vval">${esc(v.model)}</span></td>
+          <td><span class="vlab"><span class="ltr">Car Year</span><span class="var">سنة الصنع</span></span><span class="vval num">${esc(v.modelYear)}</span></td>
+        </tr>
+        <tr>
+          <td><span class="vlab"><span class="ltr">ODO Meter</span><span class="var">عداد المسافات</span></span><span class="vval num">${esc(grouped(v.odometer))} km</span></td>
+          <td><span class="vlab"><span class="ltr">Car Color</span><span class="var">لون السيارة</span></span><span class="vval">${esc(orDash(v.color))}</span></td>
+          <td colspan="2"><span class="vlab"><span class="ltr">VIN Number</span><span class="var">رقم القاعدة (الشاصي)</span></span><span class="vval num">${esc(v.vin)}</span></td>
+        </tr>
+      </table>
     </div>
+    ${vehiclePhoto(p, input.verification)}
     ${liabilityBlock()}
     ${importantRemarks()}
     ${signatureBlock([
@@ -346,14 +367,23 @@ export function inspectionGroupPage(
   const pair = (right: string, left: string): string =>
     `<table class="grid"><tr><td>${right || '&nbsp;'}</td><td>${left || '&nbsp;'}</td></tr></table>`;
 
+  // The approved form paints the interior fittings drawing as a faint,
+  // absolutely-positioned background behind the lower-left (exterior)
+  // checklist, not as an in-flow figure. An in-flow copy would add its full
+  // height to a page that is already complete and push the last checklist onto
+  // a sixth sheet.
+  const interiorArt = interior
+    ? `<figure class="interior-art"><img src="${INTERIOR_DIAGRAM_DATA_URI}" alt=""></figure>`
+    : '';
+
   const cabin = `
   <div class="grp cabin">
+    ${interiorArt}
     <div class="grp-title">فحص التجهيزات الداخلية والملحقات الخارجية<span class="ltr">Cabin Electronics &amp; Exterior Accessories Checks</span>
       <span class="grp-legend">${legendChip('check', 'اجتياز', 'Pass')}${legendChip('cross', 'فشل', 'Fail')}<span class="lg-chip">N/A · غير متوفر</span></span>
     </div>
     ${pair(cell(engine, 'مقصورة المحرك', 'Engine Compartment', false), cell(road, 'تجربة القيادة', 'Road Test', false))}
     ${pair(cell(interior, 'داخلية السيارة', 'Interior Car', true), cell(exterior, 'خارجية السيارة', 'Exterior Car', true))}
-    ${interior ? `<figure class="interior-art"><img src="${INTERIOR_DIAGRAM_DATA_URI}" alt=""><figcaption>مخطط التجهيزات الداخلية<span class="ltr">Interior fittings reference</span></figcaption></figure>` : ''}
   </div>`;
 
   const remarkRows: string[] = [];
@@ -607,7 +637,11 @@ export const INSPECTION_REPORT_CSS = `
   .report-head{ display:flex; direction:ltr; justify-content:space-between; align-items:center;
     padding-bottom:4px; margin-bottom:2px; }
   .rh-left{ display:flex; align-items:center; gap:9px; }
-  .rh-logo{ height:38px; width:auto; }
+  /* The approved lockup prints the mark across x16-213pt (41.8pt tall). The
+   * bundled logo is a full mark+wordmark lockup, so its printed height is set
+   * to the reference mark's height rather than the previous 38px, which left it
+   * noticeably smaller than the approved header. */
+  .rh-logo{ height:56px; width:auto; }
   .rh-monogram{ width:38px; height:38px; border-radius:8px; background:var(--navy); color:var(--gold);
     display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14pt; letter-spacing:.5px; }
   .rh-name{ display:flex; flex-direction:column; line-height:1.12; }
@@ -632,25 +666,42 @@ export const INSPECTION_REPORT_CSS = `
   .lg-chip{ display:inline-flex; align-items:center; gap:4px; font-size:8pt; color:var(--ink); margin-inline-start:10px; }
   .legend-row{ display:flex; gap:6px; margin-top:6px; }
   /* ---- cover ---- */
-  .cover-grid{ display:flex; gap:12px; align-items:flex-start; }
-  .cover-info{ flex:1 1 auto; }
+  .cover-info{ width:100%; }
   .cover-sec-title{ background:var(--navy); color:#fff; font-size:9.5pt; font-weight:700; padding:3px 10px; border-radius:5px 5px 0 0; }
   .cover-sec-title .ltr{ margin-inline-start:8px; color:var(--gold-soft); font-size:8pt; font-weight:400; }
-  .vinfo{ border:1px solid var(--line); border-top:none; border-collapse:collapse; direction:ltr; }
+  .vinfo{ width:100%; border:1px solid var(--line); border-top:none; border-collapse:collapse; direction:ltr; }
   .vinfo td{ border:1px solid var(--line); padding:3px 8px; width:25%; vertical-align:top; }
   .vlab{ display:flex; align-items:baseline; gap:6px; font-size:7.3pt; color:var(--muted); line-height:1.2; }
   .vlab .ltr{ font-weight:700; color:var(--navy-soft); }
   .vlab .var{ direction:rtl; color:var(--muted); }
   .vval{ display:block; margin-top:1px; font-size:8.8pt; font-weight:700; color:var(--ink); }
-  .cover-verify{ flex:0 0 250px; }
-  .cover-verify .verify{ margin-top:0; flex-direction:column; align-items:stretch; }
-  .cover-verify .verify-qr{ display:flex; justify-content:center; }
-  .cover-verify .verify-qr img{ width:130px; height:130px; }
-  .vphoto{ margin:10px 0 0; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#fff; }
-  .vphoto img{ width:100%; height:132px; object-fit:cover; display:block; }
-  .vphoto figcaption{ font-size:7.5pt; color:var(--muted); padding:3px 6px; }
-  .vphoto-empty .vphoto-ph{ display:flex; flex-direction:column; align-items:center; justify-content:center;
-    height:64px; color:var(--muted); font-size:8pt; background:#f7f9fc; }
+  /* The approved cover prints the verification QR inside the photograph band,
+   * bottom-right, over a white card so the modules stay scannable. Physical
+   * right/bottom is used because the page is RTL and the reference anchors the
+   * code to the visual right regardless of direction. */
+  .cover-qr{ position:absolute; bottom:8px; right:10px; z-index:2;
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    background:#fff; border:1px solid var(--line); border-radius:5px; padding:5px 6px; }
+  .cover-qr img{ width:92px; height:92px; display:block; }
+  .cover-qr-cap{ font-size:6.4pt; font-weight:700; color:var(--navy); line-height:1.15; text-align:center; }
+  .cover-qr-cap .ltr{ display:block; font-size:5.6pt; color:var(--muted); font-weight:400; letter-spacing:.2px; }
+  /* The approved cover prints the vehicle photograph as a wide band across the
+   * middle of the page, bleeding past the side margins. */
+  .vphoto{ position:relative; margin:10px 0 0; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#f7f9fc; }
+  /* The approved cover bleeds the photograph to the paper edges. A negative
+   * margin, or a wider in-flow box, enlarges the printable area and shifts every
+   * other element on the sheet sideways. The band is therefore painted with an
+   * absolutely positioned image that overflows its (in-flow, margin-width)
+   * figure: absolute overflow is clipped by the paper edge, it does not resize
+   * the page. */
+  .vphoto--bleed{ margin-inline:0; border-radius:0; border-inline:none; height:176px; }
+  .vphoto--bleed .vphoto-img{ position:absolute; top:0; inset-inline:-12mm;
+    width:calc(100% + 24mm); height:176px; object-fit:cover; }
+  .vphoto-img{ width:100%; height:176px; object-fit:cover; display:block; }
+  .vphoto-empty .vphoto-ph{ position:absolute; top:0; inset-inline:-12mm;
+    width:calc(100% + 24mm); height:176px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:var(--muted); font-size:8pt; }
   .vphoto-ph .ltr{ font-size:7.5pt; color:var(--line-strong); }
   .terms{ margin-top:10px; border:1px solid var(--line); border-radius:6px; padding:8px 10px; background:#f7f9fc; }
   .terms-title{ font-size:9.5pt; font-weight:700; color:var(--navy); }
@@ -682,9 +733,16 @@ export const INSPECTION_REPORT_CSS = `
   .cabin .item-en{ font-size:5.6pt; line-height:1.0; }
   .grid{ table-layout:fixed; border-collapse:separate; border-spacing:4px 2px; }
   .grid > tbody > tr > td{ width:50%; vertical-align:top; padding:0; }
-  .interior-art{ margin:6px 0 0; }
-  .interior-art img{ width:100%; max-height:46px; object-fit:contain; object-position:top; display:block; }
-  .interior-art figcaption{ font-size:7pt; color:var(--muted); padding-top:2px; }
+  /* The approved form paints the interior fittings drawing as a faint
+   * background behind the lower-left (exterior) checklist, at 250x163pt (333px
+   * at Chromium's 96dpi/72pt ratio). It is out of flow, so it neither adds page
+   * height nor competes with the printed rows. The anchor is the physical left
+   * (left, not inset-inline-start, which resolves to the right in this RTL
+   * report) and the bottom of the cabin block, so the drawing sits under the
+   * exterior checklist exactly as the reference does. */
+  .cabin{ position:relative; }
+  .interior-art{ position:absolute; left:0; bottom:0; margin:0; z-index:0; }
+  .interior-art img{ width:333px; height:auto; display:block; opacity:.28; }
   .itable{ border:1px solid var(--line); border-top:none; }
   .itable-head{ background:#eef2f8; color:var(--navy); font-size:8.2pt; font-weight:700; padding:2px 7px; border-bottom:1px solid var(--line); }
   .itable-head .ltr{ margin-inline-start:6px; font-size:7.5pt; color:var(--muted); font-weight:400; }
@@ -709,9 +767,13 @@ export const INSPECTION_REPORT_CSS = `
   .diagram-title{ display:flex; align-items:baseline; font-size:10pt; font-weight:700; color:var(--navy);
     margin-bottom:6px; border-inline-start:4px solid var(--gold); padding-inline-start:7px; }
   .diagram-title .ltr{ margin-inline-start:8px; font-size:8pt; color:var(--muted); font-weight:400; }
-  .diagram-wrap{ display:flex; gap:14px; align-items:flex-start; }
+  /* The approved form prints the body-panel scheme at its full size, centred,
+   * with the condition legend beneath it. The drawing is the approved artwork
+   * itself, so its printed size is fixed to the reference: the car occupies
+   * 321x439pt, which is 428px at Chromium's 96dpi/72pt ratio. */
+  .diagram-wrap{ display:block; }
   .diagram{ position:relative; width:230px; flex:0 0 230px; }
-  .diagram--art{ width:200px; flex:0 0 200px; }
+  .diagram--art{ width:428px; margin:0 auto; }
   .artplan{ width:100%; height:auto; display:block; }
   .bodyplan{ width:100%; height:auto; display:block; }
   .bp-body{ fill:#eef2f8; stroke:#5b6472; stroke-width:3; }
@@ -731,8 +793,12 @@ export const INSPECTION_REPORT_CSS = `
   .marker-table{ margin-top:8px; border:1px solid var(--line); }
   .marker-table th,.marker-table td{ border-bottom:1px solid var(--line); padding:3px 7px; font-size:8pt; text-align:start; }
   .marker-table thead th{ background:#eef2f8; color:var(--navy); }
+  /* The approved form prints the chassis drawing beside its eight region
+   * labels. The drawing is the approved artwork itself and occupies 270x489pt
+   * on the reference (360px wide at Chromium's 96dpi/72pt ratio), so the box is
+   * fixed to that width rather than a nominal one. */
   .chassis-wrap{ display:flex; gap:14px; align-items:flex-start; }
-  .chassis-art{ position:relative; width:210px; flex:0 0 210px; }
+  .chassis-art{ position:relative; width:360px; flex:0 0 360px; }
   .artchassis{ width:100%; height:auto; display:block; }
   .chmark{ position:absolute; width:15px; height:15px; border-radius:50%; transform:translate(-50%,-50%);
     display:flex; align-items:center; justify-content:center; font-size:8pt; font-weight:700; color:#fff;

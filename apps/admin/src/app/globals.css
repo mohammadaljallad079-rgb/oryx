@@ -29,6 +29,14 @@
   --oryx-font-sans: Verdana, 'Segoe UI', 'Noto Sans Arabic', Arial, system-ui, -apple-system,
     'Helvetica Neue', sans-serif;
 
+  /*
+   * Tell the browser which scheme the native widgets belong to. Without this the
+   * date/time picker popup and the calendar indicator keep the operating
+   * system's default (usually light), so a dark-theme field renders a bright
+   * white panel over the navy page. It flips with the theme below.
+   */
+  color-scheme: dark;
+
   /* The official brand colours. */
   --brand-navy: #0f2b48;
   --brand-gray: #64748b;
@@ -113,6 +121,16 @@
    * theme needs a softer ring and a lighter scrim than a navy page does. */
   --focus-ring: rgba(212, 175, 55, 0.18);
   --backdrop: rgba(0, 10, 20, 0.66);
+  /* Compatibility aliases. Several screens reference these names directly, so
+   * they are defined here rather than left to fall back to nothing: an
+   * unresolved custom property drops the declaration, which made muted text
+   * render at full strength and a hovered option lose its background. */
+  --muted: var(--text-muted);
+  --surface-2: var(--surface-hover);
+  --accent: var(--gold);
+  --accent-strong: var(--gold);
+  --brand-primary: var(--primary);
+  --brand-primary-foreground: var(--on-primary);
   /* The shade a company brand colour is mixed toward to derive its pressed and
    * hover states. It is a token rather than a literal so the branded shell has
    * no colour value that a theme switch cannot reach. */
@@ -184,6 +202,7 @@
  * fails the build when a future edit breaks contrast.
  */
 :root[data-theme='light'] {
+  color-scheme: light;
   --bg: #f7f4ed;
   --bg-deep: #efeae0;
   --surface: #ffffff;
@@ -265,6 +284,16 @@
   --shadow-modal: 0 40px 80px -40px rgba(58, 48, 30, 0.4);
   --focus-ring: color-mix(in srgb, var(--gold) 20%, transparent);
   --backdrop: rgba(26, 22, 14, 0.5);
+  /* Compatibility aliases. Several screens reference these names directly, so
+   * they are defined here rather than left to fall back to nothing: an
+   * unresolved custom property drops the declaration, which made muted text
+   * render at full strength and a hovered option lose its background. */
+  --muted: var(--text-muted);
+  --surface-2: var(--surface-hover);
+  --accent: var(--gold);
+  --accent-strong: var(--gold);
+  --brand-primary: var(--primary);
+  --brand-primary-foreground: var(--on-primary);
   /* Photo surfaces keep the dark-theme ink: the scrim behind them is navy in
    * both themes, so white type over artwork stays correct on ivory too. */
   --on-media: #ffffff;
@@ -325,6 +354,24 @@ body {
   font-size: 14px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * UI text scale.
+ *
+ * The interface is authored in absolute pixel sizes across many Tailwind
+ * utilities, so a root `font-size` change would only move the handful of
+ * `rem`-based values. `zoom` scales the whole shell — every card, table, badge
+ * and control — in one place, which is what a text-size preference is expected
+ * to do. The inline bootstrap script sets the same attribute before first paint
+ * so a reload never flashes the default size.
+ */
+html[data-font-scale='SM'] {
+  zoom: 0.92;
+}
+
+html[data-font-scale='LG'] {
+  zoom: 1.12;
 }
 
 /* Ambient navy/gold wash behind the app shell, as in the reference. */
@@ -1001,6 +1048,45 @@ body::before {
 .oryx-textarea {
   min-height: 110px;
   resize: vertical;
+}
+
+/*
+ * Native date and time fields.
+ *
+ * The calendar/clock glyph the browser paints on a date field is a native
+ * control: at the shared control height it is drawn small and sits hard against
+ * the field edge, which is what made the inspection booking picker awkward to
+ * hit. Enlarging the indicator and giving it a consistent box keeps it usable on
+ * a touch screen, and `color-scheme` (set on `:root` per theme) keeps the popup
+ * itself legible instead of always light.
+ */
+.oryx-input--date,
+input[type='date'].oryx-input,
+input[type='time'].oryx-input,
+input[type='datetime-local'].oryx-input {
+  min-height: var(--control-h);
+  padding-inline-end: 8px;
+}
+
+.oryx-input--date::-webkit-calendar-picker-indicator,
+input[type='date'].oryx-input::-webkit-calendar-picker-indicator,
+input[type='time'].oryx-input::-webkit-calendar-picker-indicator,
+input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator {
+  width: 20px;
+  height: 20px;
+  padding: 2px;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.oryx-input--date::-webkit-calendar-picker-indicator:hover,
+input[type='date'].oryx-input::-webkit-calendar-picker-indicator:hover,
+input[type='time'].oryx-input::-webkit-calendar-picker-indicator:hover,
+input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  background-color: var(--surface-hover);
 }
 
 /*

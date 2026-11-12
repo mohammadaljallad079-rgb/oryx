@@ -21,7 +21,7 @@ import { conflict, ERROR_CODES, notFound } from '../common/errors';
 import type { ActorContext } from '../organizations/organizations.service';
 import type { RequestPrincipal } from '../auth/auth.decorators';
 import { DocumentStorageService } from './document-storage.service';
-import { PdfRendererService, OFFICIAL_PDF_MARGINS } from './pdf/pdf-renderer.service';
+import { PdfRendererService, OFFICIAL_PDF_MARGINS, REPORT_PDF_MARGINS } from './pdf/pdf-renderer.service';
 import { QrService } from './pdf/qr.service';
 import { renderInspectionReportHtml } from './templates/report-html';
 import { renderOfficialFinancialHtml } from './templates/official-financial.template';
@@ -263,9 +263,8 @@ export class DocumentsService {
           });
     const { pdf, pageCount } = await this.renderer.render(html, {
       footerHtml,
-      margins: layout === 'official' ? OFFICIAL_PDF_MARGINS : undefined,
+      margins: layout === 'official' ? OFFICIAL_PDF_MARGINS : REPORT_PDF_MARGINS,
     });
-
     const documentId = newDocumentId();
     const storageKey = this.storage.keyFor(args.companyId, documentId, version);
     await this.storage.write(storageKey, pdf);
@@ -404,7 +403,12 @@ export class DocumentsService {
     const html = bodyHtml.includes('@font-face')
       ? bodyHtml
       : bodyHtml.replace('<style>', `<style>${baseCss}\n`);
-    const footerHtml = referenceLayout
+    // The approved inspection report carries the same contacts-row footer as the
+    // approved invoice: a hairline rule, then the page counter, the phone and
+    // email, and the website on one row, with the registered address flush right
+    // beneath. Only the internal statements (which never print an identity band)
+    // keep the compact `footerTemplate`.
+    const footerHtml = referenceLayout || payload.kind === 'INSPECTION_REPORT'
       ? officialFooterTemplate(issuer)
       : footerTemplate({
           issuer,
@@ -414,7 +418,12 @@ export class DocumentsService {
         });
     const { pdf, pageCount } = await this.renderer.render(html, {
       footerHtml,
-      margins: referenceLayout ? OFFICIAL_PDF_MARGINS : undefined,
+      margins:
+        payload.kind === 'INSPECTION_REPORT'
+          ? REPORT_PDF_MARGINS
+          : referenceLayout
+            ? OFFICIAL_PDF_MARGINS
+            : undefined,
     });
 
     const storageKey = this.storage.keyFor(row.companyId, row.id, row.version);

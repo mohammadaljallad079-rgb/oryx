@@ -183,14 +183,14 @@ export const CONTACT_ICON_GLOBE =
 export function officialFooterTemplate(issuer: DocumentIssuer): string {
   const base = [
     'font-family:Verdana,Arial,Helvetica,sans-serif',
-    'color:#1f2d3d',
+    'color:#64748b',
     '-webkit-print-color-adjust:exact',
   ].join(';');
   // The reference footer spreads the contacts across one row — the page counter
   // on the left, the phone and email in the middle, the website on the right —
   // over a hairline rule, with the registered address (and its CR number)
-  // centred beneath. The VAT/TRN is the navy strip at the top of the page, so it
-  // is deliberately not repeated here.
+  // flush right beneath. The VAT/TRN is the navy strip at the top of the page,
+  // so it is deliberately not repeated here.
   //
   // The contact icons are inline SVG, not emoji. A footer template is its own
   // document: Chromium ignores an `@font-face` declared there, so the glyphs
@@ -205,19 +205,20 @@ export function officialFooterTemplate(issuer: DocumentIssuer): string {
   const addressLine = [address, registration].filter(Boolean).join(' | ');
   // The reference prints the page counter bilingually ("Page 1 of 1 • 1 من 1
   // صفحة"); both counters carry the same placeholders, which Chromium fills on
-  // every page. The insets match the measured reference footer (left ≈ 15mm,
-  // right ≈ 13mm), so the counter, the contacts and the website land on the same
-  // x-positions the approved sheet uses.
+  // every page. The contact figures are 7.2pt in the reference (measured), a
+  // step heavier and darker than the 6.5pt counter and address.
+  const contact = 'font-size:7.2pt;font-weight:700;color:#475569';
   return `
-<div style="${base};width:100%;padding:0 16.8mm 0 15mm;box-sizing:border-box;position:relative;top:11pt;">
-  <div style="border-top:0.75px solid #94a3b8;padding-top:5px;display:flex;justify-content:space-between;align-items:baseline;font-size:6.5pt;font-weight:700;">
+<div style="${base};width:100%;box-sizing:border-box;position:relative;top:15.5pt;">
+  <div style="border-top:0.75px solid #94a3b8;margin:0 15.8pt 0 13.7pt;"></div>
+  <div style="padding:5px 13.3mm 0 15mm;display:flex;justify-content:space-between;align-items:baseline;font-size:6.5pt;font-weight:700;">
     <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span> &bull; <span style="direction:rtl;unicode-bidi:embed;display:inline-block;"><span class="pageNumber"></span> من <span class="totalPages"></span> صفحة</span></span>
-    <span>${phone}${phone && email ? ' &nbsp; ' : ''}${email}</span>
-    <span>${website}</span>
+    <span style="${contact}">${phone}${phone && email ? ' &nbsp; ' : ''}${email}</span>
+    <span style="${contact}">${website}</span>
   </div>
   ${
     addressLine
-      ? `<div style="margin-top:9px;text-align:center;font-size:6.5pt;color:#334155;">${esc(addressLine)}</div>`
+      ? `<div style="margin-top:9px;padding-inline-end:13.3mm;text-align:end;font-size:6.5pt;color:#64748b;">${esc(addressLine)}</div>`
       : ''
   }
 </div>`;
@@ -280,7 +281,10 @@ export const CHROME_CSS = `
   .doc-issuer-en{ font-size:15pt; font-weight:700; color:var(--navy); }
   .doc-issuer-ar{ font-size:12pt; color:var(--navy-soft); }
   .doc-issuer-meta{ margin-top:4px; font-size:8.5pt; color:var(--muted); display:flex; gap:10px; flex-wrap:wrap; }
-  .doc-logo{ height:46px; width:auto; }
+  /* The approved lockup prints the mark at 136pt wide (its 41.8pt height is
+   * driven by the mark's own aspect). The previous 46px box printed it at
+   * 124pt, visibly smaller than the reference. */
+  .doc-logo{ height:51px; width:auto; }
   .doc-monogram{ width:46px; height:46px; border-radius:8px; background:var(--navy);
     color:var(--gold); display:flex; align-items:center; justify-content:center;
     font-weight:700; font-size:17pt; letter-spacing:.5px; }
