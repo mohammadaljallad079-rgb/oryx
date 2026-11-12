@@ -137,7 +137,7 @@ the branch and the date/time picker. The date/time inputs are enlarged via
 | `pnpm --filter @oryx/shared test` | **232** passed (12 files) |
 | `pnpm --filter @oryx/api test` | **78** passed (10 suites) |
 | `pnpm --filter @oryx/api test:e2e` | **745** passed (41 suites, 0 failed) |
-| Admin browser suite (full) | see §4 |
+| Admin browser suite (full) | **258** passed, 1 skipped, 0 failed (11.1m) |
 | `pnpm --filter @oryx/admin build` | success (relative API base) |
 | `pnpm --filter @oryx/admin lint` | clean (0 warnings) |
 | QR decoded out of the rendered PDF | success; the extracted URL opens the public verification page with no session |
