@@ -403,7 +403,12 @@ export class DocumentsService {
     const html = bodyHtml.includes('@font-face')
       ? bodyHtml
       : bodyHtml.replace('<style>', `<style>${baseCss}\n`);
-    const footerHtml = referenceLayout
+    // The approved inspection report carries the same contacts-row footer as the
+    // approved invoice: a hairline rule, then the page counter, the phone and
+    // email, and the website on one row, with the registered address flush right
+    // beneath. Only the internal statements (which never print an identity band)
+    // keep the compact `footerTemplate`.
+    const footerHtml = referenceLayout || payload.kind === 'INSPECTION_REPORT'
       ? officialFooterTemplate(issuer)
       : footerTemplate({
           issuer,

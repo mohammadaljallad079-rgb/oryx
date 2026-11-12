@@ -238,4 +238,34 @@ describe('inspection report template — font independence', () => {
     });
     expect(html).not.toContain('class="interior-art"');
   });
+
+  it('prints the approved wordmark alone when a logo is configured', () => {
+    const html = renderInspectionReportHtml({
+      issuer: { ...issuer, logoDataUri: 'data:image/png;base64,AAAA' },
+      payload,
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    // The wordmark already carries the company name, so the name stack beside it
+    // must not be printed — the approved header shows the mark only.
+    expect(html).toContain('class="rh-logo"');
+    expect(html).not.toContain('class="rh-name"');
+  });
+
+  it('falls back to the monogram and name stack when no logo is configured', () => {
+    const html = renderInspectionReportHtml({
+      issuer: { ...issuer, logoDataUri: null },
+      payload,
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    expect(html).toContain('class="rh-monogram"');
+    expect(html).toContain('class="rh-name"');
+  });
 });

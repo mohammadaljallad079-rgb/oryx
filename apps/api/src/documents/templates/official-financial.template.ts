@@ -505,7 +505,7 @@ export const OFFICIAL_FINANCIAL_CSS = `
     font-family:${DOCUMENT_LATIN_STACK}; }
   /* The reference watermark is the "AUTO SERVICES" wordmark set in the identity
      navy at ~52pt, centred on the page (measured y 374-426 on an 842pt sheet). */
-  .of-watermark{ position:absolute; left:0; right:0; top:45%;
+  .of-watermark{ position:absolute; left:0; right:0; top:44.2%;
     text-align:center; font-size:52pt; font-weight:700; letter-spacing:1px;
     color:#0a1f44; opacity:0.055; pointer-events:none; z-index:-1;
     font-family:Verdana,Arial,Helvetica,sans-serif; }
@@ -513,28 +513,28 @@ export const OFFICIAL_FINANCIAL_CSS = `
     min-height:37pt; }
   .of-band-lead{ flex:0 0 auto; }
   .of-band-trail{ text-align:end; }
-  .of-logo{ height:33pt; width:auto; }
+  .of-logo{ height:31.3pt; width:auto; }
   .of-wordmark-ar{ font-size:14.5pt; font-weight:700; color:#0a1f44; }
   .of-wordmark-en{ font-size:14.2pt; font-weight:700; color:#0a1f44; letter-spacing:.5px; }
   .of-tag-ar{ font-size:11.8pt; font-weight:700; color:#102749; }
   .of-tag-en{ font-size:7.9pt; font-weight:700; color:#102749; letter-spacing:.4px; }
-  .of-title{ text-align:center; margin-top:31.5pt; }
+  .of-title{ text-align:center; margin-top:33pt; }
   .of-title-ar{ font-size:12.3pt; font-weight:700; color:#0f2b48; line-height:1.0; }
   .of-title-en{ font-size:12.3pt; font-weight:700; color:#0f2b48; letter-spacing:.6px; line-height:1.0; }
   .of-trn{ margin-top:1pt; background:#0f2b48; color:#fff; font-size:8.8pt;
     font-weight:700; text-align:end; padding:2pt 10pt; line-height:1.0; }
   /* The reference panel has a hairline light border and no internal divider:
      the left column is wide, the customer column is a label/value grid. */
-  .of-panel{ display:flex; border:0.75px solid #c2c9d5; border-top:none;
+  .of-panel{ display:flex; border:1.5px solid #94a3b8; border-top:none;
     line-height:1.2; }
   /* Measured from the reference: the customer column's labels begin at x≈327
      on a 545pt content width, so the left column is ~51% (not an even split). */
-  .of-panel-left{ flex:0 0 51%; padding:7pt 10pt; }
+  .of-panel-left{ flex:0 0 52%; padding:7pt 10pt; }
   /* The approved quotation sets its field block 3.3pt lower than the invoice's
      (Quotation Date 155.3 against Order Date 152.0) while the document number
      stays at the same height, so only the field grid is inset. */
   .of-panel-left-quote .of-lgrid{ margin-top:3.3pt; }
-  .of-panel-right{ flex:1 1 auto; padding:4pt 10pt; }
+  .of-panel-right{ flex:1 1 auto; padding:1.5pt 10pt; }
   .of-docno{ font-size:13.3pt; font-weight:700; color:#0f2b48; margin-bottom:2pt; }
   .of-field{ margin-top:4.5pt; }
   /* The reference prints the date and the expiration date side by side in one
@@ -547,7 +547,7 @@ export const OFFICIAL_FINANCIAL_CSS = `
      right-aligned (every label ends on the same x, ≈392) with the values on a
      common left edge (≈400), exactly as the approved sheet prints them. */
   .of-cp-row{ display:grid; grid-template-columns:72pt 1fr; gap:0 8pt;
-    margin-top:3pt; align-items:baseline; }
+    margin-top:6pt; align-items:baseline; }
   .of-cp-row-top{ align-items:start; }
   .of-cp-label{ font-size:7.3pt; color:#64748b; font-weight:700; text-align:end; }
   .of-cp-value{ font-size:8.8pt; color:#0f2b48; font-weight:700; }
@@ -603,17 +603,19 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-notes{ margin-top:9pt; border:1px solid #c2c9d5; padding:7pt 10pt; }
   .of-notes-body{ font-size:9pt; color:#334155; }
   .of-thanks{ margin-top:10pt; text-align:center; }
-  .of-thanks-ar{ font-size:9pt; font-weight:700; color:#05162b; }
-  .of-thanks-en{ font-size:8.5pt; font-weight:700; color:#05162b; }
+  /* The reference thank-you line is 5.6pt (measured), noticeably smaller than
+     the signature labels, so it reads as a footnote rather than a heading. */
+  .of-thanks-ar{ font-size:5.6pt; font-weight:700; color:#05162b; }
+  .of-thanks-en{ font-size:5.6pt; font-weight:700; color:#05162b; }
   /* The thanks/signature strip is pinned to the foot of the page box, as the
      approved reference prints it, rather than trailing the last table row. The
      reference leaves ~3.5pt more clearance below the strip than the box end, so
      a small bottom margin lifts the strip and the thank-you line onto the
      measured reference positions (signature 761.1, thanks 797.9). */
-  .of-bottom{ margin-top:auto; margin-bottom:3.5pt; }
+  .of-bottom{ margin-top:auto; margin-bottom:12pt; }
   /* The reference leaves a clear gap between the signature strip and the
      thank-you line (measured 761pt to 798pt), so the strip is not cramped. */
-  .of-bottom .of-thanks{ margin-top:10pt; }
+  .of-bottom .of-thanks{ margin-top:18pt; }
   /* The reference signature strip is a single row. Each signatory's English and
      Arabic label sit inline on one line; the first label starts at the content
      edge and the second at ~60% across, exactly as the approved sheet prints
@@ -622,8 +624,8 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-sign{ display:flex; gap:8pt; justify-content:flex-start; align-items:baseline; }
   .of-sign:first-child{ flex:0 0 60%; }
   .of-sign:last-child{ flex:1 1 auto; }
-  .of-sign-en{ font-size:8.8pt; font-weight:700; color:#0f2b48; }
-  .of-sign-ar{ font-size:8.8pt; font-weight:700; color:#0f2b48; }
+  .of-sign-en{ font-size:7.5pt; font-weight:700; color:#0f2b48; }
+  .of-sign-ar{ font-size:7.5pt; font-weight:700; color:#0f2b48; }
   /* The verification strip: a compact ruled box above the signature strip. It is
      deliberately restrained so it reads as a security footnote and never
      competes with the priced table or the approved identity band. */

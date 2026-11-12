@@ -105,5 +105,13 @@ describe('document chrome', () => {
       const html = officialFooterTemplate({ ...issuer, addressLine: '<img src=x onerror=alert(1)>' });
       expect(html).not.toContain('<img');
     });
+
+    it('sets the contact figures above the counter and flushes the address right', () => {
+      const html = officialFooterTemplate(issuer);
+      // The approved sheet prints the phone/email/website a step heavier than
+      // the counter, and the registered address flush right beneath it.
+      expect(html).toContain('font-size:7.2pt;font-weight:700;color:#475569');
+      expect(html).toContain('text-align:end');
+    });
   });
 });

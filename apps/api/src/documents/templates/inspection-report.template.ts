@@ -101,17 +101,21 @@ function reportHeader(issuer: DocumentIssuer): string {
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase() ?? '')
     .join('');
-  const mark = issuer.logoDataUri
+  // The approved header is the ORYX wordmark on the left and the tagline on the
+  // right — the wordmark already spells the Arabic name and "AUTO SERVICES", so
+  // repeating the company name beside it (as the fallback does) is not on the
+  // approved sheet. The name stack is therefore kept only for the no-logo case.
+  const left = issuer.logoDataUri
     ? `<img class="rh-logo" src="${esc(issuer.logoDataUri)}" alt="${esc(issuer.nameEn)}">`
-    : `<div class="rh-monogram">${esc(initials || 'OR')}</div>`;
-  return `
-  <header class="report-head">
-    <div class="rh-left">
-      ${mark}
+    : `<div class="rh-monogram">${esc(initials || 'OR')}</div>
       <div class="rh-name">
         <span class="rh-name-ar">${esc(issuer.nameAr || issuer.nameEn)}</span>
         <span class="rh-name-en">${esc(issuer.nameEn)}</span>
-      </div>
+      </div>`;
+  return `
+  <header class="report-head">
+    <div class="rh-left">
+      ${left}
     </div>
     <div class="rh-right">
       <span class="rh-tag-ar">خبراء فحص المركبات</span>
