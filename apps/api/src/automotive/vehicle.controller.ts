@@ -23,6 +23,7 @@ import {
   RecordMileageDto,
   SubmitReportDto,
   UpdateInspectionBookingDto,
+  UpdateInspectionServiceDto,
   UpdateVehicleDto,
   VehicleDocumentDto,
 } from './automotive.dto';
@@ -169,6 +170,35 @@ export class VehicleController {
   @ApiOperation({ summary: 'Delete an inspection service that has no bookings' })
   deleteService(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.vehicles.deleteInspectionService(id, p, actorFrom(p, req));
+  }
+
+  @Patch('inspection-services/:id')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.inspection.service.manage')
+  @ApiOperation({ summary: 'Edit an inspection service, its price, VAT or picture' })
+  updateService(@Param('id') id: string, @Body() dto: UpdateInspectionServiceDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.vehicles.updateInspectionService(id, dto, p, actorFrom(p, req));
+  }
+
+  /**
+   * Uploads the service picture. The image is re-encoded and stored in the
+   * shared media library; the returned asset id is written onto the service
+   * with a follow-up `PATCH`, so the same upload path serves a service picture
+   * and every other catalogue image.
+   */
+  @Post('inspection-services/:id/image')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.inspection.service.manage')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 12 * 1024 * 1024, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload a picture for an inspection service' })
+  uploadServiceImage(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.vehicles.uploadInspectionServiceImage(id, file, p, actorFrom(p, req));
   }
 
   @Post('inspection-checklist-items')

@@ -68,6 +68,24 @@ export class UpdateAccountDto {
   @MaxLength(160)
   nameAr?: string;
 
+  /** `null` detaches the account and makes it a root; a string re-parents it. */
+  @IsOptional()
+  @IsString()
+  parentId?: string | null;
+
+  /**
+   * A type change is refused for an account that has postings or children —
+   * either would leave the chart and the statements inconsistent — but an
+   * account still being built may be reclassified.
+   */
+  @IsOptional()
+  @IsIn(ACCOUNT_TYPES)
+  type?: (typeof ACCOUNT_TYPES)[number];
+
+  @IsOptional()
+  @IsIn(['DEBIT', 'CREDIT'])
+  normalBalance?: 'DEBIT' | 'CREDIT';
+
   @IsOptional()
   @IsBoolean()
   isPostable?: boolean;

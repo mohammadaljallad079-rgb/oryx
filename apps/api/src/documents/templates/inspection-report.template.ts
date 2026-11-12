@@ -212,17 +212,25 @@ function liabilityBlock(): string {
   </div>`;
 }
 
-/** The vehicle photo, or a neutral placeholder when none was attached. */
+/**
+ * The vehicle photo band on the identification cover.
+ *
+ * The approved report prints the vehicle photograph as a wide band across the
+ * middle of the cover, bleeding past the side margins. The frame keeps that
+ * proportion (a wide band, not a thumbnail) so the printed sheet reads the same
+ * as the reference. A session with no attached photograph prints the neutral
+ * placeholder rather than an empty frame, so the cover never shows a broken
+ * image.
+ */
 function vehiclePhoto(p: InspectionReportPayload): string {
   if (p.vehiclePhotoDataUri) {
     return `
-    <figure class="vphoto">
-      <img src="${esc(p.vehiclePhotoDataUri)}" alt="${esc(`${p.vehicle.make} ${p.vehicle.model}`)}">
-      <figcaption>صورة المركبة · Vehicle photograph</figcaption>
+    <figure class="vphoto vphoto--bleed">
+      <img class="vphoto-img" src="${esc(p.vehiclePhotoDataUri)}" alt="${esc(`${p.vehicle.make} ${p.vehicle.model}`)}">
     </figure>`;
   }
   return `
-    <figure class="vphoto vphoto-empty">
+    <figure class="vphoto vphoto--bleed vphoto-empty">
       <div class="vphoto-ph">لا توجد صورة مرفقة للمركبة<span class="ltr">No vehicle photograph attached</span></div>
     </figure>`;
 }
@@ -269,12 +277,12 @@ export function identificationPage(input: InspectionReportInput, chrome: Documen
             <td colspan="2"><span class="vlab"><span class="ltr">VIN Number</span><span class="var">رقم القاعدة (الشاصي)</span></span><span class="vval num">${esc(v.vin)}</span></td>
           </tr>
         </table>
-        ${vehiclePhoto(p)}
       </div>
       <div class="cover-verify">
         ${verificationBlock(input.verification)}
       </div>
     </div>
+    ${vehiclePhoto(p)}
     ${liabilityBlock()}
     ${importantRemarks()}
     ${signatureBlock([
@@ -646,11 +654,23 @@ export const INSPECTION_REPORT_CSS = `
   .cover-verify .verify{ margin-top:0; flex-direction:column; align-items:stretch; }
   .cover-verify .verify-qr{ display:flex; justify-content:center; }
   .cover-verify .verify-qr img{ width:130px; height:130px; }
-  .vphoto{ margin:10px 0 0; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#fff; }
-  .vphoto img{ width:100%; height:132px; object-fit:cover; display:block; }
-  .vphoto figcaption{ font-size:7.5pt; color:var(--muted); padding:3px 6px; }
-  .vphoto-empty .vphoto-ph{ display:flex; flex-direction:column; align-items:center; justify-content:center;
-    height:64px; color:var(--muted); font-size:8pt; background:#f7f9fc; }
+  /* The approved cover prints the vehicle photograph as a wide band across the
+   * middle of the page, bleeding past the side margins. */
+  .vphoto{ position:relative; margin:10px 0 0; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#f7f9fc; }
+  /* The approved cover bleeds the photograph to the paper edges. A negative
+   * margin, or a wider in-flow box, enlarges the printable area and shifts every
+   * other element on the sheet sideways. The band is therefore painted with an
+   * absolutely positioned image that overflows its (in-flow, margin-width)
+   * figure: absolute overflow is clipped by the paper edge, it does not resize
+   * the page. */
+  .vphoto--bleed{ margin-inline:0; border-radius:0; border-inline:none; height:176px; }
+  .vphoto--bleed .vphoto-img{ position:absolute; top:0; inset-inline:-12mm;
+    width:calc(100% + 24mm); height:176px; object-fit:cover; }
+  .vphoto-img{ width:100%; height:176px; object-fit:cover; display:block; }
+  .vphoto-empty .vphoto-ph{ position:absolute; top:0; inset-inline:-12mm;
+    width:calc(100% + 24mm); height:176px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:var(--muted); font-size:8pt; }
   .vphoto-ph .ltr{ font-size:7.5pt; color:var(--line-strong); }
   .terms{ margin-top:10px; border:1px solid var(--line); border-radius:6px; padding:8px 10px; background:#f7f9fc; }
   .terms-title{ font-size:9.5pt; font-weight:700; color:var(--navy); }

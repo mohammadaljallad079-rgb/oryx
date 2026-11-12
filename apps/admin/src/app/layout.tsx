@@ -25,7 +25,7 @@ export const viewport: Viewport = {
  * flash on every navigation. Running it as a blocking inline script also means
  * `data-theme` is already correct when React hydrates.
  */
-const PREFERENCE_BOOTSTRAP = `(function(){try{var d=document.documentElement;var t=localStorage.getItem('oryx.theme');if(t==='light'||t==='dark'){d.setAttribute('data-theme',t);d.style.colorScheme=t;}var l=localStorage.getItem('oryx.locale');if(l==='ar'||l==='en'){d.setAttribute('lang',l);d.setAttribute('data-dir',l==='ar'?'rtl':'ltr');d.dir=l==='ar'?'rtl':'ltr';}}catch(e){}})();`;
+const PREFERENCE_BOOTSTRAP = `(function(){try{var d=document.documentElement;var t=localStorage.getItem('oryx.theme');if(t==='light'||t==='dark'){d.setAttribute('data-theme',t);d.style.colorScheme=t;}var l=localStorage.getItem('oryx.locale');if(l==='ar'||l==='en'){d.setAttribute('lang',l);d.setAttribute('data-dir',l==='ar'?'rtl':'ltr');d.dir=l==='ar'?'rtl':'ltr';}var f=localStorage.getItem('oryx.fontScale');var m={SM:'12.5px',MD:'14px',LG:'16px'};if(f&&m[f]){d.setAttribute('data-font-scale',f);d.style.fontSize=m[f];}}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   // Defaults are applied server-side; the bootstrap script and the client

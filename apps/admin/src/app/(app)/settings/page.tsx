@@ -12,7 +12,7 @@ import { CompanySettingsPanel } from '@/components/company-settings-panel';
 import { TaxRatesPanel } from '@/components/tax-rates-panel';
 
 export default function SettingsPage() {
-  const { t, locale, theme, setLocale, setTheme } = useUi();
+  const { t, locale, theme, fontScale, setLocale, setTheme, setFontScale } = useUi();
   const { user, companyId, isPlatform, can, updatePreferences, refreshSession } = useAuth();
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -117,7 +117,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div>
+          <div className="mb-4">
             <p className="oryx-label">{t('settings.locale')}</p>
             <div className="flex gap-2">
               {(['ar', 'en'] as const).map((code) => (
@@ -138,11 +138,33 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          <div>
+            <p className="oryx-label">{t('settings.fontSize')}</p>
+            <div className="flex flex-wrap gap-2">
+              {(['SM', 'MD', 'LG'] as const).map((scale) => (
+                <Button
+                  key={scale}
+                  size="sm"
+                  variant={fontScale === scale ? 'primary' : 'default'}
+                  onClick={() => {
+                    setFontScale(scale);
+                    void updatePreferences({ preferredFontScale: scale }).catch(() => undefined);
+                  }}
+                  data-testid={`font-scale-${scale}`}
+                >
+                  <span aria-hidden style={{ fontSize: scale === 'SM' ? 12 : scale === 'LG' ? 17 : 14 }}>A</span>
+                  {t(`settings.fontScale.${scale}` as const)}
+                </Button>
+              ))}
+            </div>
+          </div>
+
           <hr className="oryx-divider my-4" />
           <div className="flex flex-wrap gap-2">
             <Badge tone={isPlatform ? 'gold' : 'info'}>{isPlatform ? 'Super Admin' : 'Company user'}</Badge>
             <Badge tone="neutral">{locale.toUpperCase()}</Badge>
             <Badge tone="neutral">{theme}</Badge>
+            <Badge tone="neutral">{fontScale}</Badge>
           </div>
         </Card>
       </div>

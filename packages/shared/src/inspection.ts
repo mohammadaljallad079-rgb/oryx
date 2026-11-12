@@ -17,7 +17,10 @@
  * one monolithic form.
  */
 
-/** The seven selectable inspection areas. */
+/** The seven data areas an inspection can record results against. These are the
+ * storage/editor granularity and are *not* what the operator selects: the
+ * approved report offers four selectable inspection types, each of which covers
+ * one or more of these areas (see `INSPECTION_TYPES`). */
 export const INSPECTION_SECTION_KEYS = [
   'PAINT_BODY',
   'CHASSIS_UNDERCARRIAGE',
@@ -29,6 +32,114 @@ export const INSPECTION_SECTION_KEYS = [
 ] as const;
 
 export type InspectionSectionKey = (typeof INSPECTION_SECTION_KEYS)[number];
+
+/**
+ * The four selectable inspection types of the approved report.
+ *
+ * The report has exactly four check sections, so the operator chooses one or
+ * more of these — never the seven internal areas. Each type maps to the areas
+ * that record its results, which is why selecting a type expands to its areas
+ * for storage while the screen and the printed plan stay at four.
+ */
+export const INSPECTION_TYPE_KEYS = [
+  'PAINT_BODY',
+  'CHASSIS_UNDERCARRIAGE',
+  'CABIN_AND_MECHANICAL',
+  'COMPUTER_UNIT',
+] as const;
+
+export type InspectionTypeKey = (typeof INSPECTION_TYPE_KEYS)[number];
+
+export interface InspectionTypeSpec {
+  key: InspectionTypeKey;
+  labelEn: string;
+  labelAr: string;
+  summaryEn: string;
+  summaryAr: string;
+  /** The printed page of the report this type is drawn on. */
+  page: number;
+  /** The data areas this type records results against. */
+  sections: readonly InspectionSectionKey[];
+}
+
+export const INSPECTION_TYPES: readonly InspectionTypeSpec[] = [
+  {
+    key: 'PAINT_BODY',
+    labelEn: 'Vehicle Paint & Body Check',
+    labelAr: 'فحص الصبغ وبدن المركبة',
+    summaryEn: 'Body panels diagnostic scheme and paint remarks.',
+    summaryAr: 'مخطط تشخيص هياكل السيارة وملاحظات الصبغ.',
+    page: 2,
+    sections: ['PAINT_BODY'],
+  },
+  {
+    key: 'CHASSIS_UNDERCARRIAGE',
+    labelEn: 'Chassis & Undercarriage Condition',
+    labelAr: 'فحص الشاصي وأسفل المركبة',
+    summaryEn: 'Chassis safety diagram with eight assessed regions.',
+    summaryAr: 'مخطط سلامة الشاصي بثماني مناطق تقييم.',
+    page: 3,
+    sections: ['CHASSIS_UNDERCARRIAGE'],
+  },
+  {
+    key: 'CABIN_AND_MECHANICAL',
+    labelEn: 'Interior & Exterior / Engine Compartment / Road Test',
+    labelAr: 'الفحص الداخلي والخارجي / مقصورة المحرك / تجربة القيادة',
+    summaryEn: 'Cabin, exterior, engine compartment and road test checklists.',
+    summaryAr: 'قوائم الفحص الداخلي والخارجي ومقصورة المحرك وتجربة القيادة.',
+    page: 4,
+    sections: ['INTERIOR', 'EXTERIOR', 'ENGINE_COMPARTMENT', 'ROAD_TEST'],
+  },
+  {
+    key: 'COMPUTER_UNIT',
+    labelEn: 'Computer Unit Inspection',
+    labelAr: 'فحص وحدة الكمبيوتر',
+    summaryEn: 'Computer module faults and an optional vendor diagnostic PDF.',
+    summaryAr: 'أعطال وحدة الكمبيوتر وملف تشخيص PDF الخارجي الاختياري.',
+    page: 5,
+    sections: ['COMPUTER_UNIT'],
+  },
+] as const;
+
+export function inspectionTypeSpec(key: string): InspectionTypeSpec {
+  const found = INSPECTION_TYPES.find((t) => t.key === key);
+  if (!found) throw new Error(`Unknown inspection type: ${key}`);
+  return found;
+}
+
+export function isInspectionTypeKey(key: string): key is InspectionTypeKey {
+  return (INSPECTION_TYPE_KEYS as readonly string[]).includes(key);
+}
+
+/** The data areas a type records, in catalogue order. */
+export function sectionsForType(key: InspectionTypeKey): InspectionSectionKey[] {
+  const spec = inspectionTypeSpec(key);
+  return INSPECTION_SECTION_KEYS.filter((k) => spec.sections.includes(k));
+}
+
+/** Expand a set of selected types into the areas they record, deduped and in
+ * catalogue order. This is what the API stores on `selectedAreas`. */
+export function areasForTypes(types: readonly InspectionTypeKey[]): InspectionSectionKey[] {
+  const wanted = new Set<InspectionSectionKey>();
+  for (const type of types) for (const area of sectionsForType(type)) wanted.add(area);
+  return INSPECTION_SECTION_KEYS.filter((k) => wanted.has(k));
+}
+
+/** The type that owns a stored area. */
+export function typeForSection(area: InspectionSectionKey): InspectionTypeKey {
+  const found = INSPECTION_TYPES.find((t) => t.sections.includes(area));
+  if (!found) throw new Error(`No inspection type owns area ${area}`);
+  return found.key;
+}
+
+/** The distinct types a set of stored areas maps back to, in catalogue order.
+ * The inverse of `areasForTypes`, used to show the operator the four types a
+ * job covers. */
+export function typesForAreas(areas: readonly InspectionSectionKey[]): InspectionTypeKey[] {
+  const wanted = new Set<InspectionTypeKey>();
+  for (const area of areas) wanted.add(typeForSection(area));
+  return INSPECTION_TYPE_KEYS.filter((k) => wanted.has(k));
+}
 
 /**
  * How a section is completed. `ITEMS` is a checklist, `DIAGRAM_PAINT` and

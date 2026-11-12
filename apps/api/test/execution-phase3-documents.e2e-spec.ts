@@ -2,6 +2,7 @@ import * as argon2 from 'argon2';
 import { INSPECTION_SECTION_SPECS, MODULE_KEYS, planInspectionReport, type InspectionSectionKey } from '@oryx/shared';
 import { PrismaService } from '../src/common/prisma.service';
 import { call, companyCall, createTestApp, login, type TestContext } from './test-app';
+import { decodeQrCodesInPdf } from './pdf-qr';
 
 /**
  * Execution Phase 3 — official documents, PDF printing and QR verification.
@@ -717,6 +718,38 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
       expect(text).not.toContain('/Type3');
       // A literal `&nbsp;` in the text layer is the escaped-entity regression.
       expect(text).not.toContain('&amp;nbsp;');
+    });
+
+    it('prints a QR code that a real scanner can read off the rendered PDF and that verifies', async () => {
+      // The requirement is a *working* code, tested by scanning the generated
+      // document — not merely a PNG in the HTML. This decodes the code out of
+      // the finished PDF, then presents what a scanner would open to the public
+      // verification endpoint and checks it resolves to this document.
+      const res = await companyCall<{ id: string; verificationToken: string; verificationUrl: string }>(
+        ctx.base,
+        companyId,
+        '/documents/issue',
+        { method: 'POST', token: issuerToken, body: { type: 'SALES_INVOICE', sourceId: invoiceId } },
+      );
+      expect(res.status === 201 ? '' : JSON.stringify(res.body)).toBe('');
+
+      const pdf = await fetch(`${ctx.base}/api/v1/documents/${res.body.id}/file`, {
+        headers: { Authorization: `Bearer ${issuerToken}`, 'x-oryx-company-id': companyId },
+      });
+      const decoded = decodeQrCodesInPdf(Buffer.from(await pdf.arrayBuffer()));
+      expect(decoded.length).toBeGreaterThanOrEqual(1);
+      expect(decoded[0]).toBe(res.body.verificationUrl);
+      expect(decoded[0]).toContain(res.body.verificationToken);
+
+      // The scanned URL is the one a reader would open, so it must verify.
+      const scannedPath = new URL(decoded[0]).pathname.replace(/^\/+/, '');
+      const verified = await call<{ found: boolean; document: { type: string } }>(
+        ctx.base,
+        `/${scannedPath.replace(/^verify\//, 'documents/verify/')}`,
+      );
+      expect(verified.status).toBe(200);
+      expect(verified.body.found).toBe(true);
+      expect(verified.body.document.type).toBe('SALES_INVOICE');
     });
 
     it('prints the official brand mark and a faint watermark without a tenant upload', async () => {

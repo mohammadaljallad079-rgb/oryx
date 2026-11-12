@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { DOCUMENT_FONT_STACK, DOCUMENT_LATIN_STACK } from './document-fonts.service';
-import { BASE_PRINT_CSS, launchChromium } from './pdf-renderer.service';
+import { BASE_PRINT_CSS, launchChromium, OFFICIAL_PDF_MARGINS, REPORT_PDF_MARGINS } from './pdf-renderer.service';
 
 /**
  * The numeric and Latin classes must keep an Arabic face in their stack.
@@ -34,6 +34,30 @@ describe('document print CSS font stacks', () => {
     expect(DOCUMENT_LATIN_STACK).toContain('ORYX Arabic');
     expect(DOCUMENT_LATIN_STACK).toContain('ORYX Sans');
     expect(DOCUMENT_FONT_STACK).toContain('ORYX Arabic');
+  });
+});
+
+/**
+ * The report and the financial forms print to different edges.
+ *
+ * The approved invoice sits close to every edge; the approved report lifts only
+ * its top edge (the brand band) and keeps the default side margins, because its
+ * cover photograph bleeds to the paper edges by cancelling exactly that inset.
+ * Sharing one margin set with the invoice would drag the report's header down,
+ * so the two constants must stay distinct.
+ */
+describe('document page margins', () => {
+  it('lifts the report top edge without narrowing its sides', () => {
+    expect(REPORT_PDF_MARGINS.top).not.toBe(OFFICIAL_PDF_MARGINS.top);
+    expect(REPORT_PDF_MARGINS.left).toBe(REPORT_PDF_MARGINS.right);
+    // The photograph's bleed cancels the side inset, so the sides must remain the
+    // default the bleed was measured against.
+    expect(REPORT_PDF_MARGINS.left).toBe('12mm');
+  });
+
+  it('keeps the official invoice margins on all four edges', () => {
+    expect(OFFICIAL_PDF_MARGINS.left).not.toBe(OFFICIAL_PDF_MARGINS.right);
+    expect(OFFICIAL_PDF_MARGINS.top).toBe('5.7mm');
   });
 });
 

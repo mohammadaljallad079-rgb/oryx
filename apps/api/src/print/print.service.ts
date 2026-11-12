@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { fromMinor, currencyScale, currencySymbol, type PrintDocumentDto, type PrintDocumentKind, type PrintPartyDto } from '@oryx/shared';
+import { fromMinor, currencyScale, currencySymbol, type PrintDocumentDto, type PrintDocumentKind, type PrintPartyDto, type PrintVerificationDto } from '@oryx/shared';
 import { notFound, ERROR_CODES } from '../common/errors';
 import { ErpContextService } from '../common/erp-context.service';
 import { PrismaService } from '../common/prisma.service';
+import { QrService } from '../documents/pdf/qr.service';
 import type { RequestPrincipal } from '../auth/auth.decorators';
 import { amountInWords, toPrintLines, toPrintTotals } from './print-format';
 
@@ -90,6 +91,7 @@ export class PrintService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly context: ErpContextService,
+    private readonly qr: QrService,
   ) {}
 
   async build(kind: PrintDocumentKind, id: string, principal: RequestPrincipal): Promise<PrintDocumentDto> {
@@ -129,18 +131,50 @@ export class PrintService {
 
     switch (kind) {
       case 'SALES_INVOICE':
-        return this.buildInvoice(id, companyId, meta);
+        return this.withVerification(await this.buildInvoice(id, companyId, meta), companyId, 'SalesInvoice', id);
       case 'QUOTATION':
-        return this.buildQuotation(id, companyId, meta);
+        return this.withVerification(await this.buildQuotation(id, companyId, meta), companyId, 'Quotation', id);
       case 'SALES_ORDER':
-        return this.buildOrder(id, companyId, meta);
+        return this.withVerification(await this.buildOrder(id, companyId, meta), companyId, 'SalesOrder', id);
       case 'CREDIT_NOTE':
-        return this.buildCreditNote(id, companyId, meta);
+        return this.withVerification(await this.buildCreditNote(id, companyId, meta), companyId, 'CreditNote', id);
       case 'RECEIPT':
-        return this.buildReceipt(id, companyId, meta);
+        return this.withVerification(await this.buildReceipt(id, companyId, meta), companyId, 'Payment', id);
       default:
         throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Unknown document kind.');
     }
+  }
+
+  /**
+   * Attach the record's issued verification code to the print model.
+   *
+   * The code is read from the *stored* official document rather than minted
+   * here: the token on the sheet must be the one the public verification
+   * endpoint already resolves, so a reprint and the issued PDF carry the same
+   * code. A record that has not been issued yet prints no code — the print form
+   * is available before issuing, and inventing a token would produce a code that
+   * scans to a 404.
+   */
+  private async withVerification(
+    dto: Omit<PrintDocumentDto, 'verification'>,
+    companyId: string,
+    sourceType: string,
+    sourceId: string,
+  ): Promise<PrintDocumentDto> {
+    const issued = await this.prisma.officialDocument.findFirst({
+      where: {
+        companyId,
+        sourceType,
+        sourceId,
+        status: { notIn: ['CANCELLED', 'REVOKED'] },
+      },
+      orderBy: { version: 'desc' },
+      select: { verificationToken: true },
+    });
+    if (!issued) return { ...dto, verification: null };
+    const url = this.qr.verificationUrl(issued.verificationToken);
+    const verification: PrintVerificationDto = { url, qrDataUri: await this.qr.dataUri(url) };
+    return { ...dto, verification };
   }
 
   /**
@@ -183,7 +217,7 @@ export class PrintService {
     };
   }
 
-  private async buildInvoice(id: string, companyId: string, company: PrintDocumentDto['company']): Promise<PrintDocumentDto> {
+  private async buildInvoice(id: string, companyId: string, company: PrintDocumentDto['company']): Promise<Omit<PrintDocumentDto, 'verification'>> {
     const invoice = await this.prisma.salesInvoice.findFirst({
       where: { id, companyId },
       include: {
@@ -240,7 +274,7 @@ export class PrintService {
     };
   }
 
-  private async buildQuotation(id: string, companyId: string, company: PrintDocumentDto['company']): Promise<PrintDocumentDto> {
+  private async buildQuotation(id: string, companyId: string, company: PrintDocumentDto['company']): Promise<Omit<PrintDocumentDto, 'verification'>> {
     const quote = await this.prisma.quotation.findFirst({
       where: { id, companyId },
       include: { customer: true, lines: { orderBy: { sortOrder: 'asc' } } },
@@ -286,7 +320,7 @@ export class PrintService {
     };
   }
 
-  private async buildOrder(id: string, companyId: string, company: PrintDocumentDto['company']): Promise<PrintDocumentDto> {
+  private async buildOrder(id: string, companyId: string, company: PrintDocumentDto['company']): Promise<Omit<PrintDocumentDto, 'verification'>> {
     const order = await this.prisma.salesOrder.findFirst({
       where: { id, companyId },
       include: { customer: true, lines: { orderBy: { sortOrder: 'asc' } } },
@@ -332,7 +366,7 @@ export class PrintService {
     };
   }
 
-  private async buildCreditNote(id: string, companyId: string, company: PrintDocumentDto['company']): Promise<PrintDocumentDto> {
+  private async buildCreditNote(id: string, companyId: string, company: PrintDocumentDto['company']): Promise<Omit<PrintDocumentDto, 'verification'>> {
     const note = await this.prisma.creditNote.findFirst({
       where: { id, companyId },
       include: { customer: true, lines: { orderBy: { sortOrder: 'asc' } } },
@@ -378,7 +412,7 @@ export class PrintService {
     };
   }
 
-  private async buildReceipt(id: string, companyId: string, company: PrintDocumentDto['company']): Promise<PrintDocumentDto> {
+  private async buildReceipt(id: string, companyId: string, company: PrintDocumentDto['company']): Promise<Omit<PrintDocumentDto, 'verification'>> {
     const payment = await this.prisma.payment.findFirst({
       where: { id, companyId },
       include: {

@@ -57,14 +57,14 @@ interface LineDraft {
   taxPercent: string;
 }
 
-const emptyLine = (): LineDraft => ({
+const emptyLine = (taxPercent = '10'): LineDraft => ({
   productId: '',
   description: '',
   quantity: '1',
   unitPrice: '0.00',
   discountPercent: '0',
   taxId: '',
-  taxPercent: '15',
+  taxPercent,
 });
 
 /** The payment methods a POS sale may be settled with. */
@@ -2155,6 +2155,7 @@ function LineEditor({
   testIdPrefix,
   currency,
   roundingMode,
+  defaultTaxPercent = '10',
 }: {
   lines: LineDraft[];
   setLines: (lines: LineDraft[]) => void;
@@ -2165,6 +2166,8 @@ function LineEditor({
   currency?: string;
   /** The tenant's whole-amount rounding, so the summary matches the printed total. */
   roundingMode: RoundingMode;
+  /** The tenant's default VAT rate as a percent, used when a blank line is added. */
+  defaultTaxPercent?: string;
 }) {
   const { t } = useUi();
   const scale = currencyScaleOf(currency ?? 'BHD');
@@ -2285,7 +2288,7 @@ function LineEditor({
         </div>
       ))}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <Button size="sm" onClick={() => setLines([...lines, emptyLine()])} data-testid={`${testIdPrefix}-add`}>
+        <Button size="sm" onClick={() => setLines([...lines, emptyLine(defaultTaxPercent)])} data-testid={`${testIdPrefix}-add`}>
           <Icon name="plus" size={14} />
           {t('erp.accounting.addLine')}
         </Button>
@@ -2394,6 +2397,7 @@ function DocumentModal({
     currency: string;
     roundingMode: RoundingMode;
     taxNumber: string | null;
+    defaultTaxRateBp: number;
   } | null>(null);
   const [customerId, setCustomerId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
@@ -2446,7 +2450,18 @@ function DocumentModal({
           currency: c.currency,
           roundingMode: c.roundingMode ?? 'NONE',
           taxNumber: c.taxNumber ?? null,
+          defaultTaxRateBp: c.defaultTaxRateBp ?? 0,
         });
+        // A brand-new document adopts the tenant's configured default rate. Only
+        // an untouched single line is seeded, so opening an existing document or
+        // a line the operator has already edited is never rewritten.
+        if (!initialDocument && c.defaultTaxRateBp != null) {
+          setLines((prev) =>
+            prev.length === 1 && !prev[0].productId && !prev[0].description && prev[0].unitPrice === '0.00'
+              ? [{ ...prev[0], taxPercent: String(c.defaultTaxRateBp / 100) }]
+              : prev,
+          );
+        }
       } catch {
         /* the form still works without the company summary */
       }
@@ -2500,7 +2515,7 @@ function DocumentModal({
 
       await onSubmit(payload);
       onClose();
-      setLines([emptyLine()]);
+      setLines([emptyLine(company ? String(company.defaultTaxRateBp / 100) : '10')]);
       setCustomerId('');
       setDueDate('');
       setNotes('');
@@ -2649,6 +2664,7 @@ function DocumentModal({
             testIdPrefix={testIdPrefix}
             currency={currency}
             roundingMode={company?.roundingMode ?? 'NONE'}
+            defaultTaxPercent={company ? String(company.defaultTaxRateBp / 100) : '10'}
           />
         </div>
       </section>

@@ -275,6 +275,20 @@ describe('ORYX Execution 03 (e2e)', () => {
       expect(site.status).toBe(201);
       const list = await erp<{ items: Array<{ code: string }> }>('/hr/work-sites');
       expect(list.body.items.some((s) => s.code === 'HQ')).toBe(true);
+
+      const edited = await erp<{ nameEn: string; radiusMeters: number }>(`/hr/work-sites/${site.body.id}`, {
+        method: 'PATCH',
+        body: { nameEn: 'Head office (renamed)', radiusMeters: 350 },
+      });
+      expect(edited.status).toBe(200);
+      expect(edited.body.nameEn).toBe('Head office (renamed)');
+      expect(edited.body.radiusMeters).toBe(350);
+
+      const removed = await erp<{ id: string; deleted: boolean }>(`/hr/work-sites/${site.body.id}`, { method: 'DELETE' });
+      expect(removed.status).toBe(200);
+      expect(removed.body.deleted).toBe(true);
+      const after = await erp<{ items: Array<{ code: string }> }>('/hr/work-sites');
+      expect(after.body.items.some((s) => s.code === 'HQ')).toBe(false);
     });
 
     it('records a self check-in with GPS and computes the worked time', async () => {
