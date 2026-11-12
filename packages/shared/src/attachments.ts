@@ -13,7 +13,7 @@
  */
 
 /** The record kinds an attachment can hang off. */
-export const ATTACHMENT_ENTITY_TYPES = ['SALES_INVOICE', 'PAYMENT'] as const;
+export const ATTACHMENT_ENTITY_TYPES = ['SALES_INVOICE', 'PAYMENT', 'EMPLOYEE'] as const;
 export type AttachmentEntityType = (typeof ATTACHMENT_ENTITY_TYPES)[number];
 
 /** Accepted upload MIME types. A screenshot is a PNG or a JPEG. */

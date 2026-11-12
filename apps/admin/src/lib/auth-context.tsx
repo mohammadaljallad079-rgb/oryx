@@ -46,7 +46,11 @@ interface AuthContextValue extends AuthState {
   logout: () => Promise<void>;
   setCompanyContext: (companyId: string | null, branchId?: string | null) => void;
   refreshSession: () => Promise<void>;
-  updatePreferences: (patch: { preferredLocale?: 'ar' | 'en'; preferredTheme?: 'dark' | 'light' }) => Promise<void>;
+  updatePreferences: (patch: {
+    preferredLocale?: 'ar' | 'en';
+    preferredTheme?: 'dark' | 'light';
+    preferredFontScale?: 'SM' | 'MD' | 'LG';
+  }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -56,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // operator keeps their preference across devices and reloads. The UI provider
   // owns the live value; this effect pushes the account preference into it once
   // the session is known (and after a preference change on the settings page).
-  const { setLocale, setTheme } = useUi();
+  const { setLocale, setTheme, setFontScale } = useUi();
   const [state, setState] = useState<AuthState>({
     user: null,
     memberships: [],
@@ -123,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           kind: me.user.isSuperAdmin ? 'PLATFORM' : 'COMPANY',
           preferredLocale: me.user.preferredLocale,
           preferredTheme: me.user.preferredTheme,
+          preferredFontScale: me.user.preferredFontScale,
           isSuperAdmin: me.user.isSuperAdmin,
         },
         memberships: me.memberships as MembershipSummary[],
@@ -169,11 +174,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return;
     const hasStoredLocale = window.localStorage.getItem('oryx.locale');
     const hasStoredTheme = window.localStorage.getItem('oryx.theme');
+    const hasStoredFontScale = window.localStorage.getItem('oryx.fontScale');
     if (!hasStoredLocale && isLocale(user.preferredLocale)) setLocale(user.preferredLocale);
     if (!hasStoredTheme && (user.preferredTheme === 'dark' || user.preferredTheme === 'light')) {
       setTheme(user.preferredTheme);
     }
-  }, [state.user, setLocale, setTheme]);
+    if (
+      !hasStoredFontScale &&
+      (user.preferredFontScale === 'SM' ||
+        user.preferredFontScale === 'MD' ||
+        user.preferredFontScale === 'LG')
+    ) {
+      setFontScale(user.preferredFontScale);
+    }
+  }, [state.user, setLocale, setTheme, setFontScale]);
 
   // When a request proves the session is gone (refresh failed), drop local state
   // so the shell redirects to sign-in rather than showing a broken screen.
@@ -290,7 +304,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const updatePreferences = useCallback(
-    async (patch: { preferredLocale?: 'ar' | 'en'; preferredTheme?: 'dark' | 'light' }) => {
+    async (patch: {
+      preferredLocale?: 'ar' | 'en';
+      preferredTheme?: 'dark' | 'light';
+      preferredFontScale?: 'SM' | 'MD' | 'LG';
+    }) => {
       await api.updateProfile(patch);
       setState((p) =>
         p.user
@@ -300,6 +318,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 ...p.user,
                 preferredLocale: patch.preferredLocale ?? p.user.preferredLocale,
                 preferredTheme: patch.preferredTheme ?? p.user.preferredTheme,
+                preferredFontScale: patch.preferredFontScale ?? p.user.preferredFontScale,
               },
             }
           : p,

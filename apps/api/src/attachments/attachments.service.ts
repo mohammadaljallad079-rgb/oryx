@@ -78,6 +78,11 @@ export class AttachmentsService {
       if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Receipt not found.');
       return;
     }
+    if (entityType === 'EMPLOYEE') {
+      const found = await this.prisma.employee.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Employee not found.');
+      return;
+    }
     throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Unsupported attachment entity type.');
   }
 

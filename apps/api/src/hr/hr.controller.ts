@@ -1,7 +1,10 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsBoolean, IsOptional } from 'class-validator';
+import { memoryStorage } from 'multer';
 import type { Response } from 'express';
+import { ATTACHMENT_MAX_BYTES } from '@oryx/shared';
 import {
   CurrentPrincipal,
   RequireAnyPermission,
@@ -10,6 +13,7 @@ import {
   type RequestPrincipal,
 } from '../auth/auth.decorators';
 import { actorFrom } from '../common/erp-context.service';
+import type { UploadedFileLike } from '../attachments/attachments.service';
 import { HrService } from './hr.service';
 import { HrExportService } from './hr-export.service';
 import {
@@ -37,6 +41,7 @@ import {
   StartLifecycleDto,
   UpdateAttendancePolicyDto,
   UpdateEmployeeDto,
+  UpdateLeaveRequestDto,
   UpdateWorkSiteDto,
 } from './hr.dto';
 
@@ -144,9 +149,53 @@ export class HrController {
 
   @Post('employees/:id/documents')
   @RequirePermissions('erp.hr.employee.manage')
-  @ApiOperation({ summary: 'Add an employee document' })
-  createDocument(@Param('id') id: string, @Body() dto: CreateDocumentDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
-    return this.hr.createDocument(id, dto, p, actorFrom(p, req));
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: ATTACHMENT_MAX_BYTES, files: 1 },
+    }),
+  )
+  @ApiOperation({ summary: 'Add an employee document, optionally with an uploaded file' })
+  createDocument(
+    @Param('id') id: string,
+    @Body() dto: CreateDocumentDto,
+    @UploadedFile() file: UploadedFileLike,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.hr.createDocument(id, dto, file, p, actorFrom(p, req));
+  }
+
+  @Get('employees/:id/documents/:documentId/file')
+  @RequirePermissions('erp.hr.document.read')
+  @ApiOperation({ summary: 'Preview or download an employee document file' })
+  async documentFile(
+    @Param('id') id: string,
+    @Param('documentId') documentId: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Res() res: Response,
+  ): Promise<void> {
+    const file = await this.hr.resolveDocumentFile(id, documentId, p);
+    res.setHeader('Content-Type', file.mimeType);
+    res.setHeader('Content-Length', String(file.sizeBytes));
+    // `inline` lets the browser preview a PDF or image; the filename is
+    // RFC 5987 encoded so a name with spaces or Arabic survives the header.
+    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    this.hr.streamDocumentFile(file.path).pipe(res);
+  }
+
+  @Delete('employees/:id/documents/:documentId')
+  @RequirePermissions('erp.hr.employee.manage')
+  @ApiOperation({ summary: 'Remove an employee document and any stored file' })
+  deleteDocument(
+    @Param('id') id: string,
+    @Param('documentId') documentId: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.hr.deleteDocument(id, documentId, p, actorFrom(p, req));
   }
 
   // -------------------------------------------------------------- lifecycle
@@ -198,6 +247,13 @@ export class HrController {
   @ApiOperation({ summary: 'Submit a leave request (balance is enforced)' })
   requestLeave(@Body() dto: RequestLeaveDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.hr.requestLeave(dto, p, actorFrom(p, req));
+  }
+
+  @Patch('leave-requests/:id')
+  @RequirePermissions('erp.hr.leave.request')
+  @ApiOperation({ summary: 'Edit a submitted leave request (balance stays in step)' })
+  updateLeaveRequest(@Param('id') id: string, @Body() dto: UpdateLeaveRequestDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.updateLeaveRequest(id, dto, p, actorFrom(p, req));
   }
 
   @Post('leave-requests/:id/decide')

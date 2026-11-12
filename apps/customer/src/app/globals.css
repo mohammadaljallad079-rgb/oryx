@@ -23,6 +23,9 @@
   --oryx-font-sans: Verdana, 'Segoe UI', 'Noto Sans Arabic', Arial, system-ui, -apple-system,
     'Helvetica Neue', sans-serif;
 
+  /* Native widgets (date pickers, scrollbars) follow the page theme. */
+  color-scheme: dark;
+
   /* The official brand colours and the primary action ramp. Navy is the ORYX
    * primary; gold is the accent. */
   --brand-navy: #0f2b48;
@@ -243,6 +246,7 @@
  * future edit that breaks contrast fails a test instead of shipping.
  */
 :root[data-theme='light'] {
+  color-scheme: light;
   --bg: #f7f4ed;
   --bg-deep: #efeae0;
   --surface: #ffffff;
