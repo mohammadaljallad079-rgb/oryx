@@ -269,3 +269,88 @@ describe('inspection report template — font independence', () => {
     expect(html).toContain('class="rh-name"');
   });
 });
+
+describe('inspection report template — reference page parity (Execution 19)', () => {
+  const render = (payloadOverride: Partial<InspectionReportPayload> = {}) =>
+    renderInspectionReportHtml({
+      issuer,
+      payload: { ...payload, ...payloadOverride },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+
+  it('centres the chassis drawing and distributes the eight region boxes around it', () => {
+    const html = render();
+    // The approved sheet places the eight boxes around a centred drawing, not in
+    // a two-column list beside it.
+    expect(html).toContain('class="ch-board"');
+    expect(html).toContain('class="ch-row ch-row-edge"');
+    expect(html).toContain('class="ch-row ch-row-mid"');
+    expect(html).toContain('class="ch-side"');
+    expect(html).toContain('class="ch-art"');
+    // The old side-list grid must be gone.
+    expect(html).not.toContain('class="chassis-wrap"');
+    expect(html).not.toContain('class="chassis-grid"');
+    expect(html).not.toContain('class="ch-region"');
+  });
+
+  it('lays the chassis boxes out physically (LTR) so left cards stay on the left in RTL', () => {
+    const html = render();
+    expect(html).toMatch(/\.ch-board\{[^}]*direction:ltr/);
+  });
+
+  it('prints the paint legend on one row in the reference order, with no marker table', () => {
+    const html = render();
+    expect(html).toContain('class="legend legend--row"');
+    // The reference order is sectioned, Change, Filler, Paint left to right.
+    const row = html.slice(html.indexOf('legend legend--row'));
+    const order = ['مقطوع', 'تبديل', 'معجون', 'صبغ'].map((w) => row.indexOf(w));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    // The invented marker table must not be printed.
+    expect(html).not.toContain('marker-table');
+  });
+
+  it('prints the paint remarks box after the legend, as in the reference', () => {
+    const withRemarks: InspectionReportPayload = {
+      ...payload,
+      sections: payload.sections.map((s) =>
+        s.area === 'PAINT_BODY' ? { ...s, remarks: '• خط ملاحظة' } : s,
+      ),
+    };
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload: withRemarks,
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    const legendAt = html.indexOf('class="legend legend--row"');
+    const remarksAt = html.indexOf('class="sec-remarks"');
+    expect(legendAt).toBeGreaterThan(-1);
+    expect(remarksAt).toBeGreaterThan(legendAt);
+  });
+
+  it('overlays the ORYX watermark on the cover photograph band', () => {
+    const html = renderInspectionReportHtml({
+      issuer: { ...issuer, logoDataUri: 'data:image/png;base64,LOGO' },
+      payload: { ...payload, vehiclePhotoDataUri: 'data:image/png;base64,PHOTO' },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    expect(html).toContain('class="vphoto-mark"');
+    expect(html).toContain('data:image/png;base64,LOGO');
+    // The watermark is painted over the photograph inside the band.
+    const band = html.slice(html.indexOf('vphoto--bleed'), html.indexOf('</figure>'));
+    expect(band).toContain('vphoto-mark');
+    expect(band).toContain('vphoto-img');
+  });
+});

@@ -251,16 +251,11 @@ export class DocumentsService {
       : bodyHtml.replace('<style>', `<style>${baseCss}\n`);
 
     // The footer is a Chromium page template, so the page counter is real on
-    // every page and the footer cannot push content onto a blank page.
-    const footerHtml =
-      layout === 'official'
-        ? officialFooterTemplate(args.issuer)
-        : footerTemplate({
-            issuer: args.issuer,
-            titleEn: spec.labelEn,
-            titleAr: spec.labelAr,
-            documentNumber: args.documentNumber,
-          });
+    // every page and the footer cannot push content onto a blank page. Both
+    // layouts print the same contacts row; the report does not use the
+    // document-number footer because its per-page identity is the job number in
+    // the in-flow header.
+    const footerHtml = officialFooterTemplate(args.issuer);
     const { pdf, pageCount } = await this.renderer.render(html, {
       footerHtml,
       margins: layout === 'official' ? OFFICIAL_PDF_MARGINS : REPORT_PDF_MARGINS,

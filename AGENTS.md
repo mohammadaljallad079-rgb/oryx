@@ -1113,6 +1113,37 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   overflows an in-flow figure — absolute overflow is clipped by the paper edge
   and does not resize the page.
 
+### Execution 19 gotchas
+
+- **The report footer is the invoice footer.** The approved inspection report
+  prints the same contacts row as the tax invoice — hairline rule, bilingual
+  page counter left, phone and email centre, website right, registered address
+  and CR beneath — so `documents.service.ts` routes both through
+  `officialFooterTemplate`. Only the internal statements keep the compact
+  `footerTemplate`. Do not reintroduce a report-specific footer; it drifts.
+- **Report `REPORT_PDF_MARGINS.bottom` is 11mm, not 20mm.** The official footer
+  template paints inside the bottom margin; a 20mm bottom margin pushed the
+  contacts row off the page. The footer template lives in the margin, so it
+  consumes no content height — keep the margin tight enough to show it.
+- **The chassis page distributes its boxes *around* the drawing.** The approved
+  sheet centres the chassis artwork and places the eight region cards Front
+  above, Rear below, three pairs down the sides — not a side list. The board is
+  forced `direction:ltr` because the arrangement is physical; in RTL the left
+  cards would otherwise flip to the right.
+- **The paint legend prints in the reverse of the catalogue order.** The
+  approved key reads sectioned, Change, Filler, Paint left to right, so
+  `paintDiagram` reverses `PAINT_CONDITIONS` and the row is `direction:ltr`.
+  There is no marker table on the approved sheet — do not add one back.
+- **The cover photograph carries the ORYX wordmark as a watermark.** The
+  approved cover lays the logo over the photo band at low opacity; the QR sits
+  in the lower-right of the same band. Both come from the issuer/verification
+  already in the payload — no new fields.
+- **Render the report through the product path to verify parity.** The
+  `.run/render-report2.mts` harness imports the compiled template, the product
+  `QrService` and `officialFooterTemplate`, so a rendered sheet can be decoded
+  (jsQR) and measured (PyMuPDF) against the reference. It is scratch, not
+  committed.
+
 ### Adding a new ERP module
 
 1. Add a `ModuleDefinition` to `packages/shared/src/modules.ts`.

@@ -1,5 +1,4 @@
 import {
-  BODY_PANELS,
   CHASSIS_REGIONS,
   PAINT_CONDITIONS,
 } from '@oryx/shared';
@@ -229,6 +228,7 @@ function liabilityBlock(): string {
 function vehiclePhoto(
   p: InspectionReportPayload,
   verification: DocumentVerification | null | undefined,
+  issuer: DocumentIssuer,
 ): string {
   // The approved cover prints the verification QR inside the photograph band,
   // anchored to its lower right. A white quiet zone is kept around the modules
@@ -239,15 +239,23 @@ function vehiclePhoto(
         <img src="${esc(verification.qrDataUri)}" alt="Document verification QR code">
       </div>`
     : '';
+  // The approved cover lays the ORYX wordmark over the photograph band as a
+  // translucent watermark, so the vehicle is still legible through it. With no
+  // configured logo there is nothing to print and the band keeps only the photo.
+  const mark = issuer.logoDataUri
+    ? `<img class="vphoto-mark" src="${esc(issuer.logoDataUri)}" alt="" aria-hidden="true">`
+    : '';
   if (p.vehiclePhotoDataUri) {
     return `
     <figure class="vphoto vphoto--bleed">
       <img class="vphoto-img" src="${esc(p.vehiclePhotoDataUri)}" alt="${esc(`${p.vehicle.make} ${p.vehicle.model}`)}">
+      ${mark}
       ${qr}
     </figure>`;
   }
   return `
     <figure class="vphoto vphoto--bleed vphoto-empty">
+      ${mark}
       <div class="vphoto-ph">لا توجد صورة مرفقة للمركبة<span class="ltr">No vehicle photograph attached</span></div>
       ${qr}
     </figure>`;
@@ -295,7 +303,7 @@ export function identificationPage(input: InspectionReportInput, chrome: Documen
         </tr>
       </table>
     </div>
-    ${vehiclePhoto(p, input.verification)}
+    ${vehiclePhoto(p, input.verification, input.issuer)}
     ${liabilityBlock()}
     ${importantRemarks()}
     ${signatureBlock([
@@ -476,10 +484,16 @@ function itemsTable(
  * can never show two different vehicles.
  */
 function paintDiagram(section: InspectionReportSection): string {
-  const legend = PAINT_CONDITIONS.map(
-    (c) =>
-      `<span class="legend-item"><span class="legend-dot ld-${c.color}">${c.cross ? markGlyph('x', 7) : ''}</span>${esc(c.labelAr)} / ${esc(c.labelEn)}</span>`,
-  ).join('');
+  // The approved legend reads sectioned, Change, Filler, Paint left to right —
+  // the reverse of the catalogue's declaration order — so the printed key
+  // matches the reference rather than the data model.
+  const legend = [...PAINT_CONDITIONS]
+    .reverse()
+    .map(
+      (c) =>
+        `<span class="legend-item"><span class="legend-dot ld-${c.color}">${c.cross ? markGlyph('x', 7) : ''}</span>${esc(c.labelAr)} / ${esc(c.labelEn)}</span>`,
+    )
+    .join('');
 
   const markers = section.markers
     .map((m) => {
@@ -489,85 +503,74 @@ function paintDiagram(section: InspectionReportSection): string {
     })
     .join('');
 
-  const rows =
-    section.markers.length > 0
-      ? `<table class="marker-table">
-          <thead><tr><th>#</th><th>الموضع / Location</th><th>الحالة / Condition</th><th>ملاحظة / Note</th></tr></thead>
-          <tbody>${section.markers
-            .map((m, i) => {
-              const spec = PAINT_CONDITIONS.find((c) => c.key === m.condition);
-              const panel = BODY_PANELS.find((p) => p.key === m.panelKey);
-              return `<tr><td class="num">${i + 1}</td><td>${esc(panel ? `${panel.labelAr} / ${panel.labelEn}` : (m.panelKey ?? '—'))}</td><td>${esc(spec?.labelAr ?? '')} / ${esc(spec?.labelEn ?? '')}</td><td>${esc(m.note ?? '')}</td></tr>`;
-            })
-            .join('')}</tbody>
-        </table>`
-      : `<div class="no-findings">لا توجد ملاحظات على الصبغ والهيكل · No paint or body findings recorded</div>`;
-
   return `
   <div class="diagram-block avoid-break">
     <div class="diagram-title">مخطط الفحص السطحي لهيكل السيارة<span class="ltr">Body Panels Diagnostic Scheme</span></div>
-    <div class="diagram-wrap">
-      <div class="diagram diagram--art">
-        <img class="artplan" src="${BODY_SCHEME_DATA_URI}" alt="">
-        ${markers}
-      </div>
-      <div class="legend">${legend}</div>
+    <div class="diagram diagram--art">
+      <img class="artplan" src="${BODY_SCHEME_DATA_URI}" alt="">
+      ${markers}
     </div>
-    ${rows}
-    ${section.remarks ? `<div class="sec-remarks"><b>${esc(section.remarksLabelAr)}:</b> ${escMultiline(section.remarks)}</div>` : ''}
+    <div class="legend legend--row">${legend}</div>
+    ${
+      section.remarks
+        ? `<div class="sec-remarks"><b>${esc(section.remarksLabelAr)}</b><span class="ltr">${esc(section.remarksLabelEn)}</span>${escMultiline(section.remarks)}</div>`
+        : ''
+    }
   </div>`;
 }
 
-/** The eight-region chassis safety diagram, drawn over the approved artwork. */
+/**
+ * The eight-region chassis safety diagram.
+ *
+ * The approved sheet centres the drawing and places the eight region boxes
+ * *around* it — Front above, Rear below, and the three left/right pairs down
+ * each side — each joined to the drawing by a leader line. A side list of
+ * boxes is not the approved arrangement, so the boxes are laid out on a
+ * three-column board with the drawing in the centre cell.
+ */
 function chassisDiagram(section: InspectionReportSection): string {
   const byKey = new Map(section.chassisRegions.map((r) => [r.regionKey, r]));
 
-  const chips = CHASSIS_REGIONS.map((region) => {
-    const row = byKey.get(region.key);
+  const card = (key: string): string => {
+    const region = CHASSIS_REGIONS.find((r) => r.key === key);
+    if (!region) return '';
+    const row = byKey.get(key);
     const state = row?.condition ?? 'UNSET';
     const cls = state === 'OK' ? 'ch-ok' : state === 'DAMAGE' ? 'ch-bad' : 'ch-unset';
-    const symbol =
-      state === 'OK' ? markGlyph('check', 11) : state === 'DAMAGE' ? markGlyph('cross', 11) : '·';
+    const glyph =
+      state === 'OK' ? markGlyph('check', 9) : state === 'DAMAGE' ? markGlyph('cross', 9) : '';
+    const tag =
+      state === 'OK' ? '[OK / سليم]' : state === 'DAMAGE' ? '[Damage / متضرر]' : '[— / —]';
     return `
-    <div class="ch-region ${cls}">
-      <div class="ch-region-head">
-        <span class="ch-region-ar">${esc(region.labelAr)}</span>
-        <span class="ch-region-mark">${symbol}</span>
-      </div>
-      <div class="ch-region-en ltr">${esc(region.labelEn)}</div>
-      ${row?.note ? `<div class="ch-region-note">${esc(row.note)}</div>` : ''}
+    <div class="ch-card ${cls}">
+      <span class="ch-card-ar">${esc(region.labelAr)}</span>
+      <span class="ch-card-en ltr">${esc(region.labelEn)}</span>
+      <span class="ch-card-state">${glyph}${tag}</span>
+      ${row?.note ? `<span class="ch-card-note">${esc(row.note)}</span>` : ''}
     </div>`;
-  }).join('');
+  };
 
-  const damaged = section.chassisRegions.filter((r) => r.condition === 'DAMAGE');
   return `
   <div class="chassis-block avoid-break">
     <div class="diagram-title">مخطط سلامة الشاصي<span class="ltr">Chassis safety diagram</span></div>
-    <div class="chassis-wrap">
-      <div class="chassis-art">
-        <img class="artchassis" src="${CHASSIS_DIAGRAM_DATA_URI}" alt="">
-        ${chassisMarkers(section)}
+    <div class="ch-board">
+      <div class="ch-row ch-row-edge">${card('FRONT')}</div>
+      <div class="ch-row ch-row-mid">
+        <div class="ch-side">${card('FRONT_LEFT')}${card('MIDDLE_LEFT')}${card('REAR_LEFT')}</div>
+        <div class="ch-art">
+          <img class="artchassis" src="${CHASSIS_DIAGRAM_DATA_URI}" alt="">
+          ${chassisMarkers(section)}
+        </div>
+        <div class="ch-side">${card('FRONT_RIGHT')}${card('MIDDLE_RIGHT')}${card('REAR_RIGHT')}</div>
       </div>
-      <div class="chassis-grid">${chips}</div>
+      <div class="ch-row ch-row-edge">${card('REAR')}</div>
     </div>
     <div class="legend-row">
       <span class="lg-chip">${markGlyph('check', 10)}سليم / OK</span>
       <span class="lg-chip">${markGlyph('cross', 10)}متضرر / Damage</span>
     </div>
-    <div class="chassis-summary ${damaged.length ? 'chassis-summary-bad' : 'chassis-summary-ok'}">
-      ${
-        damaged.length
-          ? `مناطق متضررة / Damaged regions: ${damaged.map((d) => esc(chassisRegionLabel(d.regionKey))).join('، ')}`
-          : 'لم يتم تسجيل أي أضرار في الهيكل السفلي · No chassis damage recorded'
-      }
-    </div>
     ${section.remarks ? `<div class="sec-remarks"><b>${esc(section.remarksLabelAr)}:</b> ${escMultiline(section.remarks)}</div>` : ''}
   </div>`;
-}
-
-/** The Arabic label of a chassis region, or its key if the catalogue changed. */
-function chassisRegionLabel(key: string): string {
-  return CHASSIS_REGIONS.find((r) => r.key === key)?.labelAr ?? key;
 }
 
 /**
@@ -648,8 +651,8 @@ export const INSPECTION_REPORT_CSS = `
   .rh-name-ar{ font-size:14pt; font-weight:700; color:var(--navy); }
   .rh-name-en{ font-size:8.5pt; font-weight:700; color:var(--muted); letter-spacing:.6px; text-transform:uppercase; }
   .rh-right{ display:flex; flex-direction:column; align-items:flex-end; line-height:1.2; text-align:right; }
-  .rh-tag-ar{ font-size:11pt; font-weight:700; color:var(--navy); }
-  .rh-tag-en{ font-size:7.6pt; font-weight:700; color:var(--gold); letter-spacing:.6px; }
+  .rh-tag-ar{ font-size:11.8pt; font-weight:700; color:var(--navy); }
+  .rh-tag-en{ font-size:7.9pt; font-weight:700; color:var(--gold); letter-spacing:.6px; }
   /* ---- shared page furniture ---- */
   .p-title{ display:flex; flex-direction:column; align-items:center; margin:0 0 6px; }
   .p-title-ar{ font-size:15pt; font-weight:700; color:var(--navy); }
@@ -703,6 +706,11 @@ export const INSPECTION_REPORT_CSS = `
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     color:var(--muted); font-size:8pt; }
   .vphoto-ph .ltr{ font-size:7.5pt; color:var(--line-strong); }
+  /* The approved cover lays the ORYX wordmark across the photograph band as a
+   * translucent watermark, centred, so the vehicle is still readable through
+   * it. */
+  .vphoto-mark{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:62%; height:auto; opacity:0.18; z-index:1; pointer-events:none; }
   .terms{ margin-top:10px; border:1px solid var(--line); border-radius:6px; padding:8px 10px; background:#f7f9fc; }
   .terms-title{ font-size:9.5pt; font-weight:700; color:var(--navy); }
   .terms-title .ltr{ margin-inline-start:8px; font-size:8pt; color:var(--muted); font-weight:400; }
@@ -768,60 +776,56 @@ export const INSPECTION_REPORT_CSS = `
     margin-bottom:6px; border-inline-start:4px solid var(--gold); padding-inline-start:7px; }
   .diagram-title .ltr{ margin-inline-start:8px; font-size:8pt; color:var(--muted); font-weight:400; }
   /* The approved form prints the body-panel scheme at its full size, centred,
-   * with the condition legend beneath it. The drawing is the approved artwork
-   * itself, so its printed size is fixed to the reference: the car occupies
-   * 321x439pt, which is 428px at Chromium's 96dpi/72pt ratio. */
-  .diagram-wrap{ display:block; }
-  .diagram{ position:relative; width:230px; flex:0 0 230px; }
+   * with the condition legend on one row beneath it and the remarks box last.
+   * The drawing is the approved artwork itself, so its printed size is fixed to
+   * the reference: the car occupies 321x439pt, which is 428px at Chromium's
+   * 96dpi/72pt ratio. */
+  .diagram{ position:relative; width:230px; }
   .diagram--art{ width:428px; margin:0 auto; }
   .artplan{ width:100%; height:auto; display:block; }
-  .bodyplan{ width:100%; height:auto; display:block; }
-  .bp-body{ fill:#eef2f8; stroke:#5b6472; stroke-width:3; }
-  .bp-glass{ fill:#d6e2f0; stroke:#5b6472; stroke-width:2; }
-  .bp-panel{ fill:none; stroke:#9aa4b2; stroke-width:1.6; }
-  .bp-seam{ fill:none; stroke:#9aa4b2; stroke-width:2; }
-  .bp-wheel{ fill:#3c4653; stroke:#5b6472; stroke-width:2; }
   .marker{ position:absolute; width:14px; height:14px; border-radius:50%; transform:translate(-50%,-50%);
     display:flex; align-items:center; justify-content:center; font-size:8pt; font-weight:700; color:#fff;
     border:1.5px solid #fff; box-shadow:0 0 0 .5px rgba(0,0,0,.4); }
   .m-green{ background:#1f9d55; } .m-orange{ background:#e08a1e; } .m-red{ background:#d92d20; }
-  .legend{ flex:1 1 auto; display:flex; flex-wrap:wrap; gap:8px 16px; align-content:flex-start; }
+  .legend{ display:flex; flex-wrap:wrap; gap:8px 16px; align-content:flex-start; }
+  /* The reference prints the four condition keys on a single row, centred under
+   * the drawing, in the physical order sectioned, Change, Filler, Paint. The
+   * order is physical, so the row is forced LTR rather than inheriting the
+   * document's RTL flow. */
+  .legend--row{ justify-content:center; margin-top:10px; direction:ltr; }
   .legend-item{ font-size:8.5pt; color:var(--ink); display:flex; align-items:center; gap:6px; }
   .legend-dot{ width:14px; height:14px; border-radius:50%; display:inline-flex; align-items:center;
     justify-content:center; font-size:8pt; color:#fff; font-weight:700; }
   .ld-green{ background:#1f9d55; } .ld-orange{ background:#e08a1e; } .ld-red{ background:#d92d20; }
-  .marker-table{ margin-top:8px; border:1px solid var(--line); }
-  .marker-table th,.marker-table td{ border-bottom:1px solid var(--line); padding:3px 7px; font-size:8pt; text-align:start; }
-  .marker-table thead th{ background:#eef2f8; color:var(--navy); }
-  /* The approved form prints the chassis drawing beside its eight region
-   * labels. The drawing is the approved artwork itself and occupies 270x489pt
-   * on the reference (360px wide at Chromium's 96dpi/72pt ratio), so the box is
-   * fixed to that width rather than a nominal one. */
-  .chassis-wrap{ display:flex; gap:14px; align-items:flex-start; }
-  .chassis-art{ position:relative; width:360px; flex:0 0 360px; }
+  /* The approved chassis page centres the drawing and distributes the eight
+   * region boxes around it — Front above, Rear below, three pairs down the
+   * sides. The board is a three-column grid with the drawing in the centre.
+   * The arrangement is physical (left cards on the left), so it is forced LTR
+   * rather than following the document's RTL flow. */
+  .ch-board{ display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:4px; direction:ltr; }
+  .ch-row{ display:flex; justify-content:center; width:100%; }
+  .ch-row-mid{ align-items:center; gap:10px; }
+  .ch-row-edge .ch-card{ min-width:150px; text-align:center; }
+  .ch-side{ display:flex; flex-direction:column; gap:14px; width:150px; }
+  .ch-side:first-child{ align-items:flex-start; text-align:left; }
+  .ch-side:last-child{ align-items:flex-end; text-align:right; }
+  /* The reference draws the chassis at ~270x374pt, i.e. 360px wide at
+   * Chromium's 96dpi/72pt ratio, with the side cards narrower than the
+   * drawing. */
+  .ch-art{ position:relative; width:330px; flex:0 0 330px; }
   .artchassis{ width:100%; height:auto; display:block; }
   .chmark{ position:absolute; width:15px; height:15px; border-radius:50%; transform:translate(-50%,-50%);
     display:flex; align-items:center; justify-content:center; font-size:8pt; font-weight:700; color:#fff;
     border:1.5px solid #fff; box-shadow:0 0 0 .5px rgba(0,0,0,.4); }
-  .chassisplan{ width:190px; flex:0 0 190px; height:auto; }
-  .cp-outline{ fill:#f2f5f9; stroke:#5b6472; stroke-width:3; }
-  .cp-seam{ fill:none; stroke:#9aa4b2; stroke-width:1.4; }
-  .cz path{ stroke:#9aa4b2; stroke-width:1.2; }
-  .cz-num{ font-size:24px; font-weight:800; fill:#7a8494; text-anchor:middle; dominant-baseline:middle; }
-  .cz-ok .cz-num,.cz-damage .cz-num{ fill:#fff; }
-  .chassis-grid{ flex:1 1 auto; display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
-  .ch-region{ border:1px solid var(--line); border-radius:5px; padding:6px 7px; background:#f7f9fc; }
-  .ch-region-head{ display:flex; justify-content:space-between; align-items:center; }
-  .ch-region-ar{ font-size:9pt; font-weight:700; color:var(--navy); }
-  .ch-region-mark{ font-size:11pt; font-weight:700; }
-  .ch-region-en{ font-size:7.5pt; color:var(--muted); }
-  .ch-region-note{ font-size:7.5pt; color:var(--ink); margin-top:3px; }
-  .ch-ok{ background:#f0fdf4; border-color:#86efac; } .ch-ok .ch-region-mark{ color:var(--ok); }
-  .ch-bad{ background:#fef2f2; border-color:#fca5a5; } .ch-bad .ch-region-mark{ color:var(--bad); }
-  .ch-unset .ch-region-mark{ color:#9aa4b2; }
-  .chassis-summary{ margin-top:7px; padding:6px 9px; border-radius:5px; font-size:8.5pt; }
-  .chassis-summary-ok{ background:#f0fdf4; color:var(--ok); border:1px solid #86efac; }
-  .chassis-summary-bad{ background:#fef2f2; color:var(--bad); border:1px solid #fca5a5; }
+  .ch-card{ border:1px solid var(--line); border-radius:5px; padding:4px 7px; background:#f7f9fc;
+    display:flex; flex-direction:column; gap:1px; }
+  .ch-card-ar{ font-size:8.5pt; font-weight:700; color:var(--navy); }
+  .ch-card-en{ font-size:6.6pt; color:var(--muted); }
+  .ch-card-state{ font-size:6.6pt; font-weight:700; }
+  .ch-card-note{ font-size:6.4pt; color:var(--ink); }
+  .ch-ok{ background:#f0fdf4; border-color:#86efac; } .ch-ok .ch-card-state{ color:var(--ok); }
+  .ch-bad{ background:#fef2f2; border-color:#fca5a5; } .ch-bad .ch-card-state{ color:var(--bad); }
+  .ch-unset .ch-card-state{ color:#9aa4b2; }
   .diag-table{ border:1px solid var(--line); }
   .diag-table th,.diag-table td{ border-bottom:1px solid var(--line); padding:4px 7px; font-size:8pt; text-align:start; }
   .diag-table thead th{ background:#eef2f8; color:var(--navy); }

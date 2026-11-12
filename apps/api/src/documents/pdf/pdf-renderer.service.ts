@@ -202,7 +202,7 @@ export const OFFICIAL_PDF_MARGINS: PdfMargins = {
 export const REPORT_PDF_MARGINS: PdfMargins = {
   top: '5.6mm',
   right: '12mm',
-  bottom: '20mm',
+  bottom: '11mm',
   left: '12mm',
 };
 
