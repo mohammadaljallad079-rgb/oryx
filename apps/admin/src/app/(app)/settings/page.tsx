@@ -140,7 +140,7 @@ export default function SettingsPage() {
 
           <div>
             <p className="oryx-label">{t('settings.fontSize')}</p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {(['SM', 'MD', 'LG'] as const).map((scale) => (
                 <Button
                   key={scale}
