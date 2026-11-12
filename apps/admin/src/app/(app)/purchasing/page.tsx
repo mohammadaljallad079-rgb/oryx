@@ -37,7 +37,7 @@ interface LineDraft {
   taxPercent: string;
 }
 
-const emptyLine = (): LineDraft => ({ productId: '', description: '', quantity: '1', unitCost: '0.00', taxId: '', taxPercent: '15' });
+const emptyLine = (taxPercent = '10'): LineDraft => ({ productId: '', description: '', quantity: '1', unitCost: '0.00', taxId: '', taxPercent });
 
 /**
  * The tenant's saved purchase-applicable taxes as dropdown options. `value` is

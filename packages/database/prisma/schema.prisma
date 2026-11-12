@@ -463,10 +463,10 @@ model Company {
   functionalCurrency String?
   /**
    * The VAT/sales-tax rate the tenant applies by default, in basis points
-   * (1500 = 15%). A line's own rate always wins; this only seeds a new line, so
-   * changing it never rewrites an issued document.
+   * (1000 = 10%, Bahrain's standard rate). A line's own rate always wins; this
+   * only seeds a new line, so changing it never rewrites an issued document.
    */
-  defaultTaxRateBp   Int             @default(1500)
+  defaultTaxRateBp   Int             @default(1000)
   /**
    * Optional whole-amount rounding for cash settlement. `NONE` keeps the exact
    * total; the other modes snap a document total to the nearest whole or half
