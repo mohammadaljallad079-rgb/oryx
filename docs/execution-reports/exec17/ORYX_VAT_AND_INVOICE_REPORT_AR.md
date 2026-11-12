@@ -112,16 +112,36 @@ https://oryxbhr.com/verify/oX0zGQIF9OVkschLbbgTpXSCyAZ05DPByiwrJn0vaOo
 | `pnpm --filter @oryx/api test:e2e` | 746 ناجح / 41 حزمة |
 | `pnpm --filter @oryx/shared test` | 235 ناجح |
 | اختبارات المتصفّح (مستندات + نقاط بيع) | 16 ناجح |
+| اختبارات المتصفّح (المتطلّبات السبعة) | 29 ناجح |
 | `typecheck` (api + admin) | نظيف |
 | بناء api + admin | ناجح |
 
+الحزمة `execution08-remediation.spec.ts` تغطّي المتطلّبات السبعة مباشرةً:
+تحميل مستند موظف، إجازة من تواريخ تقويمية مجرّدة ثم اعتمادها، تطابق نموذجي
+إنشاء/تعديل الفرع، عرض سعر الفحص مع الضريبة والإجمالي، النافذة في الثيمين،
+وإنشاء/إعادة تصنيف/حذف حساب في دليل الحسابات.
+
 ---
 
-## 6) روابط المعاينة
+## 6) روابط المعاينة (مباشرة)
 
-- لوحة الإدارة: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/login
+الأساس: `https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev`
+
+| الغرض | الرابط |
+| --- | --- |
+| تسجيل الدخول | `/login` |
+| الفاتورة / المبيعات | `/sales` |
+| سجلّ المستندات الرسمية | `/documents` |
+| الموارد البشرية والإجازات | `/hr` |
+| الفروع | `/branches` |
+| دليل الحسابات | `/accounting` |
+| الفحوصات الفنية | `/automotive/inspections` |
+| صفحة التحقّق العامة | `https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/verify/<token>` |
+
+مثال على صفحة تحقّق عامة:
+https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/verify/testtoken1234567890
+
 - الموقع العام / صفحة التحقّق: https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/
-- صفحة تحقّق نموذجية: https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/verify/testtoken1234567890
 - طلب السحب: https://github.com/mohammadaljallad079-rgb/oryx/pull/15
 
 ---
