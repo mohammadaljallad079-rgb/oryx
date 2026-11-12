@@ -3,13 +3,20 @@ import {
   CHASSIS_REGIONS,
   INSPECTION_SECTION_SPECS,
   INSPECTION_SECTION_KEYS,
+  INSPECTION_TYPES,
+  INSPECTION_TYPE_KEYS,
   PAINT_CONDITIONS,
+  areasForTypes,
   chassisRegionSpec,
   inspectionResultsFor,
   inspectionSectionSpec,
+  inspectionTypeSpec,
   isInspectionEditable,
   isInspectionSectionKey,
+  isInspectionTypeKey,
   paintConditionSpec,
+  sectionsForType,
+  typeForSection,
 } from '../src/inspection';
 
 /**
@@ -19,9 +26,51 @@ import {
  * report's own counts.
  */
 describe('inspection catalogue — section and item completeness', () => {
-  it('declares all seven selectable inspection areas', () => {
+  it('declares all seven data areas', () => {
     expect(INSPECTION_SECTION_KEYS).toHaveLength(7);
     expect(INSPECTION_SECTION_SPECS.map((s) => s.key)).toEqual([...INSPECTION_SECTION_KEYS]);
+  });
+
+  it('offers exactly the four selectable inspection types of the approved report', () => {
+    expect(INSPECTION_TYPE_KEYS).toHaveLength(4);
+    expect(INSPECTION_TYPES.map((t) => t.key)).toEqual([...INSPECTION_TYPE_KEYS]);
+    expect(INSPECTION_TYPES.map((t) => t.labelEn)).toEqual([
+      'Vehicle Paint & Body Check',
+      'Chassis & Undercarriage Condition',
+      'Interior & Exterior / Engine Compartment / Road Test',
+      'Computer Unit Inspection',
+    ]);
+  });
+
+  it('covers every data area with exactly one type and expands back to areas', () => {
+    // Every area belongs to exactly one type, so a selection never leaves an
+    // area orphaned and never records the same area twice.
+    for (const area of INSPECTION_SECTION_KEYS) {
+      const owners = INSPECTION_TYPES.filter((t) => t.sections.includes(area));
+      expect(owners, `${area} must belong to exactly one type`).toHaveLength(1);
+      expect(typeForSection(area)).toBe(owners[0].key);
+    }
+    expect(sectionsForType('CABIN_AND_MECHANICAL')).toEqual([
+      'INTERIOR',
+      'EXTERIOR',
+      'ENGINE_COMPARTMENT',
+      'ROAD_TEST',
+    ]);
+    expect(areasForTypes(['PAINT_BODY', 'COMPUTER_UNIT'])).toEqual(['PAINT_BODY', 'COMPUTER_UNIT']);
+    expect(areasForTypes(['CABIN_AND_MECHANICAL'])).toEqual([
+      'INTERIOR',
+      'EXTERIOR',
+      'ENGINE_COMPARTMENT',
+      'ROAD_TEST',
+    ]);
+    // Selecting all four types yields all seven areas, in catalogue order.
+    expect(areasForTypes([...INSPECTION_TYPE_KEYS])).toEqual([...INSPECTION_SECTION_KEYS]);
+  });
+
+  it('rejects an unknown type rather than returning an empty type', () => {
+    expect(() => inspectionTypeSpec('NOT_A_TYPE')).toThrow();
+    expect(isInspectionTypeKey('CABIN_AND_MECHANICAL')).toBe(true);
+    expect(isInspectionTypeKey('INTERIOR')).toBe(false);
   });
 
   it('carries the exact item count of each report table', () => {
