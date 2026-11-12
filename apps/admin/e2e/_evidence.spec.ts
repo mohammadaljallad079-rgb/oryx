@@ -47,3 +47,16 @@ test('evidence: inspection service VAT (ar, light)', async ({ page }) => {
   await page.waitForTimeout(800);
   await page.screenshot({ path: `${OUT}/e08-inspection-services-ar-light.png`, fullPage: true });
 });
+
+test('evidence: inspection booking date/time picker', async ({ page }) => {
+  await signIn(page, ENTERPRISE_ADMIN);
+  await setLocale(page, 'en');
+  await setTheme(page, 'light');
+  await page.goto('/automotive/inspections');
+  await page.getByTestId('inspections-tab-bookings').click();
+  await page.getByTestId('new-inspection-booking').click();
+  await page.getByTestId('booking-date').waitFor({ timeout: 15_000 });
+  await page.getByTestId('booking-date').click();
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: `${OUT}/e08-inspection-booking-date-en-light.png` });
+});
