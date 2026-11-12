@@ -61,6 +61,25 @@ test('evidence: inspection booking date/time picker', async ({ page }) => {
   await page.screenshot({ path: `${OUT}/e08-inspection-booking-date-en-light.png` });
 });
 
+test('evidence: inspection job types (en, light)', async ({ page }) => {
+  await signIn(page, ENTERPRISE_ADMIN);
+  await setLocale(page, 'en');
+  await setTheme(page, 'light');
+  await page.goto('/automotive/inspections');
+  await page.getByTestId('new-inspection-job').click();
+  await expect(page.getByTestId('job-types')).toBeVisible({ timeout: 20_000 });
+  await page.screenshot({ path: `${OUT}/e09-inspection-job-types-en-light.png`, fullPage: true });
+});
+
+test('evidence: inspection job list shows the four types (en, light)', async ({ page }) => {
+  await signIn(page, ENTERPRISE_ADMIN);
+  await setLocale(page, 'en');
+  await setTheme(page, 'light');
+  await page.goto('/automotive/inspections');
+  await expect(page.getByTestId('inspection-jobs')).toBeVisible({ timeout: 20_000 });
+  await page.screenshot({ path: `${OUT}/e09-inspection-jobs-list-en-light.png`, fullPage: true });
+});
+
 test('evidence: HR work-site edit/delete actions', async ({ page }) => {
   await signIn(page, ENTERPRISE_ADMIN);
   await setLocale(page, 'en');
