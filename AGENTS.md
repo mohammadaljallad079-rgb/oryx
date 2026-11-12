@@ -1212,3 +1212,21 @@ so nothing else needs changing.
   the later specs fail intermittently in `signIn` with a `waitForURL **/dashboard`
   timeout — a login 429, not a product defect. It looks like flakiness because
   the failure moves between specs as the login count crosses the ceiling.
+
+### Execution 09 gotchas
+
+- **Execution 09 is a stack, not a branch off production.** The Execution 08
+  remediation was never merged into `release/oryx-latest`, so
+  `fix/oryx-remaining-requirements` builds directly on `897f428`. A PR against
+  the production branch therefore shows the Execution 08 commits too until PR
+  #13 merges; the diff self-heals to the Execution 09 commits afterward. Do not
+  "fix" that by rebasing onto release — it would drop the Execution 08 fixes the
+  branch depends on.
+- **The browser suite rewrites the `docs/**` evidence PNGs.** A full
+  `playwright test` run re-encodes every capture under `docs/audit/**` and
+  `docs/execution-reports/screenshots/**`, so `git status` shows dozens of
+  modified images that differ only by PNG recompression. `git checkout --` them
+  before committing, or the PR carries meaningless binary churn.
+- **`apps/admin/build` clears `.next`.** `next start` keeps serving the old
+  build from memory, so restart the admin (and customer) server after a build
+  before running the UI suites, or the suite exercises stale chunks.
