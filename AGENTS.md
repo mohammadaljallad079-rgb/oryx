@@ -1099,6 +1099,20 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   code resolves to its display name; do not hard-code a name or a timezone
   offset.
 
+### Execution 18 gotchas
+
+- **The report and the financial forms print to different edges.**
+  `REPORT_PDF_MARGINS` lifts only the inspection report's top edge (the brand
+  band sits ~5.6mm from the paper). Its side margins stay at the default because
+  the cover photograph bleeds to the paper edges by cancelling exactly that
+  inset. Do not fold the report onto `OFFICIAL_PDF_MARGINS`; the header drops
+  ~20pt.
+- **A full-bleed band must not widen the layout box.** A negative `margin`, or a
+  wider in-flow box, enlarges Chromium's printable area and shifts every element
+  on the sheet sideways. Paint the bleed with an absolutely positioned image that
+  overflows an in-flow figure — absolute overflow is clipped by the paper edge
+  and does not resize the page.
+
 ### Adding a new ERP module
 
 1. Add a `ModuleDefinition` to `packages/shared/src/modules.ts`.
