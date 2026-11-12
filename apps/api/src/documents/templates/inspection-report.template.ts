@@ -657,10 +657,20 @@ export const INSPECTION_REPORT_CSS = `
   /* The approved cover prints the vehicle photograph as a wide band across the
    * middle of the page, bleeding past the side margins. */
   .vphoto{ position:relative; margin:10px 0 0; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#f7f9fc; }
-  .vphoto--bleed{ margin-inline:-12mm; border-radius:0; border-inline:none; }
+  /* The approved cover bleeds the photograph to the paper edges. A negative
+   * margin, or a wider in-flow box, enlarges the printable area and shifts every
+   * other element on the sheet sideways. The band is therefore painted with an
+   * absolutely positioned image that overflows its (in-flow, margin-width)
+   * figure: absolute overflow is clipped by the paper edge, it does not resize
+   * the page. */
+  .vphoto--bleed{ margin-inline:0; border-radius:0; border-inline:none; height:176px; }
+  .vphoto--bleed .vphoto-img{ position:absolute; top:0; inset-inline:-12mm;
+    width:calc(100% + 24mm); height:176px; object-fit:cover; }
   .vphoto-img{ width:100%; height:176px; object-fit:cover; display:block; }
-  .vphoto-empty .vphoto-ph{ position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    height:120px; color:var(--muted); font-size:8pt; }
+  .vphoto-empty .vphoto-ph{ position:absolute; top:0; inset-inline:-12mm;
+    width:calc(100% + 24mm); height:176px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:var(--muted); font-size:8pt; }
   .vphoto-ph .ltr{ font-size:7.5pt; color:var(--line-strong); }
   .terms{ margin-top:10px; border:1px solid var(--line); border-radius:6px; padding:8px 10px; background:#f7f9fc; }
   .terms-title{ font-size:9.5pt; font-weight:700; color:var(--navy); }
