@@ -280,7 +280,10 @@ export const CHROME_CSS = `
   .doc-issuer-en{ font-size:15pt; font-weight:700; color:var(--navy); }
   .doc-issuer-ar{ font-size:12pt; color:var(--navy-soft); }
   .doc-issuer-meta{ margin-top:4px; font-size:8.5pt; color:var(--muted); display:flex; gap:10px; flex-wrap:wrap; }
-  .doc-logo{ height:46px; width:auto; }
+  /* The approved lockup prints the mark at 136pt wide (its 41.8pt height is
+   * driven by the mark's own aspect). The previous 46px box printed it at
+   * 124pt, visibly smaller than the reference. */
+  .doc-logo{ height:51px; width:auto; }
   .doc-monogram{ width:46px; height:46px; border-radius:8px; background:var(--navy);
     color:var(--gold); display:flex; align-items:center; justify-content:center;
     font-weight:700; font-size:17pt; letter-spacing:.5px; }

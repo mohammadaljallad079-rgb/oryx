@@ -201,4 +201,41 @@ describe('inspection report template — font independence', () => {
     expect(html).toContain('vphoto-empty');
     expect(html).not.toContain('class="vphoto-img"');
   });
+
+  it('anchors the interior fittings drawing to the physical left inside the cabin block', () => {
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload,
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    // The drawing is the approved artwork, painted out of flow behind the
+    // lower-left checklist. `left` (not `inset-inline-start`) is deliberate:
+    // this page is RTL, so the logical property would resolve to the right and
+    // the drawing would sit under the wrong column.
+    expect(html).toContain('class="interior-art"');
+    expect(html).toMatch(/class="interior-art"><img src="data:image\/png;base64,/);
+    expect(html).toMatch(/\.cabin\{\s*position:relative;/);
+    expect(html).toMatch(/\.interior-art\{\s*position:absolute;\s*left:0;/);
+    expect(html).not.toMatch(/\.interior-art\{[^}]*inset-inline-start/);
+  });
+
+  it('drops the interior drawing entirely when the cabin checklist is absent', () => {
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload: {
+        ...payload,
+        sections: payload.sections.filter((s) => s.area !== 'INTERIOR'),
+      },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    expect(html).not.toContain('class="interior-art"');
+  });
 });

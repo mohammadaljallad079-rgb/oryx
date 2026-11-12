@@ -363,14 +363,23 @@ export function inspectionGroupPage(
   const pair = (right: string, left: string): string =>
     `<table class="grid"><tr><td>${right || '&nbsp;'}</td><td>${left || '&nbsp;'}</td></tr></table>`;
 
+  // The approved form paints the interior fittings drawing as a faint,
+  // absolutely-positioned background behind the lower-left (exterior)
+  // checklist, not as an in-flow figure. An in-flow copy would add its full
+  // height to a page that is already complete and push the last checklist onto
+  // a sixth sheet.
+  const interiorArt = interior
+    ? `<figure class="interior-art"><img src="${INTERIOR_DIAGRAM_DATA_URI}" alt=""></figure>`
+    : '';
+
   const cabin = `
   <div class="grp cabin">
+    ${interiorArt}
     <div class="grp-title">فحص التجهيزات الداخلية والملحقات الخارجية<span class="ltr">Cabin Electronics &amp; Exterior Accessories Checks</span>
       <span class="grp-legend">${legendChip('check', 'اجتياز', 'Pass')}${legendChip('cross', 'فشل', 'Fail')}<span class="lg-chip">N/A · غير متوفر</span></span>
     </div>
     ${pair(cell(engine, 'مقصورة المحرك', 'Engine Compartment', false), cell(road, 'تجربة القيادة', 'Road Test', false))}
     ${pair(cell(interior, 'داخلية السيارة', 'Interior Car', true), cell(exterior, 'خارجية السيارة', 'Exterior Car', true))}
-    ${interior ? `<figure class="interior-art"><img src="${INTERIOR_DIAGRAM_DATA_URI}" alt=""><figcaption>مخطط التجهيزات الداخلية<span class="ltr">Interior fittings reference</span></figcaption></figure>` : ''}
   </div>`;
 
   const remarkRows: string[] = [];
@@ -624,7 +633,11 @@ export const INSPECTION_REPORT_CSS = `
   .report-head{ display:flex; direction:ltr; justify-content:space-between; align-items:center;
     padding-bottom:4px; margin-bottom:2px; }
   .rh-left{ display:flex; align-items:center; gap:9px; }
-  .rh-logo{ height:38px; width:auto; }
+  /* The approved lockup prints the mark across x16-213pt (41.8pt tall). The
+   * bundled logo is a full mark+wordmark lockup, so its printed height is set
+   * to the reference mark's height rather than the previous 38px, which left it
+   * noticeably smaller than the approved header. */
+  .rh-logo{ height:56px; width:auto; }
   .rh-monogram{ width:38px; height:38px; border-radius:8px; background:var(--navy); color:var(--gold);
     display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14pt; letter-spacing:.5px; }
   .rh-name{ display:flex; flex-direction:column; line-height:1.12; }
@@ -716,9 +729,16 @@ export const INSPECTION_REPORT_CSS = `
   .cabin .item-en{ font-size:5.6pt; line-height:1.0; }
   .grid{ table-layout:fixed; border-collapse:separate; border-spacing:4px 2px; }
   .grid > tbody > tr > td{ width:50%; vertical-align:top; padding:0; }
-  .interior-art{ margin:6px 0 0; }
-  .interior-art img{ width:100%; max-height:46px; object-fit:contain; object-position:top; display:block; }
-  .interior-art figcaption{ font-size:7pt; color:var(--muted); padding-top:2px; }
+  /* The approved form paints the interior fittings drawing as a faint
+   * background behind the lower-left (exterior) checklist, at 250x163pt (333px
+   * at Chromium's 96dpi/72pt ratio). It is out of flow, so it neither adds page
+   * height nor competes with the printed rows. The anchor is the physical left
+   * (left, not inset-inline-start, which resolves to the right in this RTL
+   * report) and the bottom of the cabin block, so the drawing sits under the
+   * exterior checklist exactly as the reference does. */
+  .cabin{ position:relative; }
+  .interior-art{ position:absolute; left:0; bottom:0; margin:0; z-index:0; }
+  .interior-art img{ width:333px; height:auto; display:block; opacity:.28; }
   .itable{ border:1px solid var(--line); border-top:none; }
   .itable-head{ background:#eef2f8; color:var(--navy); font-size:8.2pt; font-weight:700; padding:2px 7px; border-bottom:1px solid var(--line); }
   .itable-head .ltr{ margin-inline-start:6px; font-size:7.5pt; color:var(--muted); font-weight:400; }
@@ -743,9 +763,13 @@ export const INSPECTION_REPORT_CSS = `
   .diagram-title{ display:flex; align-items:baseline; font-size:10pt; font-weight:700; color:var(--navy);
     margin-bottom:6px; border-inline-start:4px solid var(--gold); padding-inline-start:7px; }
   .diagram-title .ltr{ margin-inline-start:8px; font-size:8pt; color:var(--muted); font-weight:400; }
-  .diagram-wrap{ display:flex; gap:14px; align-items:flex-start; }
+  /* The approved form prints the body-panel scheme at its full size, centred,
+   * with the condition legend beneath it. The drawing is the approved artwork
+   * itself, so its printed size is fixed to the reference: the car occupies
+   * 321x439pt, which is 428px at Chromium's 96dpi/72pt ratio. */
+  .diagram-wrap{ display:block; }
   .diagram{ position:relative; width:230px; flex:0 0 230px; }
-  .diagram--art{ width:200px; flex:0 0 200px; }
+  .diagram--art{ width:428px; margin:0 auto; }
   .artplan{ width:100%; height:auto; display:block; }
   .bodyplan{ width:100%; height:auto; display:block; }
   .bp-body{ fill:#eef2f8; stroke:#5b6472; stroke-width:3; }
@@ -765,8 +789,12 @@ export const INSPECTION_REPORT_CSS = `
   .marker-table{ margin-top:8px; border:1px solid var(--line); }
   .marker-table th,.marker-table td{ border-bottom:1px solid var(--line); padding:3px 7px; font-size:8pt; text-align:start; }
   .marker-table thead th{ background:#eef2f8; color:var(--navy); }
+  /* The approved form prints the chassis drawing beside its eight region
+   * labels. The drawing is the approved artwork itself and occupies 270x489pt
+   * on the reference (360px wide at Chromium's 96dpi/72pt ratio), so the box is
+   * fixed to that width rather than a nominal one. */
   .chassis-wrap{ display:flex; gap:14px; align-items:flex-start; }
-  .chassis-art{ position:relative; width:210px; flex:0 0 210px; }
+  .chassis-art{ position:relative; width:360px; flex:0 0 360px; }
   .artchassis{ width:100%; height:auto; display:block; }
   .chmark{ position:absolute; width:15px; height:15px; border-radius:50%; transform:translate(-50%,-50%);
     display:flex; align-items:center; justify-content:center; font-size:8pt; font-weight:700; color:#fff;
