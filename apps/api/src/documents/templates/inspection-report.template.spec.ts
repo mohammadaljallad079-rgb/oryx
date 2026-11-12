@@ -148,4 +148,34 @@ describe('inspection report template — font independence', () => {
       }
     }
   });
+
+  it('prints the vehicle photograph as a full-width band on the cover', () => {
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload: { ...payload, vehiclePhotoDataUri: 'data:image/png;base64,AAAA' },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    // The approved cover prints the photograph as a bleeding band, not a thumbnail.
+    expect(html).toContain('vphoto--bleed');
+    expect(html).toContain('class="vphoto-img"');
+    expect(html).toContain('data:image/png;base64,AAAA');
+  });
+
+  it('prints a neutral placeholder when no photograph was attached', () => {
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload,
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    expect(html).toContain('vphoto-empty');
+    expect(html).not.toContain('class="vphoto-img"');
+  });
 });

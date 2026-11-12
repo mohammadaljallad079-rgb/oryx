@@ -23,7 +23,12 @@ import {
   TableShell,
 } from '@/components/ui';
 import type { InspectionBookingDto, InspectionServiceDto, VehicleDto, VehicleDocumentDto, VehicleDocumentOcrResultDto, CustomerDto } from '@oryx/shared';
-import { basisPointsOfMinor, INSPECTION_SECTION_SPECS, VEHICLE_DOCUMENT_CATEGORIES, type InspectionSectionKey } from '@oryx/shared';
+import {
+  basisPointsOfMinor,
+  INSPECTION_TYPES,
+  VEHICLE_DOCUMENT_CATEGORIES,
+  type InspectionTypeKey,
+} from '@oryx/shared';
 import { useRouter } from 'next/navigation';
 import { inspectionFieldLabelParts, INSPECTION_COVER_ROWS, INSPECTION_VEHICLE_INFO } from '@/lib/inspection-fields';
 
@@ -155,9 +160,9 @@ function JobsTab({ canWrite }: { canWrite: boolean }) {
                       {j.plateNumber ? <span className="oryx-faint"> · {j.plateNumber}</span> : null}
                     </td>
                     <td className="oryx-faint text-[12px]">
-                      {j.selectedAreas
+                      {j.selectedTypes
                         .map((a) => {
-                          const spec = INSPECTION_SECTION_SPECS.find((x) => x.key === a);
+                          const spec = INSPECTION_TYPES.find((x) => x.key === a);
                           return spec ? (locale === 'ar' ? spec.labelAr : spec.labelEn) : a;
                         })
                         .join(' · ')}
@@ -241,7 +246,7 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   const [error, setError] = useState<string | null>(null);
   const [customerId, setCustomerId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
-  const [areas, setAreas] = useState<InspectionSectionKey[]>([]);
+  const [types, setTypes] = useState<InspectionTypeKey[]>([]);
   const [addVehicleOpen, setAddVehicleOpen] = useState(false);
   const [identity, setIdentity] = useState<JobIdentity>(EMPTY_IDENTITY);
   const customers = useAsync(() => api.salesCustomers(), []);
@@ -308,11 +313,11 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   const setField = (key: keyof JobIdentity, value: string) =>
     setIdentity((prev) => ({ ...prev, [key]: value }));
 
-  const toggleArea = (key: InspectionSectionKey) =>
-    setAreas((prev) => (prev.includes(key) ? prev.filter((a) => a !== key) : [...prev, key]));
+  const toggleType = (key: InspectionTypeKey) =>
+    setTypes((prev) => (prev.includes(key) ? prev.filter((t) => t !== key) : [...prev, key]));
 
   const submit = async () => {
-    if (!customerId || !vehicleId || areas.length === 0) {
+    if (!customerId || !vehicleId || types.length === 0) {
       setError(t('inspection.selectTypesHint'));
       return;
     }
@@ -322,7 +327,7 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
       await api.createInspectionSession({
         customerId,
         vehicleId,
-        selectedAreas: areas,
+        selectedTypes: types,
         ...(identity.customerName.trim() ? { customerName: identity.customerName.trim() } : {}),
         ...(identity.contactNumber.trim() ? { contactNumber: identity.contactNumber.trim() } : {}),
         ...(identity.plateNumber.trim() ? { plateNumber: identity.plateNumber.trim() } : {}),
@@ -448,13 +453,13 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
         <div>
           <span className="oryx-label">{t('inspection.selectTypes')}</span>
           <div className="grid gap-2 sm:grid-cols-2" data-testid="job-types">
-            {INSPECTION_SECTION_SPECS.map((spec) => (
+            {INSPECTION_TYPES.map((spec) => (
               <label
                 key={spec.key}
-                className={`oryx-job-type${areas.includes(spec.key) ? ' is-selected' : ''}`}
+                className={`oryx-job-type${types.includes(spec.key) ? ' is-selected' : ''}`}
                 data-testid={`job-type-${spec.key}`}
               >
-                <input type="checkbox" checked={areas.includes(spec.key)} onChange={() => toggleArea(spec.key)} />
+                <input type="checkbox" checked={types.includes(spec.key)} onChange={() => toggleType(spec.key)} />
                 <span>
                   <span className="block font-semibold">{locale === 'ar' ? spec.labelAr : spec.labelEn}</span>
                   <span className="oryx-faint block text-[11.5px]">{locale === 'ar' ? spec.summaryAr : spec.summaryEn}</span>

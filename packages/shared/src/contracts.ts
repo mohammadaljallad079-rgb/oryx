@@ -3,6 +3,7 @@ import type {
   IntegrationImplementation,
   IntegrationProviderState,
 } from './integrations';
+import type { InspectionTypeKey } from './inspection';
 import type { RoundingMode } from './money';
 
 /** Shared API contracts between the ORYX API and the admin app. */
@@ -2153,6 +2154,8 @@ export interface InspectionSessionSummaryDto {
   plateNumber: string | null;
   vin: string;
   selectedAreas: InspectionAreaKey[];
+  /** The operator-facing inspection types the stored areas map back to. */
+  selectedTypes: InspectionTypeKey[];
   inspectorUserId: string | null;
   inspectedAt: string;
   createdAt: string;
