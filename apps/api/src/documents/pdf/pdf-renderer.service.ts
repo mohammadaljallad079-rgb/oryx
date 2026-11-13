@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
+import { PDFDocument } from 'pdf-lib';
 import type { Browser, BrowserType } from 'playwright';
 import { DocumentFontService, DOCUMENT_FONT_STACK, DOCUMENT_LATIN_STACK } from './document-fonts.service';
 
@@ -71,7 +72,28 @@ export class PdfRendererService implements OnModuleDestroy {
    */
   async render(
     html: string,
-    options: { footerHtml?: string; margins?: PdfMargins } = {},
+    options: { footerHtml?: string; coverFooterHtml?: string; margins?: PdfMargins } = {},
+  ): Promise<{ pdf: Buffer; pageCount: number }> {
+    const pdf = await this.renderOnce(html, options.footerHtml, options.margins);
+    // The approved inspection report prints a different footer on its cover than
+    // on its section pages, and Chromium paints one footer template on *every*
+    // page. A second pass with the cover footer supplies page one, and the
+    // cover's page is spliced onto the section pass so both variants appear in
+    // one document. The footer is painted inside the bottom margin, so it never
+    // changes pagination — the two passes break at exactly the same places.
+    if (options.coverFooterHtml && options.coverFooterHtml !== options.footerHtml) {
+      const cover = await this.renderOnce(html, options.coverFooterHtml, options.margins);
+      if (cover.pageCount === pdf.pageCount && cover.pageCount > 1) {
+        return { pdf: await spliceFirstPage(cover.pdf, pdf.pdf), pageCount: pdf.pageCount };
+      }
+    }
+    return pdf;
+  }
+
+  private async renderOnce(
+    html: string,
+    footerHtml: string | undefined,
+    margins: PdfMargins | undefined,
   ): Promise<{ pdf: Buffer; pageCount: number }> {
     const browser = await this.browser();
     const context = await browser.newContext({ viewport: { width: 1240, height: 1754 } });
@@ -94,7 +116,6 @@ export class PdfRendererService implements OnModuleDestroy {
       // The margins are a parameter because the official financial layout was
       // measured against a printed reference with tighter edges than the report;
       // a single fixed margin would make one of the two documents drift.
-      const footerHtml = options.footerHtml;
       const pdf = await page.pdf({
         format: 'A4',
         printBackground: true,
@@ -102,7 +123,7 @@ export class PdfRendererService implements OnModuleDestroy {
         displayHeaderFooter: Boolean(footerHtml),
         headerTemplate: '<span></span>',
         footerTemplate: footerHtml ?? '<span></span>',
-        margin: options.margins ?? DEFAULT_PDF_MARGINS,
+        margin: margins ?? DEFAULT_PDF_MARGINS,
       });
 
       const buffer = Buffer.from(pdf);
@@ -222,6 +243,31 @@ export function countPdfPages(pdf: Buffer): number {
   if (counts.length > 0) return Math.max(...counts);
   const pages = text.match(/\/Type\s*\/Page[^s]/g);
   return pages ? pages.length : 1;
+}
+
+/**
+ * Replaces the first page of `body` with the first page of `cover`.
+ *
+ * The approved inspection report prints the signature-box band on its cover and
+ * a compact lockup on its section pages. Chromium paints a single footer
+ * template on every page, so the report is rendered twice — once with each
+ * footer — and the cover's first page is lifted onto the section render. The two
+ * passes break at identical points (the footer lives in the page margin and
+ * consumes no content height), so page one is the only page that differs.
+ */
+export async function spliceFirstPage(cover: Buffer, body: Buffer): Promise<Buffer> {
+  const coverDoc = await PDFDocument.load(cover);
+  const bodyDoc = await PDFDocument.load(body);
+  const out = await PDFDocument.create();
+  const [first] = await out.copyPages(coverDoc, [0]);
+  out.addPage(first);
+  const rest = bodyDoc.getPageIndices().filter((index) => index > 0);
+  for (const page of await out.copyPages(bodyDoc, rest)) out.addPage(page);
+  // `useObjectStreams: false` keeps the page tree and `/MediaBox` in plain text.
+  // `countPdfPages` and the document tests read the raw bytes rather than
+  // pulling in a full PDF parser, and pdf-lib's default object streams would
+  // hide both behind a compressed xref.
+  return Buffer.from(await out.save({ useObjectStreams: false }));
 }
 
 /**

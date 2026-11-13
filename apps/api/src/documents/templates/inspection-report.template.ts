@@ -255,7 +255,7 @@ function vehiclePhoto(
   // so a scanner can still resolve it against the picture.
   const qr = verification?.qrDataUri
     ? `<div class="cover-qr">
-        <span class="cover-qr-cap">للتأكد من صحة التقرير<span class="ltr">Scan to verify</span></span>
+        <span class="cover-qr-cap">للتأكد من صحة التقرير</span>
         <img src="${esc(verification.qrDataUri)}" alt="Document verification QR code">
       </div>`
     : '';
@@ -736,11 +736,12 @@ export const INSPECTION_REPORT_CSS = `
    * right/bottom is used because the page is RTL and the reference anchors the
    * code to the visual right regardless of direction. */
   .cover-qr{ position:absolute; bottom:8px; right:10px; z-index:2;
-    display:flex; flex-direction:column; align-items:center; gap:3px;
+    display:flex; flex-direction:column; align-items:center; gap:4px;
     background:#fff; border:1px solid var(--line); border-radius:5px; padding:5px 6px; }
-  .cover-qr img{ width:92px; height:92px; display:block; }
-  .cover-qr-cap{ font-size:6.4pt; font-weight:700; color:var(--navy); line-height:1.15; text-align:center; }
-  .cover-qr-cap .ltr{ display:block; font-size:5.6pt; color:var(--muted); font-weight:400; letter-spacing:.2px; }
+  /* Measured from the approved cover: a 47pt code (bbox 522,461-569,508) with a
+   * single Arabic caption above it (7pt). */
+  .cover-qr img{ width:62px; height:62px; display:block; }
+  .cover-qr-cap{ font-size:7pt; font-weight:700; color:var(--navy); line-height:1.15; text-align:center; direction:rtl; unicode-bidi:embed; }
   /* The approved cover prints the vehicle photograph as a wide band across the
    * middle of the page, bleeding past the side margins. Measured from the
    * reference: the band spans y184-549 of an 842pt sheet, i.e. 365pt tall. */

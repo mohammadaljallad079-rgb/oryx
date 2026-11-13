@@ -1,6 +1,13 @@
 import { existsSync } from 'node:fs';
+import { PDFDocument } from 'pdf-lib';
 import { DOCUMENT_FONT_STACK, DOCUMENT_LATIN_STACK } from './document-fonts.service';
-import { BASE_PRINT_CSS, launchChromium, OFFICIAL_PDF_MARGINS, REPORT_PDF_MARGINS } from './pdf-renderer.service';
+import {
+  BASE_PRINT_CSS,
+  launchChromium,
+  OFFICIAL_PDF_MARGINS,
+  REPORT_PDF_MARGINS,
+  spliceFirstPage,
+} from './pdf-renderer.service';
 
 /**
  * The numeric and Latin classes must keep an Arabic face in their stack.
@@ -58,6 +65,44 @@ describe('document page margins', () => {
   it('keeps the official invoice margins on all four edges', () => {
     expect(OFFICIAL_PDF_MARGINS.left).not.toBe(OFFICIAL_PDF_MARGINS.right);
     expect(OFFICIAL_PDF_MARGINS.top).toBe('5.7mm');
+  });
+});
+
+/**
+ * The report prints a different footer on its cover than on its section pages.
+ *
+ * Chromium paints a single footer template on every page, so the report is
+ * rendered twice — once with each footer — and page one is lifted from the cover
+ * pass onto the section pass. The splice must keep the page count, the section
+ * pages, and the cover's own first page.
+ */
+describe('spliceFirstPage', () => {
+  // Distinct page widths identify which pass each page came from: PDF text is
+  // Flate-compressed, so the marker is the geometry, not a readable string.
+  async function makePdf(pageCount: number, width: number): Promise<Buffer> {
+    const doc = await PDFDocument.create();
+    for (let i = 0; i < pageCount; i += 1) doc.addPage([width, 842]);
+    return Buffer.from(await doc.save());
+  }
+
+  it('takes page one from the cover and the rest from the body', async () => {
+    const cover = await makePdf(3, 610);
+    const body = await makePdf(3, 595);
+    const merged = await spliceFirstPage(cover, body);
+    const doc = await PDFDocument.load(merged);
+    expect(doc.getPageCount()).toBe(3);
+    expect(doc.getPage(0).getWidth()).toBe(610);
+    expect(doc.getPage(1).getWidth()).toBe(595);
+    expect(doc.getPage(2).getWidth()).toBe(595);
+  });
+
+  it('does not drop or duplicate pages when the body is a single page', async () => {
+    const cover = await makePdf(1, 610);
+    const body = await makePdf(1, 595);
+    const merged = await spliceFirstPage(cover, body);
+    const doc = await PDFDocument.load(merged);
+    expect(doc.getPageCount()).toBe(1);
+    expect(doc.getPage(0).getWidth()).toBe(610);
   });
 });
 

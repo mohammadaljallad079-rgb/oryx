@@ -261,9 +261,16 @@ export class DocumentsService {
     const footerHtml =
       layout === 'official'
         ? officialFooterTemplate(args.issuer)
-        : reportFooterTemplate(args.issuer);
+        : reportFooterTemplate(args.issuer, spec.verifiable ? verification.qrDataUri : undefined);
+    // The report's cover prints the signature-box band while its section pages
+    // print only the compact lockup, so the cover footer is a second template
+    // the renderer splices onto page one. Financial layouts paint one band on
+    // every page and need no second pass.
+    const coverFooterHtml =
+      layout === 'official' ? undefined : officialFooterTemplate(args.issuer);
     const { pdf, pageCount } = await this.renderer.render(html, {
       footerHtml,
+      coverFooterHtml,
       margins: layout === 'official' ? OFFICIAL_PDF_MARGINS : REPORT_PDF_MARGINS,
     });
     const documentId = newDocumentId();
@@ -410,15 +417,20 @@ export class DocumentsService {
     // beneath. Only the internal statements (which never print an identity band)
     // keep the compact `footerTemplate`.
     const footerHtml = referenceLayout || payload.kind === 'INSPECTION_REPORT'
-      ? officialFooterTemplate(issuer)
+      ? payload.kind === 'INSPECTION_REPORT'
+        ? reportFooterTemplate(issuer, spec.verifiable ? verification.qrDataUri : undefined)
+        : officialFooterTemplate(issuer)
       : footerTemplate({
           issuer,
           titleEn: spec.labelEn,
           titleAr: spec.labelAr,
           documentNumber,
         });
+    const coverFooterHtml =
+      payload.kind === 'INSPECTION_REPORT' ? officialFooterTemplate(issuer) : undefined;
     const { pdf, pageCount } = await this.renderer.render(html, {
       footerHtml,
+      coverFooterHtml,
       margins:
         payload.kind === 'INSPECTION_REPORT'
           ? REPORT_PDF_MARGINS
