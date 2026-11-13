@@ -186,20 +186,35 @@ export const CONTACT_ICON_GLOBE =
  * logo is a data URI rather than an embedded file.
  */
 function brandBand(issuer: DocumentIssuer): string {
-  // The reference prints the full lockup (mark + wordmark) at 52pt tall, 240pt
-  // wide, on both outer edges (measured x14-254 and x341-581, y755-807).
-  const logo = issuer.logoDataUri
-    ? `<img src="${esc(issuer.logoDataUri)}" alt="" style="height:52pt;width:auto;display:block">`
+  // The reference prints two bordered signature boxes on the outer edges with a
+  // compact ORYX lockup and the closing line centred between them (measured
+  // boxes x14-254 and x341-581, y755-807; the centre lockup at x257-337). The
+  // outer edges are *not* the full logotype — the signature labels sit inside
+  // those boxes — so the band renders the boxes and the small centred mark.
+  const mark = issuer.logoDataUri
+    ? `<img src="${esc(issuer.logoDataUri)}" alt="" style="height:19pt;width:auto;display:block;margin:0 auto">`
     : '';
+  const box =
+    'flex:0 0 auto;width:239.8pt;height:51.8pt;box-sizing:border-box;' +
+    'border:0.75px solid #a3b1c2;border-radius:6pt;padding:5pt 9pt;white-space:nowrap;';
+  const label = 'font-size:7.5pt;font-weight:700;color:#0f2b48;';
+  const labelAr = 'font-size:7.5pt;font-weight:700;color:#0f2b48;direction:rtl;unicode-bidi:embed;';
   return `
-  <div style="padding:0 14pt;display:flex;align-items:flex-end;justify-content:space-between;">
-    <div style="flex:0 0 auto;">${logo}</div>
-    <div style="flex:1 1 auto;text-align:center;line-height:1.2;">
-      <div style="font-size:8.3pt;font-weight:700;letter-spacing:.5px;color:#0f2b48;margin-bottom:4px;">AUTO SERVICES</div>
-      <div style="font-size:5.6pt;font-weight:700;color:#0f2b48;direction:rtl;unicode-bidi:embed;">شكراً لثقتكم بنا.</div>
+  <div style="padding:0 14pt;display:flex;align-items:flex-start;justify-content:space-between;">
+    <div style="${box}">
+      <span style="${label}">Authorized Stamp &amp; Signature</span>
+      <span style="${labelAr}">اعتماد المركز</span>
+    </div>
+    <div style="flex:0 0 auto;width:80pt;text-align:center;padding-top:1pt;line-height:1.15;">
+      ${mark}
+      <div style="font-size:8.3pt;font-weight:700;letter-spacing:.5px;color:#0f2b48;">AUTO SERVICES</div>
+      <div style="font-size:5.6pt;font-weight:700;color:#0f2b48;direction:rtl;unicode-bidi:embed;margin-top:3pt;">شكراً لثقتكم بنا.</div>
       <div style="font-size:5.6pt;color:#64748b;">Thank you for your trust.</div>
     </div>
-    <div style="flex:0 0 auto;">${logo}</div>
+    <div style="${box}">
+      <span style="${label}">Customer Signature</span>
+      <span style="${labelAr}">توقيع العميل</span>
+    </div>
   </div>`;
 }
 
@@ -243,8 +258,8 @@ export function officialFooterTemplate(issuer: DocumentIssuer): string {
   return `
 <div style="${base};width:100%;box-sizing:border-box;position:relative;top:4pt;">
   ${brandBand(issuer)}
-  <div style="border-top:0.75px solid #94a3b8;margin:5px 15.8pt 0 13.7pt;"></div>
-  <div style="padding:5px 13.3mm 0 15mm;display:flex;justify-content:space-between;align-items:baseline;font-size:6.5pt;font-weight:700;">
+  <div style="border-top:0.75px solid #94a3b8;margin:10px 15.8pt 0 13.7pt;"></div>
+  <div style="padding:0 13.3mm 0 15mm;display:flex;justify-content:space-between;align-items:baseline;font-size:6.5pt;font-weight:700;">
     <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span> &bull; <span style="direction:rtl;unicode-bidi:embed;display:inline-block;"><span class="pageNumber"></span> من <span class="totalPages"></span> صفحة</span></span>
     <span style="${contact}">${phone}${phone && email ? ' &nbsp; ' : ''}${email}</span>
     <span style="${contact}">${website}</span>

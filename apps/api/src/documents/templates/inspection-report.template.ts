@@ -316,10 +316,6 @@ export function identificationPage(input: InspectionReportInput, chrome: Documen
     ${vehiclePhoto(p, input.verification, input.issuer)}
     ${liabilityBlock()}
     ${importantRemarks()}
-    ${signatureBlock([
-      { ar: 'اعتماد المركز', en: 'Authorized Stamp & Signature' },
-      { ar: 'توقيع العميل', en: 'Customer Signature', name: p.customerName },
-    ])}
   </section>`;
 }
 
@@ -727,7 +723,7 @@ export const INSPECTION_REPORT_CSS = `
   .legend-row{ display:flex; gap:6px; margin-top:6px; }
   /* ---- cover ---- */
   .cover-info{ width:100%; }
-  .cover-sec-title{ background:var(--navy); color:#fff; font-size:9.5pt; font-weight:700; padding:3px 10px; border-radius:5px 5px 0 0; }
+  .cover-sec-title{ background:var(--navy); color:#fff; font-size:9.5pt; font-weight:700; padding:2.2px 10px; border-radius:5px 5px 0 0; }
   .cover-sec-title .ltr{ margin-inline-start:8px; color:var(--gold-soft); font-size:8pt; font-weight:400; }
   .vinfo{ width:100%; border:1px solid var(--line); border-top:none; border-collapse:collapse; direction:ltr; }
   .vinfo td{ border:1px solid var(--line); padding:3px 8px; width:25%; vertical-align:top; }

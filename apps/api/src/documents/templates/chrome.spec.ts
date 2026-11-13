@@ -113,5 +113,29 @@ describe('document chrome', () => {
       expect(html).toContain('font-size:7.2pt;font-weight:700;color:#475569');
       expect(html).toContain('text-align:end');
     });
+
+    it('prints the two signature boxes flanking the centred lockup, as the reference does', () => {
+      const html = officialFooterTemplate(issuer);
+      // The reference footer is not the logotype repeated at both edges: it is
+      // two bordered signature boxes (authorised / customer) with the ORYX
+      // lockup and the closing line centred between them. Reproducing the wrong
+      // shape was the defect this locks down.
+      expect(html).toContain('Authorized Stamp &amp; Signature');
+      expect(html).toContain('اعتماد المركز');
+      expect(html).toContain('Customer Signature');
+      expect(html).toContain('توقيع العميل');
+      expect(html).toContain('border:0.75px solid #a3b1c2');
+      // Both boxes are the measured 239.8pt wide and the closing line sits
+      // between them.
+      expect((html.match(/width:239\.8pt/g) || []).length).toBe(2);
+      expect(html).toContain('شكراً لثقتكم بنا');
+      expect(html).toContain('Thank you for your trust.');
+    });
+
+    it('never repeats the full logotype at both outer edges', () => {
+      // The old band printed the same image twice; the boxes must not.
+      const html = officialFooterTemplate({ ...issuer, logoDataUri: 'data:image/png;base64,AAAA' });
+      expect((html.match(/<img/g) || []).length).toBe(1);
+    });
   });
 });

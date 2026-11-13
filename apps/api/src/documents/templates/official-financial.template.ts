@@ -434,42 +434,9 @@ ${OFFICIAL_FINANCIAL_CSS}
   }
   ${verificationStrip(input.verification)}
   </div>
-  <div class="of-bottom">
-    <div class="of-body">
-    ${signatureStrip()}
-    <div class="of-thanks">
-      <div class="of-thanks-ar">شكراً لثقتكم بنا.</div>
-      <div class="of-thanks-en">Thank you for your trust.</div>
-    </div>
-    </div>
-  </div>
 </section>
 </body>
 </html>`;
-}
-
-/**
- * The signature strip exactly as the approved reference prints it.
- *
- * The reference places the English and Arabic labels of each signatory on one
- * line — "Authorized Stamp & Signature اعتماد المركز" on the leading edge and
- * "Customer Signature توقيع العميل" on the trailing edge — rather than the
- * stacked three-line block the shared `signatureBlock` renders. This local strip
- * keeps the approved wording and geometry without changing the shared chrome
- * used by the other document kinds.
- */
-function signatureStrip(): string {
-  return `
-  <div class="of-signrow">
-    <div class="of-sign">
-      <span class="of-sign-en">Authorized Stamp &amp; Signature</span>
-      <span class="of-sign-ar">اعتماد المركز</span>
-    </div>
-    <div class="of-sign">
-      <span class="of-sign-en">Customer Signature</span>
-      <span class="of-sign-ar">توقيع العميل</span>
-    </div>
-  </div>`;
 }
 
 /**
@@ -622,30 +589,6 @@ export const OFFICIAL_FINANCIAL_CSS = `
      so the box height is exactly the note text and its padding. */
   .of-notes{ margin-top:9pt; border:1px solid #c2c9d5; padding:7pt 10pt; }
   .of-notes-body{ font-size:9pt; color:#334155; }
-  .of-thanks{ margin-top:10pt; text-align:center; }
-  /* The reference thank-you line is 5.6pt (measured), noticeably smaller than
-     the signature labels, so it reads as a footnote rather than a heading. */
-  .of-thanks-ar{ font-size:5.6pt; font-weight:700; color:#05162b; }
-  .of-thanks-en{ font-size:5.6pt; font-weight:700; color:#05162b; }
-  /* The thanks/signature strip is pinned to the foot of the page box, as the
-     approved reference prints it, rather than trailing the last table row. The
-     reference leaves ~3.5pt more clearance below the strip than the box end, so
-     a small bottom margin lifts the strip and the thank-you line onto the
-     measured reference positions (signature 761.1, thanks 797.9). */
-  .of-bottom{ margin-top:auto; margin-bottom:12pt; }
-  /* The reference leaves a clear gap between the signature strip and the
-     thank-you line (measured 761pt to 798pt), so the strip is not cramped. */
-  .of-bottom .of-thanks{ margin-top:18pt; }
-  /* The reference signature strip is a single row. Each signatory's English and
-     Arabic label sit inline on one line; the first label starts at the content
-     edge and the second at ~60% across, exactly as the approved sheet prints
-     them (measured x 24.3 and 351.1 on a 595.5pt page). */
-  .of-signrow{ display:flex; margin-top:12pt; }
-  .of-sign{ display:flex; gap:8pt; justify-content:flex-start; align-items:baseline; }
-  .of-sign:first-child{ flex:0 0 60%; }
-  .of-sign:last-child{ flex:1 1 auto; }
-  .of-sign-en{ font-size:7.5pt; font-weight:700; color:#0f2b48; }
-  .of-sign-ar{ font-size:7.5pt; font-weight:700; color:#0f2b48; }
   /* The verification strip: a compact ruled box above the signature strip. It is
      deliberately restrained so it reads as a security footnote and never
      competes with the priced table or the approved identity band. */
