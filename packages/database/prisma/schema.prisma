@@ -210,6 +210,7 @@ model Company {
   payments            Payment[]
   paymentAllocations  PaymentAllocation[]
   customers           Customer[]
+  customerBranches    CustomerBranch[]
   products            Product[]
   warehouses          Warehouse[]
   stockLevels         StockLevel[]
@@ -310,6 +311,10 @@ model Company {
 
   // Execution 05 — per-tenant integration configuration.
   integrationProviders      IntegrationProvider[]
+
+  // Execution 20 — isolated per-company settings and their audit history.
+  settings                  CompanySetting[]
+  settingRevisions          CompanySettingRevision[]
 
   @@index([type])
   @@index([status])
@@ -723,6 +728,59 @@ model PlatformSetting {
 }
 
 // ============================================================================
+// EXECUTION 20 — PER-COMPANY SETTINGS
+//
+// Settings are stored one row per (company, namespace). Every value lives in
+// JSON so a namespace can gain a field without a migration, while the defaults
+// are validated in code (@oryx/shared/settings.ts) so a malformed row can never
+// change behaviour silently. The rows are strictly company-scoped: a document
+// produced for a company reads only that company's rows, so two tenants with
+// different VAT rates issue documents with their own rate.
+// ============================================================================
+
+/** Namespaces of the settings control center. */
+enum SettingNamespace {
+  GENERAL
+  INVOICING
+  ACCOUNTING
+  TAX
+  HR
+  INVENTORY
+  SALES
+  MAINTENANCE
+  DOCUMENTS
+}
+
+model CompanySetting {
+  id        String           @id @default(cuid())
+  companyId String
+  namespace SettingNamespace
+  value     Json
+  updatedById String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, namespace])
+  @@index([companyId])
+}
+
+/** Append-only history of settings changes, for auditability. */
+model CompanySettingRevision {
+  id         String           @id @default(cuid())
+  companyId  String
+  namespace  SettingNamespace
+  value      Json
+  changedById String?
+  changedAt  DateTime         @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, namespace, changedAt])
+}
+
+// ============================================================================
 // EXECUTION 02 — ENTERPRISE ERP CORE
 //
 // Every operational table carries `companyId` so tenant isolation is expressible
@@ -794,6 +852,12 @@ enum PaymentMethod {
   CHEQUE
   WALLET
   OTHER
+}
+
+/** A customer is either an individual person or a company. */
+enum CustomerType {
+  INDIVIDUAL
+  COMPANY
 }
 
 enum AllocationTarget {
@@ -1332,13 +1396,28 @@ model Customer {
   id                  String   @id @default(cuid())
   companyId           String
   code                String
+  /** INDIVIDUAL = person, COMPANY = business. Drives which form is used. */
+  type                CustomerType @default(INDIVIDUAL)
   nameEn              String
   nameAr              String
   email               String?
   phone               String?
+  /** VAT registration number (الرقم الضريبي). */
   taxNumber           String?
+  /** Commercial registration number (السجل التجاري) — companies only. */
+  crNumber            String?
+  crExpiresAt         DateTime?
+  website             String?
+  /** Primary contact person for a company customer. */
+  contactPersonName   String?
+  contactPersonPhone  String?
+  contactPersonEmail  String?
+  /** National / personal identity number — individuals only. */
+  nationalId          String?
   addressLine         String?
   city                String?
+  state               String?
+  postalCode          String?
   countryCode         String?
   creditLimitMinor    Int      @default(0)
   paymentTermsDays    Int      @default(0)
@@ -1370,8 +1449,40 @@ model Customer {
   bookingSlots      BookingSlot[]
   paymentIntents    PaymentIntent[]
 
+  // Execution 20 — secondary trading addresses (documents are linked
+  // polymorphically through EntityAttachment by entityType/entityId).
+  customerBranches  CustomerBranch[]
+
   @@unique([companyId, code])
   @@index([companyId, isActive])
+  @@index([companyId, type])
+}
+
+/**
+ * A trading address / branch belonging to a company customer.
+ *
+ * `isHeadOffice` marks the registered address; additional rows describe the
+ * branches listed on the company form. Deleting the customer removes them.
+ */
+model CustomerBranch {
+  id          String   @id @default(cuid())
+  companyId   String
+  customerId  String
+  name        String
+  contactName String?
+  phone       String?
+  email       String?
+  addressLine String?
+  city        String?
+  countryCode String?
+  isHeadOffice Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, customerId])
 }
 
 model Quotation {
@@ -3103,12 +3214,18 @@ model EntityAttachment {
   sizeBytes  Int      @default(0)
   /** Opaque storage reference; no binary is stored in the database. */
   storageRef String?
+  /** Optional document classification (e.g. CONTRACT, CV, CERTIFICATE). */
+  category   String?
+  /** Optional free-text label shown to the user. */
+  title      String?
   uploadedById String?
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId, entityType, entityId])
+  @@index([companyId, category])
 }
 
 /** Internal, database-persisted notification. No external provider is claimed. */

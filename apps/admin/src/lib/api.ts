@@ -10,8 +10,13 @@ import type {
   CmsPageDto,
   CompanyDto,
   ContextResponse,
+  CustomerBranchDto,
   CustomerDto,
+  CompanySettingRevisionDto,
+  CompanySettingsMap,
   DashboardResponse,
+  DocumentDto,
+  ModuleDashboardResponse,
   ErpAccountDto,
   FeatureFlagDto,
   FiscalYearDto,
@@ -595,8 +600,9 @@ export const api = {
     request<{ items: ReorderAlertDto[] }>(`/inventory/reorder-alerts${companyId ? `?companyId=${companyId}` : ''}`),
 
   // ------------------------------------------------------------ sales (E02)
-  salesCustomers: (params: { companyId?: string; search?: string } = {}) =>
+  salesCustomers: (params: { companyId?: string; search?: string; type?: string } = {}) =>
     request<Paginated<CustomerDto>>(`/sales/customers?${toQuery(params)}`),
+  customer: (id: string) => request<CustomerDto & { branches: CustomerBranchDto[] }>(`/sales/customers/${id}`),
   createCustomer: (body: Record<string, unknown>) =>
     request<CustomerDto>('/sales/customers', { method: 'POST', body }),
   updateCustomer: (id: string, body: Record<string, unknown>) =>
@@ -969,6 +975,119 @@ export const api = {
     }),
   verifyIntegration: (key: string) =>
     request<IntegrationDetailResponse>(`/integrations/${key}/verify`, { method: 'POST', body: {} }),
+
+  // ---------------------------------------- Execution 20: module dashboards
+  moduleDashboard: (moduleKey: string, params: { companyId?: string; branchId?: string } = {}) =>
+    request<ModuleDashboardResponse>(`/dashboard/modules/${moduleKey}?${toQuery(params)}`),
+
+  // ------------------------------------------- Execution 20: company settings
+  settings: (params: { companyId?: string } = {}) =>
+    request<{ companyId: string; settings: CompanySettingsMap }>(`/settings?${toQuery(params)}`),
+  settingNamespace: (namespace: string, params: { companyId?: string } = {}) =>
+    request<{ companyId: string; namespace: string; value: Record<string, unknown> }>(
+      `/settings/${namespace}?${toQuery(params)}`,
+    ),
+  updateSettingNamespace: (namespace: string, value: Record<string, unknown>, params: { companyId?: string } = {}) =>
+    request<{ companyId: string; namespace: string; value: Record<string, unknown> }>(
+      `/settings/${namespace}?${toQuery(params)}`,
+      { method: 'PATCH', body: { value } },
+    ),
+  resetSettingNamespace: (namespace: string, params: { companyId?: string } = {}) =>
+    request<{ companyId: string; namespace: string; value: Record<string, unknown> }>(
+      `/settings/${namespace}/reset?${toQuery(params)}`,
+      { method: 'POST', body: {} },
+    ),
+  settingsHistory: (params: { companyId?: string; namespace?: string } = {}) =>
+    request<{ items: CompanySettingRevisionDto[] }>(`/settings/history?${toQuery(params)}`),
+
+  // --------------------------------------------- Execution 20: documents
+  documents: (params: { entityType: string; entityId: string; companyId?: string }) =>
+    request<{ items: DocumentDto[] }>(`/documents?${toQuery(params)}`),
+  documentEntityTypes: () => request<{ entityTypes: string[] }>('/documents/entity-types'),
+  registerDocument: (body: Record<string, unknown>) => request<DocumentDto>('/documents', { method: 'POST', body }),
+  uploadDocument: async (form: FormData) => {
+    // Multipart upload cannot go through `request`, which serialises JSON and
+    // attaches the CSRF header; the same double-submit rule applies here.
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    const csrf = readCookie(CSRF_COOKIE);
+    if (csrf) headers[CSRF_HEADER] = csrf;
+    const res = await fetch(`${API_BASE}/v1/documents/upload`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: form,
+    });
+    if (!res.ok) {
+      let body: { message?: string | string[]; code?: string } = {};
+      try {
+        body = await res.json();
+      } catch {
+        /* non-JSON error body */
+      }
+      const message = Array.isArray(body.message) ? body.message.join(', ') : body.message ?? 'Upload failed';
+      throw new ApiError(res.status, body.code ?? 'upload_failed', message);
+    }
+    return (await res.json()) as DocumentDto;
+  },
+  deleteDocument: (id: string) => request<{ deleted: boolean }>(`/documents/${id}`, { method: 'DELETE' }),
+  /**
+   * Fetch a stored document's bytes.
+   *
+   * A download cannot go through `request` (it returns JSON) and cannot be a
+   * plain link either: the route needs the bearer token and the company header.
+   * The response is handed back as a blob URL for the browser to open or save.
+   */
+  downloadDocument: async (id: string) => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    const res = await fetch(`${API_BASE}/v1/documents/${id}/download`, {
+      headers,
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      throw new ApiError(res.status, 'download_failed', 'The file could not be downloaded.');
+    }
+    const disposition = res.headers.get('content-disposition') ?? '';
+    const match = /filename="([^"]+)"/.exec(disposition);
+    return {
+      blob: await res.blob(),
+      fileName: match ? decodeURIComponent(match[1]) : 'document',
+      mimeType: res.headers.get('content-type') ?? 'application/octet-stream',
+    };
+  },
+  replaceDocument: async (id: string, form: FormData) => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    const csrf = readCookie(CSRF_COOKIE);
+    if (csrf) headers[CSRF_HEADER] = csrf;
+    const res = await fetch(`${API_BASE}/v1/documents/${id}/replace`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: form,
+    });
+    if (!res.ok) {
+      let body: { message?: string | string[]; code?: string } = {};
+      try {
+        body = await res.json();
+      } catch {
+        /* non-JSON error body */
+      }
+      const message = Array.isArray(body.message) ? body.message.join(', ') : body.message ?? 'Replace failed';
+      throw new ApiError(res.status, body.code ?? 'replace_failed', message);
+    }
+    return (await res.json()) as DocumentDto;
+  },
 };
 
 function toQuery(params: Record<string, unknown>): string {

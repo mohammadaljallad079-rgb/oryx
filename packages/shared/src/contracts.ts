@@ -3,6 +3,7 @@ import type {
   IntegrationImplementation,
   IntegrationProviderState,
 } from './integrations';
+import type { CompanySettingsMap } from './settings';
 
 /** Shared API contracts between the ORYX API and the admin app. */
 
@@ -687,19 +688,58 @@ export interface ReorderAlertDto {
 export interface CustomerDto {
   id: string;
   code: string;
+  type: CustomerTypeDto;
   nameEn: string;
   nameAr: string;
   email: string | null;
   phone: string | null;
   taxNumber: string | null;
+  crNumber: string | null;
+  crExpiresAt: string | null;
+  website: string | null;
+  contactPersonName: string | null;
+  contactPersonPhone: string | null;
+  contactPersonEmail: string | null;
+  nationalId: string | null;
   addressLine: string | null;
   city: string | null;
+  state: string | null;
+  postalCode: string | null;
   countryCode: string | null;
   creditLimitMinor: number;
   paymentTermsDays: number;
   currency: string;
   isActive: boolean;
   notes: string | null;
+}
+
+export type CustomerTypeDto = 'INDIVIDUAL' | 'COMPANY';
+
+export interface CustomerBranchDto {
+  id: string;
+  customerId: string;
+  name: string;
+  contactName: string | null;
+  phone: string | null;
+  email: string | null;
+  addressLine: string | null;
+  city: string | null;
+  countryCode: string | null;
+  isHeadOffice: boolean;
+}
+
+export interface DocumentDto {
+  id: string;
+  entityType: string;
+  entityId: string;
+  fileName: string;
+  mimeType: string | null;
+  sizeBytes: number;
+  storageRef: string | null;
+  category: string | null;
+  title: string | null;
+  uploadedById: string | null;
+  createdAt: string;
 }
 
 export interface SupplierDto {
@@ -1421,4 +1461,84 @@ export interface CustomerCapabilitiesResponse {
     whatsapp: boolean;
     push: boolean;
   };
+}
+
+// ============================================================================
+// EXECUTION 20 — per-company settings and module dashboards
+// ============================================================================
+
+/** A company's full settings, one entry per namespace. */
+export interface CompanySettingsResponse {
+  companyId: string;
+  settings: CompanySettingsMap;
+}
+
+/** A single settings change, for the history panel. */
+export interface CompanySettingRevisionDto {
+  id: string;
+  namespace: string;
+  changedById: string | null;
+  changedAt: string;
+}
+
+/** One live statistic shown on a module dashboard. */
+export interface ModuleStatDto {
+  key: string;
+  labelEn: string;
+  labelAr: string;
+  value: number;
+  /** Optional monetary/unit suffix, already formatted server-side is avoided. */
+  format: 'count' | 'money' | 'percent' | 'text';
+  currency?: string | null;
+  /** Optional trend vs. the previous comparable period, in basis points. */
+  trendBp?: number | null;
+}
+
+/** A shortcut to a primary action on a module dashboard. */
+export interface ModuleShortcutDto {
+  key: string;
+  labelEn: string;
+  labelAr: string;
+  route: string;
+  permission?: string | null;
+  icon: string;
+}
+
+/** A recent activity row on a module dashboard. */
+export interface ModuleActivityDto {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  at: string;
+  tone: 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'gold';
+}
+
+/** A KPI card on a module dashboard. */
+export interface ModuleKpiDto {
+  key: string;
+  labelEn: string;
+  labelAr: string;
+  value: string;
+  hint?: string | null;
+  icon: string;
+}
+
+/** The uniform payload every module dashboard renders. */
+export interface ModuleDashboardResponse {
+  moduleKey: string;
+  nameEn: string;
+  nameAr: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  tileImage: string;
+  /** Live statistics drawn from this module's own tables. */
+  stats: ModuleStatDto[];
+  kpis: ModuleKpiDto[];
+  shortcuts: ModuleShortcutDto[];
+  recentActivity: ModuleActivityDto[];
+  /** Chart series: label/value pairs specific to the module. */
+  series: Array<{ label: string; value: number }>;
+  seriesTitleEn: string;
+  seriesTitleAr: string;
+  generatedAt: string;
 }

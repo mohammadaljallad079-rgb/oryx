@@ -7,6 +7,7 @@ import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput, todayIso } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { ModuleBanner } from '@/components/module-banner';
 import {
   Badge,
   Button,
@@ -35,8 +36,13 @@ type Tab = 'accounts' | 'journals' | 'periods' | 'statements' | 'ledger';
 
 export default function AccountingPage() {
   const { t } = useUi();
-  const { can } = useAuth();
+  const { can, companyId, branchId } = useAuth();
   const [tab, setTab] = useState<Tab>('accounts');
+
+  const dashboard = useAsync(
+    () => api.moduleDashboard('financial_accounting', { companyId: companyId ?? undefined, branchId: branchId ?? undefined }),
+    [companyId, branchId],
+  );
 
   const canManageCoa = can('erp.accounting.coa.manage');
   const canPost = can('erp.accounting.journal.post');
@@ -51,9 +57,10 @@ export default function AccountingPage() {
 
   return (
     <div className="flex flex-col gap-5" data-testid="accounting-page">
+      <ModuleBanner data={dashboard.data} loading={dashboard.loading} moduleKey="financial_accounting" />
+
       <SectionHeader
-        title={t('nav.financial_accounting')}
-        subtitle={t('erp.accounting.subtitle')}
+        title={t('erp.accounting.subtitle')}
         actions={<Badge tone="gold">{t('modules.available')}</Badge>}
       />
 

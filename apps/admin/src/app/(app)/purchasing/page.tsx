@@ -7,6 +7,7 @@ import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { ModuleBanner } from '@/components/module-banner';
 import {
   Badge,
   Button,
@@ -36,8 +37,13 @@ const emptyLine = (): LineDraft => ({ productId: '', description: '', quantity: 
 
 export default function PurchasingPage() {
   const { t } = useUi();
-  const { can } = useAuth();
+  const { can, companyId, branchId } = useAuth();
   const [tab, setTab] = useState<Tab>('orders');
+
+  const dashboard = useAsync(
+    () => api.moduleDashboard('purchasing_procurement', { companyId: companyId ?? undefined, branchId: branchId ?? undefined }),
+    [companyId, branchId],
+  );
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'orders', label: t('erp.purchasing.orders') },
@@ -50,6 +56,8 @@ export default function PurchasingPage() {
 
   return (
     <div className="flex flex-col gap-5" data-testid="purchasing-page">
+      <ModuleBanner data={dashboard.data} loading={dashboard.loading} moduleKey="purchasing_procurement" />
+
       <SectionHeader
         title={t('nav.purchasing_procurement')}
         subtitle={t('erp.purchasing.subtitle')}

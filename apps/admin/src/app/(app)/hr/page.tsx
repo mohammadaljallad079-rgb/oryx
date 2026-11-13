@@ -7,6 +7,8 @@ import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { DocumentsPanel } from '@/components/documents-panel';
+import { ModuleBanner } from '@/components/module-banner';
 import {
   Badge,
   Button,
@@ -26,8 +28,13 @@ type Tab = 'dashboard' | 'employees' | 'leave' | 'attendance' | 'payroll' | 'adv
 
 export default function HrPage() {
   const { t } = useUi();
-  const { can } = useAuth();
+  const { can, companyId, branchId } = useAuth();
   const [tab, setTab] = useState<Tab>('dashboard');
+
+  const dashboard = useAsync(
+    () => api.moduleDashboard('human_resources', { companyId: companyId ?? undefined, branchId: branchId ?? undefined }),
+    [companyId, branchId],
+  );
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'dashboard', label: t('erp.hr.dashboard') },
@@ -40,6 +47,8 @@ export default function HrPage() {
 
   return (
     <div className="flex flex-col gap-5" data-testid="hr-page">
+      <ModuleBanner data={dashboard.data} loading={dashboard.loading} moduleKey="human_resources" />
+
       <SectionHeader
         title={t('nav.human_resources')}
         subtitle={t('erp.hr.subtitle')}
@@ -101,8 +110,11 @@ function DashboardTab() {
 
 function EmployeesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
+  const { can } = useAuth();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [documentsFor, setDocumentsFor] = useState<EmployeeDto | null>(null);
+  const canUploadDocuments = can('erp.document.upload');
   const list = useAsync(() => api.hrEmployees({ search: search || undefined }), [search]);
   const departments = useAsync(() => api.hrDepartments(), []);
 
@@ -135,6 +147,7 @@ function EmployeesTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.hr.jobTitle')}</th>
               <th>{t('erp.hr.hireDate')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -149,12 +162,33 @@ function EmployeesTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{e.jobTitleNameEn ?? '—'}</td>
                 <td className="text-[12.5px]">{e.hireDate.slice(0, 10)}</td>
                 <td><StatusBadge status={e.status} label={e.status} /></td>
+                <td>
+                  <Button size="sm" onClick={() => setDocumentsFor(e)} data-testid={`employee-documents-${e.code}`}>
+                    {t('documents.title')}
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
       <CreateEmployeeModal open={open} departments={departments.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
+
+      <Modal
+        open={!!documentsFor}
+        title={`${documentsFor?.fullNameEn ?? ''} — ${t('documents.title')}`}
+        onClose={() => setDocumentsFor(null)}
+        wide
+      >
+        {documentsFor ? (
+          <DocumentsPanel
+            entityType="EMPLOYEE"
+            entityId={documentsFor.id}
+            canUpload={canUploadDocuments}
+            canDelete={can('erp.document.delete')}
+          />
+        ) : null}
+      </Modal>
     </Card>
   );
 }

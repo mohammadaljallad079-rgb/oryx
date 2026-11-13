@@ -1,12 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { ModuleBanner } from '@/components/module-banner';
+import { SearchableSelect, type PickerOption } from '@/components/searchable-select';
+import { CustomerFormModal } from '@/components/customer-form';
+import { VehicleFormModal } from '@/components/vehicle-form';
 import {
   Badge,
   Button,
@@ -26,8 +30,13 @@ type Tab = 'job-cards' | 'bay' | 'warranties' | 'providers' | 'requests';
 
 export default function MaintenancePage() {
   const { t } = useUi();
-  const { can } = useAuth();
+  const { can, companyId, branchId } = useAuth();
   const [tab, setTab] = useState<Tab>('job-cards');
+
+  const dashboard = useAsync(
+    () => api.moduleDashboard('automotive_maintenance', { companyId: companyId ?? undefined, branchId: branchId ?? undefined }),
+    [companyId, branchId],
+  );
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'job-cards', label: t('erp.automotive.jobCards') },
@@ -39,9 +48,10 @@ export default function MaintenancePage() {
 
   return (
     <div className="flex flex-col gap-5" data-testid="maintenance-page">
+      <ModuleBanner data={dashboard.data} loading={dashboard.loading} moduleKey="automotive_maintenance" />
+
       <SectionHeader
-        title={t('nav.automotive_maintenance')}
-        subtitle={t('erp.automotive.maintenanceSubtitle')}
+        title={t('erp.automotive.maintenanceSubtitle')}
         actions={<Badge tone="gold">{t('modules.available')}</Badge>}
       />
 
@@ -93,7 +103,6 @@ function JobCardsTab({
 }) {
   const { t } = useUi();
   const list = useAsync(() => api.jobCards(), []);
-  const vehicles = useAsync(() => api.vehicles(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
   const [open, setOpen] = useState(false);
@@ -167,7 +176,7 @@ function JobCardsTab({
         </TableShell>
       )}
 
-      <CreateJobCardModal open={open} vehicles={vehicles.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <CreateJobCardModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
       <EstimateModal
         job={estimateTarget}
         products={products.data?.items ?? []}
@@ -336,19 +345,49 @@ function ReserveModal({
 
 function CreateJobCardModal({
   open,
-  vehicles,
   onClose,
   onCreated,
 }: {
   open: boolean;
-  vehicles: Array<{ id: string; vin: string; make: string; model: string }>;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
   const { t } = useUi();
+  const { can } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ vehicleId: '', complaint: '', odometer: '' });
+  const [form, setForm] = useState({ customerId: '', vehicleId: '', complaint: '', odometer: '' });
+  const [customerOptions, setCustomerOptions] = useState<PickerOption[]>([]);
+  const [vehicleOptions, setVehicleOptions] = useState<PickerOption[]>([]);
+  const canManageCustomers = can('erp.sales.customer.manage');
+
+  useEffect(() => {
+    if (!open) return;
+    setForm({ customerId: '', vehicleId: '', complaint: '', odometer: '' });
+    setError(null);
+    void api.salesCustomers().then((res) =>
+      setCustomerOptions(
+        res.items.map((c) => ({ id: c.id, label: `${c.code} — ${c.nameEn}`, sublabel: c.phone ?? null, keywords: c.nameAr })),
+      ),
+    );
+  }, [open]);
+
+  useEffect(() => {
+    if (!form.customerId) {
+      setVehicleOptions([]);
+      return;
+    }
+    void api.vehicles({ customerId: form.customerId }).then((res) =>
+      setVehicleOptions(
+        res.items.map((v) => ({
+          id: v.id,
+          label: `${v.make} ${v.model} · ${v.plateNumber ?? v.vin}`,
+          sublabel: v.vin,
+          keywords: `${v.modelYear} ${v.color ?? ''}`,
+        })),
+      ),
+    );
+  }, [form.customerId]);
 
   const submit = async () => {
     setBusy(true); setError(null);
@@ -368,11 +407,56 @@ function CreateJobCardModal({
       footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || !form.vehicleId} onClick={submit} data-testid="save-job-card">{busy ? t('common.loading') : t('common.save')}</Button></>}>
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
+        <Field label={t('erp.sales.customer')} required>
+          <SearchableSelect
+            testId="job-customer"
+            value={form.customerId}
+            onChange={(id) => setForm({ ...form, customerId: id, vehicleId: '' })}
+            options={customerOptions}
+            placeholder={t('common.selectPlaceholder')}
+            labels={{ search: t('common.search'), addNew: t('settings.list.add'), noResults: t('common.empty') }}
+            renderCreate={
+              canManageCustomers
+                ? (props) => (
+                    <CustomerFormModal
+                      open={props.open}
+                      type="INDIVIDUAL"
+                      onClose={props.onClose}
+                      onSaved={(c) => props.onCreated({ id: c.id, label: `${c.code} — ${c.nameEn}` })}
+                    />
+                  )
+                : undefined
+            }
+          />
+        </Field>
         <Field label={t('erp.automotive.vehicle')} required>
-          <select className="oryx-select" value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })} data-testid="job-vehicle">
-            <option value="">—</option>
-            {vehicles.map((v) => <option key={v.id} value={v.id}>{v.vin} — {v.make} {v.model}</option>)}
-          </select>
+          <SearchableSelect
+            testId="job-vehicle"
+            value={form.vehicleId}
+            onChange={(id) => setForm({ ...form, vehicleId: id })}
+            options={vehicleOptions}
+            disabled={!form.customerId}
+            placeholder={t('common.selectPlaceholder')}
+            labels={{ search: t('common.search'), addNew: t('settings.list.add'), noResults: t('common.empty') }}
+            renderCreate={
+              form.customerId
+                ? (props) => (
+                    <VehicleFormModal
+                      open={props.open}
+                      customerId={form.customerId}
+                      onClose={props.onClose}
+                      onSaved={(v) => {
+                        setVehicleOptions((prev) => [
+                          ...prev,
+                          { id: v.id, label: `${v.make} ${v.model} · ${v.plateNumber ?? v.vin}`, sublabel: v.vin },
+                        ]);
+                        props.onCreated({ id: v.id, label: `${v.make} ${v.model}` });
+                      }}
+                    />
+                  )
+                : undefined
+            }
+          />
         </Field>
         <Field label={t('erp.automotive.odometer')}>
           <input className="oryx-input" value={form.odometer} onChange={(e) => setForm({ ...form, odometer: e.target.value })} />

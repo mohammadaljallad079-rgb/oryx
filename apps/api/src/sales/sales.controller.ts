@@ -43,6 +43,13 @@ export class SalesController {
     return this.sales.listCustomers(query, p);
   }
 
+  @Get('customers/:id')
+  @RequireAnyPermission('erp.sales.read', 'erp.sales.customer.manage')
+  @ApiOperation({ summary: 'Customer detail including branches' })
+  customer(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.sales.getCustomer(id, p);
+  }
+
   @Post('customers')
   @RequirePermissions('erp.sales.customer.manage')
   @ApiOperation({ summary: 'Create a customer' })

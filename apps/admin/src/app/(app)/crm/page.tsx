@@ -7,6 +7,7 @@ import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { ModuleBanner } from '@/components/module-banner';
 import {
   Badge,
   Button,
@@ -26,8 +27,13 @@ type Tab = 'dashboard' | 'leads' | 'opportunities' | 'tickets' | 'activities';
 
 export default function CrmPage() {
   const { t } = useUi();
-  const { can } = useAuth();
+  const { can, companyId, branchId } = useAuth();
   const [tab, setTab] = useState<Tab>('dashboard');
+
+  const dashboard = useAsync(
+    () => api.moduleDashboard('crm', { companyId: companyId ?? undefined, branchId: branchId ?? undefined }),
+    [companyId, branchId],
+  );
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'dashboard', label: t('erp.crm.dashboard') },
@@ -39,6 +45,8 @@ export default function CrmPage() {
 
   return (
     <div className="flex flex-col gap-5" data-testid="crm-page">
+      <ModuleBanner data={dashboard.data} loading={dashboard.loading} moduleKey="crm" />
+
       <SectionHeader
         title={t('nav.crm')}
         subtitle={t('erp.crm.subtitle')}

@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
+import { ModuleBanner } from '@/components/module-banner';
 import {
   Badge,
   Button,
@@ -25,8 +26,13 @@ type Tab = 'dashboard' | 'projects' | 'tasks' | 'work-orders' | 'approvals' | 'c
 
 export default function OperationsPage() {
   const { t } = useUi();
-  const { can } = useAuth();
+  const { can, companyId, branchId } = useAuth();
   const [tab, setTab] = useState<Tab>('dashboard');
+
+  const dashboard = useAsync(
+    () => api.moduleDashboard('operations', { companyId: companyId ?? undefined, branchId: branchId ?? undefined }),
+    [companyId, branchId],
+  );
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'dashboard', label: t('erp.operations.dashboard') },
@@ -40,6 +46,8 @@ export default function OperationsPage() {
 
   return (
     <div className="flex flex-col gap-5" data-testid="operations-page">
+      <ModuleBanner data={dashboard.data} loading={dashboard.loading} moduleKey="operations" />
+
       <SectionHeader
         title={t('nav.operations')}
         subtitle={t('erp.operations.subtitle')}

@@ -580,6 +580,10 @@ body::before {
   box-shadow: 0 40px 80px -40px rgba(0, 0, 0, 0.9);
 }
 
+.oryx-modal--wide {
+  width: min(1000px, 100%);
+}
+
 /* -------------------------------------------------------------------- misc */
 
 .oryx-kpi-value {
@@ -633,6 +637,167 @@ body::before {
 .oryx-focus-ring:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
+}
+
+/* --------------------------------------------------- module hero + monogram */
+
+.oryx-hero--module {
+  min-height: 188px;
+}
+
+.oryx-monogram {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: rgba(212, 175, 55, 0.16);
+  color: var(--gold-soft);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* ------------------------------------------------------- searchable picker */
+
+.oryx-picker {
+  position: relative;
+}
+
+.oryx-picker__control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.oryx-picker__control:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.oryx-picker__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oryx-picker__placeholder {
+  color: var(--text-faint);
+}
+
+.oryx-picker__menu {
+  position: absolute;
+  z-index: 60;
+  inset-inline: 0;
+  margin-top: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  box-shadow: 0 22px 48px rgba(0, 10, 22, 0.42);
+  overflow: hidden;
+}
+
+.oryx-picker__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.oryx-picker__search-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+
+.oryx-picker__clear {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.oryx-picker__list {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.oryx-picker__empty {
+  margin: 0;
+  padding: 14px;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+
+.oryx-picker__option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+  font: inherit;
+}
+
+.oryx-picker__option:hover {
+  background: var(--surface-hover);
+}
+
+.oryx-picker__option.is-selected {
+  background: color-mix(in srgb, var(--gold) 16%, transparent);
+}
+
+.oryx-picker__option-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.oryx-picker__option-sub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.oryx-picker__add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--gold);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.oryx-picker__add:hover {
+  background: var(--surface-hover);
+}
+
+.oryx-select--sm {
+  min-height: 32px;
+  padding: 4px 8px;
+  font-size: 12.5px;
+  width: auto;
 }
 
 /* ------------------------------------------------------------- responsive */

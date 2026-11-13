@@ -3,19 +3,21 @@
 Read **docs/ORYX_MASTER_REFERENCE.md**, **docs/architecture/ARCHITECTURE.md** and
 **docs/architecture/PERMISSION_MATRIX.md** before writing code.
 
-## Current state (Execution 01, 01.1, 02, 03, 04 and 05 complete)
+## Current state (Execution 01, 01.1, 02, 03, 04, 05 and 20 complete)
 
 Execution 01 delivered the working Super Admin foundation, Execution 01.1
 hardened it (secure session transport, TOTP MFA, approved photography and
 mobile layout fixes), Execution 02 added the enterprise ERP core, Execution 03
 added HR and payroll, CRM, operations and automotive services, Execution 04
 added the customer platform, the automotive marketplace, the shared booking
-engine, payments, notifications and the ORYX customer mobile application, and
+engine, payments, notifications and the ORYX customer mobile application,
 Execution 05 added the External Integrations Center and platform-completion
-work. It is **not** a mock: a NestJS API, a Next.js admin app, a Next.js
-customer site, an Expo/React Native mobile app and a PostgreSQL database run
-locally and are covered by 445 automated tests (93 shared unit, 218 API
-integration, 120 browser, 14 mobile).
+work, and Execution 20 added per-company namespaced settings, the unified
+document/attachment system, customer types with secondary branches, and a
+DB-backed dashboard for every module. It is **not** a mock: a NestJS API, a
+Next.js admin app, a Next.js customer site, an Expo/React Native mobile app and
+a PostgreSQL database run locally and are covered by 490 automated tests
+(102 shared unit, 242 API integration, 129 browser, 17 mobile).
 
 Security baseline (do not regress):
 - The refresh token lives in an HttpOnly cookie scoped to `/api/v1/auth`. It is
@@ -73,8 +75,20 @@ Security baseline (do not regress):
   connection-test path with append-only check history, audit logging by key and
   never by value, and a customer capabilities endpoint that advertises only
   operational providers) plus platform-completion work.
+- **Execution 20 (implemented and tested):** per-company settings held in
+  `CompanySetting(companyId, namespace, value)` with an append-only
+  `CompanySettingRevision` history, nine namespaces (GENERAL, INVOICING,
+  ACCOUNTING, TAX, HR, INVENTORY, SALES, MAINTENANCE, DOCUMENTS) declared once in
+  `packages/shared/src/settings.ts` and validated on the server; a unified
+  document store (`EntityAttachment`) that attaches PDF/DOC/DOCX/XLS/XLSX/JPG/PNG
+  files to any supported record, writes binaries outside the web root behind an
+  authenticated download route, and resolves the owning company before every
+  read, replace or delete; customer types (`CustomerType` INDIVIDUAL/COMPANY)
+  with a company-only commercial field set and per-customer secondary branches;
+  and a DB-backed dashboard for every module (`ModuleDashboardService`) that
+  reports each module's own live statistics, KPIs, shortcuts and activity.
 - **Scaffolded only:** nothing. Every ERP module catalog entry is implemented and
-  DB-backed across Executions 01–05.
+  DB-backed across Executions 01–05 and 20.
 - **Missing assets:** the official ORYX logo and the approved dashboard
   photography are not in the repository. The UI uses a neutral monogram
   placeholder and generated vector tile art. Do not invent brand marks.
@@ -300,6 +314,62 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   set the refresh cookie, and `CsrfGuard` rejects any unsafe method carrying that
   cookie without a matching `x-oryx-csrf` header. The refresh branch above it
   echoes the cookie; the login branch must too.
+
+### Execution 20 gotchas
+
+- **Settings isolation lives in the query, not the UI.** Every settings and
+  document route resolves the company through
+  `ErpContextService.resolveCompanyScope` before touching a row. A company
+  principal that names another `companyId` gets its own scope, and a platform
+  principal must be inside an explicit support session. Do not add a settings or
+  document path that reads a raw `companyId` from the query.
+- **A settings namespace is stored whole and merged over the defaults.** Reads
+  merge the stored object over `defaultSettingsFor(namespace)`, so a company that
+  never saved a namespace still reads a complete set. Writes go through
+  `sanitizeSettings`, which drops unknown keys and rejects out-of-range values —
+  never write a namespace value that has not been through it.
+- **The settings namespace list is declared once.** `SETTING_NAMESPACES` and the
+  `defaultSettingsFor` schema in `packages/shared/src/settings.ts` feed the API,
+  the admin control center and the seed. Add a namespace or a field there, not in
+  a second list. The Prisma `SettingNamespace` enum must stay in step with it.
+- **Changing a namespace appends a revision.** `CompanySettingRevision` records
+  the *previous* value in the same transaction as the write, so history is
+  append-only and a reset is just another revision. Do not delete revision rows.
+- **Documents are company-scoped before the file is touched.** `DocumentsService`
+  resolves the owning company and confirms the owner record exists inside it
+  before a row is written, and re-resolves it before a download. Binaries live
+  outside the web root under `DOCUMENT_STORAGE_DIR`; the `storageRef` is an
+  opaque `<companyId>/<uuid><ext>` path that is re-joined under the root and
+  re-checked on every read. Never serve a document statically.
+- **A document's bytes never leave the API as metadata.** Reads return the file
+  name, size, type and uploader; only the authenticated `download` route streams
+  the binary. Do not add a response field that echoes file contents.
+- **`ReplaceDocumentDto` is partial on purpose.** Replace accepts only the fields
+  that changed; a missing field keeps the existing value and an empty metadata
+  value clears it. Do not make it require every field, or a metadata-only edit
+  will wipe the stored file's record.
+- **A customer's type decides its field set.** An `INDIVIDUAL` carries personal
+  fields (`nationalId`, `phone`) and a `COMPANY` carries commercial fields
+  (`crNumber`, `taxNumber`, `website`, `contactPersonName`) plus secondary
+  branches. Branches are replaced wholesale on update; the server rejects a
+  branch on an individual.
+- **Module dashboards are per module, not a shared block.** `ModuleDashboardService`
+  computes each module's own figures from its own tables and drops a shortcut the
+  caller cannot act on and refuses a module the company is not licensed for. Do
+  not return the same KPIs for every module, and do not skip the entitlement
+  check.
+- **The maintenance job card is Enterprise-only.** The browser picker suite signs
+  in as `admin@oryx-auto.local`; the demo tenant does not license automotive, so
+  a test that exercises the job-card pickers must not use the demo administrator.
+- **`setting-<NS>-<key>` is the input, not a wrapper.** The settings control
+  center puts the test id directly on the `<input>`/`<select>`/`<textarea>`, so a
+  Playwright assertion reads `getByTestId('setting-INVOICING-numberPrefix')`
+  directly rather than `.locator('input')`.
+- **One sign-in per test file section.** Playwright's `signIn` navigates to
+  `/login`; calling it again mid-suite while a session is live makes the login
+  form race the session redirect and the password field never appears. Put a
+  differently-authenticated test in its own `describe` with its own
+  `beforeEach`, not inline in the middle of another test.
 
 ### Mobile gotchas
 

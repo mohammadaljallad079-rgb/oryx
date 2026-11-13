@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
+import { ModuleBanner } from '@/components/module-banner';
 import {
   Badge,
   Button,
@@ -53,8 +54,13 @@ type Tab = 'intents' | 'providers' | 'reconciliation';
  */
 export default function PaymentsPage() {
   const { t } = useUi();
-  const { can } = useAuth();
+  const { can, companyId, branchId } = useAuth();
   const [tab, setTab] = useState<Tab>('intents');
+
+  const dashboard = useAsync(
+    () => api.moduleDashboard('payments', { companyId: companyId ?? undefined, branchId: branchId ?? undefined }),
+    [companyId, branchId],
+  );
 
   const tabs = [
     { key: 'intents' as const, label: t('erp.payments.intents') },
@@ -64,6 +70,8 @@ export default function PaymentsPage() {
 
   return (
     <div className="flex flex-col gap-5" data-testid="payments-page">
+      <ModuleBanner data={dashboard.data} loading={dashboard.loading} moduleKey="payments" />
+
       <SectionHeader
         title={t('nav.payments')}
         subtitle={t('erp.payments.subtitle')}

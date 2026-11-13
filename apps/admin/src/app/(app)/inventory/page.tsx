@@ -7,6 +7,7 @@ import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, qty, toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { ModuleBanner } from '@/components/module-banner';
 import {
   Badge,
   Button,
@@ -34,8 +35,13 @@ type Tab = 'valuation' | 'products' | 'warehouses' | 'movements' | 'transfers' |
 
 export default function InventoryPage() {
   const { t } = useUi();
-  const { can } = useAuth();
+  const { can, companyId, branchId } = useAuth();
   const [tab, setTab] = useState<Tab>('valuation');
+
+  const dashboard = useAsync(
+    () => api.moduleDashboard('warehouses_inventory', { companyId: companyId ?? undefined, branchId: branchId ?? undefined }),
+    [companyId, branchId],
+  );
 
   const canItem = can('erp.inventory.item.manage');
   const canWarehouse = can('erp.inventory.warehouse.manage');
@@ -55,6 +61,8 @@ export default function InventoryPage() {
 
   return (
     <div className="flex flex-col gap-5" data-testid="inventory-page">
+      <ModuleBanner data={dashboard.data} loading={dashboard.loading} moduleKey="warehouses_inventory" />
+
       <SectionHeader
         title={t('nav.warehouses_inventory')}
         subtitle={t('erp.inventory.subtitle')}

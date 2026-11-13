@@ -11,9 +11,12 @@ export interface PricedLineInput {
   unitPriceMinor: number;
   discountPercentBp?: number;
   taxPercentBp?: number;
+  /** When true the line is zero-rated regardless of `taxPercentBp`. */
+  taxExempt?: boolean;
 }
 
-export interface PricedLine extends Required<Omit<PricedLineInput, never>> {
+export interface PricedLine extends Required<Omit<PricedLineInput, 'taxExempt'>> {
+  taxExempt: boolean;
   lineSubtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
@@ -40,7 +43,8 @@ export interface DocumentTotals {
 export function computeDocumentTotals(lines: PricedLineInput[]): DocumentTotals {
   const priced: PricedLine[] = lines.map((line) => {
     const discountPercentBp = line.discountPercentBp ?? 0;
-    const taxPercentBp = line.taxPercentBp ?? 0;
+    const taxExempt = line.taxExempt ?? false;
+    const taxPercentBp = taxExempt ? 0 : (line.taxPercentBp ?? 0);
     const lineSubtotalMinor = lineAmountMinor(line.quantity, line.unitPriceMinor);
     const discountMinor = basisPointsOfMinor(lineSubtotalMinor, discountPercentBp);
     const net = lineSubtotalMinor - discountMinor;
@@ -50,6 +54,7 @@ export function computeDocumentTotals(lines: PricedLineInput[]): DocumentTotals 
       unitPriceMinor: line.unitPriceMinor,
       discountPercentBp,
       taxPercentBp,
+      taxExempt,
       lineSubtotalMinor,
       discountMinor,
       taxMinor,
