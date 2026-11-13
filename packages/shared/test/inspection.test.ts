@@ -134,7 +134,7 @@ describe('inspection catalogue — section and item completeness', () => {
 describe('inspection catalogue — paint conditions', () => {
   it('declares the four body-panel conditions with the report colours', () => {
     expect(PAINT_CONDITIONS.map((c) => c.key)).toEqual(['PAINT', 'FILLER', 'CHANGE', 'SECTIONED']);
-    expect(paintConditionSpec('PAINT')).toMatchObject({ color: 'green', cross: false, labelAr: 'صبغ / رش' });
+    expect(paintConditionSpec('PAINT')).toMatchObject({ color: 'green', cross: false, labelAr: 'صبغ (رش)' });
     expect(paintConditionSpec('FILLER')).toMatchObject({ color: 'orange', cross: false, labelAr: 'معجون' });
     expect(paintConditionSpec('CHANGE')).toMatchObject({ color: 'red', cross: false, labelAr: 'تبديل' });
     expect(paintConditionSpec('SECTIONED')).toMatchObject({ color: 'red', cross: true, labelAr: 'مقطوع' });

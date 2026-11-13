@@ -197,7 +197,7 @@ const LIABILITY_AR =
   'اوريكس لخدمات السيارات ليست مصنّعة للمركبات ولا بائعة لها، ولن تتحمل اي مسؤولية عن عيوب تصنيعية أو أضرار غير مُفصح عنها أو غير مُبلغ عنها. يقتصر دور اوريكس لخدمات السيارات على إجراء فحص بصري وفحص بأجهزة تقنية لتحديد الإصلاحات والأضرار السابقة والظاهرة التي لحقت بالمكونات الميكانيكية والهيكلية، ودون تقديم أي ضمان للسلامة الهيكلية أو الصلاحية العامة للسير على الطرق. أنت توافق على انحصار مسؤولية اوريكس لخدمات السيارات في فحص المركبة داخله وبالأدوات المعتمدة في المركز ووفق حدود الباقة المختارة فقط، دون أدنى مسؤولية عن أي خدمات غير مشمولة بالباقة أو عن حالة المركبة قبل دخولها وبعد خروجها منه. وبناءً عليه يُصدر التقرير الفني ليعكس نتيجة الفحص ضمن نطاق الباقة المحددة حصرا.';
 
 const LIABILITY_EN =
-  'Oryx Auto Services is neither a vehicle manufacturer nor a seller and assumes no liability for manufacturing defects or undisclosed or unreported damage. The role of Oryx Auto Services is limited to conducting visual and technical inspections to identify existing or prior damage and necessary repairs regarding mechanical and structural components; it provides no guarantee regarding structural integrity or general roadworthiness. You acknowledge that the liability of Oryx Auto Services is strictly limited to the inspection performed on site using the centre\u2019s approved tools and within the scope of the selected service package; the company bears no responsibility for services not included in the package or for the vehicle\u2019s condition prior to its arrival at or after its departure from the centre. Accordingly, the technical report is issued to reflect inspection results exclusively within the scope of the specified package.';
+  'Oryx Auto Services is neither a vehicle manufacturer nor a seller and assumes no liability for manufacturing defects or undisclosed or unreported damage. The role of Oryx Auto Services is limited to conducting visual and technical inspections to identify existing or prior damage and necessary repairs regarding mechanical and structural components; it provides no guarantee regarding structural integrity or general roadworthiness. You acknowledge that the liability of Oryx Auto Services is strictly limited to the inspection performed on site using the center\u2019s approved tools and within the scope of the selected service package; the company bears no responsibility for services not included in the package or for the vehicle\u2019s condition prior to its arrival at or after its departure from the center. Accordingly, the technical report is issued to reflect inspection results exclusively within the scope of the specified package.';
 
 const IMPORTANT_REMARKS_AR = [
   'يتم إصدار التقرير بواسطة أجهزة الفحص الإلكتروني المعتمدة.',
@@ -210,8 +210,8 @@ const IMPORTANT_REMARKS_AR = [
 const IMPORTANT_REMARKS_EN = [
   'The report is issued by approved electronic inspection devices.',
   'Any erasure, deletion or change in the contents of the report renders it invalid and unsupported.',
-  'The report describes the condition of the vehicle while it is inside the centre only.',
-  'The centre is not responsible for personal belongings left inside the car.',
+  'The report describes the condition of the vehicle while it is inside the center only.',
+  'The center is not responsible for personal belongings left inside the car.',
   'Some cases require an additional test drive to check the performance of the transmission and mechanical parts.',
 ];
 
@@ -413,6 +413,33 @@ export function inspectionGroupPage(
     ? `<figure class="interior-art"><img src="${INTERIOR_DIAGRAM_DATA_URI}" alt=""></figure>`
     : '';
 
+  // The approved sheet prints three separate remark blocks in the left column
+  // beneath the exterior checklist: the general inspection remarks, the
+  // additional exterior inspection remarks, and the final result and technical
+  // assessment. They are three stored fields, so each prints under its own
+  // heading rather than being merged into one.
+  const remarkBlock = (titleAr: string, titleEn: string, body: string | null): string =>
+    body
+      ? `<div class="grp remark-block">
+        <div class="grp-title">${titleAr}<span class="ltr">${titleEn}</span></div>
+        <div class="general-remarks">${escMultiline(body)}</div>
+      </div>`
+      : '';
+
+  const remarks = [
+    remarkBlock('الملاحظات والتعليقات العامة', 'General Inspection Remarks', input.payload.generalRemarks),
+    remarkBlock(
+      'ملاحظات الفحص الخارجي الإضافية',
+      'Additional Exterior Inspection Remarks',
+      input.payload.exteriorRemarks,
+    ),
+    remarkBlock(
+      'النتيجة النهائية والتقييم العام للفحص الفني',
+      'Final Result &amp; General Assessment',
+      input.payload.finalAssessment,
+    ),
+  ].join('');
+
   const cabin = `
   <div class="grp cabin">
     ${interiorArt}
@@ -420,18 +447,11 @@ export function inspectionGroupPage(
       <span class="grp-legend">${legendChip('check', 'اجتياز', 'Pass')}${legendChip('cross', 'فشل', 'Fail')}<span class="lg-chip">N/A · غير متوفر</span></span>
     </div>
     ${pair(cell(engine, 'مقصورة المحرك', 'Engine Compartment', false), cell(road, 'تجربة القيادة', 'Road Test', false))}
-    ${pair(cell(interior, 'داخلية السيارة', 'Interior Car', true), cell(exterior, 'خارجية السيارة', 'Exterior Car', true))}
+    <table class="grid"><tr>
+      <td>${cell(exterior, 'خارجية السيارة', 'Exterior Car', true)}${remarks}</td>
+      <td>${cell(interior, 'داخلية السيارة', 'Interior Car', true)}</td>
+    </tr></table>
   </div>`;
-
-  const remarkRows: string[] = [];
-  if (input.payload.generalRemarks) remarkRows.push(input.payload.generalRemarks);
-  if (input.payload.finalAssessment) remarkRows.push(input.payload.finalAssessment);
-  const remarks = remarkRows.length
-    ? `<div class="grp">
-        <div class="grp-title">الملاحظات والتعليقات العامة<span class="ltr">General Inspection Remarks</span></div>
-        <div class="general-remarks">${remarkRows.map((r) => escMultiline(r)).join('<br>')}</div>
-      </div>`
-    : '';
 
   return `
   <section class="doc-page">
@@ -439,7 +459,6 @@ export function inspectionGroupPage(
     ${pageTitleBar('الفحص الداخلي والخارجي / مقصورة المحرك / تجربة القيادة', 'INTERIOR & EXTERIOR INSPECTION / ENGINE COMPARTMENT / ROAD TEST')}
     ${jobStrip(input.payload)}
     ${cabin}
-    ${remarks}
   </section>`;
 }
 
@@ -815,7 +834,12 @@ export const INSPECTION_REPORT_CSS = `
   .rm-pass{ color:var(--ok); } .rm-fail{ color:var(--bad); } .rm-na{ color:var(--muted); } .rm-unset{ color:#c3c9d2; }
   .mark{ display:inline-block; vertical-align:-2px; }
   .general-remarks{ border:1px solid var(--line); border-top:none; border-radius:0 0 5px 5px; padding:5px 9px;
-    font-size:7.8pt; line-height:1.3; color:var(--ink); min-height:22px; }
+    font-size:7.8pt; line-height:1.3; color:var(--ink); min-height:22px; white-space:pre-line; }
+  /* The three remark blocks sit in the lower-left cell beside the interior
+   * checklist, so they take the cabin's compact type scale and hug the table. */
+  .cabin .remark-block{ margin-top:0; }
+  .cabin .remark-block .grp-title{ font-size:6.2pt; padding:0 5px; }
+  .cabin .remark-block .general-remarks{ font-size:5.7pt; line-height:1.12; padding:1px 5px; min-height:0; }
   .sec-remarks{ margin-top:6px; border:1px solid var(--line); border-radius:5px; padding:6px 9px; font-size:7.6pt; line-height:1.3; color:var(--ink); background:#fbfcfe; }
   .no-findings{ border:1px solid var(--line); border-top:none; padding:8px; font-size:8.5pt; color:var(--muted); background:#f7f9fc; text-align:center; }
   /* ---- diagrams ---- */

@@ -366,7 +366,7 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
 
     // The rail carries the Arabic section names from the shared catalogue.
     await expect(page.getByTestId('inspection-rail-EXTERIOR')).toContainText('الفحص الخارجي');
-    await expect(page.getByTestId('inspection-rail-ENGINE_COMPARTMENT')).toContainText('حجرة المحرك');
+    await expect(page.getByTestId('inspection-rail-ENGINE_COMPARTMENT')).toContainText('مقصورة المحرك');
     await expectNoServerError(page);
   });
 });
