@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
 import { toMinorInput, toQuantityInput } from '@/lib/erp-format';
@@ -10,7 +10,7 @@ import {
   Field,
   Modal,
 } from '@/components/ui';
-import type { ErpAccountDto, LeadDto, ProductDto, SupplierDto, VehicleDto } from '@oryx/shared';
+import type { EmployeeDto, ErpAccountDto, LeadDto, ProductDto, SupplierDto, VehicleDto } from '@oryx/shared';
 
 /**
  * The shared create/edit forms for the entities a form most often needs to add
@@ -446,13 +446,20 @@ export function VehicleModal({
 
 export function EmployeeModal({
   open,
+  employee,
   departments,
+  canManage,
+  documentsSlot,
   onClose,
   onCreated,
   onSaved,
 }: {
   open: boolean;
+  employee?: EmployeeDto | null;
   departments: Array<{ id: string; nameEn: string }>;
+  canManage?: boolean;
+  /** Rendered under the fields, e.g. the employee's documents section on edit. */
+  documentsSlot?: ReactNode;
   onClose: () => void;
   onCreated: () => Promise<void> | void;
   onSaved?: (saved: { id: string }) => void;
@@ -462,24 +469,32 @@ export function EmployeeModal({
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     code: '', fullNameEn: '', fullNameAr: '', email: '', phone: '', secondaryPhone: '',
-    departmentId: '', hireDate: new Date().toISOString().slice(0, 10), addressLine: '', notes: '',
+    departmentId: '', hireDate: new Date().toISOString().slice(0, 10), terminationDate: '', addressLine: '', notes: '',
   });
 
   useEffect(() => {
     if (!open) return;
     setError(null);
     setForm({
-      code: '', fullNameEn: '', fullNameAr: '', email: '', phone: '', secondaryPhone: '',
-      departmentId: '', hireDate: new Date().toISOString().slice(0, 10), addressLine: '', notes: '',
+      code: employee?.code ?? '',
+      fullNameEn: employee?.fullNameEn ?? '',
+      fullNameAr: employee?.fullNameAr ?? '',
+      email: employee?.email ?? '',
+      phone: employee?.phone ?? '',
+      secondaryPhone: employee?.secondaryPhone ?? '',
+      departmentId: employee?.departmentId ?? '',
+      hireDate: employee?.hireDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+      terminationDate: employee?.terminationDate?.slice(0, 10) ?? '',
+      addressLine: '',
+      notes: '',
     });
-  }, [open]);
+  }, [open, employee]);
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      const saved = await api.createEmployee({
-        code: form.code,
+      const body = {
         fullNameEn: form.fullNameEn,
         fullNameAr: form.fullNameAr,
         email: form.email || undefined,
@@ -488,8 +503,10 @@ export function EmployeeModal({
         departmentId: form.departmentId || undefined,
         addressLine: form.addressLine || undefined,
         notes: form.notes || undefined,
-        hireDate: form.hireDate,
-      });
+      };
+      const saved = employee
+        ? await api.updateEmployee(employee.id, { ...body, terminationDate: form.terminationDate || undefined })
+        : await api.createEmployee({ ...body, code: form.code, hireDate: form.hireDate });
       await onCreated();
       onSaved?.(saved);
       onClose();
@@ -503,14 +520,14 @@ export function EmployeeModal({
   return (
     <Modal
       open={open}
-      title={t('erp.hr.newEmployee')}
+      title={employee ? t('erp.hr.editEmployee') : t('erp.hr.newEmployee')}
       onClose={onClose}
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
-            disabled={busy || !form.fullNameEn || !form.fullNameAr || !form.code}
+            disabled={busy || !form.fullNameEn || !form.fullNameAr || (!employee && !form.code)}
             onClick={submit}
             data-testid="save-employee"
           >
@@ -522,7 +539,7 @@ export function EmployeeModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="employee-code" />
+          <input className="oryx-input" value={form.code} disabled={Boolean(employee)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="employee-code" />
         </Field>
         <Field label={t('erp.hr.department')}>
           <select className="oryx-select" value={form.departmentId} onChange={(e) => setForm({ ...form, departmentId: e.target.value })} data-testid="employee-department">
@@ -545,9 +562,15 @@ export function EmployeeModal({
         <Field label={t('erp.hr.secondaryPhone')}>
           <input className="oryx-input" value={form.secondaryPhone} onChange={(e) => setForm({ ...form, secondaryPhone: e.target.value })} data-testid="employee-secondary-phone" />
         </Field>
-        <Field label={t('erp.hr.hireDate')} required>
-          <input type="date" className="oryx-input" value={form.hireDate} onChange={(e) => setForm({ ...form, hireDate: e.target.value })} data-testid="employee-hire-date" />
-        </Field>
+        {!employee ? (
+          <Field label={t('erp.hr.hireDate')} required>
+            <input type="date" className="oryx-input" value={form.hireDate} onChange={(e) => setForm({ ...form, hireDate: e.target.value })} data-testid="employee-hire-date" />
+          </Field>
+        ) : (
+          <Field label={t('erp.hr.employmentEndDate')}>
+            <input type="date" className="oryx-input" value={form.terminationDate} onChange={(e) => setForm({ ...form, terminationDate: e.target.value })} data-testid="employee-termination-date" />
+          </Field>
+        )}
         <Field label={t('common.address')}>
           <input className="oryx-input" value={form.addressLine} onChange={(e) => setForm({ ...form, addressLine: e.target.value })} data-testid="employee-address" />
         </Field>
@@ -555,6 +578,7 @@ export function EmployeeModal({
           <input className="oryx-input" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} data-testid="employee-notes" />
         </Field>
       </div>
+      {employee && canManage !== undefined ? documentsSlot : null}
     </Modal>
   );
 }

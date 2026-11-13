@@ -9,6 +9,8 @@ import { money, toMinorInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import { ModuleDashboard } from '@/components/module-dashboard';
 import { TabDeepLink } from '@/components/tab-deep-link';
+import { EntityPicker } from '@/components/inline-create';
+import { EmployeeModal } from '@/components/entity-modals';
 import {
   Badge,
   Button,
@@ -203,157 +205,15 @@ function EmployeesTab({ canManage }: { canManage: boolean }) {
         employee={editing}
         departments={departments.data?.items ?? []}
         canManage={canManage}
+        documentsSlot={editing ? <EmployeeDocumentsSection employeeId={editing.id} canManage={canManage} /> : null}
         onClose={() => { setOpen(false); setEditing(null); }}
-        onSaved={list.reload}
+        onCreated={list.reload}
       />
       <SalaryModal employee={salaryFor} canManage={canManage} onClose={() => setSalaryFor(null)} />
     </Card>
   );
 }
 
-function EmployeeModal({
-  open,
-  employee,
-  departments,
-  canManage,
-  onClose,
-  onSaved,
-}: {
-  open: boolean;
-  employee: EmployeeDto | null;
-  departments: Array<{ id: string; nameEn: string }>;
-  canManage: boolean;
-  onClose: () => void;
-  onSaved: () => Promise<void>;
-}) {
-  const { t } = useUi();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    code: '',
-    fullNameEn: '',
-    fullNameAr: '',
-    email: '',
-    phone: '',
-    secondaryPhone: '',
-    departmentId: '',
-    hireDate: new Date().toISOString().slice(0, 10),
-    terminationDate: '',
-    addressLine: '',
-    notes: '',
-  });
-
-  useEffect(() => {
-    if (!open) return;
-    setError(null);
-    setForm({
-      code: employee?.code ?? '',
-      fullNameEn: employee?.fullNameEn ?? '',
-      fullNameAr: employee?.fullNameAr ?? '',
-      email: employee?.email ?? '',
-      phone: employee?.phone ?? '',
-      secondaryPhone: employee?.secondaryPhone ?? '',
-      departmentId: employee?.departmentId ?? '',
-      hireDate: employee?.hireDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
-      terminationDate: employee?.terminationDate?.slice(0, 10) ?? '',
-      addressLine: '',
-      notes: '',
-    });
-  }, [open, employee]);
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const body = {
-        fullNameEn: form.fullNameEn,
-        fullNameAr: form.fullNameAr,
-        email: form.email || undefined,
-        phone: form.phone || undefined,
-        secondaryPhone: form.secondaryPhone || undefined,
-        departmentId: form.departmentId || undefined,
-        addressLine: form.addressLine || undefined,
-        notes: form.notes || undefined,
-      };
-      if (employee) {
-        await api.updateEmployee(employee.id, { ...body, terminationDate: form.terminationDate || undefined });
-      } else {
-        await api.createEmployee({ ...body, code: form.code, hireDate: form.hireDate });
-      }
-      await onSaved();
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      title={employee ? t('erp.hr.editEmployee') : t('erp.hr.newEmployee')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            variant="primary"
-            disabled={busy || !form.fullNameEn || !form.fullNameAr || (!employee && !form.code)}
-            onClick={submit}
-            data-testid="save-employee"
-          >
-            {busy ? t('common.loading') : t('common.save')}
-          </Button>
-        </>
-      }
-    >
-      {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} disabled={Boolean(employee)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="employee-code" />
-        </Field>
-        <Field label={t('erp.hr.department')}>
-          <select className="oryx-select" value={form.departmentId} onChange={(e) => setForm({ ...form, departmentId: e.target.value })} data-testid="employee-department">
-            <option value="">—</option>
-            {departments.map((d) => <option key={d.id} value={d.id}>{d.nameEn}</option>)}
-          </select>
-        </Field>
-        <Field label={`${t('common.name')} (EN)`} required>
-          <input className="oryx-input" value={form.fullNameEn} onChange={(e) => setForm({ ...form, fullNameEn: e.target.value })} data-testid="employee-name-en" />
-        </Field>
-        <Field label={`${t('common.name')} (AR)`} required>
-          <input className="oryx-input" value={form.fullNameAr} onChange={(e) => setForm({ ...form, fullNameAr: e.target.value })} data-testid="employee-name-ar" />
-        </Field>
-        <Field label={t('common.email')}>
-          <input className="oryx-input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="employee-email" />
-        </Field>
-        <Field label={t('erp.sales.phone')}>
-          <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} data-testid="employee-phone" />
-        </Field>
-        <Field label={t('erp.hr.secondaryPhone')}>
-          <input className="oryx-input" value={form.secondaryPhone} onChange={(e) => setForm({ ...form, secondaryPhone: e.target.value })} data-testid="employee-secondary-phone" />
-        </Field>
-        {!employee ? (
-          <Field label={t('erp.hr.hireDate')} required>
-            <input type="date" className="oryx-input" value={form.hireDate} onChange={(e) => setForm({ ...form, hireDate: e.target.value })} data-testid="employee-hire-date" />
-          </Field>
-        ) : (
-          <Field label={t('erp.hr.employmentEndDate')}>
-            <input type="date" className="oryx-input" value={form.terminationDate} onChange={(e) => setForm({ ...form, terminationDate: e.target.value })} data-testid="employee-termination-date" />
-          </Field>
-        )}
-        <Field label={t('common.address')}>
-          <input className="oryx-input" value={form.addressLine} onChange={(e) => setForm({ ...form, addressLine: e.target.value })} data-testid="employee-address" />
-        </Field>
-        <Field label={t('common.notes')}>
-          <input className="oryx-input" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} data-testid="employee-notes" />
-        </Field>
-      </div>
-      {employee ? <EmployeeDocumentsSection employeeId={employee.id} canManage={canManage} /> : null}
-    </Modal>
-  );
-}
 
 const DOC_CATEGORIES = ['IDENTITY', 'PASSPORT', 'VISA', 'CONTRACT', 'CERTIFICATE', 'MEDICAL', 'OTHER'] as const;
 
@@ -637,6 +497,7 @@ function LeaveTab({ canRequest, canApprove }: { canRequest: boolean; canApprove:
   const list = useAsync(() => api.leaveRequests(), []);
   const employees = useAsync(() => api.hrEmployees(), []);
   const types = useAsync(() => api.leaveTypes(), []);
+  const departments = useAsync(() => api.hrDepartments(), []);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<LeaveRequestDto | null>(null);
 
@@ -703,6 +564,8 @@ function LeaveTab({ canRequest, canApprove }: { canRequest: boolean; canApprove:
         editing={editing}
         employees={employees.data?.items ?? []}
         types={types.data?.items ?? []}
+        departments={departments.data?.items ?? []}
+        onEmployeeCreated={employees.reload}
         onClose={() => { setOpen(false); setEditing(null); }}
         onCreated={list.reload}
       />
@@ -715,6 +578,8 @@ function LeaveRequestModal({
   editing,
   employees,
   types,
+  departments,
+  onEmployeeCreated,
   onClose,
   onCreated,
 }: {
@@ -722,6 +587,8 @@ function LeaveRequestModal({
   editing: LeaveRequestDto | null;
   employees: Array<{ id: string; code: string; fullNameEn: string }>;
   types: Array<{ id: string; nameEn: string }>;
+  departments: Array<{ id: string; nameEn: string }>;
+  onEmployeeCreated?: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
@@ -788,10 +655,25 @@ function LeaveRequestModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.hr.employee')} required>
-          <select className="oryx-select" value={form.employeeId} disabled={Boolean(editing)} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} data-testid="leave-employee">
-            <option value="">—</option>
-            {employees.map((x) => <option key={x.id} value={x.id}>{x.code} — {x.fullNameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.employeeId || null}
+            options={employees.map((x) => ({ value: x.id, label: `${x.code} — ${x.fullNameEn}` }))}
+            onChange={(v) => setForm({ ...form, employeeId: v ?? '' })}
+            placeholder={t('common.select')}
+            disabled={Boolean(editing)}
+            testId="leave-employee"
+            createLabel={t('erp.hr.newEmployee')}
+            reloadOptions={onEmployeeCreated}
+            renderCreate={({ onClose, onSaved }) => (
+              <EmployeeModal
+                open
+                departments={departments}
+                onClose={onClose}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.hr.leaveType')} required>
           <select className="oryx-select" value={form.leaveTypeId} onChange={(e) => setForm({ ...form, leaveTypeId: e.target.value })} data-testid="leave-type">
@@ -819,6 +701,7 @@ function AttendanceTab({ canManage, canSelf }: { canManage: boolean; canSelf: bo
   const { t } = useUi();
   const list = useAsync(() => api.hrAttendance(), []);
   const employees = useAsync(() => api.hrEmployees(), []);
+  const departments = useAsync(() => api.hrDepartments(), []);
   const [open, setOpen] = useState(false);
 
   const hours = (minutes: number) => `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}`;
@@ -871,6 +754,8 @@ function AttendanceTab({ canManage, canSelf }: { canManage: boolean; canSelf: bo
       <RecordAttendanceModal
         open={open}
         employees={employees.data?.items ?? []}
+        departments={departments.data?.items ?? []}
+        onEmployeeCreated={employees.reload}
         onClose={() => setOpen(false)}
         onSaved={list.reload}
       />
@@ -954,11 +839,15 @@ function SelfServiceCard({ onRecorded }: { onRecorded: () => Promise<void> }) {
 function RecordAttendanceModal({
   open,
   employees,
+  departments,
+  onEmployeeCreated,
   onClose,
   onSaved,
 }: {
   open: boolean;
   employees: EmployeeDto[];
+  departments: Array<{ id: string; nameEn: string }>;
+  onEmployeeCreated?: () => Promise<void> | void;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -1028,10 +917,24 @@ function RecordAttendanceModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.hr.employee')} required>
-          <select className="oryx-select" value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} data-testid="attendance-employee">
-            <option value="">—</option>
-            {employees.map((e) => <option key={e.id} value={e.id}>{e.code} — {e.fullNameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.employeeId || null}
+            options={employees.map((x) => ({ value: x.id, label: `${x.code} — ${x.fullNameEn}` }))}
+            onChange={(v) => setForm({ ...form, employeeId: v ?? '' })}
+            placeholder={t('common.select')}
+            testId="attendance-employee"
+            createLabel={t('erp.hr.newEmployee')}
+            reloadOptions={onEmployeeCreated}
+            renderCreate={({ onClose, onSaved }) => (
+              <EmployeeModal
+                open
+                departments={departments}
+                onClose={onClose}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('common.date')} required>
           <input type="date" className="oryx-input" value={form.workDate} onChange={(e) => setForm({ ...form, workDate: e.target.value })} data-testid="attendance-date" />
