@@ -56,10 +56,14 @@ export default function DashboardHomePage() {
       {/* ------------------------------------------------ hero banner */}
       <section className="oryx-hero" data-testid="dashboard-hero">
         <div className="oryx-hero__content">
-          <BrandLogo height={40} className="oryx-hero__logo" />
-          <p className="oryx-hero__eyebrow m-0">{scopeLabel ?? ''}</p>
-          <h1 className="oryx-hero__title m-0">{t('dash.heroTitle')}</h1>
-          <p className="oryx-hero__body m-0">{t('dash.heroBody')}</p>
+          <span className="oryx-hero__lockup">
+            <BrandLogo height={64} className="oryx-hero__logo" />
+          </span>
+          <div className="oryx-hero__identity">
+            <p className="oryx-hero__eyebrow m-0">{scopeLabel ?? ''}</p>
+            <h1 className="oryx-hero__title m-0">{t('dash.heroTitle')}</h1>
+            <p className="oryx-hero__body m-0">{t('dash.heroBody')}</p>
+          </div>
         </div>
       </section>
 
