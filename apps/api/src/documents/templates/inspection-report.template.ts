@@ -5,6 +5,7 @@ import {
 import {
   BODY_SCHEME_DATA_URI,
   CHASSIS_DIAGRAM_DATA_URI,
+  COVER_ILLUSTRATION_DATA_URI,
   INTERIOR_DIAGRAM_DATA_URI,
 } from './inspection-artwork.assets';
 import {
@@ -233,13 +234,25 @@ function importantRemarks(): string {
 
 /** The Limitation of Liability block. */
 function liabilityBlock(): string {
+  // The approved sheet prints the heading as a full-width navy banner carrying
+  // the English title on the physical left and the Arabic title on the physical
+  // right (both white), over two bordered columns: the Arabic column on the
+  // right and the English column on the left.
   return `
   <div class="terms avoid-break">
-    <div class="terms-title">الشروط والأحكام ومسؤولية الفحص<span class="ltr">Terms, Conditions &amp; Liability Disclaimer</span></div>
-    <div class="terms-sub">تحديد المسؤولية القانونية<span class="ltr">Limitation of Liability</span></div>
+    <div class="terms-banner">
+      <span class="terms-banner-en ltr">Terms, Conditions &amp; Liability Disclaimer</span>
+      <span class="terms-banner-ar">الشروط والأحكام ومسؤولية الفحص</span>
+    </div>
     <div class="terms-cols">
-      <p class="terms-ar">${esc(LIABILITY_AR)}</p>
-      <p class="terms-en ltr">${esc(LIABILITY_EN)}</p>
+      <div class="terms-col">
+        <div class="terms-col-head terms-col-head--ar">تحديد المسؤولية القانونية</div>
+        <p class="terms-ar">${esc(LIABILITY_AR)}</p>
+      </div>
+      <div class="terms-col">
+        <div class="terms-col-head terms-col-head--en ltr">Limitation of Liability</div>
+        <p class="terms-en ltr">${esc(LIABILITY_EN)}</p>
+      </div>
     </div>
   </div>`;
 }
@@ -282,12 +295,16 @@ function vehiclePhoto(
       ${qr}
     </figure>`;
   }
+  // No photograph attached: the approved sheet prints its own vehicle
+  // illustration across the cover, reserving the reference's blank band
+  // (y184-549 of the 842pt sheet) between the vehicle information and the terms
+  // block. The illustration is painted as a CSS background so it bleeds past the
+  // side margins without contributing to layout (an overflowing <img> makes
+  // Chromium shrink the whole sheet), and the verification QR floats over it.
   return `
-    <figure class="vphoto vphoto--bleed vphoto-empty">
-      ${mark}
-      <div class="vphoto-ph">لا توجد صورة مرفقة للمركبة<span class="ltr">No vehicle photograph attached</span></div>
+    <div class="vphoto-art" style="background-image:url('${COVER_ILLUSTRATION_DATA_URI}')">
       ${qr}
-    </figure>`;
+    </div>`;
 }
 
 /** The identification cover (page 1). */
@@ -765,6 +782,16 @@ export const INSPECTION_REPORT_CSS = `
   .vphoto--bleed .vphoto-img{ position:absolute; top:0; inset-inline:-12mm;
     width:calc(100% + 24mm); height:var(--vphoto-h); object-fit:cover; }
   .vphoto-img{ width:100%; height:var(--vphoto-h); object-fit:cover; display:block; }
+  /* With no attached photograph the approved sheet prints its own vehicle
+   * illustration across the cover. It is drawn at the reference's car size
+   * (about 485pt wide, inside the printable content box) so it never exceeds the
+   * page and never makes Chromium shrink the sheet to fit; the band's height
+   * reserves the reference's blank strip (y184-549) so the vehicle information
+   * and the terms block land where the approved sheet puts them. The verification
+   * QR floats over it, anchored bottom-right. */
+  .vphoto-art{ position:relative; width:595.5pt; margin-left:-15.87pt;
+    height:334pt; margin-top:-37pt; background-repeat:no-repeat;
+    background-size:100% auto; background-position:center 5pt; }
   .vphoto-empty .vphoto-ph{ position:absolute; top:0; inset-inline:-12mm;
     width:calc(100% + 24mm); height:var(--vphoto-h);
     display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -775,20 +802,25 @@ export const INSPECTION_REPORT_CSS = `
    * it. */
   .vphoto-mark{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
     width:62%; height:auto; opacity:0.18; z-index:1; pointer-events:none; }
-  /* The approved sheet sets the disclaimer body a step smaller than the
-   * checklist rows: the Arabic column prints at 8pt and the English column at
-   * 6pt (measured y566-660 of page 1). The English is deliberately lighter —
-   * it is the translation, not the governing text — so both columns stay the
-   * same height across the block. */
-  .terms{ margin-top:10px; border:1px solid var(--line); border-radius:6px; padding:8px 10px; background:#f7f9fc; }
-  .terms-title{ font-size:10pt; font-weight:700; color:var(--navy); }
-  .terms-title .ltr{ margin-inline-start:8px; font-size:10pt; color:var(--muted); font-weight:400; }
-  .terms-sub{ font-size:10pt; color:var(--navy-soft); margin:2px 0 5px; }
-  .terms-sub .ltr{ margin-inline-start:8px; color:var(--muted); }
-  .terms-cols{ display:flex; gap:14px; }
-  .terms-ar{ flex:1 1 0; margin:0; font-size:8pt; line-height:1.2; color:var(--ink); }
-  .terms-en{ flex:1 1 0; margin:0; font-size:6pt; line-height:1.2; color:var(--muted); text-align:left; }
-  .remarks-block{ margin-top:10px; border:1px solid var(--line); border-radius:6px; padding:8px 10px; }
+  /* The approved sheet prints the disclaimer heading as a full-width navy
+   * banner, white text, with the English title on the physical left and the
+   * Arabic on the physical right. The two body columns sit below it in bordered
+   * cards: the Arabic column on the right at 8pt and the English column on the
+   * left at 6pt (measured y524-660 of page 1). The banner is forced LTR so the
+   * English always leads on the left regardless of the document direction. */
+  .terms{ margin-top:10px; }
+  .terms-banner{ display:flex; direction:ltr; align-items:center; justify-content:space-between;
+    background:#0f2b48; color:#fff; padding:3px 10px; font-size:10pt; font-weight:700; }
+  .terms-banner-en{ text-align:left; }
+  .terms-banner-ar{ text-align:right; direction:rtl; unicode-bidi:embed; }
+  .terms-cols{ display:flex; gap:0; border:1px solid var(--line); border-top:none; }
+  .terms-col{ flex:1 1 0; min-width:0; padding:6px 10px; }
+  .terms-col + .terms-col{ border-inline-start:1px solid var(--line); }
+  .terms-col-head{ font-size:10pt; font-weight:700; color:var(--navy); padding-bottom:3px;
+    margin-bottom:4px; border-bottom:1px solid var(--line); }
+  .terms-ar{ margin:0; font-size:8pt; line-height:1.2; color:var(--ink); }
+  .terms-en{ margin:0; font-size:6pt; line-height:1.2; color:var(--muted); text-align:left; }
+  .remarks-block{ margin-top:9px; border:1px solid var(--line); border-radius:6px; padding:5px 10px; }
   .remarks-title{ font-size:10pt; font-weight:700; color:var(--navy); margin-bottom:4px; }
   .remarks-title .ltr{ margin-inline-start:8px; font-size:8.3pt; color:var(--muted); font-weight:400; }
   .remarks-cols{ display:flex; gap:14px; }

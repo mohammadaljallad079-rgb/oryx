@@ -188,7 +188,7 @@ describe('inspection report template — font independence', () => {
     expect(html).toContain('للتأكد من صحة التقرير');
   });
 
-  it('prints a neutral placeholder when no photograph was attached', () => {
+  it('prints the approved cover illustration when no photograph was attached', () => {
     const html = renderInspectionReportHtml({
       issuer,
       payload,
@@ -198,8 +198,14 @@ describe('inspection report template — font independence', () => {
       verification: null,
       baseCss: '',
     });
-    expect(html).toContain('vphoto-empty');
+    // With no attached photograph the approved sheet prints its own faint
+    // vehicle illustration in the band, not a text placeholder. The illustration
+    // is painted as a CSS background so it bleeds past the side margins without
+    // widening the document.
+    expect(html).toContain('class="vphoto-art"');
+    expect(html).toMatch(/class="vphoto-art" style="background-image:url\('data:image\/png;base64,/);
     expect(html).not.toContain('class="vphoto-img"');
+    expect(html).not.toContain('No vehicle photograph attached');
   });
 
   it('anchors the interior fittings drawing to the physical left inside the cabin block', () => {
@@ -392,8 +398,20 @@ describe('inspection report template — reference page parity (Execution 19)', 
     const html = render();
     // The Arabic disclaimer column prints at 8pt and its English translation at
     // 6pt (measured y566-660 of page 1); the remarks list at 6.6pt.
-    expect(html).toContain('.terms-ar{ flex:1 1 0; margin:0; font-size:8pt;');
-    expect(html).toContain('.terms-en{ flex:1 1 0; margin:0; font-size:6pt;');
+    expect(html).toContain('.terms-ar{ margin:0; font-size:8pt;');
+    expect(html).toContain('.terms-en{ margin:0; font-size:6pt;');
     expect(html).toContain('.remarks-list{ flex:1 1 0; margin:0; padding-inline-start:15px; font-size:6.6pt;');
+  });
+
+  it('prints the disclaimer heading as a full-width navy banner', () => {
+    const html = render();
+    // The approved sheet prints the heading as a navy banner with the English
+    // title on the physical left and the Arabic on the physical right, over two
+    // bordered columns.
+    expect(html).toContain('class="terms-banner"');
+    expect(html).toContain('terms-banner-en');
+    expect(html).toContain('terms-banner-ar');
+    expect(html).toMatch(/\.terms-banner\{ display:flex; direction:ltr;[^}]*background:#0f2b48; color:#fff;/);
+    expect(html).toContain('Terms, Conditions &amp; Liability Disclaimer');
   });
 });
