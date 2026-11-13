@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { Icon } from '@/components/icons';
 import { BrandLogo } from '@/components/brand-logo';
-import { ErrorBanner, Skeleton } from '@/components/ui';
+import { ErrorBanner, Skeleton, StatCard, StatGrid } from '@/components/ui';
 
 /**
  * Homepage — hero banner followed by وحدات النظام (the system modules).
@@ -63,7 +63,51 @@ export default function DashboardHomePage() {
         </div>
       </section>
 
-      {/* ------------------------------------- system modules (وحدات النظام) */}
+        {/* --------------------------------------------------- live KPIs */}
+        {/* Real figures from `GET /dashboard` (company/branch scoped), so the
+            homepage is not a bare banner. The deeper charts stay in لوحة المعلومات. */}
+        <section data-testid="dashboard-kpis">
+          {loading ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} height={84} />
+              ))}
+            </div>
+          ) : (
+            <StatGrid>
+              <StatCard
+                icon="building"
+                tone="gold"
+                label={t('dash.kpi.companies')}
+                value={String(data?.kpis.companies ?? 0)}
+                sub={`${data?.kpis.activeCompanies ?? 0} ${t('dash.kpi.activeCompanies')}`}
+                data-testid="kpi-companies"
+              />
+              <StatCard
+                icon="mapPin"
+                label={t('dash.kpi.branches')}
+                value={String(data?.kpis.branches ?? 0)}
+                data-testid="kpi-branches"
+              />
+              <StatCard
+                icon="users"
+                label={t('dash.kpi.users')}
+                value={String(data?.kpis.users ?? 0)}
+                data-testid="kpi-users"
+              />
+              <StatCard
+                icon="layers"
+                tone="success"
+                label={t('dash.kpi.modulesLicensed')}
+                value={String(data?.kpis.modulesLicensed ?? 0)}
+                sub={`${data?.kpis.planUtilisationPct ?? 0}% ${t('dash.kpi.planUtilisation')}`}
+                data-testid="kpi-modules"
+              />
+            </StatGrid>
+          )}
+        </section>
+
+        {/* ------------------------------------- system modules (وحدات النظام) */}
       <section data-testid="module-tiles">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
           <div>
@@ -87,30 +131,26 @@ export default function DashboardHomePage() {
                 className={`oryx-tile ${tile.available ? '' : 'oryx-tile--planned'}`}
                 data-testid={`tile-${tile.moduleKey}`}
               >
+                {/* The approved artwork is a fixed plate and never changes with
+                    the theme. Only the information band under it switches. */}
                 <span
                   className="oryx-tile__media"
                   style={{ backgroundImage: `url(${tileImageUrl(tile.tileImage)})` }}
-                />
-                <span className="oryx-tile__scrim" />
-                <span className="oryx-tile__body">
-                  <span className="flex items-start justify-between gap-2">
-                    <span className="oryx-tile__icon">
-                      <Icon name={iconFor(tile.moduleKey)} size={18} />
-                    </span>
-                    <span
-                      className="oryx-badge"
-                      style={{
-                        background: 'rgba(0,15,30,.62)',
-                        borderColor: tile.available ? 'rgba(62,207,142,.55)' : 'rgba(212,175,55,.45)',
-                        color: tile.available ? 'var(--success)' : 'var(--gold-soft)',
-                      }}
-                    >
-                      {tile.available ? t('modules.available') : t('modules.planned')}
-                    </span>
+                >
+                  <span className="oryx-tile__icon">
+                    <Icon name={iconFor(tile.moduleKey)} size={18} />
                   </span>
+                </span>
+                <span className="oryx-tile__band">
                   <span className="oryx-tile__title">{locale === 'ar' ? tile.nameAr : tile.nameEn}</span>
                   <span className="oryx-tile__desc">
                     {locale === 'ar' ? tile.descriptionAr : tile.descriptionEn}
+                  </span>
+                  <span className="oryx-tile__meta">
+                    <span className="oryx-tile__state">
+                      {tile.available ? t('modules.available') : t('modules.planned')}
+                    </span>
+                    <Icon name="arrowForward" size={13} />
                   </span>
                 </span>
               </Link>

@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Param, Post, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
@@ -27,7 +27,17 @@ export class AttachmentsController {
   constructor(private readonly attachments: AttachmentsService) {}
 
   @Get(':entityType/:entityId')
-  @RequireAnyPermission('erp.sales.read', 'erp.accounting.read', 'erp.accounting.payment.manage')
+  @RequireAnyPermission(
+    'erp.sales.read',
+    'erp.accounting.read',
+    'erp.accounting.payment.manage',
+    'erp.hr.read',
+    'erp.purchasing.read',
+    'erp.inventory.read',
+    'erp.maintenance.read',
+    'erp.inspection.read',
+    'erp.operations.read',
+  )
   @ApiOperation({ summary: 'List attachments for a document' })
   list(
     @Param('entityType') entityType: string,
@@ -38,7 +48,15 @@ export class AttachmentsController {
   }
 
   @Post(':entityType/:entityId')
-  @RequireAnyPermission('erp.sales.invoice.manage', 'erp.accounting.payment.manage')
+  @RequireAnyPermission(
+    'erp.sales.invoice.manage',
+    'erp.accounting.payment.manage',
+    'erp.hr.write',
+    'erp.purchasing.write',
+    'erp.inventory.write',
+    'erp.maintenance.write',
+    'erp.operations.write',
+  )
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -51,13 +69,24 @@ export class AttachmentsController {
     @Param('entityType') entityType: string,
     @Param('entityId') entityId: string,
     @UploadedFile() file: UploadedFileLike,
+    @Body('category') category: string | undefined,
     @CurrentPrincipal() p: RequestPrincipal,
   ): Promise<AttachmentDto> {
-    return this.attachments.upload(entityType, entityId, file, p);
+    return this.attachments.upload(entityType, entityId, file, p, category);
   }
 
   @Get(':entityType/:entityId/:attachmentId/download')
-  @RequireAnyPermission('erp.sales.read', 'erp.accounting.read', 'erp.accounting.payment.manage')
+  @RequireAnyPermission(
+    'erp.sales.read',
+    'erp.accounting.read',
+    'erp.accounting.payment.manage',
+    'erp.hr.read',
+    'erp.purchasing.read',
+    'erp.inventory.read',
+    'erp.maintenance.read',
+    'erp.inspection.read',
+    'erp.operations.read',
+  )
   @ApiOperation({ summary: 'Download an attachment (or open it for preview)' })
   async download(
     @Param('entityType') entityType: string,
@@ -79,7 +108,15 @@ export class AttachmentsController {
   }
 
   @Delete(':entityType/:entityId/:attachmentId')
-  @RequireAnyPermission('erp.sales.invoice.manage', 'erp.accounting.payment.manage')
+  @RequireAnyPermission(
+    'erp.sales.invoice.manage',
+    'erp.accounting.payment.manage',
+    'erp.hr.write',
+    'erp.purchasing.write',
+    'erp.inventory.write',
+    'erp.maintenance.write',
+    'erp.operations.write',
+  )
   @ApiOperation({ summary: 'Remove an attachment' })
   remove(
     @Param('entityType') entityType: string,

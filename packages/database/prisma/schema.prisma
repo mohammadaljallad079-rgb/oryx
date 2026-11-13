@@ -259,6 +259,20 @@ enum CompanyType {
   SAAS_TENANT
 }
 
+/**
+ * The two customer shapes the platform models separately.
+ *
+ * An INDIVIDUAL is a person: a national id, a personal address. A COMPANY is a
+ * legal entity: a commercial registration, a VAT number, an expiry date for the
+ * CR, a responsible officer and one or more secondary branches. The distinction
+ * drives which form the UI shows, but both are the same `Customer` row so the
+ * existing invoice/order/ledger relations keep working unchanged.
+ */
+enum CustomerKind {
+  INDIVIDUAL
+  COMPANY
+}
+
 enum CompanyStatus {
   PROVISIONING
   ACTIVE
@@ -504,6 +518,7 @@ model Company {
   auditLogs       AuditLog[]
   supportSessions SupportSession[]
   branding        CompanyBranding?
+  settings        CompanySetting[]
 
   // Execution 02 — ERP core (all tenant-owned rows carry companyId).
   documentSequences    DocumentSequence[]
@@ -517,6 +532,7 @@ model Company {
   payments             Payment[]
   paymentAllocations   PaymentAllocation[]
   customers            Customer[]
+  customerBranches     CustomerBranch[]
   products             Product[]
   warehouses           Warehouse[]
   stockLevels          StockLevel[]
@@ -1884,10 +1900,32 @@ model Customer {
   currency            String   @default("BHD")
   isActive            Boolean  @default(true)
   notes               String?
+  /**
+   * Individual vs company. Defaults to INDIVIDUAL so every pre-existing row and
+   * every POS walk-in keeps its current meaning without a backfill guess.
+   */
+  kind                CustomerKind @default(INDIVIDUAL)
+  /** Individual: the national id / personal number. */
+  nationalId          String?
+  /** Company: the commercial registration number and its expiry. */
+  crNumber            String?
+  crExpiryDate        DateTime?
+  /** Company: the website and the responsible officer's contact details. */
+  website             String?
+  contactPersonName   String?
+  contactPersonPhone  String?
+  /**
+   * A secondary branch is a customer record of its own that rolls up to the
+   * head-office company customer. Null means this record *is* the head office.
+   */
+  parentCustomerId    String?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
   company           Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  parent            Customer?  @relation("CustomerBranches", fields: [parentCustomerId], references: [id], onDelete: SetNull)
+  branches          Customer[] @relation("CustomerBranches")
+  customerBranches  CustomerBranch[]
   receivableAccount Account?   @relation(fields: [receivableAccountId], references: [id], onDelete: SetNull)
   source            LeadSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
   department        Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
@@ -1914,6 +1952,41 @@ model Customer {
   @@index([companyId, isActive])
   @@index([sourceId])
   @@index([departmentId])
+  @@index([companyId, kind])
+  @@index([parentCustomerId])
+}
+
+/**
+ * A secondary branch of a company customer.
+ *
+ * Kept as its own table rather than folded into `Customer` because a branch has
+ * no ledger account and issues no documents of its own — it is an address and a
+ * contact for a head-office company, and duplicating the customer row for each
+ * branch would fragment the receivable.
+ */
+model CustomerBranch {
+  id          String   @id @default(cuid())
+  companyId   String
+  customerId  String
+  code        String
+  nameEn      String
+  nameAr      String
+  contactName String?
+  phone       String?
+  email       String?
+  addressLine String?
+  city        String?
+  countryCode String?
+  isActive    Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, code])
+  @@index([companyId, customerId])
 }
 
 model Quotation {
@@ -3918,6 +3991,11 @@ model EntityAttachment {
    */
   storageRef   String?
   uploadedById String?
+  /**
+   * Classification of the document (IDENTITY, CONTRACT, CV, ...). Nullable so
+   * rows created before categories existed stay valid.
+   */
+  category     String?
   createdAt    DateTime @default(now())
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -6016,6 +6094,36 @@ model CompanyBranding {
   logoAsset     CmsMediaAsset? @relation("CompanyLogo", fields: [logoAssetId], references: [id], onDelete: SetNull)
   logoDarkAsset CmsMediaAsset? @relation("CompanyLogoDark", fields: [logoDarkAssetId], references: [id], onDelete: SetNull)
   faviconAsset  CmsMediaAsset? @relation("CompanyFavicon", fields: [faviconAssetId], references: [id], onDelete: SetNull)
+}
+
+/**
+ * Per-company settings, one namespaced row per (company, section).
+ *
+ * Every tenant owns its own configuration: general identity, invoicing, tax,
+ * accounting, HR, purchasing, inventory, sales and maintenance. Storing them as
+ * one JSON document per section (rather than one wide column per field) lets a
+ * section gain a field without a migration, while the `(companyId, section)`
+ * unique key guarantees a company can never read another company's settings —
+ * isolation is expressed in the query, not only in the UI.
+ *
+ * `Company` already carries the identity fields the settings centre edits
+ * (names, currency, tax number, CR, print notes); this table holds the sections
+ * that have no natural column and the values that must not be shared between
+ * tenants, such as document prefixes and default accounts.
+ */
+model CompanySetting {
+  id        String   @id @default(cuid())
+  companyId String
+  section   String
+  value     Json
+  updatedById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, section])
+  @@index([companyId])
 }
 
 model CmsMediaFolder {

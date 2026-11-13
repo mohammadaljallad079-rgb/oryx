@@ -48,7 +48,7 @@ export default function InventoryPage() {
 function InventoryInner() {
   const { t } = useUi();
   const { can } = useAuth();
-  const [tab, setTab] = useState<Tab>('dashboard');
+  const [tab, setTab] = useState<Tab>('valuation');
 
   const canItem = can('erp.inventory.item.manage');
   const canWarehouse = can('erp.inventory.warehouse.manage');

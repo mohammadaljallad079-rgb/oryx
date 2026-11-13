@@ -166,7 +166,7 @@ export default function SalesPage() {
 function SalesInner() {
   const { t } = useUi();
   const { can } = useAuth();
-  const [tab, setTab] = useState<Tab>('dashboard');
+  const [tab, setTab] = useState<Tab>('invoices');
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'dashboard', label: t('erp.sales.dashboard') },
@@ -355,11 +355,18 @@ function CustomersTab({ canManage }: { canManage: boolean }) {
 
 interface CustomerFormState {
   code: string;
+  kind: 'INDIVIDUAL' | 'COMPANY';
   nameEn: string;
   nameAr: string;
   email: string;
   phone: string;
   taxNumber: string;
+  nationalId: string;
+  crNumber: string;
+  crExpiryDate: string;
+  website: string;
+  contactPersonName: string;
+  contactPersonPhone: string;
   addressLine: string;
   city: string;
   countryCode: string;
@@ -394,11 +401,18 @@ function CustomerModal({
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<CustomerFormState>({
     code: '',
+    kind: 'INDIVIDUAL',
     nameEn: '',
     nameAr: '',
     email: '',
     phone: '',
     taxNumber: '',
+    nationalId: '',
+    crNumber: '',
+    crExpiryDate: '',
+    website: '',
+    contactPersonName: '',
+    contactPersonPhone: '',
     addressLine: '',
     city: '',
     countryCode: '',
@@ -414,11 +428,18 @@ function CustomerModal({
     setError(null);
     setForm({
       code: customer?.code ?? '',
+      kind: customer?.kind ?? 'INDIVIDUAL',
       nameEn: customer?.nameEn ?? '',
       nameAr: customer?.nameAr ?? '',
       email: customer?.email ?? '',
       phone: customer?.phone ?? '',
       taxNumber: customer?.taxNumber ?? '',
+      nationalId: customer?.nationalId ?? '',
+      crNumber: customer?.crNumber ?? '',
+      crExpiryDate: customer?.crExpiryDate ? customer.crExpiryDate.slice(0, 10) : '',
+      website: customer?.website ?? '',
+      contactPersonName: customer?.contactPersonName ?? '',
+      contactPersonPhone: customer?.contactPersonPhone ?? '',
       addressLine: customer?.addressLine ?? '',
       city: customer?.city ?? '',
       countryCode: customer?.countryCode ?? '',
@@ -439,11 +460,18 @@ function CustomerModal({
         return;
       }
       const body: Record<string, unknown> = {
+        kind: form.kind,
         ...(form.nameEn.trim() ? { nameEn: form.nameEn.trim() } : {}),
         ...(form.nameAr.trim() ? { nameAr: form.nameAr.trim() } : {}),
         email: form.email || undefined,
         phone: form.phone || undefined,
         taxNumber: form.taxNumber || undefined,
+        nationalId: form.kind === 'INDIVIDUAL' ? form.nationalId || undefined : undefined,
+        crNumber: form.kind === 'COMPANY' ? form.crNumber || undefined : undefined,
+        crExpiryDate: form.kind === 'COMPANY' && form.crExpiryDate ? form.crExpiryDate : undefined,
+        website: form.kind === 'COMPANY' ? form.website || undefined : undefined,
+        contactPersonName: form.kind === 'COMPANY' ? form.contactPersonName || undefined : undefined,
+        contactPersonPhone: form.kind === 'COMPANY' ? form.contactPersonPhone || undefined : undefined,
         addressLine: form.addressLine || undefined,
         city: form.city || undefined,
         countryCode: form.countryCode || undefined,
@@ -482,6 +510,22 @@ function CustomerModal({
       }
     >
       {error ? <ErrorBanner message={error} /> : null}
+      <div className="mb-4" role="tablist" aria-label={t('erp.sales.customerType')}>
+        <div className="flex gap-2">
+          {(['INDIVIDUAL', 'COMPANY'] as const).map((k) => (
+            <Button
+              key={k}
+              size="sm"
+              variant={form.kind === k ? 'primary' : 'default'}
+              onClick={() => setForm({ ...form, kind: k })}
+              data-testid={`customer-kind-${k.toLowerCase()}`}
+            >
+              <Icon name={k === 'COMPANY' ? 'building' : 'users'} size={15} />
+              {k === 'COMPANY' ? t('erp.sales.customerKindCompany') : t('erp.sales.customerKindIndividual')}
+            </Button>
+          ))}
+        </div>
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
           <input
@@ -523,6 +567,60 @@ function CustomerModal({
             data-testid="customer-country"
           />
         </Field>
+        {form.kind === 'INDIVIDUAL' ? (
+          <Field label={t('erp.sales.nationalId')} hint={t('erp.sales.nationalIdHint')}>
+            <input
+              className="oryx-input"
+              value={form.nationalId}
+              onChange={(e) => setForm({ ...form, nationalId: e.target.value })}
+              data-testid="customer-national-id"
+            />
+          </Field>
+        ) : (
+          <>
+            <Field label={t('erp.sales.crNumber')}>
+              <input
+                className="oryx-input"
+                value={form.crNumber}
+                onChange={(e) => setForm({ ...form, crNumber: e.target.value })}
+                data-testid="customer-cr-number"
+              />
+            </Field>
+            <Field label={t('erp.sales.crExpiry')}>
+              <input
+                className="oryx-input"
+                type="date"
+                value={form.crExpiryDate}
+                onChange={(e) => setForm({ ...form, crExpiryDate: e.target.value })}
+                data-testid="customer-cr-expiry"
+              />
+            </Field>
+            <Field label={t('erp.sales.website')}>
+              <input
+                className="oryx-input"
+                value={form.website}
+                onChange={(e) => setForm({ ...form, website: e.target.value })}
+                data-testid="customer-website"
+              />
+            </Field>
+            <Field label={t('erp.sales.contactPerson')}>
+              <input
+                className="oryx-input"
+                value={form.contactPersonName}
+                onChange={(e) => setForm({ ...form, contactPersonName: e.target.value })}
+                data-testid="customer-contact-person"
+              />
+            </Field>
+            <Field label={t('erp.sales.contactPersonPhone')}>
+              <input
+                className="oryx-input"
+                value={form.contactPersonPhone}
+                onChange={(e) => setForm({ ...form, contactPersonPhone: e.target.value })}
+                data-testid="customer-contact-person-phone"
+              />
+            </Field>
+          </>
+        )}
         <Field label={t('erp.sales.customerSource')} hint={t('erp.sales.customerSourceHint')}>
           <div className="flex items-center gap-2">
             <div className="flex-1">
@@ -662,28 +760,6 @@ function CustomerDetailDrawer({
 }) {
   const { t, locale } = useUi();
   const detail = useAsync(() => api.customer(id), [id]);
-  const attachments = useAsync(() => api.customerAttachments(id), [id]);
-  const [busy, setBusy] = useState(false);
-  const [attachOpen, setAttachOpen] = useState(false);
-  const [attach, setAttach] = useState({ fileName: '', storageRef: '' });
-
-  const removeAttachment = async (attachmentId: string) => {
-    if (!window.confirm(t('common.confirm'))) return;
-    await api.removeCustomerAttachment(id, attachmentId);
-    await attachments.reload();
-  };
-
-  const addAttachment = async () => {
-    setBusy(true);
-    try {
-      await api.addCustomerAttachment(id, { fileName: attach.fileName, storageRef: attach.storageRef || undefined });
-      setAttach({ fileName: '', storageRef: '' });
-      setAttachOpen(false);
-      await attachments.reload();
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const d = detail.data;
   const historyEntries: Array<[string, number]> = d
@@ -713,6 +789,21 @@ function CustomerDetailDrawer({
             <DetailRow label={t('common.city')} value={d.city} />
             <DetailRow label={t('erp.sales.customerSource')} value={locale === 'ar' ? d.sourceNameAr || d.sourceNameEn : d.sourceNameEn || d.sourceNameAr} />
             <DetailRow label={t('erp.sales.customerDepartment')} value={locale === 'ar' ? d.departmentNameAr || d.departmentNameEn : d.departmentNameEn || d.departmentNameAr} />
+            <DetailRow
+              label={t('erp.sales.customerType')}
+              value={d.kind === 'COMPANY' ? t('erp.sales.customerKindCompany') : t('erp.sales.customerKindIndividual')}
+            />
+            {d.kind === 'INDIVIDUAL' ? (
+              <DetailRow label={t('erp.sales.nationalId')} value={d.nationalId} />
+            ) : (
+              <>
+                <DetailRow label={t('erp.sales.crNumber')} value={d.crNumber} />
+                <DetailRow label={t('erp.sales.crExpiry')} value={d.crExpiryDate ? d.crExpiryDate.slice(0, 10) : null} />
+                <DetailRow label={t('erp.sales.website')} value={d.website} />
+                <DetailRow label={t('erp.sales.contactPerson')} value={d.contactPersonName} />
+                <DetailRow label={t('erp.sales.contactPersonPhone')} value={d.contactPersonPhone} />
+              </>
+            )}
             <DetailRow label={t('erp.sales.creditLimit')} value={money(d.creditLimitMinor, d.currency)} />
             <DetailRow label={t('erp.sales.paymentTerms')} value={String(d.paymentTermsDays)} />
             <DetailRow label={t('common.status')} value={d.isActive ? t('common.active') : t('common.inactive')} />
@@ -769,63 +860,12 @@ function CustomerDetailDrawer({
             </div>
           ) : null}
 
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="m-0 text-[13px] font-bold">{t('erp.sales.customerAttachments')}</h3>
-              {canManage ? (
-                <Button size="sm" variant="ghost" onClick={() => setAttachOpen(true)} data-testid="add-customer-attachment">
-                  <Icon name="plus" size={15} />
-                  {t('erp.sales.addAttachment')}
-                </Button>
-              ) : null}
-            </div>
-            {attachments.loading ? (
-              <Skeleton height={40} />
-            ) : (attachments.data?.items.length ?? 0) === 0 ? (
-              <p className="oryx-faint m-0 text-[12px]">{t('erp.sales.noAttachments')}</p>
-            ) : (
-              <ul className="m-0 flex list-none flex-col gap-1 p-0">
-                {attachments.data!.items.map((a) => (
-                  <li key={a.id} className="flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2 text-[12.5px]">
-                    <span>
-                      <span className="font-semibold">{a.fileName}</span>
-                      {a.storageRef ? <span className="oryx-faint block text-[11px]">{a.storageRef}</span> : null}
-                    </span>
-                    {canManage ? (
-                      <Button size="sm" variant="ghost" onClick={() => void removeAttachment(a.id)}>
-                        {t('common.delete')}
-                      </Button>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {d.kind === 'COMPANY' ? <CustomerBranchesPanel customerId={id} canManage={canManage} /> : null}
+
+          <AttachmentsPanel entityType="CUSTOMER" entityId={id} canManage={canManage} categorised />
         </div>
       )}
 
-      <Modal
-        open={attachOpen}
-        title={t('erp.sales.addAttachment')}
-        onClose={() => setAttachOpen(false)}
-        footer={
-          <>
-            <Button onClick={() => setAttachOpen(false)}>{t('common.cancel')}</Button>
-            <Button variant="primary" disabled={busy || !attach.fileName} onClick={addAttachment} data-testid="save-customer-attachment">
-              {busy ? t('common.loading') : t('common.save')}
-            </Button>
-          </>
-        }
-      >
-        <div className="grid gap-3">
-          <Field label={t('erp.sales.attachmentName')} required>
-            <input className="oryx-input" value={attach.fileName} onChange={(e) => setAttach({ ...attach, fileName: e.target.value })} data-testid="attachment-file-name" />
-          </Field>
-          <Field label={t('erp.sales.attachmentReference')}>
-            <input className="oryx-input" value={attach.storageRef} onChange={(e) => setAttach({ ...attach, storageRef: e.target.value })} />
-          </Field>
-        </div>
-      </Modal>
     </Modal>
   );
 }
@@ -2739,5 +2779,121 @@ function DocumentModal({
         </div>
       </section>
     </Modal>
+  );
+}
+
+/**
+ * Secondary branches of a company customer.
+ *
+ * A branch is stored in its own table and rolled up to the head-office customer,
+ * so it never fragments the receivable. The create form posts to the real branch
+ * endpoint and the list reloads from the server rather than echoing local state.
+ */
+function CustomerBranchesPanel({ customerId, canManage }: { customerId: string; canManage: boolean }) {
+  const { t, locale } = useUi();
+  const branches = useAsync(() => api.customerBranches(customerId), [customerId]);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', contactName: '', phone: '', city: '' });
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.createCustomerBranch(customerId, {
+        code: form.code,
+        nameEn: form.nameEn || undefined,
+        nameAr: form.nameAr || undefined,
+        contactName: form.contactName || undefined,
+        phone: form.phone || undefined,
+        city: form.city || undefined,
+      });
+      setForm({ code: '', nameEn: '', nameAr: '', contactName: '', phone: '', city: '' });
+      setOpen(false);
+      await branches.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (branchId: string) => {
+    if (!window.confirm(t('common.deleteConfirm'))) return;
+    await api.deleteCustomerBranch(customerId, branchId);
+    await branches.reload();
+  };
+
+  return (
+    <div data-testid="customer-branches">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="m-0 text-[13px] font-bold">{t('erp.sales.branches')}</h3>
+        {canManage ? (
+          <Button size="sm" variant="ghost" onClick={() => setOpen(true)} data-testid="add-customer-branch">
+            <Icon name="plus" size={15} />
+            {t('erp.sales.addBranch')}
+          </Button>
+        ) : null}
+      </div>
+      <p className="oryx-faint m-0 mb-2 text-[11px]">{t('erp.sales.branchesHint')}</p>
+      {branches.loading ? (
+        <Skeleton height={40} />
+      ) : (branches.data?.length ?? 0) === 0 ? (
+        <p className="oryx-faint m-0 text-[12px]" data-testid="customer-branches-empty">{t('erp.sales.noBranches')}</p>
+      ) : (
+        <ul className="m-0 flex list-none flex-col gap-1 p-0">
+          {branches.data!.map((b) => (
+            <li key={b.id} className="flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2 text-[12.5px]" data-testid={`customer-branch-${b.code}`}>
+              <span>
+                <span className="font-mono text-[11px]">{b.code}</span>{' '}
+                <span className="font-semibold">{locale === 'ar' ? b.nameAr || b.nameEn : b.nameEn || b.nameAr}</span>
+                {b.city ? <span className="oryx-faint block text-[11px]">{b.city}</span> : null}
+              </span>
+              {canManage ? (
+                <Button size="sm" variant="ghost" onClick={() => void remove(b.id)}>
+                  {t('common.delete')}
+                </Button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      <Modal
+        open={open}
+        title={t('erp.sales.addBranch')}
+        onClose={() => setOpen(false)}
+        footer={
+          <>
+            <Button onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
+            <Button variant="primary" disabled={busy || !form.code} onClick={() => void submit()} data-testid="save-customer-branch">
+              {busy ? t('common.loading') : t('common.save')}
+            </Button>
+          </>
+        }
+      >
+        {error ? <ErrorBanner message={error} /> : null}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={t('erp.sales.branchCode')} required>
+            <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="branch-code" />
+          </Field>
+          <Field label={`${t('erp.sales.branchName')} (EN)`}>
+            <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="branch-name-en" />
+          </Field>
+          <Field label={`${t('erp.sales.branchName')} (AR)`}>
+            <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="branch-name-ar" />
+          </Field>
+          <Field label={t('erp.sales.contactPerson')}>
+            <input className="oryx-input" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
+          </Field>
+          <Field label={t('common.phone')}>
+            <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          </Field>
+          <Field label={t('common.city')}>
+            <input className="oryx-input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+          </Field>
+        </div>
+      </Modal>
+    </div>
   );
 }

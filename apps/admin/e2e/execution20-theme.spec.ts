@@ -66,6 +66,7 @@ test.describe('theme system', () => {
   });
 
   test('module-tile band tracks the theme, artwork does not', async ({ page }) => {
+    const seen: Record<string, { artwork: string; band: string; ink: string }> = {};
     for (const theme of ['dark', 'light'] as const) {
       await setTheme(page, theme);
       await page.goto('/dashboard');
@@ -74,21 +75,25 @@ test.describe('theme system', () => {
       await page.waitForTimeout(300);
       const info = await tile.evaluate((el) => {
         const title = el.querySelector('.oryx-tile__title');
+        const band = el.querySelector('.oryx-tile__band');
         return {
-          band: getComputedStyle(el, '::after').backgroundImage,
+          band: band ? getComputedStyle(band).backgroundImage : '',
           artwork: getComputedStyle(el.querySelector('.oryx-tile__media')!).backgroundImage,
           ink: title ? getComputedStyle(title).color : '',
         };
       });
       // The artwork is the approved photograph and is identical in both themes.
       expect(info.artwork, 'tile artwork must not change with the theme').toContain('url(');
-      if (theme === 'dark') {
-        expect(info.band, 'dark band stays on the full-cover scrim').toBe('none');
-        expect(info.ink).toBe('rgb(255, 255, 255)');
-      } else {
-        expect(info.band, 'light band paints an ivory fade').toContain('247, 244, 237');
-        expect(info.ink, 'light band uses dark ink').toBe('rgb(26, 23, 18)');
-      }
+      seen[theme] = info;
     }
+    // The photograph is byte-identical across themes; only the band switches.
+    expect(seen.light.artwork).toBe(seen.dark.artwork);
+    // The dark band is a navy plate, the light band an ivory one, and the ink
+    // flips with it. Both bands are a real painted plate, never `none`.
+    expect(seen.dark.band).toContain('gradient');
+    expect(seen.light.band).toContain('gradient');
+    expect(seen.dark.band).not.toBe(seen.light.band);
+    expect(seen.dark.ink).not.toBe(seen.light.ink);
+    expect(seen.light.ink, 'light band uses dark ink').toBe('rgb(26, 23, 18)');
   });
 });

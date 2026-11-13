@@ -257,6 +257,14 @@ export const Icons = {
       <path d="M6 7l5 5-5 5" />
     </Base>
   ),
+  /* Direction-neutral "forward" chevron used on the module-tile band. The
+   * wrapper flips it under RTL so it always points along the reading direction. */
+  arrowForward: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M5 12h14" />
+      <path d="M13 6l6 6-6 6" />
+    </Base>
+  ),
   calendar: (p: IconProps) => (
     <Base {...p}>
       <rect x="3" y="5" width="18" height="16" rx="2" />

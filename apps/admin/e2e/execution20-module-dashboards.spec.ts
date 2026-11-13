@@ -32,7 +32,9 @@ test.describe('Execution 20 — module dashboards', () => {
 
   for (const { route, key, testId } of MODULES) {
     test(`renders the ${key} dashboard with real figures`, async ({ page }) => {
-      await page.goto(route);
+      // Every module keeps its original landing tab, so the dashboard is reached
+      // through the deep link its own tile/shortcut uses.
+      await page.goto(`${route}?tab=dashboard`);
       await expect(page.getByTestId(testId)).toBeVisible({ timeout: 25_000 });
       await expect(page.getByTestId(`module-hero-${key}`)).toBeVisible();
       await expect(page.getByTestId(`module-hero-title-${key}`)).not.toBeEmpty();
@@ -50,17 +52,17 @@ test.describe('Execution 20 — module dashboards', () => {
 
   test('an unknown deep-link tab falls back to the default', async ({ page }) => {
     await page.goto('/accounting?tab=not-a-real-tab');
-    await expect(page.getByTestId('accounting-tab-dashboard')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('accounting-tab-accounts')).toHaveAttribute('aria-selected', 'true');
   });
 
   test('the banner switches with the theme and keeps its artwork', async ({ page }) => {
-    await page.goto('/accounting');
+    await page.goto('/accounting?tab=dashboard');
     const hero = page.getByTestId('module-hero-financial_accounting');
     await expect(hero).toBeVisible({ timeout: 25_000 });
     await expect(hero.locator('.oryx-module-hero__art img')).toBeVisible();
 
     await setTheme(page, 'light');
-    await page.goto('/accounting');
+    await page.goto('/accounting?tab=dashboard');
     await expect(page.getByTestId('module-hero-financial_accounting')).toBeVisible({ timeout: 25_000 });
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
     await expect(page.getByTestId('module-hero-financial_accounting').locator('.oryx-module-hero__art img')).toBeVisible();
@@ -73,11 +75,11 @@ test.describe('Execution 20 — module dashboards (Enterprise tenant)', () => {
     await setLocale(page, 'en');
     await setTheme(page, 'dark');
 
-    await page.goto('/automotive/maintenance');
+    await page.goto('/automotive/maintenance?tab=dashboard');
     await expect(page.getByTestId('module-dashboard-automotive_maintenance')).toBeVisible({ timeout: 25_000 });
     await expect(page.getByTestId('module-stats-automotive_maintenance')).toBeVisible();
 
-    await page.goto('/automotive/spare-parts');
+    await page.goto('/automotive/spare-parts?tab=dashboard');
     await expect(page.getByTestId('module-dashboard-spare_parts')).toBeVisible({ timeout: 25_000 });
     await expect(page.getByTestId('module-stats-spare_parts')).toBeVisible();
   });

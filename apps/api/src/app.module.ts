@@ -39,6 +39,7 @@ import { EcosystemModule } from './ecosystem/ecosystem.module';
 import { TaxModule } from './tax/tax.module';
 import { PrintModule } from './print/print.module';
 import { AttachmentsModule } from './attachments/attachments.module';
+import { CompanySettingsModule } from './company-settings/company-settings.module';
 
 @Module({
   imports: [
@@ -75,6 +76,7 @@ import { AttachmentsModule } from './attachments/attachments.module';
     AutomotiveModule,
     DocumentsModule,
     AttachmentsModule,
+    CompanySettingsModule,
     CustomerModule,
     NotificationsModule,
     MarketplaceModule,

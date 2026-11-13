@@ -137,10 +137,13 @@ test.describe('Execution 21 — customer master data', () => {
     await page.getByTestId(`customer-view-${customerCode}`).click();
     await expect(page.getByTestId('customer-detail')).toBeVisible({ timeout: 20_000 });
 
-    // Add an attachment through the UI, then assert it is persisted.
-    await page.getByTestId('add-customer-attachment').click();
-    await page.getByTestId('attachment-file-name').fill('trade-licence.pdf');
-    await page.getByTestId('save-customer-attachment').click();
+    // Upload a real file through the unified attachments panel and assert it is
+    // persisted by the API.
+    await page.getByTestId(`attach-input-${customerId}`).setInputFiles({
+      name: 'trade-licence.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4\n% trade licence\n'),
+    });
 
     await expect
       .poll(async () => {

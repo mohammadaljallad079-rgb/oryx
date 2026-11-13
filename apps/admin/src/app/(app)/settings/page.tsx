@@ -10,6 +10,7 @@ import { Badge, Button, Card, EmptyState, ErrorBanner, Field, SectionHeader, Ske
 import { BrandingPanel } from '@/components/branding-panel';
 import { CompanySettingsPanel } from '@/components/company-settings-panel';
 import { TaxRatesPanel } from '@/components/tax-rates-panel';
+import { CompanySettingsCentre } from '@/components/company-settings-centre';
 
 export default function SettingsPage() {
   const { t, locale, theme, fontScale, setLocale, setTheme, setFontScale } = useUi();
@@ -174,6 +175,14 @@ export default function SettingsPage() {
           <p className="oryx-panel-title m-0 mb-1">{t('branding.title')}</p>
           <p className="oryx-muted m-0 mb-4 text-[12px]">{t('branding.subtitle')}</p>
           <BrandingPanel companyId={companyId} />
+        </Card>
+      ) : null}
+
+      {companyId ? (
+        <Card className="p-4" data-testid="settings-centre-card">
+          <p className="oryx-panel-title m-0 mb-1">{t('settings.centre')}</p>
+          <p className="oryx-muted m-0 mb-4 text-[12px]">{t('settings.centreHint')}</p>
+          <CompanySettingsCentre canEdit={canEditBranding} />
         </Card>
       ) : null}
 

@@ -80,6 +80,7 @@ export const PERMISSIONS: PermissionDefinition[] = [
   // ----------------------------------------------------------------- company
   P('company.read', 'Company', 'View company', 'عرض الشركة', 'COMPANY', true, 'Read own company profile.'),
   P('company.update', 'Company', 'Update company profile', 'تعديل بيانات الشركة', 'COMPANY', true, 'Edit own company profile.'),
+  P('company.settings.read', 'Company', 'View company settings', 'عرض إعدادات الشركة', 'COMPANY', true, 'Read company-level configuration.'),
   P('company.settings.update', 'Company', 'Update company settings', 'تعديل إعدادات الشركة', 'COMPANY', true, 'Edit company-level configuration.'),
   P('company.branch.read', 'Company', 'View branches', 'عرض الفروع', 'COMPANY', true, 'Read branches of own company.'),
   P('company.branch.create', 'Company', 'Create branch', 'إنشاء فرع', 'COMPANY', true, 'Create a branch within plan limits.'),

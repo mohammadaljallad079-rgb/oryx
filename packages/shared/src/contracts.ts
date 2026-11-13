@@ -882,12 +882,24 @@ export interface CustomerDto {
   code: string;
   nameEn: string;
   nameAr: string;
+  /** Individual or company. Drives which form the UI shows; both share this row. */
+  kind: CustomerKind;
   email: string | null;
   phone: string | null;
   taxNumber: string | null;
   addressLine: string | null;
   city: string | null;
   countryCode: string | null;
+  /** Individual: national id / personal number. */
+  nationalId: string | null;
+  /** Company: commercial registration number and expiry. */
+  crNumber: string | null;
+  crExpiryDate: string | null;
+  website: string | null;
+  contactPersonName: string | null;
+  contactPersonPhone: string | null;
+  /** Head-office customer a secondary branch rolls up to; null for a head office. */
+  parentCustomerId: string | null;
   /** Lead-source catalogue id and the resolved bilingual label. */
   sourceId: string | null;
   sourceNameEn: string | null;
@@ -914,6 +926,25 @@ export interface AccountStatementRowDto {
 }
 
 /** A document reference attached to a customer record. */
+export type CustomerKind = 'INDIVIDUAL' | 'COMPANY';
+
+/** A secondary branch of a company customer. */
+export interface CustomerBranchDto {
+  id: string;
+  customerId: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  contactName: string | null;
+  phone: string | null;
+  email: string | null;
+  addressLine: string | null;
+  city: string | null;
+  countryCode: string | null;
+  isActive: boolean;
+  notes: string | null;
+}
+
 export interface CustomerAttachmentDto {
   id: string;
   companyId: string;

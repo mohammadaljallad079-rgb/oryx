@@ -109,12 +109,6 @@
   --warning: #f0b429;
   --danger: #f2555a;
   --info: #4aa8ff;
-  --tile-overlay: linear-gradient(
-    180deg,
-    rgba(0, 12, 24, 0.15) 0%,
-    rgba(0, 15, 30, 0.72) 55%,
-    rgba(0, 18, 34, 0.94) 100%
-  );
   --shadow-card: 0 18px 40px -24px rgba(0, 0, 0, 0.85);
   --shadow-tile: 0 24px 48px -26px rgba(0, 0, 0, 0.9);
   --shadow-modal: 0 40px 80px -40px rgba(0, 0, 0, 0.9);
@@ -155,11 +149,13 @@
    * fade with dark ink so no fixed navy plate survives a theme switch. The
    * artwork itself is untouched in both themes.
    */
-  --tile-band: none;
-  --tile-band-ink: var(--on-media);
-  --tile-band-ink-muted: var(--on-media-muted);
-  --tile-band-shadow: 0 1px 12px var(--on-media-shadow);
-  --tile-band-shadow-soft: 0 1px 10px var(--on-media-shadow-soft);
+  --tile-band: linear-gradient(180deg, var(--surface-raised) 0%, var(--surface) 100%);
+  --tile-band-ink: var(--text);
+  --tile-band-ink-muted: var(--text-muted);
+  --tile-band-line: var(--border-soft);
+  --tile-state-bg: color-mix(in srgb, var(--gold) 14%, transparent);
+  --tile-state-border: color-mix(in srgb, var(--gold) 38%, transparent);
+  --tile-state-ink: var(--gold-soft);
   /*
    * The dashboard banner field. A navy gradient with a warm gold bloom, so the
    * centred white/gold lockup sits on a deep ground in the dark theme and on a
@@ -283,12 +279,6 @@
   --info: #1d5fa8;
   /* Photo tiles keep white ink over a navy scrim in both themes, so this ramp
    * is deliberately theme-independent. */
-  --tile-overlay: linear-gradient(
-    180deg,
-    rgba(0, 12, 24, 0.1) 0%,
-    rgba(0, 22, 43, 0.62) 55%,
-    rgba(0, 22, 43, 0.9) 100%
-  );
   --shadow-card: 0 16px 36px -26px rgba(58, 48, 30, 0.28);
   /* See the dark block: a warm charcoal reads as a shade on ivory, whereas
    * pure black makes a branded button look dirty. */
@@ -319,11 +309,13 @@
   /* The module-tile information band in the light theme: an ivory fade with
    * dark ink, so the card bottom switches with the theme while the artwork above
    * it stays put. The scrim stops at 94%, so the photograph still reads. */
-  --tile-band: linear-gradient(180deg, transparent 0%, rgba(247, 244, 237, 0.94) 60%);
+  --tile-band: linear-gradient(180deg, #fffdf9 0%, #f4efe4 100%);
   --tile-band-ink: #1a1712;
   --tile-band-ink-muted: #4a443a;
-  --tile-band-shadow: none;
-  --tile-band-shadow-soft: none;
+  --tile-band-line: color-mix(in srgb, var(--gold) 22%, transparent);
+  --tile-state-bg: color-mix(in srgb, var(--gold) 16%, transparent);
+  --tile-state-border: color-mix(in srgb, var(--gold) 40%, transparent);
+  --tile-state-ink: var(--gold-on-tint);
   /* The dashboard banner is a navy panel in the light theme too: the ORYX
    * lockup's on-light colourway is navy/gold ink, which needs the darker
    * "on-dark" colourway here, exactly as the sidebar does. The field is
@@ -1246,18 +1238,27 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
 /* ------------------------------------------------------------------- tiles */
 
 /*
- * Image-led module tile. The photograph sits behind a navy gradient so the
- * caption keeps contrast in both themes, matching the reference dashboard.
+ * Module tile — the approved two-part card.
+ *
+ * Top: the module's own artwork, a fixed plate that is byte-identical in both
+ * themes (the brief forbids the photograph changing colour with the theme), with
+ * the module glyph chip over it.
+ * Bottom: a separate information band. This is the only part that tracks the
+ * theme — a navy plate on the dark theme, an ivory plate on the light one — so
+ * no fixed dark plate survives a theme switch while the artwork stays put.
+ * Text never sits over the photograph, which is why there is no full-cover
+ * scrim any more.
  */
 .oryx-tile {
   position: relative;
-  display: block;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   border-radius: 14px;
   border: 1px solid var(--border);
-  min-height: 142px;
+  background: var(--surface);
   text-decoration: none;
-  color: var(--on-media);
+  color: var(--tile-band-ink);
   isolation: isolate;
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
@@ -1268,75 +1269,98 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   box-shadow: var(--shadow-tile);
 }
 
+.oryx-tile:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
 .oryx-tile__media {
-  position: absolute;
-  inset: 0;
-  z-index: -2;
+  position: relative;
+  display: block;
+  height: 132px;
+  flex: none;
+  overflow: hidden;
+  background-color: var(--bg-deep);
   background-size: cover;
   background-position: center;
+  transition: transform 0.4s ease;
 }
 
-.oryx-tile__scrim {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--tile-overlay);
-}
-
-/*
- * The bottom information band. A separate layer rather than part of the scrim,
- * because only this band tracks the theme: the dark theme resolves
- * `--tile-band` to `none` and lets the full-cover scrim carry the card, while
- * the light theme paints an ivory fade here so the card bottom switches without
- * touching the artwork above it. It is a child of the tile (a block) rather than
- * of the flex body, so it never becomes a flex item.
- */
-.oryx-tile::after {
-  content: '';
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 62%;
-  z-index: -1;
-  background: var(--tile-band);
-  pointer-events: none;
-}
-
-.oryx-tile__body {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 5px;
-  min-height: 142px;
-  padding: 13px;
+.oryx-tile:hover .oryx-tile__media {
+  transform: scale(1.05);
 }
 
 .oryx-tile__icon {
+  position: absolute;
+  inset-inline-start: 12px;
+  inset-block-start: 12px;
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  margin-bottom: auto;
-  border-radius: 9px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
   background: var(--media-chip-bg);
   border: 1px solid var(--media-chip-border);
   color: var(--on-media-accent);
   backdrop-filter: blur(3px);
 }
 
+.oryx-tile__band {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  padding: 12px 14px 13px;
+  background: var(--tile-band);
+  border-block-start: 1px solid var(--tile-band-line);
+}
+
 .oryx-tile__title {
-  font-size: 16px;
+  font-size: 15.5px;
   font-weight: 700;
   letter-spacing: 0.01em;
   color: var(--tile-band-ink);
-  text-shadow: var(--tile-band-shadow);
 }
 
 .oryx-tile__desc {
   font-size: 12.5px;
   color: var(--tile-band-ink-muted);
   line-height: 1.5;
-  text-shadow: var(--tile-band-shadow-soft);
+  /* Keep every band the same height so the grid rows stay aligned. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.oryx-tile__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.oryx-tile__state {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tile-state-ink);
+  background: var(--tile-state-bg);
+  border: 1px solid var(--tile-state-border);
+}
+
+.oryx-tile__meta > svg {
+  color: var(--tile-band-ink-muted);
+}
+
+/* The forward chevron follows the reading direction. */
+[dir='rtl'] .oryx-tile__meta > svg {
+  transform: scaleX(-1);
 }
 
 .oryx-tile--planned .oryx-tile__media {
@@ -2694,4 +2718,11 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+/* Compact variant used inside dense panels (document category picker). */
+.oryx-input--sm {
+  padding-block: 4px;
+  padding-inline: 8px;
+  font-size: 12px;
 }
