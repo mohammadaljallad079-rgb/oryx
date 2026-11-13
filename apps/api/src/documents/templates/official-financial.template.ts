@@ -192,6 +192,12 @@ export function identityBand(issuer: DocumentIssuer): string {
       <div class="of-tag-ar">خبراء فحص المركبات</div>
       <div class="of-tag-en">VEHICLE INSPECTION EXPERTS</div>
     </div>
+    <div class="of-badge" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="11" fill="#0e4477"/>
+        <path d="M6.9 12.5 10.4 16 17.2 7.8" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
   </div>`;
 }
 
@@ -495,7 +501,7 @@ export const OFFICIAL_FINANCIAL_CSS = `
      printable area (842.25 - 5.7mm top - 14mm bottom ≈ 786pt) and the bottom
      strip is pinned to its end, so a short invoice still prints its signatures
      where the reference does. */
-  .of-page{ position:relative; min-height:796pt; box-sizing:border-box;
+  .of-page{ position:relative; min-height:746pt; box-sizing:border-box;
     display:flex; flex-direction:column; padding-bottom:0;
     /* The approved sheet sets its Latin labels and figures in a Latin face
        (Verdana/CodecPro) and its Arabic in an Arabic face. The base print CSS
@@ -505,12 +511,16 @@ export const OFFICIAL_FINANCIAL_CSS = `
     font-family:${DOCUMENT_LATIN_STACK}; }
   /* The reference watermark is the "AUTO SERVICES" wordmark set in the identity
      navy at ~52pt, centred on the page (measured y 374-426 on an 842pt sheet). */
-  .of-watermark{ position:absolute; left:0; right:0; top:44.2%;
+  .of-watermark{ position:absolute; left:0; right:0; top:46.8%;
     text-align:center; font-size:52pt; font-weight:700; letter-spacing:1px;
     color:#0a1f44; opacity:0.055; pointer-events:none; z-index:-1;
     font-family:Verdana,Arial,Helvetica,sans-serif; }
   .of-band{ display:flex; justify-content:space-between; align-items:center;
-    min-height:37pt; }
+    min-height:37pt; position:relative; }
+  /* The reference prints the same 22pt circled tick at the top-right of the
+     invoice header as on the report (measured x557-579, y29-51). */
+  .of-badge{ position:absolute; right:-8.6pt; top:13pt; line-height:0; }
+  .of-badge svg{ display:block; width:24pt; height:24pt; }
   .of-band-lead{ flex:0 0 auto; }
   .of-band-trail{ text-align:end; }
   .of-logo{ height:31.3pt; width:auto; }

@@ -25,7 +25,7 @@ import { PdfRendererService, OFFICIAL_PDF_MARGINS, REPORT_PDF_MARGINS } from './
 import { QrService } from './pdf/qr.service';
 import { renderInspectionReportHtml } from './templates/report-html';
 import { renderOfficialFinancialHtml } from './templates/official-financial.template';
-import { footerTemplate, officialFooterTemplate } from './templates/chrome';
+import { footerTemplate, officialFooterTemplate, reportFooterTemplate } from './templates/chrome';
 import { renderFinancialDocumentHtml } from './templates/financial-document.template';
 import type {
   DocumentIssuer,
@@ -255,7 +255,13 @@ export class DocumentsService {
     // layouts print the same contacts row; the report does not use the
     // document-number footer because its per-page identity is the job number in
     // the in-flow header.
-    const footerHtml = officialFooterTemplate(args.issuer);
+    // The report prints its own footer band (the ORYX lockups with the closing
+    // line) above the shared contact row; every other layout uses the financial
+    // footer as-is.
+    const footerHtml =
+      layout === 'official'
+        ? officialFooterTemplate(args.issuer)
+        : reportFooterTemplate(args.issuer);
     const { pdf, pageCount } = await this.renderer.render(html, {
       footerHtml,
       margins: layout === 'official' ? OFFICIAL_PDF_MARGINS : REPORT_PDF_MARGINS,

@@ -185,7 +185,7 @@ export const DEFAULT_PDF_MARGINS: PdfMargins = {
 export const OFFICIAL_PDF_MARGINS: PdfMargins = {
   top: '5.7mm',
   right: '8.6mm',
-  bottom: '10.5mm',
+  bottom: '28mm',
   left: '9.3mm',
 };
 
@@ -201,9 +201,9 @@ export const OFFICIAL_PDF_MARGINS: PdfMargins = {
  */
 export const REPORT_PDF_MARGINS: PdfMargins = {
   top: '5.6mm',
-  right: '12mm',
-  bottom: '11mm',
-  left: '12mm',
+  right: '5.6mm',
+  bottom: '34mm',
+  left: '5.6mm',
 };
 
 /**

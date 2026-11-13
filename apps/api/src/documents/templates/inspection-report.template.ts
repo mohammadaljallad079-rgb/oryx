@@ -120,7 +120,36 @@ function reportHeader(issuer: DocumentIssuer): string {
       <span class="rh-tag-ar">خبراء فحص المركبات</span>
       <span class="rh-tag-en">VEHICLE INSPECTION EXPERTS</span>
     </div>
+    ${qualityBadge()}
   </header>`;
+}
+
+/**
+ * The "quality assured" mark the approved sheet prints at the head of every page.
+ *
+ * Measured from the reference: a solid navy disc, 22pt across (identity blue
+ * rgb 14,68,119), holding a white tick. Drawn as one vector so it needs no font
+ * and scales cleanly.
+ */
+function qualityBadge(): string {
+  return (
+    '<svg class="rh-badge" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">' +
+    '<circle cx="12" cy="12" r="11" fill="#0e4477"/>' +
+    '<path d="M6.9 12.5 10.4 16 17.2 7.8" fill="none" stroke="#ffffff" stroke-width="2" ' +
+    'stroke-linecap="round" stroke-linejoin="round"/>' +
+    '</svg>'
+  );
+}
+
+/**
+ * The faint "AUTO SERVICES" wordmark the approved sheet lays behind the page.
+ *
+ * The reference sets the identity wordmark in the identity navy at ~52pt,
+ * centred on the sheet (measured y 374-426 of an 842pt page), at very low
+ * opacity so the printed data stays fully legible on top of it.
+ */
+export function reportWatermark(): string {
+  return '<div class="rp-watermark" aria-hidden="true">AUTO SERVICES</div>';
 }
 
 /** A legend chip with a vector mark and its bilingual label. */
@@ -633,12 +662,28 @@ function diagnosticSection(section: InspectionReportSection | undefined): string
 
 
 export const INSPECTION_REPORT_CSS = `
+  /* ---- page watermark ---- */
+  /* The approved sheet sets "AUTO SERVICES" in the identity navy at ~52pt,
+   * centred on the page, at very low opacity, behind everything. The financial
+   * sheet uses the same treatment, so the two documents read as one family. */
+  /* The band is a fixed, full-viewport layer so it repeats on every printed
+   * page at the same height (measured y 374-426 of an 842pt sheet) no matter
+   * how much content a page carries. */
+  .rp-watermark{ position:fixed; left:0; right:0; top:0; bottom:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:52pt; font-weight:700; letter-spacing:1px;
+    color:#0a1f44; opacity:0.055; pointer-events:none; z-index:-1;
+    font-family:Verdana,Arial,Helvetica,sans-serif;
+    transform:translateY(19pt); }
   /* ---- brand band ---- */
   /* The approved form prints the brand lockup on the visual left and the
    * "inspection experts" tagline on the visual right. The document is RTL, so
    * the band itself is forced LTR to keep that arrangement. */
   .report-head{ display:flex; direction:ltr; justify-content:space-between; align-items:center;
-    padding-bottom:4px; margin-bottom:2px; }
+    padding-bottom:4px; margin-bottom:2px; position:relative; }
+  /* The reference prints a 22pt circled tick at the top-right of every page
+   * header (measured x557-579, y29-51), the identity "quality assured" mark. */
+  .rh-badge{ position:absolute; right:0.3pt; top:12pt; width:24pt; height:24pt; }
   .rh-left{ display:flex; align-items:center; gap:9px; }
   /* The approved lockup prints the mark across x16-213pt (41.8pt tall). The
    * bundled logo is a full mark+wordmark lockup, so its printed height is set
@@ -650,7 +695,10 @@ export const INSPECTION_REPORT_CSS = `
   .rh-name{ display:flex; flex-direction:column; line-height:1.12; }
   .rh-name-ar{ font-size:14pt; font-weight:700; color:var(--navy); }
   .rh-name-en{ font-size:8.5pt; font-weight:700; color:var(--muted); letter-spacing:.6px; text-transform:uppercase; }
-  .rh-right{ display:flex; flex-direction:column; align-items:flex-end; line-height:1.2; text-align:right; }
+  /* The tagline sits to the left of the badge, which is anchored to the paper's
+   * right edge, so the tagline is inset to clear the disc. */
+  .rh-right{ display:flex; flex-direction:column; align-items:flex-end; line-height:1.2;
+    text-align:right; padding-inline-end:28pt; }
   .rh-tag-ar{ font-size:11.8pt; font-weight:700; color:var(--navy); }
   .rh-tag-en{ font-size:7.9pt; font-weight:700; color:var(--gold); letter-spacing:.6px; }
   /* ---- shared page furniture ---- */

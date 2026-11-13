@@ -47,12 +47,12 @@ describe('document print CSS font stacks', () => {
  * so the two constants must stay distinct.
  */
 describe('document page margins', () => {
-  it('lifts the report top edge without narrowing its sides', () => {
+  it('prints the report to the measured reference edges', () => {
     expect(REPORT_PDF_MARGINS.top).not.toBe(OFFICIAL_PDF_MARGINS.top);
     expect(REPORT_PDF_MARGINS.left).toBe(REPORT_PDF_MARGINS.right);
-    // The photograph's bleed cancels the side inset, so the sides must remain the
-    // default the bleed was measured against.
-    expect(REPORT_PDF_MARGINS.left).toBe('12mm');
+    // The reference prints its header and body from x≈16 to x≈579 on a 595.5pt
+    // sheet, so the sides are ~5.6mm, matching the bleed the cover band cancels.
+    expect(REPORT_PDF_MARGINS.left).toBe('5.6mm');
   });
 
   it('keeps the official invoice margins on all four edges', () => {
