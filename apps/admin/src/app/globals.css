@@ -66,6 +66,7 @@
   --text-inverse: #00121f;
   --navy: #00162b;
   --gold: #d4af37;
+  --gold-hover: #e8c766;
   --gold-soft: #e8c766;
   --gold-deep: #a9861f;
   /*
@@ -147,6 +148,18 @@
   --on-media-shadow-soft: rgba(0, 0, 0, 0.75);
   --media-chip-bg: rgba(0, 15, 30, 0.55);
   --media-chip-border: rgba(212, 175, 55, 0.5);
+  /*
+   * The information band along the bottom of a module tile. Unlike the artwork
+   * above it, this band tracks the theme: the dark theme leaves the full-cover
+   * scrim to do the work (`none` here), while the light block paints an ivory
+   * fade with dark ink so no fixed navy plate survives a theme switch. The
+   * artwork itself is untouched in both themes.
+   */
+  --tile-band: none;
+  --tile-band-ink: var(--on-media);
+  --tile-band-ink-muted: var(--on-media-muted);
+  --tile-band-shadow: 0 1px 12px var(--on-media-shadow);
+  --tile-band-shadow-soft: 0 1px 10px var(--on-media-shadow-soft);
   /*
    * The dashboard banner field. A navy gradient with a warm gold bloom, so the
    * centred white/gold lockup sits on a deep ground in the dark theme and on a
@@ -303,6 +316,14 @@
   --on-media-shadow-soft: rgba(0, 0, 0, 0.75);
   --media-chip-bg: rgba(0, 15, 30, 0.55);
   --media-chip-border: rgba(212, 175, 55, 0.5);
+  /* The module-tile information band in the light theme: an ivory fade with
+   * dark ink, so the card bottom switches with the theme while the artwork above
+   * it stays put. The scrim stops at 94%, so the photograph still reads. */
+  --tile-band: linear-gradient(180deg, transparent 0%, rgba(247, 244, 237, 0.94) 60%);
+  --tile-band-ink: #1a1712;
+  --tile-band-ink-muted: #4a443a;
+  --tile-band-shadow: none;
+  --tile-band-shadow-soft: none;
   /* The dashboard banner is a navy panel in the light theme too: the ORYX
    * lockup's on-light colourway is navy/gold ink, which needs the darker
    * "on-dark" colourway here, exactly as the sidebar does. The field is
@@ -1262,6 +1283,24 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   background: var(--tile-overlay);
 }
 
+/*
+ * The bottom information band. A separate layer rather than part of the scrim,
+ * because only this band tracks the theme: the dark theme resolves
+ * `--tile-band` to `none` and lets the full-cover scrim carry the card, while
+ * the light theme paints an ivory fade here so the card bottom switches without
+ * touching the artwork above it. It is a child of the tile (a block) rather than
+ * of the flex body, so it never becomes a flex item.
+ */
+.oryx-tile::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 62%;
+  z-index: -1;
+  background: var(--tile-band);
+  pointer-events: none;
+}
+
 .oryx-tile__body {
   position: relative;
   display: flex;
@@ -1289,14 +1328,15 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.01em;
-  text-shadow: 0 1px 12px var(--on-media-shadow);
+  color: var(--tile-band-ink);
+  text-shadow: var(--tile-band-shadow);
 }
 
 .oryx-tile__desc {
   font-size: 12.5px;
-  color: var(--on-media-muted);
+  color: var(--tile-band-ink-muted);
   line-height: 1.5;
-  text-shadow: 0 1px 10px var(--on-media-shadow-soft);
+  text-shadow: var(--tile-band-shadow-soft);
 }
 
 .oryx-tile--planned .oryx-tile__media {
