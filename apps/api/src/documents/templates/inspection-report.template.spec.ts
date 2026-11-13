@@ -414,4 +414,36 @@ describe('inspection report template — reference page parity (Execution 19)', 
     expect(html).toMatch(/\.terms-banner\{ display:flex; direction:ltr;[^}]*background:#0f2b48; color:#fff;/);
     expect(html).toContain('Terms, Conditions &amp; Liability Disclaimer');
   });
+
+  it('does not print a verification QR inside the report body', () => {
+    const computerSection: InspectionReportSection = {
+      area: 'COMPUTER_UNIT',
+      labelEn: 'Computer Unit',
+      labelAr: 'وحدة الكمبيوتر',
+      kind: 'DIAGNOSTICS',
+      remarks: null,
+      remarksLabelEn: 'Remarks',
+      remarksLabelAr: 'ملاحظات',
+      noFindings: false,
+      items: [],
+      markers: [],
+      chassisRegions: [],
+      diagnostics: [],
+      attachments: [],
+    };
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload: { ...payload, selectedAreas: [...payload.selectedAreas, 'COMPUTER_UNIT'], sections: [...payload.sections, computerSection] },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: { url: 'https://oryxbhr.com/verify/tok-1', token: 'tok-1', qrDataUri: 'data:image/png;base64,QRQR' },
+      baseCss: '',
+    });
+    // The approved sheet carries the verification QR only in the running footer,
+    // never as a block inside the page body.
+    expect(html).not.toContain('p5-verify');
+    expect(html).not.toContain('class="verify"');
+    expect(html).not.toContain('data:image/png;base64,QRQR');
+  });
 });

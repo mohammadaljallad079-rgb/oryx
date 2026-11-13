@@ -8,11 +8,7 @@ import {
   COVER_ILLUSTRATION_DATA_URI,
   INTERIOR_DIAGRAM_DATA_URI,
 } from './inspection-artwork.assets';
-import {
-  signatureBlock,
-  verificationBlock,
-  type DocumentChrome,
-} from './chrome';
+import { signatureBlock, type DocumentChrome } from './chrome';
 import { docStamp, esc, escMultiline, grouped, orDash } from './html.util';
 import { oryxLogoMark } from './oryx-logo.asset';
 import type {
@@ -472,7 +468,6 @@ export function computerSectionPage(
     ${pageTitleBar('فحص وحدة الكمبيوتر', 'COMPUTER UNIT INSPECTION', 8.7)}
     ${jobStrip(input.payload)}
     ${diagnosticSection(section)}
-    ${input.verification ? `<div class="p5-verify">${verificationBlock(input.verification)}</div>` : ''}
   </section>`;
 }
 
@@ -947,14 +942,4 @@ export const INSPECTION_REPORT_CSS = `
   .sev-low{ background:#ecfdf5; color:var(--ok); }
   .sev-medium{ background:#fffbeb; color:var(--warn); }
   .sev-high,.sev-critical{ background:#fef2f2; color:var(--bad); }
-  .p5-verify{ margin-top:14px; }
-  .p5-verify .verify{ flex-direction:column; align-items:stretch; }
-  .p5-verify .verify-qr{ display:flex; justify-content:center; }
-  .p5-verify .verify-qr img{ width:120px; height:120px; }
-  /* The reference anchors the verification band at the foot of the computer-unit
-   * sheet (measured y755-807), well below the fault table. The page is a
-   * flex column so the band can be pushed to the bottom without guessing the
-   * table's height. */
-  .p5-page{ display:flex; flex-direction:column; min-height:965px; }
-  .p5-page .p5-verify{ margin-top:auto; }
 `;
