@@ -448,6 +448,7 @@ function JournalsTab({ canPost }: { canPost: boolean }) {
       <PostJournalModal
         open={postOpen}
         accounts={accounts.data?.items ?? []}
+        onAccountCreated={accounts.reload}
         onClose={() => setPostOpen(false)}
         onPosted={list.reload}
       />
@@ -532,11 +533,13 @@ function ReverseJournalModal({
 function PostJournalModal({
   open,
   accounts,
+  onAccountCreated,
   onClose,
   onPosted,
 }: {
   open: boolean;
   accounts: ErpAccountDto[];
+  onAccountCreated: () => Promise<void> | void;
   onClose: () => void;
   onPosted: () => Promise<void>;
 }) {
@@ -603,25 +606,30 @@ function PostJournalModal({
       <div className="mt-4 flex flex-col gap-2">
         {lines.map((line, i) => (
           <div key={i} className="grid grid-cols-12 gap-2">
-            <select
-              className="oryx-select col-span-5"
-              value={line.accountId}
-              onChange={(e) => {
-                const next = [...lines];
-                next[i] = { ...next[i], accountId: e.target.value };
-                setLines(next);
-              }}
-              data-testid={`journal-line-account-${i}`}
-            >
-              <option value="">{t('erp.accounting.selectAccount')}</option>
-              {accounts
-                .filter((a) => a.isPostable)
-                .map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.code} — {a.nameEn}
-                  </option>
-                ))}
-            </select>
+            <div className="col-span-5">
+              <EntityPicker
+                value={line.accountId || null}
+                options={accounts.filter((a) => a.isPostable).map((a) => ({ value: a.id, label: `${a.code} — ${a.nameEn}` }))}
+                onChange={(v) => {
+                  const next = [...lines];
+                  next[i] = { ...next[i], accountId: v ?? '' };
+                  setLines(next);
+                }}
+                placeholder={t('erp.accounting.selectAccount')}
+                testId={`journal-line-account-${i}`}
+                createLabel={t('erp.accounting.newAccount')}
+                reloadOptions={onAccountCreated}
+                renderCreate={({ onClose: closeCreate, onSaved }) => (
+                  <AccountModal
+                    open
+                    parentAccounts={accounts}
+                    onClose={closeCreate}
+                    onCreated={() => { /* selection is handled by onSaved */ }}
+                    onSaved={(saved) => void onSaved(saved.id)}
+                  />
+                )}
+              />
+            </div>
             <input
               className="oryx-input col-span-3"
               placeholder={t('erp.accounting.debit')}
