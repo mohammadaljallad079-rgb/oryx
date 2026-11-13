@@ -11,6 +11,9 @@ import { DocumentActions } from '@/components/document-actions';
 import { AttachmentsPanel, DocumentPrintActions } from '@/components/document-print';
 import { ModuleDashboard } from '@/components/module-dashboard';
 import { TabDeepLink } from '@/components/tab-deep-link';
+import { EntityPicker } from '@/components/inline-create';
+import { AccountModal, SupplierModal } from '@/components/entity-modals';
+import { CustomerModal } from '@/components/customer-modal';
 import {
   Badge,
   Button,
@@ -199,6 +202,7 @@ function AccountsTab({ canManage }: { canManage: boolean }) {
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const list = useAsync(() => api.accountingAccounts({ search: search || undefined }), [search]);
+  const allAccounts = useAsync(() => api.accountingAccounts({}), []);
 
   const setStatus = async (row: ErpAccountDto, next: boolean) => {
     await api.updateAccount(row.id, { isActive: next });
@@ -324,191 +328,14 @@ function AccountsTab({ canManage }: { canManage: boolean }) {
       <AccountModal
         open={open}
         account={editing}
+        parentAccounts={allAccounts.data?.items ?? []}
         onClose={() => { setOpen(false); setEditing(null); }}
-        onSaved={list.reload}
+        onCreated={list.reload}
       />
     </Card>
   );
 }
 
-function AccountModal({
-  open,
-  account,
-  onClose,
-  onSaved,
-}: {
-  open: boolean;
-  account: ErpAccountDto | null;
-  onClose: () => void;
-  onSaved: () => Promise<void>;
-}) {
-  const { t, locale } = useUi();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    code: '',
-    nameEn: '',
-    nameAr: '',
-    type: 'ASSET',
-    normalBalance: 'DEBIT',
-    parentId: '',
-  });
-
-  const allAccounts = useAsync(() => api.accountingAccounts({}), [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    setError(null);
-    setForm({
-      code: account?.code ?? '',
-      nameEn: account?.nameEn ?? '',
-      nameAr: account?.nameAr ?? '',
-      type: account?.type ?? 'ASSET',
-      normalBalance: account?.normalBalance ?? 'DEBIT',
-      parentId: account?.parentId ?? '',
-    });
-  }, [open, account]);
-
-  // The parent choices exclude the account itself and anything beneath it, so
-  // the dropdown can never offer a move that would create a cycle.
-  const descendants = new Set<string>();
-  if (account && allAccounts.data) {
-    const byParent = new Map<string | null, ErpAccountDto[]>();
-    for (const a of allAccounts.data.items) {
-      const key = a.parentId ?? null;
-      byParent.set(key, [...(byParent.get(key) ?? []), a]);
-    }
-    const walk = (id: string) => {
-      for (const child of byParent.get(id) ?? []) {
-        if (descendants.has(child.id)) continue;
-        descendants.add(child.id);
-        walk(child.id);
-      }
-    };
-    walk(account.id);
-  }
-  const parentOptions = (allAccounts.data?.items ?? []).filter((a) => a.id !== account?.id && !descendants.has(a.id));
-
-  // A new account is numbered automatically: whenever the type changes, ask the
-  // API for the next free code in that type's block. The field stays editable,
-  // so an operator may still type their own code.
-  useEffect(() => {
-    if (!open || account) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { code } = await api.nextAccountCode({ type: form.type });
-        if (!cancelled) setForm((f) => ({ ...f, code }));
-      } catch {
-        /* leave the field for manual entry if the suggestion fails */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [open, account, form.type]);
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      if (account) {
-        await api.updateAccount(account.id, {
-          nameEn: form.nameEn,
-          nameAr: form.nameAr,
-          parentId: form.parentId || null,
-          type: form.type,
-          normalBalance: form.normalBalance,
-        });
-      } else {
-        await api.createAccount({
-          code: form.code,
-          nameEn: form.nameEn,
-          nameAr: form.nameAr,
-          type: form.type,
-          normalBalance: form.normalBalance,
-          parentId: form.parentId || undefined,
-        });
-      }
-      await onSaved();
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      title={account ? t('erp.accounting.editAccount') : t('erp.accounting.newAccount')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            variant="primary"
-            disabled={busy || !form.nameEn || !form.nameAr || (!account && !form.code)}
-            onClick={submit}
-            data-testid="save-account"
-          >
-            {busy ? t('common.loading') : t('common.save')}
-          </Button>
-        </>
-      }
-    >
-      {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} disabled={Boolean(account)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="account-code" />
-        </Field>
-        <Field label={t('erp.accounting.type')} required>
-          <select
-            className="oryx-select"
-            value={form.type}
-            onChange={(e) => {
-              const type = e.target.value;
-              // Follow the conventional balance so the operator rarely has to
-              // change it: assets and expenses are debit, the rest credit.
-              const normalBalance = type === 'ASSET' || type === 'EXPENSE' ? 'DEBIT' : 'CREDIT';
-              setForm({ ...form, type, normalBalance });
-            }}
-            data-testid="account-type"
-          >
-            {(['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'] as const).map((x) => (
-              <option key={x} value={x}>
-                {t(`erp.accounting.typeValue.${x}`)}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label={t('erp.accounting.parentAccount')}>
-          <select className="oryx-select" value={form.parentId} onChange={(e) => setForm({ ...form, parentId: e.target.value })} data-testid="account-parent">
-            <option value="">{t('erp.accounting.noParent')}</option>
-            {parentOptions.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.code} — {locale === 'ar' ? a.nameAr : a.nameEn}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label={`${t('common.name')} (EN)`} required>
-          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="account-name-en" />
-        </Field>
-        <Field label={`${t('common.name')} (AR)`} required>
-          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="account-name-ar" />
-        </Field>
-        <Field label={t('erp.accounting.normalBalance')}>
-          <select className="oryx-select" value={form.normalBalance} onChange={(e) => setForm({ ...form, normalBalance: e.target.value })} data-testid="account-normal-balance">
-            <option value="DEBIT">{t('erp.accounting.debit')}</option>
-            <option value="CREDIT">{t('erp.accounting.credit')}</option>
-          </select>
-        </Field>
-      </div>
-    </Modal>
-  );
-}
 
 // ------------------------------------------------------------------ journals
 
@@ -1008,6 +835,8 @@ function PaymentsTab({ canPay }: { canPay: boolean }) {
         open={open}
         customers={customers.data?.items ?? []}
         suppliers={suppliers.data?.items ?? []}
+        onCustomerCreated={customers.reload}
+        onSupplierCreated={suppliers.reload}
         onClose={() => setOpen(false)}
         onCreated={async () => {
           await list.reload();
@@ -1021,12 +850,16 @@ function PaymentModal({
   open,
   customers,
   suppliers,
+  onCustomerCreated,
+  onSupplierCreated,
   onClose,
   onCreated,
 }: {
   open: boolean;
   customers: CustomerDto[];
   suppliers: SupplierDto[];
+  onCustomerCreated?: () => Promise<void> | void;
+  onSupplierCreated?: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
@@ -1168,23 +1001,43 @@ function PaymentModal({
         </Field>
         <Field label={direction === 'RECEIPT' ? t('erp.sales.customer') : t('erp.purchasing.supplier')} required>
           {direction === 'RECEIPT' ? (
-            <select className="oryx-select" value={customerId} onChange={(e) => setCustomerId(e.target.value)} data-testid="payment-customer">
-              <option value="">—</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.code} — {c.nameEn}
-                </option>
-              ))}
-            </select>
+            <EntityPicker
+              value={customerId || null}
+              options={customers.map((c) => ({ value: c.id, label: `${c.code} — ${c.nameEn}`, hint: c.phone ?? undefined }))}
+              onChange={(v) => setCustomerId(v ?? '')}
+              placeholder={t('common.select')}
+              testId="payment-customer"
+              createLabel={t('erp.sales.newCustomer')}
+              reloadOptions={onCustomerCreated}
+              renderCreate={({ onClose: closeCreate, onSaved }) => (
+                <CustomerModal
+                  open
+                  customer={null}
+                  onClose={closeCreate}
+                  onCreated={() => { /* selection is handled by onSaved */ }}
+                  onSaved={(saved) => void onSaved(saved.id)}
+                />
+              )}
+            />
           ) : (
-            <select className="oryx-select" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} data-testid="payment-supplier">
-              <option value="">—</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.code} — {s.nameEn}
-                </option>
-              ))}
-            </select>
+            <EntityPicker
+              value={supplierId || null}
+              options={suppliers.map((sp) => ({ value: sp.id, label: `${sp.code} — ${sp.nameEn}`, hint: sp.phone ?? undefined }))}
+              onChange={(v) => setSupplierId(v ?? '')}
+              placeholder={t('common.select')}
+              testId="payment-supplier"
+              createLabel={t('erp.purchasing.newSupplier')}
+              reloadOptions={onSupplierCreated}
+              renderCreate={({ onClose: closeCreate, onSaved }) => (
+                <SupplierModal
+                  open
+                  supplier={null}
+                  onClose={closeCreate}
+                  onCreated={() => { /* selection is handled by onSaved */ }}
+                  onSaved={(saved) => void onSaved(saved.id)}
+                />
+              )}
+            />
           )}
         </Field>
         <Field label={t('erp.accounting.method')} required>

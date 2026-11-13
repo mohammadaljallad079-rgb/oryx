@@ -585,11 +585,13 @@ export function EmployeeModal({
 
 export function LeadModal({
   open,
+  lead,
   onClose,
   onCreated,
   onSaved,
 }: {
   open: boolean;
+  lead?: LeadDto | null;
   onClose: () => void;
   onCreated: () => Promise<void> | void;
   onSaved?: (saved: LeadDto) => void;
@@ -602,15 +604,23 @@ export function LeadModal({
   useEffect(() => {
     if (!open) return;
     setError(null);
-    setForm({ code: '', nameEn: '', nameAr: '', contactName: '', email: '', phone: '', estimatedValue: '0.00', notes: '' });
-  }, [open]);
+    setForm({
+      code: lead?.code ?? '',
+      nameEn: lead?.nameEn ?? '',
+      nameAr: lead?.nameAr ?? '',
+      contactName: lead?.contactName ?? '',
+      email: lead?.email ?? '',
+      phone: lead?.phone ?? '',
+      estimatedValue: lead ? String(lead.estimatedValueMinor / 100) : '0.00',
+      notes: '',
+    });
+  }, [open, lead]);
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      const saved = await api.createLead({
-        code: form.code,
+      const body = {
         nameEn: form.nameEn,
         nameAr: form.nameAr,
         contactName: form.contactName || undefined,
@@ -618,7 +628,8 @@ export function LeadModal({
         phone: form.phone || undefined,
         estimatedValueMinor: toMinorInput(form.estimatedValue),
         notes: form.notes || undefined,
-      });
+      };
+      const saved = lead ? await api.updateLead(lead.id, body) : await api.createLead({ ...body, code: form.code });
       await onCreated();
       onSaved?.(saved);
       onClose();
@@ -632,12 +643,12 @@ export function LeadModal({
   return (
     <Modal
       open={open}
-      title={t('erp.crm.newLead')}
+      title={lead ? t('erp.crm.editLead') : t('erp.crm.newLead')}
       onClose={onClose}
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy || !form.nameEn || !form.nameAr || !form.code} onClick={submit} data-testid="save-lead">
+          <Button variant="primary" disabled={busy || !form.nameEn || !form.nameAr || (!lead && !form.code)} onClick={submit} data-testid="save-lead">
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </>
@@ -646,7 +657,7 @@ export function LeadModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="lead-code" />
+          <input className="oryx-input" value={form.code} disabled={Boolean(lead)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="lead-code" />
         </Field>
         <Field label={t('erp.crm.contact')}>
           <input className="oryx-input" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} data-testid="lead-contact" />
@@ -676,12 +687,14 @@ export function LeadModal({
 
 export function AccountModal({
   open,
+  account,
   parentAccounts,
   onClose,
   onCreated,
   onSaved,
 }: {
   open: boolean;
+  account?: ErpAccountDto | null;
   parentAccounts: ErpAccountDto[];
   onClose: () => void;
   onCreated: () => Promise<void> | void;
@@ -697,14 +710,21 @@ export function AccountModal({
   useEffect(() => {
     if (!open) return;
     setError(null);
-    setForm({ code: '', nameEn: '', nameAr: '', type: 'ASSET', normalBalance: 'DEBIT', parentId: '' });
-  }, [open]);
+    setForm({
+      code: account?.code ?? '',
+      nameEn: account?.nameEn ?? '',
+      nameAr: account?.nameAr ?? '',
+      type: account?.type ?? 'ASSET',
+      normalBalance: account?.normalBalance ?? 'DEBIT',
+      parentId: account?.parentId ?? '',
+    });
+  }, [open, account]);
 
   // A new account is numbered automatically: whenever the type changes, ask the
   // API for the next free code in that type's block. The field stays editable,
   // so an operator may still type their own code.
   useEffect(() => {
-    if (!open) return;
+    if (!open || account) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -717,20 +737,28 @@ export function AccountModal({
     return () => {
       cancelled = true;
     };
-  }, [open, form.type]);
+  }, [open, account, form.type]);
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      const saved = await api.createAccount({
-        code: form.code,
-        nameEn: form.nameEn,
-        nameAr: form.nameAr,
-        type: form.type,
-        normalBalance: form.normalBalance,
-        parentId: form.parentId || undefined,
-      });
+      const saved = account
+        ? await api.updateAccount(account.id, {
+            nameEn: form.nameEn,
+            nameAr: form.nameAr,
+            parentId: form.parentId || null,
+            type: form.type,
+            normalBalance: form.normalBalance,
+          })
+        : await api.createAccount({
+            code: form.code,
+            nameEn: form.nameEn,
+            nameAr: form.nameAr,
+            type: form.type,
+            normalBalance: form.normalBalance,
+            parentId: form.parentId || undefined,
+          });
       await onCreated();
       onSaved?.(saved);
       onClose();
@@ -744,14 +772,14 @@ export function AccountModal({
   return (
     <Modal
       open={open}
-      title={t('erp.accounting.newAccount')}
+      title={account ? t('erp.accounting.editAccount') : t('erp.accounting.newAccount')}
       onClose={onClose}
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
-            disabled={busy || !form.nameEn || !form.nameAr || !form.code}
+            disabled={busy || !form.nameEn || !form.nameAr || (!account && !form.code)}
             onClick={submit}
             data-testid="save-account"
           >
@@ -763,7 +791,7 @@ export function AccountModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="account-code" />
+          <input className="oryx-input" value={form.code} disabled={Boolean(account)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="account-code" />
         </Field>
         <Field label={t('erp.accounting.type')} required>
           <select
