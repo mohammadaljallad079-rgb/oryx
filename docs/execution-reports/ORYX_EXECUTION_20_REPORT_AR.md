@@ -23,7 +23,25 @@
 
 ---
 
-## ثانياً: ما أُنجز بالتفصيل
+## ثانياً: روابط المعاينة
+
+| الغرض | الرابط |
+| --- | --- |
+| لوحة الإدارة (معاينة مباشرة) | https://work-1-gypyysqmmdjouhyu.prod-runtime.all-hands.dev/login |
+| موقع العملاء (معاينة مباشرة) | https://work-2-gypyysqmmdjouhyu.prod-runtime.all-hands.dev/ |
+| صفحة الأدلة (قبل/بعد، عربي/إنجليزي، داكن/فاتح) | https://work-1-gypyysqmmdjouhyu.prod-runtime.all-hands.dev/evidence/exec20-review/ |
+| إصلاح الاستجابة — عرض 320px | https://work-1-gypyysqmmdjouhyu.prod-runtime.all-hands.dev/evidence/exec20-review/responsive/dashboard-320-en-dark.png |
+| لوحة المعلومات — عربي داكن (بعد) | https://work-1-gypyysqmmdjouhyu.prod-runtime.all-hands.dev/evidence/exec20-review/after/ar/dashboard-dark.png |
+| كتالوج الوحدات — إنجليزي فاتح (بعد) | https://work-1-gypyysqmmdjouhyu.prod-runtime.all-hands.dev/evidence/exec20-review/after/en/modules-light.png |
+| إعدادات الخطوط — إنجليزي فاتح (بعد) | https://work-1-gypyysqmmdjouhyu.prod-runtime.all-hands.dev/evidence/exec20-review/after/en/settings-typography-light.png |
+
+> المعاينة الحيّة تعمل من هذه الشجرة (`/workspace/project/oryx-unified`) على المنافذ
+> 3000 (الإدارة) و3002 (العملاء) و12000/12001 (الوكيل). موقع الجوال (منفذ 8081)
+> غير مبني في هذه الشجرة وهو خارج نطاق التنفيذ 20.
+
+---
+
+## ثالثاً: ما أُنجز بالتفصيل
 
 ### 1. إعدادات مستقلة لكل شركة (Multi-tenant settings)
 
@@ -71,7 +89,7 @@
 
 ---
 
-## ثالثاً: الملفات المعدّلة (أبرزها)
+## رابعاً: الملفات المعدّلة (أبرزها)
 
 | الملف | التغيير |
 | --- | --- |
@@ -92,7 +110,7 @@
 
 ---
 
-## رابعاً: تغييرات قاعدة البيانات
+## خامساً: تغييرات قاعدة البيانات
 
 Migration: `20261113160000_execution20_module_tile_image`
 
@@ -107,7 +125,7 @@ ALTER TABLE "Module" ADD COLUMN "isActive" BOOLEAN NOT NULL DEFAULT true;
 
 ---
 
-## خامساً: API الجديدة أو المعدّلة
+## سادساً: API الجديدة أو المعدّلة
 
 | الطريقة | المسار | الوصف |
 | --- | --- | --- |
@@ -120,7 +138,7 @@ ALTER TABLE "Module" ADD COLUMN "isActive" BOOLEAN NOT NULL DEFAULT true;
 
 ---
 
-## سادساً: نتائج الاختبارات
+## سابعاً: نتائج الاختبارات
 
 | الحزمة | النتيجة |
 | --- | --- |
@@ -141,7 +159,7 @@ ALTER TABLE "Module" ADD COLUMN "isActive" BOOLEAN NOT NULL DEFAULT true;
 
 ---
 
-## سابعاً: الوظائف المكتملة والمتبقية
+## ثامناً: الوظائف المكتملة والمتبقية
 
 **مكتمل:** الإعدادات لكل شركة، قسم الخطوط، إدارة المرفقات الموحّدة، أنواع
 العملاء، لوحات الوحدات، فهرس الوحدات القابل للتعديل، الثيمات (Dark/Light)،
@@ -153,7 +171,7 @@ ALTER TABLE "Module" ADD COLUMN "isActive" BOOLEAN NOT NULL DEFAULT true;
 
 ---
 
-## ثامناً: ملاحظات السلامة
+## تاسعاً: ملاحظات السلامة
 
 - لم يُدمج الفرع ولم يُنشر إلى الإنتاج (بانتظار موافقة صريحة).
 - ملف `.env.bak` يحمل مفاتيح سرية (DATABASE_URL/JWT/MFA) وهو **غير مُدرَج** في
