@@ -686,7 +686,7 @@ export const INSPECTION_REPORT_CSS = `
    * bundled logo is a full mark+wordmark lockup, so its printed height is set
    * to the reference mark's height rather than the previous 38px, which left it
    * noticeably smaller than the approved header. */
-  .rh-logo{ height:56px; width:auto; }
+  .rh-logo{ height:44.5pt; width:auto; }
   /* The official logotype lockup: the vector mark beside the three-line Arabic
      wordmark and the Latin AUTO SERVICES line, as the approved header prints it. */
   .rh-lockup{ display:flex; align-items:center; gap:6px; }
@@ -709,9 +709,9 @@ export const INSPECTION_REPORT_CSS = `
   /* The approved section title prints at 10pt navy over an 8.7pt navy strapline,
    * both centred, with the strap in small caps. Measured from the reference
    * (y78 ar / y90 en on the section sheets). */
-  .p-title{ display:flex; flex-direction:column; align-items:center; margin:0 0 3px; }
-  .p-title-ar{ font-size:10pt; font-weight:700; color:var(--navy); line-height:1.15; }
-  .p-title-en{ font-size:10pt; font-weight:700; color:var(--navy); letter-spacing:.2px; }
+  .p-title{ display:flex; flex-direction:column; align-items:center; margin:15.9pt 0 3px; }
+  .p-title-ar{ font-size:10.3pt; font-weight:700; color:var(--navy); line-height:1.15; }
+  .p-title-en{ font-size:10.3pt; font-weight:700; color:var(--navy); letter-spacing:.2px; line-height:1.0; }
   .job-head{ display:flex; direction:ltr; justify-content:space-between; align-items:baseline;
     font-size:8pt; font-weight:700; color:var(--navy); padding:0 2px 2px; }
   /* The vehicle strip: four cells over a light rule, labels in slate at 6.8pt and
@@ -851,7 +851,7 @@ export const INSPECTION_REPORT_CSS = `
    * the reference: the car occupies 321x439pt, which is 428px at Chromium's
    * 96dpi/72pt ratio. */
   .diagram{ position:relative; width:230px; }
-  .diagram--art{ width:500px; margin:0 auto; }
+  .diagram--art{ width:446px; margin:0 auto; }
   .artplan{ width:100%; height:auto; display:block; }
   .marker{ position:absolute; width:14px; height:14px; border-radius:50%; transform:translate(-50%,-50%);
     display:flex; align-items:center; justify-content:center; font-size:8pt; font-weight:700; color:#fff;
@@ -882,7 +882,7 @@ export const INSPECTION_REPORT_CSS = `
   /* The reference draws the chassis at ~270x374pt, i.e. 360px wide at
    * Chromium's 96dpi/72pt ratio, with the side cards narrower than the
    * drawing. */
-  .ch-art{ position:relative; width:440px; flex:0 0 440px; }
+  .ch-art{ position:relative; width:352px; flex:0 0 352px; }
   .artchassis{ width:100%; height:auto; display:block; }
   .chmark{ position:absolute; width:15px; height:15px; border-radius:50%; transform:translate(-50%,-50%);
     display:flex; align-items:center; justify-content:center; font-size:8pt; font-weight:700; color:#fff;

@@ -177,16 +177,17 @@ export const DEFAULT_PDF_MARGINS: PdfMargins = {
 /**
  * Margins for the official financial layout.
  *
- * Measured from the approved printed invoice: the content starts close to the
- * top edge (the identity band sits ~4mm down) and the footer sits in the bottom
- * margin. Wider than the default so the printed table lines up with the
- * reference document.
+ * Measured from the approved printed invoice: the margin is measured to the
+ * identity band, not the priced table. The reference prints the logotype at
+ * x16.5 and the quality badge at x579.5, so the page inset is 5.8mm / 5.6mm and
+ * the table columns are recovered by the `.of-body` inset in the layout. The
+ * footer sits in the bottom margin.
  */
 export const OFFICIAL_PDF_MARGINS: PdfMargins = {
   top: '5.7mm',
-  right: '8.6mm',
+  right: '5.6mm',
   bottom: '28mm',
-  left: '9.3mm',
+  left: '5.8mm',
 };
 
 /**

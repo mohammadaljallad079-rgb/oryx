@@ -419,6 +419,7 @@ ${OFFICIAL_FINANCIAL_CSS}
 <section class="of-page">
   <div class="of-watermark" aria-hidden="true">AUTO SERVICES</div>
   ${identityBand(input.issuer)}
+  <div class="of-body">
   ${titleBlock(payload)}
   ${trnStrip(input.issuer)}
   ${infoPanel(numbered, counterpartyName, dateLabel)}
@@ -432,11 +433,14 @@ ${OFFICIAL_FINANCIAL_CSS}
       : ''
   }
   ${verificationStrip(input.verification)}
+  </div>
   <div class="of-bottom">
+    <div class="of-body">
     ${signatureStrip()}
     <div class="of-thanks">
       <div class="of-thanks-ar">شكراً لثقتكم بنا.</div>
       <div class="of-thanks-en">Thank you for your trust.</div>
+    </div>
     </div>
   </div>
 </section>
@@ -482,13 +486,21 @@ export const OFFICIAL_FINANCIAL_CSS = `
      strip is pinned to its end, so a short invoice still prints its signatures
      where the reference does. */
   .of-page{ position:relative; min-height:746pt; box-sizing:border-box;
-    display:flex; flex-direction:column; padding-bottom:0;
+    display:flex; flex-direction:column; padding:0;
     /* The approved sheet sets its Latin labels and figures in a Latin face
        (Verdana/CodecPro) and its Arabic in an Arabic face. The base print CSS
        is Arabic-first, which would set every Latin word in the wide Naskh face
        and widen the labels; the official sheet therefore leads with the Latin
        stack and falls back to the Arabic face for the Arabic runs. */
     font-family:${DOCUMENT_LATIN_STACK}; }
+  /* The reference prints the identity band wider than the priced content: the
+     logotype starts 9.9pt left of the table's left edge and the quality badge
+     ends 8.1pt right of it. The page margin is therefore measured to the band
+     (5.7mm / 5.6mm, matching the reference band edges) and the priced body is
+     inset back to the table's own 26.5pt / 571.5pt columns. A negative margin
+     on the band cannot be used: Chromium clips a child that overhangs the page
+     content box and the band loses its outer edge. */
+  .of-body{ padding-inline:10pt 8pt; flex:1 1 auto; }
   /* The reference watermark is the "AUTO SERVICES" wordmark set in the brand
      display face (Codec Pro Bold) at 51.75pt with a 6.9pt tracking, so the run
      measures the reference's 476pt ink width, in the identity navy at ~9.6%
@@ -498,8 +510,13 @@ export const OFFICIAL_FINANCIAL_CSS = `
     font-size:51.747pt; font-weight:700; letter-spacing:6.72pt;
     color:#0a1f44; opacity:0.101; pointer-events:none; z-index:0;
     font-family:'ORYX Display',Verdana,Arial,Helvetica,sans-serif; }
+  /* The approved invoice prints the identity band wider than the priced table:
+     the logotype starts ~10pt left of the content box and the quality badge ends
+     ~8pt right of it (measured logo x16.5, badge x579.5 against a content box of
+     26.5–571.5). The of-body wrapper insets the priced rows back to the table
+     columns, so the band sits at the page edge exactly as the reference does. */
   .of-band{ display:flex; justify-content:space-between; align-items:center;
-    min-height:37pt; position:relative; }
+    min-height:44.5pt; position:relative; }
   /* The reference prints the same 22pt circled tick at the top-right of the
      invoice header as on the report (measured x557-579, y29-51). It must sit
      inside the printable box: a negative offset made the page wider than the
@@ -513,14 +530,17 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-lockup{ display:flex; align-items:center; gap:6pt; }
   .of-logo-mark{ display:block; width:auto; }
   .of-wordmark{ display:flex; flex-direction:column; line-height:1.0; }
-  .of-logo{ height:31.3pt; width:auto; }
+  .of-logo{ height:44.5pt; width:auto; }
   .of-wordmark-ar{ font-size:14.5pt; font-weight:700; color:#0a1f44; }
   .of-wordmark-en{ font-size:14.2pt; font-weight:700; color:#0a1f44; letter-spacing:.5px; }
   .of-tag-ar{ font-size:11.8pt; font-weight:700; color:#102749; }
   .of-tag-en{ font-size:7.9pt; font-weight:700; color:#102749; letter-spacing:.4px; }
-  .of-title{ text-align:center; margin-top:33pt; }
-  .of-title-ar{ font-size:12.3pt; font-weight:700; color:#0f2b48; line-height:1.0; }
-  .of-title-en{ font-size:12.3pt; font-weight:700; color:#0f2b48; letter-spacing:.6px; line-height:1.0; }
+  .of-title{ text-align:center; margin-top:15.3pt; }
+  /* The reference stacks the Arabic title and the Latin title 14.2pt apart
+     (measured 79.7 → 93.9), which is looser than the 12.3pt type's own line box,
+     so the two lines carry an explicit line height rather than the default. */
+  .of-title-ar{ font-size:12.3pt; font-weight:700; color:#0f2b48; line-height:1.15; }
+  .of-title-en{ font-size:12.3pt; font-weight:700; color:#0f2b48; letter-spacing:.6px; line-height:1.15; }
   .of-trn{ margin-top:1pt; background:#0f2b48; color:#fff; font-size:8.8pt;
     font-weight:700; text-align:end; padding:2pt 10pt; line-height:1.0; }
   /* The reference panel has a hairline light border and no internal divider:
