@@ -1,4 +1,5 @@
 import { docStamp, esc, escMultiline, money, moneyPlain, quantity, countryName } from './html.util';
+import { oryxLogoMark } from './oryx-logo.asset';
 import { CHROME_CSS } from './chrome';
 import { DOCUMENT_LATIN_STACK } from '../pdf/document-fonts.service';
 import type {
@@ -155,9 +156,14 @@ function documentTaxRate(payload: FinancialDocumentPayload): number {
 export function identityBand(issuer: DocumentIssuer): string {
   const logo = issuer.logoDataUri
     ? `<img class="of-logo" src="${esc(issuer.logoDataUri)}" alt="${esc(issuer.nameEn)}">`
-    : `<div class="of-wordmark">
-         <div class="of-wordmark-ar">اوريكس لخـدمات السيارات</div>
-         <div class="of-wordmark-en">AUTO SERVICES</div>
+    : `<div class="of-lockup">
+         ${oryxLogoMark('31.3pt', 'of-logo-mark')}
+         <div class="of-wordmark">
+           <div class="of-wordmark-ar">اوريكس</div>
+           <div class="of-wordmark-ar">لخـدمات</div>
+           <div class="of-wordmark-ar">السيارات</div>
+           <div class="of-wordmark-en">AUTO SERVICES</div>
+         </div>
        </div>`;
   return `
   <div class="of-band">
@@ -502,6 +508,11 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-badge svg{ display:block; width:24pt; height:24pt; }
   .of-band-lead{ flex:0 0 auto; }
   .of-band-trail{ text-align:end; }
+  /* The reference stacks the official logotype (icon + three Arabic lines +
+     the Latin AUTO SERVICES line) in a single left-hand lockup. */
+  .of-lockup{ display:flex; align-items:center; gap:6pt; }
+  .of-logo-mark{ display:block; width:auto; }
+  .of-wordmark{ display:flex; flex-direction:column; line-height:1.0; }
   .of-logo{ height:31.3pt; width:auto; }
   .of-wordmark-ar{ font-size:14.5pt; font-weight:700; color:#0a1f44; }
   .of-wordmark-en{ font-size:14.2pt; font-weight:700; color:#0a1f44; letter-spacing:.5px; }

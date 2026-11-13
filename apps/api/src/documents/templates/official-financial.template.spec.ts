@@ -331,6 +331,15 @@ describe('official financial template — identity', () => {
     expect(html).toContain('<img class="of-logo"');
   });
 
+  it('draws the official ORYX logotype as vector art when no logo is uploaded', () => {
+    const html = render({}, { ...issuer, logoDataUri: null });
+    // Traced from the approved sheet, so it stays sharp and font-independent.
+    expect(html).toContain('class="of-logo-mark"');
+    expect(html).toContain('<svg');
+    expect(html).toContain('<path fill="#0a1f44"');
+    expect(html).not.toContain('<img class="of-logo"');
+  });
+
   it('escapes a customer name rather than emitting raw markup', () => {
     const html = render({
       counterparty: {

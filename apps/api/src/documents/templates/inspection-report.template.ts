@@ -13,6 +13,7 @@ import {
   type DocumentChrome,
 } from './chrome';
 import { docStamp, esc, escMultiline, grouped, orDash } from './html.util';
+import { oryxLogoMark } from './oryx-logo.asset';
 import type {
   InspectionReportPayload,
   InspectionReportSection,
@@ -90,26 +91,26 @@ function pageTitleBar(titleAr: string, titleEn: string): string {
  * mark on one side, the company name and the inspection tagline on the other.
  *
  * Drawn from the configured issuer so the same band appears on the report and
- * the financial documents; with no configured logo it falls back to the same
- * neutral monogram the shared chrome uses.
+ * the financial documents; with no configured logo it falls back to the official
+ * ORYX logotype drawn as vector art.
  */
 function reportHeader(issuer: DocumentIssuer): string {
-  const initials = (issuer.nameEn || 'ORYX')
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('');
   // The approved header is the ORYX wordmark on the left and the tagline on the
   // right — the wordmark already spells the Arabic name and "AUTO SERVICES", so
   // repeating the company name beside it (as the fallback does) is not on the
-  // approved sheet. The name stack is therefore kept only for the no-logo case.
+  // approved sheet. With no uploaded logo the official logotype is drawn as
+  // vector art (traced from the approved sheet) rather than a monogram.
   const left = issuer.logoDataUri
     ? `<img class="rh-logo" src="${esc(issuer.logoDataUri)}" alt="${esc(issuer.nameEn)}">`
-    : `<div class="rh-monogram">${esc(initials || 'OR')}</div>
-      <div class="rh-name">
-        <span class="rh-name-ar">${esc(issuer.nameAr || issuer.nameEn)}</span>
-        <span class="rh-name-en">${esc(issuer.nameEn)}</span>
-      </div>`;
+    : `<div class="rh-lockup">
+         ${oryxLogoMark('31.3pt', 'rh-logo-mark')}
+         <div class="rh-wordmark">
+           <span class="rh-wordmark-ar">اوريكس</span>
+           <span class="rh-wordmark-ar">لخـدمات</span>
+           <span class="rh-wordmark-ar">السيارات</span>
+           <span class="rh-wordmark-en">AUTO SERVICES</span>
+         </div>
+       </div>`;
   return `
   <header class="report-head">
     <div class="rh-left">
@@ -686,6 +687,13 @@ export const INSPECTION_REPORT_CSS = `
    * to the reference mark's height rather than the previous 38px, which left it
    * noticeably smaller than the approved header. */
   .rh-logo{ height:56px; width:auto; }
+  /* The official logotype lockup: the vector mark beside the three-line Arabic
+     wordmark and the Latin AUTO SERVICES line, as the approved header prints it. */
+  .rh-lockup{ display:flex; align-items:center; gap:6px; }
+  .rh-logo-mark{ display:block; width:auto; }
+  .rh-wordmark{ display:flex; flex-direction:column; line-height:1.0; }
+  .rh-wordmark-ar{ font-size:14.5pt; font-weight:700; color:var(--navy); }
+  .rh-wordmark-en{ font-size:14.2pt; font-weight:700; color:var(--navy); letter-spacing:.5px; }
   .rh-monogram{ width:38px; height:38px; border-radius:8px; background:var(--navy); color:var(--gold);
     display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14pt; letter-spacing:.5px; }
   .rh-name{ display:flex; flex-direction:column; line-height:1.12; }

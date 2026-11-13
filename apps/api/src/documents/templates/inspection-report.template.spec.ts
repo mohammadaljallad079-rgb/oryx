@@ -255,7 +255,7 @@ describe('inspection report template — font independence', () => {
     expect(html).not.toContain('class="rh-name"');
   });
 
-  it('falls back to the monogram and name stack when no logo is configured', () => {
+  it('draws the official ORYX logotype as vector art when no logo is configured', () => {
     const html = renderInspectionReportHtml({
       issuer: { ...issuer, logoDataUri: null },
       payload,
@@ -265,8 +265,11 @@ describe('inspection report template — font independence', () => {
       verification: null,
       baseCss: '',
     });
-    expect(html).toContain('class="rh-monogram"');
-    expect(html).toContain('class="rh-name"');
+    // The official logotype, traced from the approved sheet, replaces the old
+    // monogram placeholder rather than inventing a brand mark.
+    expect(html).toContain('class="rh-logo-mark"');
+    expect(html).toContain('<path fill="#0a1f44"');
+    expect(html).not.toContain('class="rh-monogram"');
   });
 });
 
