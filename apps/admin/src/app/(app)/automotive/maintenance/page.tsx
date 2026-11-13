@@ -9,6 +9,9 @@ import { minorToInput, money, toMinorInput, toQuantityInput } from '@/lib/erp-fo
 import { Icon } from '@/components/icons';
 import { ModuleDashboard } from '@/components/module-dashboard';
 import { TabDeepLink } from '@/components/tab-deep-link';
+import { EntityPicker } from '@/components/inline-create';
+import { CustomerModal } from '@/components/customer-modal';
+import { VehicleModal } from '@/components/entity-modals';
 import {
   Badge,
   Button,
@@ -22,7 +25,7 @@ import {
   StatusBadge,
   TableShell,
 } from '@/components/ui';
-import type { JobCardDto, MarketplaceProviderDto, ServiceRequestDto } from '@oryx/shared';
+import type { JobCardDto, MarketplaceProviderDto, ServiceRequestDto, VehicleDto } from '@oryx/shared';
 
 type Tab = 'dashboard' | 'job-cards' | 'bay' | 'warranties' | 'providers' | 'requests';
 
@@ -101,6 +104,7 @@ function JobCardsTab({
   const { t } = useUi();
   const list = useAsync(() => api.jobCards(), []);
   const vehicles = useAsync(() => api.vehicles(), []);
+  const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
   const [open, setOpen] = useState(false);
@@ -174,7 +178,15 @@ function JobCardsTab({
         </TableShell>
       )}
 
-      <CreateJobCardModal open={open} vehicles={vehicles.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <CreateJobCardModal
+        open={open}
+        vehicles={vehicles.data?.items ?? []}
+        customers={customers.data?.items ?? []}
+        onCustomersReload={customers.reload}
+        onVehiclesReload={vehicles.reload}
+        onClose={() => setOpen(false)}
+        onCreated={list.reload}
+      />
       <EstimateModal
         job={estimateTarget}
         products={products.data?.items ?? []}
@@ -344,18 +356,27 @@ function ReserveModal({
 function CreateJobCardModal({
   open,
   vehicles,
+  customers,
+  onCustomersReload,
+  onVehiclesReload,
   onClose,
   onCreated,
 }: {
   open: boolean;
-  vehicles: Array<{ id: string; vin: string; make: string; model: string }>;
+  vehicles: VehicleDto[];
+  customers: Array<{ id: string; code: string; nameEn: string; nameAr?: string | null; phone?: string | null }>;
+  onCustomersReload: () => Promise<void> | void;
+  onVehiclesReload: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [customerId, setCustomerId] = useState('');
   const [form, setForm] = useState({ vehicleId: '', complaint: '', odometer: '' });
+
+  const vehicleOptions = vehicles.filter((v) => v.customerId === customerId);
 
   const submit = async () => {
     setBusy(true); setError(null);
@@ -375,11 +396,47 @@ function CreateJobCardModal({
       footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || !form.vehicleId} onClick={submit} data-testid="save-job-card">{busy ? t('common.loading') : t('common.save')}</Button></>}>
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
+        <Field label={t('erp.sales.customer')} required>
+          <EntityPicker
+            value={customerId || null}
+            options={customers.map((c) => ({ value: c.id, label: c.nameEn || c.nameAr || c.code, hint: c.phone ?? undefined }))}
+            onChange={(v) => { setCustomerId(v ?? ''); setForm((f) => ({ ...f, vehicleId: '' })); }}
+            placeholder={t('common.select')}
+            testId="job-card-customer"
+            createLabel={t('erp.sales.newCustomer')}
+            reloadOptions={onCustomersReload}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <CustomerModal
+                open
+                customer={null}
+                onClose={closeCreate}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
+        </Field>
         <Field label={t('erp.automotive.vehicle')} required>
-          <select className="oryx-select" value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })} data-testid="job-vehicle">
-            <option value="">—</option>
-            {vehicles.map((v) => <option key={v.id} value={v.id}>{v.vin} — {v.make} {v.model}</option>)}
-          </select>
+          <EntityPicker
+            value={form.vehicleId || null}
+            options={vehicleOptions.map((v) => ({ value: v.id, label: `${v.vin} — ${v.make} ${v.model}` }))}
+            onChange={(v) => setForm({ ...form, vehicleId: v ?? '' })}
+            placeholder={t('common.select')}
+            disabled={!customerId}
+            testId="job-vehicle"
+            createLabel={t('erp.automotive.newVehicle')}
+            reloadOptions={onVehiclesReload}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <VehicleModal
+                open
+                customers={customers}
+                defaultCustomerId={customerId}
+                onClose={closeCreate}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.automotive.odometer')}>
           <input className="oryx-input" value={form.odometer} onChange={(e) => setForm({ ...form, odometer: e.target.value })} />

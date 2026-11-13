@@ -350,7 +350,7 @@ export function VehicleModal({
   onSaved,
 }: {
   open: boolean;
-  customers: Array<{ id: string; code: string; nameEn: string; nameAr?: string }>;
+  customers: Array<{ id: string; code: string; nameEn: string; nameAr?: string | null }>;
   /** Preselected customer when the modal is opened from a customer-scoped form. */
   defaultCustomerId?: string;
   onClose: () => void;

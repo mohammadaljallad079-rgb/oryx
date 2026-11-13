@@ -30,6 +30,8 @@ import {
   type InspectionTypeKey,
 } from '@oryx/shared';
 import { useRouter } from 'next/navigation';
+import { EntityPicker } from '@/components/inline-create';
+import { CustomerModal } from '@/components/customer-modal';
 import { inspectionFieldLabelParts, INSPECTION_COVER_ROWS, INSPECTION_VEHICLE_INFO } from '@/lib/inspection-fields';
 
 type Tab = 'jobs' | 'vehicles' | 'bookings' | 'services';
@@ -365,22 +367,31 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
       {error ? <ErrorBanner message={error} /> : null}
       <div className="flex flex-col gap-3">
         <Field label={t('inspection.selectCustomer')} required>
-          <select
-            className="oryx-select"
-            value={customerId}
-            onChange={(e) => {
-              setCustomerId(e.target.value);
+          <EntityPicker
+            value={customerId || null}
+            options={(customers.data?.items ?? []).map((c: CustomerDto) => ({
+              value: c.id,
+              label: c.nameEn || c.nameAr || c.code,
+              hint: c.phone ?? undefined,
+            }))}
+            onChange={(v) => {
+              setCustomerId(v ?? '');
               setVehicleId('');
             }}
-            data-testid="job-customer"
-          >
-            <option value="">{t('common.select')}</option>
-            {(customers.data?.items ?? []).map((c: CustomerDto) => (
-              <option key={c.id} value={c.id}>
-                {c.nameEn || c.nameAr || c.code}
-              </option>
-            ))}
-          </select>
+            placeholder={t('common.select')}
+            testId="job-customer"
+            createLabel={t('erp.sales.newCustomer')}
+            reloadOptions={() => customers.reload()}
+            renderCreate={({ onClose, onSaved }) => (
+              <CustomerModal
+                open
+                customer={null}
+                onClose={onClose}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
 
         <div>
