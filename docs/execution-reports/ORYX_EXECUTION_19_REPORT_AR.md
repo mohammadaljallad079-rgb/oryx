@@ -26,14 +26,14 @@
 
 | الغرض | الرابط |
 | --- | --- |
-| صفحة الأدلة (صور ومقارنات) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/ |
-| لوحة الإدارة (معاينة مباشرة) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/login |
-| تقرير الفحص المُنتَج | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/inspection-report-rendered.pdf |
-| تقرير الفحص مع صورة وQR | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/inspection-report-with-photo-qr.pdf |
-| الفاتورة الضريبية المُنتَجة | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/tax-invoice-rendered.pdf |
-| مقارنة الفاتورة (مرجع/نظامنا) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/invoice-sbs.png |
-| مقارنة الترويسة/الشعار | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/hdr-compare.png |
-| مقارنة الصفحات 1–5 | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/sbs-p1.png … `sbs-p5.png` |
+| صفحة الأدلة (صور ومقارنات) | https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/ |
+| لوحة الإدارة (معاينة مباشرة) | https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/login |
+| تقرير الفحص المُنتَج | https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/inspection-report-rendered.pdf |
+| تقرير الفحص مع صورة وQR | https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/inspection-report-with-photo-qr.pdf |
+| الفاتورة الضريبية المُنتَجة | https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/tax-invoice-rendered.pdf |
+| مقارنة الفاتورة (مرجع/نظامنا) | https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/invoice-sbs.png |
+| مقارنة الترويسة/الشعار | https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/hdr-compare.png |
+| مقارنة الصفحات 1–5 | https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/sbs-p1.png … `sbs-p5.png` |
 
 ---
 
@@ -206,6 +206,15 @@ total including VAT».
 | --- | --- | --- |
 | تقرير الفحص | x58-534، y374-426 | x57-534، y374-426 |
 | الفاتورة الضريبية | x58-534، y374-426 | x61-531، y373-425 |
+
+**تذييل المستند (العلامة + صندوقا التوقيع):** كان الشريط يطبع الشعار الكامل مرتين
+على طرفي الصفحة، وهذا ليس شكل المرجع المعتمد. المرجع يطبع **صندوقَي توقيع مؤطّرين**
+— «Authorized Stamp & Signature / اعتماد المركز» و«Customer Signature / توقيع
+العميل» — على الطرفين، وبينهما قفل ORYX مصغّر وسطر الشكر في المنتصف. أُعيد بناء
+`brandBand` ليطبع هذا الشكل بالقياس المرجعي (صندوق 239.8×51.8 نقطة). كما أُزيل شريط
+التوقيع المكرَّر من جسم الفاتورة، وكتلة التوقيع المكرَّرة من غلاف التقرير التي كانت
+تدفع المحتوى إلى ورقة سادسة (التقرير الآن 5 صفحات). صورة المقارنة:
+`footer-compare.png`.
 
 ---
 
