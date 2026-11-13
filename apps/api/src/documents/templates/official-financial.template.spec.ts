@@ -342,3 +342,22 @@ describe('official financial template — identity', () => {
     expect(html).toContain('&lt;script&gt;');
   });
 });
+
+describe('official financial template — reference watermark parity (Execution 19)', () => {
+  it('sets the AUTO SERVICES watermark in the brand display face at the measured size', () => {
+    const html = render();
+    expect(html).toContain('class="of-watermark"');
+    expect(html).toContain("font-family:'ORYX Display'");
+    expect(html).toContain('font-size:51.747pt');
+    expect(html).toContain('letter-spacing:6.72pt');
+    expect(html).toMatch(/opacity:0\.10/);
+  });
+
+  it('keeps the header badge inside the printable box so the sheet is not scaled', () => {
+    const html = render();
+    // A negative right offset made the page wider than the sheet, which made
+    // Chromium shrink the whole invoice and drift every measured size.
+    expect(html).toContain('.of-badge{ position:absolute; right:0; top:13pt');
+    expect(html).not.toContain('right:-8.6pt');
+  });
+});

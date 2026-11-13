@@ -353,4 +353,22 @@ describe('inspection report template — reference page parity (Execution 19)', 
     expect(band).toContain('vphoto-mark');
     expect(band).toContain('vphoto-img');
   });
+
+  it('prints the AUTO SERVICES watermark on the cover page only', () => {
+    const html = render();
+    const marks = html.match(/class="rp-watermark"/g) ?? [];
+    expect(marks).toHaveLength(1);
+    // The single mark must sit inside the first page section, not the body.
+    const cover = html.slice(0, html.indexOf('</section>'));
+    expect(cover).toContain('rp-watermark');
+  });
+
+  it('sets the watermark in the brand display face at the measured reference size', () => {
+    const css = render();
+    expect(css).toContain("font-family:'ORYX Display'");
+    expect(css).toContain('font-size:51.747pt');
+    expect(css).toContain('letter-spacing:6.72pt');
+    // A low-opacity mark so the printed data stays legible on top of it.
+    expect(css).toMatch(/opacity:0\.10/);
+  });
 });

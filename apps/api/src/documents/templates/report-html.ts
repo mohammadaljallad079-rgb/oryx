@@ -9,7 +9,6 @@ import {
   identificationPage,
   inspectionGroupPage,
   paintSectionPage,
-  reportWatermark,
 } from './inspection-report.template';
 
 /**
@@ -82,7 +81,6 @@ ${INSPECTION_REPORT_CSS}
 </style>
 </head>
 <body>
-${reportWatermark()}
 ${pages.join('\n')}
 </body>
 </html>`;

@@ -12,7 +12,7 @@ import {
   verificationBlock,
   type DocumentChrome,
 } from './chrome';
-import { esc, escMultiline, grouped, orDash } from './html.util';
+import { docStamp, esc, escMultiline, grouped, orDash } from './html.util';
 import type {
   InspectionReportPayload,
   InspectionReportSection,
@@ -85,7 +85,6 @@ function pageTitleBar(titleAr: string, titleEn: string): string {
     <span class="p-title-en">${esc(titleEn)}</span>
   </div>`;
 }
-
 /**
  * The compact brand band the reference prints at the head of every page: the
  * mark on one side, the company name and the inspection tagline on the other.
@@ -142,11 +141,13 @@ function qualityBadge(): string {
 }
 
 /**
- * The faint "AUTO SERVICES" wordmark the approved sheet lays behind the page.
+ * The faint "AUTO SERVICES" wordmark the approved sheet lays behind its cover.
  *
- * The reference sets the identity wordmark in the identity navy at ~52pt,
- * centred on the sheet (measured y 374-426 of an 842pt page), at very low
- * opacity so the printed data stays fully legible on top of it.
+ * The reference prints the identity wordmark in the brand display face (Codec
+ * Pro Bold) at 51.75pt with a 6.72pt tracking, centred on the sheet (measured
+ * x 57.5-533.6, y 374.4-426.1 of a 595x842pt page) at ~9.8% opacity, so the
+ * printed data stays fully legible on top of it. It appears on the cover only;
+ * the section pages carry no watermark.
  */
 export function reportWatermark(): string {
   return '<div class="rp-watermark" aria-hidden="true">AUTO SERVICES</div>';
@@ -166,18 +167,7 @@ function legendChip(kind: MarkKind, ar: string, en: string): string {
  */
 function jobStrip(p: InspectionReportPayload): string {
   const v = p.vehicle;
-  const when = new Date(p.inspectedAt);
-  const stamp = Number.isNaN(when.getTime())
-    ? '—'
-    : new Intl.DateTimeFormat('en-GB', {
-        weekday: 'short',
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'Asia/Bahrain',
-      }).format(when);
+  const stamp = docStamp(p.inspectedAt);
   const car = `${v.make} ${v.model} (${v.modelYear})`;
   return `
   <div class="job-head">
@@ -294,20 +284,10 @@ function vehiclePhoto(
 export function identificationPage(input: InspectionReportInput, chrome: DocumentChrome): string {
   const p = input.payload;
   const v = p.vehicle;
-  const when = new Date(p.inspectedAt);
-  const stamp = Number.isNaN(when.getTime())
-    ? '—'
-    : new Intl.DateTimeFormat('en-GB', {
-        weekday: 'short',
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'Asia/Bahrain',
-      }).format(when);
+  const stamp = docStamp(p.inspectedAt);
   return `
   <section class="doc-page">
+    ${reportWatermark()}
     ${reportHeader(chrome.issuer)}
     ${pageTitleBar('تقرير فحص المركبة', 'VEHICLE INSPECTION REPORT')}
     <div class="cover-info">
@@ -386,20 +366,18 @@ export function inspectionGroupPage(
   // The approved form packs the four checklists into a 2x2 grid on one sheet:
   // road test and engine compartment on the upper row, exterior and interior on
   // the lower row, with the interior reference drawing and the general remarks
-  // beneath. A layout *table* (not flexbox) is used because Chromium cannot
-  // fragment a flex row across pages, so a flex grid that does not fit jumps
-  // wholesale to the next sheet; a table keeps the four tables on one page.
+  // beneath. Each checklist heading is the navy header row of its own table, so
+  // no separate title bar is printed above it. A layout *table* (not flexbox) is
+  // used because Chromium cannot fragment a flex row across pages, so a flex
+  // grid that does not fit jumps wholesale to the next sheet; a table keeps the
+  // four tables on one page.
   const cell = (
     section: InspectionReportSection | undefined,
     titleAr: string,
     titleEn: string,
     withNa: boolean,
   ): string =>
-    section
-      ? `<div class="grp"><div class="grp-title">${esc(titleAr)}<span class="ltr">${esc(titleEn)}</span>
-          <span class="grp-legend">${legendChip('check', 'اجتياز', 'Pass')}${legendChip('cross', 'فشل', 'Fail')}${withNa ? '<span class="lg-chip">N/A · غير متوفر</span>' : ''}</span>
-        </div>${itemsTable(section, titleAr, titleEn, withNa)}</div>`
-      : '';
+    section ? `<div class="grp">${itemsTable(section, titleAr, titleEn, withNa)}</div>` : '';
 
   const pair = (right: string, left: string): string =>
     `<table class="grid"><tr><td>${right || '&nbsp;'}</td><td>${left || '&nbsp;'}</td></tr></table>`;
@@ -443,9 +421,7 @@ export function inspectionGroupPage(
   const cabin = `
   <div class="grp cabin">
     ${interiorArt}
-    <div class="grp-title">فحص التجهيزات الداخلية والملحقات الخارجية<span class="ltr">Cabin Electronics &amp; Exterior Accessories Checks</span>
-      <span class="grp-legend">${legendChip('check', 'اجتياز', 'Pass')}${legendChip('cross', 'فشل', 'Fail')}<span class="lg-chip">N/A · غير متوفر</span></span>
-    </div>
+    <div class="grp-title">فحص التجهيزات الداخلية والملحقات الخارجية<span class="ltr">Cabin Electronics &amp; Exterior Accessories Checks</span></div>
     ${pair(cell(engine, 'مقصورة المحرك', 'Engine Compartment', false), cell(road, 'تجربة القيادة', 'Road Test', false))}
     <table class="grid"><tr>
       <td>${cell(interior, 'داخلية السيارة', 'Interior Car', true)}</td>
@@ -468,7 +444,7 @@ export function computerSectionPage(
   section: InspectionReportSection | undefined,
 ): string {
   return `
-  <section class="doc-page">
+  <section class="doc-page p5-page">
     ${reportHeader(input.issuer)}
     ${pageTitleBar('فحص وحدة الكمبيوتر', 'COMPUTER UNIT INSPECTION')}
     ${jobStrip(input.payload)}
@@ -478,12 +454,14 @@ export function computerSectionPage(
 }
 
 /**
- * One pass/fail checklist as the approved two-column table.
+ * One pass/fail checklist as the approved table.
  *
- * The reference prints the Arabic label with its English translation beneath and
- * three result columns (Pass / Fail / N/A); the cell matching the recorded
- * result carries the tick or cross. `withNa` is false for the engine and road
- * tables, which are strictly pass/fail on the approved form.
+ * The reference draws the checklist heading as a navy header row that carries
+ * the bilingual title in the item column and the Pass / Fail / N-A labels over
+ * the result columns (measured y161-186 of page 4). There is therefore no
+ * separate title bar above the table — the header row *is* the title bar.
+ * `withNa` is false for the engine and road tables, which are strictly
+ * pass/fail on the approved form.
  */
 function itemsTable(
   section: InspectionReportSection,
@@ -492,19 +470,19 @@ function itemsTable(
   withNa: boolean,
 ): string {
   const results = withNa ? (['PASS', 'FAIL', 'NA'] as const) : (['PASS', 'FAIL'] as const);
+  const head = (r: (typeof results)[number]): string =>
+    r === 'PASS'
+      ? 'اجتياز<span class="ltr">Pass</span>'
+      : r === 'FAIL'
+        ? 'فشل<span class="ltr">Fail</span>'
+        : 'غير متوفر<span class="ltr">N/A</span>';
   return `
   <div class="itable avoid-break">
-    <div class="itable-head">${esc(titleAr)}<span class="ltr">${esc(titleEn)}</span></div>
     <table class="items">
       <thead>
         <tr>
-          <th class="c-item">البند<span class="ltr">Item</span></th>
-          ${results
-            .map(
-              (r) =>
-                `<th class="c-res">${r === 'PASS' ? 'اجتياز<span class="ltr">Pass</span>' : r === 'FAIL' ? 'فشل<span class="ltr">Fail</span>' : 'غير متوفر<span class="ltr">N/A</span>'}</th>`,
-            )
-            .join('')}
+          <th class="c-item">${esc(titleAr)}<span class="ltr">${esc(titleEn)}</span></th>
+          ${results.map((r) => `<th class="c-res">${head(r)}</th>`).join('')}
         </tr>
       </thead>
       <tbody>
@@ -682,18 +660,17 @@ function diagnosticSection(section: InspectionReportSection | undefined): string
 
 export const INSPECTION_REPORT_CSS = `
   /* ---- page watermark ---- */
-  /* The approved sheet sets "AUTO SERVICES" in the identity navy at ~52pt,
-   * centred on the page, at very low opacity, behind everything. The financial
-   * sheet uses the same treatment, so the two documents read as one family. */
-  /* The band is a fixed, full-viewport layer so it repeats on every printed
-   * page at the same height (measured y 374-426 of an 842pt sheet) no matter
-   * how much content a page carries. */
-  .rp-watermark{ position:fixed; left:0; right:0; top:0; bottom:0;
-    display:flex; align-items:center; justify-content:center;
-    font-size:45pt; font-weight:700; letter-spacing:6.4pt;
-    color:#0a1f44; opacity:0.055; pointer-events:none; z-index:-1;
-    font-family:Verdana,Arial,Helvetica,sans-serif;
-    transform:translateY(19pt); }
+  /* The approved sheet prints the identity wordmark on the *cover only* (the
+   * section pages carry no watermark), so the layer is scoped to the first
+   * page rather than the document body. */
+  /* The mark is the brand display face (Codec Pro Bold), 51.75pt, with a
+   * 6.9pt tracking so the run measures the reference's 476pt ink width, set in
+   * the identity navy at ~9.6% opacity (measured from the approved PDF). */
+  .rp-watermark{ position:absolute; left:0; right:0; top:349.8pt;
+    text-align:center; white-space:pre;
+    font-size:51.747pt; font-weight:700; letter-spacing:6.72pt;
+    color:#0a1f44; opacity:0.101; pointer-events:none; z-index:0;
+    font-family:'ORYX Display',Verdana,Arial,Helvetica,sans-serif; }
   /* ---- brand band ---- */
   /* The approved form prints the brand lockup on the visual left and the
    * "inspection experts" tagline on the visual right. The document is RTL, so
@@ -721,17 +698,22 @@ export const INSPECTION_REPORT_CSS = `
   .rh-tag-ar{ font-size:11.8pt; font-weight:700; color:var(--navy); }
   .rh-tag-en{ font-size:7.9pt; font-weight:700; color:var(--gold); letter-spacing:.6px; }
   /* ---- shared page furniture ---- */
-  .p-title{ display:flex; flex-direction:column; align-items:center; margin:0 0 6px; }
-  .p-title-ar{ font-size:15pt; font-weight:700; color:var(--navy); }
-  .p-title-en{ font-size:9.5pt; font-weight:700; color:var(--muted); letter-spacing:.6px; text-transform:uppercase; }
+  /* The approved section title prints at 10pt navy over an 8.7pt navy strapline,
+   * both centred, with the strap in small caps. Measured from the reference
+   * (y78 ar / y90 en on the section sheets). */
+  .p-title{ display:flex; flex-direction:column; align-items:center; margin:0 0 3px; }
+  .p-title-ar{ font-size:10pt; font-weight:700; color:var(--navy); line-height:1.15; }
+  .p-title-en{ font-size:10pt; font-weight:700; color:var(--navy); letter-spacing:.2px; }
   .job-head{ display:flex; direction:ltr; justify-content:space-between; align-items:baseline;
-    font-size:8.4pt; font-weight:700; color:var(--navy); padding:1px 2px 3px; }
-  .vstrip{ display:flex; direction:ltr; border:1px solid var(--line); border-radius:5px; overflow:hidden; }
-  .vcell{ flex:1 1 0; padding:4px 8px; border-inline-end:1px solid var(--line); }
+    font-size:8pt; font-weight:700; color:var(--navy); padding:0 2px 2px; }
+  /* The vehicle strip: four cells over a light rule, labels in slate at 6.8pt and
+   * values in navy at 8.2pt, matching the reference band (y104-132). */
+  .vstrip{ display:flex; direction:ltr; border:1px solid #e2e8f0; border-radius:4px; overflow:hidden; background:#f8fafc; }
+  .vcell{ flex:1 1 0; padding:3px 8px; border-inline-end:1px solid #e2e8f0; }
   .vcell:last-child{ border-inline-end:none; }
-  .vcell-lab{ display:block; font-size:7pt; color:var(--muted); line-height:1.2; }
-  .vcell-lab .ltr{ font-weight:700; color:var(--navy-soft); }
-  .vcell-val{ display:block; font-size:9.5pt; font-weight:700; color:var(--ink); }
+  .vcell-lab{ display:block; font-size:6.8pt; color:#64748b; line-height:1.15; }
+  .vcell-lab .ltr{ font-weight:700; color:#64748b; }
+  .vcell-val{ display:block; font-size:8.2pt; font-weight:700; color:#0f2b48; }
   .ltr{ direction:ltr; unicode-bidi:isolate; }
   .lg-chip{ display:inline-flex; align-items:center; gap:4px; font-size:8pt; color:var(--ink); margin-inline-start:10px; }
   .legend-row{ display:flex; gap:6px; margin-top:6px; }
@@ -756,20 +738,21 @@ export const INSPECTION_REPORT_CSS = `
   .cover-qr-cap{ font-size:6.4pt; font-weight:700; color:var(--navy); line-height:1.15; text-align:center; }
   .cover-qr-cap .ltr{ display:block; font-size:5.6pt; color:var(--muted); font-weight:400; letter-spacing:.2px; }
   /* The approved cover prints the vehicle photograph as a wide band across the
-   * middle of the page, bleeding past the side margins. */
-  .vphoto{ position:relative; margin:10px 0 0; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#f7f9fc; }
+   * middle of the page, bleeding past the side margins. Measured from the
+   * reference: the band spans y184-549 of an 842pt sheet, i.e. 365pt tall. */
+  .vphoto{ --vphoto-h:250px; position:relative; margin:10px 0 0; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#f7f9fc; }
   /* The approved cover bleeds the photograph to the paper edges. A negative
    * margin, or a wider in-flow box, enlarges the printable area and shifts every
    * other element on the sheet sideways. The band is therefore painted with an
    * absolutely positioned image that overflows its (in-flow, margin-width)
    * figure: absolute overflow is clipped by the paper edge, it does not resize
    * the page. */
-  .vphoto--bleed{ margin-inline:0; border-radius:0; border-inline:none; height:176px; }
+  .vphoto--bleed{ margin-inline:0; border-radius:0; border-inline:none; height:var(--vphoto-h); }
   .vphoto--bleed .vphoto-img{ position:absolute; top:0; inset-inline:-12mm;
-    width:calc(100% + 24mm); height:176px; object-fit:cover; }
-  .vphoto-img{ width:100%; height:176px; object-fit:cover; display:block; }
+    width:calc(100% + 24mm); height:var(--vphoto-h); object-fit:cover; }
+  .vphoto-img{ width:100%; height:var(--vphoto-h); object-fit:cover; display:block; }
   .vphoto-empty .vphoto-ph{ position:absolute; top:0; inset-inline:-12mm;
-    width:calc(100% + 24mm); height:176px;
+    width:calc(100% + 24mm); height:var(--vphoto-h);
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     color:var(--muted); font-size:8pt; }
   .vphoto-ph .ltr{ font-size:7.5pt; color:var(--line-strong); }
@@ -793,19 +776,18 @@ export const INSPECTION_REPORT_CSS = `
   .remarks-list{ flex:1 1 0; margin:0; padding-inline-start:15px; font-size:7pt; line-height:1.22; color:var(--ink); }
   .remarks-list.ltr{ text-align:left; }
   /* ---- section groups ---- */
-  .grp{ margin-top:7px; }
-  .grp-title{ display:flex; align-items:baseline; flex-wrap:wrap; background:var(--navy); color:#fff;
-    font-size:10pt; font-weight:700; padding:4px 10px; border-radius:5px 5px 0 0; }
-  .grp-title .ltr{ margin-inline-start:8px; font-size:8pt; color:var(--gold-soft); font-weight:400; }
+  .grp{ margin-top:5px; }
+  /* The reference paints each checklist heading as a flat bar in the softer
+   * identity navy (#1b375a) with white text, no radius, and a hairline underline
+   * (measured y161-186 on page 4). */
+  .grp-title{ display:flex; align-items:baseline; flex-wrap:wrap; background:#1b375a; color:#fff;
+    font-size:9pt; font-weight:700; padding:3px 9px; border-radius:0; }
+  .grp-title .ltr{ margin-inline-start:7px; font-size:7.6pt; color:#cbd5e1; font-weight:400; }
   .grp-legend{ margin-inline-start:auto; display:flex; gap:2px; }
-  .grp-legend .lg-chip{ color:#fff; }
+  .grp-legend .lg-chip{ color:#fff; font-size:7pt; }
   .two-col{ display:flex; gap:10px; align-items:flex-start; }
   .two-col > *{ flex:1 1 0; min-width:0; }
   .cabin .two-col{ margin-top:5px; }
-  .cabin .itable-head{ padding:1px 6px; font-size:7.6pt; }
-  .cabin .items th,.cabin .items td{ padding:0 4px; font-size:6.8pt; line-height:1.0; }
-  .cabin .item-ar{ font-size:6.7pt; line-height:1.0; }
-  .cabin .item-en{ font-size:5.6pt; line-height:1.0; }
   .grid{ table-layout:fixed; border-collapse:separate; border-spacing:4px 2px; }
   .grid > tbody > tr > td{ width:50%; vertical-align:top; padding:0; }
   /* The approved form paints the interior fittings drawing as a faint
@@ -818,12 +800,18 @@ export const INSPECTION_REPORT_CSS = `
   .cabin{ position:relative; }
   .interior-art{ position:absolute; left:0; bottom:0; margin:0; z-index:0; }
   .interior-art img{ width:333px; height:auto; display:block; opacity:.28; }
-  .itable{ border:1px solid var(--line); border-top:none; }
-  .itable-head{ background:#eef2f8; color:var(--navy); font-size:8.2pt; font-weight:700; padding:2px 7px; border-bottom:1px solid var(--line); }
-  .itable-head .ltr{ margin-inline-start:6px; font-size:7.5pt; color:var(--muted); font-weight:400; }
-  .items th,.items td{ border-bottom:1px solid var(--line); border-inline-end:1px solid var(--line); padding:1px 5px; font-size:7.2pt; line-height:1.04; vertical-align:middle; }
-  .items thead th{ background:#f7f9fc; color:var(--navy); font-size:7.6pt; text-align:center; }
+  .itable{ border:1px solid #334e68; border-top:none; }
+  .itable-head{ background:#1b375a; color:#fff; font-size:9pt; font-weight:700; padding:3px 9px; border-bottom:1px solid #334e68; }
+  .itable-head .ltr{ margin-inline-start:7px; font-size:7.6pt; color:#cbd5e1; font-weight:400; }
+  .items th,.items td{ border-bottom:1px solid var(--line); border-inline-end:1px solid var(--line); padding:3px 5px; font-size:7.2pt; line-height:1.28; vertical-align:middle; }
+  /* The checklist heading is the table's own header row: navy bar, white text,
+   * the bilingual title in the item column and the Pass/Fail/N-A labels over the
+   * result columns (measured y161-186 of the reference page 4). */
+  .items thead th{ background:#1b375a; color:#fff; font-size:7.2pt; font-weight:700; text-align:center;
+    border-bottom:1px solid #334e68; padding:3px 5px; }
+  .items thead th .ltr{ display:block; font-size:6.2pt; font-weight:400; color:#cbd5e1; }
   .items thead th.c-item{ text-align:start; }
+  .items thead th.c-item .ltr{ display:inline; margin-inline-start:6px; }
   .items th:last-child,.items td:last-child{ border-inline-end:none; }
   .items tr:last-child td{ border-bottom:none; }
   .c-item{ width:62%; }
@@ -843,17 +831,19 @@ export const INSPECTION_REPORT_CSS = `
   .sec-remarks{ margin-top:6px; border:1px solid var(--line); border-radius:5px; padding:6px 9px; font-size:7.6pt; line-height:1.3; color:var(--ink); background:#fbfcfe; }
   .no-findings{ border:1px solid var(--line); border-top:none; padding:8px; font-size:8.5pt; color:var(--muted); background:#f7f9fc; text-align:center; }
   /* ---- diagrams ---- */
-  .diagram-block,.chassis-block,.diag-block{ margin-top:10px; }
-  .diagram-title{ display:flex; align-items:baseline; font-size:10pt; font-weight:700; color:var(--navy);
-    margin-bottom:6px; border-inline-start:4px solid var(--gold); padding-inline-start:7px; }
-  .diagram-title .ltr{ margin-inline-start:8px; font-size:8pt; color:var(--muted); font-weight:400; }
+  .diagram-block,.chassis-block,.diag-block{ margin-top:8px; }
+  /* The reference paints each diagram heading as a full-width bar in the softer
+   * identity navy with white text (measured y144-160 of page 2). */
+  .diagram-title{ display:flex; align-items:baseline; background:#1b375a; color:#fff;
+    font-size:9pt; font-weight:700; padding:3px 9px; margin-bottom:6px; }
+  .diagram-title .ltr{ margin-inline-start:7px; font-size:7.6pt; color:#cbd5e1; font-weight:400; }
   /* The approved form prints the body-panel scheme at its full size, centred,
    * with the condition legend on one row beneath it and the remarks box last.
    * The drawing is the approved artwork itself, so its printed size is fixed to
    * the reference: the car occupies 321x439pt, which is 428px at Chromium's
    * 96dpi/72pt ratio. */
   .diagram{ position:relative; width:230px; }
-  .diagram--art{ width:428px; margin:0 auto; }
+  .diagram--art{ width:500px; margin:0 auto; }
   .artplan{ width:100%; height:auto; display:block; }
   .marker{ position:absolute; width:14px; height:14px; border-radius:50%; transform:translate(-50%,-50%);
     display:flex; align-items:center; justify-content:center; font-size:8pt; font-weight:700; color:#fff;
@@ -884,7 +874,7 @@ export const INSPECTION_REPORT_CSS = `
   /* The reference draws the chassis at ~270x374pt, i.e. 360px wide at
    * Chromium's 96dpi/72pt ratio, with the side cards narrower than the
    * drawing. */
-  .ch-art{ position:relative; width:330px; flex:0 0 330px; }
+  .ch-art{ position:relative; width:440px; flex:0 0 440px; }
   .artchassis{ width:100%; height:auto; display:block; }
   .chmark{ position:absolute; width:15px; height:15px; border-radius:50%; transform:translate(-50%,-50%);
     display:flex; align-items:center; justify-content:center; font-size:8pt; font-weight:700; color:#fff;
@@ -910,4 +900,10 @@ export const INSPECTION_REPORT_CSS = `
   .p5-verify .verify{ flex-direction:column; align-items:stretch; }
   .p5-verify .verify-qr{ display:flex; justify-content:center; }
   .p5-verify .verify-qr img{ width:120px; height:120px; }
+  /* The reference anchors the verification band at the foot of the computer-unit
+   * sheet (measured y755-807), well below the fault table. The page is a
+   * flex column so the band can be pushed to the bottom without guessing the
+   * table's height. */
+  .p5-page{ display:flex; flex-direction:column; min-height:965px; }
+  .p5-page .p5-verify{ margin-top:auto; }
 `;

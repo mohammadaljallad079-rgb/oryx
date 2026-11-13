@@ -1,4 +1,4 @@
-import { esc, escMultiline, money, moneyPlain, quantity, countryName } from './html.util';
+import { docStamp, esc, escMultiline, money, moneyPlain, quantity, countryName } from './html.util';
 import { CHROME_CSS } from './chrome';
 import { DOCUMENT_LATIN_STACK } from '../pdf/document-fonts.service';
 import type {
@@ -106,32 +106,6 @@ function paymentLabel(payload: FinancialDocumentPayload): string | null {
  */
 function paymentFieldLabel(payload: FinancialDocumentPayload): string {
   return paymentReference(payload) ? 'Payment at Account' : 'Payment';
-}
-
-/**
- * The reference's date stamp: "Sat 20/09/2026, 3:30 PM" in Bahrain time.
- *
- * The approved invoice prints a weekday, a dd/mm/yyyy date and a 12-hour clock;
- * `docDate` produces a different (day-month-year) shape, so the official layout
- * has its own formatter rather than reusing the report one.
- */
-function docStamp(value: string | null | undefined): string {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'Asia/Bahrain' }).format(date);
-  const day = new Intl.DateTimeFormat('en-GB', { day: '2-digit', timeZone: 'Asia/Bahrain' }).format(date);
-  const month = new Intl.DateTimeFormat('en-GB', { month: '2-digit', timeZone: 'Asia/Bahrain' }).format(date);
-  const year = new Intl.DateTimeFormat('en-GB', { year: 'numeric', timeZone: 'Asia/Bahrain' }).format(date);
-  const time = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-    timeZone: 'Asia/Bahrain',
-  })
-    .format(date)
-    .replace(/\u202f/g, ' ');
-  return `${weekday} ${day}/${month}/${year}, ${time}`;
 }
 
 /**
@@ -509,17 +483,22 @@ export const OFFICIAL_FINANCIAL_CSS = `
        and widen the labels; the official sheet therefore leads with the Latin
        stack and falls back to the Arabic face for the Arabic runs. */
     font-family:${DOCUMENT_LATIN_STACK}; }
-  /* The reference watermark is the "AUTO SERVICES" wordmark set in the identity
-     navy at ~52pt, centred on the page (measured y 374-426 on an 842pt sheet). */
-  .of-watermark{ position:absolute; left:0; right:0; top:47.75%;
-    text-align:center; font-size:45pt; font-weight:700; letter-spacing:6.4pt;
-    color:#0a1f44; opacity:0.055; pointer-events:none; z-index:-1;
-    font-family:Verdana,Arial,Helvetica,sans-serif; }
+  /* The reference watermark is the "AUTO SERVICES" wordmark set in the brand
+     display face (Codec Pro Bold) at 51.75pt with a 6.9pt tracking, so the run
+     measures the reference's 476pt ink width, in the identity navy at ~9.6%
+     opacity (measured from the approved PDF), centred on the sheet. */
+  .of-watermark{ position:absolute; left:0; right:0; top:350.2pt;
+    text-align:center; white-space:pre;
+    font-size:51.747pt; font-weight:700; letter-spacing:6.72pt;
+    color:#0a1f44; opacity:0.101; pointer-events:none; z-index:0;
+    font-family:'ORYX Display',Verdana,Arial,Helvetica,sans-serif; }
   .of-band{ display:flex; justify-content:space-between; align-items:center;
     min-height:37pt; position:relative; }
   /* The reference prints the same 22pt circled tick at the top-right of the
-     invoice header as on the report (measured x557-579, y29-51). */
-  .of-badge{ position:absolute; right:-8.6pt; top:13pt; line-height:0; }
+     invoice header as on the report (measured x557-579, y29-51). It must sit
+     inside the printable box: a negative offset made the page wider than the
+     sheet, which made Chromium shrink the whole invoice ~1.6%. */
+  .of-badge{ position:absolute; right:0; top:13pt; line-height:0; }
   .of-badge svg{ display:block; width:24pt; height:24pt; }
   .of-band-lead{ flex:0 0 auto; }
   .of-band-trail{ text-align:end; }
