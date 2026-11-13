@@ -23,6 +23,7 @@ import type {
   CustomerAttachmentDto,
   CustomerReturnDto,
   DashboardResponse,
+  ModuleSummaryDto,
   EcosystemOverviewResponse,
   ErpAccountDto,
   FeatureFlagDto,
@@ -539,6 +540,19 @@ export const api = {
     if (params.branchId) q.set('branchId', params.branchId);
     const qs = q.toString();
     return request<DashboardResponse>(`/dashboard${qs ? `?${qs}` : ''}`);
+  },
+
+  moduleSummary: (
+    moduleKey: string,
+    params: { companyId?: string | null; branchId?: string | null } = {},
+  ) => {
+    const q = new URLSearchParams();
+    if (params.companyId) q.set('companyId', params.companyId);
+    if (params.branchId) q.set('branchId', params.branchId);
+    const qs = q.toString();
+    return request<ModuleSummaryDto>(
+      `/dashboard/modules/${encodeURIComponent(moduleKey)}${qs ? `?${qs}` : ''}`,
+    );
   },
 
   // -------------------------------------------------------------- companies

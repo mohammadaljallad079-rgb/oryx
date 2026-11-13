@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -8,6 +8,8 @@ import { useAsync } from '@/lib/hooks';
 import { minorToInput, money, toMinorInput, toQuantityInput, todayIso } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import { DocumentActions } from '@/components/document-actions';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
 import {
   Badge,
   Button,
@@ -25,7 +27,7 @@ import {
 } from '@/components/ui';
 import type { PurchaseDocumentDto, RequisitionDto, SupplierDto, WarehouseDto } from '@oryx/shared';
 
-type Tab = 'orders' | 'requisitions' | 'receipts' | 'invoices' | 'returns' | 'suppliers';
+type Tab = 'dashboard' | 'orders' | 'requisitions' | 'receipts' | 'invoices' | 'returns' | 'suppliers';
 
 interface LineDraft {
   productId: string;
@@ -55,12 +57,23 @@ function useTaxOptions(companyId: string | null | undefined): SearchableOption[]
   }));
 }
 
+const TAB_KEYS = ['dashboard', 'orders', 'requisitions', 'receipts', 'invoices', 'returns', 'suppliers'] as const;
+
 export default function PurchasingPage() {
+  return (
+    <Suspense fallback={<Skeleton height={200} />}>
+      <PurchasingInner />
+    </Suspense>
+  );
+}
+
+function PurchasingInner() {
   const { t } = useUi();
   const { can } = useAuth();
-  const [tab, setTab] = useState<Tab>('orders');
+  const [tab, setTab] = useState<Tab>('dashboard');
 
   const tabs: Array<{ key: Tab; label: string }> = [
+    { key: 'dashboard', label: t('erp.purchasing.dashboard') },
     { key: 'orders', label: t('erp.purchasing.orders') },
     { key: 'requisitions', label: t('erp.purchasing.requisitions') },
     { key: 'receipts', label: t('erp.purchasing.receipts') },
@@ -71,6 +84,7 @@ export default function PurchasingPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="purchasing-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.purchasing_procurement')}
         subtitle={t('erp.purchasing.subtitle')}
@@ -93,6 +107,7 @@ export default function PurchasingPage() {
         ))}
       </div>
 
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="purchasing_procurement" /> : null}
       {tab === 'orders' ? <OrdersTab canManage={can('erp.purchasing.order.manage')} /> : null}
       {tab === 'requisitions' ? <RequisitionsTab canManage={can('erp.purchasing.requisition.manage')} /> : null}
       {tab === 'receipts' ? <ReceiptsTab canManage={can('erp.purchasing.receipt.manage')} /> : null}

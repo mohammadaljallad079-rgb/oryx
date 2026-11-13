@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -9,6 +9,8 @@ import { money, toMinorInput, todayIso } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import { DocumentActions } from '@/components/document-actions';
 import { AttachmentsPanel, DocumentPrintActions } from '@/components/document-print';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
 import {
   Badge,
   Button,
@@ -36,12 +38,22 @@ import type {
   TrialBalanceDto,
 } from '@oryx/shared';
 
-type Tab = 'accounts' | 'journals' | 'periods' | 'payments' | 'statements' | 'ledger' | 'receipts';
+type Tab = 'dashboard' | 'accounts' | 'journals' | 'periods' | 'payments' | 'statements' | 'ledger' | 'receipts';
+
+const TAB_KEYS = ['dashboard', 'accounts', 'journals', 'receipts', 'periods', 'payments', 'statements', 'ledger'] as const;
 
 export default function AccountingPage() {
+  return (
+    <Suspense fallback={<Skeleton height={200} />}>
+      <AccountingInner />
+    </Suspense>
+  );
+}
+
+function AccountingInner() {
   const { t } = useUi();
   const { can } = useAuth();
-  const [tab, setTab] = useState<Tab>('accounts');
+  const [tab, setTab] = useState<Tab>('dashboard');
 
   const canManageCoa = can('erp.accounting.coa.manage');
   const canPost = can('erp.accounting.journal.post');
@@ -49,6 +61,7 @@ export default function AccountingPage() {
   const canManagePayments = can('erp.accounting.payment.manage');
 
   const tabs: Array<{ key: Tab; label: string }> = [
+    { key: 'dashboard', label: t('erp.accounting.dashboard') },
     { key: 'accounts', label: t('erp.accounting.accounts') },
     { key: 'journals', label: t('erp.accounting.journals') },
     { key: 'receipts', label: t('erp.accounting.receipts') },
@@ -60,6 +73,7 @@ export default function AccountingPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="accounting-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.financial_accounting')}
         subtitle={t('erp.accounting.subtitle')}
@@ -82,6 +96,7 @@ export default function AccountingPage() {
         ))}
       </div>
 
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="financial_accounting" /> : null}
       {tab === 'accounts' ? <AccountsTab canManage={canManageCoa} /> : null}
       {tab === 'journals' ? <JournalsTab canPost={canPost} /> : null}
       {tab === 'receipts' ? <ReceiptsTab canManage={canManagePayments} /> : null}

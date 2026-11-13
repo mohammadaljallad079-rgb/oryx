@@ -390,6 +390,72 @@ export const Icons = {
       <path d="M9.5 12h5" />
     </Base>
   ),
+  activity: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M3 12h4l2.5-7 4 14 2.5-7H21" />
+    </Base>
+  ),
+  layers: (p: IconProps) => (
+    <Base {...p}>
+      <path d="m12 3 9 5-9 5-9-5 9-5Z" />
+      <path d="m3 13 9 5 9-5" />
+    </Base>
+  ),
+  chart: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+    </Base>
+  ),
+  file: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M6 2.5h7l5 5V21.5H6z" />
+      <path d="M13 2.5v5h5" />
+    </Base>
+  ),
+  message: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M4 5h16v11H9l-5 4z" />
+    </Base>
+  ),
+  checkSquare: (p: IconProps) => (
+    <Base {...p}>
+      <rect x="3.5" y="3.5" width="17" height="17" rx="2.5" />
+      <path d="m8 12 2.5 2.5L16 9" />
+    </Base>
+  ),
+  scale: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M12 3v18M7 21h10M12 6l7 2-3.5 6H8.5L5 8z" />
+    </Base>
+  ),
+  play: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M7 4.5 19 12 7 19.5z" />
+    </Base>
+  ),
+  grid: (p: IconProps) => (
+    <Base {...p}>
+      <rect x="4" y="4" width="7" height="7" rx="1.5" />
+      <rect x="13" y="4" width="7" height="7" rx="1.5" />
+      <rect x="4" y="13" width="7" height="7" rx="1.5" />
+      <rect x="13" y="13" width="7" height="7" rx="1.5" />
+    </Base>
+  ),
+  boxes: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M3 7.5 7.5 5 12 7.5 7.5 10z" />
+      <path d="M12 16.5 16.5 14 21 16.5 16.5 19z" />
+      <path d="M3 16.5 7.5 14 12 16.5 7.5 19z" />
+      <path d="M7.5 10v4M16.5 7v4" />
+    </Base>
+  ),
+  cash: (p: IconProps) => (
+    <Base {...p}>
+      <rect x="2.5" y="6.5" width="19" height="11" rx="2" />
+      <circle cx="12" cy="12" r="2.5" />
+      <path d="M6 10v4M18 10v4" />
+    </Base>
+  ),
 } as const;
 
 export type IconName = keyof typeof Icons;

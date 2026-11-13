@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -17,6 +17,8 @@ import {
 } from '@oryx/shared';
 import { Icon } from '@/components/icons';
 import { AttachmentsPanel, DocumentPrintActions } from '@/components/document-print';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
 import {
   Badge,
   Button,
@@ -42,7 +44,7 @@ import type {
 } from '@oryx/shared';
 import { DocumentActions } from '@/components/document-actions';
 
-type Tab = 'invoices' | 'orders' | 'quotations' | 'credit-notes' | 'pos' | 'customers';
+type Tab = 'dashboard' | 'invoices' | 'orders' | 'quotations' | 'credit-notes' | 'pos' | 'customers';
 
 interface LineDraft {
   productId: string;
@@ -151,12 +153,23 @@ function useTaxOptions(companyId: string | null | undefined): SearchableOption[]
   }));
 }
 
+const TAB_KEYS = ['dashboard', 'invoices', 'orders', 'quotations', 'credit-notes', 'pos', 'customers'] as const;
+
 export default function SalesPage() {
+  return (
+    <Suspense fallback={<Skeleton height={200} />}>
+      <SalesInner />
+    </Suspense>
+  );
+}
+
+function SalesInner() {
   const { t } = useUi();
   const { can } = useAuth();
-  const [tab, setTab] = useState<Tab>('invoices');
+  const [tab, setTab] = useState<Tab>('dashboard');
 
   const tabs: Array<{ key: Tab; label: string }> = [
+    { key: 'dashboard', label: t('erp.sales.dashboard') },
     { key: 'invoices', label: t('erp.sales.invoices') },
     { key: 'orders', label: t('erp.sales.orders') },
     { key: 'quotations', label: t('erp.sales.quotations') },
@@ -167,6 +180,7 @@ export default function SalesPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="sales-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.sales_pos')}
         subtitle={t('erp.sales.subtitle')}
@@ -189,6 +203,7 @@ export default function SalesPage() {
         ))}
       </div>
 
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="sales_pos" /> : null}
       {tab === 'invoices' ? <InvoicesTab canManage={can('erp.sales.invoice.manage')} /> : null}
       {tab === 'orders' ? <OrdersTab canManage={can('erp.sales.order.manage')} /> : null}
       {tab === 'quotations' ? <QuotationsTab canManage={can('erp.sales.order.manage')} /> : null}

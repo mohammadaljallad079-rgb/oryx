@@ -92,6 +92,8 @@ test.describe('Execution 03 — automotive modules (Enterprise tenant)', () => {
   test('5. the workshop job cards and providers render', async ({ page }) => {
     await page.goto('/automotive/maintenance');
     await expect(page.getByTestId('maintenance-page')).toBeVisible();
+    // The maintenance section opens on its dashboard; the job-card list is a tab.
+    await page.getByTestId('maintenance-tab-job-cards').click();
     await expect(page.getByTestId('new-job-card')).toBeVisible({ timeout: 20_000 });
     await page.getByTestId('maintenance-tab-providers').click();
     await expect(page.getByTestId('new-provider')).toBeVisible();

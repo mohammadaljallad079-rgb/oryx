@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
 import {
   Badge,
   Button,
@@ -41,7 +43,7 @@ interface IntentRow {
   refunds?: Array<{ id: string; refundNumber: string; amountMinor: number; status: string }>;
 }
 
-type Tab = 'intents' | 'providers' | 'reconciliation';
+type Tab = 'dashboard' | 'intents' | 'providers' | 'reconciliation';
 
 /**
  * Payments console.
@@ -51,12 +53,23 @@ type Tab = 'intents' | 'providers' | 'reconciliation';
  * `live` stays false until a real transaction is verified. Manual confirm exists
  * for cash and bank transfer, where the operator confirms the funds arrived.
  */
+const TAB_KEYS = ['dashboard', 'intents', 'providers', 'reconciliation'] as const;
+
 export default function PaymentsPage() {
+  return (
+    <Suspense fallback={<Skeleton height={200} />}>
+      <PaymentsInner />
+    </Suspense>
+  );
+}
+
+function PaymentsInner() {
   const { t } = useUi();
   const { can } = useAuth();
-  const [tab, setTab] = useState<Tab>('intents');
+  const [tab, setTab] = useState<Tab>('dashboard');
 
   const tabs = [
+    { key: 'dashboard' as const, label: t('erp.payments.dashboard') },
     { key: 'intents' as const, label: t('erp.payments.intents') },
     { key: 'providers' as const, label: t('erp.payments.providers') },
     { key: 'reconciliation' as const, label: t('erp.payments.reconciliation') },
@@ -64,6 +77,7 @@ export default function PaymentsPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="payments-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.payments')}
         subtitle={t('erp.payments.subtitle')}
@@ -86,6 +100,7 @@ export default function PaymentsPage() {
         ))}
       </div>
 
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="payments" /> : null}
       {tab === 'intents' ? <IntentsTab canManage={can('erp.payments.manage')} /> : null}
       {tab === 'providers' ? <ProvidersTab /> : null}
       {tab === 'reconciliation' ? <ReconciliationTab canManage={can('erp.payments.manage')} /> : null}

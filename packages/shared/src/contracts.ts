@@ -176,6 +176,64 @@ export interface DashboardResponse {
   tiles: DashboardTile[];
 }
 
+// ------------------------------------------------- per-module dashboard (Ex. 20)
+
+/** One headline figure on a module dashboard. Every value is a real DB aggregate. */
+export interface ModuleSummaryStat {
+  key: string;
+  labelEn: string;
+  labelAr: string;
+  value: number;
+  /** `count` renders as an integer, `money` as minor-unit currency, `percent` with a % sign. */
+  format: 'count' | 'money' | 'percent';
+  /** ISO code for a `money` stat; the company's currency. */
+  currency?: string;
+  tone?: 'default' | 'gold' | 'success' | 'danger';
+  icon?: string;
+}
+
+/** A primary operation offered as a jump on the module dashboard. */
+export interface ModuleSummaryShortcut {
+  labelEn: string;
+  labelAr: string;
+  route: string;
+  icon: string;
+  /** The permission that gates the shortcut; the UI hides it when it is absent. */
+  permission: string;
+}
+
+export interface ModuleSummaryActivity {
+  id: string;
+  action: string;
+  actorEmail: string | null;
+  targetType: string;
+  targetId: string | null;
+  createdAt: string;
+}
+
+export interface ModuleSummaryDto {
+  moduleKey: string;
+  nameEn: string;
+  nameAr: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  group: string;
+  icon: string;
+  tileImage: string;
+  route: string;
+  scope: {
+    companyId: string;
+    companyNameEn: string;
+    companyNameAr: string;
+    branchId: string | null;
+    currency: string;
+  };
+  isDemoData: boolean;
+  stats: ModuleSummaryStat[];
+  shortcuts: ModuleSummaryShortcut[];
+  activity: ModuleSummaryActivity[];
+}
+
 export interface ModuleDto {
   id: string;
   key: string;
