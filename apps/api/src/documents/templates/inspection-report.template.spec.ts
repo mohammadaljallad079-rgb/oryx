@@ -387,4 +387,13 @@ describe('inspection report template — reference page parity (Execution 19)', 
     // The size is applied through the variable, so no rule pins a fixed size.
     expect(html).toContain('font-size:var(--p-title-size,10.3pt)');
   });
+
+  it('sets the disclaimer and remarks body at the measured reference sizes', () => {
+    const html = render();
+    // The Arabic disclaimer column prints at 8pt and its English translation at
+    // 6pt (measured y566-660 of page 1); the remarks list at 6.6pt.
+    expect(html).toContain('.terms-ar{ flex:1 1 0; margin:0; font-size:8pt;');
+    expect(html).toContain('.terms-en{ flex:1 1 0; margin:0; font-size:6pt;');
+    expect(html).toContain('.remarks-list{ flex:1 1 0; margin:0; padding-inline-start:15px; font-size:6.6pt;');
+  });
 });

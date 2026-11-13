@@ -775,19 +775,24 @@ export const INSPECTION_REPORT_CSS = `
    * it. */
   .vphoto-mark{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
     width:62%; height:auto; opacity:0.18; z-index:1; pointer-events:none; }
+  /* The approved sheet sets the disclaimer body a step smaller than the
+   * checklist rows: the Arabic column prints at 8pt and the English column at
+   * 6pt (measured y566-660 of page 1). The English is deliberately lighter —
+   * it is the translation, not the governing text — so both columns stay the
+   * same height across the block. */
   .terms{ margin-top:10px; border:1px solid var(--line); border-radius:6px; padding:8px 10px; background:#f7f9fc; }
-  .terms-title{ font-size:9.5pt; font-weight:700; color:var(--navy); }
-  .terms-title .ltr{ margin-inline-start:8px; font-size:8pt; color:var(--muted); font-weight:400; }
-  .terms-sub{ font-size:8pt; color:var(--navy-soft); margin:2px 0 5px; }
+  .terms-title{ font-size:10pt; font-weight:700; color:var(--navy); }
+  .terms-title .ltr{ margin-inline-start:8px; font-size:10pt; color:var(--muted); font-weight:400; }
+  .terms-sub{ font-size:10pt; color:var(--navy-soft); margin:2px 0 5px; }
   .terms-sub .ltr{ margin-inline-start:8px; color:var(--muted); }
   .terms-cols{ display:flex; gap:14px; }
-  .terms-ar{ flex:1 1 0; margin:0; font-size:7pt; line-height:1.2; color:var(--ink); }
-  .terms-en{ flex:1 1 0; margin:0; font-size:6.8pt; line-height:1.2; color:var(--muted); text-align:left; }
+  .terms-ar{ flex:1 1 0; margin:0; font-size:8pt; line-height:1.2; color:var(--ink); }
+  .terms-en{ flex:1 1 0; margin:0; font-size:6pt; line-height:1.2; color:var(--muted); text-align:left; }
   .remarks-block{ margin-top:10px; border:1px solid var(--line); border-radius:6px; padding:8px 10px; }
-  .remarks-title{ font-size:9.5pt; font-weight:700; color:var(--navy); margin-bottom:4px; }
-  .remarks-title .ltr{ margin-inline-start:8px; font-size:8pt; color:var(--muted); font-weight:400; }
+  .remarks-title{ font-size:10pt; font-weight:700; color:var(--navy); margin-bottom:4px; }
+  .remarks-title .ltr{ margin-inline-start:8px; font-size:8.3pt; color:var(--muted); font-weight:400; }
   .remarks-cols{ display:flex; gap:14px; }
-  .remarks-list{ flex:1 1 0; margin:0; padding-inline-start:15px; font-size:7pt; line-height:1.22; color:var(--ink); }
+  .remarks-list{ flex:1 1 0; margin:0; padding-inline-start:15px; font-size:6.6pt; line-height:1.22; color:var(--ink); }
   .remarks-list.ltr{ text-align:left; }
   /* ---- section groups ---- */
   .grp{ margin-top:5px; }
