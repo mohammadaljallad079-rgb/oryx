@@ -43,6 +43,18 @@
     rgba(0, 15, 30, 0.72) 55%,
     rgba(0, 18, 34, 0.94) 100%
   );
+  /*
+   * The information band along the bottom of a module tile. Unlike the artwork
+   * above it, this band tracks the theme: the dark theme leaves the full-cover
+   * scrim to carry the card (`none` here), while the light block paints an ivory
+   * fade with dark ink so no fixed navy plate survives a theme switch. The
+   * artwork itself is untouched in both themes.
+   */
+  --tile-band: none;
+  --tile-band-ink: #ffffff;
+  --tile-band-ink-muted: rgba(233, 240, 248, 0.82);
+  --tile-band-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
+  --tile-band-shadow-soft: 0 1px 10px rgba(0, 0, 0, 0.75);
   --shadow-card: 0 18px 40px -24px rgba(0, 0, 0, 0.85);
   --header-h: 68px;
   --sidebar-w: 268px;
@@ -75,6 +87,14 @@
     rgba(0, 22, 43, 0.62) 55%,
     rgba(0, 22, 43, 0.9) 100%
   );
+  /* The module-tile information band in the light theme: an ivory fade with dark
+   * ink, so the card bottom switches with the theme while the artwork above it
+   * stays put. The scrim stops short, so the photograph still reads. */
+  --tile-band: linear-gradient(180deg, transparent 0%, rgba(247, 244, 237, 0.94) 60%);
+  --tile-band-ink: #1a1712;
+  --tile-band-ink-muted: #4a443a;
+  --tile-band-shadow: none;
+  --tile-band-shadow-soft: none;
   --shadow-card: 0 16px 36px -26px rgba(0, 22, 43, 0.45);
 }
 
@@ -389,6 +409,24 @@ body::before {
   background: var(--tile-overlay);
 }
 
+/*
+ * The bottom information band. A separate layer rather than part of the scrim,
+ * because only this band tracks the theme: the dark theme resolves
+ * `--tile-band` to `none` and lets the full-cover scrim carry the card, while
+ * the light theme paints an ivory fade here so the card bottom switches without
+ * touching the artwork above it. It is a child of the tile (a block) rather than
+ * of the flex body, so it never becomes a flex item.
+ */
+.oryx-tile::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 62%;
+  z-index: -1;
+  background: var(--tile-band);
+  pointer-events: none;
+}
+
 .oryx-tile__body {
   position: relative;
   display: flex;
@@ -416,14 +454,15 @@ body::before {
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.01em;
-  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
+  color: var(--tile-band-ink);
+  text-shadow: var(--tile-band-shadow);
 }
 
 .oryx-tile__desc {
   font-size: 12.5px;
-  color: rgba(233, 240, 248, 0.82);
+  color: var(--tile-band-ink-muted);
   line-height: 1.5;
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.75);
+  text-shadow: var(--tile-band-shadow-soft);
 }
 
 .oryx-tile--planned .oryx-tile__media {

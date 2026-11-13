@@ -145,4 +145,27 @@ test.describe('Execution 20 — maintenance pickers', () => {
     await page.keyboard.press('Escape');
     await expectNoServerError(page);
   });
+
+  test('9. creating a customer inside the job-card picker persists and selects it', async ({ page }) => {
+    await page.goto('/automotive/maintenance');
+    await expect(page.getByTestId('maintenance-page')).toBeVisible({ timeout: 25_000 });
+    await page.getByTestId('new-job-card').click();
+    await page.getByTestId('job-customer').click();
+    await page.getByTestId('job-customer-add').click();
+
+    // The "add new" action opens the *real* customer form, not a cut-down copy.
+    const stamp = Date.now().toString().slice(-7);
+    const code = `ZZ${stamp}`;
+    const nameEn = `ZZ Verify Co ${stamp}`;
+    await page.getByTestId('customer-code').fill(code);
+    await page.getByTestId('customer-name-en').fill(nameEn);
+    await page.getByTestId('customer-name-ar').fill(`شركة ${stamp}`);
+    await page.getByTestId('save-customer').click();
+
+    // The form closed, the customer was persisted through the API and the
+    // picker now shows it as the selected value on the job card.
+    await expect(page.getByTestId('save-customer')).toHaveCount(0, { timeout: 20_000 });
+    await expect(page.getByTestId('job-customer')).toContainText(code, { timeout: 20_000 });
+    await expectNoServerError(page);
+  });
 });

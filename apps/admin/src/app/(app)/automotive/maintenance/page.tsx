@@ -422,7 +422,13 @@ function CreateJobCardModal({
                       open={props.open}
                       type="INDIVIDUAL"
                       onClose={props.onClose}
-                      onSaved={(c) => props.onCreated({ id: c.id, label: `${c.code} — ${c.nameEn}` })}
+                      onSaved={(c) => {
+                        setCustomerOptions((prev) => [
+                          ...prev,
+                          { id: c.id, label: `${c.code} — ${c.nameEn}`, sublabel: c.phone ?? null, keywords: c.nameAr },
+                        ]);
+                        props.onCreated({ id: c.id, label: `${c.code} — ${c.nameEn}` });
+                      }}
                     />
                   )
                 : undefined
