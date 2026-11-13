@@ -3,6 +3,7 @@ import {
   getModule,
   type ModuleSummaryActivity,
   type ModuleSummaryDto,
+  type ModuleSummaryFunction,
   type ModuleSummaryShortcut,
   type ModuleSummaryStat,
 } from '@oryx/shared';
@@ -57,6 +58,15 @@ const MODULE_ACTIVITY: Record<string, { actions: string[]; targets: string[] }> 
   spare_parts: {
     actions: ['inventory.', 'spare_parts.', 'parts.'],
     targets: ['PRODUCT', 'PART_REFERENCE', 'PARTS_RESERVATION', 'STOCK_MOVEMENT'],
+  },
+  /**
+   * Reports is a read-only aggregation over the other modules, so its activity
+   * feed surfaces the business documents the reports describe rather than an
+   * action of its own.
+   */
+  reports_analytics: {
+    actions: ['sales.', 'purchasing.', 'inventory.', 'accounting.'],
+    targets: ['SALES_INVOICE', 'SALES_ORDER', 'PURCHASE_ORDER', 'SUPPLIER_INVOICE', 'STOCK_MOVEMENT'],
   },
 };
 
@@ -148,6 +158,7 @@ export class ModuleSummaryService {
       isDemoData: (company.notes ?? '').includes('SEED_DEMO_DATA'),
       stats,
       shortcuts: this.shortcuts(moduleKey),
+      functions: this.functions(moduleKey),
       activity,
     };
   }
@@ -178,9 +189,43 @@ export class ModuleSummaryService {
         return this.inspectionStats(ctx);
       case 'spare_parts':
         return this.sparePartsStats(ctx);
+      case 'reports_analytics':
+        return this.reportsStats(ctx);
       default:
         return [];
     }
+  }
+
+  /** Reports & Analytics: cross-module totals a report consumer reads at a glance. */
+  private async reportsStats(ctx: StatCtx) {
+    const { companyId, currency } = ctx;
+    const [invoices, invoiceTotal, orders, orderTotal, products, lowStock, receivables, payables] =
+      await Promise.all([
+        this.prisma.salesInvoice.count({ where: { companyId, status: { not: 'DRAFT' } } }),
+        this.prisma.salesInvoice.aggregate({
+          where: { companyId, status: { not: 'DRAFT' } },
+          _sum: { totalMinor: true },
+        }),
+        this.prisma.purchaseOrder.count({ where: { companyId, status: { not: 'CANCELLED' } } }),
+        this.prisma.purchaseOrder.aggregate({
+          where: { companyId, status: { not: 'CANCELLED' } },
+          _sum: { totalMinor: true },
+        }),
+        this.prisma.product.count({ where: { companyId, isActive: true } }),
+        this.lowStockCount(companyId),
+        this.controlBalance(companyId, 'AR_CONTROL'),
+        this.controlBalance(companyId, 'AP_CONTROL'),
+      ]);
+    return [
+      this.money('salesTotal', 'Sales invoiced', 'إجمالي المبيعات', invoiceTotal._sum.totalMinor ?? 0, currency, 'chart', 'gold'),
+      this.money('purchaseTotal', 'Purchases ordered', 'إجمالي المشتريات', orderTotal._sum.totalMinor ?? 0, currency, 'truck'),
+      this.money('receivable', 'Accounts receivable', 'الذمم المدينة', receivables, currency, 'wallet'),
+      this.money('payable', 'Accounts payable', 'الذمم الدائنة', -payables, currency, 'wallet', 'danger'),
+      this.count('invoices', 'Sales invoices', 'فواتير المبيعات', invoices, 'scroll'),
+      this.count('orders', 'Purchase orders', 'أوامر الشراء', orders, 'cart'),
+      this.count('products', 'Active items', 'الأصناف النشطة', products, 'package'),
+      this.count('lowStock', 'Low-stock alerts', 'تنبيهات المخزون', lowStock, 'alert', lowStock > 0 ? 'danger' : 'default'),
+    ];
   }
 
   private money(
@@ -579,12 +624,115 @@ export class ModuleSummaryService {
           S('Parts catalogue', 'كتالوج القطع', '/automotive/spare-parts?tab=catalog', 'package', 'erp.spare_parts.read'),
           S('Reservations', 'الحجوزات', '/automotive/spare-parts?tab=reservations', 'clipboardCheck', 'erp.spare_parts.read'),
         ];
+      case 'reports_analytics':
+        return [
+          S('Sales report', 'تقرير المبيعات', '/reports?tab=sales', 'chart', 'erp.reports.read'),
+          S('Purchasing report', 'تقرير المشتريات', '/reports?tab=purchasing', 'truck', 'erp.reports.read'),
+          S('Inventory report', 'تقرير المخزون', '/reports?tab=inventory', 'package', 'erp.reports.read'),
+          S('Aging report', 'تقرير الأعمار', '/reports?tab=aging', 'clock', 'erp.reports.read'),
+        ];
       default:
         return [];
     }
   }
 
-  // ----------------------------------------------------------------- activity
+  // ---------------------------------------------------------------- functions
+
+  /**
+   * The module's main functional areas, rendered as cards beneath the quick
+   * shortcuts. Each entry names a real screen the module owns (never a
+   * duplicate of the shortcut row) and carries a one-line description so the
+   * card reads as a capability, not just a link.
+   */
+  private functions(moduleKey: string): ModuleSummaryFunction[] {
+    const F = (
+      labelEn: string,
+      labelAr: string,
+      route: string,
+      icon: string,
+      permission: string,
+      descriptionEn: string,
+      descriptionAr: string,
+    ): ModuleSummaryFunction => ({ labelEn, labelAr, route, icon, permission, descriptionEn, descriptionAr });
+    switch (moduleKey) {
+      case 'financial_accounting':
+        return [
+          F('Chart of accounts', 'دليل الحسابات', '/accounting?tab=accounts', 'layers', 'erp.accounting.read', 'The account tree, control accounts and posting roles.', 'شجرة الحسابات والحسابات الرقابية وأدوار الترحيل.'),
+          F('Journal entries', 'قيود اليومية', '/accounting?tab=journals', 'edit', 'erp.accounting.read', 'Draft, post, reverse and lock double-entry journals.', 'إنشاء وترحيل وعكس وقفل القيود المزدوجة.'),
+          F('Receipts & payments', 'المقبوضات والمدفوعات', '/accounting?tab=receipts', 'cash', 'erp.accounting.read', 'Record customer receipts and supplier payments.', 'تسجيل مقبوضات العملاء ومدفوعات الموردين.'),
+          F('Financial periods', 'الفترات المالية', '/accounting?tab=periods', 'calendar', 'erp.accounting.read', 'Fiscal years and period open/close control.', 'السنوات المالية والتحكم في إغلاق الفترات.'),
+          F('Trial balance', 'ميزان المراجعة', '/accounting?tab=trial', 'scale', 'erp.accounting.read', 'Posted debit and credit balances by account.', 'الأرصدة المدينة والدائنة المرحّلة حسب الحساب.'),
+          F('Statements', 'القوائم المالية', '/accounting?tab=statements', 'barChart', 'erp.accounting.read', 'Income statement and balance sheet from the ledger.', 'قائمة الدخل والميزانية من دفتر الأستاذ.'),
+        ];
+      case 'sales_pos':
+        return [
+          F('Quotations', 'عروض الأسعار', '/sales?tab=quotations', 'file', 'erp.sales.read', 'Price a deal and convert it to an order.', 'تسعير الصفقة وتحويلها إلى أمر بيع.'),
+          F('Sales orders', 'أوامر البيع', '/sales?tab=orders', 'cart', 'erp.sales.read', 'Confirm orders and issue their invoices.', 'تأكيد الأوامر وإصدار فواتيرها.'),
+          F('Invoices', 'الفواتير', '/sales?tab=invoices', 'scroll', 'erp.sales.read', 'Issue invoices, record payment and post to the ledger.', 'إصدار الفواتير وتسجيل السداد والترحيل للدفتر.'),
+          F('Credit notes', 'إشعارات الدائن', '/sales?tab=credit-notes', 'refresh', 'erp.sales.read', 'Return goods and reverse an invoice.', 'إرجاع البضاعة وعكس الفاتورة.'),
+          F('Point of sale', 'نقاط البيع', '/sales?tab=pos', 'cash', 'erp.sales.pos.operate', 'Cashier sessions, cart checkout and receipts.', 'جلسات الكاشير وإتمام البيع والإيصالات.'),
+          F('Customers', 'العملاء', '/sales?tab=customers', 'users', 'erp.sales.read', 'The customer directory shared with CRM and maintenance.', 'دليل العملاء المشترك مع إدارة العلاقات والصيانة.'),
+        ];
+      case 'purchasing_procurement':
+        return [
+          F('Requisitions', 'طلبات الشراء', '/purchasing?tab=requisitions', 'file', 'erp.purchasing.read', 'Internal requests awaiting approval.', 'طلبات داخلية بانتظار الاعتماد.'),
+          F('Purchase orders', 'أوامر الشراء', '/purchasing?tab=orders', 'cart', 'erp.purchasing.read', 'Commit to a supplier and track delivery.', 'الالتزام مع المورد ومتابعة التسليم.'),
+          F('Goods receipts', 'استلام البضاعة', '/purchasing?tab=receipts', 'package', 'erp.purchasing.read', 'Receive stock and update the inventory ledger.', 'استلام المخزون وتحديث دفتر المخزون.'),
+          F('Supplier invoices', 'فواتير الموردين', '/purchasing?tab=invoices', 'scroll', 'erp.purchasing.read', 'Match, post and pay supplier bills.', 'مطابقة وترحيل وسداد فواتير الموردين.'),
+          F('Returns', 'المرتجعات', '/purchasing?tab=returns', 'refresh', 'erp.purchasing.read', 'Return goods and reverse the payable.', 'إرجاع البضاعة وعكس الذمة الدائنة.'),
+          F('Suppliers', 'الموردون', '/purchasing?tab=suppliers', 'truck', 'erp.purchasing.read', 'The supplier directory and their terms.', 'دليل الموردين وشروط التعامل.'),
+        ];
+      case 'warehouses_inventory':
+        return [
+          F('Items', 'الأصناف', '/inventory?tab=products', 'package', 'erp.inventory.read', 'The SKU catalogue with pricing and tracking.', 'كتالوج الأصناف بالأسعار والتتبع.'),
+          F('Warehouses', 'المستودعات', '/inventory?tab=warehouses', 'warehouse', 'erp.inventory.read', 'Locations that hold stock.', 'المواقع التي تحتفظ بالمخزون.'),
+          F('Movements', 'الحركات', '/inventory?tab=movements', 'activity', 'erp.inventory.read', 'The moving-average stock ledger.', 'دفتر المخزون بالمتوسط المرجح.'),
+          F('Transfers', 'التحويلات', '/inventory?tab=transfers', 'refresh', 'erp.inventory.read', 'Move stock between warehouses.', 'نقل المخزون بين المستودعات.'),
+          F('Adjustments', 'التسويات', '/inventory?tab=adjustments', 'sliders', 'erp.inventory.read', 'Correct counts with an audited reason.', 'تصحيح الأرصدة بسبب موثق.'),
+          F('Valuation', 'التقييم', '/inventory?tab=valuation', 'scale', 'erp.inventory.read', 'Stock value by item and warehouse.', 'قيمة المخزون حسب الصنف والمستودع.'),
+        ];
+      case 'human_resources':
+        return [
+          F('Employees', 'الموظفون', '/hr?tab=employees', 'users', 'erp.hr.read', 'The employee record, contracts and documents.', 'ملف الموظف والعقود والمستندات.'),
+          F('Attendance', 'الحضور والانصراف', '/hr?tab=attendance', 'clock', 'erp.hr.read', 'Daily attendance and absence.', 'الحضور والغياب اليومي.'),
+          F('Leave', 'الإجازات', '/hr?tab=leave', 'calendar', 'erp.hr.read', 'Leave balances and requests.', 'أرصدة الإجازات والطلبات.'),
+          F('Payroll', 'الرواتب', '/hr?tab=payroll', 'wallet', 'erp.hr.read', 'Payroll runs, payslips and posting.', 'دورات الرواتب وكشوف المرتبات والترحيل.'),
+          F('Advances', 'السلف', '/hr?tab=advances', 'creditCard', 'erp.hr.read', 'Employee advances and settlement.', 'سلف الموظفين وتسويتها.'),
+          F('HR policies', 'سياسات الموارد البشرية', '/hr?tab=policy', 'shield', 'erp.hr.read', 'Working hours, leave and attendance policy.', 'سياسة الدوام والإجازات والحضور.'),
+        ];
+      case 'crm':
+        return [
+          F('Leads', 'العملاء المحتملون', '/crm?tab=leads', 'target', 'erp.crm.read', 'Capture and qualify demand.', 'التقاط الطلب وتأهيله.'),
+          F('Opportunities', 'الفرص', '/crm?tab=opportunities', 'trend', 'erp.crm.read', 'Deals on a pipeline, ready to quote.', 'الصفقات على المسار وجاهزة للتسعير.'),
+          F('Support tickets', 'تذاكر الدعم', '/crm?tab=tickets', 'message', 'erp.crm.read', 'SLA-tracked customer support.', 'دعم العملاء بمتابعة اتفاقية الخدمة.'),
+          F('Activities', 'الأنشطة', '/crm?tab=activities', 'activity', 'erp.crm.read', 'Calls, meetings and follow-ups.', 'المكالمات والاجتماعات والمتابعات.'),
+        ];
+      case 'operations':
+        return [
+          F('Projects', 'المشاريع', '/operations?tab=projects', 'folder', 'erp.operations.read', 'Group work under a delivery plan.', 'تجميع العمل تحت خطة تسليم.'),
+          F('Tasks', 'المهام', '/operations?tab=tasks', 'checkSquare', 'erp.operations.read', 'Assignable units of work.', 'وحدات عمل قابلة للإسناد.'),
+          F('Work orders', 'أوامر العمل', '/operations?tab=work-orders', 'wrench', 'erp.operations.read', 'State-machine-enforced service jobs.', 'أعمال خدمة بمخطط حالات مُلزم.'),
+          F('Approvals', 'الاعتمادات', '/operations?tab=approvals', 'check', 'erp.operations.read', 'Requests awaiting a decision.', 'طلبات بانتظار قرار.'),
+          F('Calendar', 'التقويم', '/operations?tab=calendar', 'calendar', 'erp.operations.read', 'Scheduled work across teams.', 'العمل المجدول عبر الفرق.'),
+        ];
+      case 'payments':
+        return [
+          F('Payment intents', 'نوايا الدفع', '/payments?tab=intents', 'creditCard', 'erp.payments.read', 'Online and offline payment attempts.', 'محاولات الدفع الإلكتروني والمباشر.'),
+          F('Providers', 'مزودو الدفع', '/payments?tab=providers', 'plug', 'erp.payments.read', 'Configured gateway readiness.', 'جاهزية بوابات الدفع المهيأة.'),
+          F('Reconciliation', 'المطابقة', '/payments?tab=reconciliation', 'check', 'erp.payments.read', 'Match records to settled money.', 'مطابقة السجلات مع الأموال المسوّاة.'),
+        ];
+      case 'reports_analytics':
+        return [
+          F('Sales report', 'تقرير المبيعات', '/reports?tab=sales', 'chart', 'erp.reports.read', 'Sales, tax, collected and outstanding by customer.', 'المبيعات والضريبة والمحصّل والمستحق حسب العميل.'),
+          F('Purchasing report', 'تقرير المشتريات', '/reports?tab=purchasing', 'truck', 'erp.reports.read', 'Spend by supplier and period.', 'المصروف حسب المورد والفترة.'),
+          F('Inventory report', 'تقرير المخزون', '/reports?tab=inventory', 'package', 'erp.reports.read', 'Stock value and movement by item.', 'قيمة المخزون وحركته حسب الصنف.'),
+          F('Accounting report', 'التقرير المحاسبي', '/reports?tab=accounting', 'calculator', 'erp.reports.read', 'Ledger movement by account.', 'حركة دفتر الأستاذ حسب الحساب.'),
+          F('Aging report', 'تقرير الأعمار', '/reports?tab=aging', 'clock', 'erp.reports.read', 'Receivables and payables by age bucket.', 'الذمم المدينة والدائنة حسب أعمار الديون.'),
+        ];
+      default:
+        return [];
+    }
+  }
 
   private async activity(moduleKey: string, companyId: string): Promise<ModuleSummaryActivity[]> {
     const spec = MODULE_ACTIVITY[moduleKey];

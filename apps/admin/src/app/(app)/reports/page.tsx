@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { api } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, qty } from '@/lib/erp-format';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
 import {
   Badge,
   Button,
@@ -26,13 +28,23 @@ import type {
   SalesReportDto,
 } from '@oryx/shared';
 
-type Tab = 'accounting' | 'sales' | 'purchasing' | 'inventory' | 'aging';
+type Tab = 'dashboard' | 'accounting' | 'sales' | 'purchasing' | 'inventory' | 'aging';
 
 export default function ReportsPage() {
+  return (
+    <Suspense fallback={<Skeleton height={200} />}>
+      <ReportsInner />
+    </Suspense>
+  );
+}
+
+function ReportsInner() {
   const { t } = useUi();
-  const [tab, setTab] = useState<Tab>('sales');
+  const [tab, setTab] = useState<Tab>('dashboard');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+
+  const TAB_KEYS = ['dashboard', 'sales', 'purchasing', 'inventory', 'accounting', 'aging'] as const;
 
   const params = { from: from || undefined, to: to || undefined };
 
@@ -44,6 +56,7 @@ export default function ReportsPage() {
   const payables = useAsync<AgingRowDto[]>(() => api.payablesAging(), []);
 
   const tabs: Array<{ key: Tab; label: string }> = [
+    { key: 'dashboard', label: t('erp.reports.dashboard') },
     { key: 'sales', label: t('erp.reports.sales') },
     { key: 'purchasing', label: t('erp.reports.purchasing') },
     { key: 'inventory', label: t('erp.reports.inventory') },
@@ -62,6 +75,7 @@ export default function ReportsPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="reports-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.reports_analytics')}
         subtitle={t('erp.reports.subtitle')}
@@ -99,6 +113,8 @@ export default function ReportsPage() {
           </button>
         ))}
       </div>
+
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="reports_analytics" testId="reports-dashboard" /> : null}
 
       {tab === 'sales' ? (
         <Card>

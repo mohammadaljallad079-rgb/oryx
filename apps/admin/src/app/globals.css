@@ -410,23 +410,23 @@
   --hero-ink-muted: #4a5568;
   --hero-ink-accent: #7d5f10;
   /*
-   * Navy navigation in the light theme too. The rail is the one surface that
-   * stays navy on the ivory page: it carries the white/gold lockup and the gold
-   * active marker, which is the approved identity rather than a light-chrome
-   * sidebar. Deepened a step from the dark rail so it separates from the ivory
-   * field rather than blending toward it. Every ink pair is measured against
-   * `#0f2b48` and clears WCAG AA with room to spare.
+   * Light-theme navigation rail. The owner's Execution 20 directive requires
+   * the sidebar to switch completely with the theme: an ivory/white field, navy
+   * ink, navy/gold icons, subtle separators, light hover and a clearly marked
+   * active item. Gold stays an accent (active marker, icon tint), never the
+   * field, so the rail reads as light chrome rather than a navy slab. The lockup
+   * uses its on-light colourway (see the `.oryx-sidebar` overrides below).
    */
-  --nav-bg: linear-gradient(180deg, #12314f 0%, #0f2b48 55%, #081a2c 100%);
-  --nav-solid: #0f2b48;
-  --nav-border: rgba(212, 175, 55, 0.22);
-  --nav-text: #c9d6e4;
-  --nav-text-strong: #ffffff;
-  --nav-text-faint: #9db1c9;
-  --nav-hover: rgba(255, 255, 255, 0.08);
-  --nav-active: rgba(232, 199, 102, 0.24);
-  --nav-active-border: rgba(232, 199, 102, 0.6);
-  --nav-danger: #ff9d9d;
+  --nav-bg: linear-gradient(180deg, #ffffff 0%, #faf7f1 60%, #f4efe6 100%);
+  --nav-solid: #f7f4ed;
+  --nav-border: rgba(15, 43, 72, 0.12);
+  --nav-text: #33465c;
+  --nav-text-strong: #0f2b48;
+  --nav-text-faint: #6b7b8f;
+  --nav-hover: rgba(15, 43, 72, 0.06);
+  --nav-active: rgba(212, 175, 55, 0.2);
+  --nav-active-border: rgba(125, 95, 16, 0.5);
+  --nav-danger: #b42318;
   /* A warm gold bloom rather than the dark theme's blue one, so the ivory field
    * does not pick up a cold cast. */
   --ambient-wash: radial-gradient(1100px 520px at 78% -8%, rgba(212, 175, 55, 0.16), transparent 62%),
@@ -1853,16 +1853,16 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
  */
 
 /*
- * The navigation rail is navy in both themes (see the `--nav-*` tokens), so its
- * lockup always uses the on-dark colourway too. Without this the light theme
- * would swap in the navy-ink lockup and print a dark mark on a dark rail.
+ * The navigation rail is light in the light theme (see the `--nav-*` tokens),
+ * so its lockup uses the on-light (navy/gold) colourway. The dark theme keeps
+ * the navy rail and the on-dark colourway.
  */
 :root[data-theme='light'] .oryx-sidebar .oryx-brand-logo__on-dark {
-  display: block;
+  display: none;
 }
 
 :root[data-theme='light'] .oryx-sidebar .oryx-brand-logo__on-light {
-  display: none;
+  display: block;
 }
 
 /* A tenant-uploaded logo is centred in the lockup slot; the packaged ORYX
@@ -2803,6 +2803,77 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
 
 .oryx-shortcut {
   text-decoration: none;
+}
+
+/* ------------------------------------------------------- function cards */
+/* The module's main functional areas. A responsive grid of cards, each with
+ * an icon, a title and a one-line description, so a module dashboard reads as
+ * a map of what the section does rather than a bare list of links. */
+.oryx-function-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.oryx-function-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  text-decoration: none;
+  color: var(--text);
+  transition: border-color 0.14s ease, background 0.14s ease, transform 0.14s ease;
+}
+
+.oryx-function-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+  transform: translateY(-1px);
+}
+
+.oryx-function-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--gold) 16%, transparent);
+  color: var(--gold-on-tint, var(--gold));
+}
+
+.oryx-function-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.oryx-function-card__title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.oryx-function-card__desc {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.oryx-function-card__chevron {
+  color: var(--text-muted);
+  flex: none;
+  margin-top: 2px;
+}
+
+:root[data-dir='rtl'] .oryx-function-card__chevron {
+  transform: scaleX(-1);
 }
 
 .oryx-focus-ring:focus-visible {
