@@ -268,3 +268,76 @@ pnpm --filter @oryx/api test:e2e
 # with both dev servers running:
 pnpm --filter @oryx/admin test:ui
 ```
+
+## 10. Independent verification addendum
+
+This addendum records a second, independent verification pass over the branch
+(not a re-run of the numbers above). Every figure was reproduced on a fresh,
+isolated database.
+
+**Method**
+
+- Fresh database `oryx_e20_verify`, all 13 migrations applied cleanly from
+  scratch, then `pnpm db:seed`. The shared dev database was left untouched.
+- Real suites executed against that database, not trusted from the report:
+  shared 102/102, API e2e 242/242 (9 suites), browser 134/134 (was 129 + the new
+  theme suite), mobile 17/17. Total 495.
+- `pnpm --filter @oryx/admin typecheck`, `@oryx/admin lint`, `@oryx/customer lint`
+  and `@oryx/api typecheck` all exit 0; the admin production build succeeds.
+
+**Confirmed as implemented**
+
+- Per-company settings: `SETTING_NAMESPACES` has all nine namespaces
+  (GENERAL, INVOICING, ACCOUNTING, TAX, HR, INVENTORY, SALES, MAINTENANCE,
+  DOCUMENTS). The API scopes every read/write through
+  `resolveCompanyScope`; `execution20.e2e-spec.ts` proves one company cannot
+  read another's settings.
+- Settings drive issued documents: `SalesService.createInvoice` reads the
+  caller's own `TAX` and `INVOICING` rows for the VAT default and invoice
+  prefix. The API suite issues an invoice as company A (prefix `ZZ`, VAT 5%) and
+  as company B (prefix `YY`) and asserts the two differ.
+- Unified documents: one `EntityAttachment` store, 13 entity types (customer,
+  company, supplier, employee, vehicle, job card, inspection, purchase order,
+  supplier invoice, journal entry, contract, work order, project) and the exact
+  accepted types from the brief (PDF, DOC/DOCX, XLS/XLSX, JPG, PNG). Every read,
+  write, replace and delete is company-scoped and path traversal is refused;
+  cross-tenant access is refused by test.
+- Customer types: `INDIVIDUAL`/`COMPANY` with company-only fields and
+  secondary branches; the form renders a different field set per type.
+- Module dashboards: 21 module keys resolve to distinct, DB-backed figures; the
+  banner, KPIs, shortcuts and activity render on 12 admin pages, and an
+  unlicensed module is refused.
+
+**Two defects found and fixed (commit `3391eea`)**
+
+1. The module-tile bottom band did not follow the theme. The tile's navy scrim
+   still ended in `rgba(0,22,43,0.9)` in the light theme, so the bottom of every
+   tile stayed a fixed navy plate with white ink — the brief forbids exactly
+   this. Fixed with a themed `--tile-band` on a separate `.oryx-tile::after`
+   layer: `none` in dark (dark render byte-identical), an ivory fade with dark
+   ink in light. Measured live: dark band luminance 26.9 before and after
+   (unchanged); light 37.6 → 218.9. New `execution20-theme.spec.ts` pins the
+   contract and scans six module pages for any dark surface that survives the
+   light theme.
+2. The maintenance job-card customer picker selected the id of a customer
+   created in place but never added it to its option list, so the control kept
+   showing the placeholder. The record was saved (verified in the database), but
+   the picker looked empty. It now appends the created customer before selecting
+   it, matching the vehicle picker. `execution20.spec.ts` test 9 drives this end
+   to end and asserts the picker shows the new customer.
+
+**Database drift fixed (commit `800166d`)**
+
+`prisma migrate diff` reported exactly one difference between the migration
+history and the schema: `EntityAttachment.updatedAt` carried a database
+`DEFAULT CURRENT_TIMESTAMP` that the schema does not declare (it is
+`@updatedAt`). A new additive migration drops the default; the diff is now
+"No difference detected" and the change is safe for already-migrated databases.
+
+**Known limits (unchanged, not defects)**
+
+- Document storage is local disk; an object-store adapter is a later increment.
+- The unified searchable picker with in-place create is wired into the
+  maintenance job card (customer and vehicle) today; the other module dropdowns
+  are still native selects. Extending the picker across them is follow-up work,
+  not a regression.
