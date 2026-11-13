@@ -21,8 +21,11 @@ import type {
   CustomerDto,
   CustomerDetailDto,
   CustomerAttachmentDto,
+  CustomerBranchDto,
+  CompanySettingsResponse,
   CustomerReturnDto,
   DashboardResponse,
+  ModuleSummaryDto,
   EcosystemOverviewResponse,
   ErpAccountDto,
   FeatureFlagDto,
@@ -541,6 +544,19 @@ export const api = {
     return request<DashboardResponse>(`/dashboard${qs ? `?${qs}` : ''}`);
   },
 
+  moduleSummary: (
+    moduleKey: string,
+    params: { companyId?: string | null; branchId?: string | null } = {},
+  ) => {
+    const q = new URLSearchParams();
+    if (params.companyId) q.set('companyId', params.companyId);
+    if (params.branchId) q.set('branchId', params.branchId);
+    const qs = q.toString();
+    return request<ModuleSummaryDto>(
+      `/dashboard/modules/${encodeURIComponent(moduleKey)}${qs ? `?${qs}` : ''}`,
+    );
+  },
+
   // -------------------------------------------------------------- companies
   listCompanies: (params: { page?: number; pageSize?: number; search?: string; status?: string; type?: string } = {}) =>
     request<Paginated<CompanyDto>>(`/companies?${toQuery(params)}`),
@@ -915,6 +931,33 @@ export const api = {
     request<CustomerAttachmentDto>(`/sales/customers/${id}/attachments`, { method: 'POST', body }),
   removeCustomerAttachment: (id: string, attachmentId: string) =>
     request<{ removed: boolean }>(`/sales/customers/${id}/attachments/${attachmentId}`, { method: 'DELETE' }),
+  customerBranches: (id: string) =>
+    request<CustomerBranchDto[]>(`/sales/customers/${id}/branches`),
+  createCustomerBranch: (id: string, body: Record<string, unknown>) =>
+    request<CustomerBranchDto>(`/sales/customers/${id}/branches`, { method: 'POST', body }),
+  updateCustomerBranch: (id: string, branchId: string, body: Record<string, unknown>) =>
+    request<CustomerBranchDto>(`/sales/customers/${id}/branches/${branchId}`, { method: 'POST', body }),
+  deleteCustomerBranch: (id: string, branchId: string) =>
+    request<{ deleted: true }>(`/sales/customers/${id}/branches/${branchId}`, { method: 'DELETE' }),
+
+  // ------------------------------------------------------ company settings
+  companySettings: (companyId?: string) =>
+    request<CompanySettingsResponse>(
+      `/company-settings${companyId ? `?companyId=${companyId}` : ''}`,
+    ),
+  companySettingsCatalogue: () =>
+    request<{ sections: string[]; defaults: Record<string, Record<string, unknown>> }>(
+      '/company-settings/catalogue',
+    ),
+  companySettingSection: (section: string, companyId?: string) =>
+    request<Record<string, unknown>>(
+      `/company-settings/${section}${companyId ? `?companyId=${companyId}` : ''}`,
+    ),
+  updateCompanySettingSection: (section: string, body: Record<string, unknown>, companyId?: string) =>
+    request<Record<string, unknown>>(
+      `/company-settings/${section}${companyId ? `?companyId=${companyId}` : ''}`,
+      { method: 'PUT', body },
+    ),
   quotations: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<SalesDocumentDto>>(`/sales/quotations?${toQuery(params)}`),
   createQuotation: (body: Record<string, unknown>) =>
@@ -946,9 +989,10 @@ export const api = {
   // ----------------------------------------------------------- attachments
   attachments: (entityType: string, entityId: string) =>
     request<AttachmentDto[]>(`/attachments/${entityType}/${entityId}`),
-  uploadAttachment: (entityType: string, entityId: string, file: File) => {
+  uploadAttachment: (entityType: string, entityId: string, file: File, category?: string) => {
     const form = new FormData();
     form.append('file', file);
+    if (category) form.append('category', category);
     return request<AttachmentDto>(`/attachments/${entityType}/${entityId}`, {
       method: 'POST',
       body: form,

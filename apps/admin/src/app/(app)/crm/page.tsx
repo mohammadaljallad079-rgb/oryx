@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
 import {
   Badge,
   Button,
@@ -17,8 +19,6 @@ import {
   Modal,
   SectionHeader,
   Skeleton,
-  StatCard,
-  StatGrid,
   StatusBadge,
   TableShell,
 } from '@/components/ui';
@@ -26,7 +26,17 @@ import type { LeadDto, OpportunityDto, SupportTicketDto } from '@oryx/shared';
 
 type Tab = 'dashboard' | 'leads' | 'opportunities' | 'tickets' | 'activities';
 
+const TAB_KEYS = ['dashboard', 'leads', 'opportunities', 'tickets', 'activities'] as const;
+
 export default function CrmPage() {
+  return (
+    <Suspense fallback={<Skeleton height={200} />}>
+      <CrmInner />
+    </Suspense>
+  );
+}
+
+function CrmInner() {
   const { t } = useUi();
   const { can } = useAuth();
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -41,6 +51,7 @@ export default function CrmPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="crm-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.crm')}
         subtitle={t('erp.crm.subtitle')}
@@ -63,7 +74,7 @@ export default function CrmPage() {
         ))}
       </div>
 
-      {tab === 'dashboard' ? <DashboardTab /> : null}
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="crm" testId="crm-dashboard" /> : null}
       {tab === 'leads' ? <LeadsTab canManage={can('erp.crm.lead.manage')} /> : null}
       {tab === 'opportunities' ? <OpportunitiesTab canManage={can('erp.crm.opportunity.manage')} canConvert={can('erp.crm.opportunity.convert')} /> : null}
       {tab === 'tickets' ? <TicketsTab canManage={can('erp.crm.ticket.manage')} /> : null}
@@ -72,26 +83,6 @@ export default function CrmPage() {
   );
 }
 
-function DashboardTab() {
-  const { t } = useUi();
-  const data = useAsync(() => api.crmDashboard(), []);
-  if (data.loading) return <div className="p-4"><Skeleton height={160} /></div>;
-  if (data.error) return <ErrorBanner message={data.error} onRetry={data.reload} />;
-  const d = data.data!;
-  return (
-    <Card className="p-4" data-testid="crm-dashboard">
-      <StatGrid>
-        <StatCard icon="target" label={t('erp.crm.totalLeads')} value={String(d.totalLeads)} />
-        <StatCard icon="trend" label={t('erp.crm.openOpportunities')} value={String(d.openOpportunities)} />
-        <StatCard tone="gold" icon="wallet" label={t('erp.crm.pipelineValue')} value={money(d.pipelineValueMinor)} />
-        <StatCard icon="lifeBuoy" label={t('erp.crm.openTickets')} value={String(d.openTickets)} />
-        <StatCard tone="success" icon="check" label={t('erp.crm.wonOpportunities')} value={String(d.wonOpportunities)} />
-        <StatCard tone="danger" icon="clock" label={t('erp.crm.overdueActivities')} value={String(d.overdueActivities)} />
-        <StatCard icon="star" label={t('erp.crm.satisfaction')} value={d.averageSatisfaction ? d.averageSatisfaction.toFixed(1) : '—'} />
-      </StatGrid>
-    </Card>
-  );
-}
 
 function LeadsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();

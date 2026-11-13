@@ -7,6 +7,8 @@ import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { minorToInput, money, toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
 import {
   Badge,
   Button,
@@ -22,7 +24,9 @@ import {
 } from '@/components/ui';
 import type { JobCardDto, MarketplaceProviderDto, ServiceRequestDto } from '@oryx/shared';
 
-type Tab = 'job-cards' | 'bay' | 'warranties' | 'providers' | 'requests';
+type Tab = 'dashboard' | 'job-cards' | 'bay' | 'warranties' | 'providers' | 'requests';
+
+const TAB_KEYS = ['dashboard', 'job-cards', 'bay', 'warranties', 'providers', 'requests'] as const;
 
 export default function MaintenancePage() {
   const { t } = useUi();
@@ -30,6 +34,7 @@ export default function MaintenancePage() {
   const [tab, setTab] = useState<Tab>('job-cards');
 
   const tabs: Array<{ key: Tab; label: string }> = [
+    { key: 'dashboard', label: t('erp.maintenance.dashboard') },
     { key: 'job-cards', label: t('erp.automotive.jobCards') },
     { key: 'bay', label: t('erp.automotive.bays') },
     { key: 'warranties', label: t('erp.automotive.warranties') },
@@ -39,6 +44,7 @@ export default function MaintenancePage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="maintenance-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.automotive_maintenance')}
         subtitle={t('erp.automotive.maintenanceSubtitle')}
@@ -61,6 +67,7 @@ export default function MaintenancePage() {
         ))}
       </div>
 
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="automotive_maintenance" /> : null}
       {tab === 'job-cards' ? (
         <JobCardsTab
           canManage={can('erp.maintenance.jobcard.manage')}

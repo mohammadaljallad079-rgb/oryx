@@ -20,6 +20,8 @@ import {
   CreateQuotationDto,
   CreateSalesOrderDto,
   CustomerAttachmentDto,
+  CustomerBranchDto,
+  UpdateCustomerBranchDto,
   ListQueryDto,
   UpdateCustomerDto,
   UpdateInvoiceDto,
@@ -88,6 +90,50 @@ export class SalesController {
     @Req() req: RequestLike,
   ) {
     return this.sales.removeCustomerAttachment(id, attachmentId, p, actorFrom(p, req));
+  }
+
+  @Get('customers/:id/branches')
+  @RequireAnyPermission('erp.sales.read', 'erp.sales.customer.manage')
+  @ApiOperation({ summary: 'List a company customer secondary branches' })
+  customerBranches(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.sales.listCustomerBranches(id, p);
+  }
+
+  @Post('customers/:id/branches')
+  @RequirePermissions('erp.sales.customer.manage')
+  @ApiOperation({ summary: 'Add a secondary branch to a company customer' })
+  createCustomerBranch(
+    @Param('id') id: string,
+    @Body() dto: CustomerBranchDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.sales.createCustomerBranch(id, dto, p, actorFrom(p, req));
+  }
+
+  @Post('customers/:id/branches/:branchId')
+  @RequirePermissions('erp.sales.customer.manage')
+  @ApiOperation({ summary: 'Update a secondary branch' })
+  updateCustomerBranch(
+    @Param('id') id: string,
+    @Param('branchId') branchId: string,
+    @Body() dto: UpdateCustomerBranchDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.sales.updateCustomerBranch(id, branchId, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('customers/:id/branches/:branchId')
+  @RequirePermissions('erp.sales.customer.manage')
+  @ApiOperation({ summary: 'Remove a secondary branch' })
+  deleteCustomerBranch(
+    @Param('id') id: string,
+    @Param('branchId') branchId: string,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.sales.deleteCustomerBranch(id, branchId, p, actorFrom(p, req));
   }
 
   @Post('customers/:id')

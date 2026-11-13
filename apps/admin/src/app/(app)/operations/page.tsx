@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
 import {
   Badge,
   Button,
@@ -16,8 +18,6 @@ import {
   Modal,
   SectionHeader,
   Skeleton,
-  StatCard,
-  StatGrid,
   StatusBadge,
   TableShell,
 } from '@/components/ui';
@@ -25,7 +25,17 @@ import type { ProjectDto, ProjectTaskDto, WorkOrderDto } from '@oryx/shared';
 
 type Tab = 'dashboard' | 'projects' | 'tasks' | 'work-orders' | 'approvals' | 'calendar' | 'notifications';
 
+const TAB_KEYS = ['dashboard', 'projects', 'work-orders', 'tasks', 'approvals', 'calendar', 'notifications'] as const;
+
 export default function OperationsPage() {
+  return (
+    <Suspense fallback={<Skeleton height={200} />}>
+      <OperationsInner />
+    </Suspense>
+  );
+}
+
+function OperationsInner() {
   const { t } = useUi();
   const { can } = useAuth();
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -42,6 +52,7 @@ export default function OperationsPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="operations-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.operations')}
         subtitle={t('erp.operations.subtitle')}
@@ -64,7 +75,7 @@ export default function OperationsPage() {
         ))}
       </div>
 
-      {tab === 'dashboard' ? <DashboardTab /> : null}
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="operations" testId="operations-dashboard" /> : null}
       {tab === 'projects' ? <ProjectsTab canManage={can('erp.operations.project.manage')} /> : null}
       {tab === 'work-orders' ? <WorkOrdersTab canManage={can('erp.operations.work_order.manage')} /> : null}
       {tab === 'tasks' ? <TasksTab canManage={can('erp.operations.task.manage')} /> : null}
@@ -75,26 +86,6 @@ export default function OperationsPage() {
   );
 }
 
-function DashboardTab() {
-  const { t } = useUi();
-  const data = useAsync(() => api.operationsDashboard(), []);
-  if (data.loading) return <div className="p-4"><Skeleton height={160} /></div>;
-  if (data.error) return <ErrorBanner message={data.error} onRetry={data.reload} />;
-  const d = data.data!;
-  return (
-    <Card className="p-4" data-testid="operations-dashboard">
-      <StatGrid>
-        <StatCard icon="folder" label={t('erp.operations.totalProjects')} value={String(d.totalProjects)} />
-        <StatCard tone="success" icon="check" label={t('erp.operations.activeProjects')} value={String(d.activeProjects)} />
-        <StatCard icon="list" label={t('erp.operations.openTasks')} value={String(d.openTasks)} />
-        <StatCard tone="danger" icon="clock" label={t('erp.operations.overdueTasks')} value={String(d.overdueTasks)} />
-        <StatCard icon="wrench" label={t('erp.operations.totalWorkOrders')} value={String(d.totalWorkOrders)} />
-        <StatCard tone="gold" icon="shield" label={t('erp.operations.pendingApprovals')} value={String(d.pendingApprovals)} />
-        <StatCard icon="calendar" label={t('erp.operations.upcomingEvents')} value={String(d.upcomingEvents)} />
-      </StatGrid>
-    </Card>
-  );
-}
 
 function ProjectsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();

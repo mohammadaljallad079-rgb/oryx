@@ -374,6 +374,10 @@ export async function cleanupFixtures(prisma: PrismaService): Promise<void> {
   await prisma.vehicleMileageRecord.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.vehicleDocument.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.vehicle.deleteMany({ where: { companyId: { in: ids } } });
+  // Execution 20 — secondary branches hang off the head-office customer, and
+  // the namespaced settings rows hang off the company.
+  await prisma.customerBranch.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.companySetting.deleteMany({ where: { companyId: { in: ids } } });
   // Customers are deleted only after every table that references them.
   await prisma.customer.deleteMany({ where: { companyId: { in: ids } } });
   // Products and warehouses are referenced by E03 parts tables, so they go last.

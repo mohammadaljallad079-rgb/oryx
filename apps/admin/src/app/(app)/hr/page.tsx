@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
 import {
   Badge,
   Button,
@@ -17,8 +19,6 @@ import {
   Modal,
   SectionHeader,
   Skeleton,
-  StatCard,
-  StatGrid,
   StatusBadge,
   TableShell,
 } from '@/components/ui';
@@ -26,7 +26,17 @@ import type { EmployeeDto, LeaveRequestDto, PayrollRunDto } from '@oryx/shared';
 
 type Tab = 'dashboard' | 'employees' | 'leave' | 'attendance' | 'payroll' | 'advances' | 'policy' | 'reports';
 
+const TAB_KEYS = ['dashboard', 'employees', 'leave', 'attendance', 'policy', 'payroll', 'reports', 'advances'] as const;
+
 export default function HrPage() {
+  return (
+    <Suspense fallback={<Skeleton height={200} />}>
+      <HrInner />
+    </Suspense>
+  );
+}
+
+function HrInner() {
   const { t } = useUi();
   const { can } = useAuth();
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -44,6 +54,7 @@ export default function HrPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="hr-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.human_resources')}
         subtitle={t('erp.hr.subtitle')}
@@ -66,7 +77,7 @@ export default function HrPage() {
         ))}
       </div>
 
-      {tab === 'dashboard' ? <DashboardTab /> : null}
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="human_resources" testId="hr-dashboard" /> : null}
       {tab === 'employees' ? <EmployeesTab canManage={can('erp.hr.employee.manage')} /> : null}
       {tab === 'leave' ? <LeaveTab canRequest={can('erp.hr.leave.request')} canApprove={can('erp.hr.leave.approve')} /> : null}
       {tab === 'attendance' ? <AttendanceTab canManage={can('erp.hr.attendance.manage')} canSelf={can('erp.hr.attendance.self')} /> : null}
@@ -78,32 +89,6 @@ export default function HrPage() {
   );
 }
 
-function DashboardTab() {
-  const { t } = useUi();
-  const data = useAsync(() => api.hrDashboard(), []);
-  if (data.loading) return <div className="p-4"><Skeleton height={160} /></div>;
-  if (data.error) return <ErrorBanner message={data.error} onRetry={data.reload} />;
-  const d = data.data!;
-  return (
-    <Card className="p-4" data-testid="hr-dashboard">
-      <StatGrid>
-        <StatCard icon="users" label={t('erp.hr.totalEmployees')} value={String(d.totalEmployees)} />
-        <StatCard icon="check" label={t('erp.hr.active')} value={String(d.activeEmployees)} />
-        <StatCard icon="calendar" label={t('erp.hr.onLeave')} value={String(d.onLeaveEmployees)} />
-        <StatCard icon="clock" label={t('erp.hr.pendingLeave')} value={String(d.pendingLeaveRequests)} />
-        <StatCard icon="building" label={t('erp.hr.departments')} value={String(d.departmentCount)} />
-      </StatGrid>
-      {d.latestPayroll ? (
-        <div className="mt-4 border-t border-[var(--border)] pt-3 text-[13px]">
-          <span className="oryx-muted">{t('erp.hr.latestPayroll')}: </span>
-          <span className="font-semibold">{d.latestPayroll.runNumber}</span>{' '}
-          <Badge tone="info">{d.latestPayroll.status}</Badge>{' '}
-          <span className="tabular-nums">{money(d.latestPayroll.netMinor)}</span>
-        </div>
-      ) : null}
-    </Card>
-  );
-}
 
 function EmployeesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
