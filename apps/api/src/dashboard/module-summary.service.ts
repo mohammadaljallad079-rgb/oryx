@@ -87,8 +87,8 @@ export class ModuleSummaryService {
     principal: RequestPrincipal,
     query: { companyId?: string; branchId?: string } = {},
   ): Promise<ModuleSummaryDto> {
-    const module = getModule(moduleKey);
-    if (!module) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Unknown module.');
+    const definition = getModule(moduleKey);
+    if (!definition) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Unknown module.');
 
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const licensed = await this.entitlements.licensedModulesFor(companyId);
@@ -98,6 +98,20 @@ export class ModuleSummaryService {
         'This module is not licensed to the current company.',
       );
     }
+
+    // The catalog row is the source of the banner copy and artwork, so a module
+    // renamed or re-iconed in the platform UI is reflected on its dashboard.
+    const row = await this.prisma.module.findUnique({ where: { key: moduleKey } });
+    const module = {
+      nameEn: row?.nameEn ?? definition.nameEn,
+      nameAr: row?.nameAr ?? definition.nameAr,
+      descriptionEn: row?.descriptionEn ?? definition.descriptionEn,
+      descriptionAr: row?.descriptionAr ?? definition.descriptionAr,
+      group: row?.group ?? definition.group,
+      icon: row?.icon ?? definition.icon,
+      tileImage: row?.tileImage ?? definition.tileImage,
+      route: row?.route ?? definition.route,
+    };
 
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },

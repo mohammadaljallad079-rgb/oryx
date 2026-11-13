@@ -128,7 +128,9 @@ export default function DashboardHomePage() {
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 [&>*]:min-w-0">
-            {(data?.tiles ?? []).map((tile) => (
+            {(data?.tiles ?? [])
+              .filter((tile) => tile.isActive)
+              .map((tile) => (
               <Link
                 key={tile.moduleKey}
                 href={tile.route}
@@ -142,7 +144,7 @@ export default function DashboardHomePage() {
                   style={{ backgroundImage: `url(${tileImageUrl(tile.tileImage)})` }}
                 >
                   <span className="oryx-tile__icon">
-                    <Icon name={iconFor(tile.moduleKey)} size={24} />
+                    <Icon name={iconFor(tile.moduleKey, tile.icon)} size={24} />
                   </span>
                 </span>
                 <span className="oryx-tile__band">
@@ -166,7 +168,25 @@ export default function DashboardHomePage() {
   );
 }
 
-function iconFor(moduleKey: string): string {
+/**
+ * The catalog stores kebab-case icon names, while the inline icon set is
+ * camelCase. The catalog value is authoritative now that an operator can change
+ * it, so it wins over the per-module fallback; anything unmapped falls back to
+ * the gauge glyph rather than rendering nothing.
+ */
+const KEBAB_ICON_MAP: Record<string, string> = {
+  'shopping-cart': 'cart',
+  'bar-chart': 'barChart',
+  'heart-handshake': 'heart',
+  'clipboard-check': 'clipboardCheck',
+  'map-pin': 'mapPin',
+  'credit-card': 'creditCard',
+  'sliders': 'sliders',
+  'gauge': 'gauge',
+};
+
+function iconFor(moduleKey: string, catalogIcon?: string): string {
+  if (catalogIcon) return KEBAB_ICON_MAP[catalogIcon] ?? catalogIcon;
   const map: Record<string, string> = {
     dashboard: 'gauge',
     company_management: 'building',

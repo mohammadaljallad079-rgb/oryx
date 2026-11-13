@@ -670,6 +670,10 @@ export const api = {
 
   // ----------------------------------------------------------------- modules
   listModules: () => request<{ items: Array<ModuleDto & { licensed: boolean }> }>('/modules'),
+  updateModule: (id: string, body: Record<string, unknown>) =>
+    request<ModuleDto>(`/modules/${id}`, { method: 'PATCH', body }),
+  restoreModule: (id: string) =>
+    request<ModuleDto>(`/modules/${id}/restore-defaults`, { method: 'POST' }),
   entitlements: (companyId?: string) =>
     request<{
       companyId: string;

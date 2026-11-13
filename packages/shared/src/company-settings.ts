@@ -13,6 +13,7 @@
 
 export const COMPANY_SETTING_SECTIONS = [
   'general',
+  'typography',
   'invoicing',
   'accounting',
   'tax',
@@ -45,6 +46,21 @@ export interface GeneralSettings {
   dateFormat: string;
   numberFormat: string;
   logoUrl: string;
+}
+
+export interface TypographySettings {
+  /** Base body size in px; every other size is a multiple of it. */
+  baseSize: number;
+  /** Multipliers applied to the base size for the page, module and body scales. */
+  headingScale: number;
+  moduleScale: number;
+  descriptionScale: number;
+  /** Named family, or `default` for the bundled ORYX family. */
+  fontFamily: 'default' | 'ibm' | 'system';
+  /** Weight for headings (400-800). */
+  headingWeight: number;
+  /** Extra letter spacing applied to uppercase labels, in em. */
+  labelTracking: number;
 }
 
 export interface InvoicingSettings {
@@ -159,6 +175,7 @@ export interface DocumentsSettings {
 
 export interface CompanySettingsMap {
   general: GeneralSettings;
+  typography: TypographySettings;
   invoicing: InvoicingSettings;
   accounting: AccountingSettings;
   tax: TaxSettings;
@@ -206,6 +223,15 @@ export const COMPANY_SETTING_DEFAULTS: CompanySettingsMap = {
     dateFormat: 'dd/MM/yyyy',
     numberFormat: '1,234.56',
     logoUrl: '',
+  },
+  typography: {
+    baseSize: 15,
+    headingScale: 1.5,
+    moduleScale: 1.13,
+    descriptionScale: 0.93,
+    fontFamily: 'default',
+    headingWeight: 800,
+    labelTracking: 0.05,
   },
   invoicing: {
     numberPrefix: 'INV-',

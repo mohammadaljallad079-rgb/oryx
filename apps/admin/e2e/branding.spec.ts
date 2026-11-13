@@ -152,7 +152,9 @@ test.describe('branding and direction', () => {
     // The banner paints an opaque navy field of its own.
     expect(heroMedia).toMatch(/gradient|rgb/);
 
-    // The mark is centred: the lockup's centre is the banner's centre.
+    // The approved design anchors the mark on the reading-start edge (left in
+    // LTR) with the identity block beside it, not centred. Pin the leading-edge
+    // lockup so a future change cannot silently re-centre the banner.
     const banner = await page.getByTestId('dashboard-hero').boundingBox();
     const logo = await page
       .locator('.oryx-hero .oryx-brand-logo')
@@ -160,9 +162,8 @@ test.describe('branding and direction', () => {
       .boundingBox();
     expect(banner).not.toBeNull();
     expect(logo).not.toBeNull();
-    const bannerCentre = banner!.x + banner!.width / 2;
-    const logoCentre = logo!.x + logo!.width / 2;
-    expect(Math.abs(bannerCentre - logoCentre)).toBeLessThan(2);
+    expect(logo!.x - banner!.x).toBeLessThan(80);
+    expect(logo!.x + logo!.width / 2).toBeLessThan(banner!.x + banner!.width / 2);
 
     // The lockup must actually load, not fall back to an empty box.
     const natural = await page
@@ -173,12 +174,12 @@ test.describe('branding and direction', () => {
       });
     expect(natural.w).toBeGreaterThan(100);
 
-    // In the light theme the banner keeps its navy field, so it must still use
-    // the on-dark colourway rather than swapping to the navy-ink one.
+    // The banner is theme-adaptive: it paints ivory in the light theme, so it
+    // must swap to the navy-ink colourway rather than keeping the white one.
     await setTheme(page, 'light');
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('.oryx-hero .oryx-brand-logo__on-dark')).toBeVisible();
-    await expect(page.locator('.oryx-hero .oryx-brand-logo__on-light')).toBeHidden();
+    await expect(page.locator('.oryx-hero .oryx-brand-logo__on-light')).toBeVisible();
+    await expect(page.locator('.oryx-hero .oryx-brand-logo__on-dark')).toBeHidden();
   });
 
   test('every dashboard module tile uses its own original vector artwork', async ({ page }) => {

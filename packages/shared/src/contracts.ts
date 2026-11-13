@@ -148,8 +148,11 @@ export interface DashboardTile {
   descriptionAr: string;
   route: string;
   tileImage: string;
+  icon: string;
   status: string;
   available: boolean;
+  /** False when a platform operator has retired the module. */
+  isActive: boolean;
 }
 
 export interface DashboardResponse {
@@ -243,11 +246,14 @@ export interface ModuleDto {
   descriptionAr: string;
   group: string;
   icon: string;
+  tileImage: string | null;
   route: string;
   status: string;
   deliveryPhase: string;
   readPermission: string;
   writePermission: string | null;
+  sortOrder: number;
+  isActive: boolean;
 }
 
 export interface PlanModuleDto {

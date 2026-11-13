@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentPrincipal,
@@ -6,6 +6,7 @@ import {
   RequirePermissions,
   type RequestPrincipal,
 } from '../auth/auth.decorators';
+import { getModule } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { EntitlementService } from '../common/entitlement.service';
 import { AuditService } from '../common/audit.service';
@@ -43,6 +44,11 @@ export class UpdateModuleDto {
   @IsString()
   @MaxLength(60)
   icon?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  tileImage?: string;
 
   @IsOptional()
   @IsString()
@@ -106,11 +112,14 @@ export class ModulesController {
         descriptionAr: m.descriptionAr,
         group: m.group,
         icon: m.icon,
+        tileImage: m.tileImage,
         route: m.route,
         status: m.status,
         deliveryPhase: m.deliveryPhase,
         readPermission: m.readPermission,
         writePermission: m.writePermission,
+        sortOrder: m.sortOrder,
+        isActive: m.isActive,
         licensed: principal.kind === 'PLATFORM' && !principal.company ? true : licensedSet.has(m.key),
       })),
     };
@@ -153,9 +162,11 @@ export class ModulesController {
         ...(dto.descriptionAr !== undefined ? { descriptionAr: dto.descriptionAr } : {}),
         ...(dto.group !== undefined ? { group: dto.group } : {}),
         ...(dto.icon !== undefined ? { icon: dto.icon } : {}),
+        ...(dto.tileImage !== undefined ? { tileImage: dto.tileImage } : {}),
         ...(dto.route !== undefined ? { route: dto.route } : {}),
         ...(dto.status !== undefined ? { status: dto.status as never } : {}),
         ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
       },
     });
     await this.audit.record({
@@ -168,5 +179,51 @@ export class ModulesController {
       ipAddress: req.ip,
     });
     return updated;
+  }
+
+  @Post(':id/restore-defaults')
+  @RequirePermissions('platform.module.manage')
+  @ApiOperation({ summary: 'Reset a module catalog entry to the shipped definition (platform only)' })
+  async restoreDefaults(
+    @Param('id') id: string,
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    const module = await this.prisma.module.findUnique({ where: { id } });
+    if (!module) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Module not found.');
+    const definition = getModule(module.key);
+    if (!definition) {
+      throw badRequest(
+        ERROR_CODES.VALIDATION_FAILED,
+        'This module is not part of the shipped catalog and cannot be reset.',
+      );
+    }
+    const restored = await this.prisma.module.update({
+      where: { id },
+      data: {
+        nameEn: definition.nameEn,
+        nameAr: definition.nameAr,
+        descriptionEn: definition.descriptionEn,
+        descriptionAr: definition.descriptionAr,
+        group: definition.group,
+        icon: definition.icon,
+        tileImage: definition.tileImage,
+        route: definition.route,
+        status: definition.status,
+        deliveryPhase: definition.deliveryPhase,
+        readPermission: definition.readPermission,
+        writePermission: definition.writePermission ?? null,
+        isActive: true,
+      },
+    });
+    await this.audit.record({
+      actorUserId: principal.userId,
+      action: 'module.restored',
+      targetType: 'MODULE',
+      targetId: id,
+      summary: `Restored module ${restored.key} to the shipped definition`,
+      ipAddress: req.ip,
+    });
+    return restored;
   }
 }

@@ -1144,6 +1144,34 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   (jsQR) and measured (PyMuPDF) against the reference. It is scratch, not
   committed.
 
+### Execution 20 gotchas (dashboard, catalog, typography)
+
+- **The module catalog is a database table, not a compile-time constant.** The
+  dashboard tiles, the module dashboards' banner copy and the admin catalog
+  screen all read `Module` rows now, falling back to `getModule()` only for a
+  row created before the `tileImage`/`isActive` columns existed. `seedModules()`
+  is create-only so an operator edit survives a reseed. Add a module to
+  `packages/shared/src/modules.ts` *and* seed it, or the dashboard will not show
+  it.
+- **A retired module is hidden, not deleted.** `isActive: false` removes the tile
+  from `GET /dashboard` and the catalog screen shows a "Retired" badge, but the
+  row, its licence and its route stay. Never delete a catalog row to hide a
+  module.
+- **The banner mark is fixed-aspect raster artwork.** The lockup is 1404×320, so
+  at its 64px desktop height it is ~281px wide and cannot sit beside the identity
+  block on a phone. The `@media (max-width: 640px)` rule stacks the hero and caps
+  the logo at 240px; without it a 320px viewport overflows (the responsive-matrix
+  suite fails).
+- **The homepage banner is logo-left, not centred.** The approved design anchors
+  the mark on the reading-start edge with the identity block beside it, and the
+  field is ivory in the light theme (the navy-ink colourway swaps in). The
+  branding spec pins that geometry.
+- **Typography is per-company and applied at the document root.** `branding-context.tsx`
+  writes the tenant's `typography` section to CSS custom properties
+  (`--font-size-*`, `--oryx-heading-weight`, `--oryx-label-tracking`); every
+  component derives from those tokens. Changing the section in the settings
+  centre calls `refreshTypography()` so the shell updates without a reload.
+
 ### Adding a new ERP module
 
 1. Add a `ModuleDefinition` to `packages/shared/src/modules.ts`.

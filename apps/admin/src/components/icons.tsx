@@ -464,6 +464,11 @@ export const Icons = {
       <path d="M6 10v4M18 10v4" />
     </Base>
   ),
+  type: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M4 6h16M9 6v13M15 6v6M12 19h6" />
+    </Base>
+  ),
 } as const;
 
 export type IconName = keyof typeof Icons;

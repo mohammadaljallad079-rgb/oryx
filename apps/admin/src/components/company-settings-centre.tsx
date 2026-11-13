@@ -8,6 +8,7 @@ import {
 } from '@oryx/shared';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useBranding } from '@/lib/branding-context';
 import { useUi } from '@/lib/ui-context';
 import { Icon } from '@/components/icons';
 import { Button, Card, ErrorBanner, Field, Skeleton } from '@/components/ui';
@@ -65,6 +66,29 @@ const SECTION_META: Record<CompanySettingSection, { labelEn: string; labelAr: st
       { key: 'dateFormat', labelEn: 'Date format', labelAr: 'تنسيق التاريخ', type: 'text' },
       { key: 'numberFormat', labelEn: 'Number format', labelAr: 'تنسيق الأرقام', type: 'text' },
       { key: 'logoUrl', labelEn: 'Logo URL', labelAr: 'رابط الشعار', type: 'text' },
+    ],
+  },
+  typography: {
+    labelEn: 'Typography & layout',
+    labelAr: 'الخطوط والتنسيق',
+    icon: 'type',
+    fields: [
+      { key: 'baseSize', labelEn: 'Base text size (px)', labelAr: 'حجم النص الأساسي (بكسل)', type: 'number' },
+      { key: 'headingScale', labelEn: 'Heading multiplier', labelAr: 'معامل العناوين', type: 'number' },
+      { key: 'moduleScale', labelEn: 'Module banner multiplier', labelAr: 'معامل بانر الوحدة', type: 'number' },
+      { key: 'descriptionScale', labelEn: 'Body text multiplier', labelAr: 'معامل النص التوضيحي', type: 'number' },
+      {
+        key: 'fontFamily',
+        labelEn: 'Typeface',
+        labelAr: 'نوع الخط',
+        type: 'select',
+        options: [
+          { value: 'default', labelEn: 'ORYX (IBM Plex Sans Arabic)', labelAr: 'ORYX (IBM Plex Sans Arabic)' },
+          { value: 'system', labelEn: 'System UI', labelAr: 'خط النظام' },
+        ],
+      },
+      { key: 'headingWeight', labelEn: 'Heading weight (400-800)', labelAr: 'ثقل العناوين (400-800)', type: 'number' },
+      { key: 'labelTracking', labelEn: 'Label letter spacing (em)', labelAr: 'تباعد حروف التسميات (em)', type: 'number' },
     ],
   },
   invoicing: {
@@ -275,6 +299,7 @@ const SECTION_META: Record<CompanySettingSection, { labelEn: string; labelAr: st
 export function CompanySettingsCentre({ canEdit }: { canEdit: boolean }) {
   const { t, locale } = useUi();
   const { companyId } = useAuth();
+  const { refreshTypography } = useBranding();
   const [active, setActive] = useState<CompanySettingSection>('general');
   const [values, setValues] = useState<Record<string, SectionData>>({});
   const [loading, setLoading] = useState(true);
@@ -322,6 +347,9 @@ export function CompanySettingsCentre({ canEdit }: { canEdit: boolean }) {
       const updated = await api.updateCompanySettingSection(active, values[active] ?? {}, companyId);
       setValues((prev) => ({ ...prev, [active]: updated }));
       setSaved(true);
+      // Typography is applied to the document root, so the shell must re-read it
+      // the moment it is saved or the change would only appear after a reload.
+      if (active === 'typography') await refreshTypography();
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
