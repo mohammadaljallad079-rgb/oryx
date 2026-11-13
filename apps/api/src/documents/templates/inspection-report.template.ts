@@ -448,8 +448,8 @@ export function inspectionGroupPage(
     </div>
     ${pair(cell(engine, 'مقصورة المحرك', 'Engine Compartment', false), cell(road, 'تجربة القيادة', 'Road Test', false))}
     <table class="grid"><tr>
-      <td>${cell(exterior, 'خارجية السيارة', 'Exterior Car', true)}${remarks}</td>
       <td>${cell(interior, 'داخلية السيارة', 'Interior Car', true)}</td>
+      <td>${cell(exterior, 'خارجية السيارة', 'Exterior Car', true)}${remarks}</td>
     </tr></table>
   </div>`;
 
@@ -838,8 +838,8 @@ export const INSPECTION_REPORT_CSS = `
   /* The three remark blocks sit in the lower-left cell beside the interior
    * checklist, so they take the cabin's compact type scale and hug the table. */
   .cabin .remark-block{ margin-top:0; }
-  .cabin .remark-block .grp-title{ font-size:6.2pt; padding:0 5px; }
-  .cabin .remark-block .general-remarks{ font-size:5.7pt; line-height:1.12; padding:1px 5px; min-height:0; }
+  .cabin .remark-block .grp-title{ font-size:6.7pt; padding:0 5px; }
+  .cabin .remark-block .general-remarks{ font-size:7.2pt; line-height:1.14; padding:2px 6px; min-height:0; }
   .sec-remarks{ margin-top:6px; border:1px solid var(--line); border-radius:5px; padding:6px 9px; font-size:7.6pt; line-height:1.3; color:var(--ink); background:#fbfcfe; }
   .no-findings{ border:1px solid var(--line); border-top:none; padding:8px; font-size:8.5pt; color:var(--muted); background:#f7f9fc; text-align:center; }
   /* ---- diagrams ---- */
