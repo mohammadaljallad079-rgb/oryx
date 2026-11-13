@@ -29,8 +29,8 @@ export function SectionHeader({
   return (
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="m-0 text-[22px] font-extrabold tracking-tight">{title}</h1>
-        {subtitle ? <p className="oryx-muted m-0 mt-1 max-w-[72ch] text-[13px]">{subtitle}</p> : null}
+        <h1 className="oryx-section-title m-0">{title}</h1>
+        {subtitle ? <p className="oryx-muted oryx-section-subtitle m-0 mt-1">{subtitle}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>

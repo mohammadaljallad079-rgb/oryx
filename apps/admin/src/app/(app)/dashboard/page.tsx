@@ -142,7 +142,7 @@ export default function DashboardHomePage() {
                   style={{ backgroundImage: `url(${tileImageUrl(tile.tileImage)})` }}
                 >
                   <span className="oryx-tile__icon">
-                    <Icon name={iconFor(tile.moduleKey)} size={18} />
+                    <Icon name={iconFor(tile.moduleKey)} size={24} />
                   </span>
                 </span>
                 <span className="oryx-tile__band">

@@ -70,12 +70,16 @@ export function ModuleDashboard({
           <img src={`/tiles/${d.tileImage}.svg`} alt="" />
         </span>
         <div className="oryx-module-hero__content">
-          <BrandLogo height={34} className="oryx-module-hero__logo" />
-          <p className="oryx-module-hero__eyebrow m-0">{d.scope.companyNameEn}</p>
-          <h2 className="oryx-module-hero__title m-0" data-testid={`module-hero-title-${moduleKey}`}>
-            {name}
-          </h2>
-          <p className="oryx-module-hero__body m-0">{description}</p>
+          <span className="oryx-module-hero__lockup">
+            <BrandLogo height={48} className="oryx-module-hero__logo" />
+          </span>
+          <div className="oryx-module-hero__identity">
+            <p className="oryx-module-hero__eyebrow m-0">{d.scope.companyNameEn}</p>
+            <h2 className="oryx-module-hero__title m-0" data-testid={`module-hero-title-${moduleKey}`}>
+              {name}
+            </h2>
+            <p className="oryx-module-hero__body m-0">{description}</p>
+          </div>
         </div>
       </section>
 
