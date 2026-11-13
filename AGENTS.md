@@ -615,6 +615,17 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   surface starts redirecting to `/login` again. After a recycle, recreate
   `apps/customer/.env.local` (and `apps/admin/.env.local`) with
   `NEXT_PUBLIC_API_BASE_URL=/api` *before* rebuilding.
+- **The build guard only catches an unsafe *value*, not an absent one.** The
+  `next.config.ts` check throws when `NEXT_PUBLIC_API_BASE_URL` is set to a
+  loopback or preview host, but an *unset* variable skips it entirely and
+  `src/lib/api.ts` then falls back to `http://localhost:3001/api`. That is the
+  recycle case above: a remote browser resolves the inlined `localhost` against
+  its own machine, so login dies with "تعذّر الوصول إلى الخادم" / "could not
+  reach the server" while the same build passes every Playwright spec on the
+  sandbox. `.run/restart-app.sh` now writes `NEXT_PUBLIC_API_BASE_URL=/api` into
+  the app's `.env.local` before building, so a cold start is deterministic.
+  Confirm a fresh build with
+  `grep -r 'http://localhost:3001' apps/*/.next/static/chunks/` — it must be empty.
 - **The customer app's preference keys are namespaced.** It reads
   `oryx.customer.locale` and `oryx.customer.theme`, while the admin app reads
   `oryx.locale` and `oryx.theme`. Seeding the wrong pair leaves the app on its
