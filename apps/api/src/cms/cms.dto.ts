@@ -2,6 +2,7 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   MaxLength,
@@ -130,6 +131,19 @@ export class UpsertAppVersionDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+}
+
+export class UpsertSiteContentDto {
+  @IsIn(['ar', 'en'])
+  locale!: 'ar' | 'en';
+
+  /**
+   * The editable website document. It is validated structurally in the service
+   * against the shared `SiteContent` shape; unknown keys are dropped and the
+   * website merges the result over its approved defaults.
+   */
+  @IsObject()
+  data!: Record<string, unknown>;
 }
 
 export class CreateApiClientDto {

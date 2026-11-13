@@ -168,6 +168,68 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   cogsAccountId?: string;
+
+  // Storefront presentation. These decorate a real stock item; they never
+  // change its price, cost or quantity, which stay in the ERP columns above.
+  /** Aisle key from PART_CATEGORIES. Required before an item can be published. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  partCategoryKey?: string;
+
+  @IsOptional()
+  @IsIn(['NEW', 'REFURBISHED'])
+  partCondition?: 'NEW' | 'REFURBISHED';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  brand?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  descriptionEn?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  descriptionAr?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  warrantyEn?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  warrantyAr?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  engineType?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isPublished?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isFeatured?: boolean;
+
+  /** Strike-through promotion price in minor units. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  compareAtPriceMinor?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  imageUrl?: string;
 }
 
 export class UpdateProductDto {
@@ -224,6 +286,65 @@ export class UpdateProductDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  // Storefront presentation — see CreateProductDto.
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  partCategoryKey?: string;
+
+  @IsOptional()
+  @IsIn(['NEW', 'REFURBISHED'])
+  partCondition?: 'NEW' | 'REFURBISHED';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  brand?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  descriptionEn?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  descriptionAr?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  warrantyEn?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  warrantyAr?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  engineType?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isPublished?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isFeatured?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  compareAtPriceMinor?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  imageUrl?: string;
 }
 
 export class RecordMovementDto {

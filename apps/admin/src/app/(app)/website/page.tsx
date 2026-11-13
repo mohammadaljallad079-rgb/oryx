@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
+import { SiteContentEditor } from './site-content-editor';
 import {
   Badge,
   Button,
@@ -23,7 +24,7 @@ import {
 
 function WebsiteCmsPageInner() {
   const { t } = useUi();
-  const [tab, setTab] = useState<'pages' | 'banners'>('pages');
+  const [tab, setTab] = useState<'pages' | 'banners' | 'content'>('pages');
   const pages = useAsync(() => api.cmsPages(), []);
   const banners = useAsync(() => api.cmsBanners(), []);
   const [editingPage, setEditingPage] = useState<CmsPageDto | null>(null);
@@ -42,20 +43,22 @@ function WebsiteCmsPageInner() {
               <Icon name="search" size={15} />
               {t('common.refresh')}
             </Button>
-            <Button
-              variant="primary"
-              onClick={() => (tab === 'pages' ? setCreatingPage(true) : setCreatingBanner(true))}
-              data-testid={tab === 'pages' ? 'new-cms-page' : 'new-cms-banner'}
-            >
-              <Icon name="plus" size={16} />
-              {tab === 'pages' ? t('cms.newPage') : t('cms.newBanner')}
-            </Button>
+            {tab !== 'content' && (
+              <Button
+                variant="primary"
+                onClick={() => (tab === 'pages' ? setCreatingPage(true) : setCreatingBanner(true))}
+                data-testid={tab === 'pages' ? 'new-cms-page' : 'new-cms-banner'}
+              >
+                <Icon name="plus" size={16} />
+                {tab === 'pages' ? t('cms.newPage') : t('cms.newBanner')}
+              </Button>
+            )}
           </>
         }
       />
 
       <Card className="p-2">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
             variant={tab === 'pages' ? 'primary' : 'ghost'}
@@ -72,10 +75,20 @@ function WebsiteCmsPageInner() {
           >
             {t('cms.banners')}
           </Button>
+          <Button
+            size="sm"
+            variant={tab === 'content' ? 'primary' : 'ghost'}
+            onClick={() => setTab('content')}
+            data-testid="cms-tab-content"
+          >
+            {t('cms.siteContent')}
+          </Button>
         </div>
       </Card>
 
-      {tab === 'pages' ? (
+      {tab === 'content' ? (
+        <SiteContentEditor />
+      ) : tab === 'pages' ? (
         <Card data-testid="cms-pages-table">
           {pages.error ? <ErrorBanner message={pages.error} onRetry={pages.reload} retryLabel={t('common.retry')} /> : null}
           {pages.loading ? (

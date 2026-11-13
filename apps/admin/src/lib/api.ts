@@ -37,6 +37,7 @@ import type {
   RoleDto,
   SalesDocumentDto,
   SalesReportDto,
+  SiteContentDto,
   StockAdjustmentDto,
   StockMovementDto,
   StockTransferDto,
@@ -506,6 +507,12 @@ export const api = {
     request<Record<string, unknown>>('/cms/api-clients', { method: 'POST', body }),
   revokeApiClient: (id: string) =>
     request<{ ok: boolean }>(`/cms/api-clients/${id}/revoke`, { method: 'POST', body: {} }),
+
+  // ------------------------------------------------------------ site content
+  siteContent: (locale: 'ar' | 'en') =>
+    request<SiteContentDto>(`/cms/site-content?locale=${locale}`),
+  upsertSiteContent: (locale: 'ar' | 'en', data: unknown) =>
+    request<SiteContentDto>('/cms/site-content', { method: 'PUT', body: { locale, data } }),
 
   // ----------------------------------------------------------------- support
   supportSessions: () => request<Array<Record<string, unknown>>>('/support-sessions'),

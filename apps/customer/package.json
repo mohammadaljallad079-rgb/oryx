@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 3002",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint . --max-warnings=0"
+    "lint": "eslint . --max-warnings=0",
+    "test:ui": "playwright test"
   },
   "dependencies": {
     "@oryx/shared": "workspace:*",

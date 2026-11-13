@@ -609,6 +609,19 @@ export interface ProductDto {
   inventoryAccountId: string | null;
   cogsAccountId: string | null;
   isActive: boolean;
+  /** Storefront presentation. `partCategoryKey` null keeps the item off the web store. */
+  partCategoryKey: string | null;
+  partCondition: 'NEW' | 'REFURBISHED';
+  brand: string | null;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
+  warrantyEn: string | null;
+  warrantyAr: string | null;
+  engineType: string | null;
+  isPublished: boolean;
+  isFeatured: boolean;
+  compareAtPriceMinor: number | null;
+  imageUrl: string | null;
 }
 
 export interface StockMovementDto {

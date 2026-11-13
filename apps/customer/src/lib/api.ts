@@ -15,7 +15,19 @@
  * no staff route is reachable with a consumer token.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api';
+import type { Locale, SiteContent } from '@oryx/shared';
+
+/**
+ * Browser API base.
+ *
+ * The customer site is always served same-origin with its own `/api` rewrite
+ * (see `next.config.ts`), so the browser talks to the relative `/api` path and
+ * never an absolute origin — an absolute `http://…` base baked in at build time
+ * becomes mixed content the moment the site is served over HTTPS. This is
+ * deliberately a customer-specific variable so the shared staff/admin
+ * `NEXT_PUBLIC_API_BASE_URL` cannot leak in here.
+ */
+const API_BASE = process.env.NEXT_PUBLIC_CUSTOMER_API_BASE_URL ?? '/api';
 
 /**
  * Name of the readable CSRF cookie the API sets alongside the HttpOnly consumer
@@ -292,6 +304,210 @@ export interface DisputeRecord {
   messages?: Array<{ id: string; body: string; authorKind: string; isInternal: boolean }>;
 }
 
+export interface StorefrontProduct {
+  id: string;
+  sku: string;
+  partNumber: string | null;
+  nameEn: string;
+  nameAr: string;
+  brand: string | null;
+  categoryKey: string | null;
+  condition: 'NEW' | 'REFURBISHED';
+  priceMinor: number;
+  compareAtPriceMinor: number | null;
+  currency: string;
+  currencyScale: number;
+  taxRateBp: number;
+  image: string;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
+  warrantyEn: string | null;
+  warrantyAr: string | null;
+  engineType: string | null;
+  unit: string;
+  isFeatured: boolean;
+  inStock: boolean;
+  onHand: number;
+  fits: Array<{ make: string; model: string; yearFrom: number; yearTo: number | null }>;
+}
+
+export interface StorefrontContext {
+  companyId: string;
+  nameEn: string;
+  nameAr: string;
+  currency: string;
+  currencyScale: number;
+  countryCode: string | null;
+}
+
+export interface StorefrontService {
+  key: string;
+  nameEn: string;
+  nameAr: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  image: string;
+  durationMinutes: number;
+  priceMinor: number | null;
+  turnaroundEn: string;
+  turnaroundAr: string;
+  branchIds: string[];
+}
+
+export interface StorefrontBranch {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  city: string | null;
+  countryCode: string | null;
+  addressLine: string | null;
+  phone: string | null;
+  email: string | null;
+  whatsapp: string | null;
+  timezone: string;
+  image: string | null;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
+  services: string[];
+  isPublished: boolean;
+  hasCoordinates: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  bookable: boolean;
+  workingHours: Array<{
+    dayOfWeek: number;
+    opensMinute: number;
+    closesMinute: number;
+    isClosed: boolean;
+  }>;
+}
+
+export interface StorefrontCategory {
+  key: string;
+  nameEn: string;
+  nameAr: string;
+  image: string;
+  productCount: number;
+}
+
+export interface StorefrontFacets {
+  brands: Array<{ value: string; count: number }>;
+  categories: Array<{ key: string; nameEn: string; nameAr: string; count: number }>;
+  vehicles: Array<{
+    make: string;
+    models: Array<{ model: string; yearFrom: number; yearTo: number }>;
+  }>;
+  price: { minMinor: number; maxMinor: number };
+  conditions: Array<{ value: 'NEW' | 'REFURBISHED'; count: number }>;
+  engineTypes: Array<{ value: string; count: number }>;
+}
+
+export interface ProductPage {
+  items: StorefrontProduct[];
+  total: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+  currency: string;
+  currencyScale: number;
+}
+
+export interface ProductFilters {
+  search?: string;
+  category?: string[];
+  brand?: string[];
+  make?: string[];
+  model?: string[];
+  year?: number;
+  engineType?: string;
+  partNumber?: string;
+  priceMinMinor?: number;
+  priceMaxMinor?: number;
+  inStock?: boolean;
+  condition?: string[];
+  featured?: boolean;
+  onOffer?: boolean;
+  sort?: 'relevance' | 'price_asc' | 'price_desc' | 'newest' | 'name_asc';
+  page?: number;
+  pageSize?: number;
+}
+
+export interface CartLine {
+  productId: string;
+  quantity: number;
+}
+
+export interface PricedCart {
+  items: Array<{
+    productId: string;
+    sku: string;
+    nameEn: string;
+    nameAr: string;
+    quantity: number;
+    unitPriceMinor: number;
+    compareAtPriceMinor: number | null;
+    taxPercentBp: number;
+    image: string;
+    lineSubtotalMinor: number;
+    discountMinor: number;
+    taxMinor: number;
+    lineTotalMinor: number;
+  }>;
+  subtotalMinor: number;
+  discountMinor: number;
+  taxMinor: number;
+  totalMinor: number;
+  currency: string;
+  currencyScale: number;
+}
+
+export interface WebOrder {
+  id: string;
+  orderNumber: string;
+  status: string;
+  fulfilment: 'COLLECTION' | 'DELIVERY';
+  contactName: string;
+  contactPhone: string;
+  contactEmail: string | null;
+  deliveryAddress: Record<string, unknown> | null;
+  notes: string | null;
+  subtotalMinor: number;
+  discountMinor: number;
+  taxMinor: number;
+  totalMinor: number;
+  currency: string;
+  currencyScale: number;
+  createdAt: string;
+  itemCount?: number;
+  lines: Array<{
+    sku: string;
+    nameEn: string;
+    nameAr: string;
+    quantity: number;
+    unitPriceMinor: number;
+    lineTotalMinor: number;
+  }>;
+}
+
+export interface StorefrontAppointment {
+  id: string;
+  reference: string;
+  status: string;
+  startsAt: string;
+  endsAt: string;
+  durationMinutes: number;
+  serviceRef: string | null;
+  branchId: string | null;
+}
+
+export interface AvailabilitySlot {
+  startMinute: number;
+  endMinute: number;
+  startsAt: string;
+  endsAt: string;
+}
+
 export interface NotificationPreference {
   channel: string;
   category: string;
@@ -445,10 +661,160 @@ export const customerApi = {
       method: 'POST',
       body: { body },
     }),
+
+  // ----------------------------------------------------------- storefront
+  quoteCart: (lines: CartLine[]) =>
+    request<PricedCart>('/customer/storefront/cart/quote', { method: 'POST', body: { lines } }),
+  placeOrder: (body: {
+    lines: CartLine[];
+    fulfilment: 'COLLECTION' | 'DELIVERY';
+    branchId?: string;
+    address?: {
+      addressLine1: string;
+      addressLine2?: string;
+      city: string;
+      area?: string;
+      postalCode?: string;
+    };
+    contactName: string;
+    contactPhone: string;
+    contactEmail?: string;
+    notes?: string;
+    paymentMethod: 'CASH' | 'CARD_TERMINAL' | 'BANK_TRANSFER';
+  }) => request<WebOrder>('/customer/storefront/orders', { method: 'POST', body }),
+  orders: (page = 1, pageSize = 20) =>
+    request<{ items: WebOrder[]; total: number; pageCount: number }>(
+      `/customer/storefront/orders?page=${page}&pageSize=${pageSize}`,
+    ),
+  order: (id: string) => request<WebOrder>(`/customer/storefront/orders/${id}`),
+  wishlist: () => request<StorefrontProduct[]>('/customer/storefront/wishlist'),
+  wishlistIds: () => request<string[]>('/customer/storefront/wishlist/ids'),
+  toggleWishlist: (productId: string) =>
+    request<{ saved: boolean }>(`/customer/storefront/wishlist/${productId}`, {
+      method: 'POST',
+      body: {},
+    }),
+  removeWishlist: (productId: string) =>
+    request<{ saved: boolean }>(`/customer/storefront/wishlist/${productId}`, { method: 'DELETE' }),
+  bookAppointment: (body: {
+    customerName: string;
+    phone: string;
+    email?: string;
+    vehicleId?: string;
+    vehicleMake?: string;
+    vehicleModel?: string;
+    vehicleYear?: number;
+    plateNumber?: string;
+    serviceRef: string;
+    branchId?: string;
+    startsAt: string;
+    durationMinutes?: number;
+    notes?: string;
+    bookingType: 'INSPECTION' | 'MAINTENANCE' | 'PROVIDER_SERVICE';
+  }) => request<StorefrontAppointment>('/customer/storefront/appointments', { method: 'POST', body }),
+  appointments: (page = 1, pageSize = 20) =>
+    request<{ items: StorefrontAppointment[]; total: number; pageCount: number }>(
+      `/customer/storefront/appointments?page=${page}&pageSize=${pageSize}`,
+    ),
 };
+
+/** Serialise a storefront filter object into a query string. */
+function storefrontQuery(filters: ProductFilters): string {
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value === undefined || value === null || value === '') continue;
+    if (Array.isArray(value)) {
+      if (value.length) qs.set(key, value.join(','));
+    } else {
+      qs.set(key, String(value));
+    }
+  }
+  const text = qs.toString();
+  return text ? `?${text}` : '';
+}
 
 /** Public content, safe to fetch from a server component. */
 export const publicApi = {
+  storefrontContext: () => publicGet<StorefrontContext>('/storefront/context'),
+  /** Editable website content, merged over the approved defaults by the API. */
+  siteContent: (locale: Locale) =>
+    publicGet<{ locale: string; site: SiteContent }>(
+      `/cms/public/content?locale=${locale === 'en' ? 'en' : 'ar'}`,
+    ),
+  storefrontServices: () => publicGet<StorefrontService[]>('/storefront/services'),
+  storefrontBranches: () => publicGet<StorefrontBranch[]>('/storefront/branches'),
+  storefrontCategories: () => publicGet<StorefrontCategory[]>('/storefront/categories'),
+  storefrontFacets: () => publicGet<StorefrontFacets>('/storefront/products/facets'),
+  storefrontProducts: (filters: ProductFilters = {}) =>
+    publicGet<ProductPage>(`/storefront/products${storefrontQuery(filters)}`),
+  storefrontProduct: (idOrSku: string) =>
+    publicGet<StorefrontProduct>(`/storefront/products/${encodeURIComponent(idOrSku)}`),
+  storefrontRelated: (id: string, limit = 4) =>
+    publicGet<StorefrontProduct[]>(`/storefront/products/${id}/related?limit=${limit}`),
+  storefrontFeatured: (limit = 8) =>
+    publicGet<StorefrontProduct[]>(`/storefront/products/featured?limit=${limit}`),
+  storefrontOffers: (limit = 8) => publicGet<StorefrontProduct[]>(`/storefront/offers?limit=${limit}`),
+  storefrontQuote: (lines: CartLine[]) =>
+    request<PricedCart>('/storefront/cart/quote', { method: 'POST', body: { lines }, anonymous: true }),
+  storefrontSuggest: (q: string, limit = 8) =>
+    publicGet<Array<{ kind: string; label: string; sublabel?: string; href: string }>>(
+      `/storefront/products/suggest?q=${encodeURIComponent(q)}&limit=${limit}`,
+    ),
+  storefrontAvailability: (params: { date: string; durationMinutes: number; branchId?: string }) => {
+    const qs = new URLSearchParams({
+      date: params.date,
+      durationMinutes: String(params.durationMinutes),
+    });
+    if (params.branchId) qs.set('branchId', params.branchId);
+    return publicGet<{ date: string; slots: AvailabilitySlot[] }>(
+      `/storefront/availability?${qs.toString()}`,
+    );
+  },
+  storefrontAvailabilityDays: (params: { days?: number; durationMinutes: number; branchId?: string }) => {
+    const qs = new URLSearchParams({
+      days: String(params.days ?? 14),
+      durationMinutes: String(params.durationMinutes),
+    });
+    if (params.branchId) qs.set('branchId', params.branchId);
+    return publicGet<{ days: Array<{ date: string; slots: number }> }>(
+      `/storefront/availability/days?${qs.toString()}`,
+    );
+  },
+  contact: (body: {
+    fullName: string;
+    email: string;
+    phone?: string;
+    subject?: string;
+    message: string;
+    branchId?: string;
+    locale?: 'ar' | 'en';
+  }) =>
+    request<{ id: string; received: boolean }>('/storefront/contact', {
+      method: 'POST',
+      body,
+      anonymous: true,
+    }),
+  requestAppointment: (body: {
+    customerName: string;
+    phone: string;
+    email?: string;
+    vehicleId?: string;
+    vehicleMake?: string;
+    vehicleModel?: string;
+    vehicleYear?: number;
+    plateNumber?: string;
+    serviceRef: string;
+    branchId?: string;
+    startsAt: string;
+    durationMinutes?: number;
+    notes?: string;
+    bookingType: 'INSPECTION' | 'MAINTENANCE' | 'PROVIDER_SERVICE';
+  }) =>
+    request<StorefrontAppointment>('/storefront/appointments', {
+      method: 'POST',
+      body,
+      anonymous: true,
+    }),
   providers: (categoryKey?: string) =>
     publicGet<{ items: ProviderSummary[]; total: number }>(
       `/marketplace/providers?pageSize=50${categoryKey ? `&categoryKey=${encodeURIComponent(categoryKey)}` : ''}`,
@@ -477,11 +843,8 @@ export const publicApi = {
     }),
 };
 
-/** Service categories offered by the platform. */
-export const SERVICE_CATEGORIES = [
-  { key: 'automotive_maintenance', nameEn: 'Maintenance and repair', nameAr: 'الصيانة والإصلاح' },
-  { key: 'automotive_inspection', nameEn: 'Vehicle inspection', nameAr: 'فحص المركبات' },
-  { key: 'automotive_tyres', nameEn: 'Tyres and batteries', nameAr: 'الإطارات والبطاريات' },
-  { key: 'automotive_bodywork', nameEn: 'Bodywork and paint', nameAr: 'الهيكل والدهان' },
-  { key: 'automotive_recovery', nameEn: 'Roadside recovery', nameAr: 'خدمات الطريق' },
-] as const;
+/**
+ * The automotive service taxonomy, re-exported from the shared catalogue so the
+ * website, the API and the booking engine all read one list.
+ */
+export { SERVICE_CATEGORIES, PART_CATEGORIES } from '@oryx/shared';

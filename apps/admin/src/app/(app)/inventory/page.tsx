@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -20,14 +20,15 @@ import {
   StatusBadge,
   TableShell,
 } from '@/components/ui';
-import type {
-  ProductDto,
-  ReorderAlertDto,
-  StockAdjustmentDto,
-  StockMovementDto,
-  StockTransferDto,
-  ValuationRowDto,
-  WarehouseDto,
+import {
+  PART_CATEGORIES,
+  type ProductDto,
+  type ReorderAlertDto,
+  type StockAdjustmentDto,
+  type StockMovementDto,
+  type StockTransferDto,
+  type ValuationRowDto,
+  type WarehouseDto,
 } from '@oryx/shared';
 
 type Tab = 'valuation' | 'products' | 'warehouses' | 'movements' | 'transfers' | 'adjustments' | 'reorder';
@@ -149,7 +150,14 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<ProductDto | null>(null);
   const list = useAsync(() => api.products({ search: search || undefined }), [search]);
+
+  const categoryName = (key: string | null) => {
+    if (!key) return null;
+    const category = PART_CATEGORIES.find((c) => c.key === key);
+    return category?.nameEn ?? key;
+  };
 
   return (
     <Card>
@@ -181,8 +189,9 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.inventory.unit')}</th>
               <th>{t('erp.inventory.salesPrice')}</th>
               <th>{t('erp.inventory.costPrice')}</th>
-              <th>{t('erp.inventory.taxRate')}</th>
+              <th>{t('cms.storefront')}</th>
               <th>{t('common.status')}</th>
+              {canManage ? <th /> : null}
             </tr>
           </thead>
           <tbody>
@@ -196,42 +205,157 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{p.unit}</td>
                 <td className="tabular-nums text-[12.5px]">{money(p.salesPriceMinor)}</td>
                 <td className="tabular-nums text-[12.5px]">{money(p.costPriceMinor)}</td>
-                <td className="text-[12.5px]">{(p.taxRateBp / 100).toFixed(2)}%</td>
+                <td>
+                  <div className="flex flex-wrap gap-1.5" data-testid={`storefront-${p.sku}`}>
+                    {p.isPublished ? (
+                      <Badge tone="success">{t('cms.published')}</Badge>
+                    ) : (
+                      <Badge tone="neutral">{t('cms.unpublished')}</Badge>
+                    )}
+                    {p.isFeatured ? <Badge tone="gold">{t('cms.featured')}</Badge> : null}
+                    {categoryName(p.partCategoryKey) ? (
+                      <span className="oryx-faint text-[11px]">{categoryName(p.partCategoryKey)}</span>
+                    ) : (
+                      <span className="oryx-faint text-[11px]">{t('cms.noCategory')}</span>
+                    )}
+                  </div>
+                </td>
                 <td>
                   <Badge tone={p.isActive ? 'success' : 'neutral'}>{p.isActive ? t('common.active') : t('common.inactive')}</Badge>
                 </td>
+                {canManage ? (
+                  <td>
+                    <Button size="sm" onClick={() => setEditing(p)} data-testid={`edit-product-${p.sku}`}>
+                      {t('common.edit')}
+                    </Button>
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
-      <CreateProductModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <ProductModal
+        open={open}
+        onClose={() => setOpen(false)}
+        onSaved={list.reload}
+      />
+      <ProductModal
+        open={editing !== null}
+        product={editing ?? undefined}
+        onClose={() => setEditing(null)}
+        onSaved={list.reload}
+      />
     </Card>
   );
 }
 
-function CreateProductModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => Promise<void> }) {
+function ProductModal({
+  open,
+  product,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  product?: ProductDto;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
   const { t } = useUi();
+  const isEdit = Boolean(product);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
-    sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
+    sku: '',
+    nameEn: '',
+    nameAr: '',
+    unit: 'unit',
+    salesPrice: '0.00',
+    costPrice: '0.00',
+    taxRate: '15',
+    partCategoryKey: '',
+    brand: '',
+    imageUrl: '',
+    isPublished: false,
+    isFeatured: false,
+    compareAtPrice: '',
   });
+
+  // Reset the form whenever the modal opens, seeding from the product on edit.
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setForm(
+      product
+        ? {
+            sku: product.sku,
+            nameEn: product.nameEn,
+            nameAr: product.nameAr,
+            unit: product.unit,
+            salesPrice: (product.salesPriceMinor / 100).toFixed(2),
+            costPrice: (product.costPriceMinor / 100).toFixed(2),
+            taxRate: (product.taxRateBp / 100).toFixed(2),
+            partCategoryKey: product.partCategoryKey ?? '',
+            brand: product.brand ?? '',
+            imageUrl: product.imageUrl ?? '',
+            isPublished: product.isPublished,
+            isFeatured: product.isFeatured,
+            compareAtPrice:
+              product.compareAtPriceMinor !== null ? (product.compareAtPriceMinor / 100).toFixed(2) : '',
+          }
+        : {
+            sku: '',
+            nameEn: '',
+            nameAr: '',
+            unit: 'unit',
+            salesPrice: '0.00',
+            costPrice: '0.00',
+            taxRate: '15',
+            partCategoryKey: '',
+            brand: '',
+            imageUrl: '',
+            isPublished: false,
+            isFeatured: false,
+            compareAtPrice: '',
+          },
+    );
+  }, [open, product]);
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.createProduct({
-        sku: form.sku,
-        nameEn: form.nameEn,
-        nameAr: form.nameAr,
-        unit: form.unit,
-        salesPriceMinor: toMinorInput(form.salesPrice),
-        costPriceMinor: toMinorInput(form.costPrice),
-        taxRateBp: Math.round(Number(form.taxRate) * 100),
-      });
-      await onCreated();
+      const storefront = {
+        partCategoryKey: form.partCategoryKey || undefined,
+        brand: form.brand || undefined,
+        imageUrl: form.imageUrl || undefined,
+        isPublished: form.isPublished,
+        isFeatured: form.isFeatured,
+        compareAtPriceMinor: form.compareAtPrice ? toMinorInput(form.compareAtPrice) : undefined,
+      };
+      if (isEdit) {
+        await api.updateProduct(product!.id, {
+          nameEn: form.nameEn,
+          nameAr: form.nameAr,
+          unit: form.unit,
+          salesPriceMinor: toMinorInput(form.salesPrice),
+          costPriceMinor: toMinorInput(form.costPrice),
+          taxRateBp: Math.round(Number(form.taxRate) * 100),
+          ...storefront,
+        });
+      } else {
+        await api.createProduct({
+          sku: form.sku,
+          nameEn: form.nameEn,
+          nameAr: form.nameAr,
+          unit: form.unit,
+          salesPriceMinor: toMinorInput(form.salesPrice),
+          costPriceMinor: toMinorInput(form.costPrice),
+          taxRateBp: Math.round(Number(form.taxRate) * 100),
+          ...storefront,
+        });
+      }
+      await onSaved();
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
@@ -243,7 +367,7 @@ function CreateProductModal({ open, onClose, onCreated }: { open: boolean; onClo
   return (
     <Modal
       open={open}
-      title={t('erp.inventory.newProduct')}
+      title={isEdit ? `${t('common.edit')} ${product!.sku}` : t('erp.inventory.newProduct')}
       onClose={onClose}
       footer={
         <>
@@ -257,7 +381,13 @@ function CreateProductModal({ open, onClose, onCreated }: { open: boolean; onClo
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.inventory.sku')} required>
-          <input className="oryx-input" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} data-testid="product-sku" />
+          <input
+            className="oryx-input"
+            value={form.sku}
+            disabled={isEdit}
+            onChange={(e) => setForm({ ...form, sku: e.target.value })}
+            data-testid="product-sku"
+          />
         </Field>
         <Field label={t('erp.inventory.unit')}>
           <input className="oryx-input" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
@@ -278,6 +408,70 @@ function CreateProductModal({ open, onClose, onCreated }: { open: boolean; onClo
           <input className="oryx-input" value={form.taxRate} onChange={(e) => setForm({ ...form, taxRate: e.target.value })} />
         </Field>
       </div>
+
+      <p className="oryx-panel-title" style={{ marginTop: 20, marginBottom: 8 }}>
+        {t('cms.storefront')}
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label={t('cms.category')}>
+          <select
+            className="oryx-input"
+            value={form.partCategoryKey}
+            onChange={(e) => setForm({ ...form, partCategoryKey: e.target.value })}
+            data-testid="product-category"
+          >
+            <option value="">{t('cms.noCategory')}</option>
+            {PART_CATEGORIES.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.nameEn}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={t('cms.productBrand')}>
+          <input className="oryx-input" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} data-testid="product-brand" />
+        </Field>
+        <Field label={t('cms.image')}>
+          <input
+            className="oryx-input"
+            value={form.imageUrl}
+            placeholder="/media/part-brake-disc.jpg"
+            onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+            data-testid="product-image-url"
+          />
+        </Field>
+        <Field label={t('cms.compareAtPrice')}>
+          <input
+            className="oryx-input"
+            value={form.compareAtPrice}
+            onChange={(e) => setForm({ ...form, compareAtPrice: e.target.value })}
+            data-testid="product-compare-price"
+          />
+        </Field>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-5">
+        <label className="flex items-center gap-2 text-[13px]">
+          <input
+            type="checkbox"
+            checked={form.isPublished}
+            onChange={(e) => setForm({ ...form, isPublished: e.target.checked })}
+            data-testid="product-published"
+          />
+          {t('cms.published')}
+        </label>
+        <label className="flex items-center gap-2 text-[13px]">
+          <input
+            type="checkbox"
+            checked={form.isFeatured}
+            onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })}
+            data-testid="product-featured"
+          />
+          {t('cms.featured')}
+        </label>
+      </div>
+      <p className="oryx-faint" style={{ marginTop: 10, fontSize: 12 }}>
+        {t('cms.storefrontHint')}
+      </p>
     </Modal>
   );
 }

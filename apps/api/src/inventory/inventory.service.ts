@@ -313,6 +313,12 @@ export class InventoryService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const dup = await this.prisma.product.findUnique({ where: { companyId_sku: { companyId, sku: dto.sku } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `SKU ${dto.sku} already exists.`);
+    if ((dto.isPublished ?? false) && !dto.partCategoryKey) {
+      throw badRequest(
+        ERROR_CODES.VALIDATION_FAILED,
+        'A product needs a spare-parts category before it can be published to the store.',
+      );
+    }
     const product = await this.prisma.product.create({
       data: {
         companyId,
@@ -331,6 +337,18 @@ export class InventoryService {
         salesAccountId: dto.salesAccountId ?? null,
         inventoryAccountId: dto.inventoryAccountId ?? null,
         cogsAccountId: dto.cogsAccountId ?? null,
+        partCategoryKey: dto.partCategoryKey ?? null,
+        partCondition: dto.partCondition ?? 'NEW',
+        brand: dto.brand ?? null,
+        descriptionEn: dto.descriptionEn ?? null,
+        descriptionAr: dto.descriptionAr ?? null,
+        warrantyEn: dto.warrantyEn ?? null,
+        warrantyAr: dto.warrantyAr ?? null,
+        engineType: dto.engineType ?? null,
+        isPublished: dto.isPublished ?? false,
+        isFeatured: dto.isFeatured ?? false,
+        compareAtPriceMinor: dto.compareAtPriceMinor ?? null,
+        imageUrl: dto.imageUrl ?? null,
       },
     });
     await this.audit.record({
@@ -348,6 +366,19 @@ export class InventoryService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const product = await this.prisma.product.findFirst({ where: { id, companyId } });
     if (!product) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Product not found.');
+
+    // Publishing an item without an aisle would list it nowhere: the storefront
+    // only reads rows whose `partCategoryKey` is set. Refuse the contradictory
+    // state rather than silently storing an invisible "published" item.
+    const nextCategory = dto.partCategoryKey !== undefined ? dto.partCategoryKey : product.partCategoryKey;
+    const nextPublished = dto.isPublished !== undefined ? dto.isPublished : product.isPublished;
+    if (nextPublished && !nextCategory) {
+      throw badRequest(
+        ERROR_CODES.VALIDATION_FAILED,
+        'A product needs a spare-parts category before it can be published to the store.',
+      );
+    }
+
     const updated = await this.prisma.product.update({
       where: { id },
       data: {
@@ -361,6 +392,20 @@ export class InventoryService {
         ...(dto.reorderLevel !== undefined ? { reorderLevel: dto.reorderLevel } : {}),
         ...(dto.reorderQuantity !== undefined ? { reorderQuantity: dto.reorderQuantity } : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        ...(dto.partCategoryKey !== undefined ? { partCategoryKey: dto.partCategoryKey || null } : {}),
+        ...(dto.partCondition !== undefined ? { partCondition: dto.partCondition } : {}),
+        ...(dto.brand !== undefined ? { brand: dto.brand || null } : {}),
+        ...(dto.descriptionEn !== undefined ? { descriptionEn: dto.descriptionEn || null } : {}),
+        ...(dto.descriptionAr !== undefined ? { descriptionAr: dto.descriptionAr || null } : {}),
+        ...(dto.warrantyEn !== undefined ? { warrantyEn: dto.warrantyEn || null } : {}),
+        ...(dto.warrantyAr !== undefined ? { warrantyAr: dto.warrantyAr || null } : {}),
+        ...(dto.engineType !== undefined ? { engineType: dto.engineType || null } : {}),
+        ...(dto.isPublished !== undefined ? { isPublished: dto.isPublished } : {}),
+        ...(dto.isFeatured !== undefined ? { isFeatured: dto.isFeatured } : {}),
+        ...(dto.compareAtPriceMinor !== undefined
+          ? { compareAtPriceMinor: dto.compareAtPriceMinor || null }
+          : {}),
+        ...(dto.imageUrl !== undefined ? { imageUrl: dto.imageUrl || null } : {}),
       },
     });
     await this.audit.record({
@@ -756,6 +801,18 @@ function toProductDto(p: {
   inventoryAccountId: string | null;
   cogsAccountId: string | null;
   isActive: boolean;
+  partCategoryKey: string | null;
+  partCondition: string;
+  brand: string | null;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
+  warrantyEn: string | null;
+  warrantyAr: string | null;
+  engineType: string | null;
+  isPublished: boolean;
+  isFeatured: boolean;
+  compareAtPriceMinor: number | null;
+  imageUrl: string | null;
 }) {
   return {
     id: p.id,
@@ -775,6 +832,18 @@ function toProductDto(p: {
     inventoryAccountId: p.inventoryAccountId,
     cogsAccountId: p.cogsAccountId,
     isActive: p.isActive,
+    partCategoryKey: p.partCategoryKey,
+    partCondition: p.partCondition,
+    brand: p.brand,
+    descriptionEn: p.descriptionEn,
+    descriptionAr: p.descriptionAr,
+    warrantyEn: p.warrantyEn,
+    warrantyAr: p.warrantyAr,
+    engineType: p.engineType,
+    isPublished: p.isPublished,
+    isFeatured: p.isFeatured,
+    compareAtPriceMinor: p.compareAtPriceMinor,
+    imageUrl: p.imageUrl,
   };
 }
 

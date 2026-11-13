@@ -2,14 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
-import { conflict, ERROR_CODES, notFound } from '../common/errors';
+import { conflict, ERROR_CODES, notFound, badRequest } from '../common/errors';
 import type { ActorContext } from '../organizations/organizations.service';
+import { DEFAULT_SITE_CONTENT, resolveSiteContent, type Locale, type SiteContent } from '@oryx/shared';
 import type {
   CreateApiClientDto,
   UpsertAppVersionDto,
   UpsertBannerDto,
   UpsertCmsPageDto,
   UpsertFeatureFlagDto,
+  UpsertSiteContentDto,
 } from './cms.dto';
 
 /**
@@ -266,10 +268,51 @@ export class CmsService {
     return { ok: true };
   }
 
+  // ------------------------------------------------------------ site content
+  /** Admin view of the stored website document, merged over the defaults. */
+  async getSiteContent(locale: Locale) {
+    const row = await this.prisma.siteContent.findUnique({
+      where: { key_locale: { key: SITE_CONTENT_KEY, locale: locale as never } },
+    });
+    return {
+      id: row?.id ?? `${SITE_CONTENT_KEY}:${locale}`,
+      key: SITE_CONTENT_KEY,
+      locale,
+      data: resolveSiteContent(locale, row?.data ?? null),
+      updatedAt: (row?.updatedAt ?? new Date()).toISOString(),
+      isDefault: !row,
+    };
+  }
+
+  async upsertSiteContent(dto: UpsertSiteContentDto, actor: ActorContext) {
+    const locale = dto.locale as Locale;
+    const sanitised = sanitiseSiteContent(locale, dto.data);
+    const row = await this.prisma.siteContent.upsert({
+      where: { key_locale: { key: SITE_CONTENT_KEY, locale: locale as never } },
+      update: { data: sanitised as never },
+      create: { key: SITE_CONTENT_KEY, locale: locale as never, data: sanitised as never },
+    });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      action: 'cms.site_content_upserted',
+      targetType: 'SITE_CONTENT',
+      targetId: row.id,
+      summary: `Updated website content (${locale})`,
+    });
+    return {
+      id: row.id,
+      key: row.key,
+      locale,
+      data: resolveSiteContent(locale, row.data),
+      updatedAt: row.updatedAt.toISOString(),
+      isDefault: false,
+    };
+  }
+
   // ------------------------------------------------------------ public content
   /** Public, unauthenticated content used by the website/app shells. */
   async publicContent(locale: string) {
-    const [pages, banners, flags, versions, categories] = await Promise.all([
+    const [pages, banners, flags, versions, categories, site] = await Promise.all([
       this.prisma.cmsPage.findMany({
         where: { locale: locale as never, status: 'PUBLISHED' },
         select: { slug: true, title: true, excerpt: true, body: true },
@@ -289,7 +332,57 @@ export class CmsService {
         orderBy: { sortOrder: 'asc' },
         select: { key: true, nameEn: true, nameAr: true, domain: true },
       }),
+      this.prisma.siteContent.findUnique({
+        where: { key_locale: { key: SITE_CONTENT_KEY, locale: locale as never } },
+      }),
     ]);
-    return { locale, pages, banners, flags, versions, categories };
+    const resolved = locale === 'en' ? 'en' : 'ar';
+    return {
+      locale,
+      pages,
+      banners,
+      flags,
+      versions,
+      categories,
+      site: resolveSiteContent(resolved, site?.data ?? null),
+    };
   }
+}
+
+const SITE_CONTENT_KEY = 'website';
+
+/**
+ * Drop unknown keys from an edited document before it is stored.
+ *
+ * The website merges the stored document over its approved defaults, so this
+ * keeps the stored shape aligned with `SiteContent` and stops a stray key from
+ * a future client being persisted. Arrays are taken whole so the admin can add,
+ * remove or reorder hero slides, trust items and About blocks.
+ */
+function sanitiseSiteContent(locale: Locale, data: Record<string, unknown>): Partial<SiteContent> {
+  const base = DEFAULT_SITE_CONTENT[locale] ?? DEFAULT_SITE_CONTENT.ar;
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Website content must be an object.');
+  }
+  return pick(base, data) as Partial<SiteContent>;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function pick(base: unknown, override: unknown): unknown {
+  if (override === undefined) return undefined;
+  if (Array.isArray(base)) return Array.isArray(override) ? override : undefined;
+  if (isPlainObject(base)) {
+    if (!isPlainObject(override)) return undefined;
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(override)) {
+      if (!(key in base)) continue;
+      const picked = pick((base as Record<string, unknown>)[key], value);
+      if (picked !== undefined) out[key] = picked;
+    }
+    return out;
+  }
+  return override;
 }

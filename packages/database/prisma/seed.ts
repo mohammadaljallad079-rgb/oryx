@@ -17,7 +17,7 @@
 
 import { PrismaClient, type Prisma } from '@prisma/client';
 import * as argon2 from 'argon2';
-import { MODULES, PERMISSIONS, lineAmountMinor } from '@oryx/shared';
+import { MODULES, PERMISSIONS, lineAmountMinor, DEFAULT_SITE_CONTENT } from '@oryx/shared';
 
 const prisma = new PrismaClient();
 
@@ -384,6 +384,26 @@ async function seedUsers() {
   return superAdmin;
 }
 
+interface BranchSpec {
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  city: string;
+  countryCode?: string;
+  timezone?: string;
+  addressLine?: string;
+  phone?: string;
+  email?: string;
+  whatsapp?: string;
+  latitude?: number;
+  longitude?: number;
+  imageUrl?: string;
+  descriptionEn?: string;
+  descriptionAr?: string;
+  servicesOffered?: string[];
+  isPublished?: boolean;
+}
+
 interface CompanySpec {
   code: string;
   nameEn: string;
@@ -392,7 +412,9 @@ interface CompanySpec {
   industry: string;
   parentCode?: string;
   demo?: boolean;
-  branches: Array<{ code: string; nameEn: string; nameAr: string; city: string }>;
+  countryCode?: string;
+  currency?: string;
+  branches: BranchSpec[];
 }
 
 const COMPANIES: CompanySpec[] = [
@@ -405,15 +427,106 @@ const COMPANIES: CompanySpec[] = [
     branches: [{ code: 'HQ', nameEn: 'Head Office', nameAr: 'المقر الرئيسي', city: 'Riyadh' }],
   },
   {
+    // The public website and the consumer platform belong to this company. It
+    // is the Bahrain automotive services business the storefront presents, so
+    // its branches are the ones published on the public site.
     code: 'ORYX-AUTO',
     nameEn: 'ORYX Auto Services',
     nameAr: 'أوريكس لخدمات السيارات',
     type: 'INTERNAL',
     industry: 'Automotive Services',
     parentCode: 'ORYX-HOLDING',
+    countryCode: 'BH',
+    currency: 'BHD',
     branches: [
-      { code: 'RUH-01', nameEn: 'Riyadh North Workshop', nameAr: 'ورشة شمال الرياض', city: 'Riyadh' },
-      { code: 'JED-01', nameEn: 'Jeddah Inspection Center', nameAr: 'مركز فحص جدة', city: 'Jeddah' },
+      {
+        code: 'RUH-01',
+        nameEn: 'ORYX Auto Services — Sitra',
+        nameAr: 'أوريكس لخدمات السيارات — سترة',
+        city: 'Sitra',
+        countryCode: 'BH',
+        timezone: 'Asia/Bahrain',
+        addressLine: 'Road 1001, Building 245, Sitra Industrial Area',
+        phone: '+973 1700 0001',
+        email: 'sitra@oryx-auto.bh',
+        whatsapp: '+973 3300 0001',
+        latitude: 26.1544,
+        longitude: 50.6101,
+        imageUrl: '/media/hero-services.jpg',
+        descriptionEn:
+          'The main ORYX workshop: scheduled maintenance, mechanical and engine repair, brakes, tyres, electrical work and computer diagnostics.',
+        descriptionAr:
+          'الورشة الرئيسية لأوريكس: الصيانة الدورية والإصلاح الميكانيكي وإصلاح المحركات والفرامل والإطارات والكهرباء وفحص الكمبيوتر.',
+        servicesOffered: [
+          'periodic_maintenance',
+          'comprehensive_inspection',
+          'mechanical_repair',
+          'engine_repair',
+          'brake_service',
+          'tyre_service',
+          'electrical_service',
+          'oil_and_filters',
+          'computer_diagnostics',
+          'specialist_care',
+        ],
+        isPublished: true,
+      },
+      {
+        code: 'JED-01',
+        nameEn: 'ORYX Inspection Centre — Manama',
+        nameAr: 'مركز أوريكس للفحص — المنامة',
+        city: 'Manama',
+        countryCode: 'BH',
+        timezone: 'Asia/Bahrain',
+        addressLine: 'Road 1501, Block 315, Manama',
+        phone: '+973 1700 0002',
+        email: 'manama@oryx-auto.bh',
+        whatsapp: '+973 3300 0002',
+        latitude: 26.2285,
+        longitude: 50.586,
+        imageUrl: '/media/hero-inspection.jpg',
+        descriptionEn:
+          'A dedicated inspection centre: comprehensive multi-point examinations, computer diagnostics, brakes, tyres and oil services.',
+        descriptionAr:
+          'مركز فحص متخصص: الفحص الشامل متعدد النقاط وفحص الكمبيوتر والفرامل والإطارات وخدمات الزيوت.',
+        servicesOffered: [
+          'comprehensive_inspection',
+          'computer_diagnostics',
+          'brake_service',
+          'tyre_service',
+          'oil_and_filters',
+          'periodic_maintenance',
+        ],
+        isPublished: true,
+      },
+      {
+        code: 'MUH-01',
+        nameEn: 'ORYX Auto Services — Muharraq',
+        nameAr: 'أوريكس لخدمات السيارات — المحرق',
+        city: 'Muharraq',
+        countryCode: 'BH',
+        timezone: 'Asia/Bahrain',
+        addressLine: 'Road 2041, Building 118, Muharraq',
+        phone: '+973 1700 0003',
+        email: 'muharraq@oryx-auto.bh',
+        whatsapp: '+973 3300 0003',
+        latitude: 26.2572,
+        longitude: 50.6119,
+        imageUrl: '/media/svc-periodic.jpg',
+        descriptionEn:
+          'A neighbourhood service branch for periodic maintenance, oil and filter changes, tyres, brakes and electrical work.',
+        descriptionAr:
+          'فرع خدمة قريب منك للصيانة الدورية وتغيير الزيوت والفلاتر والإطارات والفرامل وأعمال الكهرباء.',
+        servicesOffered: [
+          'periodic_maintenance',
+          'oil_and_filters',
+          'tyre_service',
+          'brake_service',
+          'electrical_service',
+          'mechanical_repair',
+        ],
+        isPublished: true,
+      },
     ],
   },
   {
@@ -474,6 +587,8 @@ async function seedCompanies(superAdminId: string) {
         type: spec.type,
         industry: spec.industry,
         status: 'ACTIVE',
+        countryCode: spec.countryCode ?? 'SA',
+        currency: spec.currency ?? 'SAR',
         notes,
       },
       create: {
@@ -484,26 +599,37 @@ async function seedCompanies(superAdminId: string) {
         type: spec.type,
         industry: spec.industry,
         status: 'ACTIVE',
-        countryCode: 'SA',
-        currency: 'SAR',
+        countryCode: spec.countryCode ?? 'SA',
+        currency: spec.currency ?? 'SAR',
         notes,
       },
     });
     idByCode.set(spec.code, company.id);
 
     for (const b of spec.branches) {
+      const branchData = {
+        nameEn: b.nameEn,
+        nameAr: b.nameAr,
+        city: b.city,
+        countryCode: b.countryCode ?? spec.countryCode ?? 'SA',
+        timezone: b.timezone ?? 'Asia/Riyadh',
+        addressLine: b.addressLine ?? null,
+        phone: b.phone ?? null,
+        email: b.email ?? null,
+        whatsapp: b.whatsapp ?? null,
+        latitude: b.latitude ?? null,
+        longitude: b.longitude ?? null,
+        imageUrl: b.imageUrl ?? null,
+        descriptionEn: b.descriptionEn ?? null,
+        descriptionAr: b.descriptionAr ?? null,
+        servicesOffered: b.servicesOffered ?? [],
+        isPublished: b.isPublished ?? false,
+        isActive: true,
+      };
       await prisma.branch.upsert({
         where: { companyId_code: { companyId: company.id, code: b.code } },
-        update: { nameEn: b.nameEn, nameAr: b.nameAr, city: b.city, isActive: true },
-        create: {
-          companyId: company.id,
-          code: b.code,
-          nameEn: b.nameEn,
-          nameAr: b.nameAr,
-          city: b.city,
-          countryCode: 'SA',
-          isActive: true,
-        },
+        update: branchData,
+        create: { companyId: company.id, code: b.code, ...branchData },
       });
     }
 
@@ -723,7 +849,20 @@ async function seedCms() {
     create: { key: 'branding', value: { nameEn: 'ORYX', nameAr: 'أوريكس', primaryColor: '#d4af37', navy: '#00162b' } },
   });
 
-  console.log('  cms: pages, banners, flags, versions, categories, templates seeded');
+  // Editable website content: create the baseline row once. Re-seeding must
+  // never overwrite an administrator's edits, so this is create-if-missing.
+  for (const locale of ['ar', 'en'] as const) {
+    const existing = await prisma.siteContent.findUnique({
+      where: { key_locale: { key: 'website', locale } },
+    });
+    if (!existing) {
+      await prisma.siteContent.create({
+        data: { key: 'website', locale, data: DEFAULT_SITE_CONTENT[locale] as never },
+      });
+    }
+  }
+
+  console.log('  cms: pages, banners, flags, versions, categories, templates, site content seeded');
 }
 
 async function seedAuditBaseline(superAdminId: string, idByCode: Map<string, string>) {
@@ -1167,6 +1306,881 @@ async function seedExecution03Baseline(idByCode: Map<string, string>, superAdmin
   );
 }
 
+/**
+ * Public storefront baseline.
+ *
+ * Fills the ORYX Auto Services company with the data the public website reads:
+ * a published spare-parts catalogue (with brands, part numbers, fitment and
+ * offers), bookable resources and opening hours for every published branch, and
+ * one demo consumer account so the customer area can be exercised locally.
+ *
+ * Every price is in the company's own currency and in minor units — Bahraini
+ * fils, three decimals — and every compatibility row is a real fitment record.
+ * Nothing here invents a statistic, a rating or a certification.
+ */
+const STOREFRONT_PARTS: Array<{
+  sku: string;
+  nameEn: string;
+  nameAr: string;
+  category: string;
+  brand: string;
+  partNumber: string;
+  price: number;
+  compareAt?: number;
+  cost: number;
+  image: string;
+  featured?: boolean;
+  condition?: 'NEW' | 'REFURBISHED';
+  engineType?: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  warrantyEn?: string;
+  warrantyAr?: string;
+  opening: number;
+  fits: Array<[string, string, number, number | null]>;
+}> = [
+  {
+    sku: 'OIL-5W30',
+    nameEn: 'Engine oil 5W-30 fully synthetic (4L)',
+    nameAr: 'زيت محرك 5W-30 صناعي كامل (4 لتر)',
+    category: 'oil',
+    brand: 'ORYX Lubricants',
+    partNumber: 'OIL-5W30-4L',
+    price: 12500,
+    compareAt: 15500,
+    cost: 8800,
+    image: '/media/part-oil-bottle.jpg',
+    featured: true,
+    descriptionEn:
+      'Fully synthetic 5W-30 engine oil that meets the manufacturer specification for modern petrol and diesel engines. Supplied as a 4 litre pack.',
+    descriptionAr:
+      'زيت محرك صناعي كامل 5W-30 مطابق لمواصفات الشركة المصنّعة لمحركات البنزين والديزل الحديثة. يُسلَّم بعبوة 4 لتر.',
+    warrantyEn: 'Manufacturer defect warranty for 12 months.',
+    warrantyAr: 'ضمان المصنّع ضد عيوب الصناعة لمدة 12 شهرًا.',
+    opening: 480000,
+    fits: [
+      ['Toyota', 'Corolla', 2014, 2023],
+      ['Toyota', 'Camry', 2012, 2023],
+      ['Nissan', 'Altima', 2013, 2023],
+      ['Honda', 'Civic', 2016, 2023],
+    ],
+  },
+  {
+    sku: 'FILTER-OIL-01',
+    nameEn: 'Oil filter',
+    nameAr: 'فلتر زيت المحرك',
+    category: 'filters',
+    brand: 'Denso',
+    partNumber: 'OIL-FLT-26300',
+    price: 4500,
+    cost: 2600,
+    image: '/media/part-air-filter.jpg',
+    featured: true,
+    descriptionEn:
+      'High-efficiency oil filter with an anti-drain-back valve that keeps oil at the bearings on start-up.',
+    descriptionAr:
+      'فلتر زيت عالي الكفاءة مع صمام مانع للرجوع يحافظ على الزيت عند المحامل عند التشغيل.',
+    opening: 300000,
+    fits: [
+      ['Toyota', 'Corolla', 2014, 2023],
+      ['Toyota', 'Camry', 2012, 2023],
+      ['Lexus', 'ES', 2013, 2022],
+    ],
+  },
+  {
+    sku: 'FILTER-AIR-01',
+    nameEn: 'Air filter',
+    nameAr: 'فلتر الهواء',
+    category: 'filters',
+    brand: 'Denso',
+    partNumber: 'AIR-FLT-17801',
+    price: 6500,
+    cost: 4000,
+    image: '/media/part-air-filter.jpg',
+    descriptionEn:
+      'Panel air filter with a pleated paper element that protects the engine from dust and sand.',
+    descriptionAr: 'فلتر هواء مسطح بعنصر ورقي مطوي يحمي المحرك من الغبار والرمل.',
+    opening: 260000,
+    fits: [
+      ['Toyota', 'Corolla', 2014, 2023],
+      ['Nissan', 'Altima', 2013, 2023],
+      ['Hyundai', 'Elantra', 2016, 2022],
+    ],
+  },
+  {
+    sku: 'FILTER-CABIN-01',
+    nameEn: 'Cabin air filter',
+    nameAr: 'فلتر مكيف المقصورة',
+    category: 'filters',
+    brand: 'Mann',
+    partNumber: 'CAB-FLT-CU1919',
+    price: 7000,
+    cost: 4200,
+    image: '/media/cat-filters.jpg',
+    descriptionEn:
+      'Activated-carbon cabin filter that traps dust, pollen and odours before they reach the cabin.',
+    descriptionAr:
+      'فلتر مقصورة بالكربون المنشط يحجز الغبار وحبوب اللقاح والروائح قبل وصولها إلى المقصورة.',
+    opening: 180000,
+    fits: [
+      ['Toyota', 'Camry', 2012, 2023],
+      ['Honda', 'Civic', 2016, 2023],
+      ['Kia', 'Sportage', 2016, 2023],
+    ],
+  },
+  {
+    sku: 'FILTER-FUEL-01',
+    nameEn: 'Fuel filter',
+    nameAr: 'فلتر الوقود',
+    category: 'filters',
+    brand: 'Bosch',
+    partNumber: 'FUEL-FLT-F026',
+    price: 9500,
+    cost: 5800,
+    image: '/media/cat-filters.jpg',
+    descriptionEn:
+      'Inline fuel filter that protects the injection system from rust and water carried in the fuel.',
+    descriptionAr: 'فلتر وقود مضمّن يحمي نظام الحقن من الصدأ والماء المحمول مع الوقود.',
+    opening: 120000,
+    fits: [
+      ['Toyota', 'Corolla', 2014, 2020],
+      ['Nissan', 'Altima', 2013, 2019],
+    ],
+  },
+  {
+    sku: 'BRAKE-PAD-F',
+    nameEn: 'Front brake pad set',
+    nameAr: 'طقم فحمات فرامل أمامية',
+    category: 'brakes',
+    brand: 'Brembo',
+    partNumber: 'BP-FR-0986',
+    price: 28000,
+    compareAt: 34000,
+    cost: 19000,
+    image: '/media/cat-brakes.jpg',
+    featured: true,
+    descriptionEn:
+      'Low-dust ceramic front brake pads with a slotted friction surface for consistent stopping power. Sold as a set for both front wheels.',
+    descriptionAr:
+      'فحمات فرامل أمامية سيراميك منخفضة الغبار بسطح احتكاك مُشقّ لقوة توقف ثابتة. تُباع كطقم للعجلتين الأماميتين.',
+    warrantyEn: 'Manufacturer defect warranty for 12 months.',
+    warrantyAr: 'ضمان المصنّع ضد عيوب الصناعة لمدة 12 شهرًا.',
+    opening: 200000,
+    fits: [
+      ['Toyota', 'Camry', 2012, 2021],
+      ['Nissan', 'Altima', 2013, 2022],
+      ['Mazda', '3', 2014, 2021],
+    ],
+  },
+  {
+    sku: 'BRAKE-DISC-F',
+    nameEn: 'Front brake disc rotor',
+    nameAr: 'قرص فرامل أمامي',
+    category: 'brakes',
+    brand: 'Brembo',
+    partNumber: 'DISC-FR-09A1',
+    price: 22000,
+    cost: 14500,
+    image: '/media/part-brake-disc.jpg',
+    featured: true,
+    descriptionEn:
+      'Ventilated front brake disc with drilled and slotted faces for better heat dissipation. Sold per rotor.',
+    descriptionAr:
+      'قرص فرامل أمامي مهوّى بوجهين مثقّبين ومُشقّين لتبديد أفضل للحرارة. يُباع للقرص الواحد.',
+    opening: 140000,
+    fits: [
+      ['Toyota', 'Camry', 2012, 2021],
+      ['Lexus', 'ES', 2013, 2021],
+    ],
+  },
+  {
+    sku: 'BRAKE-FLUID-01',
+    nameEn: 'Brake fluid DOT 4 (1L)',
+    nameAr: 'زيت فرامل DOT 4 (1 لتر)',
+    category: 'brakes',
+    brand: 'Castrol',
+    partNumber: 'BF-DOT4-1L',
+    price: 3500,
+    cost: 2100,
+    image: '/media/cat-brakes.jpg',
+    descriptionEn: 'High boiling point DOT 4 brake fluid for hydraulic brake and clutch systems.',
+    descriptionAr: 'زيت فرامل DOT 4 بدرجة غليان مرتفعة لأنظمة الفرامل والدبرياج الهيدروليكية.',
+    opening: 250000,
+    fits: [['Toyota', 'Corolla', 2008, null]],
+  },
+  {
+    sku: 'BATT-70AH',
+    nameEn: 'Maintenance-free battery 70Ah',
+    nameAr: 'بطارية بدون صيانة 70 أمبير',
+    category: 'batteries',
+    brand: 'Varta',
+    partNumber: 'BATT-70-AGM',
+    price: 45000,
+    compareAt: 52000,
+    cost: 32000,
+    image: '/media/part-battery.jpg',
+    featured: true,
+    descriptionEn:
+      'Sealed AGM battery with high cold-cranking current for vehicles with start-stop systems. Free fitting at any ORYX branch.',
+    descriptionAr:
+      'بطارية AGM مغلقة بتيار بدء بارد عالٍ للسيارات المزودة بنظام إيقاف وتشغيل. التركيب مجانًا في أي فرع لأوريكس.',
+    warrantyEn: '24 month pro-rata warranty.',
+    warrantyAr: 'ضمان 24 شهرًا بنسبة متناقصة.',
+    opening: 90000,
+    fits: [
+      ['Toyota', 'Camry', 2012, 2021],
+      ['Hyundai', 'Elantra', 2016, 2022],
+      ['Kia', 'Sportage', 2016, 2023],
+      ['BMW', '3 Series', 2012, 2019],
+    ],
+  },
+  {
+    sku: 'BATT-55AH',
+    nameEn: 'Maintenance-free battery 55Ah',
+    nameAr: 'بطارية بدون صيانة 55 أمبير',
+    category: 'batteries',
+    brand: 'Varta',
+    partNumber: 'BATT-55-EFB',
+    price: 32000,
+    cost: 22000,
+    image: '/media/part-battery.jpg',
+    descriptionEn: 'Sealed lead-acid battery for compact saloons and hatchbacks. Free fitting in branch.',
+    descriptionAr: 'بطارية رصاص محكمة لسيارات السيدان والصغيرة. التركيب مجانًا في الفرع.',
+    warrantyEn: '18 month pro-rata warranty.',
+    warrantyAr: 'ضمان 18 شهرًا بنسبة متناقصة.',
+    opening: 110000,
+    fits: [
+      ['Toyota', 'Corolla', 2014, 2023],
+      ['Honda', 'Civic', 2016, 2023],
+      ['Nissan', 'Altima', 2013, 2022],
+    ],
+  },
+  {
+    sku: 'SPARK-PLUG-IR',
+    nameEn: 'Iridium spark plug',
+    nameAr: 'شمعة احتراق إيريديوم',
+    category: 'electrical',
+    brand: 'NGK',
+    partNumber: 'SPK-IR-IFR6',
+    price: 3200,
+    cost: 1900,
+    image: '/media/part-spark-plug.jpg',
+    featured: true,
+    descriptionEn:
+      'Long-life iridium spark plug with a fine electrode for a stronger, more consistent spark. Sold per plug.',
+    descriptionAr:
+      'شمعة احتراق إيريديوم طويلة العمر بقطب رفيع لشرارة أقوى وأكثر ثباتًا. تُباع للشمعة الواحدة.',
+    opening: 400000,
+    fits: [
+      ['Toyota', 'Corolla', 2014, 2023],
+      ['Honda', 'Civic', 2016, 2023],
+      ['Mazda', '3', 2014, 2021],
+      ['Mitsubishi', 'Lancer', 2008, 2017],
+    ],
+  },
+  {
+    sku: 'ALTERNATOR-01',
+    nameEn: 'Alternator 12V 90A',
+    nameAr: 'دينمو 12 فولت 90 أمبير',
+    category: 'electrical',
+    brand: 'Denso',
+    partNumber: 'ALT-12V-90A',
+    price: 85000,
+    cost: 62000,
+    image: '/media/part-alternator.jpg',
+    descriptionEn:
+      'Remanufactured 90 amp alternator tested on a bench before dispatch, with a new regulator and bearings.',
+    descriptionAr:
+      'دينمو مُجدّد بقوة 90 أمبير مُختبر على منصة قبل التسليم، مع منظم ومحامل جديدة.',
+    warrantyEn: '12 month exchange warranty.',
+    warrantyAr: 'ضمان استبدال لمدة 12 شهرًا.',
+    condition: 'REFURBISHED',
+    opening: 24000,
+    fits: [
+      ['Toyota', 'Camry', 2012, 2019],
+      ['Lexus', 'ES', 2013, 2019],
+    ],
+  },
+  {
+    sku: 'IGN-COIL-01',
+    nameEn: 'Ignition coil',
+    nameAr: 'ملف إشعال',
+    category: 'electrical',
+    brand: 'Bosch',
+    partNumber: 'COIL-0221',
+    price: 16000,
+    cost: 10500,
+    image: '/media/cat-electrical.jpg',
+    descriptionEn: 'Pencil-type ignition coil with a heat-resistant epoxy body. Sold per coil.',
+    descriptionAr: 'ملف إشعال من نوع القلم بجسم إيبوكسي مقاوم للحرارة. يُباع للملف الواحد.',
+    opening: 80000,
+    fits: [
+      ['Toyota', 'Corolla', 2014, 2023],
+      ['Mazda', '3', 2014, 2021],
+    ],
+  },
+  {
+    sku: 'HEADLIGHT-01',
+    nameEn: 'Halogen headlight assembly',
+    nameAr: 'شمعة إضاءة أمامية كاملة',
+    category: 'electrical',
+    brand: 'Hella',
+    partNumber: 'HL-ASSY-8821',
+    price: 55000,
+    cost: 40000,
+    image: '/media/part-headlight.jpg',
+    descriptionEn:
+      'Complete headlight assembly with lens, reflector and housing, ready to bolt on. Sold per side.',
+    descriptionAr:
+      'مجموعة إضاءة أمامية كاملة تشمل العدسة والعاكس والهيكل، جاهزة للتركيب. تُباع للجهة الواحدة.',
+    opening: 36000,
+    fits: [
+      ['Toyota', 'Corolla', 2014, 2019],
+      ['Nissan', 'Altima', 2013, 2018],
+    ],
+  },
+  {
+    sku: 'LED-BULB-PAIR',
+    nameEn: 'LED headlight bulb pair H4',
+    nameAr: 'طقم لمبات LED أمامية H4',
+    category: 'accessories',
+    brand: 'Philips',
+    partNumber: 'LED-H4-PR',
+    price: 18000,
+    compareAt: 22000,
+    cost: 12500,
+    image: '/media/part-headlight.jpg',
+    descriptionEn: 'Street-legal H4 LED bulb pair with a built-in cooling fan. Sold as a pair.',
+    descriptionAr: 'طقم لمبات LED مقاس H4 مطابق للاستخدام على الطريق مع مروحة تبريد مدمجة. يُباع كطقم.',
+    opening: 60000,
+    fits: [
+      ['Toyota', 'Corolla', 2014, 2023],
+      ['Nissan', 'Altima', 2013, 2022],
+      ['Hyundai', 'Elantra', 2016, 2022],
+    ],
+  },
+  {
+    sku: 'RADIATOR-01',
+    nameEn: 'Aluminium radiator',
+    nameAr: 'رادياتير ألمنيوم',
+    category: 'cooling',
+    brand: 'Denso',
+    partNumber: 'RAD-AL-16400',
+    price: 60000,
+    cost: 44000,
+    image: '/media/part-radiator.jpg',
+    descriptionEn:
+      'Aluminium core radiator with brazed tanks, pressure tested to the manufacturer specification.',
+    descriptionAr: 'رادياتير بقلب ألمنيوم وخزانات ملحومة، مُختبر ضغطًا وفق مواصفات المصنّع.',
+    opening: 40000,
+    fits: [
+      ['Toyota', 'Camry', 2012, 2021],
+      ['Honda', 'Civic', 2016, 2022],
+    ],
+  },
+  {
+    sku: 'COOLANT-4L',
+    nameEn: 'Engine coolant concentrate (4L)',
+    nameAr: 'ماء رادياتير مركز (4 لتر)',
+    category: 'cooling',
+    brand: 'ORYX Lubricants',
+    partNumber: 'COOL-G12-4L',
+    price: 6000,
+    cost: 3600,
+    image: '/media/cat-cooling.jpg',
+    descriptionEn:
+      'Long-life G12 coolant concentrate that protects the cooling system from corrosion and frost.',
+    descriptionAr: 'ماء رادياتير مركز G12 طويل العمر يحمي نظام التبريد من التآكل والصقيع.',
+    opening: 160000,
+    fits: [['Toyota', 'Corolla', 2008, null]],
+  },
+  {
+    sku: 'THERMOSTAT-01',
+    nameEn: 'Coolant thermostat',
+    nameAr: 'ثرموستات تبريد',
+    category: 'cooling',
+    brand: 'Mahle',
+    partNumber: 'THRM-8201',
+    price: 8000,
+    cost: 5200,
+    image: '/media/cat-cooling.jpg',
+    descriptionEn:
+      'Wax-pellet thermostat with a gasket that holds the engine at its designed operating temperature.',
+    descriptionAr: 'ثرموستات بحشوة شمعية مع حشية تحافظ على حرارة تشغيل المحرك المصممة لها.',
+    opening: 90000,
+    fits: [
+      ['Toyota', 'Corolla', 2014, 2023],
+      ['Mitsubishi', 'Lancer', 2008, 2017],
+    ],
+  },
+  {
+    sku: 'WATER-PUMP-01',
+    nameEn: 'Engine water pump',
+    nameAr: 'مضخة ماء المحرك',
+    category: 'cooling',
+    brand: 'Aisin',
+    partNumber: 'WP-1920',
+    price: 38000,
+    cost: 27000,
+    image: '/media/cat-cooling.jpg',
+    descriptionEn: 'Water pump with a sealed bearing and a machined impeller, supplied with a gasket.',
+    descriptionAr: 'مضخة ماء بمحمل محكم وريشة مشغّلة، تُسلَّم مع حشية.',
+    warrantyEn: 'Manufacturer defect warranty for 12 months.',
+    warrantyAr: 'ضمان المصنّع ضد عيوب الصناعة لمدة 12 شهرًا.',
+    opening: 45000,
+    fits: [
+      ['Toyota', 'Camry', 2012, 2021],
+      ['Lexus', 'ES', 2013, 2021],
+    ],
+  },
+  {
+    sku: 'SHOCK-ABSORB-F',
+    nameEn: 'Front shock absorber',
+    nameAr: 'مساعد تعليق أمامي',
+    category: 'suspension',
+    brand: 'KYB',
+    partNumber: 'SHK-FR-3350',
+    price: 35000,
+    compareAt: 42000,
+    cost: 25000,
+    image: '/media/part-shock.jpg',
+    descriptionEn:
+      'Gas-charged front shock absorber that restores ride comfort and tyre contact. Sold per unit.',
+    descriptionAr:
+      'مساعد تعليق أمامي معزّز بالغاز يعيد راحة القيادة وملامسة الإطار للطريق. يُباع للوحدة الواحدة.',
+    opening: 70000,
+    fits: [
+      ['Toyota', 'Corolla', 2014, 2023],
+      ['Nissan', 'Altima', 2013, 2022],
+      ['Kia', 'Sportage', 2016, 2023],
+    ],
+  },
+  {
+    sku: 'CTRL-ARM-01',
+    nameEn: 'Front lower control arm',
+    nameAr: 'ذراع تحكم سفلي أمامي',
+    category: 'suspension',
+    brand: 'Lemförder',
+    partNumber: 'ARM-FR-48068',
+    price: 48000,
+    cost: 35000,
+    image: '/media/cat-suspension.jpg',
+    descriptionEn:
+      'Forged lower control arm supplied with a pressed-in bush, ready for fitting. Sold per side.',
+    descriptionAr: 'ذراع تحكم سفلي مطروق مع جلبة مركّبة بالكبس، جاهز للتركيب. يُباع للجهة الواحدة.',
+    opening: 32000,
+    fits: [
+      ['Toyota', 'Camry', 2012, 2021],
+      ['Mercedes-Benz', 'C-Class', 2014, 2021],
+    ],
+  },
+  {
+    sku: 'TYRE-205-55R16',
+    nameEn: 'Tyre 205/55 R16 91V',
+    nameAr: 'إطار 205/55 R16 91V',
+    category: 'tyres',
+    brand: 'Michelin',
+    partNumber: 'TYR-2055516',
+    price: 38000,
+    cost: 28000,
+    image: '/media/part-tyre.jpg',
+    featured: true,
+    descriptionEn:
+      'Premium touring tyre with short wet braking distances. Fitting, balancing and old-tyre disposal included.',
+    descriptionAr:
+      'إطار سياحي متميز بمسافات توقف قصيرة على الطرق المبللة. يشمل التركيب والموازنة والتخلص من الإطار القديم.',
+    warrantyEn: 'Manufacturer treadwear warranty.',
+    warrantyAr: 'ضمان المصنّع لتآكل المداس.',
+    opening: 160000,
+    fits: [
+      ['Toyota', 'Corolla', 2014, 2023],
+      ['Honda', 'Civic', 2016, 2023],
+      ['Mazda', '3', 2014, 2021],
+    ],
+  },
+  {
+    sku: 'TYRE-225-45R17',
+    nameEn: 'Tyre 225/45 R17 94W',
+    nameAr: 'إطار 225/45 R17 94W',
+    category: 'tyres',
+    brand: 'Continental',
+    partNumber: 'TYR-2254517',
+    price: 46000,
+    cost: 34000,
+    image: '/media/part-tyre.jpg',
+    descriptionEn:
+      'Sport-touring tyre with a reinforced sidewall for larger saloons and crossovers. Fitting included.',
+    descriptionAr:
+      'إطار رياضي سياحي بجدار جانبي معزّز لسيارات السيدان الكبيرة والكروس أوفر. يشمل التركيب.',
+    opening: 120000,
+    fits: [
+      ['BMW', '3 Series', 2012, 2019],
+      ['Mercedes-Benz', 'C-Class', 2014, 2021],
+    ],
+  },
+  {
+    sku: 'ENG-TIMING-KIT',
+    nameEn: 'Timing belt kit with tensioner',
+    nameAr: 'طقم سير توقيت مع شداد',
+    category: 'engine',
+    brand: 'Gates',
+    partNumber: 'TBK-5400',
+    price: 42000,
+    cost: 31000,
+    image: '/media/cat-engine.jpg',
+    descriptionEn:
+      'Timing belt kit with a tensioner and idler pulley, specified for the manufacturer service interval.',
+    descriptionAr:
+      'طقم سير توقيت مع شداد وبكرة توجيه، مطابق لفترة الصيانة المحددة من المصنّع.',
+    warrantyEn: 'Manufacturer defect warranty for 12 months.',
+    warrantyAr: 'ضمان المصنّع ضد عيوب الصناعة لمدة 12 شهرًا.',
+    opening: 38000,
+    fits: [
+      ['Toyota', 'Corolla', 2014, 2019],
+      ['Mitsubishi', 'Lancer', 2008, 2017],
+    ],
+  },
+  {
+    sku: 'ENG-FUEL-PUMP',
+    nameEn: 'In-tank fuel pump',
+    nameAr: 'مضخة وقود داخل الخزان',
+    category: 'engine',
+    brand: 'Bosch',
+    partNumber: 'FP-0580',
+    price: 52000,
+    cost: 38000,
+    image: '/media/cat-engine.jpg',
+    descriptionEn:
+      'In-tank electric fuel pump with a strainer, delivering stable pressure to the injection system.',
+    descriptionAr:
+      'مضخة وقود كهربائية داخل الخزان مع مصفاة، توفر ضغطًا ثابتًا لنظام الحقن.',
+    opening: 30000,
+    fits: [
+      ['Toyota', 'Camry', 2012, 2021],
+      ['Nissan', 'Altima', 2013, 2022],
+    ],
+  },
+  {
+    sku: 'ENG-O2-SENSOR',
+    nameEn: 'Oxygen sensor (upstream)',
+    nameAr: 'حساس أكسجين (أمامي)',
+    category: 'engine',
+    brand: 'Denso',
+    partNumber: 'O2-2344',
+    price: 24000,
+    cost: 16500,
+    image: '/media/svc-diagnostics.jpg',
+    descriptionEn:
+      'Heated upstream oxygen sensor that keeps fuelling closed-loop and emissions within limits.',
+    descriptionAr:
+      'حساس أكسجين أمامي مُسخّن يحافظ على نظام حقن مغلق وعلى انبعاثات ضمن الحدود.',
+    opening: 50000,
+    fits: [
+      ['Toyota', 'Corolla', 2014, 2023],
+      ['Honda', 'Civic', 2016, 2022],
+    ],
+  },
+  {
+    sku: 'ENG-AIR-HOSE',
+    nameEn: 'Air intake hose',
+    nameAr: 'خرطوم هواء السحب',
+    category: 'engine',
+    brand: 'Febi',
+    partNumber: 'HOSE-17881',
+    price: 15000,
+    cost: 9800,
+    image: '/media/cat-engine.jpg',
+    descriptionEn:
+      'Reinforced rubber air intake hose that resists cracking and keeps unmetered air out of the engine.',
+    descriptionAr:
+      'خرطوم هواء سحب مطاطي معزّز يقاوم التشقق ويمنع دخول هواء غير محسوب إلى المحرك.',
+    opening: 65000,
+    fits: [
+      ['Toyota', 'Corolla', 2014, 2023],
+      ['Mitsubishi', 'Lancer', 2008, 2017],
+    ],
+  },
+  {
+    sku: 'ENG-TRANS-FLUID',
+    nameEn: 'Automatic transmission fluid (4L)',
+    nameAr: 'زيت ناقل حركة أوتوماتيكي (4 لتر)',
+    category: 'oil',
+    brand: 'ORYX Lubricants',
+    partNumber: 'ATF-WS-4L',
+    price: 22000,
+    cost: 15000,
+    image: '/media/cat-oil.jpg',
+    descriptionEn:
+      'Automatic transmission fluid meeting the WS specification for smooth, consistent shifts.',
+    descriptionAr:
+      'زيت ناقل حركة أوتوماتيكي مطابق لمواصفة WS لتبديلات سلسة وثابتة.',
+    opening: 70000,
+    fits: [
+      ['Toyota', 'Camry', 2012, 2021],
+      ['Lexus', 'ES', 2013, 2021],
+      ['Nissan', 'Altima', 2013, 2022],
+    ],
+  },
+  {
+    sku: 'ACC-FLOOR-MATS',
+    nameEn: 'All-weather floor mat set',
+    nameAr: 'طقم دواسات أرضية لجميع الأجواء',
+    category: 'accessories',
+    brand: 'ORYX Accessories',
+    partNumber: 'MAT-ALL-SET',
+    price: 12000,
+    cost: 7500,
+    image: '/media/cat-accessories.jpg',
+    descriptionEn:
+      'Moulded rubber floor mats with raised edges that hold sand and water away from the carpet.',
+    descriptionAr:
+      'دواسات أرضية مطاطية مصبوبة بحواف مرتفعة تحجز الرمل والماء بعيدًا عن فرش السيارة.',
+    opening: 90000,
+    fits: [
+      ['Toyota', 'Corolla', 2014, 2023],
+      ['Hyundai', 'Elantra', 2016, 2022],
+    ],
+  },
+  {
+    sku: 'ACC-REV-CAMERA',
+    nameEn: 'Reverse camera with night vision',
+    nameAr: 'كاميرا خلفية مع رؤية ليلية',
+    category: 'accessories',
+    brand: 'ORYX Accessories',
+    partNumber: 'CAM-REV-1080',
+    price: 25000,
+    cost: 17000,
+    image: '/media/cat-accessories.jpg',
+    descriptionEn:
+      'High-definition reverse camera with wide-angle night vision, fitted to the existing display.',
+    descriptionAr:
+      'كاميرا خلفية عالية الدقة بزاوية واسعة ورؤية ليلية، تُركّب على الشاشة الحالية.',
+    opening: 42000,
+    fits: [
+      ['Toyota', 'Camry', 2012, 2023],
+      ['Nissan', 'Altima', 2013, 2022],
+      ['Kia', 'Sportage', 2016, 2023],
+    ],
+  },
+  {
+    sku: 'ACC-PHONE-HOLDER',
+    nameEn: 'Magnetic phone holder',
+    nameAr: 'حامل هاتف مغناطيسي',
+    category: 'accessories',
+    brand: 'ORYX Accessories',
+    partNumber: 'HLD-MAG-01',
+    price: 4000,
+    cost: 2200,
+    image: '/media/cat-accessories.jpg',
+    descriptionEn: 'Air-vent magnetic phone holder with a 360 degree rotation head.',
+    descriptionAr: 'حامل هاتف مغناطيسي يُثبَّت على فتحة التكييف برأس دوّار 360 درجة.',
+    opening: 150000,
+    fits: [['Toyota', 'Corolla', 2008, null]],
+  },
+];
+
+async function seedStorefrontBaseline(idByCode: Map<string, string>, superAdminId: string) {
+  const companyId = idByCode.get('ORYX-AUTO');
+  if (!companyId) return;
+
+  const company = await prisma.company.findUniqueOrThrow({ where: { id: companyId } });
+  const branches = await prisma.branch.findMany({ where: { companyId }, orderBy: { code: 'asc' } });
+  if (branches.length === 0) return;
+
+  const warehouse = await prisma.warehouse.findFirstOrThrow({
+    where: { companyId, code: 'MAIN' },
+  });
+
+  // ------------------------------------------------------ spare-parts catalogue
+
+  let parts = 0;
+  let fitments = 0;
+  for (const part of STOREFRONT_PARTS) {
+    const product = await prisma.product.upsert({
+      where: { companyId_sku: { companyId, sku: part.sku } },
+      update: {
+        nameEn: part.nameEn,
+        nameAr: part.nameAr,
+        unit: 'piece',
+        salesPriceMinor: part.price,
+        costPriceMinor: part.cost,
+        taxRateBp: 1000,
+        partCategoryKey: part.category,
+        partCondition: part.condition ?? 'NEW',
+        brand: part.brand,
+        descriptionEn: part.descriptionEn,
+        descriptionAr: part.descriptionAr,
+        warrantyEn: part.warrantyEn ?? null,
+        warrantyAr: part.warrantyAr ?? null,
+        engineType: part.engineType ?? null,
+        isPublished: true,
+        isFeatured: part.featured ?? false,
+        compareAtPriceMinor: part.compareAt ?? null,
+        imageUrl: part.image,
+        isActive: true,
+      },
+      create: {
+        companyId,
+        sku: part.sku,
+        nameEn: part.nameEn,
+        nameAr: part.nameAr,
+        unit: 'piece',
+        salesPriceMinor: part.price,
+        costPriceMinor: part.cost,
+        taxRateBp: 1000,
+        reorderLevel: 50000,
+        reorderQuantity: 200000,
+        partCategoryKey: part.category,
+        partCondition: part.condition ?? 'NEW',
+        brand: part.brand,
+        descriptionEn: part.descriptionEn,
+        descriptionAr: part.descriptionAr,
+        warrantyEn: part.warrantyEn ?? null,
+        warrantyAr: part.warrantyAr ?? null,
+        engineType: part.engineType ?? null,
+        isPublished: true,
+        isFeatured: part.featured ?? false,
+        compareAtPriceMinor: part.compareAt ?? null,
+        imageUrl: part.image,
+      },
+    });
+    parts += 1;
+
+    await prisma.partReference.upsert({
+      where: {
+        companyId_partNumber_type: {
+          companyId,
+          partNumber: part.partNumber,
+          type: 'OEM',
+        },
+      },
+      update: { productId: product.id, brand: part.brand },
+      create: {
+        companyId,
+        productId: product.id,
+        partNumber: part.partNumber,
+        type: 'OEM',
+        brand: part.brand,
+      },
+    });
+
+    for (const [make, model, yearFrom, yearTo] of part.fits) {
+      const existing = await prisma.partCompatibility.findFirst({
+        where: { companyId, productId: product.id, make, model },
+      });
+      if (existing) {
+        await prisma.partCompatibility.update({
+          where: { id: existing.id },
+          data: { yearFrom, yearTo },
+        });
+      } else {
+        await prisma.partCompatibility.create({
+          data: { companyId, productId: product.id, make, model, yearFrom, yearTo },
+        });
+      }
+      fitments += 1;
+    }
+
+    // Opening stock so the storefront can show real availability.
+    const level = await prisma.stockLevel.findUnique({
+      where: { warehouseId_productId: { warehouseId: warehouse.id, productId: product.id } },
+    });
+    if (!level) {
+      await prisma.stockLevel.create({
+        data: {
+          companyId,
+          warehouseId: warehouse.id,
+          productId: product.id,
+          quantity: part.opening,
+          averageCostMinor: part.cost,
+        },
+      });
+      await prisma.stockMovement.create({
+        data: {
+          companyId,
+          warehouseId: warehouse.id,
+          productId: product.id,
+          movementType: 'OPENING',
+          quantity: part.opening,
+          unitCostMinor: part.cost,
+          totalCostMinor: lineAmountMinor(part.opening, part.cost),
+          balanceAfter: part.opening,
+          source: 'OPENING_BALANCE',
+          memo: 'Seeded storefront opening stock',
+          occurredAt: new Date(),
+          createdById: superAdminId,
+        },
+      });
+    }
+  }
+
+  // ------------------------------------------- bookable resources and hours
+
+  const RESOURCE_TYPES = ['BAY', 'TECHNICIAN', 'INSPECTOR'] as const;
+  let resources = 0;
+  for (const branch of branches) {
+    for (const [index, resourceType] of RESOURCE_TYPES.entries()) {
+      const code = `${branch.code}-${resourceType}-${index + 1}`;
+      const resource = await prisma.bookingResource.upsert({
+        where: { companyId_code: { companyId, code } },
+        update: { isActive: true, branchId: branch.id },
+        create: {
+          companyId,
+          branchId: branch.id,
+          resourceType,
+          code,
+          nameEn: `${branch.nameEn} — ${resourceType.toLowerCase()} ${index + 1}`,
+          nameAr: `${branch.nameAr} — ${resourceType} ${index + 1}`,
+          capacity: 1,
+          isActive: true,
+        },
+      });
+
+      // Opening hours per resource: Saturday to Thursday, closed Friday.
+      if ((await prisma.workingHours.count({ where: { resourceId: resource.id } })) === 0) {
+        await prisma.workingHours.createMany({
+          data: [0, 1, 2, 3, 4, 6].map((dayOfWeek) => ({
+            companyId,
+            branchId: branch.id,
+            resourceId: resource.id,
+            dayOfWeek,
+            opensMinute: 8 * 60,
+            closesMinute: 18 * 60,
+            isClosed: false,
+          })),
+        });
+      }
+      resources += 1;
+    }
+  }
+
+  // --------------------------------------------------- demo consumer account
+
+  const customerEmail = process.env.SEED_CUSTOMER_EMAIL ?? 'customer@oryx-auto.local';
+  const customerPassword = process.env.SEED_SUPER_ADMIN_PASSWORD ?? 'ChangeMe!Oryx2026';
+  const customerPasswordHash = await argon2.hash(customerPassword, { type: argon2.argon2id });
+  await prisma.customerAccount.upsert({
+    where: { email: customerEmail },
+    update: { defaultCompanyId: companyId, status: 'ACTIVE' },
+    create: {
+      email: customerEmail,
+      passwordHash: customerPasswordHash,
+      fullName: 'Demo ORYX Customer',
+      phone: '+973 3300 0099',
+      status: 'ACTIVE',
+      preferredLocale: 'ar',
+      preferredTheme: 'dark',
+      defaultCompanyId: companyId,
+      emailVerifiedAt: new Date(),
+    },
+  });
+
+  console.log(
+    `  storefront baseline: ${parts} parts, ${fitments} fitments, ${resources} booking resources ` +
+      `across ${branches.length} branches, demo customer ${customerEmail} (${company.currency})`,
+  );
+}
+
 async function main() {
   console.log('ORYX seed — start');
   await seedModules();
@@ -1179,6 +2193,7 @@ async function main() {
   await seedCms();
   await seedErpBaseline(idByCode, superAdmin.id);
   await seedExecution03Baseline(idByCode, superAdmin.id);
+  await seedStorefrontBaseline(idByCode, superAdmin.id);
   await seedAuditBaseline(superAdmin.id, idByCode);
   console.log('ORYX seed — done');
 }

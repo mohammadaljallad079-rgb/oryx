@@ -318,6 +318,37 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   body-carried token — an artefact of running a native client in a browser, not a
   product path.
 
+### Customer website (Execution 04) gotchas
+
+- **The customer browser must never be given an absolute API base.**
+  `NEXT_PUBLIC_*` values are inlined at build time, and the shared root `.env`
+  sets `NEXT_PUBLIC_API_BASE_URL="http://localhost:3001/api"` for the staff
+  apps. The customer site always has its own `/api` rewrite (see
+  `apps/customer/next.config.ts`), so `apps/customer/src/lib/api.ts` reads a
+  customer-specific `NEXT_PUBLIC_CUSTOMER_API_BASE_URL ?? '/api'`. Reusing the
+  staff variable bakes `http://…` into the client bundle, which becomes mixed
+  content the moment the site is served over HTTPS.
+- **Server-side SEO fetches need an absolute origin.** Node's `fetch` cannot
+  resolve `/api`. `apps/customer/src/lib/structured-data.ts` exports
+  `SERVER_API_BASE`, which ignores a relative base and falls back to
+  `ORYX_API_BASE_URL` / `http://127.0.0.1:3001/api`. `publicFetch` and
+  `apps/customer/src/app/sitemap.ts` both use it; without it the sitemap loses
+  the whole catalogue and product pages lose their Product/Offer JSON-LD.
+- **Never put two `product-grid` test ids on one page.** The store page renders
+  a featured rail and the main grid; `ProductGrid` takes a `testId` prop and the
+  featured rail passes `featured-grid`, so the E2E selector stays unambiguous.
+- **The booking wizard must not default to a closed day.** Bahrain's weekend is
+  Friday/Saturday, so "tomorrow" often has zero slots. The wizard loads day
+  availability from `GET /storefront/availability/days` (which reuses
+  `BookingService.availableSlots`), disables closed days and auto-selects the
+  first open one. Keep the availability engine as the single source of truth for
+  what is bookable.
+- **Interior page banners are theme-aware.** `PageHead` with an `image` renders
+  `.oryx-page-head--banner`; its background, veil and text colours come from the
+  `--banner-*` tokens, which differ per theme (navy veil + white text in dark,
+  ivory veil + navy text in light). Never hard-code `var(--navy)` or white text
+  in that rule — the banner then ignores the light theme and stays dark.
+
 ### Adding a new ERP module
 
 1. Add a `ModuleDefinition` to `packages/shared/src/modules.ts`.
