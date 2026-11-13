@@ -511,8 +511,8 @@ export const OFFICIAL_FINANCIAL_CSS = `
     font-family:${DOCUMENT_LATIN_STACK}; }
   /* The reference watermark is the "AUTO SERVICES" wordmark set in the identity
      navy at ~52pt, centred on the page (measured y 374-426 on an 842pt sheet). */
-  .of-watermark{ position:absolute; left:0; right:0; top:46.8%;
-    text-align:center; font-size:52pt; font-weight:700; letter-spacing:1px;
+  .of-watermark{ position:absolute; left:0; right:0; top:47.75%;
+    text-align:center; font-size:45pt; font-weight:700; letter-spacing:6.4pt;
     color:#0a1f44; opacity:0.055; pointer-events:none; z-index:-1;
     font-family:Verdana,Arial,Helvetica,sans-serif; }
   .of-band{ display:flex; justify-content:space-between; align-items:center;

@@ -671,7 +671,7 @@ export const INSPECTION_REPORT_CSS = `
    * how much content a page carries. */
   .rp-watermark{ position:fixed; left:0; right:0; top:0; bottom:0;
     display:flex; align-items:center; justify-content:center;
-    font-size:52pt; font-weight:700; letter-spacing:1px;
+    font-size:45pt; font-weight:700; letter-spacing:6.4pt;
     color:#0a1f44; opacity:0.055; pointer-events:none; z-index:-1;
     font-family:Verdana,Arial,Helvetica,sans-serif;
     transform:translateY(19pt); }
