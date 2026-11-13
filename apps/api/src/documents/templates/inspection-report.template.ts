@@ -78,10 +78,19 @@ function resultMark(result: string): string {
   }
 }
 
-/** The bilingual title band that heads the reference page. */
-function pageTitleBar(titleAr: string, titleEn: string): string {
+/**
+ * The bilingual title band that heads the reference page.
+ *
+ * The approved sheet does not set every page title at one size: the cover is
+ * 10.3pt, the paint and chassis pages 10pt, and the longer interior/exterior and
+ * computer-unit headings drop to 8.7pt (measured from the reference). The size
+ * is passed per page rather than derived, because a character-count rule cannot
+ * reproduce the reference — `COMPUTER UNIT INSPECTION` is shorter than
+ * `VEHICLE PAINT & BODY CHECK` yet prints smaller.
+ */
+function pageTitleBar(titleAr: string, titleEn: string, sizePt = 10.3): string {
   return `
-  <div class="p-title">
+  <div class="p-title" style="--p-title-size:${sizePt}pt">
     <span class="p-title-ar">${esc(titleAr)}</span>
     <span class="p-title-en">${esc(titleEn)}</span>
   </div>`;
@@ -328,7 +337,7 @@ export function paintSectionPage(
   return `
   <section class="doc-page">
     ${reportHeader(input.issuer)}
-    ${pageTitleBar('فحص الصبغ وبدن المركبة', 'VEHICLE PAINT & BODY CHECK')}
+    ${pageTitleBar('فحص الصبغ وبدن المركبة', 'VEHICLE PAINT & BODY CHECK', 10)}
     ${jobStrip(input.payload)}
     ${paintDiagram(section)}
   </section>`;
@@ -343,7 +352,7 @@ export function chassisSectionPage(
   return `
   <section class="doc-page">
     ${reportHeader(input.issuer)}
-    ${pageTitleBar('فحص الشاصي وأسفل المركبة', 'CHASSIS & UNDERCARRIAGE CONDITION')}
+    ${pageTitleBar('فحص الشاصي وأسفل المركبة', 'CHASSIS & UNDERCARRIAGE CONDITION', 10)}
     ${jobStrip(input.payload)}
     ${chassisDiagram(section)}
   </section>`;
@@ -429,7 +438,7 @@ export function inspectionGroupPage(
   return `
   <section class="doc-page">
     ${reportHeader(input.issuer)}
-    ${pageTitleBar('الفحص الداخلي والخارجي / مقصورة المحرك / تجربة القيادة', 'INTERIOR & EXTERIOR INSPECTION / ENGINE COMPARTMENT / ROAD TEST')}
+    ${pageTitleBar('الفحص الداخلي والخارجي / مقصورة المحرك / تجربة القيادة', 'INTERIOR & EXTERIOR INSPECTION / ENGINE COMPARTMENT / ROAD TEST', 8.7)}
     ${jobStrip(input.payload)}
     ${cabin}
   </section>`;
@@ -443,7 +452,7 @@ export function computerSectionPage(
   return `
   <section class="doc-page p5-page">
     ${reportHeader(input.issuer)}
-    ${pageTitleBar('فحص وحدة الكمبيوتر', 'COMPUTER UNIT INSPECTION')}
+    ${pageTitleBar('فحص وحدة الكمبيوتر', 'COMPUTER UNIT INSPECTION', 8.7)}
     ${jobStrip(input.payload)}
     ${diagnosticSection(section)}
     ${input.verification ? `<div class="p5-verify">${verificationBlock(input.verification)}</div>` : ''}
@@ -706,8 +715,8 @@ export const INSPECTION_REPORT_CSS = `
    * both centred, with the strap in small caps. Measured from the reference
    * (y78 ar / y90 en on the section sheets). */
   .p-title{ display:flex; flex-direction:column; align-items:center; margin:15.9pt 0 3px; }
-  .p-title-ar{ font-size:10.3pt; font-weight:700; color:var(--navy); line-height:1.15; }
-  .p-title-en{ font-size:10.3pt; font-weight:700; color:var(--navy); letter-spacing:.2px; line-height:1.0; }
+  .p-title-ar{ font-size:var(--p-title-size,10.3pt); font-weight:700; color:var(--navy); line-height:1.15; }
+  .p-title-en{ font-size:var(--p-title-size,10.3pt); font-weight:700; color:var(--navy); letter-spacing:.2px; line-height:1.0; }
   .job-head{ display:flex; direction:ltr; justify-content:space-between; align-items:baseline;
     font-size:8pt; font-weight:700; color:var(--navy); padding:0 2px 2px; }
   /* The vehicle strip: four cells over a light rule, labels in slate at 6.8pt and

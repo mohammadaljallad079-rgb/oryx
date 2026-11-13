@@ -90,8 +90,12 @@ describe('document chrome', () => {
       const html = officialFooterTemplate(issuer);
       // English half carries the placeholders Chromium fills per page.
       expect(html).toContain('Page <span class="pageNumber"></span> of <span class="totalPages"></span>');
-      // Arabic half repeats them, so both counters stay in step.
-      expect(html).toContain('من <span class="totalPages"></span> صفحة');
+      // The Arabic clause must be authored as `صفحة <n> من <total>`. Inside the
+      // RTL embed that logical order renders right-to-left as the approved
+      // sheet reads ("صفحة 2 من 5"); the reversed source order prints
+      // "2 من 5 صفحة" instead, which is the defect this guards.
+      expect(html).toContain('صفحة <span class="pageNumber"></span> من <span class="totalPages"></span>');
+      expect(html).not.toContain('<span class="pageNumber"></span> من <span class="totalPages"></span> صفحة');
       expect((html.match(/class="pageNumber"/g) || []).length).toBe(2);
     });
 

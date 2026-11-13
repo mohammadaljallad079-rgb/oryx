@@ -374,4 +374,17 @@ describe('inspection report template — reference page parity (Execution 19)', 
     // A low-opacity mark so the printed data stays legible on top of it.
     expect(css).toMatch(/opacity:0\.10/);
   });
+
+  it('sizes each page title to the measurement the approved sheet uses', () => {
+    const html = render();
+    // The cover and the paint/chassis pages carry the wide setting; the long
+    // interior/exterior heading drops a step, exactly as the reference prints
+    // it. The computer-unit page adds a second 8.7pt heading when that section
+    // is present, which this fixture does not include.
+    expect(html).toContain('--p-title-size:10.3pt');
+    expect(html).toContain('--p-title-size:10pt');
+    expect((html.match(/--p-title-size:8\.7pt/g) ?? []).length).toBe(1);
+    // The size is applied through the variable, so no rule pins a fixed size.
+    expect(html).toContain('font-size:var(--p-title-size,10.3pt)');
+  });
 });

@@ -107,6 +107,7 @@ import type {
   WarehouseDto,
   OfficialDocumentType,
   OfficialDocumentStatus,
+  DocumentVerificationView,
   PrintDocumentDto,
   PrintDocumentKind,
 } from '@oryx/shared';
@@ -1661,11 +1662,26 @@ export const api = {
         nameEn: string;
         nameAr: string;
         descriptionEn: string;
+        descriptionAr: string;
         permissions: string[];
         totalPermissions: number;
         withheldPermissions: number;
       }>;
     }>(`/permissions/role-templates?${toQuery({ companyId })}`),
+
+  /**
+   * Verify a printed document by the token in its QR code.
+   *
+   * Unauthenticated: a scan arrives with no session. The QR code on an issued
+   * report or invoice embeds `<origin>/verify/<token>`, and production issues
+   * codes against the admin origin, so this host has to answer the scan even
+   * though the read-only verification page also lives on the customer site.
+   */
+  verifyDocument: (token: string) =>
+    request<{ found: boolean; document: DocumentVerificationView | null }>(
+      `/documents/verify/${encodeURIComponent(token)}`,
+      { anonymous: true, noRetry: true },
+    ),
 };
 
 function toQuery(params: Record<string, unknown>): string {

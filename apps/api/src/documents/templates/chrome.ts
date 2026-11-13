@@ -251,10 +251,14 @@ export function officialFooterTemplate(issuer: DocumentIssuer): string {
  * there and the glyphs come from the host's fallback face, where a phone/globe
  * emoji (U+1F4DE / U+1F310) is absent and printed as a broken box.
  *
- * The reference prints the page counter bilingually ("Page 1 of 1 • 1 من 1
- * صفحة"); both counters carry the same placeholders, which Chromium fills on
- * every page. The contact figures are 7.2pt in the reference (measured), a step
- * heavier and darker than the 6.5pt counter and address.
+ * The reference prints the page counter bilingually. The Arabic clause is set
+ * so it reads right-to-left as `صفحة <n> من <total>`, the visual order the
+ * approved sheet uses; writing the words in the opposite logical order
+ * (`<n> من <total> صفحة`) inside an RTL embed reverses them on the page, so the
+ * counter reads "2 من 5 صفحة" instead of "صفحة 2 من 5". Both counters carry the
+ * same placeholders, which Chromium fills on every page. The contact figures
+ * are 7.2pt in the reference (measured), a step heavier and darker than the
+ * 6.5pt counter and address.
  */
 function contactRow(issuer: DocumentIssuer): string {
   const phone = issuer.phone ? `${CONTACT_ICON_PHONE} ${esc(issuer.phone)}` : '';
@@ -267,7 +271,7 @@ function contactRow(issuer: DocumentIssuer): string {
   return `
   <div style="border-top:0.75px solid #94a3b8;margin:10px 15.8pt 0 13.7pt;"></div>
   <div style="padding:0 13.3mm 0 15mm;display:flex;justify-content:space-between;align-items:baseline;font-size:6.5pt;font-weight:700;">
-    <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span> &bull; <span style="direction:rtl;unicode-bidi:embed;display:inline-block;"><span class="pageNumber"></span> من <span class="totalPages"></span> صفحة</span></span>
+    <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span> &bull; <span style="direction:rtl;unicode-bidi:embed;display:inline-block;">صفحة <span class="pageNumber"></span> من <span class="totalPages"></span></span></span>
     <span style="${contact}">${phone}${phone && email ? ' &nbsp; ' : ''}${email}</span>
     <span style="${contact}">${website}</span>
   </div>

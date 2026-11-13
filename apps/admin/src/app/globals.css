@@ -2575,3 +2575,130 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
     align-items: stretch;
   }
 }
+
+/* ------------------------------------------------------------------ verify
+ * Public document verification, reached by scanning a printed QR code.
+ *
+ * The route sits outside the authenticated shell, so it owns its own centred
+ * column and its own background: there is no sidebar, no topbar and no theme
+ * toggle on this page. Everything is drawn from the same identity variables the
+ * console uses, so it reads as the same product in both themes.
+ */
+.oryx-verify {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  max-width: 620px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 56px 20px 72px;
+}
+
+.oryx-verify__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.oryx-verify__head h1 {
+  margin: 6px 0 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.oryx-verify__head p {
+  margin: 0;
+  max-width: 48ch;
+  font-size: 13px;
+}
+
+.oryx-verify__form,
+.oryx-verify__result {
+  width: 100%;
+}
+
+.oryx-verify__row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.oryx-verify__row label {
+  flex: 1 1 auto;
+}
+
+.oryx-verify__result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* A status stripe on the leading edge, so the verdict reads before the words. */
+.oryx-verify__result--valid {
+  border-inline-start: 3px solid var(--success);
+}
+.oryx-verify__result--revoked,
+.oryx-verify__result--cancelled,
+.oryx-verify__result--error {
+  border-inline-start: 3px solid var(--danger);
+}
+.oryx-verify__result--superseded {
+  border-inline-start: 3px solid var(--warning);
+}
+.oryx-verify__result--notfound {
+  border-inline-start: 3px solid var(--border-strong);
+}
+
+.oryx-verify__status p {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.oryx-verify__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px 18px;
+  margin: 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.oryx-verify__fact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.oryx-verify__fact dt {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+
+.oryx-verify__fact dd {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.oryx-verify__privacy {
+  margin: 0;
+  font-size: 11.5px;
+}
+
+@media (max-width: 520px) {
+  .oryx-verify__row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
