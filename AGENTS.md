@@ -1199,10 +1199,15 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 - **Extract a modal before wiring it inline.** The tax form was extracted from
   `tax-rates-panel.tsx` into `tax-modal.tsx` so the settings list and the sales/
   purchasing line pickers share one component; a second copy would drift. The
-  same pattern produced `branch-modal`, `pipeline-modal` and `leave-type-modal`.
-  A line's tax option `value` is the rate in basis points and the `label` is the
+  same pattern produced `branch-modal`, `pipeline-modal`, `leave-type-modal` and
+  `CatalogModal` (the two-name code/EN/AR catalogue dialog). `InlineCatalogButton`
+  was removed once both its callers moved their create inside the dropdown. A
+  line's tax option `value` is the rate in basis points and the `label` is the
   display percentage the line parses back, so `TaxPicker` passes
   `defaultScope` (`SALES`/`PURCHASES`) to preselect the side.
+- **The topbar branch scope is an `EntityPicker`, not a `<select>`.** Only the
+  company scope remains a native select. Specs that drove the second select in
+  `context-selector` must open `context-branch`'s trigger button instead.
 - **`useTaxOptions` returns `{ options, reload }`.** An inline-created rate must
   be reloaded into the list before the new id is selected, or the line selects
   an option the list does not yet contain. Destructure it at every call site.
