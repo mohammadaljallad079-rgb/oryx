@@ -615,6 +615,17 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   surface starts redirecting to `/login` again. After a recycle, recreate
   `apps/customer/.env.local` (and `apps/admin/.env.local`) with
   `NEXT_PUBLIC_API_BASE_URL=/api` *before* rebuilding.
+- **The build guard only catches an unsafe *value*, not an absent one.** The
+  `next.config.ts` check throws when `NEXT_PUBLIC_API_BASE_URL` is set to a
+  loopback or preview host, but an *unset* variable skips it entirely and
+  `src/lib/api.ts` then falls back to `http://localhost:3001/api`. That is the
+  recycle case above: a remote browser resolves the inlined `localhost` against
+  its own machine, so login dies with "تعذّر الوصول إلى الخادم" / "could not
+  reach the server" while the same build passes every Playwright spec on the
+  sandbox. `.run/restart-app.sh` now writes `NEXT_PUBLIC_API_BASE_URL=/api` into
+  the app's `.env.local` before building, so a cold start is deterministic.
+  Confirm a fresh build with
+  `grep -r 'http://localhost:3001' apps/*/.next/static/chunks/` — it must be empty.
 - **The customer app's preference keys are namespaced.** It reads
   `oryx.customer.locale` and `oryx.customer.theme`, while the admin app reads
   `oryx.locale` and `oryx.theme`. Seeding the wrong pair leaves the app on its
@@ -1168,6 +1179,34 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `QrService` and `officialFooterTemplate`, so a rendered sheet can be decoded
   (jsQR) and measured (PyMuPDF) against the reference. It is scratch, not
   committed.
+
+### Execution 20 gotchas (dashboard, catalog, typography)
+
+- **The module catalog is a database table, not a compile-time constant.** The
+  dashboard tiles, the module dashboards' banner copy and the admin catalog
+  screen all read `Module` rows now, falling back to `getModule()` only for a
+  row created before the `tileImage`/`isActive` columns existed. `seedModules()`
+  is create-only so an operator edit survives a reseed. Add a module to
+  `packages/shared/src/modules.ts` *and* seed it, or the dashboard will not show
+  it.
+- **A retired module is hidden, not deleted.** `isActive: false` removes the tile
+  from `GET /dashboard` and the catalog screen shows a "Retired" badge, but the
+  row, its licence and its route stay. Never delete a catalog row to hide a
+  module.
+- **The banner mark is fixed-aspect raster artwork.** The lockup is 1404×320, so
+  at its 64px desktop height it is ~281px wide and cannot sit beside the identity
+  block on a phone. The `@media (max-width: 640px)` rule stacks the hero and caps
+  the logo at 240px; without it a 320px viewport overflows (the responsive-matrix
+  suite fails).
+- **The homepage banner is logo-left, not centred.** The approved design anchors
+  the mark on the reading-start edge with the identity block beside it, and the
+  field is ivory in the light theme (the navy-ink colourway swaps in). The
+  branding spec pins that geometry.
+- **Typography is per-company and applied at the document root.** `branding-context.tsx`
+  writes the tenant's `typography` section to CSS custom properties
+  (`--font-size-*`, `--oryx-heading-weight`, `--oryx-label-tracking`); every
+  component derives from those tokens. Changing the section in the settings
+  centre calls `refreshTypography()` so the shell updates without a reload.
 
 ### Adding a new ERP module
 

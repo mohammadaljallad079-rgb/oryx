@@ -1,12 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { minorToInput, money, qty, toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
 import {
   Badge,
   Button,
@@ -31,9 +33,19 @@ import type {
   WarehouseDto,
 } from '@oryx/shared';
 
-type Tab = 'valuation' | 'products' | 'warehouses' | 'movements' | 'transfers' | 'adjustments' | 'reorder';
+type Tab = 'dashboard' | 'valuation' | 'products' | 'warehouses' | 'movements' | 'transfers' | 'adjustments' | 'reorder';
+
+const TAB_KEYS = ['dashboard', 'valuation', 'products', 'warehouses', 'movements', 'transfers', 'adjustments', 'reorder'] as const;
 
 export default function InventoryPage() {
+  return (
+    <Suspense fallback={<Skeleton height={200} />}>
+      <InventoryInner />
+    </Suspense>
+  );
+}
+
+function InventoryInner() {
   const { t } = useUi();
   const { can } = useAuth();
   const [tab, setTab] = useState<Tab>('valuation');
@@ -45,6 +57,7 @@ export default function InventoryPage() {
   const canAdjust = can('erp.inventory.adjustment.manage');
 
   const tabs: Array<{ key: Tab; label: string }> = [
+    { key: 'dashboard', label: t('erp.inventory.dashboard') },
     { key: 'valuation', label: t('erp.inventory.valuation') },
     { key: 'products', label: t('erp.inventory.products') },
     { key: 'warehouses', label: t('erp.inventory.warehouses') },
@@ -56,6 +69,7 @@ export default function InventoryPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="inventory-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.warehouses_inventory')}
         subtitle={t('erp.inventory.subtitle')}
@@ -78,6 +92,7 @@ export default function InventoryPage() {
         ))}
       </div>
 
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="warehouses_inventory" /> : null}
       {tab === 'valuation' ? <ValuationTab /> : null}
       {tab === 'products' ? <ProductsTab canManage={canItem} /> : null}
       {tab === 'warehouses' ? <WarehousesTab canManage={canWarehouse} /> : null}

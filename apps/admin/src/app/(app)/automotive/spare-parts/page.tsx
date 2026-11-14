@@ -7,6 +7,8 @@ import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
 import {
   Badge,
   Button,
@@ -22,7 +24,9 @@ import {
 } from '@/components/ui';
 import type { PartsReservationDto } from '@oryx/shared';
 
-type Tab = 'catalog' | 'references' | 'compatibility' | 'reservations';
+type Tab = 'dashboard' | 'catalog' | 'references' | 'compatibility' | 'reservations';
+
+const TAB_KEYS = ['dashboard', 'catalog', 'references', 'compatibility', 'reservations'] as const;
 
 export default function SparePartsPage() {
   const { t } = useUi();
@@ -30,6 +34,7 @@ export default function SparePartsPage() {
   const [tab, setTab] = useState<Tab>('catalog');
 
   const tabs: Array<{ key: Tab; label: string }> = [
+    { key: 'dashboard', label: t('erp.parts.dashboard') },
     { key: 'catalog', label: t('erp.parts.catalog') },
     { key: 'references', label: t('erp.parts.partNumbers') },
     { key: 'compatibility', label: t('erp.parts.compatibility') },
@@ -38,6 +43,7 @@ export default function SparePartsPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="spare-parts-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.spare_parts')}
         subtitle={t('erp.parts.subtitle')}
@@ -60,6 +66,7 @@ export default function SparePartsPage() {
         ))}
       </div>
 
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="spare_parts" /> : null}
       {tab === 'catalog' ? <CatalogTab /> : null}
       {tab === 'references' ? <ReferencesTab canManage={can('erp.parts.reference.manage')} /> : null}
       {tab === 'compatibility' ? <CompatibilityTab canManage={can('erp.parts.compatibility.manage')} /> : null}

@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { ContextResponse } from '@oryx/shared';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -136,13 +137,95 @@ export function UserMenu() {
   const { user, logout, isPlatform } = useAuth();
   const { t, locale } = useUi();
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number; minWidth: number; dir: 'up' | 'down' } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // The menu is rendered in a portal at a measured fixed position, because the
+  // sticky, backdrop-filtered header clips any absolutely-positioned child and
+  // traps `position: fixed` in its own containing block.
+  const place = useCallback(() => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const menuH = menuRef.current?.offsetHeight ?? 230;
+    const spaceBelow = window.innerHeight - r.bottom;
+    const openUp = spaceBelow < menuH + 16 && r.top > spaceBelow;
+    const rtl = document.documentElement.getAttribute('data-dir') === 'rtl';
+    const minWidth = Math.max(260, Math.round(r.width));
+    // Align the menu's inline-end edge to the trigger's, whichever side that is.
+    const left = rtl ? r.left : r.right - minWidth;
+    setPos({
+      top: openUp ? r.top - 8 : r.bottom + 8,
+      left: Math.max(8, Math.min(left, window.innerWidth - minWidth - 8)),
+      minWidth,
+      dir: openUp ? 'up' : 'down',
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    place();
+    // Re-measure after the first paint so the menu's real height drives the flip.
+    const raf = requestAnimationFrame(place);
+    const onScroll = () => place();
+    window.addEventListener('resize', onScroll);
+    window.addEventListener('scroll', onScroll, true);
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', onScroll);
+      window.removeEventListener('scroll', onScroll, true);
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open, place]);
+
   if (!user) return null;
 
   const name = locale === 'ar' ? user.fullNameAr : user.fullNameEn;
 
+  const menu =
+    open && pos ? (
+      <div
+        ref={menuRef}
+        role="menu"
+        className="oryx-card oryx-menu"
+        data-dir={pos.dir}
+        style={{ position: 'fixed', top: pos.top, left: pos.left, minWidth: pos.minWidth }}
+      >
+        <p className="m-0 truncate text-[13.5px] font-semibold">{name}</p>
+        <p className="oryx-faint m-0 mb-2 truncate text-[12px]">{user.email}</p>
+        <div className="mb-2 flex flex-wrap gap-1">
+          {isPlatform ? <span className="oryx-badge oryx-badge--gold">Super Admin</span> : null}
+          <span className="oryx-badge oryx-badge--neutral">{locale.toUpperCase()}</span>
+        </div>
+        <hr className="oryx-divider my-2" />
+        <button
+          type="button"
+          className="oryx-btn oryx-btn--ghost w-full justify-start"
+          onClick={() => void logout()}
+          data-testid="logout"
+        >
+          <Icon name="logout" size={16} />
+          {t('auth.logout')}
+        </button>
+      </div>
+    ) : null;
+
   return (
     <div className="relative">
       <button
+        ref={triggerRef}
         type="button"
         className="oryx-btn oryx-btn--ghost oryx-btn--sm"
         onClick={() => setOpen((p) => !p)}
@@ -159,30 +242,7 @@ export function UserMenu() {
         <span className="hidden max-w-[140px] truncate md:inline">{name}</span>
         <Icon name="chevronDown" size={14} />
       </button>
-      {open ? (
-        <div
-          className="oryx-card absolute end-0 z-50 mt-2 w-64 p-3"
-          role="menu"
-          style={{ insetInlineEnd: 0 }}
-        >
-          <p className="m-0 truncate text-[13px] font-semibold">{name}</p>
-          <p className="oryx-faint m-0 mb-2 truncate text-[11.5px]">{user.email}</p>
-          <div className="mb-2 flex flex-wrap gap-1">
-            {isPlatform ? <span className="oryx-badge oryx-badge--gold">Super Admin</span> : null}
-            <span className="oryx-badge oryx-badge--neutral">{locale.toUpperCase()}</span>
-          </div>
-          <hr className="oryx-divider my-2" />
-          <button
-            type="button"
-            className="oryx-btn oryx-btn--ghost w-full justify-start"
-            onClick={() => void logout()}
-            data-testid="logout"
-          >
-            <Icon name="logout" size={16} />
-            {t('auth.logout')}
-          </button>
-        </div>
-      ) : null}
+      {menu ? createPortal(menu, document.body) : null}
     </div>
   );
 }

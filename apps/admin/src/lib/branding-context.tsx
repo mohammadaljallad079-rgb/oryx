@@ -10,13 +10,50 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  COMPANY_SETTING_DEFAULTS,
   ORYX_DEFAULT_BRANDING,
   brandingCssVariables,
   type CompanyBrandingDto,
+  type TypographySettings,
 } from '@oryx/shared';
 import { api } from './api';
 import { useAuth } from './auth-context';
 import { useUi } from './ui-context';
+
+/**
+ * Apply a company's typography to the document root.
+ *
+ * Every size in the interface is derived from these custom properties, so a
+ * tenant that prefers larger text changes one row and the whole admin follows.
+ * The CSS `data-font-scale` preference still multiplies on top, which is why
+ * these are written as plain custom properties rather than overriding `zoom`.
+ */
+function applyTypography(doc: HTMLElement, settings: TypographySettings): void {
+  const base = clamp(settings.baseSize, 12, 20);
+  const heading = clamp(settings.headingScale, 1.1, 2);
+  const moduleScale = clamp(settings.moduleScale, 0.9, 1.6);
+  const description = clamp(settings.descriptionScale, 0.8, 1.2);
+  const weight = clamp(Math.round(settings.headingWeight), 400, 800);
+  const tracking = clamp(settings.labelTracking, 0, 0.2);
+
+  doc.style.setProperty('--font-size-base', `${base}px`);
+  doc.style.setProperty('--font-size-heading', String(heading));
+  doc.style.setProperty('--font-size-module', String(moduleScale));
+  doc.style.setProperty('--font-size-desc', String(description));
+  doc.style.setProperty('--oryx-heading-weight', String(weight));
+  doc.style.setProperty('--oryx-label-tracking', `${tracking}em`);
+  doc.style.setProperty(
+    '--oryx-font-sans',
+    settings.fontFamily === 'system'
+      ? "system-ui, -apple-system, 'Segoe UI', Arial, sans-serif"
+      : "'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif",
+  );
+}
+
+function clamp(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, value));
+}
 
 /**
  * The active company's visual identity, resolved once for the whole shell.
@@ -61,6 +98,8 @@ interface BrandingContextValue {
   isBranded: boolean;
   /** Re-read the identity after the settings screen writes it. */
   refresh: () => Promise<void>;
+  /** Re-read the company's typography after the settings screen writes it. */
+  refreshTypography: () => Promise<void>;
 }
 
 const PLATFORM_DEFAULT: CompanyBrandingDto = {
@@ -103,6 +142,34 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
     }
     void load();
   }, [isAuthenticated, load]);
+
+  // Typography is per company too, so it is read from the same company context
+  // and re-applied whenever the company selector changes. The platform default
+  // is applied when no tenant is selected, so a platform principal never sees a
+  // previous tenant's type scale linger.
+  const loadTypography = useCallback(async () => {
+    const doc = typeof document !== 'undefined' ? document.documentElement : null;
+    if (!doc) return;
+    if (!companyId) {
+      applyTypography(doc, COMPANY_SETTING_DEFAULTS.typography);
+      return;
+    }
+    try {
+      const section = (await api.companySettingSection('typography', companyId)) as Partial<TypographySettings>;
+      applyTypography(doc, { ...COMPANY_SETTING_DEFAULTS.typography, ...section });
+    } catch {
+      applyTypography(doc, COMPANY_SETTING_DEFAULTS.typography);
+    }
+  }, [companyId]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      const doc = typeof document !== 'undefined' ? document.documentElement : null;
+      if (doc) applyTypography(doc, COMPANY_SETTING_DEFAULTS.typography);
+      return;
+    }
+    void loadTypography();
+  }, [isAuthenticated, loadTypography]);
 
   // Theme-aware logo selection, with a packaged fallback for the colourway a
   // tenant has not uploaded.
@@ -159,8 +226,9 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
       cssVariables,
       isBranded,
       refresh: load,
+      refreshTypography: loadTypography,
     }),
-    [branding, loading, displayName, logoAssetId, cssVariables, isBranded, load],
+    [branding, loading, displayName, logoAssetId, cssVariables, isBranded, load, loadTypography],
   );
 
   return <BrandingContext.Provider value={value}>{children}</BrandingContext.Provider>;

@@ -30,8 +30,8 @@ export function SectionHeader({
   return (
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="m-0 text-[22px] font-extrabold tracking-tight">{title}</h1>
-        {subtitle ? <p className="oryx-muted m-0 mt-1 max-w-[72ch] text-[13px]">{subtitle}</p> : null}
+        <h1 className="oryx-section-title m-0">{title}</h1>
+        {subtitle ? <p className="oryx-muted oryx-section-subtitle m-0 mt-1">{subtitle}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
@@ -428,6 +428,8 @@ export function SearchableSelect({
   disabled = false,
   testId,
   ariaLabel,
+  onCreateNew,
+  createLabel,
 }: {
   value: string | null;
   options: SearchableOption[];
@@ -438,6 +440,14 @@ export function SearchableSelect({
   disabled?: boolean;
   testId?: string;
   ariaLabel?: string;
+  /**
+   * When set, a "+ Add new" action is shown inside the popover. It opens the
+   * record's own create form over the current one; on success the caller
+   * reloads the option list and selects the new id, so the same full form and
+   * the same validation are used as the standalone screen.
+   */
+  onCreateNew?: () => void;
+  createLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -511,6 +521,22 @@ export function SearchableSelect({
                 onClick={() => pick(null)}
               >
                 {emptyLabel}
+              </button>
+            ) : null}
+            {onCreateNew ? (
+              <button
+                type="button"
+                className="mb-1 flex w-full items-center gap-2 rounded-lg border border-dashed border-[var(--border-strong)] px-3 py-2 text-start text-[12.5px] font-semibold"
+                style={{ color: 'var(--gold)' }}
+                onClick={() => {
+                  setOpen(false);
+                  setQuery('');
+                  onCreateNew();
+                }}
+                data-testid={testId ? `${testId}-create` : undefined}
+              >
+                <Icon name="plus" size={14} />
+                {createLabel ?? '+ Add new'}
               </button>
             ) : null}
             {filtered.length === 0 ? (
