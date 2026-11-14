@@ -10,7 +10,13 @@
 # Usage: bash .run/start-stack.sh
 set -u
 
-ROOT=/workspace/project/oryx
+# Self-locating: several checkouts of this repository can coexist under
+# /workspace/project (each on its own branch and its own database). A hardcoded
+# path would start the wrong checkout — a different branch, a different seeded
+# database and no `feature/dashboard-modules-redesign-unified` work. Resolve the
+# repository root from this script's own location so `bash .run/start-stack.sh`
+# always recovers the checkout it was invoked from. `ORYX_ROOT` overrides it.
+ROOT="${ORYX_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 RUN="$ROOT/.run"
 PG_BIN=/usr/lib/postgresql/17/bin
 PGDATA="$RUN/pgdata"
