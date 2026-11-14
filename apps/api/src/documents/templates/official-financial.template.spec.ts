@@ -353,21 +353,24 @@ describe('official financial template — identity', () => {
 });
 
 describe('official financial template — reference watermark parity (Execution 19)', () => {
-  it('paints the official ORYX logo as the watermark, not a typed wordmark', () => {
+  it('prints the "AUTO SERVICES" wordmark exactly as the reference, not a logo', () => {
     const html = render({}, { ...issuer, logoDataUri: 'data:image/png;base64,LOGO' });
-    expect(html).toContain('class="of-watermark"');
-    // The owner requires the real mark: the issuer's logo image, not the
-    // "AUTO SERVICES" text stand-in.
-    expect(html).toContain('class="of-watermark-img"');
-    expect(html).toContain('src="data:image/png;base64,LOGO"');
-    expect(html).not.toContain('of-watermark" aria-hidden="true">AUTO SERVICES');
+    expect(html).toContain('class="of-watermark" aria-hidden="true">AUTO SERVICES</div>');
+    // The reference prints a typed wordmark, not the issuer logo, so the mark
+    // must not depend on a configured logo image.
+    expect(html).not.toContain('class="of-watermark-img"');
+    expect(html).not.toContain('class="of-watermark-mark"');
     expect(html).toMatch(/opacity:0\.10/);
+    // Measured off the reference: brand display face, 51.747pt, 6.72pt tracking.
+    expect(html).toContain('font-size:51.747pt');
+    expect(html).toContain('letter-spacing:6.72pt');
   });
 
-  it('falls back to the vector ORYX mark when no logo is configured', () => {
-    const html = render({}, { ...issuer, logoDataUri: null });
-    expect(html).toContain('class="of-watermark-mark"');
-    expect(html).not.toContain('of-watermark" aria-hidden="true">AUTO SERVICES');
+  it('prints the same wordmark regardless of a configured tenant logo', () => {
+    const withLogo = render({}, { ...issuer, logoDataUri: 'data:image/png;base64,LOGO' });
+    const noLogo = render({}, { ...issuer, logoDataUri: null });
+    const extract = (h: string) => h.match(/<div class="of-watermark"[^>]*>[^<]*<\/div>/)![0];
+    expect(extract(withLogo)).toBe(extract(noLogo));
   });
 
   it('fixes the watermark so it repeats on every printed page', () => {

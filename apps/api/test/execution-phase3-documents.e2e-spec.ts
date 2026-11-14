@@ -752,10 +752,11 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
       expect(verified.body.document.type).toBe('SALES_INVOICE');
     });
 
-    it('prints the official brand mark and a faint watermark without a tenant upload', async () => {
+    it('prints the bundled brand mark in the header and the wordmark watermark', async () => {
       // This tenant never uploaded a logo, so the header must carry the bundled
-      // official ORYX lockup rather than a text monogram, and the same mark must
-      // appear as the page watermark.
+      // official ORYX lockup rather than a text monogram. The page watermark is
+      // the reference's typed "AUTO SERVICES" wordmark (asserted in the template
+      // unit test), so it is not a second copy of the header image.
       const res = await companyCall<{ id: string }>(ctx.base, companyId, '/documents/issue', {
         method: 'POST',
         token: issuerToken,
@@ -765,8 +766,9 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
         headers: { Authorization: `Bearer ${issuerToken}`, 'x-oryx-company-id': companyId },
       });
       const bytes = Buffer.from(await pdf.arrayBuffer());
-      // The bundled logo is a 600px-wide PNG; Chromium embeds the same bytes
-      // twice (header + watermark), so the object appears at least twice.
+      // The bundled logo is a 600px-wide PNG embedded as an image XObject in the
+      // header; the verification strip adds the QR image, so at least two image
+      // objects are expected.
       const matches = bytes.toString('latin1').match(/\/Subtype\s*\/Image/g) ?? [];
       expect(matches.length).toBeGreaterThanOrEqual(2);
       expect(bytes.toString('latin1')).toContain('/Subtype /Image');
