@@ -4,6 +4,8 @@ import {
   SUPER_ADMIN,
   apiToken,
   expectNoServerError,
+  pickOption,
+  searchableOptionCount,
   setLocale,
   setTheme,
   signIn,
@@ -125,10 +127,10 @@ test.describe('company and branch management', () => {
     await page.getByTestId('company-name-ar').fill(`شركة اختبار ${suffix}`);
     await page.getByTestId('company-admin-email').fill(`admin-${suffix}@e2e.local`);
 
-    // Pick the first real plan so the tenant gets entitlements.
-    const planSelect = page.getByTestId('company-plan');
-    const planValue = await planSelect.locator('option').nth(1).getAttribute('value');
-    if (planValue) await planSelect.selectOption(planValue);
+    // Pick the first real plan so the tenant gets entitlements. The plan
+    // picker is a searchable combobox, so its options are read from the opened
+    // listbox rather than from `<option>` elements.
+    await pickOption(page, 'company-plan');
 
     await page.getByTestId('create-company-submit').click();
     await expect(page.getByTestId('new-company')).toBeVisible({ timeout: 20_000 });
@@ -363,8 +365,12 @@ test.describe('company administrator delegation', () => {
     await expect(page.getByTestId('users-page')).toBeVisible();
     await page.getByTestId('invite-user').click();
     await expect(page.getByTestId('invite-role')).toBeVisible();
+    // The role picker is a searchable combobox; its options live in the opened
+    // listbox, so open it and count what it offers. The list loads
+    // asynchronously, so poll until it is populated rather than reading the
+    // count the instant the trigger appears.
     await expect
-      .poll(async () => page.getByTestId('invite-role').locator('option').count(), { timeout: 20_000 })
+      .poll(async () => searchableOptionCount(page, 'invite-role'), { timeout: 20_000 })
       .toBeGreaterThan(1);
   });
 

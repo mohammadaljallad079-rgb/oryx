@@ -576,6 +576,7 @@ export function SearchableSelect({
                   role="option"
                   aria-selected={o.value === value}
                   disabled={o.disabled}
+                  data-value={o.value}
                   className="block w-full rounded-lg px-3 py-2 text-start hover:bg-[var(--surface-2)] disabled:opacity-50"
                   onClick={() => pick(o.value)}
                 >

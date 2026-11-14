@@ -1,5 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
-import { ENTERPRISE_ADMIN, apiToken, expectNoServerError, setLocale, signIn } from './helpers';
+import {
+  ENTERPRISE_ADMIN,
+  apiToken,
+  expectNoServerError,
+  pickOption,
+  setLocale,
+  signIn,
+} from './helpers';
 
 /**
  * The interactive vehicle inspection workspace.
@@ -102,7 +109,7 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     // Select the seeded Toyota owner by name rather than by position: sibling
     // specs create bare customers that sort to the top of the list, so an
     // index-based pick would land on a customer with no vehicles.
-    await page.getByTestId('job-customer').selectOption({ label: 'Al Noor Trading Est.' });
+    await pickOption(page, 'job-customer', { label: 'Al Noor Trading Est.' });
 
     // The vehicle list must be scoped to the chosen customer and must never be
     // offered from a stale, unfiltered fetch. The second seeded customer owns
@@ -231,7 +238,7 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
 
     // Choosing a vehicle prefills the cover fields from the vehicle record, so
     // the report prints the same identification the picker showed.
-    await page.getByTestId('job-customer').selectOption({ label: 'Al Noor Trading Est.' });
+    await pickOption(page, 'job-customer', { label: 'Al Noor Trading Est.' });
     await page.getByTestId('job-vehicle-input').click();
     await page.getByTestId('job-vehicle-list').locator('[role="option"]').first().click();
     await expect(page.getByTestId('job-field-make')).toHaveValue('Toyota');

@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { COMPANY_ADMIN, apiToken, setLocale, setTheme, signIn } from './helpers';
+import {
+  COMPANY_ADMIN,
+  apiToken,
+  pickOption,
+  setLocale,
+  setTheme,
+  signIn,
+} from './helpers';
 
 /**
  * Execution 02 — ERP core UI acceptance.
@@ -67,19 +74,12 @@ test.describe('Execution 02 — ERP core interfaces', () => {
     await expect(page.getByTestId('journal-balanced')).toBeVisible();
 
     // Fill two lines with unequal sides: the indicator must read "not balanced"
-    // and the post button must stay disabled. The chart of accounts loads
-    // asynchronously, so wait for the select to carry its options before
-    // reading them; a plain `.all()` on a still-empty select is a race that
-    // passes against a warm API and fails against a cold one.
-    const accountSelect = page.getByTestId('journal-line-account-0');
-    await expect
-      .poll(async () => accountSelect.locator('option').count(), { timeout: 20_000 })
-      .toBeGreaterThanOrEqual(3);
-    const accountOptions = await accountSelect.locator('option').all();
-    const firstValue = await accountOptions[1].getAttribute('value');
-    const secondValue = await accountOptions[2].getAttribute('value');
-    await page.getByTestId('journal-line-account-0').selectOption(firstValue!);
-    await page.getByTestId('journal-line-account-1').selectOption(secondValue!);
+    // and the post button must stay disabled. The account picker is a
+    // searchable combobox scoped to the chart of accounts, so its options live
+    // in the opened listbox; open each one and take two distinct postable
+    // accounts.
+    await pickOption(page, 'journal-line-account-0', { index: 0 });
+    await pickOption(page, 'journal-line-account-1', { index: 1 });
     await page.getByTestId('journal-line-debit-0').fill('100.00');
     await page.getByTestId('journal-line-credit-1').fill('99.00');
 

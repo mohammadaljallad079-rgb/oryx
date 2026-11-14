@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { apiToken, setLocale, signIn } from './helpers';
+import {
+  apiToken,
+  pickOption,
+  setLocale,
+  signIn,
+} from './helpers';
 
 /**
  * Functional acceptance audit.
@@ -266,10 +271,7 @@ test.describe('functional audit', () => {
     await expect(page.getByTestId('users-page')).toBeVisible();
     await page.getByTestId('invite-user').click();
     await page.getByTestId('invite-email').fill(`audit-${suffix}@oryx.test`);
-    const roleSelect = page.getByTestId('invite-role');
-    const roleValue = await roleSelect.locator('option').nth(1).getAttribute('value');
-    expect(roleValue).toBeTruthy();
-    await roleSelect.selectOption(roleValue!);
+    await pickOption(page, 'invite-role');
     await page.getByTestId('invite-submit').click();
 
     // The token is displayed once and is a real 64-character secret.
@@ -550,7 +552,7 @@ test.describe('functional audit', () => {
     await page.goto('/support');
     await expect(page.getByTestId('support-page')).toBeVisible();
     await page.getByTestId('open-support').click();
-    await page.getByTestId('support-company').selectOption(companies.body.items[0].id);
+    await pickOption(page, 'support-company', { value: companies.body.items[0].id });
     await page.getByTestId('support-reason').fill('Auditing a customer reported issue end to end');
     await page.getByTestId('support-submit').click();
 

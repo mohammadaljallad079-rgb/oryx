@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ENTERPRISE_ADMIN, setLocale, setTheme, signIn } from './helpers';
+import { ENTERPRISE_ADMIN, pickOption, setLocale, setTheme, signIn } from './helpers';
 
 /**
  * Execution 08 remediation — interface coverage for the reported defects.
@@ -47,8 +47,9 @@ test.describe('Execution 08 remediation — interface', () => {
     await page.getByTestId('hr-tab-leave').click();
     await page.getByTestId('new-leave-request').click();
 
-    await page.getByTestId('leave-employee').selectOption({ index: 1 });
-    await page.getByTestId('leave-type').selectOption({ index: 1 });
+    // Both pickers are searchable comboboxes, not native `<select>` elements.
+    await pickOption(page, 'leave-employee');
+    await pickOption(page, 'leave-type');
     // `<input type="date">` yields `YYYY-MM-DD`; the API must accept it without
     // an ISO 8601 rejection.
     await page.getByTestId('leave-start').fill('2026-11-02');
