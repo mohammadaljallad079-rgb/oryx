@@ -1181,6 +1181,25 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
 
 ### Execution 20 gotchas (dashboard, catalog, typography)
 
+- **A unit-test failure in `tokens.test.ts` may be a stale guard, not a code
+  bug.** Commit `aa2395d` deliberately made the light-theme navigation rail an
+  ivory field (the Execution 20 brief forbids a fixed navy background in the
+  light theme) and left `tokens.test.ts`, `branding.spec.ts` and
+  `.run/check-admin-light-palette.mjs` asserting "navy in both themes". When a
+  theme guard fails, read the CSS first: if the CSS matches the brief, update
+  the guard rather than reverting the design.
+- **Name the tint ramp, never an ad-hoc `color-mix`.** The gold tint ramp guard
+  fails on any rule that writes `color-mix(in srgb, var(--gold) …)` directly.
+  Use `var(--tint-fill)` (a wash) or `var(--tint-focus)` so the tint stays in
+  one place.
+- **`CompanySetting` is per company and never seeded.** The seed writes no
+  `CompanySetting` rows, so any row the test suite did not just write is
+  pollution from an earlier run. A stray row on a *second* company makes
+  `execution20-customer-settings.e2e-spec.ts` fail its isolation assertions
+  ("the other company has no tax row of its own") even though the code is
+  correct. Prove it by running that suite against a freshly migrated and seeded
+  scratch database; if it passes there, delete the stray row
+  (`DELETE FROM "CompanySetting" …`) instead of touching the code.
 - **The module catalog is a database table, not a compile-time constant.** The
   dashboard tiles, the module dashboards' banner copy and the admin catalog
   screen all read `Module` rows now, falling back to `getModule()` only for a
