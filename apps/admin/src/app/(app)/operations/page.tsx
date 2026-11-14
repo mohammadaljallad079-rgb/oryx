@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
+import { EntityPicker } from '@/components/inline-create';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
 import {
   Badge,
   Button,
@@ -16,8 +19,6 @@ import {
   Modal,
   SectionHeader,
   Skeleton,
-  StatCard,
-  StatGrid,
   StatusBadge,
   TableShell,
 } from '@/components/ui';
@@ -25,7 +26,17 @@ import type { ProjectDto, ProjectTaskDto, WorkOrderDto } from '@oryx/shared';
 
 type Tab = 'dashboard' | 'projects' | 'tasks' | 'work-orders' | 'approvals' | 'calendar' | 'notifications';
 
+const TAB_KEYS = ['dashboard', 'projects', 'work-orders', 'tasks', 'approvals', 'calendar', 'notifications'] as const;
+
 export default function OperationsPage() {
+  return (
+    <Suspense fallback={<Skeleton height={200} />}>
+      <OperationsInner />
+    </Suspense>
+  );
+}
+
+function OperationsInner() {
   const { t } = useUi();
   const { can } = useAuth();
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -42,6 +53,7 @@ export default function OperationsPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="operations-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.operations')}
         subtitle={t('erp.operations.subtitle')}
@@ -64,7 +76,7 @@ export default function OperationsPage() {
         ))}
       </div>
 
-      {tab === 'dashboard' ? <DashboardTab /> : null}
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="operations" testId="operations-dashboard" /> : null}
       {tab === 'projects' ? <ProjectsTab canManage={can('erp.operations.project.manage')} /> : null}
       {tab === 'work-orders' ? <WorkOrdersTab canManage={can('erp.operations.work_order.manage')} /> : null}
       {tab === 'tasks' ? <TasksTab canManage={can('erp.operations.task.manage')} /> : null}
@@ -75,26 +87,6 @@ export default function OperationsPage() {
   );
 }
 
-function DashboardTab() {
-  const { t } = useUi();
-  const data = useAsync(() => api.operationsDashboard(), []);
-  if (data.loading) return <div className="p-4"><Skeleton height={160} /></div>;
-  if (data.error) return <ErrorBanner message={data.error} onRetry={data.reload} />;
-  const d = data.data!;
-  return (
-    <Card className="p-4" data-testid="operations-dashboard">
-      <StatGrid>
-        <StatCard icon="folder" label={t('erp.operations.totalProjects')} value={String(d.totalProjects)} />
-        <StatCard tone="success" icon="check" label={t('erp.operations.activeProjects')} value={String(d.activeProjects)} />
-        <StatCard icon="list" label={t('erp.operations.openTasks')} value={String(d.openTasks)} />
-        <StatCard tone="danger" icon="clock" label={t('erp.operations.overdueTasks')} value={String(d.overdueTasks)} />
-        <StatCard icon="wrench" label={t('erp.operations.totalWorkOrders')} value={String(d.totalWorkOrders)} />
-        <StatCard tone="gold" icon="shield" label={t('erp.operations.pendingApprovals')} value={String(d.pendingApprovals)} />
-        <StatCard icon="calendar" label={t('erp.operations.upcomingEvents')} value={String(d.upcomingEvents)} />
-      </StatGrid>
-    </Card>
-  );
-}
 
 function ProjectsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
@@ -198,11 +190,14 @@ function ProjectModal({
   project,
   onClose,
   onSaved,
+  onSavedRecord,
 }: {
   open: boolean;
   project: ProjectDto | null;
   onClose: () => void;
   onSaved: () => Promise<void>;
+  /** Receives the saved project so an inline picker can select it. */
+  onSavedRecord?: (saved: ProjectDto) => void;
 }) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
@@ -232,12 +227,14 @@ function ProjectModal({
         endDate: form.endDate || undefined,
         description: form.description || undefined,
       };
+      let saved: ProjectDto;
       if (project) {
-        await api.updateOperationsProject(project.id, body);
+        saved = await api.updateOperationsProject(project.id, body);
       } else {
-        await api.createOperationsProject({ ...body, code: form.code });
+        saved = await api.createOperationsProject({ ...body, code: form.code });
       }
       await onSaved();
+      onSavedRecord?.(saved);
       onClose();
     } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); } finally { setBusy(false); }
   };
@@ -364,7 +361,7 @@ function WorkOrdersTab({ canManage }: { canManage: boolean }) {
         </div>
       ) : null}
 
-      <CreateWorkOrderModal open={open} projects={projects.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <CreateWorkOrderModal open={open} projects={projects.data?.items ?? []} onProjectCreated={projects.reload} onClose={() => setOpen(false)} onCreated={list.reload} />
     </Card>
   );
 }
@@ -372,11 +369,14 @@ function WorkOrdersTab({ canManage }: { canManage: boolean }) {
 function CreateWorkOrderModal({
   open,
   projects,
+  onProjectCreated,
   onClose,
   onCreated,
 }: {
   open: boolean;
   projects: Array<{ id: string; code: string; nameEn: string }>;
+  /** Reload the project list after one is created from the picker. */
+  onProjectCreated?: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
@@ -410,10 +410,27 @@ function CreateWorkOrderModal({
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.operations.title')} required><input className="oryx-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="work-order-title" /></Field>
         <Field label={t('erp.operations.project')}>
-          <select className="oryx-select" value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })} data-testid="work-order-project">
-            <option value="">—</option>
-            {projects.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.projectId || null}
+            options={projects.map((p) => ({ value: p.id, label: `${p.code} — ${p.nameEn}` }))}
+            onChange={(v) => setForm({ ...form, projectId: v ?? '' })}
+            placeholder={t('common.select')}
+            emptyLabel={t('common.none')}
+            testId="work-order-project"
+            createLabel={t('erp.operations.newProject')}
+            reloadOptions={onProjectCreated}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <ProjectModal
+                open
+                project={null}
+                onClose={closeCreate}
+                // The picker's own `onSaved` reloads the option list, so the
+                // nested form must not fetch it a second time.
+                onSaved={async () => {}}
+                onSavedRecord={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.crm.priority')}>
           <select className="oryx-select" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>

@@ -24,6 +24,7 @@ import type {
   RecordMileageDto,
   SubmitReportDto,
   UpdateInspectionBookingDto,
+  UpdateInspectionServiceDto,
   UpdateVehicleDto,
   VehicleDocumentDto,
 } from './automotive.dto';
@@ -344,14 +345,19 @@ export class VehicleService {
 
   async listInspectionServices(query: ListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
-    const rows = await this.prisma.inspectionService.findMany({ where: { companyId }, include: { items: { orderBy: { sortOrder: 'asc' } } } });
-    return { items: rows, total: rows.length, page: 1, pageSize: rows.length };
+    const rows = await this.prisma.inspectionService.findMany({
+      where: { companyId },
+      include: { items: { orderBy: { sortOrder: 'asc' } }, imageAsset: { select: { id: true } } },
+      orderBy: { code: 'asc' },
+    });
+    return { items: rows.map(toInspectionServiceDto), total: rows.length, page: 1, pageSize: rows.length };
   }
 
   async createInspectionService(dto: CreateInspectionServiceDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const dup = await this.prisma.inspectionService.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Inspection service ${dto.code} already exists.`);
+    if (dto.imageAssetId) await this.assertMediaAsset(companyId, dto.imageAssetId);
     const service = await this.prisma.inspectionService.create({
       data: {
         companyId,
@@ -362,10 +368,94 @@ export class VehicleService {
         priceMinor: dto.priceMinor ?? 0,
         taxPercentBp: dto.taxPercentBp ?? 0,
         durationMinutes: dto.durationMinutes ?? 60,
+        imageAssetId: dto.imageAssetId ?? null,
       },
+      include: { items: { orderBy: { sortOrder: 'asc' } }, imageAsset: { select: { id: true } } },
     });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.inspection_service_created', targetType: 'INSPECTION_SERVICE', targetId: service.id, summary: `Created inspection service ${service.code}` });
-    return service;
+    return toInspectionServiceDto(service);
+  }
+
+  /**
+   * Edit an inspection service.
+   *
+   * Price, tax and the catalogue picture are all editable: the printed document
+   * reads them live when an inspection is invoiced, so correcting a mis-priced
+   * service is a normal operation. Only the code is immutable — a booking and a
+   * printed invoice reference it by code, so changing it would break history.
+   */
+  async updateInspectionService(id: string, dto: UpdateInspectionServiceDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const service = await this.prisma.inspectionService.findFirst({ where: { id, companyId } });
+    if (!service) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection service not found.');
+    if (dto.imageAssetId) await this.assertMediaAsset(companyId, dto.imageAssetId);
+    const updated = await this.prisma.inspectionService.update({
+      where: { id },
+      data: {
+        ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
+        ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
+        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.priceMinor !== undefined ? { priceMinor: dto.priceMinor } : {}),
+        ...(dto.taxPercentBp !== undefined ? { taxPercentBp: dto.taxPercentBp } : {}),
+        ...(dto.durationMinutes !== undefined ? { durationMinutes: dto.durationMinutes } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        // An empty string clears the picture; a value links the stored asset.
+        ...(dto.imageAssetId !== undefined ? { imageAssetId: dto.imageAssetId || null } : {}),
+      },
+      include: { items: { orderBy: { sortOrder: 'asc' } }, imageAsset: { select: { id: true } } },
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.inspection_service_updated', targetType: 'INSPECTION_SERVICE', targetId: id, summary: `Updated inspection service ${service.code}` });
+    return toInspectionServiceDto(updated);
+  }
+
+  /** A media-library asset, asserted to exist in the caller's company library. */
+  private async assertMediaAsset(companyId: string, assetId: string) {
+    const asset = await this.prisma.cmsMediaAsset.findFirst({ where: { id: assetId } });
+    if (!asset) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'The service picture could not be found in the media library.');
+  }
+
+  /**
+   * Upload a picture for an inspection service.
+   *
+   * The bytes go through the shared media store (re-encoded, variants
+   * generated) exactly like a product image; the new asset id replaces the
+   * service's current picture. A missing file is a validation error, not a
+   * silent no-op, so the caller learns the upload failed.
+   */
+  async uploadInspectionServiceImage(
+    id: string,
+    file: { buffer: Buffer; originalname: string } | undefined,
+    principal: RequestPrincipal,
+    actor: ActorContext,
+  ) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const service = await this.prisma.inspectionService.findFirst({ where: { id, companyId } });
+    if (!service) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection service not found.');
+    if (!file || file.buffer.length === 0) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'No image file was uploaded.');
+    }
+    const stored = await this.storage.store(file.buffer);
+    const asset = await this.prisma.cmsMediaAsset.create({
+      data: {
+        originalName: file.originalname.slice(0, 255),
+        storageKey: stored.storageKey,
+        mimeType: stored.mimeType,
+        byteSize: stored.byteSize,
+        width: stored.width,
+        height: stored.height,
+        dominantColor: stored.dominantColor,
+        blurDataUrl: stored.blurDataUrl,
+        variants: stored.variants as never,
+        caption: `${service.code} — inspection service`,
+      },
+    });
+    const updated = await this.prisma.inspectionService.update({
+      where: { id },
+      data: { imageAssetId: asset.id },
+      include: { items: { orderBy: { sortOrder: 'asc' } }, imageAsset: { select: { id: true } } },
+    });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.inspection_service_image_uploaded', targetType: 'INSPECTION_SERVICE', targetId: id, summary: `Uploaded a picture for inspection service ${service.code}` });
+    return toInspectionServiceDto(updated);
   }
 
   /**
@@ -697,6 +787,41 @@ export class VehicleService {
 }
 
 // ---------------------------------------------------------------- mappers
+
+/**
+ * An inspection service for the catalogue and the booking screen.
+ *
+ * `imageUrl` is the public media route when a picture is attached, so the
+ * admin and the customer site render the same URL from one stored asset. The
+ * asset id itself is not exposed.
+ */
+function toInspectionServiceDto(s: {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  description: string | null;
+  priceMinor: number;
+  taxPercentBp: number;
+  durationMinutes: number;
+  isActive: boolean;
+  imageAsset?: { id: string } | null;
+  items?: Array<{ id: string; code: string; labelEn: string; labelAr: string; category: string; sortOrder: number }>;
+}) {
+  return {
+    id: s.id,
+    code: s.code,
+    nameEn: s.nameEn,
+    nameAr: s.nameAr,
+    description: s.description,
+    priceMinor: s.priceMinor,
+    taxPercentBp: s.taxPercentBp,
+    durationMinutes: s.durationMinutes,
+    isActive: s.isActive,
+    imageUrl: s.imageAsset?.id ? `/api/v1/cms/media/${s.imageAsset.id}/file?variant=card` : null,
+    items: s.items ?? [],
+  };
+}
 
 function toVehicleDto(v: {
   id: string;

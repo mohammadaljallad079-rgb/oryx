@@ -199,24 +199,15 @@ const DEMO_VEHICLES: Array<{
 
 
 async function seedModules() {
+  // Create-only: the module catalog is editable from the platform UI, so a
+  // reseed must not overwrite an operator's names, descriptions or artwork. A
+  // module that already exists is left exactly as it was.
+  let created = 0;
   for (const [index, m] of MODULES.entries()) {
-    await prisma.module.upsert({
-      where: { key: m.key },
-      update: {
-        nameEn: m.nameEn,
-        nameAr: m.nameAr,
-        descriptionEn: m.descriptionEn,
-        descriptionAr: m.descriptionAr,
-        group: m.group,
-        icon: m.icon,
-        route: m.route,
-        status: m.status,
-        deliveryPhase: m.deliveryPhase,
-        readPermission: m.readPermission,
-        writePermission: m.writePermission ?? null,
-        sortOrder: index,
-      },
-      create: {
+    const existing = await prisma.module.findUnique({ where: { key: m.key } });
+    if (existing) continue;
+    await prisma.module.create({
+      data: {
         key: m.key,
         nameEn: m.nameEn,
         nameAr: m.nameAr,
@@ -224,6 +215,7 @@ async function seedModules() {
         descriptionAr: m.descriptionAr,
         group: m.group,
         icon: m.icon,
+        tileImage: m.tileImage,
         route: m.route,
         status: m.status,
         deliveryPhase: m.deliveryPhase,
@@ -232,8 +224,9 @@ async function seedModules() {
         sortOrder: index,
       },
     });
+    created += 1;
   }
-  console.log(`  modules: ${MODULES.length} upserted`);
+  console.log(`  modules: ${created} created, ${MODULES.length - created} already present`);
 }
 
 async function seedPlans() {
@@ -1027,7 +1020,7 @@ async function seedErpBaseline(idByCode: Map<string, string>, superAdminId: stri
           barcode: p.barcode,
           salesPriceMinor: p.salesPriceMinor,
           costPriceMinor: p.costPriceMinor,
-          taxRateBp: 1500,
+          taxRateBp: 1000,
           reorderLevel: p.reorderLevel,
           reorderQuantity: p.reorderQuantity,
         },
@@ -1299,12 +1292,12 @@ async function seedExecution03Baseline(idByCode: Map<string, string>, superAdmin
       leadSources += 1;
     }
 
-    // Tax list. The standard Bahrain VAT rate is the tenant default, and a
-    // zero-rated row exists so an exempt line can be chosen rather than typed.
+    // Tax list. Bahrain's standard VAT rate is 10% and is the tenant default;
+    // a zero-rated row exists so an exempt line can be chosen rather than typed.
     for (const t of [
       { code: 'VAT5', nameEn: 'VAT 5%', nameAr: 'ضريبة القيمة المضافة ٥٪', rateBp: 500, isDefault: false, sortOrder: 5 },
-      { code: 'VAT10', nameEn: 'VAT 10%', nameAr: 'ضريبة القيمة المضافة ١٠٪', rateBp: 1000, isDefault: false, sortOrder: 10 },
-      { code: 'VAT15', nameEn: 'VAT 15%', nameAr: 'ضريبة القيمة المضافة ١٥٪', rateBp: 1500, isDefault: true, sortOrder: 15 },
+      { code: 'VAT10', nameEn: 'VAT 10%', nameAr: 'ضريبة القيمة المضافة ١٠٪', rateBp: 1000, isDefault: true, sortOrder: 10 },
+      { code: 'VAT15', nameEn: 'VAT 15%', nameAr: 'ضريبة القيمة المضافة ١٥٪', rateBp: 1500, isDefault: false, sortOrder: 15 },
       { code: 'ZERO', nameEn: 'Zero-rated', nameAr: 'معفاة', rateBp: 0, isDefault: false, sortOrder: 20 },
     ]) {
       await prisma.taxRate.upsert({
@@ -1366,7 +1359,7 @@ async function seedExecution03Baseline(idByCode: Map<string, string>, superAdmin
       const service = await prisma.inspectionService.upsert({
         where: { companyId_code: { companyId: company.id, code: s.code } },
         update: {},
-        create: { companyId: company.id, code: s.code, nameEn: s.nameEn, nameAr: s.nameAr, priceMinor: s.price, taxPercentBp: 1500 },
+        create: { companyId: company.id, code: s.code, nameEn: s.nameEn, nameAr: s.nameAr, priceMinor: s.price, taxPercentBp: 1000 },
       });
       if ((await prisma.inspectionChecklistItem.count({ where: { serviceId: service.id } })) === 0) {
         await prisma.inspectionChecklistItem.createMany({

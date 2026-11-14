@@ -148,4 +148,209 @@ describe('inspection report template — font independence', () => {
       }
     }
   });
+
+  it('prints the vehicle photograph as a full-width band on the cover', () => {
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload: { ...payload, vehiclePhotoDataUri: 'data:image/png;base64,AAAA' },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    // The approved cover prints the photograph as a bleeding band, not a thumbnail.
+    expect(html).toContain('vphoto--bleed');
+    expect(html).toContain('class="vphoto-img"');
+    expect(html).toContain('data:image/png;base64,AAAA');
+    // The vehicle information band spans the full content width, as in the
+    // reference, rather than sharing a row with the QR card.
+    expect(html).toContain('class="cover-info"');
+    expect(html).not.toContain('class="cover-grid"');
+  });
+
+  it('overlays the verification QR on the cover photograph band', () => {
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload: { ...payload, vehiclePhotoDataUri: 'data:image/png;base64,AAAA' },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: {
+        token: 'tok-1',
+        url: 'https://oryxbhr.com/verify/tok-1',
+        qrDataUri: 'data:image/png;base64,QRQR',
+      },
+      baseCss: '',
+    });
+    expect(html).toContain('class="cover-qr"');
+    expect(html).toContain('data:image/png;base64,QRQR');
+    expect(html).toContain('للتأكد من صحة التقرير');
+  });
+
+  it('prints a neutral placeholder when no photograph was attached', () => {
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload,
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    expect(html).toContain('vphoto-empty');
+    expect(html).not.toContain('class="vphoto-img"');
+  });
+
+  it('anchors the interior fittings drawing to the physical left inside the cabin block', () => {
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload,
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    // The drawing is the approved artwork, painted out of flow behind the
+    // lower-left checklist. `left` (not `inset-inline-start`) is deliberate:
+    // this page is RTL, so the logical property would resolve to the right and
+    // the drawing would sit under the wrong column.
+    expect(html).toContain('class="interior-art"');
+    expect(html).toMatch(/class="interior-art"><img src="data:image\/png;base64,/);
+    expect(html).toMatch(/\.cabin\{\s*position:relative;/);
+    expect(html).toMatch(/\.interior-art\{\s*position:absolute;\s*left:0;/);
+    expect(html).not.toMatch(/\.interior-art\{[^}]*inset-inline-start/);
+  });
+
+  it('drops the interior drawing entirely when the cabin checklist is absent', () => {
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload: {
+        ...payload,
+        sections: payload.sections.filter((s) => s.area !== 'INTERIOR'),
+      },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    expect(html).not.toContain('class="interior-art"');
+  });
+
+  it('prints the approved wordmark alone when a logo is configured', () => {
+    const html = renderInspectionReportHtml({
+      issuer: { ...issuer, logoDataUri: 'data:image/png;base64,AAAA' },
+      payload,
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    // The wordmark already carries the company name, so the name stack beside it
+    // must not be printed — the approved header shows the mark only.
+    expect(html).toContain('class="rh-logo"');
+    expect(html).not.toContain('class="rh-name"');
+  });
+
+  it('falls back to the monogram and name stack when no logo is configured', () => {
+    const html = renderInspectionReportHtml({
+      issuer: { ...issuer, logoDataUri: null },
+      payload,
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    expect(html).toContain('class="rh-monogram"');
+    expect(html).toContain('class="rh-name"');
+  });
+});
+
+describe('inspection report template — reference page parity (Execution 19)', () => {
+  const render = (payloadOverride: Partial<InspectionReportPayload> = {}) =>
+    renderInspectionReportHtml({
+      issuer,
+      payload: { ...payload, ...payloadOverride },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+
+  it('centres the chassis drawing and distributes the eight region boxes around it', () => {
+    const html = render();
+    // The approved sheet places the eight boxes around a centred drawing, not in
+    // a two-column list beside it.
+    expect(html).toContain('class="ch-board"');
+    expect(html).toContain('class="ch-row ch-row-edge"');
+    expect(html).toContain('class="ch-row ch-row-mid"');
+    expect(html).toContain('class="ch-side"');
+    expect(html).toContain('class="ch-art"');
+    // The old side-list grid must be gone.
+    expect(html).not.toContain('class="chassis-wrap"');
+    expect(html).not.toContain('class="chassis-grid"');
+    expect(html).not.toContain('class="ch-region"');
+  });
+
+  it('lays the chassis boxes out physically (LTR) so left cards stay on the left in RTL', () => {
+    const html = render();
+    expect(html).toMatch(/\.ch-board\{[^}]*direction:ltr/);
+  });
+
+  it('prints the paint legend on one row in the reference order, with no marker table', () => {
+    const html = render();
+    expect(html).toContain('class="legend legend--row"');
+    // The reference order is sectioned, Change, Filler, Paint left to right.
+    const row = html.slice(html.indexOf('legend legend--row'));
+    const order = ['مقطوع', 'تبديل', 'معجون', 'صبغ'].map((w) => row.indexOf(w));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    // The invented marker table must not be printed.
+    expect(html).not.toContain('marker-table');
+  });
+
+  it('prints the paint remarks box after the legend, as in the reference', () => {
+    const withRemarks: InspectionReportPayload = {
+      ...payload,
+      sections: payload.sections.map((s) =>
+        s.area === 'PAINT_BODY' ? { ...s, remarks: '• خط ملاحظة' } : s,
+      ),
+    };
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload: withRemarks,
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    const legendAt = html.indexOf('class="legend legend--row"');
+    const remarksAt = html.indexOf('class="sec-remarks"');
+    expect(legendAt).toBeGreaterThan(-1);
+    expect(remarksAt).toBeGreaterThan(legendAt);
+  });
+
+  it('overlays the ORYX watermark on the cover photograph band', () => {
+    const html = renderInspectionReportHtml({
+      issuer: { ...issuer, logoDataUri: 'data:image/png;base64,LOGO' },
+      payload: { ...payload, vehiclePhotoDataUri: 'data:image/png;base64,PHOTO' },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    expect(html).toContain('class="vphoto-mark"');
+    expect(html).toContain('data:image/png;base64,LOGO');
+    // The watermark is painted over the photograph inside the band.
+    const band = html.slice(html.indexOf('vphoto--bleed'), html.indexOf('</figure>'));
+    expect(band).toContain('vphoto-mark');
+    expect(band).toContain('vphoto-img');
+  });
 });

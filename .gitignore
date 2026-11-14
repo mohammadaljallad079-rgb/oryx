@@ -8,6 +8,10 @@ coverage/
 .env
 .env.local
 .env.*.local
+# Editor/backup copies of the env file (e.g. `.env.bak`) carry the same secrets
+# and must never be committed either.
+.env.*
+!.env.example
 # Production and staging secrets live in a real env file and must never be
 # committed. The templates in deploy/env/ are the committed examples.
 .env.production
@@ -90,8 +94,12 @@ oryx out put*.pdf
 
 # Ad-hoc verification/repro scripts kept out of the release branch.
 .run/*.mjs
+.run/*.mts
+.run/*.cjs
 .run/*.py
 .run/*.sh
+.run/ref-assets/
+.run/ref-inv/
 .run/preview-links/
 
 # Ad-hoc visual-comparison scratch produced while matching the approved

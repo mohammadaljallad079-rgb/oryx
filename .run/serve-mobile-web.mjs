@@ -11,7 +11,9 @@ import { extname, join, normalize } from 'node:path';
 // The export is written to `dist/web` (the Android and iOS exports take their
 // own `dist/<platform>` directories), so the server roots there rather than at
 // `dist`, which holds no `index.html` of its own.
-const ROOT = '/workspace/project/oryx/apps/mobile/dist/web';
+// Resolve from this script's own location so the server always serves the
+// checkout it was started from, not a sibling checkout on another branch.
+const ROOT = new URL('../apps/mobile/dist/web', import.meta.url).pathname;
 const PREFIX = '/mobile';
 const PORT = Number(process.env.MOBILE_WEB_PORT ?? 8081);
 

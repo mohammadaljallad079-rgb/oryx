@@ -21,8 +21,11 @@ import type {
   CustomerDto,
   CustomerDetailDto,
   CustomerAttachmentDto,
+  CustomerBranchDto,
+  CompanySettingsResponse,
   CustomerReturnDto,
   DashboardResponse,
+  ModuleSummaryDto,
   EcosystemOverviewResponse,
   ErpAccountDto,
   FeatureFlagDto,
@@ -64,6 +67,7 @@ import type {
   DepartmentDto,
   JobTitleDto,
   EmployeeDto,
+  EmployeeDocumentDto,
   LeaveTypeDto,
   LeaveRequestDto,
   ShiftDto,
@@ -480,6 +484,7 @@ export const api = {
         isSuperAdmin: boolean;
         preferredLocale: 'ar' | 'en';
         preferredTheme: 'dark' | 'light';
+        preferredFontScale: 'SM' | 'MD' | 'LG';
       };
       memberships: unknown[];
       permissions: string[];
@@ -537,6 +542,19 @@ export const api = {
     if (params.branchId) q.set('branchId', params.branchId);
     const qs = q.toString();
     return request<DashboardResponse>(`/dashboard${qs ? `?${qs}` : ''}`);
+  },
+
+  moduleSummary: (
+    moduleKey: string,
+    params: { companyId?: string | null; branchId?: string | null } = {},
+  ) => {
+    const q = new URLSearchParams();
+    if (params.companyId) q.set('companyId', params.companyId);
+    if (params.branchId) q.set('branchId', params.branchId);
+    const qs = q.toString();
+    return request<ModuleSummaryDto>(
+      `/dashboard/modules/${encodeURIComponent(moduleKey)}${qs ? `?${qs}` : ''}`,
+    );
   },
 
   // -------------------------------------------------------------- companies
@@ -652,6 +670,10 @@ export const api = {
 
   // ----------------------------------------------------------------- modules
   listModules: () => request<{ items: Array<ModuleDto & { licensed: boolean }> }>('/modules'),
+  updateModule: (id: string, body: Record<string, unknown>) =>
+    request<ModuleDto>(`/modules/${id}`, { method: 'PATCH', body }),
+  restoreModule: (id: string) =>
+    request<ModuleDto>(`/modules/${id}/restore-defaults`, { method: 'POST' }),
   entitlements: (companyId?: string) =>
     request<{
       companyId: string;
@@ -913,6 +935,33 @@ export const api = {
     request<CustomerAttachmentDto>(`/sales/customers/${id}/attachments`, { method: 'POST', body }),
   removeCustomerAttachment: (id: string, attachmentId: string) =>
     request<{ removed: boolean }>(`/sales/customers/${id}/attachments/${attachmentId}`, { method: 'DELETE' }),
+  customerBranches: (id: string) =>
+    request<CustomerBranchDto[]>(`/sales/customers/${id}/branches`),
+  createCustomerBranch: (id: string, body: Record<string, unknown>) =>
+    request<CustomerBranchDto>(`/sales/customers/${id}/branches`, { method: 'POST', body }),
+  updateCustomerBranch: (id: string, branchId: string, body: Record<string, unknown>) =>
+    request<CustomerBranchDto>(`/sales/customers/${id}/branches/${branchId}`, { method: 'POST', body }),
+  deleteCustomerBranch: (id: string, branchId: string) =>
+    request<{ deleted: true }>(`/sales/customers/${id}/branches/${branchId}`, { method: 'DELETE' }),
+
+  // ------------------------------------------------------ company settings
+  companySettings: (companyId?: string) =>
+    request<CompanySettingsResponse>(
+      `/company-settings${companyId ? `?companyId=${companyId}` : ''}`,
+    ),
+  companySettingsCatalogue: () =>
+    request<{ sections: string[]; defaults: Record<string, Record<string, unknown>> }>(
+      '/company-settings/catalogue',
+    ),
+  companySettingSection: (section: string, companyId?: string) =>
+    request<Record<string, unknown>>(
+      `/company-settings/${section}${companyId ? `?companyId=${companyId}` : ''}`,
+    ),
+  updateCompanySettingSection: (section: string, body: Record<string, unknown>, companyId?: string) =>
+    request<Record<string, unknown>>(
+      `/company-settings/${section}${companyId ? `?companyId=${companyId}` : ''}`,
+      { method: 'PUT', body },
+    ),
   quotations: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<SalesDocumentDto>>(`/sales/quotations?${toQuery(params)}`),
   createQuotation: (body: Record<string, unknown>) =>
@@ -944,9 +993,10 @@ export const api = {
   // ----------------------------------------------------------- attachments
   attachments: (entityType: string, entityId: string) =>
     request<AttachmentDto[]>(`/attachments/${entityType}/${entityId}`),
-  uploadAttachment: (entityType: string, entityId: string, file: File) => {
+  uploadAttachment: (entityType: string, entityId: string, file: File, category?: string) => {
     const form = new FormData();
     form.append('file', file);
+    if (category) form.append('category', category);
     return request<AttachmentDto>(`/attachments/${entityType}/${entityId}`, {
       method: 'POST',
       body: form,
@@ -1056,15 +1106,42 @@ export const api = {
   createContract: (employeeId: string, body: Record<string, unknown>) =>
     request<Record<string, unknown>>(`/hr/employees/${employeeId}/contracts`, { method: 'POST', body }),
   employeeDocuments: (employeeId: string) =>
-    request<Paginated<Record<string, unknown>>>(`/hr/employees/${employeeId}/documents`),
-  createEmployeeDocument: (employeeId: string, body: Record<string, unknown>) =>
-    request<Record<string, unknown>>(`/hr/employees/${employeeId}/documents`, { method: 'POST', body }),
+    request<Paginated<EmployeeDocumentDto>>(`/hr/employees/${employeeId}/documents`),
+  createEmployeeDocument: (employeeId: string, body: Record<string, unknown> | FormData) =>
+    request<EmployeeDocumentDto>(`/hr/employees/${employeeId}/documents`, { method: 'POST', body }),
+  deleteEmployeeDocument: (employeeId: string, documentId: string) =>
+    request<{ deleted: boolean }>(`/hr/employees/${employeeId}/documents/${documentId}`, {
+      method: 'DELETE',
+    }),
+  /**
+   * Fetch an employee document as a blob so it can be previewed or downloaded
+   * without leaking the bearer token into a URL. The access token comes from the
+   * same in-memory store the request helper uses.
+   */
+  fetchEmployeeDocumentBlob: async (employeeId: string, documentId: string): Promise<Blob> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    const branchId = tokenStore.branchId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    if (branchId) headers['x-oryx-branch-id'] = branchId;
+    const res = await fetch(`${API_BASE}/v1/hr/employees/${employeeId}/documents/${documentId}/file`, {
+      headers,
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new ApiError(res.status, 'document_fetch_failed', 'Could not load the document.');
+    return res.blob();
+  },
   leaveTypes: (params: { companyId?: string } = {}) =>
     request<Paginated<LeaveTypeDto>>(`/hr/leave-types?${toQuery(params)}`),
   createLeaveType: (body: Record<string, unknown>) => request<LeaveTypeDto>('/hr/leave-types', { method: 'POST', body }),
   leaveRequests: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<LeaveRequestDto>>(`/hr/leave-requests?${toQuery(params)}`),
   requestLeave: (body: Record<string, unknown>) => request<LeaveRequestDto>('/hr/leave-requests', { method: 'POST', body }),
+  updateLeaveRequest: (id: string, body: Record<string, unknown>) =>
+    request<LeaveRequestDto>(`/hr/leave-requests/${id}`, { method: 'PATCH', body }),
   decideLeave: (id: string, decision: string, note?: string) =>
     request<LeaveRequestDto>(`/hr/leave-requests/${id}/decide`, { method: 'POST', body: { decision, note } }),
   hrShifts: (params: { companyId?: string } = {}) => request<Paginated<ShiftDto>>(`/hr/shifts?${toQuery(params)}`),
@@ -1103,6 +1180,7 @@ export const api = {
     request<Record<string, unknown>>('/hr/work-sites', { method: 'POST', body }),
   updateWorkSite: (id: string, body: Record<string, unknown>) =>
     request<Record<string, unknown>>(`/hr/work-sites/${id}`, { method: 'PATCH', body }),
+  deleteWorkSite: (id: string) => request<{ id: string; deleted: boolean }>(`/hr/work-sites/${id}`, { method: 'DELETE' }),
   workSiteQrToken: (id: string) => request<Record<string, unknown>>(`/hr/work-sites/${id}/qr-token`),
   salaryHistory: (employeeId: string) => request<Record<string, unknown>>(`/hr/employees/${employeeId}/salary-history`),
   myPayslips: () => request<Paginated<Record<string, unknown>>>('/hr/payslips/me'),
@@ -1266,6 +1344,11 @@ export const api = {
     request<Paginated<InspectionServiceDto>>(`/automotive/inspection-services?${toQuery(params)}`),
   createInspectionService: (body: Record<string, unknown>) =>
     request<InspectionServiceDto>('/automotive/inspection-services', { method: 'POST', body }),
+  updateInspectionService: (id: string, body: Record<string, unknown>) =>
+    request<InspectionServiceDto>(`/automotive/inspection-services/${id}`, { method: 'PATCH', body }),
+  /** Upload a service picture. Multipart, so no JSON content type may be set. */
+  uploadInspectionServiceImage: (id: string, form: FormData) =>
+    request<InspectionServiceDto>(`/automotive/inspection-services/${id}/image`, { method: 'POST', body: form, raw: true }),
   deleteInspectionService: (id: string) =>
     request<{ id: string; deleted: boolean }>(`/automotive/inspection-services/${id}`, { method: 'DELETE' }),
   inspectionBookings: (params: { companyId?: string; status?: string; page?: number } = {}) =>

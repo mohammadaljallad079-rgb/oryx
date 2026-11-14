@@ -21,11 +21,11 @@ import { conflict, ERROR_CODES, notFound } from '../common/errors';
 import type { ActorContext } from '../organizations/organizations.service';
 import type { RequestPrincipal } from '../auth/auth.decorators';
 import { DocumentStorageService } from './document-storage.service';
-import { PdfRendererService, OFFICIAL_PDF_MARGINS } from './pdf/pdf-renderer.service';
+import { PdfRendererService, OFFICIAL_PDF_MARGINS, REPORT_PDF_MARGINS } from './pdf/pdf-renderer.service';
 import { QrService } from './pdf/qr.service';
 import { renderInspectionReportHtml } from './templates/report-html';
 import { renderOfficialFinancialHtml } from './templates/official-financial.template';
-import { footerTemplate, officialFooterTemplate } from './templates/chrome';
+import { footerTemplate, officialFooterTemplate, reportFooterTemplate } from './templates/chrome';
 import { renderFinancialDocumentHtml } from './templates/financial-document.template';
 import type {
   DocumentIssuer,
@@ -251,21 +251,21 @@ export class DocumentsService {
       : bodyHtml.replace('<style>', `<style>${baseCss}\n`);
 
     // The footer is a Chromium page template, so the page counter is real on
-    // every page and the footer cannot push content onto a blank page.
+    // every page and the footer cannot push content onto a blank page. Both
+    // layouts print the same contacts row; the report does not use the
+    // document-number footer because its per-page identity is the job number in
+    // the in-flow header.
+    // The report prints its own footer band (the ORYX lockups with the closing
+    // line) above the shared contact row; every other layout uses the financial
+    // footer as-is.
     const footerHtml =
       layout === 'official'
         ? officialFooterTemplate(args.issuer)
-        : footerTemplate({
-            issuer: args.issuer,
-            titleEn: spec.labelEn,
-            titleAr: spec.labelAr,
-            documentNumber: args.documentNumber,
-          });
+        : reportFooterTemplate(args.issuer);
     const { pdf, pageCount } = await this.renderer.render(html, {
       footerHtml,
-      margins: layout === 'official' ? OFFICIAL_PDF_MARGINS : undefined,
+      margins: layout === 'official' ? OFFICIAL_PDF_MARGINS : REPORT_PDF_MARGINS,
     });
-
     const documentId = newDocumentId();
     const storageKey = this.storage.keyFor(args.companyId, documentId, version);
     await this.storage.write(storageKey, pdf);
@@ -404,7 +404,12 @@ export class DocumentsService {
     const html = bodyHtml.includes('@font-face')
       ? bodyHtml
       : bodyHtml.replace('<style>', `<style>${baseCss}\n`);
-    const footerHtml = referenceLayout
+    // The approved inspection report carries the same contacts-row footer as the
+    // approved invoice: a hairline rule, then the page counter, the phone and
+    // email, and the website on one row, with the registered address flush right
+    // beneath. Only the internal statements (which never print an identity band)
+    // keep the compact `footerTemplate`.
+    const footerHtml = referenceLayout || payload.kind === 'INSPECTION_REPORT'
       ? officialFooterTemplate(issuer)
       : footerTemplate({
           issuer,
@@ -414,7 +419,12 @@ export class DocumentsService {
         });
     const { pdf, pageCount } = await this.renderer.render(html, {
       footerHtml,
-      margins: referenceLayout ? OFFICIAL_PDF_MARGINS : undefined,
+      margins:
+        payload.kind === 'INSPECTION_REPORT'
+          ? REPORT_PDF_MARGINS
+          : referenceLayout
+            ? OFFICIAL_PDF_MARGINS
+            : undefined,
     });
 
     const storageKey = this.storage.keyFor(row.companyId, row.id, row.version);

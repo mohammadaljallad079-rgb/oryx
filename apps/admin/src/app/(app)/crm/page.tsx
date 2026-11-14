@@ -1,12 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { EntityPicker } from '@/components/inline-create';
+import { LeadModal } from '@/components/entity-modals';
+import { PipelineModal } from '@/components/pipeline-modal';
+import { CustomerModal } from '@/components/customer-modal';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
 import {
   Badge,
   Button,
@@ -17,8 +23,6 @@ import {
   Modal,
   SectionHeader,
   Skeleton,
-  StatCard,
-  StatGrid,
   StatusBadge,
   TableShell,
 } from '@/components/ui';
@@ -26,7 +30,17 @@ import type { LeadDto, OpportunityDto, SupportTicketDto } from '@oryx/shared';
 
 type Tab = 'dashboard' | 'leads' | 'opportunities' | 'tickets' | 'activities';
 
+const TAB_KEYS = ['dashboard', 'leads', 'opportunities', 'tickets', 'activities'] as const;
+
 export default function CrmPage() {
+  return (
+    <Suspense fallback={<Skeleton height={200} />}>
+      <CrmInner />
+    </Suspense>
+  );
+}
+
+function CrmInner() {
   const { t } = useUi();
   const { can } = useAuth();
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -41,6 +55,7 @@ export default function CrmPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="crm-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.crm')}
         subtitle={t('erp.crm.subtitle')}
@@ -63,7 +78,7 @@ export default function CrmPage() {
         ))}
       </div>
 
-      {tab === 'dashboard' ? <DashboardTab /> : null}
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="crm" testId="crm-dashboard" /> : null}
       {tab === 'leads' ? <LeadsTab canManage={can('erp.crm.lead.manage')} /> : null}
       {tab === 'opportunities' ? <OpportunitiesTab canManage={can('erp.crm.opportunity.manage')} canConvert={can('erp.crm.opportunity.convert')} /> : null}
       {tab === 'tickets' ? <TicketsTab canManage={can('erp.crm.ticket.manage')} /> : null}
@@ -72,26 +87,6 @@ export default function CrmPage() {
   );
 }
 
-function DashboardTab() {
-  const { t } = useUi();
-  const data = useAsync(() => api.crmDashboard(), []);
-  if (data.loading) return <div className="p-4"><Skeleton height={160} /></div>;
-  if (data.error) return <ErrorBanner message={data.error} onRetry={data.reload} />;
-  const d = data.data!;
-  return (
-    <Card className="p-4" data-testid="crm-dashboard">
-      <StatGrid>
-        <StatCard icon="target" label={t('erp.crm.totalLeads')} value={String(d.totalLeads)} />
-        <StatCard icon="trend" label={t('erp.crm.openOpportunities')} value={String(d.openOpportunities)} />
-        <StatCard tone="gold" icon="wallet" label={t('erp.crm.pipelineValue')} value={money(d.pipelineValueMinor)} />
-        <StatCard icon="lifeBuoy" label={t('erp.crm.openTickets')} value={String(d.openTickets)} />
-        <StatCard tone="success" icon="check" label={t('erp.crm.wonOpportunities')} value={String(d.wonOpportunities)} />
-        <StatCard tone="danger" icon="clock" label={t('erp.crm.overdueActivities')} value={String(d.overdueActivities)} />
-        <StatCard icon="star" label={t('erp.crm.satisfaction')} value={d.averageSatisfaction ? d.averageSatisfaction.toFixed(1) : '—'} />
-      </StatGrid>
-    </Card>
-  );
-}
 
 function LeadsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
@@ -202,119 +197,12 @@ function LeadsTab({ canManage }: { canManage: boolean }) {
         open={open}
         lead={editing}
         onClose={() => { setOpen(false); setEditing(null); }}
-        onSaved={list.reload}
+        onCreated={list.reload}
       />
     </Card>
   );
 }
 
-function LeadModal({
-  open,
-  lead,
-  onClose,
-  onSaved,
-}: {
-  open: boolean;
-  lead: LeadDto | null;
-  onClose: () => void;
-  onSaved: () => Promise<void>;
-}) {
-  const { t } = useUi();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', contactName: '', email: '', phone: '', estimatedValue: '0.00', notes: '' });
-
-  useEffect(() => {
-    if (!open) return;
-    setError(null);
-    setForm({
-      code: lead?.code ?? '',
-      nameEn: lead?.nameEn ?? '',
-      nameAr: lead?.nameAr ?? '',
-      contactName: lead?.contactName ?? '',
-      email: lead?.email ?? '',
-      phone: lead?.phone ?? '',
-      estimatedValue: lead ? String(lead.estimatedValueMinor / 100) : '0.00',
-      notes: '',
-    });
-  }, [open, lead]);
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const body = {
-        nameEn: form.nameEn,
-        nameAr: form.nameAr,
-        contactName: form.contactName || undefined,
-        email: form.email || undefined,
-        phone: form.phone || undefined,
-        estimatedValueMinor: toMinorInput(form.estimatedValue),
-        notes: form.notes || undefined,
-      };
-      if (lead) {
-        await api.updateLead(lead.id, body);
-      } else {
-        await api.createLead({ ...body, code: form.code });
-      }
-      await onSaved();
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      title={lead ? t('erp.crm.editLead') : t('erp.crm.newLead')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            variant="primary"
-            disabled={busy || !form.nameEn || !form.nameAr || (!lead && !form.code)}
-            onClick={submit}
-            data-testid="save-lead"
-          >
-            {busy ? t('common.loading') : t('common.save')}
-          </Button>
-        </>
-      }
-    >
-      {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} disabled={Boolean(lead)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="lead-code" />
-        </Field>
-        <Field label={t('erp.crm.contact')}>
-          <input className="oryx-input" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} data-testid="lead-contact" />
-        </Field>
-        <Field label={`${t('common.name')} (EN)`} required>
-          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="lead-name-en" />
-        </Field>
-        <Field label={`${t('common.name')} (AR)`} required>
-          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="lead-name-ar" />
-        </Field>
-        <Field label={t('erp.crm.estimatedValue')}>
-          <input className="oryx-input" value={form.estimatedValue} onChange={(e) => setForm({ ...form, estimatedValue: e.target.value })} data-testid="lead-estimated-value" />
-        </Field>
-        <Field label={t('erp.sales.phone')}>
-          <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} data-testid="lead-phone" />
-        </Field>
-        <Field label={t('common.email')}>
-          <input className="oryx-input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="lead-email" />
-        </Field>
-        <Field label={t('common.notes')}>
-          <input className="oryx-input" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} data-testid="lead-notes" />
-        </Field>
-      </div>
-    </Modal>
-  );
-}
 
 function OpportunitiesTab({ canManage, canConvert }: { canManage: boolean; canConvert: boolean }) {
   const { t } = useUi();
@@ -406,6 +294,8 @@ function OpportunitiesTab({ canManage, canConvert }: { canManage: boolean; canCo
         open={open}
         pipelines={pipelines.data?.items ?? []}
         customers={customers.data?.items ?? []}
+        onPipelinesReload={pipelines.reload}
+        onCustomersReload={customers.reload}
         onClose={() => setOpen(false)}
         onCreated={list.reload}
       />
@@ -417,12 +307,16 @@ function CreateOpportunityModal({
   open,
   pipelines,
   customers,
+  onPipelinesReload,
+  onCustomersReload,
   onClose,
   onCreated,
 }: {
   open: boolean;
   pipelines: Array<{ id: string; nameEn: string; stages: Array<{ id: string; nameEn: string }> }>;
   customers: Array<{ id: string; code: string; nameEn: string }>;
+  onPipelinesReload: () => Promise<void> | void;
+  onCustomersReload: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
@@ -475,10 +369,23 @@ function CreateOpportunityModal({
           <input className="oryx-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="opportunity-title" />
         </Field>
         <Field label={t('erp.crm.pipeline')} required>
-          <select className="oryx-select" value={form.pipelineId} onChange={(e) => setForm({ ...form, pipelineId: e.target.value, stageId: '' })} data-testid="opportunity-pipeline">
-            <option value="">—</option>
-            {pipelines.map((p) => <option key={p.id} value={p.id}>{p.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.pipelineId || null}
+            options={pipelines.map((p) => ({ value: p.id, label: p.nameEn }))}
+            onChange={(v) => setForm({ ...form, pipelineId: v ?? '', stageId: '' })}
+            placeholder={t('common.select')}
+            testId="opportunity-pipeline"
+            createLabel={t('erp.crm.newPipeline')}
+            reloadOptions={onPipelinesReload}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <PipelineModal
+                open
+                onClose={closeCreate}
+                onCreated={onPipelinesReload}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.crm.stage')}>
           <select className="oryx-select" value={form.stageId} onChange={(e) => setForm({ ...form, stageId: e.target.value })}>
@@ -487,10 +394,24 @@ function CreateOpportunityModal({
           </select>
         </Field>
         <Field label={t('erp.sales.customer')}>
-          <select className="oryx-select" value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })} data-testid="opportunity-customer">
-            <option value="">—</option>
-            {customers.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.customerId || null}
+            options={customers.map((c) => ({ value: c.id, label: `${c.code} — ${c.nameEn}` }))}
+            onChange={(v) => setForm({ ...form, customerId: v ?? '' })}
+            placeholder={t('common.select')}
+            testId="opportunity-customer"
+            createLabel={t('erp.sales.newCustomer')}
+            reloadOptions={onCustomersReload}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <CustomerModal
+                open
+                customer={null}
+                onClose={closeCreate}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.crm.amount')} required>
           <input className="oryx-input" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} data-testid="opportunity-amount" />

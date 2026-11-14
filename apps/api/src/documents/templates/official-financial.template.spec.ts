@@ -141,6 +141,28 @@ describe('official financial template — reference columns', () => {
     expect(html).toContain('of-line-sub">1 Years Warranty Car Battry (AMARON 55).</span>');
   });
 
+  it('never prints a line SKU under the description', () => {
+    // The approved reference sheet carries no SKU column and no SKU line, so a
+    // product code must not leak into the printed form even when the payload
+    // still carries one from the source record.
+    const html = render({
+      lines: [
+        {
+          description: 'Oil (Havoline 5w20)',
+          sku: 'AC-REFRIGERANT',
+          quantity: 10_000,
+          unitPriceMinor: 7_500,
+          discountMinor: 0,
+          taxMinor: 750,
+          lineTotalMinor: 8_250,
+          taxPercentBp: 1000,
+        },
+      ],
+    });
+    expect(html).not.toContain('AC-REFRIGERANT');
+    expect(html).not.toContain('of-line-sku');
+  });
+
   it('splits a legacy description that carries its note after a newline', () => {
     const html = render({
       lines: [

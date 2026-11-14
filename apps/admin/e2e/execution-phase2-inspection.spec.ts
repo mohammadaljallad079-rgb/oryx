@@ -62,16 +62,23 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await page.getByTestId('new-inspection-job').click();
     await expect(page.locator('.oryx-modal')).toHaveCount(1);
 
-    // Every selectable inspection type is offered, in English.
+    // Every selectable inspection type is offered, in English. The approved
+    // report has exactly four check sections, so the form offers four types and
+    // never the seven internal storage areas.
     await expect(page.getByTestId('job-types')).toBeVisible();
     await expect(page.getByTestId('job-type-PAINT_BODY')).toBeVisible();
     await expect(page.getByTestId('job-type-CHASSIS_UNDERCARRIAGE')).toBeVisible();
+    await expect(page.getByTestId('job-type-CABIN_AND_MECHANICAL')).toBeVisible();
     await expect(page.getByTestId('job-type-COMPUTER_UNIT')).toBeVisible();
+    await expect(page.getByTestId('job-type-INTERIOR')).toHaveCount(0);
 
     // Select the seeded Toyota owner by name rather than by position: sibling
     // specs create bare customers that sort to the top of the list, so an
     // index-based pick would land on a customer with no vehicles.
-    await page.getByTestId('job-customer').selectOption({ label: 'Al Noor Trading Est.' });
+    // The customer field is a searchable picker (with an inline create action),
+    // not a native select.
+    await page.getByTestId('job-customer').locator('button').click();
+    await page.getByTestId('job-customer').locator('[role="option"]', { hasText: 'Al Noor Trading Est.' }).first().click();
 
     // The vehicle list must be scoped to the chosen customer and must never be
     // offered from a stale, unfiltered fetch. The second seeded customer owns
@@ -89,8 +96,9 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
 
     await options.first().click();
     await expect(page.getByTestId('job-vehicle-identity')).toBeVisible();
-    await page.getByTestId('job-type-INTERIOR').click();
-    await page.getByTestId('job-type-EXTERIOR').click();
+    // The cabin type is one selectable type that expands to the interior,
+    // exterior, engine-compartment and road-test sections server-side.
+    await page.getByTestId('job-type-CABIN_AND_MECHANICAL').click();
     await page.getByTestId('create-inspection-job').click();
 
     await expect(page.locator('.oryx-modal')).toHaveCount(0);
@@ -110,11 +118,14 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await expect(page.getByTestId('inspection-identity')).toContainText('JTMHV05J204123456');
     await expect(page.getByTestId('inspection-workspace')).toContainText('Toyota');
 
-    // Only the two selected sections are on the rail.
+    // The rail shows the four areas the cabin type expands to, and never a
+    // section outside the selected types.
     await expect(page.getByTestId('inspection-rail')).toBeVisible();
     await expect(page.getByTestId('inspection-rail-INTERIOR')).toBeVisible();
     await expect(page.getByTestId('inspection-rail-EXTERIOR')).toBeVisible();
-    await expect(page.getByTestId('inspection-rail-ROAD_TEST')).toHaveCount(0);
+    await expect(page.getByTestId('inspection-rail-ENGINE_COMPARTMENT')).toBeVisible();
+    await expect(page.getByTestId('inspection-rail-ROAD_TEST')).toBeVisible();
+    await expect(page.getByTestId('inspection-rail-PAINT_BODY')).toHaveCount(0);
     await expect(page.getByTestId('inspection-rail-COMPUTER_UNIT')).toHaveCount(0);
   });
 
@@ -196,7 +207,10 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
 
     // Choosing a vehicle prefills the cover fields from the vehicle record, so
     // the report prints the same identification the picker showed.
-    await page.getByTestId('job-customer').selectOption({ label: 'Al Noor Trading Est.' });
+    // The customer field is a searchable picker (with an inline create action),
+    // not a native select.
+    await page.getByTestId('job-customer').locator('button').click();
+    await page.getByTestId('job-customer').locator('[role="option"]', { hasText: 'Al Noor Trading Est.' }).first().click();
     await page.getByTestId('job-vehicle-input').click();
     await page.getByTestId('job-vehicle-list').locator('[role="option"]').first().click();
     await expect(page.getByTestId('job-field-make')).toHaveValue('Toyota');
@@ -358,7 +372,7 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
 
     // The rail carries the Arabic section names from the shared catalogue.
     await expect(page.getByTestId('inspection-rail-EXTERIOR')).toContainText('الفحص الخارجي');
-    await expect(page.getByTestId('inspection-rail-ENGINE_COMPARTMENT')).toContainText('حجرة المحرك');
+    await expect(page.getByTestId('inspection-rail-ENGINE_COMPARTMENT')).toContainText('مقصورة المحرك');
     await expectNoServerError(page);
   });
 });

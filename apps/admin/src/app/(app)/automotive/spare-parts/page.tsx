@@ -7,6 +7,10 @@ import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
+import { EntityPicker } from '@/components/inline-create';
+import { ProductModal } from '@/components/entity-modals';
 import {
   Badge,
   Button,
@@ -22,7 +26,9 @@ import {
 } from '@/components/ui';
 import type { PartsReservationDto } from '@oryx/shared';
 
-type Tab = 'catalog' | 'references' | 'compatibility' | 'reservations';
+type Tab = 'dashboard' | 'catalog' | 'references' | 'compatibility' | 'reservations';
+
+const TAB_KEYS = ['dashboard', 'catalog', 'references', 'compatibility', 'reservations'] as const;
 
 export default function SparePartsPage() {
   const { t } = useUi();
@@ -30,6 +36,7 @@ export default function SparePartsPage() {
   const [tab, setTab] = useState<Tab>('catalog');
 
   const tabs: Array<{ key: Tab; label: string }> = [
+    { key: 'dashboard', label: t('erp.parts.dashboard') },
     { key: 'catalog', label: t('erp.parts.catalog') },
     { key: 'references', label: t('erp.parts.partNumbers') },
     { key: 'compatibility', label: t('erp.parts.compatibility') },
@@ -38,6 +45,7 @@ export default function SparePartsPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="spare-parts-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.spare_parts')}
         subtitle={t('erp.parts.subtitle')}
@@ -60,6 +68,7 @@ export default function SparePartsPage() {
         ))}
       </div>
 
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="spare_parts" /> : null}
       {tab === 'catalog' ? <CatalogTab /> : null}
       {tab === 'references' ? <ReferencesTab canManage={can('erp.parts.reference.manage')} /> : null}
       {tab === 'compatibility' ? <CompatibilityTab canManage={can('erp.parts.compatibility.manage')} /> : null}
@@ -145,7 +154,13 @@ function ReferencesTab({ canManage }: { canManage: boolean }) {
           </tbody>
         </TableShell>
       )}
-      <CreateReferenceModal open={open} products={products.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <CreateReferenceModal
+        open={open}
+        products={products.data?.items ?? []}
+        onProductCreated={products.reload}
+        onClose={() => setOpen(false)}
+        onCreated={list.reload}
+      />
     </Card>
   );
 }
@@ -153,11 +168,13 @@ function ReferencesTab({ canManage }: { canManage: boolean }) {
 function CreateReferenceModal({
   open,
   products,
+  onProductCreated,
   onClose,
   onCreated,
 }: {
   open: boolean;
   products: Array<{ id: string; sku: string; nameEn: string }>;
+  onProductCreated: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
@@ -179,10 +196,23 @@ function CreateReferenceModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.inventory.product')} required>
-          <select className="oryx-select" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })} data-testid="reference-product">
-            <option value="">—</option>
-            {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.productId || null}
+            options={products.map((p) => ({ value: p.id, label: `${p.sku} — ${p.nameEn}` }))}
+            onChange={(v) => setForm({ ...form, productId: v ?? '' })}
+            placeholder={t('common.select')}
+            testId="reference-product"
+            createLabel={t('erp.inventory.newProduct')}
+            reloadOptions={onProductCreated}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <ProductModal
+                open
+                onClose={closeCreate}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.parts.partNumber')} required>
           <input className="oryx-input" value={form.partNumber} onChange={(e) => setForm({ ...form, partNumber: e.target.value })} data-testid="reference-number" />
@@ -269,7 +299,13 @@ function CompatibilityTab({ canManage }: { canManage: boolean }) {
         ) : null}
       </Card>
 
-      <CreateCompatibilityModal open={open} products={products.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <CreateCompatibilityModal
+        open={open}
+        products={products.data?.items ?? []}
+        onProductCreated={products.reload}
+        onClose={() => setOpen(false)}
+        onCreated={list.reload}
+      />
     </div>
   );
 }
@@ -277,11 +313,13 @@ function CompatibilityTab({ canManage }: { canManage: boolean }) {
 function CreateCompatibilityModal({
   open,
   products,
+  onProductCreated,
   onClose,
   onCreated,
 }: {
   open: boolean;
   products: Array<{ id: string; sku: string; nameEn: string }>;
+  onProductCreated: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
@@ -309,10 +347,23 @@ function CreateCompatibilityModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.inventory.product')} required>
-          <select className="oryx-select" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })} data-testid="compatibility-product">
-            <option value="">—</option>
-            {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.productId || null}
+            options={products.map((p) => ({ value: p.id, label: `${p.sku} — ${p.nameEn}` }))}
+            onChange={(v) => setForm({ ...form, productId: v ?? '' })}
+            placeholder={t('common.select')}
+            testId="compatibility-product"
+            createLabel={t('erp.inventory.newProduct')}
+            reloadOptions={onProductCreated}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <ProductModal
+                open
+                onClose={closeCreate}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.automotive.make')} required><input className="oryx-input" value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} data-testid="compatibility-make" /></Field>
         <Field label={t('erp.automotive.model')} required><input className="oryx-input" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} data-testid="compatibility-model" /></Field>

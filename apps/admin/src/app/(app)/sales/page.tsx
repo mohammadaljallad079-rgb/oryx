@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -17,6 +17,12 @@ import {
 } from '@oryx/shared';
 import { Icon } from '@/components/icons';
 import { AttachmentsPanel, DocumentPrintActions } from '@/components/document-print';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
+import { CustomerModal } from '@/components/customer-modal';
+import { EntityPicker } from '@/components/inline-create';
+import { ProductModal, WarehouseModal } from '@/components/entity-modals';
+import { TaxPicker } from '@/components/tax-modal';
 import {
   Badge,
   Button,
@@ -25,7 +31,6 @@ import {
   ErrorBanner,
   Field,
   Modal,
-  SearchableSelect,
   SectionHeader,
   Skeleton,
   StatusBadge,
@@ -42,7 +47,7 @@ import type {
 } from '@oryx/shared';
 import { DocumentActions } from '@/components/document-actions';
 
-type Tab = 'invoices' | 'orders' | 'quotations' | 'credit-notes' | 'pos' | 'customers';
+type Tab = 'dashboard' | 'invoices' | 'orders' | 'quotations' | 'credit-notes' | 'pos' | 'customers';
 
 interface LineDraft {
   productId: string;
@@ -57,14 +62,14 @@ interface LineDraft {
   taxPercent: string;
 }
 
-const emptyLine = (): LineDraft => ({
+const emptyLine = (taxPercent = '10'): LineDraft => ({
   productId: '',
   description: '',
   quantity: '1',
   unitPrice: '0.00',
   discountPercent: '0',
   taxId: '',
-  taxPercent: '15',
+  taxPercent,
 });
 
 /** The payment methods a POS sale may be settled with. */
@@ -138,25 +143,43 @@ function computePosTotals(
  * The tenant's saved taxes as dropdown options. `value` is the rate in basis
  * points so a product's own `taxRateBp` can be matched without a lookup table,
  * and `label` is the display percentage the line parses back on selection.
+ * `reload` refreshes the list after a rate is created from a line's picker.
  */
-function useTaxOptions(companyId: string | null | undefined): SearchableOption[] {
+function useTaxOptions(companyId: string | null | undefined): {
+  options: SearchableOption[];
+  reload: () => Promise<void>;
+} {
   const taxes = useAsync(
     () => api.taxes({ companyId: companyId ?? undefined, includeInactive: 'false' }),
     [companyId],
   );
-  return (taxes.data?.items ?? []).map((tax) => ({
-    value: String(tax.rateBp),
-    label: `${tax.rateBp / 100}%`,
-    hint: tax.nameEn,
-  }));
+  return {
+    options: (taxes.data?.items ?? []).map((tax) => ({
+      value: String(tax.rateBp),
+      label: `${tax.rateBp / 100}%`,
+      hint: tax.nameEn,
+    })),
+    reload: taxes.reload,
+  };
 }
 
+const TAB_KEYS = ['dashboard', 'invoices', 'orders', 'quotations', 'credit-notes', 'pos', 'customers'] as const;
+
 export default function SalesPage() {
+  return (
+    <Suspense fallback={<Skeleton height={200} />}>
+      <SalesInner />
+    </Suspense>
+  );
+}
+
+function SalesInner() {
   const { t } = useUi();
   const { can } = useAuth();
   const [tab, setTab] = useState<Tab>('invoices');
 
   const tabs: Array<{ key: Tab; label: string }> = [
+    { key: 'dashboard', label: t('erp.sales.dashboard') },
     { key: 'invoices', label: t('erp.sales.invoices') },
     { key: 'orders', label: t('erp.sales.orders') },
     { key: 'quotations', label: t('erp.sales.quotations') },
@@ -167,6 +190,7 @@ export default function SalesPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="sales-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.sales_pos')}
         subtitle={t('erp.sales.subtitle')}
@@ -189,6 +213,7 @@ export default function SalesPage() {
         ))}
       </div>
 
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="sales_pos" /> : null}
       {tab === 'invoices' ? <InvoicesTab canManage={can('erp.sales.invoice.manage')} /> : null}
       {tab === 'orders' ? <OrdersTab canManage={can('erp.sales.order.manage')} /> : null}
       {tab === 'quotations' ? <QuotationsTab canManage={can('erp.sales.order.manage')} /> : null}
@@ -338,303 +363,6 @@ function CustomersTab({ canManage }: { canManage: boolean }) {
   );
 }
 
-interface CustomerFormState {
-  code: string;
-  nameEn: string;
-  nameAr: string;
-  email: string;
-  phone: string;
-  taxNumber: string;
-  addressLine: string;
-  city: string;
-  countryCode: string;
-  sourceId: string | null;
-  departmentId: string | null;
-  creditLimit: string;
-  paymentTermsDays: string;
-  notes: string;
-}
-
-function CustomerModal({
-  open,
-  customer,
-  sourceOptions,
-  departmentOptions,
-  onClose,
-  onCreated,
-  onCreatedSource,
-  onCreatedDepartment,
-}: {
-  open: boolean;
-  customer: CustomerDto | null;
-  sourceOptions: SearchableOption[];
-  departmentOptions: SearchableOption[];
-  onClose: () => void;
-  onCreated: () => Promise<void>;
-  onCreatedSource: () => Promise<void>;
-  onCreatedDepartment: () => Promise<void>;
-}) {
-  const { t, locale } = useUi();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState<CustomerFormState>({
-    code: '',
-    nameEn: '',
-    nameAr: '',
-    email: '',
-    phone: '',
-    taxNumber: '',
-    addressLine: '',
-    city: '',
-    countryCode: '',
-    sourceId: null as string | null,
-    departmentId: null as string | null,
-    creditLimit: '0.000',
-    paymentTermsDays: '30',
-    notes: '',
-  });
-
-  useEffect(() => {
-    if (!open) return;
-    setError(null);
-    setForm({
-      code: customer?.code ?? '',
-      nameEn: customer?.nameEn ?? '',
-      nameAr: customer?.nameAr ?? '',
-      email: customer?.email ?? '',
-      phone: customer?.phone ?? '',
-      taxNumber: customer?.taxNumber ?? '',
-      addressLine: customer?.addressLine ?? '',
-      city: customer?.city ?? '',
-      countryCode: customer?.countryCode ?? '',
-      sourceId: customer?.sourceId ?? null,
-      departmentId: customer?.departmentId ?? null,
-      creditLimit: minorToInput(customer?.creditLimitMinor ?? 0, customer?.currency),
-      paymentTermsDays: String(customer?.paymentTermsDays ?? 30),
-      notes: customer?.notes ?? '',
-    });
-  }, [open, customer]);
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      if (!form.nameEn.trim() && !form.nameAr.trim()) {
-        setError(t('erp.sales.nameRequired'));
-        return;
-      }
-      const body: Record<string, unknown> = {
-        ...(form.nameEn.trim() ? { nameEn: form.nameEn.trim() } : {}),
-        ...(form.nameAr.trim() ? { nameAr: form.nameAr.trim() } : {}),
-        email: form.email || undefined,
-        phone: form.phone || undefined,
-        taxNumber: form.taxNumber || undefined,
-        addressLine: form.addressLine || undefined,
-        city: form.city || undefined,
-        countryCode: form.countryCode || undefined,
-        sourceId: form.sourceId ?? undefined,
-        departmentId: form.departmentId ?? undefined,
-        creditLimitMinor: toMinorInput(form.creditLimit, customer?.currency),
-        paymentTermsDays: Number(form.paymentTermsDays) || 0,
-        notes: form.notes || undefined,
-      };
-      if (customer) {
-        await api.updateCustomer(customer.id, body);
-      } else {
-        await api.createCustomer({ ...body, code: form.code });
-      }
-      await onCreated();
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      title={customer ? t('erp.sales.customerEdit') : t('erp.sales.newCustomer')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy} onClick={() => void submit()} data-testid="save-customer">
-            {busy ? t('common.loading') : t('common.save')}
-          </Button>
-        </>
-      }
-    >
-      {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('common.code')} required>
-          <input
-            className="oryx-input"
-            value={form.code}
-            disabled={Boolean(customer)}
-            onChange={(e) => setForm({ ...form, code: e.target.value })}
-            data-testid="customer-code"
-          />
-        </Field>
-        <Field label={t('erp.sales.phone')}>
-          <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-        </Field>
-        <Field label={`${t('common.name')} (EN)`} hint={t('erp.sales.nameOptionalHint')}>
-          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="customer-name-en" />
-        </Field>
-        <Field label={`${t('common.name')} (AR)`} hint={t('erp.sales.nameOptionalHint')}>
-          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="customer-name-ar" />
-        </Field>
-        <Field label={t('common.email')}>
-          <input className="oryx-input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="customer-email" />
-        </Field>
-        <Field label={t('erp.sales.taxNumber')}>
-          <input className="oryx-input" value={form.taxNumber} onChange={(e) => setForm({ ...form, taxNumber: e.target.value })} />
-        </Field>
-        <Field label={t('common.address')}>
-          <input className="oryx-input" value={form.addressLine} onChange={(e) => setForm({ ...form, addressLine: e.target.value })} />
-        </Field>
-        <Field label={t('common.city')}>
-          <input className="oryx-input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-        </Field>
-        <Field label={t('common.country')} hint={t('erp.sales.countryHint')}>
-          <input
-            className="oryx-input"
-            value={form.countryCode}
-            maxLength={2}
-            placeholder="BH"
-            onChange={(e) => setForm({ ...form, countryCode: e.target.value.toUpperCase() })}
-            data-testid="customer-country"
-          />
-        </Field>
-        <Field label={t('erp.sales.customerSource')} hint={t('erp.sales.customerSourceHint')}>
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
-              <SearchableSelect
-                value={form.sourceId}
-                options={sourceOptions}
-                onChange={(v) => setForm({ ...form, sourceId: v })}
-                placeholder={t('common.select')}
-                emptyLabel={t('common.none')}
-                testId="customer-source"
-              />
-            </div>
-            <InlineCreateButton
-              testId="inline-create-source"
-              label={t('erp.sales.customerSource')}
-              onCreate={async (code, nameEn, nameAr) => {
-                const created = await api.createLeadSource({ code, nameEn, nameAr });
-                await onCreatedSource();
-                setForm((f) => ({ ...f, sourceId: created.id }));
-              }}
-            />
-          </div>
-        </Field>
-        <Field label={t('erp.sales.customerDepartment')} hint={t('erp.sales.customerDepartmentHint')}>
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
-              <SearchableSelect
-                value={form.departmentId}
-                options={departmentOptions}
-                onChange={(v) => setForm({ ...form, departmentId: v })}
-                placeholder={t('common.select')}
-                emptyLabel={t('common.none')}
-                testId="customer-department"
-              />
-            </div>
-            <InlineCreateButton
-              testId="inline-create-department"
-              label={t('erp.sales.customerDepartment')}
-              onCreate={async (code, nameEn, nameAr) => {
-                const created = await api.createDepartment({ code, nameEn, nameAr });
-                await onCreatedDepartment();
-                setForm((f) => ({ ...f, departmentId: created.id }));
-              }}
-            />
-          </div>
-        </Field>
-        <Field label={t('erp.sales.creditLimit')}>
-          <input className="oryx-input" value={form.creditLimit} onChange={(e) => setForm({ ...form, creditLimit: e.target.value })} />
-        </Field>
-        <Field label={t('erp.sales.paymentTerms')}>
-          <input className="oryx-input" value={form.paymentTermsDays} onChange={(e) => setForm({ ...form, paymentTermsDays: e.target.value })} />
-        </Field>
-        <div className="sm:col-span-2">
-          <Field label={t('common.notes')}>
-            <textarea className="oryx-textarea" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-          </Field>
-        </div>
-      </div>
-      <p className="oryx-faint m-0 mt-3 text-[11px]">{locale === 'ar' ? 'يُسمح باسم واحد على الأقل.' : 'At least one name is required.'}</p>
-    </Modal>
-  );
-}
-
-/** A compact "+" that opens a small create dialog for an inline catalogue. */
-function InlineCreateButton({
-  label,
-  onCreate,
-  testId,
-}: {
-  label: string;
-  onCreate: (code: string, nameEn: string, nameAr: string) => Promise<void>;
-  testId?: string;
-}) {
-  const { t } = useUi();
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '' });
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await onCreate(form.code, form.nameEn, form.nameAr);
-      setForm({ code: '', nameEn: '', nameAr: '' });
-      setOpen(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <>
-      <Button size="sm" variant="ghost" onClick={() => setOpen(true)} aria-label={`${t('common.create')} ${label}`} data-testid={testId ?? 'inline-create'}>
-        <Icon name="plus" size={15} />
-      </Button>
-      <Modal
-        open={open}
-        title={`${t('common.create')} — ${label}`}
-        onClose={() => setOpen(false)}
-        footer={
-          <>
-            <Button onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
-            <Button variant="primary" disabled={busy || !form.code || !form.nameEn || !form.nameAr} onClick={submit} data-testid="inline-create-save">
-              {busy ? t('common.loading') : t('common.save')}
-            </Button>
-          </>
-        }
-      >
-        {error ? <ErrorBanner message={error} /> : null}
-        <div className="grid gap-3">
-          <Field label={t('common.code')} required>
-            <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="inline-create-code" />
-          </Field>
-          <Field label={`${t('common.name')} (EN)`} required>
-            <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="inline-create-name-en" />
-          </Field>
-          <Field label={`${t('common.name')} (AR)`} required>
-            <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="inline-create-name-ar" />
-          </Field>
-        </div>
-      </Modal>
-    </>
-  );
-}
 
 function CustomerDetailDrawer({
   id,
@@ -647,28 +375,6 @@ function CustomerDetailDrawer({
 }) {
   const { t, locale } = useUi();
   const detail = useAsync(() => api.customer(id), [id]);
-  const attachments = useAsync(() => api.customerAttachments(id), [id]);
-  const [busy, setBusy] = useState(false);
-  const [attachOpen, setAttachOpen] = useState(false);
-  const [attach, setAttach] = useState({ fileName: '', storageRef: '' });
-
-  const removeAttachment = async (attachmentId: string) => {
-    if (!window.confirm(t('common.confirm'))) return;
-    await api.removeCustomerAttachment(id, attachmentId);
-    await attachments.reload();
-  };
-
-  const addAttachment = async () => {
-    setBusy(true);
-    try {
-      await api.addCustomerAttachment(id, { fileName: attach.fileName, storageRef: attach.storageRef || undefined });
-      setAttach({ fileName: '', storageRef: '' });
-      setAttachOpen(false);
-      await attachments.reload();
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const d = detail.data;
   const historyEntries: Array<[string, number]> = d
@@ -698,6 +404,21 @@ function CustomerDetailDrawer({
             <DetailRow label={t('common.city')} value={d.city} />
             <DetailRow label={t('erp.sales.customerSource')} value={locale === 'ar' ? d.sourceNameAr || d.sourceNameEn : d.sourceNameEn || d.sourceNameAr} />
             <DetailRow label={t('erp.sales.customerDepartment')} value={locale === 'ar' ? d.departmentNameAr || d.departmentNameEn : d.departmentNameEn || d.departmentNameAr} />
+            <DetailRow
+              label={t('erp.sales.customerType')}
+              value={d.kind === 'COMPANY' ? t('erp.sales.customerKindCompany') : t('erp.sales.customerKindIndividual')}
+            />
+            {d.kind === 'INDIVIDUAL' ? (
+              <DetailRow label={t('erp.sales.nationalId')} value={d.nationalId} />
+            ) : (
+              <>
+                <DetailRow label={t('erp.sales.crNumber')} value={d.crNumber} />
+                <DetailRow label={t('erp.sales.crExpiry')} value={d.crExpiryDate ? d.crExpiryDate.slice(0, 10) : null} />
+                <DetailRow label={t('erp.sales.website')} value={d.website} />
+                <DetailRow label={t('erp.sales.contactPerson')} value={d.contactPersonName} />
+                <DetailRow label={t('erp.sales.contactPersonPhone')} value={d.contactPersonPhone} />
+              </>
+            )}
             <DetailRow label={t('erp.sales.creditLimit')} value={money(d.creditLimitMinor, d.currency)} />
             <DetailRow label={t('erp.sales.paymentTerms')} value={String(d.paymentTermsDays)} />
             <DetailRow label={t('common.status')} value={d.isActive ? t('common.active') : t('common.inactive')} />
@@ -754,63 +475,12 @@ function CustomerDetailDrawer({
             </div>
           ) : null}
 
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="m-0 text-[13px] font-bold">{t('erp.sales.customerAttachments')}</h3>
-              {canManage ? (
-                <Button size="sm" variant="ghost" onClick={() => setAttachOpen(true)} data-testid="add-customer-attachment">
-                  <Icon name="plus" size={15} />
-                  {t('erp.sales.addAttachment')}
-                </Button>
-              ) : null}
-            </div>
-            {attachments.loading ? (
-              <Skeleton height={40} />
-            ) : (attachments.data?.items.length ?? 0) === 0 ? (
-              <p className="oryx-faint m-0 text-[12px]">{t('erp.sales.noAttachments')}</p>
-            ) : (
-              <ul className="m-0 flex list-none flex-col gap-1 p-0">
-                {attachments.data!.items.map((a) => (
-                  <li key={a.id} className="flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2 text-[12.5px]">
-                    <span>
-                      <span className="font-semibold">{a.fileName}</span>
-                      {a.storageRef ? <span className="oryx-faint block text-[11px]">{a.storageRef}</span> : null}
-                    </span>
-                    {canManage ? (
-                      <Button size="sm" variant="ghost" onClick={() => void removeAttachment(a.id)}>
-                        {t('common.delete')}
-                      </Button>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {d.kind === 'COMPANY' ? <CustomerBranchesPanel customerId={id} canManage={canManage} /> : null}
+
+          <AttachmentsPanel entityType="CUSTOMER" entityId={id} canManage={canManage} categorised />
         </div>
       )}
 
-      <Modal
-        open={attachOpen}
-        title={t('erp.sales.addAttachment')}
-        onClose={() => setAttachOpen(false)}
-        footer={
-          <>
-            <Button onClick={() => setAttachOpen(false)}>{t('common.cancel')}</Button>
-            <Button variant="primary" disabled={busy || !attach.fileName} onClick={addAttachment} data-testid="save-customer-attachment">
-              {busy ? t('common.loading') : t('common.save')}
-            </Button>
-          </>
-        }
-      >
-        <div className="grid gap-3">
-          <Field label={t('erp.sales.attachmentName')} required>
-            <input className="oryx-input" value={attach.fileName} onChange={(e) => setAttach({ ...attach, fileName: e.target.value })} data-testid="attachment-file-name" />
-          </Field>
-          <Field label={t('erp.sales.attachmentReference')}>
-            <input className="oryx-input" value={attach.storageRef} onChange={(e) => setAttach({ ...attach, storageRef: e.target.value })} />
-          </Field>
-        </div>
-      </Modal>
     </Modal>
   );
 }
@@ -839,7 +509,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
-  const taxOptions = useTaxOptions(companyId);
+  const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
 
   return (
     <Card>
@@ -950,9 +620,13 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         initialDocument={editingInvoice}
         allowDraft
         customers={customers.data?.items ?? []}
+        onCustomerCreated={customers.reload}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
+        onProductCreated={products.reload}
+        onWarehouseCreated={warehouses.reload}
         taxOptions={taxOptions}
+        onTaxCreated={reloadTaxOptions}
         showWarehouse
         dueDateField="dueDate"
         settlement
@@ -976,9 +650,13 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         initialDocument={creditNoteSource}
         relatedInvoiceId={creditNoteSource?.id}
         customers={customers.data?.items ?? []}
+        onCustomerCreated={customers.reload}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
+        onProductCreated={products.reload}
+        onWarehouseCreated={warehouses.reload}
         taxOptions={taxOptions}
+        onTaxCreated={reloadTaxOptions}
         showWarehouse
         showRestock
         reasonField
@@ -1019,7 +697,7 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
-  const taxOptions = useTaxOptions(companyId);
+  const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
 
   return (
     <Card>
@@ -1072,9 +750,13 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
         open={open}
         title={t('erp.sales.newOrder')}
         customers={customers.data?.items ?? []}
+        onCustomerCreated={customers.reload}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
+        onProductCreated={products.reload}
+        onWarehouseCreated={warehouses.reload}
         taxOptions={taxOptions}
+        onTaxCreated={reloadTaxOptions}
         showWarehouse
         testIdPrefix="order"
         onClose={() => setOpen(false)}
@@ -1097,7 +779,7 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
-  const taxOptions = useTaxOptions(companyId);
+  const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
 
   return (
     <Card>
@@ -1164,9 +846,13 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
         open={open}
         title={t('erp.sales.newQuotation')}
         customers={customers.data?.items ?? []}
+        onCustomerCreated={customers.reload}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
+        onProductCreated={products.reload}
+        onWarehouseCreated={warehouses.reload}
         taxOptions={taxOptions}
+        onTaxCreated={reloadTaxOptions}
         dueDateField="validUntil"
         settlement
         testIdPrefix="quotation"
@@ -1190,7 +876,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
-  const taxOptions = useTaxOptions(companyId);
+  const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
 
   return (
     <Card>
@@ -1245,9 +931,13 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
         open={open}
         title={t('erp.sales.newCreditNote')}
         customers={customers.data?.items ?? []}
+        onCustomerCreated={customers.reload}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
+        onProductCreated={products.reload}
+        onWarehouseCreated={warehouses.reload}
         taxOptions={taxOptions}
+        onTaxCreated={reloadTaxOptions}
         showWarehouse
         showRestock
         reasonField
@@ -1446,7 +1136,9 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
         open={saleOpen}
         session={openSession ?? null}
         customers={customers.data?.items ?? []}
+        onCustomerCreated={customers.reload}
         warehouses={warehouses.data?.items ?? []}
+        onWarehouseCreated={warehouses.reload}
         roundingMode={roundingMode}
         currencyScale={currencyScale}
         onClose={() => setSaleOpen(false)}
@@ -1483,7 +1175,9 @@ function PosSaleModal({
   open,
   session,
   customers,
+  onCustomerCreated,
   warehouses,
+  onWarehouseCreated,
   roundingMode,
   currencyScale,
   onClose,
@@ -1492,7 +1186,9 @@ function PosSaleModal({
   open: boolean;
   session: CashierSessionDto | null;
   customers: CustomerDto[];
+  onCustomerCreated?: () => Promise<void> | void;
   warehouses: WarehouseDto[];
+  onWarehouseCreated?: () => Promise<void> | void;
   roundingMode: RoundingMode;
   currencyScale: number;
   onClose: () => void;
@@ -1801,34 +1497,51 @@ function PosSaleModal({
 
           <div className="grid gap-2 border-t border-[var(--border)] p-3 sm:grid-cols-2">
             <Field label={t('erp.sales.pos.customer')}>
-              <select
-                className="oryx-select"
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                data-testid="pos-customer"
-              >
-                <option value="">{t('erp.sales.pos.walkIn')}</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.code} — {c.nameEn || c.nameAr}
-                  </option>
-                ))}
-              </select>
+              <EntityPicker
+                value={customerId || null}
+                options={customers.map((c) => ({
+                  value: c.id,
+                  label: `${c.code} — ${c.nameEn || c.nameAr}`,
+                  hint: c.phone ?? undefined,
+                }))}
+                onChange={(v) => setCustomerId(v ?? '')}
+                placeholder={t('erp.sales.pos.walkIn')}
+                emptyLabel={t('erp.sales.pos.walkIn')}
+                testId="pos-customer"
+                createLabel={t('erp.sales.newCustomer')}
+                reloadOptions={onCustomerCreated}
+                renderCreate={({ onClose, onSaved }) => (
+                  <CustomerModal
+                    open
+                    customer={null}
+                    onClose={onClose}
+                    onCreated={() => {
+                      /* selection is handled by onSaved below */
+                    }}
+                    onSaved={(saved) => void onSaved(saved.id)}
+                  />
+                )}
+              />
             </Field>
             <Field label={t('erp.sales.pos.warehouse')}>
-              <select
-                className="oryx-select"
-                value={warehouseId}
-                onChange={(e) => setWarehouseId(e.target.value)}
-                data-testid="pos-warehouse"
-              >
-                <option value="">—</option>
-                {warehouses.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.code} — {w.nameEn}
-                  </option>
-                ))}
-              </select>
+              <EntityPicker
+                value={warehouseId || null}
+                options={warehouses.map((w) => ({ value: w.id, label: `${w.code} — ${w.nameEn}` }))}
+                onChange={(v) => setWarehouseId(v ?? '')}
+                placeholder={t('common.select')}
+                emptyLabel={t('common.none')}
+                testId="pos-warehouse"
+                createLabel={t('erp.inventory.newWarehouse')}
+                reloadOptions={onWarehouseCreated}
+                renderCreate={({ onClose: closeCreate, onSaved }) => (
+                  <WarehouseModal
+                    open
+                    onClose={closeCreate}
+                    onCreated={() => { /* selection is handled by onSaved */ }}
+                    onSaved={(saved) => void onSaved(saved.id)}
+                  />
+                )}
+              />
             </Field>
           </div>
 
@@ -2155,6 +1868,9 @@ function LineEditor({
   testIdPrefix,
   currency,
   roundingMode,
+  defaultTaxPercent = '10',
+  onProductCreated,
+  onTaxCreated,
 }: {
   lines: LineDraft[];
   setLines: (lines: LineDraft[]) => void;
@@ -2165,9 +1881,37 @@ function LineEditor({
   currency?: string;
   /** The tenant's whole-amount rounding, so the summary matches the printed total. */
   roundingMode: RoundingMode;
+  /** The tenant's default VAT rate as a percent, used when a blank line is added. */
+  defaultTaxPercent?: string;
+  /** Reload the product list after one is created from a line's picker. */
+  onProductCreated?: () => Promise<void> | void;
+  /** Reload the tax list after one is created from a line's picker. */
+  onTaxCreated?: () => Promise<void> | void;
 }) {
   const { t } = useUi();
   const scale = currencyScaleOf(currency ?? 'BHD');
+
+  const applyProduct = (i: number, productId: string) => {
+    const product = products.find((p) => p.id === productId);
+    // A product carries its own rate; if it is not in the saved tax list, keep
+    // the numeric value and clear the selection rather than silently switching
+    // the line to a different tax.
+    const matched = product
+      ? taxOptions.find((o) => o.value === String(product.taxRateBp))
+      : undefined;
+    const next = [...lines];
+    next[i] = {
+      ...next[i],
+      productId,
+      description: product ? product.nameEn : next[i].description,
+      unitPrice: product
+        ? minorToInput(product.salesPriceMinor, currency ?? 'BHD')
+        : next[i].unitPrice,
+      taxPercent: product ? String(product.taxRateBp / 100) : next[i].taxPercent,
+      taxId: product ? (matched ? matched.value : '') : next[i].taxId,
+    };
+    setLines(next);
+  };
 
   const totals = useMemo(
     () => computeDraftTotals(lines, roundingMode, scale, currency),
@@ -2194,36 +1938,24 @@ function LineEditor({
       {lines.map((line, i) => (
         <div key={i} className="oryx-doc-form__grid">
           <div className="flex flex-col gap-1">
-            <select
-              className="oryx-select"
-              value={line.productId}
-              onChange={(e) => {
-                const product = products.find((p) => p.id === e.target.value);
-                // A product carries its own rate; if it is not in the saved tax
-                // list, keep the numeric value and clear the selection rather than
-                // silently switching the line to a different tax.
-                const matched = product
-                  ? taxOptions.find((o) => o.value === String(product.taxRateBp))
-                  : undefined;
-                update(i, {
-                  productId: e.target.value,
-                  description: product ? product.nameEn : line.description,
-                  unitPrice: product
-                    ? minorToInput(product.salesPriceMinor, currency ?? 'BHD')
-                    : line.unitPrice,
-                  taxPercent: product ? String(product.taxRateBp / 100) : line.taxPercent,
-                  taxId: product ? (matched ? matched.value : '') : line.taxId,
-                });
-              }}
-              data-testid={`${testIdPrefix}-product-${i}`}
-            >
-              <option value="">{t('erp.inventory.product')}</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.sku} — {p.nameEn}
-                </option>
-              ))}
-            </select>
+            <EntityPicker
+              value={line.productId || null}
+              options={products.map((p) => ({ value: p.id, label: `${p.sku} — ${p.nameEn}` }))}
+              onChange={(v) => applyProduct(i, v ?? '')}
+              placeholder={t('erp.inventory.product')}
+              emptyLabel={t('common.none')}
+              testId={`${testIdPrefix}-product-${i}`}
+              createLabel={t('erp.inventory.newProduct')}
+              reloadOptions={onProductCreated}
+              renderCreate={({ onClose, onSaved }) => (
+                <ProductModal
+                  open
+                  onClose={onClose}
+                  onCreated={() => { /* selection is handled by onSaved */ }}
+                  onSaved={(saved) => void onSaved(saved.id)}
+                />
+              )}
+            />
             <input
               className="oryx-input"
               placeholder={t('erp.sales.form.description')}
@@ -2253,7 +1985,7 @@ function LineEditor({
             onChange={(e) => update(i, { discountPercent: e.target.value })}
             data-testid={`${testIdPrefix}-discount-${i}`}
           />
-          <SearchableSelect
+          <TaxPicker
             value={line.taxId || null}
             options={taxOptions}
             onChange={(v) => {
@@ -2263,9 +1995,11 @@ function LineEditor({
                 taxPercent: chosen ? chosen.label.replace(/[^\d.]/g, '') : line.taxPercent,
               });
             }}
+            scope="SALES"
             placeholder="%"
             emptyLabel={t('common.none')}
             testId={`${testIdPrefix}-tax-${i}`}
+            onCreated={onTaxCreated}
           />
           <span
             className="text-end tabular-nums text-[12.5px] font-semibold"
@@ -2285,7 +2019,7 @@ function LineEditor({
         </div>
       ))}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <Button size="sm" onClick={() => setLines([...lines, emptyLine()])} data-testid={`${testIdPrefix}-add`}>
+        <Button size="sm" onClick={() => setLines([...lines, emptyLine(defaultTaxPercent)])} data-testid={`${testIdPrefix}-add`}>
           <Icon name="plus" size={14} />
           {t('erp.accounting.addLine')}
         </Button>
@@ -2350,6 +2084,10 @@ function DocumentModal({
   testIdPrefix,
   onClose,
   onSubmit,
+  onCustomerCreated,
+  onProductCreated,
+  onWarehouseCreated,
+  onTaxCreated,
 }: {
   open: boolean;
   title: string;
@@ -2362,6 +2100,14 @@ function DocumentModal({
   taxOptions: SearchableOption[];
   showWarehouse?: boolean;
   showRestock?: boolean;
+  /** Reload the customer list after one is created from the picker. */
+  onCustomerCreated?: () => Promise<void> | void;
+  /** Reload the product list after one is created from a line picker. */
+  onProductCreated?: () => Promise<void> | void;
+  /** Reload the warehouse list after one is created from the picker. */
+  onWarehouseCreated?: () => Promise<void> | void;
+  /** Reload the tax list after one is created from a line's picker. */
+  onTaxCreated?: () => Promise<void> | void;
   /**
    * Whether the printed document renders a free-text reason (a credit note
    * prints one where an invoice prints notes). The field is only offered where
@@ -2394,6 +2140,7 @@ function DocumentModal({
     currency: string;
     roundingMode: RoundingMode;
     taxNumber: string | null;
+    defaultTaxRateBp: number;
   } | null>(null);
   const [customerId, setCustomerId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
@@ -2446,7 +2193,18 @@ function DocumentModal({
           currency: c.currency,
           roundingMode: c.roundingMode ?? 'NONE',
           taxNumber: c.taxNumber ?? null,
+          defaultTaxRateBp: c.defaultTaxRateBp ?? 0,
         });
+        // A brand-new document adopts the tenant's configured default rate. Only
+        // an untouched single line is seeded, so opening an existing document or
+        // a line the operator has already edited is never rewritten.
+        if (!initialDocument && c.defaultTaxRateBp != null) {
+          setLines((prev) =>
+            prev.length === 1 && !prev[0].productId && !prev[0].description && prev[0].unitPrice === '0.00'
+              ? [{ ...prev[0], taxPercent: String(c.defaultTaxRateBp / 100) }]
+              : prev,
+          );
+        }
       } catch {
         /* the form still works without the company summary */
       }
@@ -2500,7 +2258,7 @@ function DocumentModal({
 
       await onSubmit(payload);
       onClose();
-      setLines([emptyLine()]);
+      setLines([emptyLine(company ? String(company.defaultTaxRateBp / 100) : '10')]);
       setCustomerId('');
       setDueDate('');
       setNotes('');
@@ -2615,12 +2373,25 @@ function DocumentModal({
           <div className="grid gap-3 p-3 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <Field label={t('erp.sales.form.customerName')} hint={t('erp.sales.form.customerHint')} required>
-                <SearchableSelect
+                <EntityPicker
                   value={customerId || null}
                   options={customerOptions}
                   onChange={(v) => setCustomerId(v ?? '')}
                   placeholder={t('common.select')}
                   testId={`${testIdPrefix}-customer`}
+                  createLabel={t('erp.sales.newCustomer')}
+                  reloadOptions={onCustomerCreated}
+                  renderCreate={({ onClose, onSaved }) => (
+                    <CustomerModal
+                      open
+                      customer={null}
+                      onClose={onClose}
+                      onCreated={() => {
+                        /* selection is handled by onSaved below */
+                      }}
+                      onSaved={(saved) => void onSaved(saved.id)}
+                    />
+                  )}
                 />
               </Field>
             </div>
@@ -2646,9 +2417,12 @@ function DocumentModal({
             setLines={setLines}
             products={products}
             taxOptions={taxOptions}
+            onTaxCreated={onTaxCreated}
             testIdPrefix={testIdPrefix}
             currency={currency}
             roundingMode={company?.roundingMode ?? 'NONE'}
+            defaultTaxPercent={company ? String(company.defaultTaxRateBp / 100) : '10'}
+            onProductCreated={onProductCreated}
           />
         </div>
       </section>
@@ -2660,19 +2434,24 @@ function DocumentModal({
         <div className="grid gap-3 p-3 sm:grid-cols-2">
           {showWarehouse ? (
             <Field label={t('erp.inventory.warehouse')}>
-              <select
-                className="oryx-select"
-                value={warehouseId}
-                onChange={(e) => setWarehouseId(e.target.value)}
-                data-testid={`${testIdPrefix}-warehouse`}
-              >
-                <option value="">—</option>
-                {warehouses.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.code} — {w.nameEn}
-                  </option>
-                ))}
-              </select>
+              <EntityPicker
+                value={warehouseId || null}
+                options={warehouses.map((w) => ({ value: w.id, label: `${w.code} — ${w.nameEn}` }))}
+                onChange={(v) => setWarehouseId(v ?? '')}
+                placeholder={t('common.select')}
+                emptyLabel={t('common.none')}
+                testId={`${testIdPrefix}-warehouse`}
+                createLabel={t('erp.inventory.newWarehouse')}
+                reloadOptions={onWarehouseCreated}
+                renderCreate={({ onClose, onSaved }) => (
+                  <WarehouseModal
+                    open
+                    onClose={onClose}
+                    onCreated={() => { /* selection is handled by onSaved */ }}
+                    onSaved={(saved) => void onSaved(saved.id)}
+                  />
+                )}
+              />
             </Field>
           ) : null}
           {showRestock ? (
@@ -2708,5 +2487,121 @@ function DocumentModal({
         </div>
       </section>
     </Modal>
+  );
+}
+
+/**
+ * Secondary branches of a company customer.
+ *
+ * A branch is stored in its own table and rolled up to the head-office customer,
+ * so it never fragments the receivable. The create form posts to the real branch
+ * endpoint and the list reloads from the server rather than echoing local state.
+ */
+function CustomerBranchesPanel({ customerId, canManage }: { customerId: string; canManage: boolean }) {
+  const { t, locale } = useUi();
+  const branches = useAsync(() => api.customerBranches(customerId), [customerId]);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', contactName: '', phone: '', city: '' });
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.createCustomerBranch(customerId, {
+        code: form.code,
+        nameEn: form.nameEn || undefined,
+        nameAr: form.nameAr || undefined,
+        contactName: form.contactName || undefined,
+        phone: form.phone || undefined,
+        city: form.city || undefined,
+      });
+      setForm({ code: '', nameEn: '', nameAr: '', contactName: '', phone: '', city: '' });
+      setOpen(false);
+      await branches.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (branchId: string) => {
+    if (!window.confirm(t('common.deleteConfirm'))) return;
+    await api.deleteCustomerBranch(customerId, branchId);
+    await branches.reload();
+  };
+
+  return (
+    <div data-testid="customer-branches">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="m-0 text-[13px] font-bold">{t('erp.sales.branches')}</h3>
+        {canManage ? (
+          <Button size="sm" variant="ghost" onClick={() => setOpen(true)} data-testid="add-customer-branch">
+            <Icon name="plus" size={15} />
+            {t('erp.sales.addBranch')}
+          </Button>
+        ) : null}
+      </div>
+      <p className="oryx-faint m-0 mb-2 text-[11px]">{t('erp.sales.branchesHint')}</p>
+      {branches.loading ? (
+        <Skeleton height={40} />
+      ) : (branches.data?.length ?? 0) === 0 ? (
+        <p className="oryx-faint m-0 text-[12px]" data-testid="customer-branches-empty">{t('erp.sales.noBranches')}</p>
+      ) : (
+        <ul className="m-0 flex list-none flex-col gap-1 p-0">
+          {branches.data!.map((b) => (
+            <li key={b.id} className="flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2 text-[12.5px]" data-testid={`customer-branch-${b.code}`}>
+              <span>
+                <span className="font-mono text-[11px]">{b.code}</span>{' '}
+                <span className="font-semibold">{locale === 'ar' ? b.nameAr || b.nameEn : b.nameEn || b.nameAr}</span>
+                {b.city ? <span className="oryx-faint block text-[11px]">{b.city}</span> : null}
+              </span>
+              {canManage ? (
+                <Button size="sm" variant="ghost" onClick={() => void remove(b.id)}>
+                  {t('common.delete')}
+                </Button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      <Modal
+        open={open}
+        title={t('erp.sales.addBranch')}
+        onClose={() => setOpen(false)}
+        footer={
+          <>
+            <Button onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
+            <Button variant="primary" disabled={busy || !form.code} onClick={() => void submit()} data-testid="save-customer-branch">
+              {busy ? t('common.loading') : t('common.save')}
+            </Button>
+          </>
+        }
+      >
+        {error ? <ErrorBanner message={error} /> : null}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={t('erp.sales.branchCode')} required>
+            <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="branch-code" />
+          </Field>
+          <Field label={`${t('erp.sales.branchName')} (EN)`}>
+            <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="branch-name-en" />
+          </Field>
+          <Field label={`${t('erp.sales.branchName')} (AR)`}>
+            <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="branch-name-ar" />
+          </Field>
+          <Field label={t('erp.sales.contactPerson')}>
+            <input className="oryx-input" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
+          </Field>
+          <Field label={t('common.phone')}>
+            <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          </Field>
+          <Field label={t('common.city')}>
+            <input className="oryx-input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+          </Field>
+        </div>
+      </Modal>
+    </div>
   );
 }

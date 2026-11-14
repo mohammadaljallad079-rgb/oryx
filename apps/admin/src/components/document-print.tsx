@@ -6,7 +6,15 @@ import { useUi } from '@/lib/ui-context';
 import { renderPrintDocument } from '@/lib/print-document';
 import { Icon } from '@/components/icons';
 import { Button, ErrorBanner, Modal, Skeleton } from '@/components/ui';
-import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MIME_TYPES, type AttachmentDto, type PrintDocumentKind } from '@oryx/shared';
+import {
+  ATTACHMENT_ACCEPT,
+  ATTACHMENT_CATEGORIES,
+  ATTACHMENT_MAX_BYTES,
+  ATTACHMENT_MIME_TYPES,
+  type AttachmentDto,
+  type AttachmentEntityType,
+  type PrintDocumentKind,
+} from '@oryx/shared';
 
 /** A small print toolbar injected into the preview window. */
 const TOOLBAR = `
@@ -107,6 +115,26 @@ function humanSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** Bilingual labels for the document categories a record can carry. */
+const CATEGORY_LABEL: Record<string, { en: string; ar: string }> = {
+  IDENTITY: { en: 'Identity', ar: 'هوية' },
+  CONTRACT: { en: 'Contract', ar: 'عقد' },
+  CERTIFICATE: { en: 'Certificate', ar: 'شهادة' },
+  CV: { en: 'CV', ar: 'سيرة ذاتية' },
+  INVOICE: { en: 'Invoice', ar: 'فاتورة' },
+  RECEIPT: { en: 'Receipt', ar: 'إيصال' },
+  PHOTO: { en: 'Photo', ar: 'صورة' },
+  REPORT: { en: 'Report', ar: 'تقرير' },
+  OFFICIAL: { en: 'Official', ar: 'رسمي' },
+  OTHER: { en: 'Other', ar: 'أخرى' },
+};
+
+function categoryLabel(category: string, locale: string): string {
+  const entry = CATEGORY_LABEL[category];
+  if (!entry) return category;
+  return locale === 'ar' ? entry.ar : entry.en;
+}
+
 /**
  * Attachment panel for a single document.
  *
@@ -119,15 +147,19 @@ export function AttachmentsPanel({
   entityType,
   entityId,
   canManage,
+  categorised = false,
 }: {
-  entityType: 'SALES_INVOICE' | 'PAYMENT';
+  entityType: AttachmentEntityType;
   entityId: string;
   canManage: boolean;
+  /** When set, the uploader asks for a document category and stores it. */
+  categorised?: boolean;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const [items, setItems] = useState<AttachmentDto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [category, setCategory] = useState<string>('OTHER');
   const [preview, setPreview] = useState<{ url: string; mime: string; name: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -177,7 +209,7 @@ export function AttachmentsPanel({
       // Uploaded one at a time so a failure names the file it stopped on; the
       // list is re-read once at the end, so every successful upload appears.
       for (const file of files) {
-        await api.uploadAttachment(entityType, entityId, file);
+        await api.uploadAttachment(entityType, entityId, file, categorised ? category : undefined);
       }
       await load();
     } catch (e) {
@@ -251,11 +283,26 @@ export function AttachmentsPanel({
               ref={fileRef}
               type="file"
               multiple
-              accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+              accept={ATTACHMENT_ACCEPT}
               className="hidden"
               onChange={(e) => void onFiles(e.target.files)}
               data-testid={`attach-input-${entityId}`}
             />
+            {categorised ? (
+              <select
+                className="oryx-input oryx-input--sm"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                aria-label={t('docpanel.category')}
+                data-testid={`attach-category-${entityId}`}
+              >
+                {ATTACHMENT_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {categoryLabel(c, locale)}
+                  </option>
+                ))}
+              </select>
+            ) : null}
             <Button size="sm" disabled={busy} onClick={() => fileRef.current?.click()} data-testid={`attach-${entityId}`}>
               <Icon name="plus" size={14} />
               {t('attachments.attach')}
@@ -282,6 +329,11 @@ export function AttachmentsPanel({
               <span className="flex min-w-0 items-center gap-2">
                 <Icon name="paperclip" size={14} />
                 <span className="truncate text-[12.5px] font-semibold">{item.fileName}</span>
+                {item.category ? (
+                  <span className="oryx-badge shrink-0 text-[10px]" data-testid={`attachment-category-${item.id}`}>
+                    {categoryLabel(item.category, locale)}
+                  </span>
+                ) : null}
                 <span className="oryx-faint shrink-0 text-[11px]">{humanSize(item.sizeBytes)}</span>
               </span>
               <span className="flex shrink-0 items-center gap-1">

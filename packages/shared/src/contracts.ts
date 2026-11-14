@@ -3,6 +3,7 @@ import type {
   IntegrationImplementation,
   IntegrationProviderState,
 } from './integrations';
+import type { InspectionTypeKey } from './inspection';
 import type { RoundingMode } from './money';
 
 /** Shared API contracts between the ORYX API and the admin app. */
@@ -18,6 +19,9 @@ export type SubscriptionStatus =
   | 'CANCELLED';
 export type BillingPeriod = 'MONTHLY' | 'ANNUAL';
 export type UserStatus = 'INVITED' | 'ACTIVE' | 'SUSPENDED' | 'DISABLED';
+/** UI text scale, persisted per user and applied at the document root. */
+export type FontScale = 'SM' | 'MD' | 'LG';
+export const FONT_SCALES: readonly FontScale[] = ['SM', 'MD', 'LG'];
 
 export interface ApiErrorBody {
   statusCode: number;
@@ -44,6 +48,7 @@ export interface SessionUser {
   kind: 'PLATFORM' | 'COMPANY';
   preferredLocale: 'ar' | 'en';
   preferredTheme: 'dark' | 'light';
+  preferredFontScale: FontScale;
   isSuperAdmin: boolean;
 }
 
@@ -143,8 +148,11 @@ export interface DashboardTile {
   descriptionAr: string;
   route: string;
   tileImage: string;
+  icon: string;
   status: string;
   available: boolean;
+  /** False when a platform operator has retired the module. */
+  isActive: boolean;
 }
 
 export interface DashboardResponse {
@@ -171,6 +179,78 @@ export interface DashboardResponse {
   tiles: DashboardTile[];
 }
 
+// ------------------------------------------------- per-module dashboard (Ex. 20)
+
+/** One headline figure on a module dashboard. Every value is a real DB aggregate. */
+export interface ModuleSummaryStat {
+  key: string;
+  labelEn: string;
+  labelAr: string;
+  value: number;
+  /** `count` renders as an integer, `money` as minor-unit currency, `percent` with a % sign. */
+  format: 'count' | 'money' | 'percent';
+  /** ISO code for a `money` stat; the company's currency. */
+  currency?: string;
+  tone?: 'default' | 'gold' | 'success' | 'danger';
+  icon?: string;
+}
+
+/** A primary operation offered as a jump on the module dashboard. */
+export interface ModuleSummaryShortcut {
+  labelEn: string;
+  labelAr: string;
+  route: string;
+  icon: string;
+  /** The permission that gates the shortcut; the UI hides it when it is absent. */
+  permission: string;
+}
+
+/** A main functional area of the module, rendered as a card on its dashboard. */
+export interface ModuleSummaryFunction {
+  labelEn: string;
+  labelAr: string;
+  route: string;
+  icon: string;
+  permission: string;
+  /** Optional one-line description of what the area covers. */
+  descriptionEn?: string;
+  descriptionAr?: string;
+}
+
+export interface ModuleSummaryActivity {
+  id: string;
+  action: string;
+  actorEmail: string | null;
+  targetType: string;
+  targetId: string | null;
+  createdAt: string;
+}
+
+export interface ModuleSummaryDto {
+  moduleKey: string;
+  nameEn: string;
+  nameAr: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  group: string;
+  icon: string;
+  tileImage: string;
+  route: string;
+  scope: {
+    companyId: string;
+    companyNameEn: string;
+    companyNameAr: string;
+    branchId: string | null;
+    currency: string;
+  };
+  isDemoData: boolean;
+  stats: ModuleSummaryStat[];
+  shortcuts: ModuleSummaryShortcut[];
+  /** The module's main functional areas, shown as cards beneath the shortcuts. */
+  functions: ModuleSummaryFunction[];
+  activity: ModuleSummaryActivity[];
+}
+
 export interface ModuleDto {
   id: string;
   key: string;
@@ -180,11 +260,14 @@ export interface ModuleDto {
   descriptionAr: string;
   group: string;
   icon: string;
+  tileImage: string | null;
   route: string;
   status: string;
   deliveryPhase: string;
   readPermission: string;
   writePermission: string | null;
+  sortOrder: number;
+  isActive: boolean;
 }
 
 export interface PlanModuleDto {
@@ -303,6 +386,7 @@ export interface UserDto {
   isSuperAdmin: boolean;
   preferredLocale: 'ar' | 'en';
   preferredTheme: 'dark' | 'light';
+  preferredFontScale: FontScale;
   lastLoginAt: string | null;
   createdAt: string;
   memberships: MembershipSummary[];
@@ -818,12 +902,24 @@ export interface CustomerDto {
   code: string;
   nameEn: string;
   nameAr: string;
+  /** Individual or company. Drives which form the UI shows; both share this row. */
+  kind: CustomerKind;
   email: string | null;
   phone: string | null;
   taxNumber: string | null;
   addressLine: string | null;
   city: string | null;
   countryCode: string | null;
+  /** Individual: national id / personal number. */
+  nationalId: string | null;
+  /** Company: commercial registration number and expiry. */
+  crNumber: string | null;
+  crExpiryDate: string | null;
+  website: string | null;
+  contactPersonName: string | null;
+  contactPersonPhone: string | null;
+  /** Head-office customer a secondary branch rolls up to; null for a head office. */
+  parentCustomerId: string | null;
   /** Lead-source catalogue id and the resolved bilingual label. */
   sourceId: string | null;
   sourceNameEn: string | null;
@@ -850,6 +946,25 @@ export interface AccountStatementRowDto {
 }
 
 /** A document reference attached to a customer record. */
+export type CustomerKind = 'INDIVIDUAL' | 'COMPANY';
+
+/** A secondary branch of a company customer. */
+export interface CustomerBranchDto {
+  id: string;
+  customerId: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  contactName: string | null;
+  phone: string | null;
+  email: string | null;
+  addressLine: string | null;
+  city: string | null;
+  countryCode: string | null;
+  isActive: boolean;
+  notes: string | null;
+}
+
 export interface CustomerAttachmentDto {
   id: string;
   companyId: string;
@@ -1174,8 +1289,10 @@ export interface EmployeeDto {
   fullNameAr: string;
   email: string | null;
   phone: string | null;
+  secondaryPhone: string | null;
   status: string;
   hireDate: string;
+  terminationDate: string | null;
   departmentId: string | null;
   departmentNameEn: string | null;
   departmentNameAr: string | null;
@@ -1194,6 +1311,26 @@ export interface LeaveTypeDto {
   annualEntitlementDays: number;
   isPaid: boolean;
   requiresApproval: boolean;
+}
+
+/** An HR document record; `fileName`/`sizeBytes` describe the stored upload when present. */
+export interface EmployeeDocumentDto {
+  id: string;
+  employeeId: string;
+  category: string;
+  title: string;
+  fileRef: string | null;
+  fileAssetId: string | null;
+  issuedAt: string | null;
+  expiresAt: string | null;
+  isConfidential: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  hasFile: boolean;
+  fileName: string | null;
+  mimeType: string | null;
+  sizeBytes: number | null;
 }
 
 export interface LeaveRequestDto {
@@ -1530,9 +1667,14 @@ export interface InspectionServiceDto {
   code: string;
   nameEn: string;
   nameAr: string;
+  description: string | null;
   priceMinor: number;
   taxPercentBp: number;
   durationMinutes: number;
+  isActive: boolean;
+  /** Public media-library URL for the service picture, or null when none. */
+  imageUrl: string | null;
+  items: Array<{ id: string; code: string; labelEn: string; labelAr: string; category: string; sortOrder: number }>;
 }
 
 export interface InspectionBookingDto {
@@ -2121,6 +2263,8 @@ export interface InspectionSessionSummaryDto {
   plateNumber: string | null;
   vin: string;
   selectedAreas: InspectionAreaKey[];
+  /** The operator-facing inspection types the stored areas map back to. */
+  selectedTypes: InspectionTypeKey[];
   inspectorUserId: string | null;
   inspectedAt: string;
   createdAt: string;

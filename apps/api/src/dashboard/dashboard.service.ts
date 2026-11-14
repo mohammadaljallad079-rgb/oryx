@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { MODULES, resolveEffectivePermissions, DEFAULT_CURRENCY, type DashboardResponse } from '@oryx/shared';
+import { getModule, resolveEffectivePermissions, DEFAULT_CURRENCY, type DashboardResponse } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { EntitlementService } from '../common/entitlement.service';
 import { forbidden, ERROR_CODES } from '../common/errors';
@@ -47,6 +47,7 @@ export class DashboardService {
       revenueAgg,
       openSupportSessions,
       moduleCount,
+      catalogModules,
     ] = await Promise.all([
       this.prisma.company.count({ where: { ...companyFilter, status: { not: 'ARCHIVED' } } }),
       this.prisma.company.count({ where: { ...companyFilter, status: 'ACTIVE' } }),
@@ -67,6 +68,10 @@ export class DashboardService {
         where: { ...(companyId ? { companyId } : {}), status: 'ACTIVE', expiresAt: { gt: new Date() } },
       }),
       this.prisma.module.count(),
+      // The tile band and the adoption chart read the catalog from the database,
+      // so a module renamed or re-iconed in the platform UI is reflected here
+      // without a code change.
+      this.prisma.module.findMany({ orderBy: [{ group: 'asc' }, { sortOrder: 'asc' }] }),
     ]);
 
     const licensedModules = companyId ? await this.entitlements.licensedModulesFor(companyId) : [];
@@ -93,7 +98,7 @@ export class DashboardService {
     }));
 
     // ------------------------------------------------------ module adoption
-    const moduleAdoption = MODULES.slice(0, 10).map((m) => ({
+    const moduleAdoption = catalogModules.slice(0, 10).map((m) => ({
       label: m.nameEn,
       value: licensedModules.includes(m.key) ? 1 : 0,
       secondary: m.status === 'AVAILABLE' ? 1 : 0,
@@ -108,16 +113,20 @@ export class DashboardService {
     });
 
     // ------------------------------------------------------------ module tiles
-    const tiles = MODULES.filter((m) => m.group !== 'administration' || true).map((m) => ({
+    const tiles = catalogModules.map((m) => ({
       moduleKey: m.key,
       nameEn: m.nameEn,
       nameAr: m.nameAr,
       descriptionEn: m.descriptionEn,
       descriptionAr: m.descriptionAr,
       route: m.route,
-      tileImage: m.tileImage,
+      // A catalog row always stores artwork; the shared constant is the fallback
+      // for a row created before the column existed.
+      tileImage: m.tileImage ?? getModule(m.key)?.tileImage ?? 'tile-modules',
+      icon: m.icon,
       status: m.status,
       available: m.status === 'AVAILABLE',
+      isActive: m.isActive,
     }));
 
     // Demo detection: the dashboard is showing synthetic seed rows only when

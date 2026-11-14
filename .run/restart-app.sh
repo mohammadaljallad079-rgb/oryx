@@ -11,7 +11,7 @@
 # Usage: bash .run/restart-admin.sh [--build]
 set -u
 
-ROOT=/workspace/project/oryx
+ROOT="${ORYX_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 APP="${1:-admin}"
 DO_BUILD="${2:-}"
 
@@ -23,6 +23,15 @@ esac
 
 # Drop anything that could leak into the client bundle.
 unset NEXT_PUBLIC_API_BASE_URL NEXT_PUBLIC_API_URL API_URL 2>/dev/null || true
+
+# `.env.local` is gitignored, so a sandbox recycle deletes it. Without it the
+# build falls back to the absolute `http://localhost:3001/api` default in
+# `src/lib/api.ts`, which a remote browser resolves against its own machine and
+# every login fails. Recreate it so a cold start is deterministic.
+if ! grep -q '^NEXT_PUBLIC_API_BASE_URL=/api$' "$DIR/.env.local" 2>/dev/null; then
+  echo "writing $APP/.env.local (NEXT_PUBLIC_API_BASE_URL=/api)"
+  printf 'NEXT_PUBLIC_API_BASE_URL=/api\n' > "$DIR/.env.local"
+fi
 
 if [ "$DO_BUILD" = "--build" ]; then
   echo "building $APP (clean env)…"

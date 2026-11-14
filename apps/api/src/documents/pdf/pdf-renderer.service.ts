@@ -185,8 +185,25 @@ export const DEFAULT_PDF_MARGINS: PdfMargins = {
 export const OFFICIAL_PDF_MARGINS: PdfMargins = {
   top: '5.7mm',
   right: '8.6mm',
-  bottom: '10.5mm',
+  bottom: '28mm',
   left: '9.3mm',
+};
+
+/**
+ * Measured from the approved inspection report.
+ *
+ * Only the top edge differs from the default: the reference prints the brand
+ * lockup about 5.6mm from the paper edge, which is higher than the default
+ * 12mm. The side margins stay at the default 12mm because the cover photograph
+ * is drawn as a full-bleed band that reaches the paper edge by cancelling
+ * exactly that inset; narrowing the sides would push the band past the page and
+ * make Chromium shrink the whole sheet to fit.
+ */
+export const REPORT_PDF_MARGINS: PdfMargins = {
+  top: '5.6mm',
+  right: '5.6mm',
+  bottom: '34mm',
+  left: '5.6mm',
 };
 
 /**

@@ -251,6 +251,11 @@ export class UpdateBranchDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(2)
+  countryCode?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(300)
   addressLine?: string;
 
@@ -258,6 +263,11 @@ export class UpdateBranchDto {
   @IsString()
   @MaxLength(40)
   phone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  timezone?: string;
 
   @IsOptional()
   @IsBoolean()

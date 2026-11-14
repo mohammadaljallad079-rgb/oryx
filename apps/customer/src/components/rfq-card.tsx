@@ -95,7 +95,7 @@ export function RfqCard({
                   justifyContent: 'space-between',
                   gap: 12,
                   padding: '12px 0',
-                  borderTop: '1px solid var(--oryx-border)',
+                  borderTop: '1px solid var(--border-soft)',
                 }}
               >
                 <div>

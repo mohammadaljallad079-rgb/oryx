@@ -55,6 +55,8 @@ test.describe('Execution 04 — customer platform, bookings, providers and payme
   test('4. payments console shows provider readiness and reconciliation', async ({ page }) => {
     await page.goto('/payments');
     await expect(page.getByTestId('payments-page')).toBeVisible();
+    // The module opens on its dashboard; the intents list is its own tab.
+    await page.getByTestId('payments-tab-intents').click();
     await expect(page.getByTestId('intent-status')).toBeVisible({ timeout: 20_000 });
 
     await page.getByTestId('payments-tab-providers').click();

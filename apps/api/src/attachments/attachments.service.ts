@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { basename, extname, join, resolve, sep } from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
 import {
+  ATTACHMENT_CATEGORIES,
   ATTACHMENT_ENTITY_TYPES,
   ATTACHMENT_MAX_BYTES,
   ATTACHMENT_MIME_TYPES,
@@ -29,6 +30,10 @@ const EXTENSIONS: Record<string, string> = {
   'image/jpeg': '.jpg',
   'image/jpg': '.jpg',
   'image/png': '.png',
+  'application/msword': '.doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+  'application/vnd.ms-excel': '.xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
 };
 
 /**
@@ -78,6 +83,56 @@ export class AttachmentsService {
       if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Receipt not found.');
       return;
     }
+    if (entityType === 'EMPLOYEE') {
+      const found = await this.prisma.employee.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Employee not found.');
+      return;
+    }
+    if (entityType === 'CUSTOMER') {
+      const found = await this.prisma.customer.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+      return;
+    }
+    if (entityType === 'SUPPLIER') {
+      const found = await this.prisma.supplier.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Supplier not found.');
+      return;
+    }
+    if (entityType === 'VEHICLE') {
+      const found = await this.prisma.vehicle.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Vehicle not found.');
+      return;
+    }
+    if (entityType === 'WORK_ORDER') {
+      const found = await this.prisma.workOrder.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Work order not found.');
+      return;
+    }
+    if (entityType === 'JOB_CARD') {
+      const found = await this.prisma.jobCard.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Job card not found.');
+      return;
+    }
+    if (entityType === 'PURCHASE_ORDER') {
+      const found = await this.prisma.purchaseOrder.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Purchase order not found.');
+      return;
+    }
+    if (entityType === 'JOURNAL_ENTRY') {
+      const found = await this.prisma.journalEntry.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Journal entry not found.');
+      return;
+    }
+    if (entityType === 'CONTRACT') {
+      const found = await this.prisma.employmentContract.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Contract not found.');
+      return;
+    }
+    if (entityType === 'INSPECTION') {
+      const found = await this.prisma.inspectionSession.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Inspection not found.');
+      return;
+    }
     throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Unsupported attachment entity type.');
   }
 
@@ -89,6 +144,7 @@ export class AttachmentsService {
     mimeType: string | null;
     sizeBytes: number;
     uploadedById: string | null;
+    category?: string | null;
     createdAt: Date;
   }): AttachmentDto {
     return {
@@ -99,6 +155,7 @@ export class AttachmentsService {
       mimeType: row.mimeType,
       sizeBytes: row.sizeBytes,
       uploadedById: row.uploadedById,
+      category: row.category ?? null,
       createdAt: row.createdAt.toISOString(),
     };
   }
@@ -123,6 +180,7 @@ export class AttachmentsService {
     entityId: string,
     file: UploadedFileLike | undefined,
     principal: RequestPrincipal,
+    category?: string,
   ): Promise<AttachmentDto> {
     const entityType = AttachmentsService.assertEntityType(entityTypeRaw);
     const { companyId } = await this.context.resolveCompanyScope(principal);
@@ -134,11 +192,14 @@ export class AttachmentsService {
     if (!(ATTACHMENT_MIME_TYPES as readonly string[]).includes(file.mimetype)) {
       throw badRequest(
         ERROR_CODES.VALIDATION_FAILED,
-        'Only PDF, JPG, PNG and screenshot images are accepted.',
+        'Only PDF, Word, Excel and image files are accepted.',
       );
     }
     if (file.size > ATTACHMENT_MAX_BYTES) {
-      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'The file exceeds the 10 MB limit.');
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'The file exceeds the 25 MB limit.');
+    }
+    if (category && !(ATTACHMENT_CATEGORIES as readonly string[]).includes(category)) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, `Unknown document category "${category}".`);
     }
 
     const safeName = basename(file.originalname || 'attachment').slice(0, 200);
@@ -157,6 +218,7 @@ export class AttachmentsService {
         sizeBytes: file.size,
         storageRef: stored,
         uploadedById: principal.userId,
+        category: category ?? null,
       },
     });
     await this.audit.record({
