@@ -547,7 +547,7 @@ export const OFFICIAL_FINANCIAL_CSS = `
   /* The document number itself is a display-face run, so the shared numeric
      Latin override (which would set it in Verdana) is reset for it. */
   .of-docno .num{ font-family:inherit; }
-  .of-field{ margin-top:4.5pt; }
+  .of-field{ margin-top:6pt; }
   /* The reference prints the date and the expiration date side by side in one
      row (invoice has only the date). */
   .of-lgrid{ display:grid; grid-template-columns:1fr 1fr; gap:0 10pt; }
@@ -565,8 +565,8 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-cp-row-top{ align-items:start; }
   .of-cp-label{ font-size:7.3pt; color:#64748b; font-weight:700; text-align:end; }
   .of-cp-value{ font-size:8.8pt; color:#0f2b48; font-weight:700; }
-  .of-addr-line{ display:block; }
-  .of-table{ margin-top:4pt; table-layout:fixed; }
+  .of-addr-line{ display:block; line-height:1.6; }
+  .of-table{ margin-top:1pt; table-layout:fixed; }
   /* The approved quotation sheet leaves a wider gap between the info panel
      and the table than the invoice does (measured 31pt vs 17.5pt). */
   .of-table-quote{ margin-top:18.4pt; }
@@ -585,6 +585,11 @@ export const OFFICIAL_FINANCIAL_CSS = `
      numeric columns, so its text starts at x≈37.5 rather than the cell edge. */
   .of-table th.of-c-desc,.of-table td.of-c-desc{ padding-inline-start:10pt; }
   .of-table td.of-c-price,.of-table td.of-c-amt{ white-space:nowrap; }
+  /* The reference right-aligns the unit-price and amount figures a little inside
+     the column edge (measured price x414.6, amount x519.1); the default cell
+     padding pushed them ~8-10pt right. */
+  .of-table td.of-c-price{ padding-inline-end:17pt; }
+  .of-table td.of-c-amt{ padding-inline-end:15pt; }
   /* The approved sheet prints the tax label on one line inside a body row
      ("VAT 10%"); without this it wraps and the row doubles in height. */
   .of-table td.of-c-tax{ white-space:nowrap; }
@@ -595,10 +600,10 @@ export const OFFICIAL_FINANCIAL_CSS = `
      columns are close to equal. Matching them keeps every label and figure on
      the same x-position the printed document uses. */
   .of-c-desc{ width:58.2%; }
-  .of-c-qty{ width:9.8%; text-align:center !important; }
-  .of-c-price{ width:10.8%; text-align:end !important; }
-  .of-c-tax{ width:10.9%; text-align:start !important; }
-  .of-c-amt{ width:10.3%; text-align:end !important; }
+  .of-c-qty{ width:9.49%; text-align:center !important; }
+  .of-c-price{ width:11.58%; text-align:end !important; }
+  .of-c-tax{ width:11.03%; text-align:start !important; }
+  .of-c-amt{ width:9.7%; text-align:end !important; }
   .of-line-name{ display:block; }
   /* The line's note prints on its own line under the name, smaller and lighter,
      exactly as the approved sheet prints a product's warranty note. */
@@ -610,7 +615,7 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-totals th{ font-size:8.8pt; font-weight:700; color:#0f2b48; text-align:start;
     padding:3.5pt 9pt; }
   .of-totals td{ font-size:8.8pt; font-weight:700; color:#0f2b48; text-align:end;
-    padding:3.5pt 9pt; }
+    padding:3.5pt 2pt; }
   .of-total-grand th,.of-total-grand td{ border-top:0.75px solid #0f2b48; }
   /* The approved reference prints the note as a bordered box with no heading,
      so the box height is exactly the note text and its padding. */

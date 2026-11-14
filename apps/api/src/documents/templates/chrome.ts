@@ -276,7 +276,7 @@ function contactRow(issuer: DocumentIssuer): string {
   const item = (html: string, gap: string) =>
     html ? `<span style="${contact}${gap}">${html}</span>` : '';
   return `
-  <div style="border-top:0.75px solid #94a3b8;margin:10px 15.8pt 0 13.7pt;"></div>
+  <div style="border-top:0.75px solid #94a3b8;margin:20px 15.8pt 0 13.7pt;"></div>
   <div style="padding:0 13.3mm 0 15mm;display:flex;align-items:baseline;font-size:6.5pt;font-weight:700;">
     <span style="flex:0 0 auto;position:relative;top:-5pt;">Page <span class="pageNumber"></span> of <span class="totalPages"></span> &bull; <span style="direction:rtl;unicode-bidi:embed;display:inline-block;">صفحة <span class="pageNumber"></span> من <span class="totalPages"></span></span></span>
     <span style="flex:1 1 auto;"></span>
@@ -333,7 +333,7 @@ export function reportFooterTemplate(issuer: DocumentIssuer, qrDataUri?: string)
   </div>`
     : '';
   return `
-<div style="${base};width:100%;box-sizing:border-box;position:relative;top:4pt;">
+<div style="${base};width:100%;box-sizing:border-box;position:relative;top:11pt;">
   <div style="padding:0 15.8pt;min-height:52pt;display:flex;align-items:flex-end;">
     <div style="flex:0 0 auto;margin-left:26pt;">${lockup}</div>
     ${verify ? `<div style="flex:0 0 auto;margin-left:17pt;">${verify}</div>` : ''}
