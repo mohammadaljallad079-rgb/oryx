@@ -331,7 +331,9 @@ describe('inspection report template — reference page parity (Execution 19)', 
     expect(html).toContain('legend-chip-mark lm-green');
     expect(html).toContain('legend-chip-mark lm-orange');
     expect((html.match(/legend-chip-mark lm-red/g) ?? []).length).toBe(2);
-    expect(html).toContain('.legend-chip{ display:inline-flex; align-items:center; gap:5pt; background:var(--navy);');
+    // The reference prints four equal 107.9pt chips with a hairline border.
+    expect(html).toContain('width:107.9pt; background:var(--navy); border:0.5pt solid #000;');
+    expect(html).toContain('.legend--row{ justify-content:center; gap:12pt;');
   });
 
   it('prints the paint remarks box after the legend, as in the reference', () => {

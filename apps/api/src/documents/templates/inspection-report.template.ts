@@ -913,13 +913,16 @@ export const INSPECTION_REPORT_CSS = `
    * the drawing, in the physical order sectioned, Change, Filler, Paint. The
    * order is physical, so the row is forced LTR rather than inheriting the
    * document's RTL flow. */
-  .legend--row{ justify-content:center; margin-top:10px; direction:ltr; }
-  /* The approved key: a navy chip per condition, the bilingual label in white,
-     and the condition's own colour swatch (green/orange/red, cross on
-     sectioned) as a square badge on the trailing edge. Measured from the
-     reference (chip height ~20.3pt, swatch ~13.7pt square). */
-  .legend-chip{ display:inline-flex; align-items:center; gap:5pt; background:var(--navy);
-    color:#fff; font-size:8.5pt; line-height:1; padding:3pt 4pt 3pt 7pt; }
+  /* The approved key: four equal navy chips across one row, each with a thin
+     black hairline, the bilingual label in white, and the condition's own
+     colour swatch (green/orange/red, cross on sectioned) right-aligned at the
+     trailing edge. Measured from the reference: chip 107.9x20.3pt with a 0.5pt
+     black border, swatch 13.7pt square inset ~7pt from the right, row gap
+     ~12pt (chip pitch ~119.5pt). */
+  .legend--row{ justify-content:center; gap:12pt; margin-top:10px; direction:ltr; }
+  .legend-chip{ display:inline-flex; align-items:center; justify-content:space-between;
+    box-sizing:border-box; width:107.9pt; background:var(--navy); border:0.5pt solid #000;
+    color:#fff; font-size:8.5pt; line-height:1; padding:3pt 7pt; }
   .legend-chip-label{ white-space:nowrap; }
   .legend-chip-mark{ width:13.7pt; height:13.7pt; display:inline-flex; align-items:center;
     justify-content:center; color:#fff; flex:0 0 auto; }
