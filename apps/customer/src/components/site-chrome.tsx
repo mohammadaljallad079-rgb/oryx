@@ -108,7 +108,7 @@ export function SiteHeader() {
             )}
           </Link>
 
-          <span className="oryx-desktop-only" style={{ display: 'inline-flex', gap: 8 }}>
+          <span className="oryx-desktop-only oryx-header-auth">
             {isAuthenticated ? (
               <>
                 <Link href="/dashboard" className="oryx-btn">

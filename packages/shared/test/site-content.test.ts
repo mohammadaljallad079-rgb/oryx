@@ -4,6 +4,7 @@ import {
   DEFAULT_SITE_CONTENT,
   resolveSiteContent,
   resolveSiteContentPair,
+  whatsappLink,
 } from '../src/site-content';
 
 /**
@@ -69,5 +70,34 @@ describe('site content — merge over defaults', () => {
     const pair = resolveSiteContentPair({ ar: { brand: { nameAr: 'أوريكس' } } });
     expect(pair.ar.brand.nameAr).toBe('أوريكس');
     expect(pair.en.brand.nameAr).toBe(DEFAULT_SITE_CONTENT.en.brand.nameAr);
+  });
+});
+
+describe('site content — whatsapp contact', () => {
+  it('ships the approved default number in both locales', () => {
+    expect(DEFAULT_SITE_CONTENT.ar.contact.whatsapp).toBe('+973 3885 8595');
+    expect(DEFAULT_SITE_CONTENT.en.contact.whatsapp).toBe('+973 3885 8595');
+  });
+
+  it('lets an administrator override the number without touching siblings', () => {
+    const merged = resolveSiteContent('ar', { contact: { whatsapp: '+973 1111 2222' } });
+    expect(merged.contact.whatsapp).toBe('+973 1111 2222');
+    expect(merged.contact.phone).toBe(DEFAULT_SITE_CONTENT.ar.contact.phone);
+  });
+
+  it('strips formatting to a digits-only wa.me link', () => {
+    expect(whatsappLink('+973 3885 8595')).toBe('https://wa.me/97338858595');
+  });
+
+  it('encodes the pre-filled message', () => {
+    const link = whatsappLink('+973 3885 8595', 'أرغب في طلب قطعة');
+    expect(link?.startsWith('https://wa.me/97338858595?text=')).toBe(true);
+    expect(link).toContain(encodeURIComponent('أرغب في طلب قطعة'));
+  });
+
+  it('returns null for an unset or unusable number so callers can hide the action', () => {
+    expect(whatsappLink('')).toBeNull();
+    expect(whatsappLink(undefined)).toBeNull();
+    expect(whatsappLink('12345')).toBeNull();
   });
 });

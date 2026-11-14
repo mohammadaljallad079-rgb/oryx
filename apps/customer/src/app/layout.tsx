@@ -7,6 +7,7 @@ import { CartProvider } from '@/lib/cart-context';
 import { WishlistProvider } from '@/lib/wishlist';
 import { SiteContentProvider } from '@/lib/site-content-context';
 import { SiteFooter, SiteHeader } from '@/components/site-chrome';
+import { WhatsAppFab } from '@/components/whatsapp';
 import { SITE_URL } from '@/lib/structured-data';
 
 const siteUrl = SITE_URL;
@@ -95,6 +96,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                       {children}
                     </main>
                     <SiteFooter />
+                    <WhatsAppFab />
                   </div>
                 </WishlistProvider>
               </CustomerAuthProvider>

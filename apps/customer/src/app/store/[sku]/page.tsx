@@ -7,6 +7,8 @@ import { useCart } from '@/lib/cart-context';
 import { useWishlist } from '@/lib/wishlist';
 import { publicApi, type StorefrontProduct } from '@/lib/api';
 import { Alert, EmptyState, Loading, Money, PageHead, SectionHead } from '@/components/ui';
+import { ProductWhatsAppAction } from '@/components/whatsapp';
+import { formatMinorAmount, productEnquiryMessage, productUrl } from '@/lib/whatsapp';
 import { ProductCard } from '@/components/storefront';
 
 const CATEGORY_FALLBACK: Record<string, string> = {
@@ -215,6 +217,17 @@ export default function ProductDetailPage({ params }: { params: Promise<{ sku: s
                 >
                   {isSaved(product.id) ? `★ ${t('product.wishlisted')}` : `☆ ${t('product.wishlist')}`}
                 </button>
+                <ProductWhatsAppAction
+                  testId="product-whatsapp"
+                  label={t('product.orderWhatsapp')}
+                  message={productEnquiryMessage({
+                    locale,
+                    name,
+                    sku: product.partNumber ?? product.sku,
+                    price: formatMinorAmount(product.priceMinor, product.currencyScale, product.currency),
+                    url: productUrl(product.sku),
+                  })}
+                />
               </div>
 
               {!product.inStock && (

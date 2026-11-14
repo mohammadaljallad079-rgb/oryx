@@ -353,7 +353,7 @@ export const DEFAULT_SITE_CONTENT: Record<Locale, SiteContent> = {
       subtitleAr: 'أرسل لنا رسالة وسيتواصل معك فريقنا.',
       phone: '+973 1700 0000',
       email: 'info@oryx-auto.local',
-      whatsapp: '',
+      whatsapp: '+973 3885 8595',
       addressEn: 'Bahrain',
       addressAr: 'البحرين',
       hoursEn: 'Saturday–Thursday, 8:00–18:00',
@@ -583,7 +583,7 @@ export const DEFAULT_SITE_CONTENT: Record<Locale, SiteContent> = {
       subtitleAr: 'أرسل لنا رسالة وسيتواصل معك فريقنا.',
       phone: '+973 1700 0000',
       email: 'info@oryx-auto.local',
-      whatsapp: '',
+      whatsapp: '+973 3885 8595',
       addressEn: 'Bahrain',
       addressAr: 'البحرين',
       hoursEn: 'Saturday–Thursday, 8:00–18:00',
@@ -650,4 +650,19 @@ export interface SiteContentDto {
   locale: Locale;
   data: SiteContent;
   updatedAt: string;
+}
+
+/**
+ * Turn an administrator-entered number into a `wa.me` link.
+ *
+ * The console lets the number be typed with spaces, parentheses or a leading
+ * `+`, but WhatsApp only accepts digits in international form, so the display
+ * value and the dial value differ. Returns `null` for an unset or unusable
+ * number so callers can hide the action rather than link to a broken chat.
+ */
+export function whatsappLink(number: string | null | undefined, message?: string): string | null {
+  const digits = (number ?? '').replace(/\D/g, '');
+  if (digits.length < 7) return null;
+  const base = `https://wa.me/${digits}`;
+  return message ? `${base}?text=${encodeURIComponent(message)}` : base;
 }

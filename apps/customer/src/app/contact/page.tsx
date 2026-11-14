@@ -7,6 +7,7 @@ import { useSiteContent } from '@/lib/site-content-context';
 import { publicApi, type StorefrontBranch } from '@/lib/api';
 import { Alert, Button, Field, PageHead } from '@/components/ui';
 import { messageOf } from '@/lib/hooks';
+import { siteWhatsappLink } from '@/lib/whatsapp';
 import type { ContactSocialContent } from '@oryx/shared';
 
 const SOCIAL_LABELS: Array<{ key: keyof ContactSocialContent; label: string }> = [
@@ -206,11 +207,15 @@ export default function ContactPage() {
                     </div>
                   </div>
                 )}
-                {content.contact.whatsapp && (
+                {siteWhatsappLink(content.contact.whatsapp) && (
                   <div style={{ marginBottom: 8 }}>
                     <strong>WhatsApp</strong>
                     <div className="oryx-muted" dir="ltr">
-                      <a href={`https://wa.me/${content.contact.whatsapp.replace(/\D/g, '')}`}>
+                      <a
+                        href={siteWhatsappLink(content.contact.whatsapp)!}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                      >
                         {content.contact.whatsapp}
                       </a>
                     </div>

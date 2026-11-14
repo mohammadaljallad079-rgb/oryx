@@ -511,6 +511,17 @@ button {
   gap: 8px;
 }
 
+/*
+ * The signed-in/guest actions sit in a flex group on desktop. It must be a
+ * class, not an inline `display`, so the `max-width: 920px` rule that hides
+ * `.oryx-desktop-only` can actually win on small screens.
+ */
+.oryx-header-auth {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .oryx-cart-link {
   position: relative;
 }
@@ -2158,5 +2169,78 @@ button {
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ------------------------------------------------------------- whatsapp */
+
+/*
+ * WhatsApp actions use the platform's own green so the affordance is
+ * recognisable in both themes; everything else stays on the ORYX palette.
+ */
+.oryx-btn-whatsapp {
+  background: linear-gradient(140deg, #2fce6a, #1faa54);
+  border-color: transparent;
+  color: #04240f;
+}
+
+.oryx-btn-whatsapp:hover:not(:disabled) {
+  background: linear-gradient(140deg, #26c261, #178c45);
+  color: #04240f;
+}
+
+.oryx-whatsapp-icon {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: linear-gradient(140deg, #2fce6a, #1faa54);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 0.16s ease, background 0.16s ease;
+}
+
+.oryx-whatsapp-icon:hover {
+  transform: translateY(-1px);
+  background: linear-gradient(140deg, #26c261, #178c45);
+}
+
+.oryx-whatsapp-fab {
+  position: fixed;
+  bottom: 22px;
+  inset-inline-end: 22px;
+  z-index: 60;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  background: linear-gradient(140deg, #2fce6a, #1faa54);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: var(--shadow-float);
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.oryx-whatsapp-fab:hover {
+  transform: translateY(-2px) scale(1.03);
+  background: linear-gradient(140deg, #26c261, #178c45);
+}
+
+.oryx-whatsapp-fab:focus-visible,
+.oryx-whatsapp-icon:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .oryx-whatsapp-fab {
+    bottom: 16px;
+    inset-inline-end: 16px;
+    width: 50px;
+    height: 50px;
   }
 }

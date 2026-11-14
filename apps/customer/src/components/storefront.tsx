@@ -6,6 +6,8 @@ import { useUi } from '@/lib/ui-context';
 import { useCart } from '@/lib/cart-context';
 import { useWishlist } from '@/lib/wishlist';
 import { Money, SectionHead } from '@/components/ui';
+import { ProductWhatsAppAction } from '@/components/whatsapp';
+import { formatMinorAmount, productEnquiryMessage, productUrl } from '@/lib/whatsapp';
 import { publicApi, type StorefrontProduct, type StorefrontService } from '@/lib/api';
 
 function discountPercent(product: StorefrontProduct): number | null {
@@ -101,6 +103,18 @@ export function ProductCard({ product }: { product: StorefrontProduct }) {
           <Link href={`/store/${product.sku}`} className="oryx-btn">
             {t('store.details')}
           </Link>
+          <ProductWhatsAppAction
+            variant="icon"
+            testId="product-whatsapp"
+            label={t('product.orderWhatsapp')}
+            message={productEnquiryMessage({
+              locale,
+              name,
+              sku: product.partNumber ?? product.sku,
+              price: formatMinorAmount(product.priceMinor, product.currencyScale, product.currency),
+              url: productUrl(product.sku),
+            })}
+          />
         </div>
       </div>
     </article>

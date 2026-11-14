@@ -134,7 +134,7 @@ export default function CheckoutPage() {
     return (
       <>
         <PageHead title={t('checkout.title')} />
-        <section className="oryx-section">
+        <section className="oryx-section" data-testid="checkout-signin">
           <div className="oryx-container" style={{ maxWidth: 560 }}>
             <EmptyState
               message={t('cart.requiresLogin')}

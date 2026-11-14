@@ -133,7 +133,9 @@ test.describe('cart and checkout', () => {
     await setLocale(page, 'en');
     await addFirstProductToCart(page);
     await page.goto('/checkout');
-    await expect(page.getByText(/sign in/i).first()).toBeVisible();
+    // The checkout page's own sign-in gate, not the header link (which is
+    // hidden on mobile viewports).
+    await expect(page.getByTestId('checkout-signin')).toBeVisible();
 
     await signIn(page);
     await page.goto('/checkout');
