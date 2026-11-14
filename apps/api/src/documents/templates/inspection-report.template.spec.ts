@@ -457,6 +457,21 @@ describe('inspection report template — reference page parity (Execution 19)', 
     expect(html).toContain('letter-spacing:var(--p-title-track,0)');
   });
 
+  it('centres each cover-card value and spreads its bilingual label, per the reference', () => {
+    const css = render();
+    // The approved cover centres every value in its cell (the short "37702020"
+    // and "2020" sit at the cell midpoint, not the left edge) and pushes the
+    // Latin label and the Arabic label to the two cell edges. Measured against
+    // the reference this brings each value within ~2pt of its printed x, where
+    // left alignment was 40-70pt out.
+    expect(css).toMatch(/\.vinfo td\{[^}]*text-align:center/);
+    expect(css).toMatch(/\.vlab\{[^}]*justify-content:space-between/);
+    // Column rules measured from the reference at x174.4 / 305.4 / 437.0 on a
+    // 545pt content width, so the first cell is wider than the three even ones.
+    expect(css).toMatch(/\.vinfo td:first-child\{ width:26\.8%/);
+    expect(css).toMatch(/\.vinfo td\{[^}]*width:24\.4%/);
+  });
+
   it('sets the disclaimer and remarks body at the measured reference sizes', () => {
     const html = render();
     // The Arabic disclaimer column prints at 8pt and its English translation at

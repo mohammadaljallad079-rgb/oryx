@@ -762,9 +762,9 @@ export const INSPECTION_REPORT_CSS = `
      the rest equally (measured rules at x174.4 / 305.4 / 437.0). The values are
      printed on one line and are allowed to sit slightly past the cell padding
      rather than wrap, which is what keeps every row at the reference's 28pt. */
-  .vinfo td{ border:1px solid var(--line); padding:3px 8px; vertical-align:top; width:24.1%; }
-  .vinfo td:first-child{ width:27.7%; }
-  .vlab{ display:flex; align-items:baseline; gap:6px; font-size:7.3pt; color:var(--muted); line-height:1.2; }
+  .vinfo td{ border:1px solid var(--line); padding:3px 8px; vertical-align:top; width:24.4%; text-align:center; }
+  .vinfo td:first-child{ width:26.8%; }
+  .vlab{ display:flex; align-items:baseline; justify-content:space-between; gap:6px; font-size:7.3pt; color:var(--muted); line-height:1.2; }
   .vlab .ltr{ font-weight:700; color:var(--navy-soft); }
   .vlab .var{ direction:rtl; color:var(--muted); }
   .vval{ display:block; margin-top:1px; font-size:8.8pt; font-weight:700; color:var(--ink); white-space:nowrap; }
