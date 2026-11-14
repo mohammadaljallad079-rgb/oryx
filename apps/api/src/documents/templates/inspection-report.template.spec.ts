@@ -353,4 +353,43 @@ describe('inspection report template — reference page parity (Execution 19)', 
     expect(band).toContain('vphoto-mark');
     expect(band).toContain('vphoto-img');
   });
+
+  it('prints the single notes block from generalRemarks and drops the duplicate remark surfaces', () => {
+    // The inspection has one optional notes field. The former "additional
+    // exterior remarks" and "final assessment" blocks were duplicate surfaces
+    // for the same note, so a payload carrying them prints neither.
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload: {
+        ...payload,
+        generalRemarks: 'Chassis note · ملاحظة الشاصي',
+        exteriorRemarks: 'SHOULD-NOT-PRINT',
+        finalAssessment: 'ALSO-SHOULD-NOT-PRINT',
+      },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    expect(html).toContain('Chassis note');
+    expect(html).toContain('General Inspection Remarks');
+    expect(html).not.toContain('SHOULD-NOT-PRINT');
+    expect(html).not.toContain('ALSO-SHOULD-NOT-PRINT');
+    expect(html).not.toContain('Additional Exterior Inspection Remarks');
+    expect(html).not.toContain('Final Result');
+  });
+
+  it('prints no notes block at all when the inspection has no notes', () => {
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload: { ...payload, generalRemarks: null, exteriorRemarks: null, finalAssessment: null },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    expect(html).not.toContain('class="grp remark-block"');
+  });
 });

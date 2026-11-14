@@ -139,11 +139,11 @@ export default function InspectionWorkspacePage() {
           ) : (
             <Card>{t('inspection.noSections')}</Card>
           )}
-          {/* The report prints the general remarks block on its inspection-group
-              page, so the input is offered whenever a section that page carries
-              was selected — the same rule the printed document follows. */}
+          {/* The report prints the notes block on its inspection-group page, so
+              the input is offered whenever a section that page carries was
+              selected — the same rule the printed document follows. */}
           {session.selectedAreas.some((a) => GROUP_PAGE_AREAS.includes(a)) ? (
-            <GeneralRemarksCard
+            <InspectionNotesCard
               sessionId={id}
               session={session}
               editable={editable && canWrite}
@@ -283,15 +283,17 @@ function IdentityCard({ session }: { session: InspectionSessionDto }) {
 }
 
 /**
- * The general remarks the report prints on its inspection-group page.
+ * The single optional notes field of the inspection.
  *
- * The printed document carries a "General Inspection Remarks" block after the
- * checklist tables, composed from the session's general remarks and its final
- * assessment. This card is that block's input: both fields map to the exact
- * lines the report renders, so nothing the report prints is left without a
- * source, and the screen carries no field the document would drop.
+ * The workspace used to offer two session-level free-text fields (general
+ * remarks and a final assessment) that both fed the report's remarks area, so an
+ * inspector had to choose where to write the same note. They are one optional
+ * field now: `generalRemarks` is the inspection's notes, it is never required,
+ * and it prints under the report's remarks heading. Nothing here is a
+ * prerequisite for submitting — a fully passing inspection submits with the
+ * field empty.
  */
-function GeneralRemarksCard({
+function InspectionNotesCard({
   sessionId,
   session,
   editable,
@@ -306,18 +308,16 @@ function GeneralRemarksCard({
 }) {
   const { t, locale } = useUi();
   const [busy, setBusy] = useState(false);
-  const [remarks, setRemarks] = useState(session.generalRemarks ?? '');
-  const [assessment, setAssessment] = useState(session.finalAssessment ?? '');
+  const [notes, setNotes] = useState(session.generalRemarks ?? '');
 
   useEffect(() => {
-    setRemarks(session.generalRemarks ?? '');
-    setAssessment(session.finalAssessment ?? '');
-  }, [session.generalRemarks, session.finalAssessment]);
+    setNotes(session.generalRemarks ?? '');
+  }, [session.generalRemarks]);
 
   const save = async () => {
     setBusy(true);
     try {
-      onSaved(await api.updateInspectionSession(sessionId, { generalRemarks: remarks, finalAssessment: assessment }));
+      onSaved(await api.updateInspectionSession(sessionId, { generalRemarks: notes }));
     } catch (e) {
       onError(e instanceof Error ? e.message : t('common.error'));
     } finally {
@@ -326,30 +326,20 @@ function GeneralRemarksCard({
   };
 
   return (
-    <Card data-testid="inspection-general-remarks">
-      <Field label={locale === 'ar' ? 'الملاحظات والتعليقات العامة' : 'General Inspection Remarks'}>
+    <Card data-testid="inspection-notes">
+      <Field label={locale === 'ar' ? 'ملاحظات الفحص' : 'Inspection Notes'} hint={t('common.optional')}>
         <textarea
-          className="oryx-input"
-          rows={3}
-          value={remarks}
+          className="oryx-input oryx-textarea"
+          rows={4}
+          value={notes}
           disabled={!editable}
-          onChange={(e) => setRemarks(e.target.value)}
-          data-testid="general-remarks"
-        />
-      </Field>
-      <Field label={locale === 'ar' ? 'التقييم النهائي' : 'Final Assessment'}>
-        <textarea
-          className="oryx-input"
-          rows={2}
-          value={assessment}
-          disabled={!editable}
-          onChange={(e) => setAssessment(e.target.value)}
-          data-testid="final-assessment"
+          onChange={(e) => setNotes(e.target.value)}
+          data-testid="inspection-notes-input"
         />
       </Field>
       {editable ? (
         <div className="mt-2 flex justify-end">
-          <Button size="sm" variant="primary" disabled={busy} onClick={() => void save()} data-testid="save-general-remarks">
+          <Button size="sm" variant="primary" disabled={busy} onClick={() => void save()} data-testid="save-inspection-notes">
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </div>

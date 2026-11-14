@@ -896,6 +896,24 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `ATTACHMENT_STORAGE_DIR` (default `apps/api/storage/attachments`); `storage/`
   and `apps/api/storage/` are gitignored. `ATTACHMENT_MIME_TYPES` accepts PDF,
   JPEG and PNG only.
+- **A browser test that creates a sales document must delete it.** The suites run
+  against the shared seeded tenant, and `print-attachments.spec.ts` picks the
+  newest sales invoice from the list. A fixture draft left behind becomes that
+  invoice, and the print tests then fail because a draft has no posted preview.
+  Clean the fixture up in a `finally` block through the API from Node.
+
+### Inspection gotchas
+
+- **An inspection has one optional notes field.** Session-level notes are the
+  single `generalRemarks` column, printed under one "General Inspection Remarks"
+  heading. The former `finalAssessment` and `exteriorRemarks` blocks were
+  duplicate surfaces for the same note and are no longer offered or printed.
+  Notes are never required: a fully passing inspection submits with the field
+  empty. Do not reintroduce a second notes field or a submit-time requirement.
+- **The inspections module is re-activated, not seeded active.** `automotive_inspections`
+  was retired (`isActive = false`) and restored through the audited catalog
+  endpoint (`PATCH /modules/:id`, which writes `module.restored`). If its
+  dashboard tile disappears, check the module row's `isActive` before the code.
 
 ### Mobile gotchas
 
