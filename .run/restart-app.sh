@@ -21,11 +21,18 @@ case "$APP" in
   *) echo "unknown app: $APP"; exit 1 ;;
 esac
 
-# Drop anything that could leak into the client bundle.
-unset NEXT_PUBLIC_API_BASE_URL NEXT_PUBLIC_API_URL API_URL 2>/dev/null || true
+# Drop anything that could leak into the client bundle, then pin the API base
+# to the same-origin `/api` the preview proxy owns. The apps' `next.config`
+# rewrites `/api` to the API on their own port, so a local `next start` and the
+# proxy both work. Leaving the variable unset would bake the client's
+# `?? 'http://localhost:3001/api'` fallback into the bundle, which only resolves
+# on the build host — a reviewer's browser then calls its own localhost and the
+# preview looks broken.
+unset NEXT_PUBLIC_API_URL API_URL 2>/dev/null || true
+export NEXT_PUBLIC_API_BASE_URL=/api
 
 if [ "$DO_BUILD" = "--build" ]; then
-  echo "building $APP (clean env)…"
+  echo "building $APP (same-origin API base)…"
   ( cd "$DIR" && pnpm build ) || { echo "build failed"; exit 1; }
 fi
 

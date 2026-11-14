@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput, todayIso } from '@/lib/erp-format';
+import { EntitySelect } from '@/components/entity-select';
 import { Icon } from '@/components/icons';
 import { DocumentActions } from '@/components/document-actions';
 import { AttachmentsPanel, DocumentPrintActions } from '@/components/document-print';
@@ -18,6 +19,7 @@ import {
   Field,
   Modal,
   Pagination,
+  SearchableSelect,
   SectionHeader,
   Skeleton,
   StatusBadge,
@@ -469,14 +471,17 @@ function AccountModal({
           </select>
         </Field>
         <Field label={t('erp.accounting.parentAccount')}>
-          <select className="oryx-select" value={form.parentId} onChange={(e) => setForm({ ...form, parentId: e.target.value })} data-testid="account-parent">
-            <option value="">{t('erp.accounting.noParent')}</option>
-            {parentOptions.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.code} — {locale === 'ar' ? a.nameAr : a.nameEn}
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            value={form.parentId || null}
+            options={parentOptions.map((a) => ({
+              value: a.id,
+              label: `${a.code} — ${locale === 'ar' ? a.nameAr : a.nameEn}`,
+            }))}
+            onChange={(v) => setForm({ ...form, parentId: v ?? '' })}
+            placeholder={t('erp.accounting.noParent')}
+            emptyLabel={t('erp.accounting.noParent')}
+            testId="account-parent"
+          />
         </Field>
         <Field label={`${t('common.name')} (EN)`} required>
           <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="account-name-en" />
@@ -689,7 +694,6 @@ function ReverseJournalModal({
 
 function PostJournalModal({
   open,
-  accounts,
   onClose,
   onPosted,
 }: {
@@ -761,25 +765,21 @@ function PostJournalModal({
       <div className="mt-4 flex flex-col gap-2">
         {lines.map((line, i) => (
           <div key={i} className="grid grid-cols-12 gap-2">
-            <select
-              className="oryx-select col-span-5"
-              value={line.accountId}
-              onChange={(e) => {
+            <EntitySelect
+              catalogue="account"
+              className="col-span-5"
+              value={line.accountId || null}
+              onChange={(v) => {
                 const next = [...lines];
-                next[i] = { ...next[i], accountId: e.target.value };
+                next[i] = { ...next[i], accountId: v ?? '' };
                 setLines(next);
               }}
-              data-testid={`journal-line-account-${i}`}
-            >
-              <option value="">{t('erp.accounting.selectAccount')}</option>
-              {accounts
-                .filter((a) => a.isPostable)
-                .map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.code} — {a.nameEn}
-                  </option>
-                ))}
-            </select>
+              placeholder={t('erp.accounting.selectAccount')}
+              // Only postable accounts may carry a journal line; a header or a
+              // total row would break the trial balance if it were selectable.
+              filter={(o) => o.data?.isPostable !== false}
+              testId={`journal-line-account-${i}`}
+            />
             <input
               className="oryx-input col-span-3"
               placeholder={t('erp.accounting.debit')}
@@ -1004,8 +1004,6 @@ function PaymentsTab({ canPay }: { canPay: boolean }) {
 
 function PaymentModal({
   open,
-  customers,
-  suppliers,
   onClose,
   onCreated,
 }: {
@@ -1153,23 +1151,23 @@ function PaymentModal({
         </Field>
         <Field label={direction === 'RECEIPT' ? t('erp.sales.customer') : t('erp.purchasing.supplier')} required>
           {direction === 'RECEIPT' ? (
-            <select className="oryx-select" value={customerId} onChange={(e) => setCustomerId(e.target.value)} data-testid="payment-customer">
-              <option value="">—</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.code} — {c.nameEn}
-                </option>
-              ))}
-            </select>
+            <EntitySelect
+              catalogue="customer"
+              allowCreate
+              value={customerId || null}
+              onChange={(v) => setCustomerId(v ?? '')}
+              placeholder={t('common.select')}
+              testId="payment-customer"
+            />
           ) : (
-            <select className="oryx-select" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} data-testid="payment-supplier">
-              <option value="">—</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.code} — {s.nameEn}
-                </option>
-              ))}
-            </select>
+            <EntitySelect
+              catalogue="supplier"
+              allowCreate
+              value={supplierId || null}
+              onChange={(v) => setSupplierId(v ?? '')}
+              placeholder={t('common.select')}
+              testId="payment-supplier"
+            />
           )}
         </Field>
         <Field label={t('erp.accounting.method')} required>
@@ -1424,7 +1422,6 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function LedgerTab() {
   const { t, locale } = useUi();
-  const accounts = useAsync(() => api.accountingAccounts(), []);
   const [accountId, setAccountId] = useState<string>('');
   const ledger = useAsync<{ accounts: LedgerAccountDto[] }>(
     () => api.generalLedger({ accountId: accountId || undefined }),
@@ -1438,14 +1435,14 @@ function LedgerTab() {
       <div className="mb-3 flex flex-wrap items-end gap-3">
         <label className="min-w-[260px] flex-1">
           <span className="oryx-label">{t('erp.accounting.account')}</span>
-          <select className="oryx-select" value={accountId} onChange={(e) => setAccountId(e.target.value)} data-testid="ledger-account">
-            <option value="">{t('common.all')}</option>
-            {accounts.data?.items.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.code} — {a.nameEn}
-              </option>
-            ))}
-          </select>
+          <EntitySelect
+            catalogue="account"
+            value={accountId || null}
+            onChange={(v) => setAccountId(v ?? '')}
+            placeholder={t('common.all')}
+            emptyLabel={t('common.all')}
+            testId="ledger-account"
+          />
         </label>
       </div>
 

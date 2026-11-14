@@ -18,6 +18,7 @@ import {
   Field,
   Modal,
   Pagination,
+  SearchableSelect,
   SectionHeader,
   Skeleton,
   StatusBadge,
@@ -554,19 +555,17 @@ function CreateCompanyModal({
           />
         </Field>
         <Field label={t('companies.selectPlan')} hint={t('plans.note')}>
-          <select
-            className="oryx-select"
-            value={form.planId}
-            onChange={(e) => setForm({ ...form, planId: e.target.value })}
-            data-testid="company-plan"
-          >
-            <option value="">{t('companies.noPlan')}</option>
-            {plans.map((p) => (
-              <option key={p.id} value={p.id}>
-                {locale === 'ar' ? p.nameAr : p.nameEn} — {p.currency} {p.monthlyPrice.toLocaleString()}
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            value={form.planId || null}
+            options={plans.map((p) => ({
+              value: p.id,
+              label: `${locale === 'ar' ? p.nameAr : p.nameEn} — ${p.currency} ${p.monthlyPrice.toLocaleString()}`,
+            }))}
+            onChange={(v) => setForm({ ...form, planId: v ?? '' })}
+            placeholder={t('companies.noPlan')}
+            emptyLabel={t('companies.noPlan')}
+            testId="company-plan"
+          />
         </Field>
         <Field label={t('common.name') + ' — ' + (locale === 'ar' ? 'القطاع' : 'Industry')}>
           <input

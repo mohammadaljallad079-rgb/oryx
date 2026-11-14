@@ -14,6 +14,7 @@ import {
   ErrorBanner,
   Field,
   Modal,
+  SearchableSelect,
   SectionHeader,
   Skeleton,
   StatusBadge,
@@ -224,18 +225,16 @@ function AssignModal({
       ) : null}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t('companies.selectPlan')} required>
-          <select
-            className="oryx-select"
-            value={planId}
-            onChange={(e) => setPlanId(e.target.value)}
-            data-testid="assign-plan"
-          >
-            {plans.map((p) => (
-              <option key={p.id} value={p.id}>
-                {locale === 'ar' ? p.nameAr : p.nameEn} — {p.modules.length} modules
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            value={planId || null}
+            options={plans.map((p) => ({
+              value: p.id,
+              label: `${locale === 'ar' ? p.nameAr : p.nameEn} — ${p.modules.length} modules`,
+            }))}
+            onChange={(v) => setPlanId(v ?? '')}
+            placeholder={t('companies.selectPlan')}
+            testId="assign-plan"
+          />
         </Field>
         <Field label={t('subscriptions.period')} required>
           <select

@@ -14,6 +14,7 @@ import {
   ErrorBanner,
   Field,
   Modal,
+  SearchableSelect,
   SectionHeader,
   Skeleton,
   StatCard,
@@ -410,10 +411,14 @@ function CreateWorkOrderModal({
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.operations.title')} required><input className="oryx-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="work-order-title" /></Field>
         <Field label={t('erp.operations.project')}>
-          <select className="oryx-select" value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })} data-testid="work-order-project">
-            <option value="">—</option>
-            {projects.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.nameEn}</option>)}
-          </select>
+          <SearchableSelect
+            value={form.projectId || null}
+            options={projects.map((p) => ({ value: p.id, label: `${p.code} — ${p.nameEn}` }))}
+            onChange={(v) => setForm({ ...form, projectId: v ?? '' })}
+            placeholder={t('common.select')}
+            emptyLabel={t('common.none')}
+            testId="work-order-project"
+          />
         </Field>
         <Field label={t('erp.crm.priority')}>
           <select className="oryx-select" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>

@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput } from '@/lib/erp-format';
+import { EntitySelect } from '@/components/entity-select';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -15,6 +16,7 @@ import {
   ErrorBanner,
   Field,
   Modal,
+  SearchableSelect,
   SectionHeader,
   Skeleton,
   StatCard,
@@ -416,7 +418,6 @@ function OpportunitiesTab({ canManage, canConvert }: { canManage: boolean; canCo
 function CreateOpportunityModal({
   open,
   pipelines,
-  customers,
   onClose,
   onCreated,
 }: {
@@ -475,10 +476,13 @@ function CreateOpportunityModal({
           <input className="oryx-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="opportunity-title" />
         </Field>
         <Field label={t('erp.crm.pipeline')} required>
-          <select className="oryx-select" value={form.pipelineId} onChange={(e) => setForm({ ...form, pipelineId: e.target.value, stageId: '' })} data-testid="opportunity-pipeline">
-            <option value="">—</option>
-            {pipelines.map((p) => <option key={p.id} value={p.id}>{p.nameEn}</option>)}
-          </select>
+          <SearchableSelect
+            value={form.pipelineId || null}
+            options={pipelines.map((p) => ({ value: p.id, label: p.nameEn }))}
+            onChange={(v) => setForm({ ...form, pipelineId: v ?? '', stageId: '' })}
+            placeholder={t('common.select')}
+            testId="opportunity-pipeline"
+          />
         </Field>
         <Field label={t('erp.crm.stage')}>
           <select className="oryx-select" value={form.stageId} onChange={(e) => setForm({ ...form, stageId: e.target.value })}>
@@ -487,10 +491,15 @@ function CreateOpportunityModal({
           </select>
         </Field>
         <Field label={t('erp.sales.customer')}>
-          <select className="oryx-select" value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })} data-testid="opportunity-customer">
-            <option value="">—</option>
-            {customers.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.nameEn}</option>)}
-          </select>
+          <EntitySelect
+            catalogue="customer"
+            allowCreate
+            value={form.customerId || null}
+            onChange={(v) => setForm({ ...form, customerId: v ?? '' })}
+            placeholder={t('common.select')}
+            emptyLabel={t('common.none')}
+            testId="opportunity-customer"
+          />
         </Field>
         <Field label={t('erp.crm.amount')} required>
           <input className="oryx-input" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} data-testid="opportunity-amount" />

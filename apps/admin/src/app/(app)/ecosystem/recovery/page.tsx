@@ -13,6 +13,7 @@ import {
   ErrorBanner,
   Field,
   Modal,
+  SearchableSelect,
   SectionHeader,
   Skeleton,
   StatusBadge,
@@ -142,12 +143,13 @@ function RecoveryInner() {
             {detail.status === 'REQUESTED' ? (
               <div className="flex flex-col gap-2 border-t border-[var(--border)] pt-3">
                 <Field label={t('recovery.assignProvider')} hint={t('recovery.assignHint')}>
-                  <select className="oryx-input" value={providerId} onChange={(e) => setProviderId(e.target.value)} data-testid="recovery-provider">
-                    <option value="">{t('common.select')}</option>
-                    {(providers.data?.items ?? []).map((p) => (
-                      <option key={p.id} value={p.id}>{p.nameEn}</option>
-                    ))}
-                  </select>
+                  <SearchableSelect
+                    value={providerId || null}
+                    options={(providers.data?.items ?? []).map((p) => ({ value: p.id, label: p.nameEn }))}
+                    onChange={(v) => setProviderId(v ?? '')}
+                    placeholder={t('common.select')}
+                    testId="recovery-provider"
+                  />
                 </Field>
                 <div>
                   <Button size="sm" variant="primary" disabled={busy || !providerId} onClick={() => void assign()} data-testid="recovery-assign">

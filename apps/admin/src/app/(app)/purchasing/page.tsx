@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { minorToInput, money, toMinorInput, toQuantityInput, todayIso } from '@/lib/erp-format';
+import { EntitySelect } from '@/components/entity-select';
 import { Icon } from '@/components/icons';
 import { DocumentActions } from '@/components/document-actions';
 import {
@@ -435,7 +436,6 @@ function RequisitionsTab({ canManage }: { canManage: boolean }) {
 function RequisitionModal({
   taxOptions,
   open,
-  suppliers,
   products,
   onClose,
   onCreated,
@@ -491,14 +491,14 @@ function RequisitionModal({
     >
       {error ? <ErrorBanner message={error} /> : null}
       <Field label={t('erp.purchasing.supplier')}>
-        <select className="oryx-select" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} data-testid="requisition-supplier">
-          <option value="">—</option>
-          {suppliers.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.code} — {s.nameEn}
-            </option>
-          ))}
-        </select>
+        <EntitySelect
+            catalogue="supplier"
+            allowCreate
+            value={supplierId || null}
+            onChange={(v) => setSupplierId(v ?? '')}
+            placeholder={t('common.select')}
+            testId="requisition-supplier"
+          />
       </Field>
       <div className="mt-4">
         <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} testIdPrefix="requisition-line" costLabel={t('erp.inventory.estimatedCost')} />
@@ -596,9 +596,7 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
 function PurchaseOrderModal({
   taxOptions,
   open,
-  suppliers,
   products,
-  warehouses,
   onClose,
   onCreated,
 }: {
@@ -664,24 +662,24 @@ function PurchaseOrderModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.purchasing.supplier')} required>
-          <select className="oryx-select" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} data-testid="purchase-order-supplier">
-            <option value="">—</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code} — {s.nameEn}
-              </option>
-            ))}
-          </select>
+          <EntitySelect
+            catalogue="supplier"
+            allowCreate
+            value={supplierId || null}
+            onChange={(v) => setSupplierId(v ?? '')}
+            placeholder={t('common.select')}
+            testId="purchase-order-supplier"
+          />
         </Field>
         <Field label={t('erp.inventory.warehouse')}>
-          <select className="oryx-select" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} data-testid="purchase-order-warehouse">
-            <option value="">—</option>
-            {warehouses.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.code} — {w.nameEn}
-              </option>
-            ))}
-          </select>
+          <EntitySelect
+            catalogue="warehouse"
+            allowCreate
+            value={warehouseId || null}
+            onChange={(v) => setWarehouseId(v ?? '')}
+            placeholder={t('common.select')}
+            testId="purchase-order-warehouse"
+          />
         </Field>
         <Field label={t('erp.purchasing.expectedDate')}>
           <input
@@ -842,7 +840,6 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
 function SupplierInvoiceModal({
   taxOptions,
   open,
-  suppliers,
   products,
   onClose,
   onCreated,
@@ -907,14 +904,14 @@ function SupplierInvoiceModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.purchasing.supplier')} required>
-          <select className="oryx-select" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} data-testid="supplier-invoice-supplier">
-            <option value="">—</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code} — {s.nameEn}
-              </option>
-            ))}
-          </select>
+          <EntitySelect
+            catalogue="supplier"
+            allowCreate
+            value={supplierId || null}
+            onChange={(v) => setSupplierId(v ?? '')}
+            placeholder={t('common.select')}
+            testId="supplier-invoice-supplier"
+          />
         </Field>
         <Field label={t('erp.purchasing.supplierInvoiceNumber')} required>
           <input
@@ -1023,9 +1020,7 @@ function ReturnsTab({ canManage }: { canManage: boolean }) {
 
 function PurchaseReturnModal({
   open,
-  suppliers,
   products,
-  warehouses,
   taxOptions,
   onClose,
   onCreated,
@@ -1097,24 +1092,24 @@ function PurchaseReturnModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.purchasing.supplier')} required>
-          <select className="oryx-select" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} data-testid="purchase-return-supplier">
-            <option value="">—</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code} — {s.nameEn}
-              </option>
-            ))}
-          </select>
+          <EntitySelect
+            catalogue="supplier"
+            allowCreate
+            value={supplierId || null}
+            onChange={(v) => setSupplierId(v ?? '')}
+            placeholder={t('common.select')}
+            testId="purchase-return-supplier"
+          />
         </Field>
         <Field label={t('erp.inventory.warehouse')} required>
-          <select className="oryx-select" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} data-testid="purchase-return-warehouse">
-            <option value="">—</option>
-            {warehouses.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.code} — {w.nameEn}
-              </option>
-            ))}
-          </select>
+          <EntitySelect
+            catalogue="warehouse"
+            allowCreate
+            value={warehouseId || null}
+            onChange={(v) => setWarehouseId(v ?? '')}
+            placeholder={t('common.select')}
+            testId="purchase-return-warehouse"
+          />
         </Field>
         <Field label={t('erp.purchasing.returnDate')} required>
           <input type="date" className="oryx-input" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} data-testid="purchase-return-date" />
@@ -1135,7 +1130,6 @@ function PurchaseReturnModal({
 function CostLineEditor({
   lines,
   setLines,
-  products,
   taxOptions,
   testIdPrefix,
   costLabel,
@@ -1159,26 +1153,20 @@ function CostLineEditor({
     <div className="flex flex-col gap-2">
       {lines.map((line, i) => (
         <div key={i} className="grid grid-cols-12 gap-2">
-          <select
-            className="oryx-select col-span-4"
-            value={line.productId}
-            onChange={(e) => {
-              const product = products.find((p) => p.id === e.target.value);
-              update(i, {
-                productId: e.target.value,
-                description: product ? product.nameEn : line.description,
-                unitCost: product ? minorToInput(product.costPriceMinor) : line.unitCost,
-              });
-            }}
-            data-testid={`${testIdPrefix}-product-${i}`}
-          >
-            <option value="">{t('erp.inventory.product')}</option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.sku} — {p.nameEn}
-              </option>
-            ))}
-          </select>
+          <EntitySelect
+            catalogue="product"
+            allowCreate
+            className="col-span-4"
+            value={line.productId || null}
+            onChange={() => undefined}
+            onSelectData={(data) => update(i, {
+              productId: String(data.id ?? ''),
+              description: String(data.nameEn ?? line.description),
+              unitCost: minorToInput(Number(data.costPriceMinor ?? 0)),
+            })}
+            placeholder={t('erp.inventory.product')}
+            testId={`${testIdPrefix}-product-${i}`}
+          />
           <input
             className="oryx-input col-span-3"
             placeholder={t('erp.accounting.description')}

@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money } from '@/lib/erp-format';
+import { EntitySelect } from '@/components/entity-select';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -152,7 +153,6 @@ function ReferencesTab({ canManage }: { canManage: boolean }) {
 
 function CreateReferenceModal({
   open,
-  products,
   onClose,
   onCreated,
 }: {
@@ -179,10 +179,14 @@ function CreateReferenceModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.inventory.product')} required>
-          <select className="oryx-select" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })} data-testid="reference-product">
-            <option value="">—</option>
-            {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.nameEn}</option>)}
-          </select>
+          <EntitySelect
+            catalogue="product"
+            allowCreate
+            value={form.productId || null}
+            onChange={(v) => setForm({ ...form, productId: v ?? '' })}
+            placeholder={t('common.select')}
+            testId="reference-product"
+          />
         </Field>
         <Field label={t('erp.parts.partNumber')} required>
           <input className="oryx-input" value={form.partNumber} onChange={(e) => setForm({ ...form, partNumber: e.target.value })} data-testid="reference-number" />
@@ -276,7 +280,6 @@ function CompatibilityTab({ canManage }: { canManage: boolean }) {
 
 function CreateCompatibilityModal({
   open,
-  products,
   onClose,
   onCreated,
 }: {
@@ -309,10 +312,14 @@ function CreateCompatibilityModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.inventory.product')} required>
-          <select className="oryx-select" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })} data-testid="compatibility-product">
-            <option value="">—</option>
-            {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.nameEn}</option>)}
-          </select>
+          <EntitySelect
+            catalogue="product"
+            allowCreate
+            value={form.productId || null}
+            onChange={(v) => setForm({ ...form, productId: v ?? '' })}
+            placeholder={t('common.select')}
+            testId="compatibility-product"
+          />
         </Field>
         <Field label={t('erp.automotive.make')} required><input className="oryx-input" value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} data-testid="compatibility-make" /></Field>
         <Field label={t('erp.automotive.model')} required><input className="oryx-input" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} data-testid="compatibility-model" /></Field>

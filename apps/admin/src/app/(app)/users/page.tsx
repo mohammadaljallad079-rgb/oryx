@@ -16,6 +16,7 @@ import {
   ErrorBanner,
   Field,
   Modal,
+  SearchableSelect,
   SectionHeader,
   Skeleton,
   StatusBadge,
@@ -361,20 +362,17 @@ function ManageAccessModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="flex flex-col gap-3">
         <Field label={t('users.role')} required>
-          <select
-            className="oryx-select"
-            value={roleId}
+          <SearchableSelect
+            value={roleId || null}
             disabled={!canManage}
-            onChange={(e) => setRoleId(e.target.value)}
-            data-testid="membership-role"
-          >
-            <option value="">—</option>
-            {assignableRoles.map((r) => (
-              <option key={r.id} value={r.id}>
-                {locale === 'ar' ? r.nameAr : r.nameEn}
-              </option>
-            ))}
-          </select>
+            options={assignableRoles.map((r) => ({
+              value: r.id,
+              label: locale === 'ar' ? r.nameAr : r.nameEn,
+            }))}
+            onChange={(v) => setRoleId(v ?? '')}
+            placeholder={t('common.select')}
+            testId="membership-role"
+          />
         </Field>
 
         <Field label={t('users.branchScope')} hint={t('users.branchScopeHint')}>
@@ -541,19 +539,16 @@ function InviteModal({
               />
             </Field>
             <Field label={t('users.role')} required hint={t('users.delegationNote')}>
-              <select
-                className="oryx-select"
-                value={form.roleId}
-                onChange={(e) => setForm({ ...form, roleId: e.target.value })}
-                data-testid="invite-role"
-              >
-                <option value="">—</option>
-                {assignableRoles.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.nameEn} ({r.permissions.length})
-                  </option>
-                ))}
-              </select>
+              <SearchableSelect
+                value={form.roleId || null}
+                options={assignableRoles.map((r) => ({
+                  value: r.id,
+                  label: `${r.nameEn} (${r.permissions.length})`,
+                }))}
+                onChange={(v) => setForm({ ...form, roleId: v ?? '' })}
+                placeholder={t('common.select')}
+                testId="invite-role"
+              />
             </Field>
             <Field label={`${t('common.name')} (EN)`}>
               <input

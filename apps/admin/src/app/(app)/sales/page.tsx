@@ -15,6 +15,7 @@ import {
   sumMinor,
   type RoundingMode,
 } from '@oryx/shared';
+import { EntitySelect } from '@/components/entity-select';
 import { Icon } from '@/components/icons';
 import { AttachmentsPanel, DocumentPrintActions } from '@/components/document-print';
 import {
@@ -1482,7 +1483,6 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
 function PosSaleModal({
   open,
   session,
-  customers,
   warehouses,
   roundingMode,
   currencyScale,
@@ -1801,34 +1801,25 @@ function PosSaleModal({
 
           <div className="grid gap-2 border-t border-[var(--border)] p-3 sm:grid-cols-2">
             <Field label={t('erp.sales.pos.customer')}>
-              <select
-                className="oryx-select"
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                data-testid="pos-customer"
-              >
-                <option value="">{t('erp.sales.pos.walkIn')}</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.code} — {c.nameEn || c.nameAr}
-                  </option>
-                ))}
-              </select>
+              <EntitySelect
+                catalogue="customer"
+                allowCreate
+                value={customerId || null}
+                onChange={(v) => setCustomerId(v ?? '')}
+                placeholder={t('erp.sales.pos.walkIn')}
+                emptyLabel={t('erp.sales.pos.walkIn')}
+                testId="pos-customer"
+              />
             </Field>
             <Field label={t('erp.sales.pos.warehouse')}>
-              <select
-                className="oryx-select"
-                value={warehouseId}
-                onChange={(e) => setWarehouseId(e.target.value)}
-                data-testid="pos-warehouse"
-              >
-                <option value="">—</option>
-                {warehouses.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.code} — {w.nameEn}
-                  </option>
-                ))}
-              </select>
+              <EntitySelect
+                catalogue="warehouse"
+                allowCreate
+                value={warehouseId || null}
+                onChange={(v) => setWarehouseId(v ?? '')}
+                placeholder={t('common.select')}
+                testId="pos-warehouse"
+              />
             </Field>
           </div>
 
@@ -2150,7 +2141,6 @@ function computeDraftTotals(
 function LineEditor({
   lines,
   setLines,
-  products,
   taxOptions,
   testIdPrefix,
   currency,
@@ -2197,36 +2187,28 @@ function LineEditor({
       {lines.map((line, i) => (
         <div key={i} className="oryx-doc-form__grid">
           <div className="flex flex-col gap-1">
-            <select
-              className="oryx-select"
-              value={line.productId}
-              onChange={(e) => {
-                const product = products.find((p) => p.id === e.target.value);
+            <EntitySelect
+              catalogue="product"
+              allowCreate
+              value={line.productId || null}
+              onChange={() => undefined}
+              onSelectData={(data) => {
                 // A product carries its own rate; if it is not in the saved tax
                 // list, keep the numeric value and clear the selection rather than
                 // silently switching the line to a different tax.
-                const matched = product
-                  ? taxOptions.find((o) => o.value === String(product.taxRateBp))
-                  : undefined;
+                const taxRateBp = Number(data.taxRateBp ?? 0);
+                const matched = taxOptions.find((o) => o.value === String(taxRateBp));
                 update(i, {
-                  productId: e.target.value,
-                  description: product ? product.nameEn : line.description,
-                  unitPrice: product
-                    ? minorToInput(product.salesPriceMinor, currency ?? 'BHD')
-                    : line.unitPrice,
-                  taxPercent: product ? String(product.taxRateBp / 100) : line.taxPercent,
-                  taxId: product ? (matched ? matched.value : '') : line.taxId,
+                  productId: String(data.id ?? ''),
+                  description: String(data.nameEn ?? line.description),
+                  unitPrice: minorToInput(Number(data.salesPriceMinor ?? 0), currency ?? 'BHD'),
+                  taxPercent: String(taxRateBp / 100),
+                  taxId: matched ? matched.value : '',
                 });
               }}
-              data-testid={`${testIdPrefix}-product-${i}`}
-            >
-              <option value="">{t('erp.inventory.product')}</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.sku} — {p.nameEn}
-                </option>
-              ))}
-            </select>
+              placeholder={t('erp.inventory.product')}
+              testId={`${testIdPrefix}-product-${i}`}
+            />
             <input
               className="oryx-input"
               placeholder={t('erp.sales.form.description')}
@@ -2343,7 +2325,6 @@ function DocumentModal({
   allowDraft,
   customers,
   products,
-  warehouses,
   taxOptions,
   showWarehouse,
   showRestock,
@@ -2676,19 +2657,14 @@ function DocumentModal({
         <div className="grid gap-3 p-3 sm:grid-cols-2">
           {showWarehouse ? (
             <Field label={t('erp.inventory.warehouse')}>
-              <select
-                className="oryx-select"
-                value={warehouseId}
-                onChange={(e) => setWarehouseId(e.target.value)}
-                data-testid={`${testIdPrefix}-warehouse`}
-              >
-                <option value="">—</option>
-                {warehouses.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.code} — {w.nameEn}
-                  </option>
-                ))}
-              </select>
+              <EntitySelect
+                catalogue="warehouse"
+                allowCreate
+                value={warehouseId || null}
+                onChange={(v) => setWarehouseId(v ?? '')}
+                placeholder={t('common.select')}
+                testId={`${testIdPrefix}-warehouse`}
+              />
             </Field>
           ) : null}
           {showRestock ? (

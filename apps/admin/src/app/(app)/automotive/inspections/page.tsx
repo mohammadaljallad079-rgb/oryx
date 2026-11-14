@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync, useDebounced } from '@/lib/hooks';
 import { minorToInput, money, toMinorInput } from '@/lib/erp-format';
+import { EntitySelect } from '@/components/entity-select';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -365,22 +366,14 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
       {error ? <ErrorBanner message={error} /> : null}
       <div className="flex flex-col gap-3">
         <Field label={t('inspection.selectCustomer')} required>
-          <select
-            className="oryx-select"
-            value={customerId}
-            onChange={(e) => {
-              setCustomerId(e.target.value);
-              setVehicleId('');
-            }}
-            data-testid="job-customer"
-          >
-            <option value="">{t('common.select')}</option>
-            {(customers.data?.items ?? []).map((c: CustomerDto) => (
-              <option key={c.id} value={c.id}>
-                {c.nameEn || c.nameAr || c.code}
-              </option>
-            ))}
-          </select>
+          <EntitySelect
+            catalogue="customer"
+            allowCreate
+            value={customerId || null}
+            onChange={(v) => { setCustomerId(v ?? ''); setVehicleId(''); }}
+            placeholder={t('common.select')}
+            testId="job-customer"
+          />
         </Field>
 
         <div>
@@ -923,7 +916,6 @@ function VehiclePicker({
 function CreateVehicleModal({
   open,
   vehicle,
-  customers,
   defaultCustomerId,
   onClose,
   onSaved,
@@ -1025,10 +1017,15 @@ function CreateVehicleModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.sales.customer')} required>
-          <select className="oryx-select" value={form.customerId} disabled={Boolean(vehicle)} onChange={(e) => setForm({ ...form, customerId: e.target.value })} data-testid="vehicle-customer">
-            <option value="">—</option>
-            {customers.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.nameEn}</option>)}
-          </select>
+          <EntitySelect
+            catalogue="customer"
+            allowCreate
+            value={form.customerId || null}
+            onChange={(v) => setForm({ ...form, customerId: v ?? '' })}
+            disabled={Boolean(vehicle)}
+            placeholder={t('common.select')}
+            testId="vehicle-customer"
+          />
         </Field>
         <Field label={t('erp.automotive.vin')} required hint={vinValid ? t('erp.automotive.vinHint') : t('erp.automotive.vinInvalid')}>
           <input className={`oryx-input${form.vin && !vinValid ? ' oryx-input--invalid' : ''}`} value={form.vin} disabled={Boolean(vehicle)} onChange={(e) => setForm({ ...form, vin: e.target.value.toUpperCase() })} maxLength={17} data-testid="vehicle-vin" />
@@ -1188,7 +1185,6 @@ function BookingsTab({ canBook, canApprove, canInvoice }: { canBook: boolean; ca
 
 function CreateBookingModal({
   open,
-  vehicles,
   services,
   onClose,
   onCreated,
@@ -1200,8 +1196,6 @@ function CreateBookingModal({
   onCreated: () => Promise<void>;
 }) {
   const { t } = useUi();
-  const { companyId } = useAuth();
-  const branches = useAsync(() => (companyId ? api.listBranches(companyId, { pageSize: 100 }) : Promise.resolve(null)), [companyId]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -1244,25 +1238,37 @@ function CreateBookingModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.automotive.vehicle')} required>
-          <select className="oryx-select" value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })} data-testid="booking-vehicle">
-            <option value="">—</option>
-            {vehicles.map((v) => <option key={v.id} value={v.id}>{v.vin} — {v.make} {v.model}</option>)}
-          </select>
+          <EntitySelect
+            catalogue="vehicle"
+            value={form.vehicleId || null}
+            onChange={(v) => setForm({ ...form, vehicleId: v ?? '' })}
+            placeholder={t('common.select')}
+            testId="booking-vehicle"
+          />
         </Field>
         <Field label={t('erp.automotive.service')} required>
-          <select className="oryx-select" value={form.serviceId} onChange={(e) => setForm({ ...form, serviceId: e.target.value })} data-testid="booking-service">
-            <option value="">—</option>
-            {services.map((s) => <option key={s.id} value={s.id}>{s.nameEn}</option>)}
-          </select>
+          <EntitySelect
+            catalogue="inspectionService"
+            allowCreate
+            value={form.serviceId || null}
+            onChange={(v) => setForm({ ...form, serviceId: v ?? '' })}
+            placeholder={t('common.select')}
+            testId="booking-service"
+          />
         </Field>
         <Field label={t('erp.automotive.scheduledAt')} required>
           <input type="datetime-local" className="oryx-input oryx-input--date" value={form.scheduledAt} onChange={(e) => setForm({ ...form, scheduledAt: e.target.value })} data-testid="booking-date" />
         </Field>
         <Field label={t('erp.automotive.branch')}>
-          <select className="oryx-select" value={form.branchId} onChange={(e) => setForm({ ...form, branchId: e.target.value })} data-testid="booking-branch">
-            <option value="">—</option>
-            {(branches.data?.items ?? []).map((b) => <option key={b.id} value={b.id}>{b.nameEn}</option>)}
-          </select>
+          <EntitySelect
+            catalogue="branch"
+            allowCreate
+            value={form.branchId || null}
+            onChange={(v) => setForm({ ...form, branchId: v ?? '' })}
+            placeholder={t('common.select')}
+            emptyLabel={t('common.none')}
+            testId="booking-branch"
+          />
         </Field>
         <Field label={t('erp.automotive.odometer')}>
           <input type="number" min="0" className="oryx-input tabular-nums" value={form.odometer} onChange={(e) => setForm({ ...form, odometer: e.target.value })} data-testid="booking-odometer" />

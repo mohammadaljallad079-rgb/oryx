@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput } from '@/lib/erp-format';
+import { EntitySelect } from '@/components/entity-select';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -15,6 +16,7 @@ import {
   ErrorBanner,
   Field,
   Modal,
+  SearchableSelect,
   SectionHeader,
   Skeleton,
   StatCard,
@@ -229,7 +231,6 @@ function EmployeesTab({ canManage }: { canManage: boolean }) {
 function EmployeeModal({
   open,
   employee,
-  departments,
   canManage,
   onClose,
   onSaved,
@@ -329,10 +330,15 @@ function EmployeeModal({
           <input className="oryx-input" value={form.code} disabled={Boolean(employee)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="employee-code" />
         </Field>
         <Field label={t('erp.hr.department')}>
-          <select className="oryx-select" value={form.departmentId} onChange={(e) => setForm({ ...form, departmentId: e.target.value })} data-testid="employee-department">
-            <option value="">—</option>
-            {departments.map((d) => <option key={d.id} value={d.id}>{d.nameEn}</option>)}
-          </select>
+          <EntitySelect
+            catalogue="department"
+            allowCreate
+            value={form.departmentId || null}
+            onChange={(v) => setForm({ ...form, departmentId: v ?? '' })}
+            placeholder={t('common.select')}
+            emptyLabel={t('common.none')}
+            testId="employee-department"
+          />
         </Field>
         <Field label={`${t('common.name')} (EN)`} required>
           <input className="oryx-input" value={form.fullNameEn} onChange={(e) => setForm({ ...form, fullNameEn: e.target.value })} data-testid="employee-name-en" />
@@ -728,7 +734,6 @@ function LeaveTab({ canRequest, canApprove }: { canRequest: boolean; canApprove:
 function LeaveRequestModal({
   open,
   editing,
-  employees,
   types,
   onClose,
   onCreated,
@@ -803,16 +808,23 @@ function LeaveRequestModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.hr.employee')} required>
-          <select className="oryx-select" value={form.employeeId} disabled={Boolean(editing)} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} data-testid="leave-employee">
-            <option value="">—</option>
-            {employees.map((x) => <option key={x.id} value={x.id}>{x.code} — {x.fullNameEn}</option>)}
-          </select>
+          <EntitySelect
+            catalogue="employee"
+            value={form.employeeId || null}
+            onChange={(v) => setForm({ ...form, employeeId: v ?? '' })}
+            disabled={Boolean(editing)}
+            placeholder={t('common.select')}
+            testId="leave-employee"
+          />
         </Field>
         <Field label={t('erp.hr.leaveType')} required>
-          <select className="oryx-select" value={form.leaveTypeId} onChange={(e) => setForm({ ...form, leaveTypeId: e.target.value })} data-testid="leave-type">
-            <option value="">—</option>
-            {types.map((x) => <option key={x.id} value={x.id}>{x.nameEn}</option>)}
-          </select>
+          <SearchableSelect
+            value={form.leaveTypeId || null}
+            options={types.map((x) => ({ value: x.id, label: x.nameEn }))}
+            onChange={(v) => setForm({ ...form, leaveTypeId: v ?? '' })}
+            placeholder={t('common.select')}
+            testId="leave-type"
+          />
         </Field>
         <Field label={t('erp.reports.from')} required>
           <input type="date" className="oryx-input" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} data-testid="leave-start" />
@@ -968,7 +980,6 @@ function SelfServiceCard({ onRecorded }: { onRecorded: () => Promise<void> }) {
 
 function RecordAttendanceModal({
   open,
-  employees,
   onClose,
   onSaved,
 }: {
@@ -1043,10 +1054,13 @@ function RecordAttendanceModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.hr.employee')} required>
-          <select className="oryx-select" value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} data-testid="attendance-employee">
-            <option value="">—</option>
-            {employees.map((e) => <option key={e.id} value={e.id}>{e.code} — {e.fullNameEn}</option>)}
-          </select>
+          <EntitySelect
+            catalogue="employee"
+            value={form.employeeId || null}
+            onChange={(v) => setForm({ ...form, employeeId: v ?? '' })}
+            placeholder={t('common.select')}
+            testId="attendance-employee"
+          />
         </Field>
         <Field label={t('common.date')} required>
           <input type="date" className="oryx-input" value={form.workDate} onChange={(e) => setForm({ ...form, workDate: e.target.value })} data-testid="attendance-date" />
@@ -1231,10 +1245,13 @@ function RunPayrollModal({
     >
       {error ? <ErrorBanner message={error} /> : null}
       <Field label={t('erp.hr.period')} required>
-        <select className="oryx-select" value={periodId} onChange={(e) => setPeriodId(e.target.value)} data-testid="payroll-period">
-          <option value="">—</option>
-          {periods.filter((p) => p.status === 'OPEN').map((p) => <option key={p.id} value={p.id}>{p.code} — {p.nameEn}</option>)}
-        </select>
+        <SearchableSelect
+          value={periodId || null}
+          options={periods.filter((p) => p.status === 'OPEN').map((p) => ({ value: p.id, label: `${p.code} — ${p.nameEn}` }))}
+          onChange={(v) => setPeriodId(v ?? '')}
+          placeholder={t('common.select')}
+          testId="payroll-period"
+        />
       </Field>
     </Modal>
   );

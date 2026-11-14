@@ -55,7 +55,7 @@ const line = (
 ) => ({
   description,
   subDescription: subDescription ?? null,
-  quantity: 1,
+  quantity: 10000, // 1.0000 at QUANTITY_SCALE=4
   unitPriceMinor,
   discountMinor: 0,
   taxMinor,

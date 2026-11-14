@@ -14,6 +14,7 @@ import {
   ErrorBanner,
   Field,
   Modal,
+  SearchableSelect,
   SectionHeader,
   Skeleton,
   StatusBadge,
@@ -455,14 +456,16 @@ function RequestsTab({ canAssign }: { canAssign: boolean }) {
       >
         {error ? <ErrorBanner message={error} /> : null}
         <Field label={t('erp.providers.provider')} required>
-          <select className="oryx-select" value={providerId} onChange={(e) => setProviderId(e.target.value)} data-testid="assign-provider">
-            <option value="">—</option>
-            {(providers.data?.items ?? []).map((p) => (
-              <option key={(p as ProviderRow).id} value={(p as ProviderRow).id}>
-                {(p as ProviderRow).code} — {(p as ProviderRow).nameEn}
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            value={providerId || null}
+            options={(providers.data?.items ?? []).map((p) => ({
+              value: (p as ProviderRow).id,
+              label: `${(p as ProviderRow).code} — ${(p as ProviderRow).nameEn}`,
+            }))}
+            onChange={(v) => setProviderId(v ?? '')}
+            placeholder={t('common.select')}
+            testId="assign-provider"
+          />
         </Field>
       </Modal>
     </Card>

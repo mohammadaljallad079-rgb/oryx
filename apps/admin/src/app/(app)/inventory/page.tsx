@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { minorToInput, money, qty, toMinorInput, toQuantityInput } from '@/lib/erp-format';
+import { EntitySelect } from '@/components/entity-select';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -15,6 +16,7 @@ import {
   ErrorBanner,
   Field,
   Modal,
+  SearchableSelect,
   SectionHeader,
   Skeleton,
   StatusBadge,
@@ -302,19 +304,14 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
         <div className="flex flex-wrap items-end gap-3" data-testid="product-filters">
           <label className="min-w-[150px]">
             <span className="oryx-label">{t('erp.inventory.category')}</span>
-            <select
-              className="oryx-select"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              data-testid="filter-category"
-            >
-              <option value="">{t('erp.inventory.allCategories')}</option>
-              {(categories.data?.items ?? []).map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+            <SearchableSelect
+              value={category || null}
+              options={(categories.data?.items ?? []).map((c) => ({ value: c, label: c }))}
+              onChange={(v) => setCategory(v ?? '')}
+              placeholder={t('erp.inventory.allCategories')}
+              emptyLabel={t('erp.inventory.allCategories')}
+              testId="filter-category"
+            />
           </label>
           <label className="min-w-[130px]">
             <span className="oryx-label">{t('erp.inventory.type')}</span>
@@ -361,19 +358,14 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
           </label>
           <label className="min-w-[150px]">
             <span className="oryx-label">{t('erp.inventory.warehouse')}</span>
-            <select
-              className="oryx-select"
-              value={warehouseId}
-              onChange={(e) => setWarehouseId(e.target.value)}
-              data-testid="filter-warehouse"
-            >
-              <option value="">{t('erp.inventory.allWarehouses')}</option>
-              {(warehouses.data?.items ?? []).map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.nameEn}
-                </option>
-              ))}
-            </select>
+            <SearchableSelect
+              value={warehouseId || null}
+              options={(warehouses.data?.items ?? []).map((w) => ({ value: w.id, label: w.nameEn }))}
+              onChange={(v) => setWarehouseId(v ?? '')}
+              placeholder={t('erp.inventory.allWarehouses')}
+              emptyLabel={t('erp.inventory.allWarehouses')}
+              testId="filter-warehouse"
+            />
           </label>
           <label className="min-w-[120px]">
             <span className="oryx-label">{t('erp.inventory.minPrice')}</span>
@@ -1137,8 +1129,6 @@ function MovementsTab({ canManage }: { canManage: boolean }) {
 
 function RecordMovementModal({
   open,
-  warehouses,
-  products,
   onClose,
   onDone,
 }: {
@@ -1191,16 +1181,24 @@ function RecordMovementModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.inventory.warehouse')} required>
-          <select className="oryx-select" value={form.warehouseId} onChange={(e) => setForm({ ...form, warehouseId: e.target.value })} data-testid="movement-warehouse">
-            <option value="">—</option>
-            {warehouses.map((w) => <option key={w.id} value={w.id}>{w.code} — {w.nameEn}</option>)}
-          </select>
+          <EntitySelect
+            catalogue="warehouse"
+            allowCreate
+            value={form.warehouseId || null}
+            onChange={(v) => setForm({ ...form, warehouseId: v ?? '' })}
+            placeholder={t('common.select')}
+            testId="movement-warehouse"
+          />
         </Field>
         <Field label={t('erp.inventory.product')} required>
-          <select className="oryx-select" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })} data-testid="movement-product">
-            <option value="">—</option>
-            {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.nameEn}</option>)}
-          </select>
+          <EntitySelect
+            catalogue="product"
+            allowCreate
+            value={form.productId || null}
+            onChange={(v) => setForm({ ...form, productId: v ?? '' })}
+            placeholder={t('common.select')}
+            testId="movement-product"
+          />
         </Field>
         <Field label={t('erp.inventory.movementType')} required>
           <select className="oryx-select" value={form.direction} onChange={(e) => setForm({ ...form, direction: e.target.value })}>
