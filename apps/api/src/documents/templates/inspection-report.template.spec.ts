@@ -376,6 +376,30 @@ describe('inspection report template — reference page parity (Execution 19)', 
     expect(band).toContain('vphoto-img');
   });
 
+  it('spreads each bilingual title bar between the two physical edges, per the reference', () => {
+    const html = render();
+    // The approved sheet prints the Arabic title flush to the visual right and
+    // the English title flush to the visual left of the same full-width navy
+    // band. Packing both to the right (the old behaviour) moved every English
+    // label ~30-400pt away from its reference position, so the bars must push
+    // the two apart.
+    for (const sel of ['.cover-sec-title', '.remarks-title', '.grp-title', '.diagram-title']) {
+      const rule = html.slice(html.indexOf(`${sel}{`));
+      const body = rule.slice(0, rule.indexOf('}'));
+      expect(body).toContain('justify-content:space-between');
+    }
+  });
+
+  it('gives the checklist item column the reference proportion so results share the rest', () => {
+    const html = render();
+    // Measured from the approved sheet: the item column takes about a third of
+    // the checklist width and the three result columns split the remainder. The
+    // old 62%/12.66% split pushed the Pass/Fail columns far from the reference.
+    expect(html).toContain('.c-item{ width:33%; }');
+    expect(html).toMatch(/\.c-res\{ text-align:center; \}/);
+    expect(html).not.toContain('.c-item{ width:62%; }');
+  });
+
   it('prints the AUTO SERVICES watermark on the cover page only', () => {
     const html = render();
     const marks = html.match(/class="rp-watermark"/g) ?? [];
