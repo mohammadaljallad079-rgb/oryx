@@ -271,6 +271,23 @@ export async function spliceFirstPage(cover: Buffer, body: Buffer): Promise<Buff
 }
 
 /**
+ * Appends every page of `extra` after every page of `base`.
+ *
+ * Used to attach an external diagnostic PDF (a vendor's computer-unit scan) to
+ * an issued inspection report so the two travel as one document. The pages are
+ * copied verbatim — the report's own bytes are untouched — so the merged file
+ * still verifies against the token printed on the report.
+ */
+export async function appendPdf(base: Buffer, extra: Buffer): Promise<Buffer> {
+  const baseDoc = await PDFDocument.load(base);
+  const extraDoc = await PDFDocument.load(extra, { ignoreEncryption: true });
+  const out = await PDFDocument.create();
+  for (const page of await out.copyPages(baseDoc, baseDoc.getPageIndices())) out.addPage(page);
+  for (const page of await out.copyPages(extraDoc, extraDoc.getPageIndices())) out.addPage(page);
+  return Buffer.from(await out.save({ useObjectStreams: false }));
+}
+
+/**
  * Shared print CSS.
  *
  * The palette is the approved ORYX identity: navy #0F2B48 and gold. `@page`

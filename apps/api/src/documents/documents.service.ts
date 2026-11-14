@@ -21,8 +21,15 @@ import { conflict, ERROR_CODES, notFound } from '../common/errors';
 import type { ActorContext } from '../organizations/organizations.service';
 import type { RequestPrincipal } from '../auth/auth.decorators';
 import { DocumentStorageService } from './document-storage.service';
-import { PdfRendererService, OFFICIAL_PDF_MARGINS, REPORT_PDF_MARGINS } from './pdf/pdf-renderer.service';
+import {
+  PdfRendererService,
+  OFFICIAL_PDF_MARGINS,
+  REPORT_PDF_MARGINS,
+  appendPdf,
+  countPdfPages,
+} from './pdf/pdf-renderer.service';
 import { QrService } from './pdf/qr.service';
+import { MediaStorageService } from '../cms/media-storage.service';
 import { renderInspectionReportHtml } from './templates/report-html';
 import { renderOfficialFinancialHtml } from './templates/official-financial.template';
 import { footerTemplate, officialFooterTemplate, reportFooterTemplate } from './templates/chrome';
@@ -63,6 +70,7 @@ export class DocumentsService {
     private readonly context: ErpContextService,
     private readonly sequences: DocumentSequenceService,
     private readonly storage: DocumentStorageService,
+    private readonly mediaStorage: MediaStorageService,
     private readonly renderer: PdfRendererService,
     private readonly qr: QrService,
   ) {}
@@ -110,6 +118,11 @@ export class DocumentsService {
     const issuer = await this.issuerFor(companyId);
     const payload = await this.buildInspectionPayload(companyId, session);
 
+    // A PDF attached to the inspection (a vendor's computer-unit scan) is merged
+    // into the report so the two travel as one file. Images are excluded: they
+    // are photographs rendered inside the report body, not documents to append.
+    const diagnosticPdfs = session.attachments.filter((a) => a.mimeType === 'application/pdf');
+
     return this.issue({
       companyId,
       type: 'VEHICLE_INSPECTION_REPORT',
@@ -130,7 +143,40 @@ export class DocumentsService {
           verification,
           baseCss: '',
         }),
+      mergePdf: diagnosticPdfs.length
+        ? async () => {
+            const parts: Buffer[] = [];
+            for (const attachment of diagnosticPdfs) {
+              const bytes = await this.loadDocumentBytes(attachment.mediaAssetId);
+              if (bytes) parts.push(bytes);
+            }
+            if (!parts.length) return null;
+            // Merge left-to-right so the uploads appear in the order they were
+            // attached; a single part is returned as-is.
+            let merged = parts[0];
+            for (const part of parts.slice(1)) merged = await appendPdf(merged, part);
+            return merged;
+          }
+        : undefined,
     });
+  }
+
+  /**
+   * Reads a stored PDF attachment's bytes for merging into the report.
+   *
+   * Returns `null` rather than throwing when the asset row or file is missing,
+   * so a report still issues if a previously uploaded scan was removed from
+   * storage — the report is the authoritative document, the scan is an annex.
+   */
+  private async loadDocumentBytes(mediaAssetId: string | null): Promise<Buffer | null> {
+    if (!mediaAssetId) return null;
+    const asset = await this.prisma.cmsMediaAsset.findUnique({ where: { id: mediaAssetId } });
+    if (!asset || asset.mimeType !== 'application/pdf') return null;
+    try {
+      return await this.mediaStorage.read(asset.storageKey);
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -212,6 +258,15 @@ export class DocumentsService {
     req?: RequestLike;
     render: (verification: DocumentVerification | null) => string;
     /**
+     * Optional extra PDF appended after the rendered document.
+     *
+     * Used by the inspection report to carry an external diagnostic scan in the
+     * same file. It runs after rendering and before storage, so the stored bytes
+     * and the recorded page count both describe the merged document. Returning
+     * `null` leaves the report as rendered.
+     */
+    mergePdf?: () => Promise<Buffer | null>;
+    /**
      * Which page furniture to paint. `official` is the measured invoice/
      * quotation layout with its own margins and contact footer; `report` is the
      * framed report layout. The body HTML is produced by the caller's `render`,
@@ -278,9 +333,19 @@ export class DocumentsService {
       coverFooterHtml,
       margins: layout === 'official' ? OFFICIAL_PDF_MARGINS : REPORT_PDF_MARGINS,
     });
+    // An external diagnostic PDF, when present, is appended after the report so
+    // the two pages travel as one file. The page count is re-measured from the
+    // merged bytes, so the stored record describes what was actually written.
+    let finalPdf = pdf;
+    let finalPageCount = pageCount;
+    const extra = args.mergePdf ? await args.mergePdf() : null;
+    if (extra) {
+      finalPdf = await appendPdf(pdf, extra);
+      finalPageCount = countPdfPages(finalPdf);
+    }
     const documentId = newDocumentId();
     const storageKey = this.storage.keyFor(args.companyId, documentId, version);
-    await this.storage.write(storageKey, pdf);
+    await this.storage.write(storageKey, finalPdf);
 
     const created = await this.prisma.$transaction(async (tx) => {
       if (prior && prior.status === 'ISSUED') {
@@ -313,8 +378,8 @@ export class DocumentsService {
           sourceId: args.sourceId,
           payload: args.payload as never,
           storageKey,
-          byteSize: pdf.byteLength,
-          pageCount,
+          byteSize: finalPdf.byteLength,
+          pageCount: finalPageCount,
           issuerNameEn: args.issuer.nameEn,
           issuerNameAr: args.issuer.nameAr,
           issuerCode: args.issuer.code,
@@ -338,12 +403,12 @@ export class DocumentsService {
       targetType: 'OFFICIAL_DOCUMENT',
       targetId: created.id,
       summary: `Issued ${spec.labelEn} ${args.documentNumber} v${version}`,
-      metadata: { type: args.type, documentNumber: args.documentNumber, version, pageCount },
+      metadata: { type: args.type, documentNumber: args.documentNumber, version, pageCount: finalPageCount },
       ipAddress: args.req?.ip,
       userAgent: this.userAgent(args.req),
     });
 
-    this.logger.log(`Issued ${args.type} ${args.documentNumber} v${version} (${pageCount}p)`);
+    this.logger.log(`Issued ${args.type} ${args.documentNumber} v${version} (${finalPageCount}p)`);
     return this.toDto(created);
   }
 

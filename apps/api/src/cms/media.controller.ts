@@ -21,7 +21,7 @@ import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagg
 import type { Response } from 'express';
 import { CurrentPrincipal, Public, RequirePermissions, type RequestPrincipal } from '../auth/auth.decorators';
 import { MediaService } from './media.service';
-import { MediaStorageService, sniffMime } from './media-storage.service';
+import { MediaStorageService, sniffMime, sniffDocumentMime } from './media-storage.service';
 import type { ActorContext } from '../organizations/organizations.service';
 import {
   PublishContentDto,
@@ -220,7 +220,7 @@ export class MediaController {
   @Public()
   @Get('media/:id/file')
   @Header('Cache-Control', 'public, max-age=31536000, immutable')
-  @ApiOperation({ summary: 'Serve an image variant' })
+  @ApiOperation({ summary: 'Serve an image variant or a stored document' })
   async file(
     @Param('id') id: string,
     @Res() res: Response,
@@ -229,12 +229,11 @@ export class MediaController {
     const asset = await this.media.getAsset(id);
     const variants = asset.variants as Record<string, { key: string; width: number; height: number }>;
     const chosen = variant && variants[variant] ? variants[variant] : variants.hero ?? variants.wide;
-    if (!chosen) {
-      throw new BadRequestException({ code: 'media.variant_missing', message: 'No variant available.' });
-    }
-
-    const buffer = await this.storage.read(chosen.key);
-    const sniffed = sniffMime(buffer) ?? 'image/webp';
+    // A document (PDF) has no image variants; its bytes live at the asset's own
+    // storage key and must be served verbatim so a download opens in a viewer.
+    const key = chosen?.key ?? asset.storageKey;
+    const buffer = await this.storage.read(key);
+    const sniffed = sniffMime(buffer) ?? sniffDocumentMime(buffer) ?? 'image/webp';
     res.setHeader('Content-Type', sniffed);
     res.setHeader('Content-Length', String(buffer.length));
     res.status(200).send(buffer);

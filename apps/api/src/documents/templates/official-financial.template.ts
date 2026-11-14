@@ -529,15 +529,21 @@ export const OFFICIAL_FINANCIAL_CSS = `
      face (Codec Pro Bold); the Latin labels and figures stay in Verdana. */
   .of-title-ar{ font-size:12.3pt; font-weight:700; color:#0f2b48; line-height:1.15; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
   .of-title-en{ font-size:12.3pt; font-weight:700; color:#0f2b48; letter-spacing:.6px; line-height:1.15; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
-  .of-trn{ margin-top:1pt; background:#0f2b48; color:#fff; font-size:8.8pt;
-    font-weight:700; text-align:end; padding:2pt 10pt; line-height:1.0; }
+  /* The reference navy strip is 16.5pt tall (measured y 108.5-125.0) around one
+     8.8pt line, so its vertical padding is ~3.85pt, not the 2pt a bare line box
+     would give; the shortfall printed a white gap where the reference is navy. */
+  .of-trn{ margin-top:0; background:#0f2b48; color:#fff; font-size:8.8pt;
+    font-weight:700; text-align:end; padding:4.1pt 10pt; line-height:1.0; }
   /* The reference panel has a hairline light border and no internal divider:
      the left column is wide, the customer column is a label/value grid. */
   .of-panel{ display:flex; border:1.5px solid #94a3b8; border-top:none;
     line-height:1.2; }
   /* Measured from the reference: the customer column's labels begin at x≈327
-     on a 545pt content width, so the left column is ~51% (not an even split). */
-  .of-panel-left{ flex:0 0 52%; padding:7pt 10pt; }
+     on a 545pt content width, so the left column is ~51% (not an even split).
+     The reference's panel ends at y225.5 with a visible bottom rule, ~7.5pt
+     above the table's top rule (y233); a 7pt bottom pad pushed our rule onto the
+     table border and merged the two lines. */
+  .of-panel-left{ flex:0 0 52%; padding:4.9pt 10pt 2.1pt; }
   /* The approved quotation sets its field block 3.3pt lower than the invoice's
      (Quotation Date 155.3 against Order Date 152.0) while the document number
      stays at the same height, so only the field grid is inset. */
@@ -569,12 +575,15 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-cp-label{ font-size:7.3pt; color:#64748b; font-weight:700; text-align:end; }
   .of-cp-value{ font-size:8.8pt; color:#0f2b48; font-weight:700; }
   .of-addr-line{ display:block; line-height:1.6; }
-  .of-table{ margin-top:0; table-layout:fixed; }
+  .of-table{ margin-top:6pt; table-layout:fixed; }
   /* The approved quotation sheet leaves a wider gap between the info panel
      and the table than the invoice does (measured 31pt vs 17.5pt). */
   .of-table-quote{ margin-top:13.9pt; }
+  /* The reference's header band is 29.5pt tall (rule y233 to rule y262.5)
+     around one 8.8pt line, so each side is ~7.75pt; 10pt made the band 34pt
+     and pushed every figure 4.5pt below the approved sheet. */
   .of-table th{ font-size:8.8pt; font-weight:700; color:#0f2b48; text-align:start;
-    padding:10pt 7pt; background:transparent; white-space:nowrap;
+    padding:7.75pt 7pt; background:transparent; white-space:nowrap;
     border-top:1.5px solid #94a3b8; border-bottom:1.5px solid #94a3b8; }
   /* The reference shades a fixed band per body row and spaces the rows 33.5pt
      apart (measured band tops 265.1, 298.5, 332.0), so a row that carries a

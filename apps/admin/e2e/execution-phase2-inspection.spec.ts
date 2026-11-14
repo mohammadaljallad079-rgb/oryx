@@ -12,6 +12,33 @@ import { ENTERPRISE_ADMIN, apiToken, expectNoServerError, setLocale, signIn } fr
 
 const API = process.env.ORYX_API ?? 'http://localhost:3001/api/v1';
 
+/** A minimal but structurally valid single-page PDF, used as a diagnostic scan. */
+const DIAGNOSTIC_PDF = Buffer.from(
+  `%PDF-1.7
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 120] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 46 >>
+stream
+BT /F1 12 Tf 20 60 Td (Diagnostic report) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+trailer
+<< /Root 1 0 R >>
+%%EOF`,
+  'latin1',
+);
+
 /** The seeded vehicle that belongs to the first seeded customer. */
 async function seedJob(page: Page, areas: string[]): Promise<string> {
   const token = await apiToken(page, ENTERPRISE_ADMIN);
@@ -368,5 +395,34 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await expect(page.getByTestId('inspection-rail-EXTERIOR')).toContainText('الفحص الخارجي');
     await expect(page.getByTestId('inspection-rail-ENGINE_COMPARTMENT')).toContainText('مقصورة المحرك');
     await expectNoServerError(page);
+  });
+
+  test('uploads a diagnostic PDF and opens it from the attachment list', async ({ page }) => {
+    const id = await seedJob(page, ['EXTERIOR']);
+    await page.goto(`/automotive/inspections/${id}`);
+    await expect(page.getByTestId('inspection-workspace')).toBeVisible();
+    await expect(page.getByTestId('inspection-attachments')).toBeVisible();
+
+    // A real, minimal PDF travels through the same multipart route the operator
+    // uses; the API must accept a document (not only an image) and serve its
+    // bytes back so the link opens a viewer rather than a broken image.
+    await page.getByTestId('attachment-input').setInputFiles({
+      name: 'diagnostic.pdf',
+      mimeType: 'application/pdf',
+      buffer: DIAGNOSTIC_PDF,
+    });
+
+    const card = page.getByTestId('inspection-attachments');
+    const link = card.locator('[data-testid^="attachment-open-"]').first();
+    await expect(link).toBeVisible({ timeout: 20_000 });
+    await expect(link).toContainText('diagnostic.pdf');
+
+    // Fetching the link returns the stored PDF bytes with the PDF content type.
+    const href = await link.getAttribute('href');
+    expect(href).toBeTruthy();
+    const served = await page.request.get(href!);
+    expect(served.status()).toBe(200);
+    expect(served.headers()['content-type']).toContain('application/pdf');
+    expect((await served.body()).subarray(0, 5).toString('ascii')).toBe('%PDF-');
   });
 });

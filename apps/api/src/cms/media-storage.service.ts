@@ -26,6 +26,19 @@ import { badRequest, ERROR_CODES } from '../common/errors';
 export const ALLOWED_INPUT_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'] as const;
 export type AllowedInputMime = (typeof ALLOWED_INPUT_MIME)[number];
 
+/**
+ * Non-image documents the shared store can hold verbatim.
+ *
+ * A PDF is never re-encoded — it is a document, not an image — so it is stored
+ * byte-for-byte and only the magic bytes are trusted. It exists for the
+ * vehicle-inspection diagnostic report: an external scan is uploaded and then
+ * appended to the issued report, so the two must survive as the same bytes the
+ * vendor produced. Only a PDF is accepted here; anything else would need a
+ * re-encoding path the image pipeline already owns.
+ */
+export const ALLOWED_DOCUMENT_MIME = ['application/pdf'] as const;
+export type AllowedDocumentMime = (typeof ALLOWED_DOCUMENT_MIME)[number];
+
 /** Variants generated for every upload, so pages never ship a full-size image. */
 export const MEDIA_VARIANTS = {
   thumb: { width: 320, height: 240 },
@@ -73,8 +86,22 @@ const SIGNATURES: Array<{ mime: AllowedInputMime; test: (b: Buffer) => boolean }
   },
 ];
 
+/** Magic-byte signature for a PDF document. */
+function isPdf(buffer: Buffer): boolean {
+  return buffer.length > 5 && buffer.toString('ascii', 0, 5) === '%PDF-';
+}
+
 export function sniffMime(buffer: Buffer): AllowedInputMime | null {
   return SIGNATURES.find((s) => s.test(buffer))?.mime ?? null;
+}
+
+/**
+ * Sniffs the non-image document types the shared store accepts. Separate from
+ * `sniffMime` because callers that expect an image (OCR, cropping) must not
+ * silently receive a PDF and fail later in sharp.
+ */
+export function sniffDocumentMime(buffer: Buffer): AllowedDocumentMime | null {
+  return isPdf(buffer) ? 'application/pdf' : null;
 }
 
 @Injectable()
@@ -244,6 +271,43 @@ export class MediaStorageService implements OnModuleInit {
     } catch {
       throw badRequest(ERROR_CODES.MEDIA_NOT_FOUND, 'The media file is missing from storage.');
     }
+  }
+
+  /**
+   * Stores a non-image document verbatim.
+   *
+   * A PDF is not re-encoded: its bytes are the document, and re-writing them
+   * would either corrupt the file or require a full PDF rewriter for no gain.
+   * The magic bytes are still checked, and the key is derived from a UUID plus
+   * the content hash, so a client cannot choose a path or predict one.
+   */
+  async storeDocument(
+    buffer: Buffer,
+    originalName: string,
+  ): Promise<{ storageKey: string; mimeType: AllowedDocumentMime; byteSize: number }> {
+    if (buffer.length === 0) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'The uploaded file is empty.');
+    }
+    if (buffer.length > this.maxUploadBytes) {
+      throw badRequest(
+        ERROR_CODES.MEDIA_TOO_LARGE,
+        `Documents must be ${Math.floor(this.maxUploadBytes / (1024 * 1024))} MB or smaller.`,
+      );
+    }
+    const sniffed = sniffDocumentMime(buffer);
+    if (!sniffed) {
+      throw badRequest(ERROR_CODES.MEDIA_TYPE_NOT_ALLOWED, 'Only PDF documents are accepted.');
+    }
+
+    const now = new Date();
+    const folder = `${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+    const digest = createHash('sha256').update(buffer).digest('hex').slice(0, 16);
+    const safeStem = originalName.replace(/[^A-Za-z0-9._-]+/g, '_').slice(-60) || 'document.pdf';
+    const key = `${folder}/${randomUUID().slice(0, 8)}-${digest}-${safeStem}`;
+    const full = this.resolvePath(key);
+    await mkdir(dirname(full), { recursive: true });
+    await writeFile(full, buffer);
+    return { storageKey: key, mimeType: sniffed, byteSize: buffer.length };
   }
 
   async exists(storageKey: string): Promise<boolean> {

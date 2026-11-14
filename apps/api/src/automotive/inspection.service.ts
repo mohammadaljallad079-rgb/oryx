@@ -17,7 +17,7 @@ import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { DocumentSequenceService } from '../common/document-sequence.service';
 import { ErpContextService } from '../common/erp-context.service';
-import { MediaStorageService } from '../cms/media-storage.service';
+import { MediaStorageService, sniffDocumentMime } from '../cms/media-storage.service';
 import { badRequest, conflict, ERROR_CODES, notFound } from '../common/errors';
 import type { ActorContext } from '../organizations/organizations.service';
 import type { RequestPrincipal } from '../auth/auth.decorators';
@@ -80,6 +80,27 @@ export class InspectionService {
   private assetUrl(assetId: string | null): string | null {
     if (!assetId) return null;
     return `/api/v1/cms/media/${assetId}/file?variant=card`;
+  }
+
+  /**
+   * Stores a PDF attachment verbatim and returns it in the same shape the image
+   * pipeline returns, so `addAttachment` can treat both uniformly. Documents
+   * carry no dimensions, variants, blur placeholder or dominant colour.
+   */
+  private async storeDocumentAsset(
+    buffer: Buffer,
+    originalName: string,
+  ): Promise<{
+    storageKey: string;
+    mimeType: string;
+    byteSize: number;
+    width?: number;
+    height?: number;
+    dominantColor?: string | null;
+    blurDataUrl?: string | null;
+    variants?: Record<string, never>;
+  }> {
+    return this.storage.storeDocument(buffer, originalName);
   }
 
   /** Load a session inside the caller's company, or fail with a 404. */
@@ -565,9 +586,14 @@ export class InspectionService {
 
     if (dto.sectionArea) this.assertAreaSelected(session.selectedAreas, dto.sectionArea);
 
-    // MediaStorageService sniffs the real type, re-encodes to strip EXIF, and
-    // derives the key from a UUID — a client never chooses a path.
-    const stored = await this.storage.store(file.buffer);
+    // A PDF (an external diagnostic scan) is stored verbatim so it can later be
+    // appended to the issued report as the same bytes the vendor produced;
+    // images go through the re-encoding pipeline that strips EXIF. MediaStorage
+    // sniffs the real type in both paths — a client never chooses a path.
+    const isDocument = sniffDocumentMime(file.buffer) !== null;
+    const stored = isDocument
+      ? await this.storeDocumentAsset(file.buffer, file.originalname)
+      : await this.storage.store(file.buffer);
 
     const attachment = await this.prisma.$transaction(async (tx) => {
       const asset = await tx.cmsMediaAsset.create({
@@ -576,11 +602,11 @@ export class InspectionService {
           storageKey: stored.storageKey,
           mimeType: stored.mimeType,
           byteSize: stored.byteSize,
-          width: stored.width,
-          height: stored.height,
-          dominantColor: stored.dominantColor,
-          blurDataUrl: stored.blurDataUrl,
-          variants: stored.variants as never,
+          width: stored.width ?? 0,
+          height: stored.height ?? 0,
+          dominantColor: stored.dominantColor ?? null,
+          blurDataUrl: stored.blurDataUrl ?? null,
+          variants: (stored.variants ?? {}) as never,
           caption: dto.caption ?? null,
         },
       });

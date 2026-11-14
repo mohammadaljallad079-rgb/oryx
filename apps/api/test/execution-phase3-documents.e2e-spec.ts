@@ -198,8 +198,17 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
     headers: { 'x-oryx-company-id': company },
   });
 
-  /** Create, fill, submit and approve an inspection for the given areas. */
-  async function approvedInspection(areas: string[]): Promise<string> {
+  /**
+   * Create, fill, submit and approve an inspection for the given areas.
+   *
+   * `beforeSubmit` runs while the session is still editable, which is the only
+   * window in which an attachment can be added — an approved inspection is
+   * frozen. It is used to attach a diagnostic PDF before the report is issued.
+   */
+  async function approvedInspection(
+    areas: string[],
+    beforeSubmit?: (sessionId: string) => Promise<void>,
+  ): Promise<string> {
     const created = await companyCall<{ id: string; selectedAreas: string[] }>(
       ctx.base,
       companyId,
@@ -248,6 +257,8 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
       body: { finalAssessment: 'المركبة بحالة جيدة · Vehicle in good condition' },
     });
     expect([200, 201]).toContain(updated.status);
+
+    if (beforeSubmit) await beforeSubmit(sessionId);
 
     const submitted = await companyCall(ctx.base, companyId, `/automotive/inspections/${sessionId}/submit`, {
       method: 'POST',
@@ -518,6 +529,129 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
       );
       const events = detail.body.events.map((e) => e.event);
       expect(events).toContain('REISSUED');
+    });
+  });
+
+  describe('merging an external diagnostic PDF into the report', () => {
+    /**
+     * A minimal but real one-page PDF. The merge path copies pages verbatim, so
+     * any valid PDF works; building it here keeps the fixture self-contained
+     * rather than depending on a binary checked into the repo.
+     */
+    function onePagePdf(label: string): Buffer {
+      const text = label.replace(/[()\\]/g, '');
+      const content = `BT /F1 24 Tf 72 720 Td (${text}) Tj ET`;
+      const objects = [
+        '<< /Type /Catalog /Pages 2 0 R >>',
+        '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+        '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+        `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+        '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+      ];
+      let pdf = '%PDF-1.4\n';
+      const offsets: number[] = [];
+      objects.forEach((body, index) => {
+        offsets.push(pdf.length);
+        pdf += `${index + 1} 0 obj\n${body}\nendobj\n`;
+      });
+      const xrefStart = pdf.length;
+      pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+      for (const offset of offsets) pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
+      pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF\n`;
+      return Buffer.from(pdf, 'latin1');
+    }
+
+    async function attachPdf(sessionId: string, bytes: Buffer, name = 'diagnostic.pdf') {
+      const form = new FormData();
+      form.append('file', new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }), name);
+      const res = await fetch(`${ctx.base}/api/v1/automotive/inspections/${sessionId}/attachments`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${issuerToken}`, 'x-oryx-company-id': companyId },
+        body: form,
+      });
+      const text = await res.text();
+      return { status: res.status, body: text ? (JSON.parse(text) as Record<string, string>) : null };
+    }
+
+    function pageCountOf(bytes: Buffer): number {
+      const text = bytes.toString('latin1');
+      const counts = [...text.matchAll(/\/Count\s+(\d+)/g)].map((m) => Number(m[1]));
+      return Math.max(...counts);
+    }
+
+    it('stores a PDF attachment verbatim and serves it back as application/pdf', async () => {
+      const session = await companyCall<{ id: string }>(ctx.base, companyId, '/automotive/inspections', {
+        method: 'POST',
+        token: issuerToken,
+        body: { customerId, vehicleId, selectedAreas: ['COMPUTER_UNIT'] },
+      });
+      const pdf = onePagePdf('DIAGNOSTIC REPORT');
+      const up = await attachPdf(session.body.id, pdf);
+      expect(up.status).toBe(201);
+      // A document is stored as-is; it is not re-encoded like an image.
+      expect(up.body!.mimeType).toBe('application/pdf');
+      expect(Number(up.body!.byteSize)).toBe(pdf.length);
+
+      const assetId = up.body!.url.match(/media\/([^/]+)\/file/)?.[1];
+      expect(assetId).toBeTruthy();
+      const served = await fetch(`${ctx.base}/api/v1/cms/media/${assetId}/file`);
+      expect(served.status).toBe(200);
+      expect(served.headers.get('content-type')).toContain('application/pdf');
+      const servedBytes = Buffer.from(await served.arrayBuffer());
+      expect(servedBytes.equals(pdf)).toBe(true);
+    });
+
+    it('appends the uploaded PDF to the issued report so the page count grows', async () => {
+      // The annex is attached while the session is still editable; an approved
+      // inspection is frozen, so the attachment must precede the approval.
+      const sessionId = await approvedInspection(['COMPUTER_UNIT'], async (id) => {
+        const up = await attachPdf(id, onePagePdf('DIAGNOSTIC PAGE ONE'));
+        expect(up.status).toBe(201);
+      });
+
+      const merged = await companyCall<{ id: string; pageCount: number }>(
+        ctx.base,
+        companyId,
+        `/documents/inspections/${sessionId}/issue`,
+        { method: 'POST', token: issuerToken },
+      );
+      expect(merged.status).toBe(201);
+
+      const fileRes = await fetch(`${ctx.base}/api/v1/documents/${merged.body.id}/file`, {
+        headers: { Authorization: `Bearer ${issuerToken}`, 'x-oryx-company-id': companyId },
+      });
+      const bytes = Buffer.from(await fileRes.arrayBuffer());
+      expect(bytes.toString('latin1').startsWith('%PDF-')).toBe(true);
+      expect(pageCountOf(bytes)).toBe(merged.body.pageCount);
+
+      // Compare against the same report issued without an annex: the merge adds
+      // exactly the annex's one page.
+      const plainSession = await approvedInspection(['COMPUTER_UNIT']);
+      const plain = await companyCall<{ id: string; pageCount: number }>(
+        ctx.base,
+        companyId,
+        `/documents/inspections/${plainSession}/issue`,
+        { method: 'POST', token: issuerToken },
+      );
+      expect(merged.body.pageCount).toBe(plain.body.pageCount + 1);
+    }, 240_000);
+
+    it('cannot attach a diagnostic PDF to another tenant\u2019s inspection', async () => {
+      const mine = await companyCall<{ id: string }>(ctx.base, companyId, '/automotive/inspections', {
+        method: 'POST',
+        token: issuerToken,
+        body: { customerId, vehicleId, selectedAreas: ['COMPUTER_UNIT'] },
+      });
+      // The other tenant presents its own token against this company's session;
+      // the session is not in its scope, so the upload is refused.
+      const form = new FormData();
+      form.append('file', new Blob([new Uint8Array(onePagePdf('FOREIGN'))], { type: 'application/pdf' }), 'x.pdf');
+      const res = await fetch(`${ctx.base}/api/v1/automotive/inspections/${mine.body.id}/attachments`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${otherTenantToken}`, 'x-oryx-company-id': otherCompanyId },
+        body: form,
+      });
+      expect(res.status).toBe(404);
     });
   });
 

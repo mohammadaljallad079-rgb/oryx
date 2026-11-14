@@ -320,6 +320,15 @@ describe('official financial template — identity', () => {
     expect(html).not.toContain('class="of-trn"');
   });
 
+  it('sizes the navy TRN strip to the reference band height', () => {
+    // The approved sheet's strip measures y 108.5-125.0 (16.5pt) around one
+    // 8.8pt line; a shorter box left a white gap the reference does not have.
+    const css = render();
+    expect(css).toContain('.of-trn{');
+    expect(css).toMatch(/\.of-trn\{[^}]*padding:4\.1pt 10pt/);
+    expect(css).toMatch(/\.of-trn\{[^}]*font-size:8\.8pt/);
+  });
+
   it('falls back to a typographic wordmark when no logo is uploaded', () => {
     const html = render({}, { ...issuer, logoDataUri: null });
     expect(html).toContain('of-wordmark-en');
