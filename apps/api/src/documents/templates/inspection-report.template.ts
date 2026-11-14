@@ -85,9 +85,9 @@ function resultMark(result: string): string {
  * reproduce the reference — `COMPUTER UNIT INSPECTION` is shorter than
  * `VEHICLE PAINT & BODY CHECK` yet prints smaller.
  */
-function pageTitleBar(titleAr: string, titleEn: string, sizePt = 10.3): string {
+function pageTitleBar(titleAr: string, titleEn: string, sizePt = 10.3, trackEm = 0): string {
   return `
-  <div class="p-title" style="--p-title-size:${sizePt}pt">
+  <div class="p-title" style="--p-title-size:${sizePt}pt;--p-title-track:${trackEm}em">
     <span class="p-title-ar">${esc(titleAr)}</span>
     <span class="p-title-en">${esc(titleEn)}</span>
   </div>`;
@@ -350,7 +350,7 @@ export function paintSectionPage(
   return `
   <section class="doc-page">
     ${reportHeader(input.issuer)}
-    ${pageTitleBar('فحص الصبغ وبدن المركبة', 'VEHICLE PAINT & BODY CHECK', 10)}
+    ${pageTitleBar('فحص الصبغ وبدن المركبة', 'VEHICLE PAINT & BODY CHECK', 10, -0.052)}
     ${jobStrip(input.payload)}
     ${paintDiagram(section)}
   </section>`;
@@ -365,7 +365,7 @@ export function chassisSectionPage(
   return `
   <section class="doc-page">
     ${reportHeader(input.issuer)}
-    ${pageTitleBar('فحص الشاصي وأسفل المركبة', 'CHASSIS & UNDERCARRIAGE CONDITION', 10)}
+    ${pageTitleBar('فحص الشاصي وأسفل المركبة', 'CHASSIS & UNDERCARRIAGE CONDITION', 10, -0.052)}
     ${jobStrip(input.payload)}
     ${chassisDiagram(section)}
   </section>`;
@@ -451,7 +451,7 @@ export function inspectionGroupPage(
   return `
   <section class="doc-page">
     ${reportHeader(input.issuer)}
-    ${pageTitleBar('الفحص الداخلي والخارجي / مقصورة المحرك / تجربة القيادة', 'INTERIOR & EXTERIOR INSPECTION / ENGINE COMPARTMENT / ROAD TEST', 8.7)}
+    ${pageTitleBar('الفحص الداخلي والخارجي / مقصورة المحرك / تجربة القيادة', 'INTERIOR & EXTERIOR INSPECTION / ENGINE COMPARTMENT / ROAD TEST', 8.7, -0.047)}
     ${jobStrip(input.payload)}
     ${cabin}
   </section>`;
@@ -465,7 +465,7 @@ export function computerSectionPage(
   return `
   <section class="doc-page p5-page">
     ${reportHeader(input.issuer)}
-    ${pageTitleBar('فحص وحدة الكمبيوتر', 'COMPUTER UNIT INSPECTION', 8.7)}
+    ${pageTitleBar('فحص وحدة الكمبيوتر', 'COMPUTER UNIT INSPECTION', 8.7, -0.047)}
     ${jobStrip(input.payload)}
     ${diagnosticSection(section)}
   </section>`;
@@ -713,7 +713,8 @@ export const INSPECTION_REPORT_CSS = `
   .rh-logo-mark{ display:block; width:auto; }
   .rh-wordmark{ display:flex; flex-direction:column; line-height:1.0; }
   .rh-wordmark-ar{ font-size:14.5pt; font-weight:700; color:var(--navy); }
-  .rh-wordmark-en{ font-size:14.2pt; font-weight:700; color:var(--navy); letter-spacing:.5px; }
+  .rh-wordmark-en{ font-size:14.2pt; font-weight:700; color:var(--navy); letter-spacing:.5px;
+    font-family:'ORYX Display',Verdana,Arial,Helvetica,sans-serif; }
   .rh-monogram{ width:38px; height:38px; border-radius:8px; background:var(--navy); color:var(--gold);
     display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14pt; letter-spacing:.5px; }
   .rh-name{ display:flex; flex-direction:column; line-height:1.12; }
@@ -724,14 +725,16 @@ export const INSPECTION_REPORT_CSS = `
   .rh-right{ display:flex; flex-direction:column; align-items:flex-end; line-height:1.2;
     text-align:right; padding-inline-end:28pt; }
   .rh-tag-ar{ font-size:11.8pt; font-weight:700; color:var(--navy); }
-  .rh-tag-en{ font-size:7.9pt; font-weight:700; color:var(--gold); letter-spacing:.6px; }
+  .rh-tag-en{ font-size:7.9pt; font-weight:700; color:var(--gold); letter-spacing:0;
+    font-family:'ORYX Display',Verdana,Arial,Helvetica,sans-serif; }
   /* ---- shared page furniture ---- */
   /* The approved section title prints at 10pt navy over an 8.7pt navy strapline,
    * both centred, with the strap in small caps. Measured from the reference
    * (y78 ar / y90 en on the section sheets). */
   .p-title{ display:flex; flex-direction:column; align-items:center; margin:15.9pt 0 3px; }
   .p-title-ar{ font-size:var(--p-title-size,10.3pt); font-weight:700; color:var(--navy); line-height:1.15; }
-  .p-title-en{ font-size:var(--p-title-size,10.3pt); font-weight:700; color:var(--navy); letter-spacing:.2px; line-height:1.0; }
+  .p-title-en{ font-size:var(--p-title-size,10.3pt); font-weight:700; color:var(--navy); letter-spacing:var(--p-title-track,0); line-height:1.0;
+    font-family:'ORYX Display','ORYX Latin',Verdana,Arial,Helvetica,sans-serif; }
   .job-head{ display:flex; direction:ltr; justify-content:space-between; align-items:baseline;
     font-size:8pt; font-weight:700; color:var(--navy); padding:0 2px 2px; }
   /* The vehicle strip: four cells over a light rule, labels in slate at 6.8pt and

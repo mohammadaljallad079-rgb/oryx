@@ -431,6 +431,32 @@ describe('inspection report template — reference page parity (Execution 19)', 
     expect(html).toContain('font-size:var(--p-title-size,10.3pt)');
   });
 
+  it('sets the Latin page titles in the brand display face, as the reference prints them', () => {
+    const html = render();
+    // The approved sheet sets the Latin title bars in the brand display face
+    // (Codec Pro Bold); its per-glyph advances match the reference to under
+    // 0.5pt, where the Verdana fallback is 1.5pt wide per glyph. The rule must
+    // therefore lead with the display face and keep a Latin fallback behind it.
+    expect(html).toMatch(
+      /\.p-title-en\{[^}]*font-family:'ORYX Display','ORYX Latin',Verdana/,
+    );
+    // The tagline and the header wordmark are display-face runs too.
+    expect(html).toMatch(/\.rh-tag-en\{[^}]*font-family:'ORYX Display'/);
+    expect(html).toMatch(/\.rh-wordmark-en\{[^}]*font-family:'ORYX Display'/);
+  });
+
+  it('applies the reference tracking to the section titles that carry it', () => {
+    const html = render();
+    // Measured from the reference: the paint/chassis headings are tracked
+    // -0.052em and the interior/computer headings -0.047em, which is what
+    // brings the run widths onto the reference's 136.0 / 179.9 / 113.5pt.
+    expect(html).toContain('--p-title-track:-0.052em');
+    expect(html).toContain('--p-title-track:-0.047em');
+    // The cover title carries no tracking (the reference prints it untracked).
+    expect(html).toMatch(/--p-title-size:10\.3pt;--p-title-track:0em/);
+    expect(html).toContain('letter-spacing:var(--p-title-track,0)');
+  });
+
   it('sets the disclaimer and remarks body at the measured reference sizes', () => {
     const html = render();
     // The Arabic disclaimer column prints at 8pt and its English translation at
