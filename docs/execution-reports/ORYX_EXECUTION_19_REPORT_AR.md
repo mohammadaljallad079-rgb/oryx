@@ -26,14 +26,15 @@
 
 | الغرض | الرابط |
 | --- | --- |
-| صفحة الأدلة (صور ومقارنات) | https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/ |
-| لوحة الإدارة (معاينة مباشرة) | https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/login |
-| تقرير الفحص المُنتَج | https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/inspection-report-rendered.pdf |
-| تقرير الفحص مع صورة وQR | https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/inspection-report-with-photo-qr.pdf |
-| الفاتورة الضريبية المُنتَجة | https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/tax-invoice-rendered.pdf |
-| مقارنة الفاتورة (مرجع/نظامنا) | https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/invoice-sbs.png |
-| مقارنة الترويسة/الشعار | https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/hdr-compare.png |
-| مقارنة الصفحات 1–5 | https://work-2-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/sbs-p1.png … `sbs-p5.png` |
+| صفحة الأدلة (كل الصور والمقارنات) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/index.html |
+| لوحة الإدارة (معاينة مباشرة) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/login |
+| الفاتورة الضريبية + عرض السعر المُنتَجة (2 صفحات) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/tax-invoice-rendered.pdf |
+| تقرير الفحص المُنتَج (5 صفحات) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/inspection-report-rendered.pdf |
+| مقارنة الفاتورة (مرجع/نظامنا) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/parity/invoice.png |
+| مقارنة عرض السعر | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/parity/quotation.png |
+| مقارنة العلامة المائية | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/session2/watermark-ref-vs-ours.png |
+| مقارنة الترويسة/الشعار | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/session2/header-ref-vs-ours.png |
+| مقارنة الصفحات 1–5 | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/parity/report-p1.png … `report-p5.png` |
 
 ---
 
@@ -414,3 +415,41 @@ SERVICES»** كعلامة مائية. لذا يختلف شكل العلامة ا
 | --- | --- |
 | قوالب المستندات (`src/documents`) | **8 حزم / 107 ✅** |
 | تكامل المستندات (`execution-phase3-documents`) | **32 ✅** |
+
+---
+
+## ملحق الجلسة الرابعة — تحقّق نهائي وتثبيت الأدلة
+
+أُعيد فحص الفرع والتحقق من أن كل التغييرات السابقة ما زالت قائمة، دون إعادة بناء
+أي شيء ودون فقدان أي عمل. النتائج الفعلية في هذه الجلسة:
+
+| الحزمة | الأمر | النتيجة |
+| --- | --- | --- |
+| وحدة المشترك | `pnpm --filter @oryx/shared test` | **12 ملفاً / 235 ✅** |
+| وحدة الـ API | `pnpm --filter @oryx/api test` | **10 حزم / 122 ✅** |
+| تكامل الـ API الكامل | `pnpm --filter @oryx/api test:e2e` | **41 حزمة / 746 ✅** |
+| واجهة إصلاحات التنفيذ 08 | `playwright test execution08-remediation` | **6/6 ✅** |
+| التقاط أدلة التنفيذ 19 | `playwright test execution19-evidence` | **9/9 ✅** |
+| بناء الإنتاج للوحة الإدارة | `pnpm --filter @oryx/admin build` | ✅ |
+| فحص Lint للوحة الإدارة | `pnpm --filter @oryx/admin lint` | ✅ نظيف |
+
+**تحقّق رمز QR (فكّ فعلي):** فُكّ رمزا التحقق من ملف PDF المُنتَج
+`tax-invoice-rendered.pdf` بمُفكِّك QR حقيقي، وأعاد الرابطان:
+
+```
+https://admin.oryxbhr.com/verify/5eGSHaEyCfRmUKkv9eazmZ7f6PSX_7kPmPsFzuE24_0
+https://admin.oryxbhr.com/verify/HX19IcDXxj8CyCFGWoWN1w8nW-dskT6KkcoRpEdfRoU
+```
+
+ويفتح مسار `/verify/:token` على أصل لوحة الإدارة صفحة تحقّق فعلية (حالة 200).
+
+**تثبيت الأدلة:** الأدلة تُخدَم من مجلد `public` في لوحة الإدارة للعرض المحلي،
+وأُضيف مسار `apps/admin/public/evidence/` إلى `.gitignore` حتى لا تُدرج بايتات
+المراجع التي تحوي بيانات عميل حقيقي في التحكم بالإصدار (نفس سياسة بقية مجلدات
+المقارنة). الصفحة الرئيسية للأدلة: `/evidence/exec19/index.html`.
+
+**فروق المطابقة المتبقية (بصراحة):** لا فروق في العناصر أو الترتيب أو النصوص أو
+الحسابات. الفرق العددي المتبقّي على مستوى البكسل سببه تنعيم الحواف (anti-aliasing)
+لاختلاف محرّك توليد PDF، ولا يمكن إيصاله إلى صفر.
+
+> أُنشئ هذا التقرير بواسطة وكيل ذكاء اصطناعي (OpenHands) نيابةً عن مالك المستودع.
