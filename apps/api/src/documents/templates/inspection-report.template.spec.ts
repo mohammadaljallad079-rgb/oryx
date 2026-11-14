@@ -323,6 +323,17 @@ describe('inspection report template — reference page parity (Execution 19)', 
     expect(html).not.toContain('marker-table');
   });
 
+  it('prints each paint condition as a navy chip with its colour swatch, per the reference', () => {
+    const html = render();
+    // The approved key is four navy chips carrying the label in white and the
+    // condition's own colour swatch (green/orange/red, cross on sectioned).
+    expect(html).toContain('class="legend-chip"');
+    expect(html).toContain('legend-chip-mark lm-green');
+    expect(html).toContain('legend-chip-mark lm-orange');
+    expect((html.match(/legend-chip-mark lm-red/g) ?? []).length).toBe(2);
+    expect(html).toContain('.legend-chip{ display:inline-flex; align-items:center; gap:5pt; background:var(--navy);');
+  });
+
   it('prints the paint remarks box after the legend, as in the reference', () => {
     const withRemarks: InspectionReportPayload = {
       ...payload,

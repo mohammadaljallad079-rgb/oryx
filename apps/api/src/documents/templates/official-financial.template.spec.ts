@@ -353,13 +353,21 @@ describe('official financial template — identity', () => {
 });
 
 describe('official financial template — reference watermark parity (Execution 19)', () => {
-  it('sets the AUTO SERVICES watermark in the brand display face at the measured size', () => {
-    const html = render();
+  it('paints the official ORYX logo as the watermark, not a typed wordmark', () => {
+    const html = render({}, { ...issuer, logoDataUri: 'data:image/png;base64,LOGO' });
     expect(html).toContain('class="of-watermark"');
-    expect(html).toContain("font-family:'ORYX Display'");
-    expect(html).toContain('font-size:51.747pt');
-    expect(html).toContain('letter-spacing:6.72pt');
+    // The owner requires the real mark: the issuer's logo image, not the
+    // "AUTO SERVICES" text stand-in.
+    expect(html).toContain('class="of-watermark-img"');
+    expect(html).toContain('src="data:image/png;base64,LOGO"');
+    expect(html).not.toContain('of-watermark" aria-hidden="true">AUTO SERVICES');
     expect(html).toMatch(/opacity:0\.10/);
+  });
+
+  it('falls back to the vector ORYX mark when no logo is configured', () => {
+    const html = render({}, { ...issuer, logoDataUri: null });
+    expect(html).toContain('class="of-watermark-mark"');
+    expect(html).not.toContain('of-watermark" aria-hidden="true">AUTO SERVICES');
   });
 
   it('fixes the watermark so it repeats on every printed page', () => {

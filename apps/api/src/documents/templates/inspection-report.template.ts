@@ -528,14 +528,17 @@ function itemsTable(
  * can never show two different vehicles.
  */
 function paintDiagram(section: InspectionReportSection): string {
-  // The approved legend reads sectioned, Change, Filler, Paint left to right —
-  // the reverse of the catalogue's declaration order — so the printed key
-  // matches the reference rather than the data model.
+  // The approved sheet prints the key as four navy chips across one row —
+  // sectioned, Change, Filler, Paint left to right (the reverse of the
+  // catalogue's declaration order) — each carrying its label in white and the
+  // condition's own colour swatch (green/orange/red, with a cross on
+  // sectioned) on the trailing edge. That is the approved design, so the printed
+  // key reproduces it rather than the plain ink-on-white list.
   const legend = [...PAINT_CONDITIONS]
     .reverse()
     .map(
       (c) =>
-        `<span class="legend-item"><span class="legend-dot ld-${c.color}">${c.cross ? markGlyph('x', 7) : ''}</span>${esc(c.labelAr)} / ${esc(c.labelEn)}</span>`,
+        `<span class="legend-chip"><span class="legend-chip-label">${esc(c.labelAr)} / ${esc(c.labelEn)}</span><span class="legend-chip-mark lm-${c.color}">${c.cross ? markGlyph('x', 8) : ''}</span></span>`,
     )
     .join('');
 
@@ -911,10 +914,16 @@ export const INSPECTION_REPORT_CSS = `
    * order is physical, so the row is forced LTR rather than inheriting the
    * document's RTL flow. */
   .legend--row{ justify-content:center; margin-top:10px; direction:ltr; }
-  .legend-item{ font-size:8.5pt; color:var(--ink); display:flex; align-items:center; gap:6px; }
-  .legend-dot{ width:14px; height:14px; border-radius:50%; display:inline-flex; align-items:center;
-    justify-content:center; font-size:8pt; color:#fff; font-weight:700; }
-  .ld-green{ background:#1f9d55; } .ld-orange{ background:#e08a1e; } .ld-red{ background:#d92d20; }
+  /* The approved key: a navy chip per condition, the bilingual label in white,
+     and the condition's own colour swatch (green/orange/red, cross on
+     sectioned) as a square badge on the trailing edge. Measured from the
+     reference (chip height ~20.3pt, swatch ~13.7pt square). */
+  .legend-chip{ display:inline-flex; align-items:center; gap:5pt; background:var(--navy);
+    color:#fff; font-size:8.5pt; line-height:1; padding:3pt 4pt 3pt 7pt; }
+  .legend-chip-label{ white-space:nowrap; }
+  .legend-chip-mark{ width:13.7pt; height:13.7pt; display:inline-flex; align-items:center;
+    justify-content:center; color:#fff; flex:0 0 auto; }
+  .lm-green{ background:#16a34a; } .lm-orange{ background:#f59e0b; } .lm-red{ background:#dc2626; }
   /* The approved chassis page centres the drawing and distributes the eight
    * region boxes around it — Front above, Rear below, three pairs down the
    * sides. The board is a three-column grid with the drawing in the centre.

@@ -145,6 +145,23 @@ function documentTaxRate(payload: FinancialDocumentPayload): number {
 }
 
 /**
+ * The faint ORYX watermark behind the priced body.
+ *
+ * The owner asked for the official ORYX *logo* — the real mark, not a typed
+ * stand-in — so this paints the issuer's own logo image (the approved lockup,
+ * or a tenant's uploaded mark) rather than the "AUTO SERVICES" wordmark text.
+ * It is fixed so Chromium repaints it on every page, placed behind the content
+ * and kept at low opacity so the navy table headings and the figures stay fully
+ * legible on top of it.
+ */
+export function watermark(issuer: DocumentIssuer): string {
+  const mark = issuer.logoDataUri
+    ? `<img class="of-watermark-img" src="${esc(issuer.logoDataUri)}" alt="">`
+    : oryxLogoMark('150pt', 'of-watermark-mark');
+  return `<div class="of-watermark" aria-hidden="true">${mark}</div>`;
+}
+
+/**
  * The identity band: the official logo on the leading edge and the tagline on
  * the trailing edge, measured from the approved reference (logo lockup at
  * x 16.5-154, y 16.3-49.5; tagline right-aligned at the same height).
@@ -417,7 +434,7 @@ ${OFFICIAL_FINANCIAL_CSS}
 </head>
 <body>
 <section class="of-page">
-  <div class="of-watermark" aria-hidden="true">AUTO SERVICES</div>
+  ${watermark(input.issuer)}
   ${identityBand(input.issuer)}
   <div class="of-body">
   ${titleBlock(payload)}
@@ -473,15 +490,17 @@ export const OFFICIAL_FINANCIAL_CSS = `
      measures the reference's 476pt ink width, in the identity navy at ~9.6%
      opacity (measured from the approved PDF), centred on the sheet.
 
-     The approved sheet repeats the watermark on every page (its two-page
-     invoice carries it on both), so the mark is position:fixed, which
-     Chromium repaints on each printed page. An absolutely positioned mark would
-     paint once, on page one only, and leave every continuation page blank. */
-  .of-watermark{ position:fixed; left:0; right:0; top:350.2pt;
-    text-align:center; white-space:pre;
-    font-size:51.747pt; font-weight:700; letter-spacing:6.72pt;
-    color:#0a1f44; opacity:0.101; pointer-events:none; z-index:0;
-    font-family:'ORYX Display',Verdana,Arial,Helvetica,sans-serif; }
+     The owner's later instruction supersedes that: the watermark must be the
+     official ORYX *logo*, not a typed wordmark. The mark is therefore the
+     issuer's own logo image, centred and scaled so its ink matches the old
+     wordmark's footprint, at the same measured opacity so the priced body stays
+     fully legible. A position:fixed mark makes Chromium repaint it on every
+     printed page; an absolutely positioned mark would paint on page one only and
+     leave continuation pages blank. */
+  .of-watermark{ position:fixed; inset:0; display:flex; align-items:center;
+    justify-content:center; pointer-events:none; z-index:0; }
+  .of-watermark-img{ width:74%; height:auto; opacity:0.10; display:block; }
+  .of-watermark-mark{ width:74%; height:auto; opacity:0.10; display:block; }
   /* The approved invoice prints the identity band wider than the priced table:
      the logotype starts ~10pt left of the content box and the quality badge ends
      ~8pt right of it (measured logo x16.5, badge x579.5 against a content box of
