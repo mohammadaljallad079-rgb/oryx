@@ -76,6 +76,63 @@ export class CalendarQueryDto {
   resourceId?: string;
 }
 
+/**
+ * Query for the "which days can I book?" endpoint.
+ *
+ * `from` is a calendar date; the caller resolves the branch timezone. `days` is
+ * bounded so a request cannot ask the engine to walk an unbounded horizon.
+ */
+export class AvailabilityDaysQueryDto {
+  @IsDateString()
+  from!: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(5)
+  @Max(1440)
+  durationMinutes!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(62)
+  days?: number;
+
+  @IsOptional()
+  @IsString()
+  branchId?: string;
+
+  @IsOptional()
+  @IsString()
+  resourceId?: string;
+
+  @IsOptional()
+  @IsString()
+  serviceRef?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(5)
+  @Max(240)
+  stepMinutes?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(20_160)
+  minimumNoticeMinutes?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(240)
+  bufferMinutes?: number;
+}
+
 export class CreateBookingDto {
   @IsString()
   @IsIn(BOOKING_TYPES)

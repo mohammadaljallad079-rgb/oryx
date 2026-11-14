@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useUi } from '@/lib/ui-context';
-import { customerApi, SERVICE_CATEGORIES, type AvailableSlot } from '@/lib/api';
+import { customerApi, SERVICE_CATEGORIES, type AvailableDay, type AvailableSlot } from '@/lib/api';
 import { messageOf, useAsync } from '@/lib/hooks';
 import { Alert, Button, Card, Field, StatusBadge, bookingTypeLabel, formatDate } from '@/components/ui';
 import { LoadingPanel, PageHeader, StatePanel, TableWrap } from '@/components/premium';
@@ -52,6 +52,8 @@ function BookingsContent() {
 
   const [slots, setSlots] = useState<AvailableSlot[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
+  const [openDays, setOpenDays] = useState<AvailableDay[]>([]);
+  const [daysLoading, setDaysLoading] = useState(false);
   const [chosen, setChosen] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -82,6 +84,47 @@ function BookingsContent() {
     void loadSlots();
   }, [loadSlots]);
 
+  /**
+   * The days that actually have a bookable slot.
+   *
+   * Loading these first lets the form steer the customer to an open day instead
+   * of letting them pick a closed one and then reporting "no slots", which
+   * looks like a fault. The list is refetched when the service or duration
+   * changes, because availability is per service.
+   */
+  const loadOpenDays = useCallback(async () => {
+    setDaysLoading(true);
+    try {
+      const days = await customerApi.availabilityDays({
+        from: todayIso(),
+        durationMinutes: duration,
+        days: 21,
+        serviceRef: categoryKey,
+      });
+      setOpenDays(days.filter((day) => day.slots > 0));
+    } catch {
+      setOpenDays([]);
+    } finally {
+      setDaysLoading(false);
+    }
+  }, [duration, categoryKey]);
+
+  useEffect(() => {
+    void loadOpenDays();
+  }, [loadOpenDays]);
+
+  // Move off a closed day: when the open-day list arrives and the selected date
+  // is not on it, jump to the first open day. An empty list (everything closed)
+  // leaves the choice alone rather than fighting the user.
+  useEffect(() => {
+    if (daysLoading || openDays.length === 0) return;
+    if (!openDays.some((day) => day.date === date)) {
+      setDate(openDays[0].date);
+    }
+  }, [openDays, daysLoading, date]);
+
+  const selectedDayOpen = openDays.length === 0 || openDays.some((day) => day.date === date);
+
   async function confirmBooking() {
     if (!chosen) return;
     setError(null);
@@ -100,6 +143,7 @@ function BookingsContent() {
       setChosen(null);
       await bookings.reload();
       await loadSlots();
+      await loadOpenDays();
     } catch (err) {
       // A taken slot is the expected concurrency outcome, not a crash.
       setError(messageOf(err));
@@ -186,7 +230,16 @@ function BookingsContent() {
             </select>
           </Field>
 
-          <Field label={t('bookings.pickDate')}>
+          <Field
+            label={t('bookings.pickDate')}
+            hint={
+              daysLoading
+                ? t('bookings.checkingDays')
+                : openDays.length === 0
+                  ? t('bookings.noOpenDays')
+                  : t('bookings.openDays', { count: String(openDays.length) })
+            }
+          >
             <input
               className="oryx-input"
               type="date"
@@ -195,6 +248,11 @@ function BookingsContent() {
               dir="ltr"
               data-testid="booking-date"
             />
+            {!daysLoading && openDays.length > 0 && !selectedDayOpen && (
+              <p className="oryx-muted" data-testid="booking-closed-day" style={{ marginTop: 6 }}>
+                {t('bookings.closedDayHint')}
+              </p>
+            )}
           </Field>
 
           <Field label={t('support.comment')} hint={t('common.optional')}>

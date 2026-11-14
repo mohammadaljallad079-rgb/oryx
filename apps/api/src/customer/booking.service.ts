@@ -183,6 +183,56 @@ export class BookingService {
   }
 
   /**
+   * Which of the next `days` days have at least one bookable slot.
+   *
+   * The booking form used to accept any date and then report "no slots" after
+   * the fact, which reads as a broken page. This answers the question the
+   * customer is actually asking — "which days can I book?" — by running the
+   * same `availableSlots` engine for each day and keeping the days that yield a
+   * slot. It respects working hours, resource exceptions, minimum notice and
+   * existing bookings, because it delegates entirely to `availableSlots`; it
+   * never invents availability.
+   *
+   * The walk starts at `fromDate` (already the UTC instant of local midnight,
+   * resolved by the caller from the branch timezone) and stays bounded.
+   */
+  async availableDays(input: {
+    companyId: string;
+    branchId?: string | null;
+    resourceId?: string | null;
+    serviceRef?: string | null;
+    fromDate: Date;
+    durationMinutes: number;
+    days: number;
+    stepMinutes?: number;
+    minimumNoticeMinutes?: number;
+    bufferMinutes?: number;
+  }): Promise<Array<{ date: string; slots: number; firstSlot: string | null }>> {
+    const days = Math.min(Math.max(1, input.days), 62);
+    const results: Array<{ date: string; slots: number; firstSlot: string | null }> = [];
+    for (let offset = 0; offset < days; offset += 1) {
+      const dayStart = new Date(input.fromDate.getTime() + offset * 24 * 60 * 60 * 1000);
+      const slots = await this.availableSlots({
+        companyId: input.companyId,
+        branchId: input.branchId ?? null,
+        resourceId: input.resourceId ?? null,
+        serviceRef: input.serviceRef ?? null,
+        dayStart,
+        durationMinutes: input.durationMinutes,
+        stepMinutes: input.stepMinutes,
+        minimumNoticeMinutes: input.minimumNoticeMinutes,
+        bufferMinutes: input.bufferMinutes,
+      });
+      results.push({
+        date: dayStart.toISOString().slice(0, 10),
+        slots: slots.length,
+        firstSlot: slots[0]?.startsAt ?? null,
+      });
+    }
+    return results;
+  }
+
+  /**
    * Generate the slots a single resource (or the company calendar, when
    * `resourceId` is null) offers on the requested day.
    */

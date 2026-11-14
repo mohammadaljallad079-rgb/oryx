@@ -1339,3 +1339,26 @@ so nothing else needs changing.
 - **`apps/admin/build` clears `.next`.** `next start` keeps serving the old
   build from memory, so restart the admin (and customer) server after a build
   before running the UI suites, or the suite exercises stale chunks.
+
+### Customer storefront SEO gotchas
+
+- **The customer `(account)` route group adds no path segment.** Those pages
+  serve at the site root (`/dashboard`, `/bookings`, `/orders`, …), not under
+  `/account`. A `robots.ts` or a link that disallows `/account` names a path
+  that does not exist and leaves the real account pages crawlable. List each
+  route by its real path.
+- **A shared JSON-LD layout leaks onto nested routes.** `products/page.tsx` and
+  `products/[id]/page.tsx` are siblings under `products/`, so an `ItemList` in
+  `products/layout.tsx` is inherited by every product detail page. The listing
+  markup lives in the `products/(list)/layout.tsx` route group, which the
+  detail route does not enter.
+- **Server-side SEO fetches need an absolute API origin.** The browser client
+  uses a relative `/api` on purpose, but Node's `fetch` cannot resolve a
+  relative URL, so `structured-data.ts` resolves an absolute origin from
+  `ORYX_API_BASE_URL`/`NEXT_PUBLIC_API_BASE_URL` and degrades to no data rather
+  than throwing when the API is down. Sitemap and JSON-LD therefore never fail
+  a build.
+- **A stale `.next/types/validator.ts` survives a route move.** After moving a
+  page into or out of a route group, `tsc --noEmit` fails with
+  `Cannot find module '…/products/layout.js'` until `rm -rf apps/customer/.next`
+  and a fresh build regenerate the validator.
