@@ -505,7 +505,10 @@ export function SearchableSelect({
               <button
                 type="button"
                 className="block w-full rounded-lg px-3 py-2 text-start text-[12.5px] hover:bg-[var(--surface-2)]"
-                onClick={() => pick(null)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  pick(null);
+                }}
               >
                 {emptyLabel}
               </button>
@@ -515,7 +518,8 @@ export function SearchableSelect({
                 type="button"
                 className="mb-1 flex w-full items-center gap-2 rounded-lg border border-dashed border-[var(--border-strong)] px-3 py-2 text-start text-[12.5px] font-semibold"
                 style={{ color: 'var(--gold)' }}
-                onClick={() => {
+                onClick={(e) => {
+                  e.preventDefault();
                   setOpen(false);
                   setQuery('');
                   onCreateNew();
@@ -537,7 +541,13 @@ export function SearchableSelect({
                   aria-selected={o.value === value}
                   disabled={o.disabled}
                   className="block w-full rounded-lg px-3 py-2 text-start hover:bg-[var(--surface-2)] disabled:opacity-50"
-                  onClick={() => pick(o.value)}
+                  onClick={(e) => {
+                    // `preventDefault` stops the wrapping `<label>` (from `Field`)
+                    // from re-dispatching a click to the trigger button, which
+                    // would instantly reopen the popover the pick just closed.
+                    e.preventDefault();
+                    pick(o.value);
+                  }}
                 >
                   <span className="block text-[12.5px] font-semibold">{o.label}</span>
                   {o.hint ? <span className="oryx-faint block text-[11px]">{o.hint}</span> : null}

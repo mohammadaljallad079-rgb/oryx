@@ -119,34 +119,34 @@ export function SupplierModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} disabled={Boolean(supplier)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="supplier-code" />
+          <input className="oryx-input" value={form.code} disabled={Boolean(supplier)} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))} data-testid="supplier-code" />
         </Field>
         <Field label={t('erp.sales.phone')}>
-          <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} data-testid="supplier-phone" />
+          <input className="oryx-input" value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))} data-testid="supplier-phone" />
         </Field>
         <Field label={`${t('common.name')} (EN)`} required>
-          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="supplier-name-en" />
+          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm((prev) => ({ ...prev, nameEn: e.target.value }))} data-testid="supplier-name-en" />
         </Field>
         <Field label={`${t('common.name')} (AR)`} required>
-          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="supplier-name-ar" />
+          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm((prev) => ({ ...prev, nameAr: e.target.value }))} data-testid="supplier-name-ar" />
         </Field>
         <Field label={t('common.email')}>
-          <input className="oryx-input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="supplier-email" />
+          <input className="oryx-input" value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} data-testid="supplier-email" />
         </Field>
         <Field label={t('erp.sales.taxNumber')}>
-          <input className="oryx-input" value={form.taxNumber} onChange={(e) => setForm({ ...form, taxNumber: e.target.value })} data-testid="supplier-tax-number" />
+          <input className="oryx-input" value={form.taxNumber} onChange={(e) => setForm((prev) => ({ ...prev, taxNumber: e.target.value }))} data-testid="supplier-tax-number" />
         </Field>
         <Field label={t('common.address')}>
-          <input className="oryx-input" value={form.addressLine} onChange={(e) => setForm({ ...form, addressLine: e.target.value })} data-testid="supplier-address" />
+          <input className="oryx-input" value={form.addressLine} onChange={(e) => setForm((prev) => ({ ...prev, addressLine: e.target.value }))} data-testid="supplier-address" />
         </Field>
         <Field label={t('common.city')}>
-          <input className="oryx-input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} data-testid="supplier-city" />
+          <input className="oryx-input" value={form.city} onChange={(e) => setForm((prev) => ({ ...prev, city: e.target.value }))} data-testid="supplier-city" />
         </Field>
         <Field label={t('erp.sales.paymentTerms')}>
-          <input className="oryx-input" value={form.paymentTermsDays} onChange={(e) => setForm({ ...form, paymentTermsDays: e.target.value })} data-testid="supplier-payment-terms" />
+          <input className="oryx-input" value={form.paymentTermsDays} onChange={(e) => setForm((prev) => ({ ...prev, paymentTermsDays: e.target.value }))} data-testid="supplier-payment-terms" />
         </Field>
         <Field label={t('common.notes')}>
-          <input className="oryx-input" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} data-testid="supplier-notes" />
+          <input className="oryx-input" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} data-testid="supplier-notes" />
         </Field>
       </div>
     </Modal>
@@ -227,37 +227,37 @@ export function ProductModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.inventory.sku')} required>
-          <input className="oryx-input" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} data-testid="product-sku" />
+          <input className="oryx-input" value={form.sku} onChange={(e) => setForm((prev) => ({ ...prev, sku: e.target.value }))} data-testid="product-sku" />
         </Field>
         <Field label={t('erp.inventory.unit')}>
-          <input className="oryx-input" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
+          <input className="oryx-input" value={form.unit} onChange={(e) => setForm((prev) => ({ ...prev, unit: e.target.value }))} />
         </Field>
         <Field label={`${t('common.name')} (EN)`} required>
-          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="product-name-en" />
+          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm((prev) => ({ ...prev, nameEn: e.target.value }))} data-testid="product-name-en" />
         </Field>
         <Field label={`${t('common.name')} (AR)`} required>
-          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="product-name-ar" />
+          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm((prev) => ({ ...prev, nameAr: e.target.value }))} data-testid="product-name-ar" />
         </Field>
         <Field label={t('erp.inventory.salesPrice')}>
-          <input className="oryx-input" value={form.salesPrice} onChange={(e) => setForm({ ...form, salesPrice: e.target.value })} />
+          <input className="oryx-input" value={form.salesPrice} onChange={(e) => setForm((prev) => ({ ...prev, salesPrice: e.target.value }))} />
         </Field>
         <Field label={t('erp.inventory.costPrice')}>
-          <input className="oryx-input" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: e.target.value })} />
+          <input className="oryx-input" value={form.costPrice} onChange={(e) => setForm((prev) => ({ ...prev, costPrice: e.target.value }))} />
         </Field>
         <Field label={t('erp.inventory.taxRate')}>
-          <input className="oryx-input" value={form.taxRate} onChange={(e) => setForm({ ...form, taxRate: e.target.value })} />
+          <input className="oryx-input" value={form.taxRate} onChange={(e) => setForm((prev) => ({ ...prev, taxRate: e.target.value }))} />
         </Field>
         <Field label={t('erp.inventory.barcode')}>
-          <input className="oryx-input" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} data-testid="product-barcode" />
+          <input className="oryx-input" value={form.barcode} onChange={(e) => setForm((prev) => ({ ...prev, barcode: e.target.value }))} data-testid="product-barcode" />
         </Field>
         <Field label={t('erp.inventory.category')}>
-          <input className="oryx-input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} data-testid="product-category" />
+          <input className="oryx-input" value={form.category} onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))} data-testid="product-category" />
         </Field>
         <Field label={t('erp.inventory.reorderLevel')}>
-          <input className="oryx-input" value={form.reorderLevel} onChange={(e) => setForm({ ...form, reorderLevel: e.target.value })} data-testid="product-reorder-level" />
+          <input className="oryx-input" value={form.reorderLevel} onChange={(e) => setForm((prev) => ({ ...prev, reorderLevel: e.target.value }))} data-testid="product-reorder-level" />
         </Field>
         <Field label={t('erp.inventory.reorderQuantity')}>
-          <input className="oryx-input" value={form.reorderQuantity} onChange={(e) => setForm({ ...form, reorderQuantity: e.target.value })} />
+          <input className="oryx-input" value={form.reorderQuantity} onChange={(e) => setForm((prev) => ({ ...prev, reorderQuantity: e.target.value }))} />
         </Field>
       </div>
       <label className="mt-4 flex items-center gap-2 text-[12.5px] font-semibold">
@@ -265,7 +265,7 @@ export function ProductModal({
           type="checkbox"
           className="oryx-checkbox"
           checked={form.trackStock}
-          onChange={(e) => setForm({ ...form, trackStock: e.target.checked })}
+          onChange={(e) => setForm((prev) => ({ ...prev, trackStock: e.target.checked }))}
           data-testid="product-track-stock"
         />
         {t('erp.inventory.trackStock')}
@@ -328,13 +328,13 @@ export function WarehouseModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="warehouse-code" />
+          <input className="oryx-input" value={form.code} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))} data-testid="warehouse-code" />
         </Field>
         <Field label={`${t('common.name')} (EN)`} required>
-          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="warehouse-name-en" />
+          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm((prev) => ({ ...prev, nameEn: e.target.value }))} data-testid="warehouse-name-en" />
         </Field>
         <Field label={`${t('common.name')} (AR)`} required>
-          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="warehouse-name-ar" />
+          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm((prev) => ({ ...prev, nameAr: e.target.value }))} data-testid="warehouse-name-ar" />
         </Field>
       </div>
     </Modal>
@@ -424,21 +424,21 @@ export function VehicleModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.sales.customer')} required>
-          <select className="oryx-select" value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })} data-testid="vehicle-customer">
+          <select className="oryx-select" value={form.customerId} onChange={(e) => setForm((prev) => ({ ...prev, customerId: e.target.value }))} data-testid="vehicle-customer">
             <option value="">—</option>
             {customers.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.nameEn}</option>)}
           </select>
         </Field>
         <Field label={t('erp.automotive.vin')} required hint={vinValid ? t('erp.automotive.vinHint') : t('erp.automotive.vinInvalid')}>
-          <input className={`oryx-input${form.vin && !vinValid ? ' oryx-input--invalid' : ''}`} value={form.vin} onChange={(e) => setForm({ ...form, vin: e.target.value.toUpperCase() })} maxLength={17} data-testid="vehicle-vin" />
+          <input className={`oryx-input${form.vin && !vinValid ? ' oryx-input--invalid' : ''}`} value={form.vin} onChange={(e) => setForm((prev) => ({ ...prev, vin: e.target.value.toUpperCase() }))} maxLength={17} data-testid="vehicle-vin" />
         </Field>
-        <Field label={t('erp.automotive.make')} required><input className="oryx-input" value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} data-testid="vehicle-make" /></Field>
-        <Field label={t('erp.automotive.model')} required><input className="oryx-input" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} data-testid="vehicle-model" /></Field>
-        <Field label={t('erp.automotive.modelYear')} required><input className="oryx-input" value={form.modelYear} onChange={(e) => setForm({ ...form, modelYear: e.target.value })} data-testid="vehicle-year" /></Field>
-        <Field label={t('erp.automotive.plate')}><input className="oryx-input" value={form.plateNumber} onChange={(e) => setForm({ ...form, plateNumber: e.target.value })} data-testid="vehicle-plate" /></Field>
-        <Field label={t('erp.automotive.mileage')}><input className="oryx-input" value={form.mileage} onChange={(e) => setForm({ ...form, mileage: e.target.value })} data-testid="vehicle-mileage" /></Field>
-        <Field label={t('erp.automotive.color')}><input className="oryx-input" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} data-testid="vehicle-color" /></Field>
-        <Field label={t('erp.automotive.registrationExpiresAt')}><input type="date" className="oryx-input" value={form.registrationExpiresAt} onChange={(e) => setForm({ ...form, registrationExpiresAt: e.target.value })} data-testid="vehicle-registration-expires" /></Field>
+        <Field label={t('erp.automotive.make')} required><input className="oryx-input" value={form.make} onChange={(e) => setForm((prev) => ({ ...prev, make: e.target.value }))} data-testid="vehicle-make" /></Field>
+        <Field label={t('erp.automotive.model')} required><input className="oryx-input" value={form.model} onChange={(e) => setForm((prev) => ({ ...prev, model: e.target.value }))} data-testid="vehicle-model" /></Field>
+        <Field label={t('erp.automotive.modelYear')} required><input className="oryx-input" value={form.modelYear} onChange={(e) => setForm((prev) => ({ ...prev, modelYear: e.target.value }))} data-testid="vehicle-year" /></Field>
+        <Field label={t('erp.automotive.plate')}><input className="oryx-input" value={form.plateNumber} onChange={(e) => setForm((prev) => ({ ...prev, plateNumber: e.target.value }))} data-testid="vehicle-plate" /></Field>
+        <Field label={t('erp.automotive.mileage')}><input className="oryx-input" value={form.mileage} onChange={(e) => setForm((prev) => ({ ...prev, mileage: e.target.value }))} data-testid="vehicle-mileage" /></Field>
+        <Field label={t('erp.automotive.color')}><input className="oryx-input" value={form.color} onChange={(e) => setForm((prev) => ({ ...prev, color: e.target.value }))} data-testid="vehicle-color" /></Field>
+        <Field label={t('erp.automotive.registrationExpiresAt')}><input type="date" className="oryx-input" value={form.registrationExpiresAt} onChange={(e) => setForm((prev) => ({ ...prev, registrationExpiresAt: e.target.value }))} data-testid="vehicle-registration-expires" /></Field>
       </div>
     </Modal>
   );
@@ -539,43 +539,43 @@ export function EmployeeModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} disabled={Boolean(employee)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="employee-code" />
+          <input className="oryx-input" value={form.code} disabled={Boolean(employee)} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))} data-testid="employee-code" />
         </Field>
         <Field label={t('erp.hr.department')}>
-          <select className="oryx-select" value={form.departmentId} onChange={(e) => setForm({ ...form, departmentId: e.target.value })} data-testid="employee-department">
+          <select className="oryx-select" value={form.departmentId} onChange={(e) => setForm((prev) => ({ ...prev, departmentId: e.target.value }))} data-testid="employee-department">
             <option value="">—</option>
             {departments.map((d) => <option key={d.id} value={d.id}>{d.nameEn}</option>)}
           </select>
         </Field>
         <Field label={`${t('common.name')} (EN)`} required>
-          <input className="oryx-input" value={form.fullNameEn} onChange={(e) => setForm({ ...form, fullNameEn: e.target.value })} data-testid="employee-name-en" />
+          <input className="oryx-input" value={form.fullNameEn} onChange={(e) => setForm((prev) => ({ ...prev, fullNameEn: e.target.value }))} data-testid="employee-name-en" />
         </Field>
         <Field label={`${t('common.name')} (AR)`} required>
-          <input className="oryx-input" value={form.fullNameAr} onChange={(e) => setForm({ ...form, fullNameAr: e.target.value })} data-testid="employee-name-ar" />
+          <input className="oryx-input" value={form.fullNameAr} onChange={(e) => setForm((prev) => ({ ...prev, fullNameAr: e.target.value }))} data-testid="employee-name-ar" />
         </Field>
         <Field label={t('common.email')}>
-          <input className="oryx-input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="employee-email" />
+          <input className="oryx-input" value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} data-testid="employee-email" />
         </Field>
         <Field label={t('erp.sales.phone')}>
-          <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} data-testid="employee-phone" />
+          <input className="oryx-input" value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))} data-testid="employee-phone" />
         </Field>
         <Field label={t('erp.hr.secondaryPhone')}>
-          <input className="oryx-input" value={form.secondaryPhone} onChange={(e) => setForm({ ...form, secondaryPhone: e.target.value })} data-testid="employee-secondary-phone" />
+          <input className="oryx-input" value={form.secondaryPhone} onChange={(e) => setForm((prev) => ({ ...prev, secondaryPhone: e.target.value }))} data-testid="employee-secondary-phone" />
         </Field>
         {!employee ? (
           <Field label={t('erp.hr.hireDate')} required>
-            <input type="date" className="oryx-input" value={form.hireDate} onChange={(e) => setForm({ ...form, hireDate: e.target.value })} data-testid="employee-hire-date" />
+            <input type="date" className="oryx-input" value={form.hireDate} onChange={(e) => setForm((prev) => ({ ...prev, hireDate: e.target.value }))} data-testid="employee-hire-date" />
           </Field>
         ) : (
           <Field label={t('erp.hr.employmentEndDate')}>
-            <input type="date" className="oryx-input" value={form.terminationDate} onChange={(e) => setForm({ ...form, terminationDate: e.target.value })} data-testid="employee-termination-date" />
+            <input type="date" className="oryx-input" value={form.terminationDate} onChange={(e) => setForm((prev) => ({ ...prev, terminationDate: e.target.value }))} data-testid="employee-termination-date" />
           </Field>
         )}
         <Field label={t('common.address')}>
-          <input className="oryx-input" value={form.addressLine} onChange={(e) => setForm({ ...form, addressLine: e.target.value })} data-testid="employee-address" />
+          <input className="oryx-input" value={form.addressLine} onChange={(e) => setForm((prev) => ({ ...prev, addressLine: e.target.value }))} data-testid="employee-address" />
         </Field>
         <Field label={t('common.notes')}>
-          <input className="oryx-input" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} data-testid="employee-notes" />
+          <input className="oryx-input" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} data-testid="employee-notes" />
         </Field>
       </div>
       {employee && canManage !== undefined ? documentsSlot : null}
@@ -657,28 +657,28 @@ export function LeadModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} disabled={Boolean(lead)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="lead-code" />
+          <input className="oryx-input" value={form.code} disabled={Boolean(lead)} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))} data-testid="lead-code" />
         </Field>
         <Field label={t('erp.crm.contact')}>
-          <input className="oryx-input" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} data-testid="lead-contact" />
+          <input className="oryx-input" value={form.contactName} onChange={(e) => setForm((prev) => ({ ...prev, contactName: e.target.value }))} data-testid="lead-contact" />
         </Field>
         <Field label={`${t('common.name')} (EN)`} required>
-          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="lead-name-en" />
+          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm((prev) => ({ ...prev, nameEn: e.target.value }))} data-testid="lead-name-en" />
         </Field>
         <Field label={`${t('common.name')} (AR)`} required>
-          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="lead-name-ar" />
+          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm((prev) => ({ ...prev, nameAr: e.target.value }))} data-testid="lead-name-ar" />
         </Field>
         <Field label={t('erp.crm.estimatedValue')}>
-          <input className="oryx-input" value={form.estimatedValue} onChange={(e) => setForm({ ...form, estimatedValue: e.target.value })} data-testid="lead-estimated-value" />
+          <input className="oryx-input" value={form.estimatedValue} onChange={(e) => setForm((prev) => ({ ...prev, estimatedValue: e.target.value }))} data-testid="lead-estimated-value" />
         </Field>
         <Field label={t('erp.sales.phone')}>
-          <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} data-testid="lead-phone" />
+          <input className="oryx-input" value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))} data-testid="lead-phone" />
         </Field>
         <Field label={t('common.email')}>
-          <input className="oryx-input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="lead-email" />
+          <input className="oryx-input" value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} data-testid="lead-email" />
         </Field>
         <Field label={t('common.notes')}>
-          <input className="oryx-input" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} data-testid="lead-notes" />
+          <input className="oryx-input" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} data-testid="lead-notes" />
         </Field>
       </div>
     </Modal>
@@ -791,7 +791,7 @@ export function AccountModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} disabled={Boolean(account)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="account-code" />
+          <input className="oryx-input" value={form.code} disabled={Boolean(account)} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))} data-testid="account-code" />
         </Field>
         <Field label={t('erp.accounting.type')} required>
           <select
@@ -802,7 +802,7 @@ export function AccountModal({
               // Follow the conventional balance so the operator rarely has to
               // change it: assets and expenses are debit, the rest credit.
               const normalBalance = type === 'ASSET' || type === 'EXPENSE' ? 'DEBIT' : 'CREDIT';
-              setForm({ ...form, type, normalBalance });
+              setForm((prev) => ({ ...prev, type, normalBalance }));
             }}
             data-testid="account-type"
           >
@@ -812,7 +812,7 @@ export function AccountModal({
           </select>
         </Field>
         <Field label={t('erp.accounting.parentAccount')}>
-          <select className="oryx-select" value={form.parentId} onChange={(e) => setForm({ ...form, parentId: e.target.value })} data-testid="account-parent">
+          <select className="oryx-select" value={form.parentId} onChange={(e) => setForm((prev) => ({ ...prev, parentId: e.target.value }))} data-testid="account-parent">
             <option value="">{t('erp.accounting.noParent')}</option>
             {parentAccounts.map((a) => (
               <option key={a.id} value={a.id}>{a.code} — {locale === 'ar' ? a.nameAr : a.nameEn}</option>
@@ -820,13 +820,13 @@ export function AccountModal({
           </select>
         </Field>
         <Field label={`${t('common.name')} (EN)`} required>
-          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="account-name-en" />
+          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm((prev) => ({ ...prev, nameEn: e.target.value }))} data-testid="account-name-en" />
         </Field>
         <Field label={`${t('common.name')} (AR)`} required>
-          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="account-name-ar" />
+          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm((prev) => ({ ...prev, nameAr: e.target.value }))} data-testid="account-name-ar" />
         </Field>
         <Field label={t('erp.accounting.normalBalance')}>
-          <select className="oryx-select" value={form.normalBalance} onChange={(e) => setForm({ ...form, normalBalance: e.target.value })} data-testid="account-normal-balance">
+          <select className="oryx-select" value={form.normalBalance} onChange={(e) => setForm((prev) => ({ ...prev, normalBalance: e.target.value }))} data-testid="account-normal-balance">
             <option value="DEBIT">{t('erp.accounting.debit')}</option>
             <option value="CREDIT">{t('erp.accounting.credit')}</option>
           </select>
