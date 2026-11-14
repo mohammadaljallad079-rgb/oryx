@@ -937,9 +937,13 @@ export const INSPECTION_REPORT_CSS = `
    * rather than following the document's RTL flow. */
   .ch-board{ display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:4px; direction:ltr; }
   .ch-row{ display:flex; justify-content:center; width:100%; }
-  .ch-row-mid{ align-items:center; gap:10px; }
+  .ch-row-mid{ align-items:flex-start; gap:10px; }
   .ch-row-edge .ch-card{ min-width:150px; text-align:center; }
-  .ch-side{ display:flex; flex-direction:column; gap:14px; width:150px; }
+  /* The approved sheet spreads the three left/right cards down the drawing
+   * band instead of stacking them at the top; min-height (not height) so a
+   * card carrying a note can still grow without overflowing the column. */
+  .ch-side{ display:flex; flex-direction:column; justify-content:space-between; gap:8px; width:149px; min-height:270px; margin-top:20px; }
+  .ch-side .ch-card{ width:149px; box-sizing:border-box; }
   .ch-side:first-child{ align-items:flex-start; text-align:left; }
   .ch-side:last-child{ align-items:flex-end; text-align:right; }
   /* The reference draws the chassis at ~270x374pt, i.e. 360px wide at
