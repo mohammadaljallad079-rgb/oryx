@@ -4,18 +4,15 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
 import { toMinorInput, toQuantityInput } from '@/lib/erp-format';
-import {
-  Button,
-  ErrorBanner,
-  Field,
-  Modal,
-} from '@/components/ui';
-import type { EmployeeDto, ErpAccountDto, LeadDto, ProductDto, SupplierDto, VehicleDto } from '@oryx/shared';
+import { Button, ErrorBanner, Field, Modal } from '@/components/ui';
+import { EntityPicker } from '@/components/inline-create';
+import { CustomerModal } from '@/components/customer-modal';
+import type { EmployeeDto, ErpAccountDto, LeadDto, MarketplaceProviderDto, ProductDto, SupplierDto, VehicleDto } from '@oryx/shared';
 
 /**
  * The shared create/edit forms for the entities a form most often needs to add
  * without leaving the page: a supplier, a product, a warehouse, a vehicle, an
- * employee, a CRM lead and a chart-of-accounts account.
+ * employee, a CRM lead, a marketplace provider and a chart-of-accounts account.
  *
  * Each is the same form the entity's own screen uses — the same fields, the
  * same validation and the same API call — so an inline "+ Add new" never
@@ -345,6 +342,7 @@ export function VehicleModal({
   open,
   customers,
   defaultCustomerId,
+  onCustomerCreated,
   onClose,
   onCreated,
   onSaved,
@@ -353,6 +351,8 @@ export function VehicleModal({
   customers: Array<{ id: string; code: string; nameEn: string; nameAr?: string | null }>;
   /** Preselected customer when the modal is opened from a customer-scoped form. */
   defaultCustomerId?: string;
+  /** Reload the customer list after one is created from the picker. */
+  onCustomerCreated?: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void> | void;
   onSaved?: (saved: VehicleDto) => void;
@@ -424,10 +424,25 @@ export function VehicleModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.sales.customer')} required>
-          <select className="oryx-select" value={form.customerId} onChange={(e) => setForm((prev) => ({ ...prev, customerId: e.target.value }))} data-testid="vehicle-customer">
-            <option value="">—</option>
-            {customers.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.customerId || null}
+            options={customers.map((c) => ({ value: c.id, label: `${c.code} — ${c.nameEn}` }))}
+            onChange={(v) => setForm((prev) => ({ ...prev, customerId: v ?? '' }))}
+            placeholder={t('common.select')}
+            emptyLabel={t('common.none')}
+            testId="vehicle-customer"
+            createLabel={t('erp.sales.newCustomer')}
+            reloadOptions={onCustomerCreated}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <CustomerModal
+                open
+                customer={null}
+                onClose={closeCreate}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.automotive.vin')} required hint={vinValid ? t('erp.automotive.vinHint') : t('erp.automotive.vinInvalid')}>
           <input className={`oryx-input${form.vin && !vinValid ? ' oryx-input--invalid' : ''}`} value={form.vin} onChange={(e) => setForm((prev) => ({ ...prev, vin: e.target.value.toUpperCase() }))} maxLength={17} data-testid="vehicle-vin" />
@@ -450,6 +465,7 @@ export function EmployeeModal({
   departments,
   canManage,
   documentsSlot,
+  onDepartmentCreated,
   onClose,
   onCreated,
   onSaved,
@@ -460,6 +476,8 @@ export function EmployeeModal({
   canManage?: boolean;
   /** Rendered under the fields, e.g. the employee's documents section on edit. */
   documentsSlot?: ReactNode;
+  /** Reload the department list after one is created from the picker. */
+  onDepartmentCreated?: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void> | void;
   onSaved?: (saved: { id: string }) => void;
@@ -542,10 +560,24 @@ export function EmployeeModal({
           <input className="oryx-input" value={form.code} disabled={Boolean(employee)} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))} data-testid="employee-code" />
         </Field>
         <Field label={t('erp.hr.department')}>
-          <select className="oryx-select" value={form.departmentId} onChange={(e) => setForm((prev) => ({ ...prev, departmentId: e.target.value }))} data-testid="employee-department">
-            <option value="">—</option>
-            {departments.map((d) => <option key={d.id} value={d.id}>{d.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.departmentId || null}
+            options={departments.map((d) => ({ value: d.id, label: d.nameEn }))}
+            onChange={(v) => setForm((prev) => ({ ...prev, departmentId: v ?? '' }))}
+            placeholder={t('common.select')}
+            emptyLabel={t('common.none')}
+            testId="employee-department"
+            createLabel={t('erp.hr.newDepartment')}
+            reloadOptions={onDepartmentCreated}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <InlineDepartmentModal
+                onClose={closeCreate}
+                // The picker's own `onSaved` reloads the option list and selects
+                // the new department, so the nested form only reports the id.
+                onCreated={(id) => void onSaved(id)}
+              />
+            )}
+          />
         </Field>
         <Field label={`${t('common.name')} (EN)`} required>
           <input className="oryx-input" value={form.fullNameEn} onChange={(e) => setForm((prev) => ({ ...prev, fullNameEn: e.target.value }))} data-testid="employee-name-en" />
@@ -689,6 +721,7 @@ export function AccountModal({
   open,
   account,
   parentAccounts,
+  onAccountCreated,
   onClose,
   onCreated,
   onSaved,
@@ -696,6 +729,8 @@ export function AccountModal({
   open: boolean;
   account?: ErpAccountDto | null;
   parentAccounts: ErpAccountDto[];
+  /** Reload the parent-account list after one is created from the picker. */
+  onAccountCreated?: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void> | void;
   onSaved?: (saved: ErpAccountDto) => void;
@@ -812,12 +847,27 @@ export function AccountModal({
           </select>
         </Field>
         <Field label={t('erp.accounting.parentAccount')}>
-          <select className="oryx-select" value={form.parentId} onChange={(e) => setForm((prev) => ({ ...prev, parentId: e.target.value }))} data-testid="account-parent">
-            <option value="">{t('erp.accounting.noParent')}</option>
-            {parentAccounts.map((a) => (
-              <option key={a.id} value={a.id}>{a.code} — {locale === 'ar' ? a.nameAr : a.nameEn}</option>
-            ))}
-          </select>
+          <EntityPicker
+            value={form.parentId || null}
+            options={parentAccounts.map((a) => ({ value: a.id, label: `${a.code} — ${locale === 'ar' ? a.nameAr : a.nameEn}` }))}
+            onChange={(v) => setForm((prev) => ({ ...prev, parentId: v ?? '' }))}
+            placeholder={t('common.select')}
+            emptyLabel={t('erp.accounting.noParent')}
+            testId="account-parent"
+            createLabel={t('erp.accounting.newAccount')}
+            reloadOptions={onAccountCreated}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <AccountModal
+                open
+                account={null}
+                parentAccounts={parentAccounts}
+                onAccountCreated={onAccountCreated}
+                onClose={closeCreate}
+                onCreated={async () => { await onAccountCreated?.(); }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={`${t('common.name')} (EN)`} required>
           <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm((prev) => ({ ...prev, nameEn: e.target.value }))} data-testid="account-name-en" />
@@ -835,3 +885,164 @@ export function AccountModal({
     </Modal>
   );
 }
+
+/**
+ * A department create form for the inline picker. Departments are a two-name
+ * catalogue (code + English name + Arabic name); the create is a real POST to
+ * `/hr/departments` and the new id is handed back so the picker selects it.
+ */
+export function InlineDepartmentModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (createdId: string) => void | Promise<void>;
+}) {
+  const { t } = useUi();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '' });
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const created = await api.createDepartment({ code: form.code, nameEn: form.nameEn, nameAr: form.nameAr });
+      await onCreated(created.id);
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open title={t('erp.hr.newDepartment')} onClose={onClose}
+      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || !form.code || !form.nameEn || !form.nameAr} onClick={submit} data-testid="inline-create-department-save">{busy ? t('common.loading') : t('common.save')}</Button></>}>
+      {error ? <ErrorBanner message={error} /> : null}
+      <div className="grid gap-3">
+        <Field label={t('common.code')} required><input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="inline-create-department-code" /></Field>
+        <Field label={`${t('common.name')} (EN)`} required><input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="inline-create-department-name-en" /></Field>
+        <Field label={`${t('common.name')} (AR)`} required><input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="inline-create-department-name-ar" /></Field>
+      </div>
+    </Modal>
+  );
+}
+
+
+/**
+ * Create a marketplace service provider. Providers start `PENDING` and only
+ * become assignable once an operator approves them, so an inline create from a
+ * service-request or recovery dispatcher produces a real, approvable record.
+ */
+export function MarketplaceProviderModal({
+  open,
+  onClose,
+  onCreated,
+  onSaved,
+  autoApprove = false,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: () => Promise<void> | void;
+  onSaved?: (saved: MarketplaceProviderDto) => void;
+  /**
+   * A provider is created `PENDING` and is only assignable once approved. In a
+   * dispatch context (assigning a request or a recovery) the operator needs the
+   * provider usable at once, so the create is followed by an approval through
+   * the same `decide` endpoint. The caller only sets this when the principal
+   * holds `erp.marketplace.provider.manage`, the permission both calls require.
+   */
+  autoApprove?: boolean;
+}) {
+  const { t } = useUi();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    code: '',
+    nameEn: '',
+    nameAr: '',
+    categoryKey: '',
+    email: '',
+    phone: '',
+    commissionPercent: '0',
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setForm({ code: '', nameEn: '', nameAr: '', categoryKey: '', email: '', phone: '', commissionPercent: '0' });
+  }, [open]);
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const saved = await api.createProvider({
+        code: form.code,
+        nameEn: form.nameEn,
+        nameAr: form.nameAr,
+        categoryKey: form.categoryKey || undefined,
+        email: form.email || undefined,
+        phone: form.phone || undefined,
+        commissionPercentBp: Math.round((Number(form.commissionPercent) || 0) * 100),
+      });
+      const usable = autoApprove ? await api.decideProvider(saved.id, 'APPROVED') : saved;
+      await onCreated();
+      onSaved?.(usable);
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      title={t('erp.automotive.newProvider')}
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            variant="primary"
+            disabled={busy || !form.nameEn || !form.nameAr || !form.code}
+            onClick={submit}
+            data-testid="save-provider"
+          >
+            {busy ? t('common.loading') : t('common.save')}
+          </Button>
+        </>
+      }
+    >
+      {error ? <ErrorBanner message={error} /> : null}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label={t('common.code')} required>
+          <input className="oryx-input" value={form.code} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))} data-testid="provider-code" />
+        </Field>
+        <Field label={t('erp.providers.category')}>
+          <input className="oryx-input" value={form.categoryKey} onChange={(e) => setForm((prev) => ({ ...prev, categoryKey: e.target.value }))} data-testid="provider-category" />
+        </Field>
+        <Field label={`${t('common.name')} (EN)`} required>
+          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm((prev) => ({ ...prev, nameEn: e.target.value }))} data-testid="provider-name-en" />
+        </Field>
+        <Field label={t('erp.providers.nameAr')} required>
+          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm((prev) => ({ ...prev, nameAr: e.target.value }))} data-testid="provider-name-ar" />
+        </Field>
+        <Field label={t('common.email')}>
+          <input className="oryx-input" value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} data-testid="provider-email" />
+        </Field>
+        <Field label={t('erp.sales.phone')}>
+          <input className="oryx-input" value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))} data-testid="provider-phone" />
+        </Field>
+        <Field label={`${t('erp.providers.commission')} (%)`}>
+          <input className="oryx-input" value={form.commissionPercent} onChange={(e) => setForm((prev) => ({ ...prev, commissionPercent: e.target.value }))} data-testid="provider-commission" />
+        </Field>
+      </div>
+    </Modal>
+  );
+}
+

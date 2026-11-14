@@ -9,6 +9,7 @@ import { money, toMinorInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import { EntityPicker } from '@/components/inline-create';
 import { LeadModal } from '@/components/entity-modals';
+import { PipelineModal } from '@/components/pipeline-modal';
 import { CustomerModal } from '@/components/customer-modal';
 import { ModuleDashboard } from '@/components/module-dashboard';
 import { TabDeepLink } from '@/components/tab-deep-link';
@@ -293,6 +294,7 @@ function OpportunitiesTab({ canManage, canConvert }: { canManage: boolean; canCo
         open={open}
         pipelines={pipelines.data?.items ?? []}
         customers={customers.data?.items ?? []}
+        onPipelinesReload={pipelines.reload}
         onCustomersReload={customers.reload}
         onClose={() => setOpen(false)}
         onCreated={list.reload}
@@ -305,6 +307,7 @@ function CreateOpportunityModal({
   open,
   pipelines,
   customers,
+  onPipelinesReload,
   onCustomersReload,
   onClose,
   onCreated,
@@ -312,6 +315,7 @@ function CreateOpportunityModal({
   open: boolean;
   pipelines: Array<{ id: string; nameEn: string; stages: Array<{ id: string; nameEn: string }> }>;
   customers: Array<{ id: string; code: string; nameEn: string }>;
+  onPipelinesReload: () => Promise<void> | void;
   onCustomersReload: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
@@ -365,10 +369,23 @@ function CreateOpportunityModal({
           <input className="oryx-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="opportunity-title" />
         </Field>
         <Field label={t('erp.crm.pipeline')} required>
-          <select className="oryx-select" value={form.pipelineId} onChange={(e) => setForm({ ...form, pipelineId: e.target.value, stageId: '' })} data-testid="opportunity-pipeline">
-            <option value="">—</option>
-            {pipelines.map((p) => <option key={p.id} value={p.id}>{p.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.pipelineId || null}
+            options={pipelines.map((p) => ({ value: p.id, label: p.nameEn }))}
+            onChange={(v) => setForm({ ...form, pipelineId: v ?? '', stageId: '' })}
+            placeholder={t('common.select')}
+            testId="opportunity-pipeline"
+            createLabel={t('erp.crm.newPipeline')}
+            reloadOptions={onPipelinesReload}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <PipelineModal
+                open
+                onClose={closeCreate}
+                onCreated={onPipelinesReload}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.crm.stage')}>
           <select className="oryx-select" value={form.stageId} onChange={(e) => setForm({ ...form, stageId: e.target.value })}>

@@ -11,7 +11,8 @@ import { DocumentActions } from '@/components/document-actions';
 import { ModuleDashboard } from '@/components/module-dashboard';
 import { TabDeepLink } from '@/components/tab-deep-link';
 import { EntityPicker } from '@/components/inline-create';
-import { SupplierModal } from '@/components/entity-modals';
+import { ProductModal, SupplierModal, WarehouseModal } from '@/components/entity-modals';
+import { TaxPicker } from '@/components/tax-modal';
 import {
   Badge,
   Button,
@@ -20,7 +21,6 @@ import {
   ErrorBanner,
   Field,
   Modal,
-  SearchableSelect,
   SectionHeader,
   Skeleton,
   StatusBadge,
@@ -46,17 +46,24 @@ const emptyLine = (taxPercent = '10'): LineDraft => ({ productId: '', descriptio
 /**
  * The tenant's saved purchase-applicable taxes as dropdown options. `value` is
  * the rate in basis points, so a product's own rate can be matched directly.
+ * `reload` refreshes the list after a rate is created from a line's picker.
  */
-function useTaxOptions(companyId: string | null | undefined): SearchableOption[] {
+function useTaxOptions(companyId: string | null | undefined): {
+  options: SearchableOption[];
+  reload: () => Promise<void>;
+} {
   const taxes = useAsync(
     () => api.taxes({ companyId: companyId ?? undefined, scope: 'PURCHASES' }),
     [companyId],
   );
-  return (taxes.data?.items ?? []).map((tax) => ({
-    value: String(tax.rateBp),
-    label: `${tax.rateBp / 100}%`,
-    hint: tax.nameEn,
-  }));
+  return {
+    options: (taxes.data?.items ?? []).map((tax) => ({
+      value: String(tax.rateBp),
+      label: `${tax.rateBp / 100}%`,
+      hint: tax.nameEn,
+    })),
+    reload: taxes.reload,
+  };
 }
 
 const TAB_KEYS = ['dashboard', 'orders', 'requisitions', 'receipts', 'invoices', 'returns', 'suppliers'] as const;
@@ -239,7 +246,7 @@ function SuppliersTab({ canManage }: { canManage: boolean }) {
 
 function RequisitionsTab({ canManage }: { canManage: boolean }) {
   const { companyId } = useAuth();
-  const taxOptions = useTaxOptions(companyId);
+  const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
   const { t } = useUi();
   const [open, setOpen] = useState(false);
   const list = useAsync(() => api.requisitions(), []);
@@ -314,7 +321,9 @@ function RequisitionsTab({ canManage }: { canManage: boolean }) {
         suppliers={suppliers.data?.items ?? []}
         onSupplierCreated={suppliers.reload}
         products={products.data?.items ?? []}
+        onProductCreated={products.reload}
         taxOptions={taxOptions}
+        onTaxCreated={reloadTaxOptions}
         onClose={() => setOpen(false)}
         onCreated={list.reload}
       />
@@ -324,9 +333,11 @@ function RequisitionsTab({ canManage }: { canManage: boolean }) {
 
 function RequisitionModal({
   taxOptions,
+  onTaxCreated,
   open,
   suppliers,
   products,
+  onProductCreated,
   onClose,
   onCreated,
   onSupplierCreated,
@@ -334,7 +345,10 @@ function RequisitionModal({
   open: boolean;
   suppliers: SupplierDto[];
   products: Array<{ id: string; sku: string; nameEn: string; costPriceMinor: number }>;
+  onProductCreated?: () => Promise<void> | void;
   taxOptions: SearchableOption[];
+  /** Reload the tax list after one is created from a line's picker. */
+  onTaxCreated?: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
   /** Reload the supplier list after one is created from the picker. */
@@ -404,7 +418,7 @@ function RequisitionModal({
         />
       </Field>
       <div className="mt-4">
-        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} testIdPrefix="requisition-line" costLabel={t('erp.inventory.estimatedCost')} />
+        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="requisition-line" onProductCreated={onProductCreated} costLabel={t('erp.inventory.estimatedCost')} />
       </div>
     </Modal>
   );
@@ -414,7 +428,7 @@ function RequisitionModal({
 
 function OrdersTab({ canManage }: { canManage: boolean }) {
   const { companyId } = useAuth();
-  const taxOptions = useTaxOptions(companyId);
+  const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
   const { t } = useUi();
   const [open, setOpen] = useState(false);
   const list = useAsync(() => api.purchaseOrders(), []);
@@ -488,8 +502,11 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
         suppliers={suppliers.data?.items ?? []}
         onSupplierCreated={suppliers.reload}
         products={products.data?.items ?? []}
+        onProductCreated={products.reload}
         warehouses={warehouses.data?.items ?? []}
+        onWarehouseCreated={warehouses.reload}
         taxOptions={taxOptions}
+        onTaxCreated={reloadTaxOptions}
         onClose={() => setOpen(false)}
         onCreated={list.reload}
       />
@@ -499,10 +516,13 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
 
 function PurchaseOrderModal({
   taxOptions,
+  onTaxCreated,
   open,
   suppliers,
   products,
+  onProductCreated,
   warehouses,
+  onWarehouseCreated,
   onClose,
   onCreated,
   onSupplierCreated,
@@ -511,7 +531,11 @@ function PurchaseOrderModal({
   suppliers: SupplierDto[];
   products: Array<{ id: string; sku: string; nameEn: string; costPriceMinor: number }>;
   warehouses: WarehouseDto[];
+  onProductCreated?: () => Promise<void> | void;
+  onWarehouseCreated?: () => Promise<void> | void;
   taxOptions: SearchableOption[];
+  /** Reload the tax list after one is created from a line's picker. */
+  onTaxCreated?: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
   /** Reload the supplier list after one is created from the picker. */
@@ -591,14 +615,24 @@ function PurchaseOrderModal({
           />
         </Field>
         <Field label={t('erp.inventory.warehouse')}>
-          <select className="oryx-select" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} data-testid="purchase-order-warehouse">
-            <option value="">—</option>
-            {warehouses.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.code} — {w.nameEn}
-              </option>
-            ))}
-          </select>
+          <EntityPicker
+            value={warehouseId || null}
+            options={warehouses.map((w) => ({ value: w.id, label: `${w.code} — ${w.nameEn}` }))}
+            onChange={(v) => setWarehouseId(v ?? '')}
+            placeholder={t('common.select')}
+            emptyLabel={t('common.none')}
+            testId="purchase-order-warehouse"
+            createLabel={t('erp.inventory.newWarehouse')}
+            reloadOptions={onWarehouseCreated}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <WarehouseModal
+                open
+                onClose={closeCreate}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.purchasing.expectedDate')}>
           <input
@@ -619,7 +653,7 @@ function PurchaseOrderModal({
         </Field>
       </div>
       <div className="mt-4">
-        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} testIdPrefix="purchase-order-line" costLabel={t('erp.inventory.unitCost')} />
+        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="purchase-order-line" onProductCreated={onProductCreated} costLabel={t('erp.inventory.unitCost')} />
       </div>
     </Modal>
   );
@@ -688,7 +722,7 @@ function ReceiptsTab({ canManage }: { canManage: boolean }) {
 
 function InvoicesTab({ canManage }: { canManage: boolean }) {
   const { companyId } = useAuth();
-  const taxOptions = useTaxOptions(companyId);
+  const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
   const { t } = useUi();
   const [open, setOpen] = useState(false);
   const list = useAsync(() => api.supplierInvoices(), []);
@@ -749,7 +783,9 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         suppliers={suppliers.data?.items ?? []}
         onSupplierCreated={suppliers.reload}
         products={products.data?.items ?? []}
+        onProductCreated={products.reload}
         taxOptions={taxOptions}
+        onTaxCreated={reloadTaxOptions}
         onClose={() => setOpen(false)}
         onCreated={list.reload}
       />
@@ -759,9 +795,11 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
 
 function SupplierInvoiceModal({
   taxOptions,
+  onTaxCreated,
   open,
   suppliers,
   products,
+  onProductCreated,
   onClose,
   onCreated,
   onSupplierCreated,
@@ -769,7 +807,10 @@ function SupplierInvoiceModal({
   open: boolean;
   suppliers: SupplierDto[];
   products: Array<{ id: string; sku: string; nameEn: string; costPriceMinor: number }>;
+  onProductCreated?: () => Promise<void> | void;
   taxOptions: SearchableOption[];
+  /** Reload the tax list after one is created from a line's picker. */
+  onTaxCreated?: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
   /** Reload the supplier list after one is created from the picker. */
@@ -874,7 +915,7 @@ function SupplierInvoiceModal({
         </Field>
       </div>
       <div className="mt-4">
-        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} testIdPrefix="supplier-invoice-line" costLabel={t('erp.inventory.unitCost')} />
+        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="supplier-invoice-line" onProductCreated={onProductCreated} costLabel={t('erp.inventory.unitCost')} />
       </div>
     </Modal>
   );
@@ -884,7 +925,7 @@ function SupplierInvoiceModal({
 
 function ReturnsTab({ canManage }: { canManage: boolean }) {
   const { companyId } = useAuth();
-  const taxOptions = useTaxOptions(companyId);
+  const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
   const { t } = useUi();
   const [open, setOpen] = useState(false);
   const list = useAsync(() => api.purchaseReturns(), []);
@@ -944,8 +985,11 @@ function ReturnsTab({ canManage }: { canManage: boolean }) {
         suppliers={suppliers.data?.items ?? []}
         onSupplierCreated={suppliers.reload}
         products={products.data?.items ?? []}
+        onProductCreated={products.reload}
         warehouses={warehouses.data?.items ?? []}
+        onWarehouseCreated={warehouses.reload}
         taxOptions={taxOptions}
+        onTaxCreated={reloadTaxOptions}
         onClose={() => setOpen(false)}
         onCreated={list.reload}
       />
@@ -957,8 +1001,11 @@ function PurchaseReturnModal({
   open,
   suppliers,
   products,
+  onProductCreated,
   warehouses,
+  onWarehouseCreated,
   taxOptions,
+  onTaxCreated,
   onClose,
   onCreated,
   onSupplierCreated,
@@ -967,7 +1014,11 @@ function PurchaseReturnModal({
   suppliers: SupplierDto[];
   products: Array<{ id: string; sku: string; nameEn: string; costPriceMinor: number }>;
   warehouses: WarehouseDto[];
+  onProductCreated?: () => Promise<void> | void;
+  onWarehouseCreated?: () => Promise<void> | void;
   taxOptions: SearchableOption[];
+  /** Reload the tax list after one is created from a line's picker. */
+  onTaxCreated?: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
   /** Reload the supplier list after one is created from the picker. */
@@ -1052,14 +1103,24 @@ function PurchaseReturnModal({
           />
         </Field>
         <Field label={t('erp.inventory.warehouse')} required>
-          <select className="oryx-select" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} data-testid="purchase-return-warehouse">
-            <option value="">—</option>
-            {warehouses.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.code} — {w.nameEn}
-              </option>
-            ))}
-          </select>
+          <EntityPicker
+            value={warehouseId || null}
+            options={warehouses.map((w) => ({ value: w.id, label: `${w.code} — ${w.nameEn}` }))}
+            onChange={(v) => setWarehouseId(v ?? '')}
+            placeholder={t('common.select')}
+            emptyLabel={t('common.none')}
+            testId="purchase-return-warehouse"
+            createLabel={t('erp.inventory.newWarehouse')}
+            reloadOptions={onWarehouseCreated}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <WarehouseModal
+                open
+                onClose={closeCreate}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.purchasing.returnDate')} required>
           <input type="date" className="oryx-input" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} data-testid="purchase-return-date" />
@@ -1069,7 +1130,7 @@ function PurchaseReturnModal({
         </Field>
       </div>
       <div className="mt-4">
-        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} testIdPrefix="purchase-return-line" costLabel={t('erp.inventory.unitCost')} />
+        <CostLineEditor lines={lines} setLines={setLines} products={products} taxOptions={taxOptions} onTaxCreated={onTaxCreated} testIdPrefix="purchase-return-line" onProductCreated={onProductCreated} costLabel={t('erp.inventory.unitCost')} />
       </div>
     </Modal>
   );
@@ -1082,15 +1143,21 @@ function CostLineEditor({
   setLines,
   products,
   taxOptions,
+  onTaxCreated,
   testIdPrefix,
   costLabel,
+  onProductCreated,
 }: {
   lines: LineDraft[];
   setLines: (lines: LineDraft[]) => void;
   products: Array<{ id: string; sku: string; nameEn: string; costPriceMinor: number }>;
   taxOptions: SearchableOption[];
+  /** Reload the tax list after one is created from a line's picker. */
+  onTaxCreated?: () => Promise<void> | void;
   testIdPrefix: string;
   costLabel: string;
+  /** Reload the product list after one is created from a line picker. */
+  onProductCreated?: () => Promise<void> | void;
 }) {
   const { t } = useUi();
 
@@ -1100,30 +1167,42 @@ function CostLineEditor({
     setLines(next);
   };
 
+  const applyProduct = (i: number, productId: string) => {
+    const product = products.find((p) => p.id === productId);
+    const next = [...lines];
+    next[i] = {
+      ...next[i],
+      productId,
+      description: product ? product.nameEn : next[i].description,
+      unitCost: product ? minorToInput(product.costPriceMinor) : next[i].unitCost,
+    };
+    setLines(next);
+  };
+
   return (
     <div className="flex flex-col gap-2">
       {lines.map((line, i) => (
         <div key={i} className="grid grid-cols-12 gap-2">
-          <select
-            className="oryx-select col-span-4"
-            value={line.productId}
-            onChange={(e) => {
-              const product = products.find((p) => p.id === e.target.value);
-              update(i, {
-                productId: e.target.value,
-                description: product ? product.nameEn : line.description,
-                unitCost: product ? minorToInput(product.costPriceMinor) : line.unitCost,
-              });
-            }}
-            data-testid={`${testIdPrefix}-product-${i}`}
-          >
-            <option value="">{t('erp.inventory.product')}</option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.sku} — {p.nameEn}
-              </option>
-            ))}
-          </select>
+          <div className="col-span-4">
+            <EntityPicker
+              value={line.productId || null}
+              options={products.map((p) => ({ value: p.id, label: `${p.sku} — ${p.nameEn}` }))}
+              onChange={(v) => applyProduct(i, v ?? '')}
+              placeholder={t('erp.inventory.product')}
+              emptyLabel={t('common.none')}
+              testId={`${testIdPrefix}-product-${i}`}
+              createLabel={t('erp.inventory.newProduct')}
+              reloadOptions={onProductCreated}
+              renderCreate={({ onClose, onSaved }) => (
+                <ProductModal
+                  open
+                  onClose={onClose}
+                  onCreated={() => { /* selection is handled by onSaved */ }}
+                  onSaved={(saved) => void onSaved(saved.id)}
+                />
+              )}
+            />
+          </div>
           <input
             className="oryx-input col-span-3"
             placeholder={t('erp.accounting.description')}
@@ -1146,16 +1225,18 @@ function CostLineEditor({
             data-testid={`${testIdPrefix}-cost-${i}`}
           />
           <div className="col-span-1">
-            <SearchableSelect
+            <TaxPicker
               value={line.taxId || null}
               options={taxOptions}
               onChange={(v) => {
                 const chosen = taxOptions.find((o) => o.value === v);
                 update(i, { taxId: v ?? '', taxPercent: chosen ? chosen.label.replace(/[^\d.]/g, '') : line.taxPercent });
               }}
+              scope="PURCHASES"
               placeholder="%"
               emptyLabel={t('common.none')}
               testId={`${testIdPrefix}-tax-${i}`}
+              onCreated={onTaxCreated}
             />
           </div>
           <Button size="sm" variant="ghost" className="col-span-1" disabled={lines.length <= 1} onClick={() => setLines(lines.filter((_, idx) => idx !== i))}>

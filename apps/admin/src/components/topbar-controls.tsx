@@ -7,6 +7,8 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { Icon } from './icons';
+import { EntityPicker } from './inline-create';
+import { CreateBranchModal } from './branch-modal';
 
 /**
  * Company/branch scope selector. Options come from the API and are already
@@ -15,8 +17,13 @@ import { Icon } from './icons';
  */
 export function ContextSelector() {
   const { t } = useUi();
-  const { isPlatform, companyId, branchId, setCompanyContext } = useAuth();
+  const { isPlatform, companyId, branchId, setCompanyContext, can, hasModule } = useAuth();
   const [context, setContext] = useState<ContextResponse | null>(null);
+
+  const reload = useCallback(async () => {
+    const res = await api.context();
+    setContext(res);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,6 +42,11 @@ export function ContextSelector() {
 
   const companies = context?.companies ?? [];
   const branches = (context?.branches ?? []).filter((b) => !companyId || b.companyId === companyId);
+
+  // A branch belongs to exactly one company, so the inline create is only
+  // offered once a single company scope is active and the principal may create
+  // branches under it.
+  const canCreateBranch = Boolean(companyId) && can('company.branch.create');
 
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="context-selector">
@@ -64,21 +76,33 @@ export function ContextSelector() {
         <span className="oryx-faint hidden text-[11.5px] font-semibold uppercase tracking-wide md:inline">
           {t('context.branch')}
         </span>
-        <select
-          className="oryx-select"
-          style={{ width: '100%', maxWidth: 190 }}
-          value={branchId ?? ''}
-          disabled={!companyId}
-          onChange={(e) => setCompanyContext(companyId, e.target.value || null)}
-          aria-label={t('context.branch')}
-        >
-          <option value="">{t('context.allBranches')}</option>
-          {branches.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.nameEn}
-            </option>
-          ))}
-        </select>
+        <div style={{ width: '100%', minWidth: 150, maxWidth: 190 }}>
+          <EntityPicker
+            value={branchId ?? null}
+            options={branches.map((b) => ({ value: b.id, label: b.nameEn }))}
+            onChange={(v) => setCompanyContext(companyId, v ?? null)}
+            placeholder={t('context.allBranches')}
+            emptyLabel={t('context.allBranches')}
+            disabled={!companyId}
+            testId="context-branch"
+            createLabel={canCreateBranch ? t('branches.new') : undefined}
+            reloadOptions={reload}
+            renderCreate={
+              canCreateBranch
+                ? ({ onClose, onSaved }) => (
+                    <CreateBranchModal
+                      open
+                      companyId={companyId as string}
+                      onClose={onClose}
+                      onCreated={() => undefined}
+                      onSaved={(saved) => void onSaved(saved.id)}
+                      hasModule={hasModule('branch_management')}
+                    />
+                  )
+                : undefined
+            }
+          />
+        </div>
       </label>
     </div>
   );

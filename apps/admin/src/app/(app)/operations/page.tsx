@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
+import { EntityPicker } from '@/components/inline-create';
 import { ModuleDashboard } from '@/components/module-dashboard';
 import { TabDeepLink } from '@/components/tab-deep-link';
 import {
@@ -189,11 +190,14 @@ function ProjectModal({
   project,
   onClose,
   onSaved,
+  onSavedRecord,
 }: {
   open: boolean;
   project: ProjectDto | null;
   onClose: () => void;
   onSaved: () => Promise<void>;
+  /** Receives the saved project so an inline picker can select it. */
+  onSavedRecord?: (saved: ProjectDto) => void;
 }) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
@@ -223,12 +227,14 @@ function ProjectModal({
         endDate: form.endDate || undefined,
         description: form.description || undefined,
       };
+      let saved: ProjectDto;
       if (project) {
-        await api.updateOperationsProject(project.id, body);
+        saved = await api.updateOperationsProject(project.id, body);
       } else {
-        await api.createOperationsProject({ ...body, code: form.code });
+        saved = await api.createOperationsProject({ ...body, code: form.code });
       }
       await onSaved();
+      onSavedRecord?.(saved);
       onClose();
     } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); } finally { setBusy(false); }
   };
@@ -355,7 +361,7 @@ function WorkOrdersTab({ canManage }: { canManage: boolean }) {
         </div>
       ) : null}
 
-      <CreateWorkOrderModal open={open} projects={projects.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <CreateWorkOrderModal open={open} projects={projects.data?.items ?? []} onProjectCreated={projects.reload} onClose={() => setOpen(false)} onCreated={list.reload} />
     </Card>
   );
 }
@@ -363,11 +369,14 @@ function WorkOrdersTab({ canManage }: { canManage: boolean }) {
 function CreateWorkOrderModal({
   open,
   projects,
+  onProjectCreated,
   onClose,
   onCreated,
 }: {
   open: boolean;
   projects: Array<{ id: string; code: string; nameEn: string }>;
+  /** Reload the project list after one is created from the picker. */
+  onProjectCreated?: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
@@ -401,10 +410,27 @@ function CreateWorkOrderModal({
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.operations.title')} required><input className="oryx-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="work-order-title" /></Field>
         <Field label={t('erp.operations.project')}>
-          <select className="oryx-select" value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })} data-testid="work-order-project">
-            <option value="">—</option>
-            {projects.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.projectId || null}
+            options={projects.map((p) => ({ value: p.id, label: `${p.code} — ${p.nameEn}` }))}
+            onChange={(v) => setForm({ ...form, projectId: v ?? '' })}
+            placeholder={t('common.select')}
+            emptyLabel={t('common.none')}
+            testId="work-order-project"
+            createLabel={t('erp.operations.newProject')}
+            reloadOptions={onProjectCreated}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <ProjectModal
+                open
+                project={null}
+                onClose={closeCreate}
+                // The picker's own `onSaved` reloads the option list, so the
+                // nested form must not fetch it a second time.
+                onSaved={async () => {}}
+                onSavedRecord={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.crm.priority')}>
           <select className="oryx-select" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>

@@ -11,7 +11,7 @@ import { ModuleDashboard } from '@/components/module-dashboard';
 import { TabDeepLink } from '@/components/tab-deep-link';
 import { EntityPicker } from '@/components/inline-create';
 import { CustomerModal } from '@/components/customer-modal';
-import { VehicleModal } from '@/components/entity-modals';
+import { VehicleModal, ProductModal, WarehouseModal } from '@/components/entity-modals';
 import {
   Badge,
   Button,
@@ -190,6 +190,7 @@ function JobCardsTab({
       <EstimateModal
         job={estimateTarget}
         products={products.data?.items ?? []}
+        onProductCreated={products.reload}
         onClose={() => setEstimateTarget(null)}
         onDone={list.reload}
       />
@@ -197,6 +198,8 @@ function JobCardsTab({
         job={reserveTarget}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
+        onProductCreated={products.reload}
+        onWarehouseCreated={warehouses.reload}
         canIssue={canIssue}
         onClose={() => setReserveTarget(null)}
         onDone={list.reload}
@@ -208,11 +211,13 @@ function JobCardsTab({
 function EstimateModal({
   job,
   products,
+  onProductCreated,
   onClose,
   onDone,
 }: {
   job: JobCardDto | null;
   products: Array<{ id: string; sku: string; nameEn: string; salesPriceMinor: number; taxRateBp: number }>;
+  onProductCreated?: () => Promise<void> | void;
   onClose: () => void;
   onDone: () => Promise<void>;
 }) {
@@ -248,13 +253,33 @@ function EstimateModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.inventory.product')}>
-          <select className="oryx-select" value={line.productId} onChange={(e) => {
-            const p = products.find((x) => x.id === e.target.value);
-            setLine({ ...line, productId: e.target.value, description: p ? p.nameEn : line.description, unitPrice: p ? minorToInput(p.salesPriceMinor) : line.unitPrice, taxRate: p ? String(p.taxRateBp / 100) : line.taxRate });
-          }} data-testid="estimate-product">
-            <option value="">{t('erp.automotive.labour')}</option>
-            {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={line.productId || null}
+            options={products.map((p) => ({ value: p.id, label: `${p.sku} — ${p.nameEn}` }))}
+            onChange={(v) => {
+              const p = products.find((x) => x.id === v);
+              setLine((prev) => ({
+                ...prev,
+                productId: v ?? '',
+                description: p ? p.nameEn : prev.description,
+                unitPrice: p ? minorToInput(p.salesPriceMinor) : prev.unitPrice,
+                taxRate: p ? String(p.taxRateBp / 100) : prev.taxRate,
+              }));
+            }}
+            placeholder={t('erp.automotive.labour')}
+            emptyLabel={t('erp.automotive.labour')}
+            testId="estimate-product"
+            createLabel={t('erp.inventory.newProduct')}
+            reloadOptions={onProductCreated}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <ProductModal
+                open
+                onClose={closeCreate}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.accounting.description')} required>
           <input className="oryx-input" value={line.description} onChange={(e) => setLine({ ...line, description: e.target.value })} data-testid="estimate-description" />
@@ -275,6 +300,8 @@ function ReserveModal({
   products,
   warehouses,
   canIssue,
+  onProductCreated,
+  onWarehouseCreated,
   onClose,
   onDone,
 }: {
@@ -282,6 +309,8 @@ function ReserveModal({
   products: Array<{ id: string; sku: string; nameEn: string }>;
   warehouses: Array<{ id: string; code: string; nameEn: string }>;
   canIssue: boolean;
+  onProductCreated?: () => Promise<void> | void;
+  onWarehouseCreated?: () => Promise<void> | void;
   onClose: () => void;
   onDone: () => Promise<void>;
 }) {
@@ -333,16 +362,44 @@ function ReserveModal({
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label={t('erp.inventory.product')} required>
-            <select className="oryx-select" value={line.productId} onChange={(e) => setLine({ ...line, productId: e.target.value })} data-testid="reserve-product">
-              <option value="">—</option>
-              {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.nameEn}</option>)}
-            </select>
+            <EntityPicker
+              value={line.productId || null}
+              options={products.map((p) => ({ value: p.id, label: `${p.sku} — ${p.nameEn}` }))}
+              onChange={(v) => setLine((prev) => ({ ...prev, productId: v ?? '' }))}
+              placeholder={t('common.select')}
+              emptyLabel={t('common.none')}
+              testId="reserve-product"
+              createLabel={t('erp.inventory.newProduct')}
+              reloadOptions={onProductCreated}
+              renderCreate={({ onClose: closeCreate, onSaved }) => (
+                <ProductModal
+                  open
+                  onClose={closeCreate}
+                  onCreated={() => { /* selection is handled by onSaved */ }}
+                  onSaved={(saved) => void onSaved(saved.id)}
+                />
+              )}
+            />
           </Field>
           <Field label={t('erp.inventory.warehouse')} required>
-            <select className="oryx-select" value={line.warehouseId} onChange={(e) => setLine({ ...line, warehouseId: e.target.value })} data-testid="reserve-warehouse">
-              <option value="">—</option>
-              {warehouses.map((w) => <option key={w.id} value={w.id}>{w.code} — {w.nameEn}</option>)}
-            </select>
+            <EntityPicker
+              value={line.warehouseId || null}
+              options={warehouses.map((w) => ({ value: w.id, label: `${w.code} — ${w.nameEn}` }))}
+              onChange={(v) => setLine((prev) => ({ ...prev, warehouseId: v ?? '' }))}
+              placeholder={t('common.select')}
+              emptyLabel={t('common.none')}
+              testId="reserve-warehouse"
+              createLabel={t('erp.inventory.newWarehouse')}
+              reloadOptions={onWarehouseCreated}
+              renderCreate={({ onClose: closeCreate, onSaved }) => (
+                <WarehouseModal
+                  open
+                  onClose={closeCreate}
+                  onCreated={() => { /* selection is handled by onSaved */ }}
+                  onSaved={(saved) => void onSaved(saved.id)}
+                />
+              )}
+            />
           </Field>
           <Field label={t('erp.inventory.quantity')} required>
             <input className="oryx-input" value={line.quantity} onChange={(e) => setLine({ ...line, quantity: e.target.value })} data-testid="reserve-quantity" />
@@ -431,6 +488,7 @@ function CreateJobCardModal({
                 open
                 customers={customers}
                 defaultCustomerId={customerId}
+                onCustomerCreated={onCustomersReload}
                 onClose={closeCreate}
                 onCreated={() => { /* selection is handled by onSaved */ }}
                 onSaved={(saved) => void onSaved(saved.id)}

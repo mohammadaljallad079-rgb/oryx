@@ -66,6 +66,11 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
   const vin = `TESTVN${suffix}`;
   let customerId: string | null = null;
   let supplierId: string | null = null;
+  let projectId: string | null = null;
+  let pipelineId: string | null = null;
+  let warehouseId: string | null = null;
+  let accountId: string | null = null;
+  const taxIds: string[] = [];
 
   test.beforeEach(async ({ page }) => {
     await signIn(page, ENTERPRISE_ADMIN);
@@ -79,6 +84,11 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
     // supplier has a delete endpoint. Both rows carry a timestamp suffix, so a
     // rerun creates fresh ones instead of colliding.
     if (supplierId) await apiCall(page, `/purchasing/suppliers/${supplierId}`, { method: 'DELETE' });
+    if (projectId) await apiCall(page, `/operations/projects/${projectId}`, { method: 'DELETE' });
+    if (pipelineId) await apiCall(page, `/crm/pipelines/${pipelineId}`, { method: 'DELETE' });
+    if (accountId) await apiCall(page, `/accounting/accounts/${accountId}`, { method: 'DELETE' });
+    for (const id of taxIds) await apiCall(page, `/tax/${id}`, { method: 'DELETE' });
+    if (warehouseId) await apiCall(page, `/inventory/warehouses/${warehouseId}`, { method: 'DELETE' });
     if (customerId) await apiCall(page, `/sales/customers/${customerId}`, { method: 'POST', body: { isActive: false } });
     await page.close();
   });
@@ -251,5 +261,210 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
     await page.getByTestId('customer-kind-company').click();
     await expect(page.getByTestId('customer-cr-number')).toBeVisible();
     await expect(page.getByTestId('customer-contact-person')).toBeVisible();
+  });
+
+  test('9. a work order creates its project inline and selects it', async ({ page }) => {
+    await page.goto('/operations?tab=work-orders');
+    await expect(page.getByTestId('operations-tab-work-orders')).toHaveAttribute('aria-selected', 'true');
+    await page.getByTestId('new-work-order').click();
+    await expect(page.getByTestId('work-order-project')).toBeVisible();
+
+    const code = `E20J${suffix}`;
+    const name = `E20 Inline Project ${suffix}`;
+    await openCreate(page, 'work-order-project');
+    await expect(page.getByTestId('project-code')).toBeVisible();
+    await page.getByTestId('project-code').fill(code);
+    await page.getByTestId('project-name-en').fill(name);
+    await page.getByTestId('project-name-ar').fill('مشروع إنشاء داخلي');
+    await page.getByTestId('save-project').click();
+
+    // The nested modal closes, the picker reloads and selects the new project.
+    await expect(page.getByTestId('project-code')).toHaveCount(0);
+    await expect(page.getByTestId('work-order-project').locator('button').first()).toContainText(code);
+
+    // The persisted create is proven by a read against the API.
+    await expect
+      .poll(async () => {
+        const res = await apiCall<{ items: Array<{ id: string; code: string }> }>(page, '/operations/projects');
+        const found = res.body.items.find((p) => p.code === code);
+        if (found) projectId = found.id;
+        return found?.id ?? null;
+      }, { timeout: 20_000 })
+      .not.toBeNull();
+  });
+
+  test('10. an opportunity creates its pipeline inline and selects it', async ({ page }) => {
+    await page.goto('/crm?tab=opportunities');
+    await expect(page.getByTestId('crm-tab-opportunities')).toHaveAttribute('aria-selected', 'true');
+    await page.getByTestId('new-opportunity').click();
+    await expect(page.getByTestId('opportunity-pipeline')).toBeVisible();
+
+    const code = `E20PL${suffix}`;
+    const name = `E20 Inline Pipeline ${suffix}`;
+    await openCreate(page, 'opportunity-pipeline');
+    await expect(page.getByTestId('pipeline-code')).toBeVisible();
+    await page.getByTestId('pipeline-code').fill(code);
+    await page.getByTestId('pipeline-name-en').fill(name);
+    await page.getByTestId('pipeline-name-ar').fill('مسار داخلي');
+    await page.getByTestId('save-pipeline').click();
+
+    // The nested modal closes, the picker reloads and selects the new pipeline,
+    // and the create is proven by a read against the API.
+    await expect(page.getByTestId('pipeline-code')).toHaveCount(0);
+    await expect(page.getByTestId('opportunity-pipeline').locator('button').first()).toContainText(name);
+    await expect(page.getByTestId('save-opportunity')).toBeEnabled();
+
+    await expect
+      .poll(async () => {
+        const res = await apiCall<{ items: Array<{ id: string; code: string }> }>(page, '/crm/pipelines');
+        const found = res.body.items.find((p) => p.code === code);
+        if (found) pipelineId = found.id;
+        return found?.id ?? null;
+      }, { timeout: 20_000 })
+      .not.toBeNull();
+  });
+
+  test('11. a leave request creates its leave type inline and selects it', async ({ page }) => {
+    await page.goto('/hr?tab=leave');
+    await expect(page.getByTestId('hr-tab-leave')).toHaveAttribute('aria-selected', 'true');
+    await page.getByTestId('new-leave-request').click();
+    await expect(page.getByTestId('leave-type')).toBeVisible();
+
+    const code = `E20LT${suffix}`;
+    const name = `E20 Inline Leave ${suffix}`;
+    await openCreate(page, 'leave-type');
+    await expect(page.getByTestId('leave-type-code')).toBeVisible();
+    await page.getByTestId('leave-type-code').fill(code);
+    await page.getByTestId('leave-type-name-en').fill(name);
+    await page.getByTestId('leave-type-name-ar').fill('إجازة داخلية');
+    await page.getByTestId('save-leave-type').click();
+
+    await expect(page.getByTestId('leave-type-code')).toHaveCount(0);
+    await expect(page.getByTestId('leave-type').locator('button').first()).toContainText(name);
+  });
+
+  test('12. the product filter creates a warehouse inline and selects it', async ({ page }) => {
+    await page.goto('/inventory?tab=products');
+    await expect(page.getByTestId('filter-warehouse')).toBeVisible();
+
+    const code = `E20W${suffix}`;
+    const name = `E20 Inline Warehouse ${suffix}`;
+    await openCreate(page, 'filter-warehouse');
+    await expect(page.getByTestId('warehouse-code')).toBeVisible();
+    await page.getByTestId('warehouse-code').fill(code);
+    await page.getByTestId('warehouse-name-en').fill(name);
+    await page.getByTestId('warehouse-name-ar').fill('مستودع داخلي');
+    await page.getByTestId('save-warehouse').click();
+
+    await expect(page.getByTestId('warehouse-code')).toHaveCount(0);
+    await expect(page.getByTestId('filter-warehouse').locator('button').first()).toContainText(name);
+
+    await expect
+      .poll(async () => {
+        const res = await apiCall<{ items: Array<{ id: string; code: string }> }>(page, '/inventory/warehouses');
+        const found = res.body.items.find((w) => w.code === code);
+        if (found) warehouseId = found.id;
+        return found?.id ?? null;
+      }, { timeout: 20_000 })
+      .not.toBeNull();
+  });
+
+  test('13. the ledger filter creates an account inline and selects it', async ({ page }) => {
+    await page.goto('/accounting?tab=ledger');
+    await expect(page.getByTestId('ledger-account')).toBeVisible();
+
+    const name = `E20 Ledger Account ${suffix}`;
+    await openCreate(page, 'ledger-account');
+    await expect(page.getByTestId('account-code')).toBeVisible();
+    await page.getByTestId('account-name-en').fill(name);
+    await page.getByTestId('account-name-ar').fill('حساب دفتر الأستاذ');
+    await page.getByTestId('save-account').click();
+
+    await expect(page.getByTestId('account-code')).toHaveCount(0);
+    await expect(page.getByTestId('ledger-account').locator('button').first()).toContainText(name);
+
+    await expect
+      .poll(async () => {
+        const res = await apiCall<{ items: Array<{ id: string; nameEn: string }> }>(
+          page,
+          `/accounting/accounts?search=${encodeURIComponent(name)}`,
+        );
+        const found = res.body.items.find((a) => a.nameEn === name);
+        if (found) accountId = found.id;
+        return found?.id ?? null;
+      }, { timeout: 20_000 })
+      .not.toBeNull();
+  });
+
+  test('14. a sales invoice line creates its tax rate inline and selects it', async ({ page }) => {
+    await page.goto('/sales?tab=invoices');
+    await expect(page.getByTestId('new-invoice')).toBeVisible();
+    await page.getByTestId('new-invoice').click();
+    await page.locator('.oryx-modal').first().waitFor();
+
+    // A line's tax control only exists once the document form is open.
+    await expect(page.getByTestId('invoice-tax-0')).toBeVisible();
+
+    const nameEn = `E20 Sales Tax ${suffix}`;
+    await openCreate(page, 'invoice-tax-0');
+    await expect(page.getByTestId('tax-code')).toBeVisible();
+    // The line opens the create form with the sales scope preselected.
+    await expect(page.getByTestId('tax-scope')).toHaveValue('SALES');
+    await page.getByTestId('tax-code').fill(`E20T${suffix}`);
+    await page.getByTestId('tax-rate').fill('5');
+    await page.getByTestId('tax-name-en').fill(nameEn);
+    await page.getByTestId('tax-name-ar').fill('ضريبة مبيعات');
+    await page.getByTestId('save-tax').click();
+
+    // The nested form closes and the new rate is selected on the line.
+    await expect(page.getByTestId('tax-code')).toHaveCount(0);
+    await expect(page.getByTestId('invoice-tax-0').locator('button').first()).toContainText('5%');
+
+    await expect
+      .poll(async () => {
+        const res = await apiCall<{ items: Array<{ id: string; nameEn: string; rateBp: number }> }>(
+          page,
+          `/tax?search=${encodeURIComponent(nameEn)}`,
+        );
+        const found = res.body.items.find((x) => x.nameEn === nameEn && x.rateBp === 500);
+        if (found) taxIds.push(found.id);
+        return found?.id ?? null;
+      }, { timeout: 20_000 })
+      .not.toBeNull();
+  });
+
+  test('15. a purchase order line creates its tax rate inline and selects it', async ({ page }) => {
+    await page.goto('/purchasing?tab=orders');
+    await expect(page.getByTestId('new-purchase-order')).toBeVisible();
+    await page.getByTestId('new-purchase-order').click();
+    await page.locator('.oryx-modal').first().waitFor();
+
+    await expect(page.getByTestId('purchase-order-line-tax-0')).toBeVisible();
+
+    const nameEn = `E20 Purchase Tax ${suffix}`;
+    await openCreate(page, 'purchase-order-line-tax-0');
+    await expect(page.getByTestId('tax-code')).toBeVisible();
+    // The purchase line opens the create form with the purchases scope preselected.
+    await expect(page.getByTestId('tax-scope')).toHaveValue('PURCHASES');
+    await page.getByTestId('tax-code').fill(`E20PT${suffix}`);
+    await page.getByTestId('tax-rate').fill('12.5');
+    await page.getByTestId('tax-name-en').fill(nameEn);
+    await page.getByTestId('tax-name-ar').fill('ضريبة مشتريات');
+    await page.getByTestId('save-tax').click();
+
+    await expect(page.getByTestId('tax-code')).toHaveCount(0);
+    await expect(page.getByTestId('purchase-order-line-tax-0').locator('button').first()).toContainText('12.5%');
+
+    await expect
+      .poll(async () => {
+        const res = await apiCall<{ items: Array<{ id: string; nameEn: string; rateBp: number }> }>(
+          page,
+          `/tax?search=${encodeURIComponent(nameEn)}`,
+        );
+        const found = res.body.items.find((x) => x.nameEn === nameEn && x.rateBp === 1250);
+        if (found) taxIds.push(found.id);
+        return found?.id ?? null;
+      }, { timeout: 20_000 })
+      .not.toBeNull();
   });
 });

@@ -21,6 +21,8 @@ import { ModuleDashboard } from '@/components/module-dashboard';
 import { TabDeepLink } from '@/components/tab-deep-link';
 import { CustomerModal } from '@/components/customer-modal';
 import { EntityPicker } from '@/components/inline-create';
+import { ProductModal, WarehouseModal } from '@/components/entity-modals';
+import { TaxPicker } from '@/components/tax-modal';
 import {
   Badge,
   Button,
@@ -29,7 +31,6 @@ import {
   ErrorBanner,
   Field,
   Modal,
-  SearchableSelect,
   SectionHeader,
   Skeleton,
   StatusBadge,
@@ -142,17 +143,24 @@ function computePosTotals(
  * The tenant's saved taxes as dropdown options. `value` is the rate in basis
  * points so a product's own `taxRateBp` can be matched without a lookup table,
  * and `label` is the display percentage the line parses back on selection.
+ * `reload` refreshes the list after a rate is created from a line's picker.
  */
-function useTaxOptions(companyId: string | null | undefined): SearchableOption[] {
+function useTaxOptions(companyId: string | null | undefined): {
+  options: SearchableOption[];
+  reload: () => Promise<void>;
+} {
   const taxes = useAsync(
     () => api.taxes({ companyId: companyId ?? undefined, includeInactive: 'false' }),
     [companyId],
   );
-  return (taxes.data?.items ?? []).map((tax) => ({
-    value: String(tax.rateBp),
-    label: `${tax.rateBp / 100}%`,
-    hint: tax.nameEn,
-  }));
+  return {
+    options: (taxes.data?.items ?? []).map((tax) => ({
+      value: String(tax.rateBp),
+      label: `${tax.rateBp / 100}%`,
+      hint: tax.nameEn,
+    })),
+    reload: taxes.reload,
+  };
 }
 
 const TAB_KEYS = ['dashboard', 'invoices', 'orders', 'quotations', 'credit-notes', 'pos', 'customers'] as const;
@@ -501,7 +509,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
-  const taxOptions = useTaxOptions(companyId);
+  const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
 
   return (
     <Card>
@@ -615,7 +623,10 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         onCustomerCreated={customers.reload}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
+        onProductCreated={products.reload}
+        onWarehouseCreated={warehouses.reload}
         taxOptions={taxOptions}
+        onTaxCreated={reloadTaxOptions}
         showWarehouse
         dueDateField="dueDate"
         settlement
@@ -642,7 +653,10 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         onCustomerCreated={customers.reload}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
+        onProductCreated={products.reload}
+        onWarehouseCreated={warehouses.reload}
         taxOptions={taxOptions}
+        onTaxCreated={reloadTaxOptions}
         showWarehouse
         showRestock
         reasonField
@@ -683,7 +697,7 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
-  const taxOptions = useTaxOptions(companyId);
+  const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
 
   return (
     <Card>
@@ -739,7 +753,10 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
         onCustomerCreated={customers.reload}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
+        onProductCreated={products.reload}
+        onWarehouseCreated={warehouses.reload}
         taxOptions={taxOptions}
+        onTaxCreated={reloadTaxOptions}
         showWarehouse
         testIdPrefix="order"
         onClose={() => setOpen(false)}
@@ -762,7 +779,7 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
-  const taxOptions = useTaxOptions(companyId);
+  const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
 
   return (
     <Card>
@@ -832,7 +849,10 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
         onCustomerCreated={customers.reload}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
+        onProductCreated={products.reload}
+        onWarehouseCreated={warehouses.reload}
         taxOptions={taxOptions}
+        onTaxCreated={reloadTaxOptions}
         dueDateField="validUntil"
         settlement
         testIdPrefix="quotation"
@@ -856,7 +876,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
-  const taxOptions = useTaxOptions(companyId);
+  const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
 
   return (
     <Card>
@@ -914,7 +934,10 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
         onCustomerCreated={customers.reload}
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
+        onProductCreated={products.reload}
+        onWarehouseCreated={warehouses.reload}
         taxOptions={taxOptions}
+        onTaxCreated={reloadTaxOptions}
         showWarehouse
         showRestock
         reasonField
@@ -1115,6 +1138,7 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
         customers={customers.data?.items ?? []}
         onCustomerCreated={customers.reload}
         warehouses={warehouses.data?.items ?? []}
+        onWarehouseCreated={warehouses.reload}
         roundingMode={roundingMode}
         currencyScale={currencyScale}
         onClose={() => setSaleOpen(false)}
@@ -1153,6 +1177,7 @@ function PosSaleModal({
   customers,
   onCustomerCreated,
   warehouses,
+  onWarehouseCreated,
   roundingMode,
   currencyScale,
   onClose,
@@ -1163,6 +1188,7 @@ function PosSaleModal({
   customers: CustomerDto[];
   onCustomerCreated?: () => Promise<void> | void;
   warehouses: WarehouseDto[];
+  onWarehouseCreated?: () => Promise<void> | void;
   roundingMode: RoundingMode;
   currencyScale: number;
   onClose: () => void;
@@ -1498,19 +1524,24 @@ function PosSaleModal({
               />
             </Field>
             <Field label={t('erp.sales.pos.warehouse')}>
-              <select
-                className="oryx-select"
-                value={warehouseId}
-                onChange={(e) => setWarehouseId(e.target.value)}
-                data-testid="pos-warehouse"
-              >
-                <option value="">—</option>
-                {warehouses.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.code} — {w.nameEn}
-                  </option>
-                ))}
-              </select>
+              <EntityPicker
+                value={warehouseId || null}
+                options={warehouses.map((w) => ({ value: w.id, label: `${w.code} — ${w.nameEn}` }))}
+                onChange={(v) => setWarehouseId(v ?? '')}
+                placeholder={t('common.select')}
+                emptyLabel={t('common.none')}
+                testId="pos-warehouse"
+                createLabel={t('erp.inventory.newWarehouse')}
+                reloadOptions={onWarehouseCreated}
+                renderCreate={({ onClose: closeCreate, onSaved }) => (
+                  <WarehouseModal
+                    open
+                    onClose={closeCreate}
+                    onCreated={() => { /* selection is handled by onSaved */ }}
+                    onSaved={(saved) => void onSaved(saved.id)}
+                  />
+                )}
+              />
             </Field>
           </div>
 
@@ -1838,6 +1869,8 @@ function LineEditor({
   currency,
   roundingMode,
   defaultTaxPercent = '10',
+  onProductCreated,
+  onTaxCreated,
 }: {
   lines: LineDraft[];
   setLines: (lines: LineDraft[]) => void;
@@ -1850,9 +1883,35 @@ function LineEditor({
   roundingMode: RoundingMode;
   /** The tenant's default VAT rate as a percent, used when a blank line is added. */
   defaultTaxPercent?: string;
+  /** Reload the product list after one is created from a line's picker. */
+  onProductCreated?: () => Promise<void> | void;
+  /** Reload the tax list after one is created from a line's picker. */
+  onTaxCreated?: () => Promise<void> | void;
 }) {
   const { t } = useUi();
   const scale = currencyScaleOf(currency ?? 'BHD');
+
+  const applyProduct = (i: number, productId: string) => {
+    const product = products.find((p) => p.id === productId);
+    // A product carries its own rate; if it is not in the saved tax list, keep
+    // the numeric value and clear the selection rather than silently switching
+    // the line to a different tax.
+    const matched = product
+      ? taxOptions.find((o) => o.value === String(product.taxRateBp))
+      : undefined;
+    const next = [...lines];
+    next[i] = {
+      ...next[i],
+      productId,
+      description: product ? product.nameEn : next[i].description,
+      unitPrice: product
+        ? minorToInput(product.salesPriceMinor, currency ?? 'BHD')
+        : next[i].unitPrice,
+      taxPercent: product ? String(product.taxRateBp / 100) : next[i].taxPercent,
+      taxId: product ? (matched ? matched.value : '') : next[i].taxId,
+    };
+    setLines(next);
+  };
 
   const totals = useMemo(
     () => computeDraftTotals(lines, roundingMode, scale, currency),
@@ -1879,36 +1938,24 @@ function LineEditor({
       {lines.map((line, i) => (
         <div key={i} className="oryx-doc-form__grid">
           <div className="flex flex-col gap-1">
-            <select
-              className="oryx-select"
-              value={line.productId}
-              onChange={(e) => {
-                const product = products.find((p) => p.id === e.target.value);
-                // A product carries its own rate; if it is not in the saved tax
-                // list, keep the numeric value and clear the selection rather than
-                // silently switching the line to a different tax.
-                const matched = product
-                  ? taxOptions.find((o) => o.value === String(product.taxRateBp))
-                  : undefined;
-                update(i, {
-                  productId: e.target.value,
-                  description: product ? product.nameEn : line.description,
-                  unitPrice: product
-                    ? minorToInput(product.salesPriceMinor, currency ?? 'BHD')
-                    : line.unitPrice,
-                  taxPercent: product ? String(product.taxRateBp / 100) : line.taxPercent,
-                  taxId: product ? (matched ? matched.value : '') : line.taxId,
-                });
-              }}
-              data-testid={`${testIdPrefix}-product-${i}`}
-            >
-              <option value="">{t('erp.inventory.product')}</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.sku} — {p.nameEn}
-                </option>
-              ))}
-            </select>
+            <EntityPicker
+              value={line.productId || null}
+              options={products.map((p) => ({ value: p.id, label: `${p.sku} — ${p.nameEn}` }))}
+              onChange={(v) => applyProduct(i, v ?? '')}
+              placeholder={t('erp.inventory.product')}
+              emptyLabel={t('common.none')}
+              testId={`${testIdPrefix}-product-${i}`}
+              createLabel={t('erp.inventory.newProduct')}
+              reloadOptions={onProductCreated}
+              renderCreate={({ onClose, onSaved }) => (
+                <ProductModal
+                  open
+                  onClose={onClose}
+                  onCreated={() => { /* selection is handled by onSaved */ }}
+                  onSaved={(saved) => void onSaved(saved.id)}
+                />
+              )}
+            />
             <input
               className="oryx-input"
               placeholder={t('erp.sales.form.description')}
@@ -1938,7 +1985,7 @@ function LineEditor({
             onChange={(e) => update(i, { discountPercent: e.target.value })}
             data-testid={`${testIdPrefix}-discount-${i}`}
           />
-          <SearchableSelect
+          <TaxPicker
             value={line.taxId || null}
             options={taxOptions}
             onChange={(v) => {
@@ -1948,9 +1995,11 @@ function LineEditor({
                 taxPercent: chosen ? chosen.label.replace(/[^\d.]/g, '') : line.taxPercent,
               });
             }}
+            scope="SALES"
             placeholder="%"
             emptyLabel={t('common.none')}
             testId={`${testIdPrefix}-tax-${i}`}
+            onCreated={onTaxCreated}
           />
           <span
             className="text-end tabular-nums text-[12.5px] font-semibold"
@@ -2036,6 +2085,9 @@ function DocumentModal({
   onClose,
   onSubmit,
   onCustomerCreated,
+  onProductCreated,
+  onWarehouseCreated,
+  onTaxCreated,
 }: {
   open: boolean;
   title: string;
@@ -2050,6 +2102,12 @@ function DocumentModal({
   showRestock?: boolean;
   /** Reload the customer list after one is created from the picker. */
   onCustomerCreated?: () => Promise<void> | void;
+  /** Reload the product list after one is created from a line picker. */
+  onProductCreated?: () => Promise<void> | void;
+  /** Reload the warehouse list after one is created from the picker. */
+  onWarehouseCreated?: () => Promise<void> | void;
+  /** Reload the tax list after one is created from a line's picker. */
+  onTaxCreated?: () => Promise<void> | void;
   /**
    * Whether the printed document renders a free-text reason (a credit note
    * prints one where an invoice prints notes). The field is only offered where
@@ -2359,10 +2417,12 @@ function DocumentModal({
             setLines={setLines}
             products={products}
             taxOptions={taxOptions}
+            onTaxCreated={onTaxCreated}
             testIdPrefix={testIdPrefix}
             currency={currency}
             roundingMode={company?.roundingMode ?? 'NONE'}
             defaultTaxPercent={company ? String(company.defaultTaxRateBp / 100) : '10'}
+            onProductCreated={onProductCreated}
           />
         </div>
       </section>
@@ -2374,19 +2434,24 @@ function DocumentModal({
         <div className="grid gap-3 p-3 sm:grid-cols-2">
           {showWarehouse ? (
             <Field label={t('erp.inventory.warehouse')}>
-              <select
-                className="oryx-select"
-                value={warehouseId}
-                onChange={(e) => setWarehouseId(e.target.value)}
-                data-testid={`${testIdPrefix}-warehouse`}
-              >
-                <option value="">—</option>
-                {warehouses.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.code} — {w.nameEn}
-                  </option>
-                ))}
-              </select>
+              <EntityPicker
+                value={warehouseId || null}
+                options={warehouses.map((w) => ({ value: w.id, label: `${w.code} — ${w.nameEn}` }))}
+                onChange={(v) => setWarehouseId(v ?? '')}
+                placeholder={t('common.select')}
+                emptyLabel={t('common.none')}
+                testId={`${testIdPrefix}-warehouse`}
+                createLabel={t('erp.inventory.newWarehouse')}
+                reloadOptions={onWarehouseCreated}
+                renderCreate={({ onClose, onSaved }) => (
+                  <WarehouseModal
+                    open
+                    onClose={onClose}
+                    onCreated={() => { /* selection is handled by onSaved */ }}
+                    onSaved={(saved) => void onSaved(saved.id)}
+                  />
+                )}
+              />
             </Field>
           ) : null}
           {showRestock ? (

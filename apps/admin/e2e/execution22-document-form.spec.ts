@@ -97,9 +97,11 @@ test.describe('document form mirrors the printed page', () => {
     await page.getByTestId('invoice-customer').locator('[role="option"]').first().click();
 
     // Choose the first real product and price a line: 3 x unit, 10% off, tax.
+    // The product line is a searchable picker, so open it and click its first
+    // option rather than driving a native select.
     const product = page.getByTestId('invoice-product-0');
-    const value = await product.locator('option').nth(1).getAttribute('value');
-    await product.selectOption(value!);
+    await product.locator('button').first().click();
+    await product.locator('[role="option"]').first().click();
     await page.getByTestId('invoice-quantity-0').fill('3');
     await page.getByTestId('invoice-discount-0').fill('10');
 

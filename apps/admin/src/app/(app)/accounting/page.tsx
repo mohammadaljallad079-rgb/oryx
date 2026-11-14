@@ -329,6 +329,7 @@ function AccountsTab({ canManage }: { canManage: boolean }) {
         open={open}
         account={editing}
         parentAccounts={allAccounts.data?.items ?? []}
+        onAccountCreated={async () => { await Promise.all([list.reload(), allAccounts.reload()]); }}
         onClose={() => { setOpen(false); setEditing(null); }}
         onCreated={list.reload}
       />
@@ -623,6 +624,7 @@ function PostJournalModal({
                   <AccountModal
                     open
                     parentAccounts={accounts}
+                    onAccountCreated={onAccountCreated}
                     onClose={closeCreate}
                     onCreated={() => { /* selection is handled by onSaved */ }}
                     onSaved={(saved) => void onSaved(saved.id)}
@@ -1314,14 +1316,31 @@ function LedgerTab() {
       <div className="mb-3 flex flex-wrap items-end gap-3">
         <label className="min-w-[260px] flex-1">
           <span className="oryx-label">{t('erp.accounting.account')}</span>
-          <select className="oryx-select" value={accountId} onChange={(e) => setAccountId(e.target.value)} data-testid="ledger-account">
-            <option value="">{t('common.all')}</option>
-            {accounts.data?.items.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.code} — {a.nameEn}
-              </option>
-            ))}
-          </select>
+          <EntityPicker
+            value={accountId || null}
+            options={(accounts.data?.items ?? []).map((a) => ({ value: a.id, label: `${a.code} — ${a.nameEn}` }))}
+            onChange={(v) => setAccountId(v ?? '')}
+            placeholder={t('common.all')}
+            emptyLabel={t('common.all')}
+            testId="ledger-account"
+            createLabel={t('erp.accounting.newAccount')}
+            reloadOptions={async () => {
+              await accounts.reload();
+              await ledger.reload();
+            }}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <AccountModal
+                open
+                parentAccounts={accounts.data?.items ?? []}
+                onAccountCreated={accounts.reload}
+                onClose={closeCreate}
+                onCreated={async () => {
+                  await accounts.reload();
+                }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </label>
       </div>
 

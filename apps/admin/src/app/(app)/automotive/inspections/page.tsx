@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
-import { useAuth } from '@/lib/auth-context';
+import { useAuth, errorMessageKey } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync, useDebounced } from '@/lib/hooks';
 import { minorToInput, money, toMinorInput } from '@/lib/erp-format';
@@ -32,6 +32,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { EntityPicker } from '@/components/inline-create';
 import { CustomerModal } from '@/components/customer-modal';
+import { VehicleModal } from '@/components/entity-modals';
 import { inspectionFieldLabelParts, INSPECTION_COVER_ROWS, INSPECTION_VEHICLE_INFO } from '@/lib/inspection-fields';
 
 type Tab = 'jobs' | 'vehicles' | 'bookings' | 'services';
@@ -487,6 +488,7 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
         vehicle={null}
         customers={(customers.data?.items ?? []).map((c: CustomerDto) => ({ id: c.id, code: c.code, nameEn: c.nameEn || c.nameAr || c.code }))}
         defaultCustomerId={customerId}
+        onCustomerCreated={customers.reload}
         onClose={() => setAddVehicleOpen(false)}
         onSaved={async (created) => {
           if (!created) return;
@@ -612,6 +614,7 @@ function VehiclesTab({ canManage }: { canManage: boolean }) {
         open={open}
         vehicle={editing}
         customers={customers.data?.items ?? []}
+        onCustomerCreated={customers.reload}
         onClose={() => { setOpen(false); setEditing(null); }}
         onSaved={list.reload}
       />
@@ -936,6 +939,7 @@ function CreateVehicleModal({
   vehicle,
   customers,
   defaultCustomerId,
+  onCustomerCreated,
   onClose,
   onSaved,
 }: {
@@ -944,6 +948,8 @@ function CreateVehicleModal({
   customers: Array<{ id: string; code: string; nameEn: string }>;
   /** Preselected customer when the modal is opened from an inspection form. */
   defaultCustomerId?: string;
+  /** Reload the customer list after one is created from the picker. */
+  onCustomerCreated?: () => Promise<void> | void;
   onClose: () => void;
   onSaved: (created?: VehicleDto) => Promise<void>;
 }) {
@@ -1036,10 +1042,26 @@ function CreateVehicleModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.sales.customer')} required>
-          <select className="oryx-select" value={form.customerId} disabled={Boolean(vehicle)} onChange={(e) => setForm({ ...form, customerId: e.target.value })} data-testid="vehicle-customer">
-            <option value="">—</option>
-            {customers.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.customerId || null}
+            options={customers.map((c) => ({ value: c.id, label: `${c.code} — ${c.nameEn}` }))}
+            onChange={(v) => setForm((prev) => ({ ...prev, customerId: v ?? '' }))}
+            placeholder={t('common.select')}
+            emptyLabel={t('common.none')}
+            disabled={Boolean(vehicle)}
+            testId="vehicle-customer"
+            createLabel={t('erp.sales.newCustomer')}
+            reloadOptions={onCustomerCreated}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <CustomerModal
+                open
+                customer={null}
+                onClose={closeCreate}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.automotive.vin')} required hint={vinValid ? t('erp.automotive.vinHint') : t('erp.automotive.vinInvalid')}>
           <input className={`oryx-input${form.vin && !vinValid ? ' oryx-input--invalid' : ''}`} value={form.vin} disabled={Boolean(vehicle)} onChange={(e) => setForm({ ...form, vin: e.target.value.toUpperCase() })} maxLength={17} data-testid="vehicle-vin" />
@@ -1079,6 +1101,7 @@ function BookingsTab({ canBook, canApprove, canInvoice }: { canBook: boolean; ca
   const list = useAsync(() => api.inspectionBookings(), []);
   const vehicles = useAsync(() => api.vehicles(), []);
   const services = useAsync(() => api.inspectionServices(), []);
+  const customers = useAsync(() => api.salesCustomers(), []);
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
@@ -1192,7 +1215,7 @@ function BookingsTab({ canBook, canApprove, canInvoice }: { canBook: boolean; ca
         </div>
       ) : null}
 
-      <CreateBookingModal open={open} vehicles={vehicles.data?.items ?? []} services={services.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <CreateBookingModal open={open} vehicles={vehicles.data?.items ?? []} services={services.data?.items ?? []} customers={customers.data?.items ?? []} onVehiclesReload={vehicles.reload} onServicesReload={services.reload} onClose={() => setOpen(false)} onCreated={list.reload} />
     </Card>
   );
 }
@@ -1201,17 +1224,23 @@ function CreateBookingModal({
   open,
   vehicles,
   services,
+  customers,
+  onVehiclesReload,
+  onServicesReload,
   onClose,
   onCreated,
 }: {
   open: boolean;
   vehicles: Array<{ id: string; vin: string; make: string; model: string }>;
   services: Array<{ id: string; nameEn: string; priceMinor: number; taxPercentBp: number }>;
+  customers: Array<{ id: string; code: string; nameEn: string; nameAr?: string | null }>;
+  onVehiclesReload?: () => Promise<void> | void;
+  onServicesReload?: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
   const { t } = useUi();
-  const { companyId } = useAuth();
+  const { companyId, hasModule } = useAuth();
   const branches = useAsync(() => (companyId ? api.listBranches(companyId, { pageSize: 100 }) : Promise.resolve(null)), [companyId]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1255,25 +1284,69 @@ function CreateBookingModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.automotive.vehicle')} required>
-          <select className="oryx-select" value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })} data-testid="booking-vehicle">
-            <option value="">—</option>
-            {vehicles.map((v) => <option key={v.id} value={v.id}>{v.vin} — {v.make} {v.model}</option>)}
-          </select>
+          <EntityPicker
+            value={form.vehicleId || null}
+            options={vehicles.map((v) => ({ value: v.id, label: `${v.vin} — ${v.make} ${v.model}` }))}
+            onChange={(v) => setForm((prev) => ({ ...prev, vehicleId: v ?? '' }))}
+            placeholder={t('common.select')}
+            emptyLabel={t('common.none')}
+            testId="booking-vehicle"
+            createLabel={t('erp.automotive.newVehicle')}
+            reloadOptions={onVehiclesReload}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <VehicleModal
+                open
+                customers={customers}
+                onClose={closeCreate}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.automotive.service')} required>
-          <select className="oryx-select" value={form.serviceId} onChange={(e) => setForm({ ...form, serviceId: e.target.value })} data-testid="booking-service">
-            <option value="">—</option>
-            {services.map((s) => <option key={s.id} value={s.id}>{s.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.serviceId || null}
+            options={services.map((s) => ({ value: s.id, label: s.nameEn }))}
+            onChange={(v) => setForm((prev) => ({ ...prev, serviceId: v ?? '' }))}
+            placeholder={t('common.select')}
+            emptyLabel={t('common.none')}
+            testId="booking-service"
+            createLabel={t('erp.automotive.newService')}
+            reloadOptions={onServicesReload}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <ServiceModal
+                open
+                service={null}
+                onClose={closeCreate}
+                onSaved={async () => { await onServicesReload?.(); }}
+                onSavedRecord={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.automotive.scheduledAt')} required>
           <input type="datetime-local" className="oryx-input oryx-input--date" value={form.scheduledAt} onChange={(e) => setForm({ ...form, scheduledAt: e.target.value })} data-testid="booking-date" />
         </Field>
         <Field label={t('erp.automotive.branch')}>
-          <select className="oryx-select" value={form.branchId} onChange={(e) => setForm({ ...form, branchId: e.target.value })} data-testid="booking-branch">
-            <option value="">—</option>
-            {(branches.data?.items ?? []).map((b) => <option key={b.id} value={b.id}>{b.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.branchId || null}
+            options={(branches.data?.items ?? []).map((b) => ({ value: b.id, label: b.nameEn }))}
+            onChange={(v) => setForm((prev) => ({ ...prev, branchId: v ?? '' }))}
+            placeholder={t('common.select')}
+            emptyLabel={t('common.none')}
+            testId="booking-branch"
+            createLabel={t('branches.new')}
+            reloadOptions={branches.reload}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <InlineBranchModal
+                companyId={companyId}
+                hasModule={hasModule('branch_management')}
+                onClose={closeCreate}
+                onSaved={(createdId) => { branches.reload(); void onSaved(createdId); }}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.automotive.odometer')}>
           <input type="number" min="0" className="oryx-input tabular-nums" value={form.odometer} onChange={(e) => setForm({ ...form, odometer: e.target.value })} data-testid="booking-odometer" />
@@ -1415,11 +1488,14 @@ function ServiceModal({
   service,
   onClose,
   onSaved,
+  onSavedRecord,
 }: {
   open: boolean;
   service: InspectionServiceDto | null;
   onClose: () => void;
   onSaved: () => Promise<void>;
+  /** Receives the saved record so an inline picker can select it. */
+  onSavedRecord?: (saved: InspectionServiceDto) => void;
 }) {
   const { t } = useUi();
   const editing = service !== null;
@@ -1465,6 +1541,7 @@ function ServiceModal({
         await api.uploadInspectionServiceImage(saved.id, fd);
       }
       await onSaved();
+      onSavedRecord?.(saved);
       onClose();
     } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); } finally { setBusy(false); }
   };
@@ -1506,6 +1583,75 @@ function ServiceModal({
             data-testid="service-image-input"
           />
         </div>
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * A branch create form for the inline picker, mirroring `CreateBranchModal` on
+ * the branches screen: the same fields, the same API call and the same
+ * plan-limit guard. It reports the new branch id so the picker can select it.
+ */
+function InlineBranchModal({
+  companyId,
+  hasModule,
+  onClose,
+  onSaved,
+}: {
+  companyId: string | null;
+  hasModule: boolean;
+  onClose: () => void;
+  onSaved: (createdId: string) => void;
+}) {
+  const { t } = useUi();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', city: '', countryCode: 'BH', addressLine: '', phone: '', timezone: 'Asia/Bahrain' });
+
+  const submit = async () => {
+    if (!companyId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const created = await api.createBranch(companyId, {
+        code: form.code.toUpperCase(),
+        nameEn: form.nameEn,
+        nameAr: form.nameAr,
+        city: form.city || undefined,
+        countryCode: form.countryCode || undefined,
+        addressLine: form.addressLine || undefined,
+        phone: form.phone || undefined,
+        timezone: form.timezone || undefined,
+      });
+      onSaved(created.id);
+      onClose();
+    } catch (err) {
+      const key = errorMessageKey(err);
+      setError(key === 'common.error' ? (err instanceof Error ? err.message : t('common.error')) : t(key));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open title={t('branches.new')} onClose={onClose}
+      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || !form.code || !form.nameEn || !form.nameAr} onClick={submit} data-testid="inline-create-branch-submit">{busy ? t('common.loading') : t('common.create')}</Button></>}>
+      {error ? <ErrorBanner message={error} /> : null}
+      {!hasModule ? (
+        <p className="mb-3 rounded-lg px-3 py-2 text-[12.5px] font-semibold" style={{ color: 'var(--warning)', background: 'color-mix(in srgb, var(--warning) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
+          {t('error.moduleNotLicensed')}
+        </p>
+      ) : null}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label={t('common.code')} required><input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} data-testid="inline-branch-code" /></Field>
+        <Field label={`${t('common.name')} (EN)`} required><input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="inline-branch-name-en" /></Field>
+        <Field label={`${t('common.name')} (AR)`} required><input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="inline-branch-name-ar" /></Field>
+        <Field label={t('common.city')}><input className="oryx-input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></Field>
+        <Field label={t('branches.phone')}><input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
+        <Field label={t('branches.addressLine')}><input className="oryx-input" value={form.addressLine} onChange={(e) => setForm({ ...form, addressLine: e.target.value })} /></Field>
+        <Field label={t('branches.country')}><input className="oryx-input" value={form.countryCode} maxLength={2} onChange={(e) => setForm({ ...form, countryCode: e.target.value.toUpperCase() })} /></Field>
+        <Field label={t('branches.timezone')}><input className="oryx-input" value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })} /></Field>
       </div>
     </Modal>
   );

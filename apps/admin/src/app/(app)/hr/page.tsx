@@ -11,6 +11,7 @@ import { ModuleDashboard } from '@/components/module-dashboard';
 import { TabDeepLink } from '@/components/tab-deep-link';
 import { EntityPicker } from '@/components/inline-create';
 import { EmployeeModal } from '@/components/entity-modals';
+import { LeaveTypeModal } from '@/components/leave-type-modal';
 import {
   Badge,
   Button,
@@ -206,6 +207,7 @@ function EmployeesTab({ canManage }: { canManage: boolean }) {
         departments={departments.data?.items ?? []}
         canManage={canManage}
         documentsSlot={editing ? <EmployeeDocumentsSection employeeId={editing.id} canManage={canManage} /> : null}
+        onDepartmentCreated={departments.reload}
         onClose={() => { setOpen(false); setEditing(null); }}
         onCreated={list.reload}
       />
@@ -566,6 +568,8 @@ function LeaveTab({ canRequest, canApprove }: { canRequest: boolean; canApprove:
         types={types.data?.items ?? []}
         departments={departments.data?.items ?? []}
         onEmployeeCreated={employees.reload}
+        onDepartmentCreated={departments.reload}
+        onTypesReload={types.reload}
         onClose={() => { setOpen(false); setEditing(null); }}
         onCreated={list.reload}
       />
@@ -580,6 +584,8 @@ function LeaveRequestModal({
   types,
   departments,
   onEmployeeCreated,
+  onDepartmentCreated,
+  onTypesReload,
   onClose,
   onCreated,
 }: {
@@ -589,6 +595,8 @@ function LeaveRequestModal({
   types: Array<{ id: string; nameEn: string }>;
   departments: Array<{ id: string; nameEn: string }>;
   onEmployeeCreated?: () => Promise<void> | void;
+  onDepartmentCreated?: () => Promise<void> | void;
+  onTypesReload?: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
@@ -668,6 +676,7 @@ function LeaveRequestModal({
               <EmployeeModal
                 open
                 departments={departments}
+                onDepartmentCreated={onDepartmentCreated}
                 onClose={onClose}
                 onCreated={() => { /* selection is handled by onSaved */ }}
                 onSaved={(saved) => void onSaved(saved.id)}
@@ -676,10 +685,23 @@ function LeaveRequestModal({
           />
         </Field>
         <Field label={t('erp.hr.leaveType')} required>
-          <select className="oryx-select" value={form.leaveTypeId} onChange={(e) => setForm({ ...form, leaveTypeId: e.target.value })} data-testid="leave-type">
-            <option value="">—</option>
-            {types.map((x) => <option key={x.id} value={x.id}>{x.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.leaveTypeId || null}
+            options={types.map((x) => ({ value: x.id, label: x.nameEn }))}
+            onChange={(v) => setForm({ ...form, leaveTypeId: v ?? '' })}
+            placeholder={t('common.select')}
+            testId="leave-type"
+            createLabel={t('erp.hr.newLeaveType')}
+            reloadOptions={onTypesReload}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <LeaveTypeModal
+                open
+                onClose={closeCreate}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.reports.from')} required>
           <input type="date" className="oryx-input" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} data-testid="leave-start" />
@@ -756,6 +778,7 @@ function AttendanceTab({ canManage, canSelf }: { canManage: boolean; canSelf: bo
         employees={employees.data?.items ?? []}
         departments={departments.data?.items ?? []}
         onEmployeeCreated={employees.reload}
+        onDepartmentCreated={departments.reload}
         onClose={() => setOpen(false)}
         onSaved={list.reload}
       />
@@ -841,6 +864,7 @@ function RecordAttendanceModal({
   employees,
   departments,
   onEmployeeCreated,
+  onDepartmentCreated,
   onClose,
   onSaved,
 }: {
@@ -848,6 +872,7 @@ function RecordAttendanceModal({
   employees: EmployeeDto[];
   departments: Array<{ id: string; nameEn: string }>;
   onEmployeeCreated?: () => Promise<void> | void;
+  onDepartmentCreated?: () => Promise<void> | void;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -929,6 +954,7 @@ function RecordAttendanceModal({
               <EmployeeModal
                 open
                 departments={departments}
+                onDepartmentCreated={onDepartmentCreated}
                 onClose={onClose}
                 onCreated={() => { /* selection is handled by onSaved */ }}
                 onSaved={(saved) => void onSaved(saved.id)}

@@ -57,7 +57,7 @@ export function EntityPicker({
   /** Reload the option list after a create so the new record appears. */
   reloadOptions?: () => Promise<unknown> | void;
   /** Renders the full create form. Receives close/saved callbacks. */
-  renderCreate: (args: InlineCreateFormArgs) => ReactNode;
+  renderCreate?: (args: InlineCreateFormArgs) => ReactNode;
 }) {
   const [creating, setCreating] = useState(false);
 
@@ -72,9 +72,9 @@ export function EntityPicker({
         disabled={disabled}
         testId={testId}
         createLabel={createLabel}
-        onCreateNew={() => setCreating(true)}
+        onCreateNew={renderCreate ? () => setCreating(true) : undefined}
       />
-      {creating
+      {creating && renderCreate
         ? renderCreate({
             onClose: () => setCreating(false),
             onSaved: async (createdId) => {

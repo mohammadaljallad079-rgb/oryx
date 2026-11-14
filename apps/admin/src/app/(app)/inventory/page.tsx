@@ -378,19 +378,24 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
           </label>
           <label className="min-w-[150px]">
             <span className="oryx-label">{t('erp.inventory.warehouse')}</span>
-            <select
-              className="oryx-select"
-              value={warehouseId}
-              onChange={(e) => setWarehouseId(e.target.value)}
-              data-testid="filter-warehouse"
-            >
-              <option value="">{t('erp.inventory.allWarehouses')}</option>
-              {(warehouses.data?.items ?? []).map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.nameEn}
-                </option>
-              ))}
-            </select>
+            <EntityPicker
+              value={warehouseId || null}
+              options={(warehouses.data?.items ?? []).map((w) => ({ value: w.id, label: w.nameEn }))}
+              onChange={(v) => setWarehouseId(v ?? '')}
+              placeholder={t('erp.inventory.allWarehouses')}
+              emptyLabel={t('erp.inventory.allWarehouses')}
+              testId="filter-warehouse"
+              createLabel={t('erp.inventory.newWarehouse')}
+              reloadOptions={warehouses.reload}
+              renderCreate={({ onClose: closeCreate, onSaved }) => (
+                <WarehouseModal
+                  open
+                  onClose={closeCreate}
+                  onCreated={() => { /* selection is handled by onSaved */ }}
+                  onSaved={(saved) => void onSaved(saved.id)}
+                />
+              )}
+            />
           </label>
           <label className="min-w-[120px]">
             <span className="oryx-label">{t('erp.inventory.minPrice')}</span>

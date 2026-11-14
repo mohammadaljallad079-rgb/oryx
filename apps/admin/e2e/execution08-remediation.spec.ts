@@ -47,11 +47,12 @@ test.describe('Execution 08 remediation — interface', () => {
     await page.getByTestId('hr-tab-leave').click();
     await page.getByTestId('new-leave-request').click();
 
-    // The employee field is a searchable picker (with an inline create action),
-    // not a native select; the leave type is still a plain select.
+    // Both the employee and the leave type are searchable pickers (with an
+    // inline create action), not native selects.
     await page.getByTestId('leave-employee').locator('button').first().click();
     await page.getByTestId('leave-employee').locator('[role="option"]').first().click();
-    await page.getByTestId('leave-type').selectOption({ index: 1 });
+    await page.getByTestId('leave-type').locator('button').first().click();
+    await page.getByTestId('leave-type').locator('[role="option"]').first().click();
     // `<input type="date">` yields `YYYY-MM-DD`; the API must accept it without
     // an ISO 8601 rejection.
     await page.getByTestId('leave-start').fill('2026-11-02');
