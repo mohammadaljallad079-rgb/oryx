@@ -302,6 +302,12 @@ enum Theme {
   light
 }
 
+enum FontScale {
+  SM
+  MD
+  LG
+}
+
 enum InvitationStatus {
   PENDING
   ACCEPTED
@@ -338,6 +344,12 @@ model User {
   isSuperAdmin              Boolean    @default(false)
   preferredLocale           Locale     @default(ar)
   preferredTheme            Theme      @default(dark)
+  /**
+   * UI text scale: `SM` (small), `MD` (medium, the default) or `LG` (large).
+   * Applied as a root font-size multiplier so the choice reaches every card,
+   * table and form without a per-screen override.
+   */
+  preferredFontScale        FontScale  @default(MD)
   lastLoginAt               DateTime?
   failedLoginCount          Int        @default(0)
   lockedUntil               DateTime?
@@ -451,10 +463,10 @@ model Company {
   functionalCurrency String?
   /**
    * The VAT/sales-tax rate the tenant applies by default, in basis points
-   * (1500 = 15%). A line's own rate always wins; this only seeds a new line, so
-   * changing it never rewrites an issued document.
+   * (1000 = 10%, Bahrain's standard rate). A line's own rate always wins; this
+   * only seeds a new line, so changing it never rewrites an issued document.
    */
-  defaultTaxRateBp   Int             @default(1500)
+  defaultTaxRateBp   Int             @default(1000)
   /**
    * Optional whole-amount rounding for cash settlement. `NONE` keeps the exact
    * total; the other modes snap a document total to the nearest whole or half
@@ -2517,6 +2529,8 @@ enum ContractStatus {
 
 enum EmployeeDocumentCategory {
   IDENTITY
+  PASSPORT
+  VISA
   CONTRACT
   CERTIFICATE
   MEDICAL
@@ -2834,6 +2848,11 @@ model Employee {
   fullNameAr      String
   email           String?
   phone           String?
+  /**
+   * A second reachable number (home or emergency contact). The primary `phone`
+   * stays the first line of contact; this one is printed beside it.
+   */
+  secondaryPhone  String?
   nationalId      String?
   /**
    * Optional link to a platform user account.
@@ -2915,6 +2934,12 @@ model EmployeeDocument {
   category       EmployeeDocumentCategory @default(OTHER)
   title          String
   fileRef        String?
+  /**
+   * The stored upload backing this document, if one was attached. The binary is
+   * held by the attachment store; `fileRef` remains a free-text reference for a
+   * document that only has a physical copy.
+   */
+  fileAssetId    String?
   issuedAt       DateTime?
   expiresAt      DateTime?
   /**
@@ -4041,14 +4066,22 @@ model InspectionService {
   taxPercentBp    Int      @default(0)
   durationMinutes Int      @default(60)
   isActive        Boolean  @default(true)
+  /**
+   * The picture shown beside the service on the booking screen and the
+   * catalogue. It references the shared media library, so the bytes are
+   * re-encoded and stored once rather than a second image store being created.
+   */
+  imageAssetId    String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  company  Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  items    InspectionChecklistItem[]
-  bookings InspectionBooking[]
+  company    Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  imageAsset CmsMediaAsset?            @relation(fields: [imageAssetId], references: [id], onDelete: SetNull)
+  items      InspectionChecklistItem[]
+  bookings   InspectionBooking[]
 
   @@unique([companyId, code])
+  @@index([imageAssetId])
 }
 
 model InspectionChecklistItem {
@@ -6003,6 +6036,8 @@ model CmsMediaAsset {
   inspectionPhotos CustomerInspectionPhoto[]
   /// Provider storefront photographs that reference this asset.
   providerImages   MarketplaceProvider[]     @relation("ProviderImage")
+  /// Inspection services that show this asset as their catalogue picture.
+  inspectionServices InspectionService[]
   id               String                    @id @default(cuid())
   folderId         String?
   /**

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from './icons';
 import { useUi } from '@/lib/ui-context';
 
@@ -142,10 +143,16 @@ export function Modal({
   const { t } = useUi();
   const idRef = useRef<symbol>(Symbol('oryx-modal'));
   const id = idRef.current;
+  // The dialog is mounted at the depth it had when it opened, so a modal opened
+  // from inside another (a preview from a form, a confirm from a list) always
+  // paints above the one that spawned it instead of losing the paint race to a
+  // sibling that happens to sit later in the DOM.
+  const [depth, setDepth] = useState(0);
 
   useEffect(() => {
     if (!open) return;
     openModals.push(id);
+    setDepth(openModals.length);
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       // Only the top-most modal reacts, so a nested preview closes alone.
@@ -162,12 +169,16 @@ export function Modal({
   }, [open, onClose, id]);
 
   if (!open) return null;
-  return (
+  // A portal lifts the dialog out of whatever scroll container or stacking
+  // context it was declared in, so the backdrop always covers the whole
+  // viewport and no ancestor `overflow`/`transform` can clip it.
+  const tree = (
     <div
       className={`oryx-modal-backdrop${size === 'pos' ? ' oryx-modal-backdrop--pos' : ''}`}
       role="dialog"
       aria-modal="true"
       aria-label={title}
+      style={{ zIndex: 60 + depth * 5 }}
       onClick={(e) => {
         e.stopPropagation();
         onClose();
@@ -215,6 +226,8 @@ export function Modal({
       </div>
     </div>
   );
+  if (typeof document === 'undefined') return tree;
+  return createPortal(tree, document.body);
 }
 
 export function EmptyState({

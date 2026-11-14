@@ -320,6 +320,7 @@ export class RbacService {
         isSuperAdmin: m.user.isSuperAdmin,
         preferredLocale: m.user.preferredLocale,
         preferredTheme: m.user.preferredTheme,
+        preferredFontScale: m.user.preferredFontScale,
         lastLoginAt: m.user.lastLoginAt?.toISOString() ?? null,
         createdAt: m.user.createdAt.toISOString(),
         memberships: [

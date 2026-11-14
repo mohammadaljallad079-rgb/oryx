@@ -90,8 +90,12 @@ oryx out put*.pdf
 
 # Ad-hoc verification/repro scripts kept out of the release branch.
 .run/*.mjs
+.run/*.mts
+.run/*.cjs
 .run/*.py
 .run/*.sh
+.run/ref-assets/
+.run/ref-inv/
 .run/preview-links/
 
 # Ad-hoc visual-comparison scratch produced while matching the approved

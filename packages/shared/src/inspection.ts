@@ -17,7 +17,10 @@
  * one monolithic form.
  */
 
-/** The seven selectable inspection areas. */
+/** The seven data areas an inspection can record results against. These are the
+ * storage/editor granularity and are *not* what the operator selects: the
+ * approved report offers four selectable inspection types, each of which covers
+ * one or more of these areas (see `INSPECTION_TYPES`). */
 export const INSPECTION_SECTION_KEYS = [
   'PAINT_BODY',
   'CHASSIS_UNDERCARRIAGE',
@@ -29,6 +32,114 @@ export const INSPECTION_SECTION_KEYS = [
 ] as const;
 
 export type InspectionSectionKey = (typeof INSPECTION_SECTION_KEYS)[number];
+
+/**
+ * The four selectable inspection types of the approved report.
+ *
+ * The report has exactly four check sections, so the operator chooses one or
+ * more of these — never the seven internal areas. Each type maps to the areas
+ * that record its results, which is why selecting a type expands to its areas
+ * for storage while the screen and the printed plan stay at four.
+ */
+export const INSPECTION_TYPE_KEYS = [
+  'PAINT_BODY',
+  'CHASSIS_UNDERCARRIAGE',
+  'CABIN_AND_MECHANICAL',
+  'COMPUTER_UNIT',
+] as const;
+
+export type InspectionTypeKey = (typeof INSPECTION_TYPE_KEYS)[number];
+
+export interface InspectionTypeSpec {
+  key: InspectionTypeKey;
+  labelEn: string;
+  labelAr: string;
+  summaryEn: string;
+  summaryAr: string;
+  /** The printed page of the report this type is drawn on. */
+  page: number;
+  /** The data areas this type records results against. */
+  sections: readonly InspectionSectionKey[];
+}
+
+export const INSPECTION_TYPES: readonly InspectionTypeSpec[] = [
+  {
+    key: 'PAINT_BODY',
+    labelEn: 'Vehicle Paint & Body Check',
+    labelAr: 'فحص الصبغ وبدن المركبة',
+    summaryEn: 'Body panels diagnostic scheme and paint remarks.',
+    summaryAr: 'مخطط تشخيص هياكل السيارة وملاحظات الصبغ.',
+    page: 2,
+    sections: ['PAINT_BODY'],
+  },
+  {
+    key: 'CHASSIS_UNDERCARRIAGE',
+    labelEn: 'Chassis & Undercarriage Condition',
+    labelAr: 'فحص الشاصي وأسفل المركبة',
+    summaryEn: 'Chassis safety diagram with eight assessed regions.',
+    summaryAr: 'مخطط سلامة الشاصي بثماني مناطق تقييم.',
+    page: 3,
+    sections: ['CHASSIS_UNDERCARRIAGE'],
+  },
+  {
+    key: 'CABIN_AND_MECHANICAL',
+    labelEn: 'Interior & Exterior / Engine Compartment / Road Test',
+    labelAr: 'الفحص الداخلي والخارجي / مقصورة المحرك / تجربة القيادة',
+    summaryEn: 'Cabin, exterior, engine compartment and road test checklists.',
+    summaryAr: 'قوائم الفحص الداخلي والخارجي ومقصورة المحرك وتجربة القيادة.',
+    page: 4,
+    sections: ['INTERIOR', 'EXTERIOR', 'ENGINE_COMPARTMENT', 'ROAD_TEST'],
+  },
+  {
+    key: 'COMPUTER_UNIT',
+    labelEn: 'Computer Unit Inspection',
+    labelAr: 'فحص وحدة الكمبيوتر',
+    summaryEn: 'Computer module faults and an optional vendor diagnostic PDF.',
+    summaryAr: 'أعطال وحدة الكمبيوتر وملف تشخيص PDF الخارجي الاختياري.',
+    page: 5,
+    sections: ['COMPUTER_UNIT'],
+  },
+] as const;
+
+export function inspectionTypeSpec(key: string): InspectionTypeSpec {
+  const found = INSPECTION_TYPES.find((t) => t.key === key);
+  if (!found) throw new Error(`Unknown inspection type: ${key}`);
+  return found;
+}
+
+export function isInspectionTypeKey(key: string): key is InspectionTypeKey {
+  return (INSPECTION_TYPE_KEYS as readonly string[]).includes(key);
+}
+
+/** The data areas a type records, in catalogue order. */
+export function sectionsForType(key: InspectionTypeKey): InspectionSectionKey[] {
+  const spec = inspectionTypeSpec(key);
+  return INSPECTION_SECTION_KEYS.filter((k) => spec.sections.includes(k));
+}
+
+/** Expand a set of selected types into the areas they record, deduped and in
+ * catalogue order. This is what the API stores on `selectedAreas`. */
+export function areasForTypes(types: readonly InspectionTypeKey[]): InspectionSectionKey[] {
+  const wanted = new Set<InspectionSectionKey>();
+  for (const type of types) for (const area of sectionsForType(type)) wanted.add(area);
+  return INSPECTION_SECTION_KEYS.filter((k) => wanted.has(k));
+}
+
+/** The type that owns a stored area. */
+export function typeForSection(area: InspectionSectionKey): InspectionTypeKey {
+  const found = INSPECTION_TYPES.find((t) => t.sections.includes(area));
+  if (!found) throw new Error(`No inspection type owns area ${area}`);
+  return found.key;
+}
+
+/** The distinct types a set of stored areas maps back to, in catalogue order.
+ * The inverse of `areasForTypes`, used to show the operator the four types a
+ * job covers. */
+export function typesForAreas(areas: readonly InspectionSectionKey[]): InspectionTypeKey[] {
+  const wanted = new Set<InspectionTypeKey>();
+  for (const area of areas) wanted.add(typeForSection(area));
+  return INSPECTION_TYPE_KEYS.filter((k) => wanted.has(k));
+}
 
 /**
  * How a section is completed. `ITEMS` is a checklist, `DIAGRAM_PAINT` and
@@ -108,8 +219,8 @@ export const INSPECTION_SECTION_SPECS: readonly InspectionSectionSpec[] = [
     kind: 'DIAGRAM_PAINT',
     resultSet: PASS_FAIL,
     items: [],
-    remarksLabelEn: 'Paint & Body Technical Remarks',
-    remarksLabelAr: 'الملاحظات الفنية للصبغ والهيكل',
+    remarksLabelEn: 'Paint & Body Remarks',
+    remarksLabelAr: 'الملاحظات الفنية لفحص الصبغ والبدن',
   },
   {
     key: 'CHASSIS_UNDERCARRIAGE',
@@ -122,7 +233,7 @@ export const INSPECTION_SECTION_SPECS: readonly InspectionSectionSpec[] = [
     resultSet: PASS_FAIL,
     items: [],
     remarksLabelEn: 'Chassis Condition & Underbody Remarks',
-    remarksLabelAr: 'ملاحظات حالة الشاسيه والأسفل',
+    remarksLabelAr: 'ملاحظات وتعليقات فحص الشاصي وأسفل المركبة',
   },
   {
     key: 'INTERIOR',
@@ -135,17 +246,17 @@ export const INSPECTION_SECTION_SPECS: readonly InspectionSectionSpec[] = [
     resultSet: PASS_FAIL_NA,
     items: [
       { key: 'interior.doors', labelEn: 'Driver & Passenger Doors', labelAr: 'أبواب السائق والركاب' },
-      { key: 'interior.controlKeys', labelEn: 'Control Keys & Switches', labelAr: 'المفاتيح والمحابس' },
-      { key: 'interior.clusterControl', labelEn: 'Cluster Control', labelAr: 'التحكم بالعدّاد' },
+      { key: 'interior.controlKeys', labelEn: 'Control Keys & Switches', labelAr: 'مفاتيح وأزرار التحكم' },
+      { key: 'interior.clusterControl', labelEn: 'Cluster Control', labelAr: 'التحكم في لوحة العدادات' },
       { key: 'interior.cupHolder', labelEn: 'Cup Holder & Console', labelAr: 'حامل الأكواب والكونسول' },
-      { key: 'interior.steeringWheel', labelEn: 'Steering Wheel & Controls', labelAr: 'المقود والتحكم' },
-      { key: 'interior.audio', labelEn: 'Audio & Display System', labelAr: 'نظام الصوت والشاشة' },
-      { key: 'interior.sunroof', labelEn: 'Sunroof Operation', labelAr: 'عمل فتحة السقف' },
-      { key: 'interior.acVents', labelEn: 'A/C Vents & Airflow', labelAr: 'فتحات التكييف وتدفق الهواء' },
+      { key: 'interior.steeringWheel', labelEn: 'Steering Wheel & Controls', labelAr: 'عجلة القيادة وأزرارها' },
+      { key: 'interior.audio', labelEn: 'Audio & Display System', labelAr: 'النظام الصوتي والشاشة' },
+      { key: 'interior.sunroof', labelEn: 'Sunroof Operation', labelAr: 'فتحة السقف' },
+      { key: 'interior.acVents', labelEn: 'A/C Vents & Airflow', labelAr: 'منافذ وتوزيع المكيف' },
       { key: 'interior.rearViewMirror', labelEn: 'Rear View Mirror', labelAr: 'مرآة الرؤية الخلفية' },
-      { key: 'interior.carpet', labelEn: 'Carpet & Floor Mats', labelAr: 'الفرش ودواسات الأرضية' },
-      { key: 'interior.cigaretteLighter', labelEn: 'Cigarette Lighter & 12V', labelAr: 'الولاعة ومقبس 12 فولت' },
-      { key: 'interior.otherParts', labelEn: 'Other Interior Parts', labelAr: 'أجزاء داخلية أخرى' },
+      { key: 'interior.carpet', labelEn: 'Carpet & Floor Mats', labelAr: 'سجاد وأرضية السيارة' },
+      { key: 'interior.cigaretteLighter', labelEn: 'Cigarette Lighter & 12V', labelAr: 'ولاعة ومنافذ الطاقة' },
+      { key: 'interior.otherParts', labelEn: 'Other Interior Parts', labelAr: 'اجزاء أخرى (إن وجدت)' },
     ],
     remarksLabelEn: 'Interior Inspection Remarks',
     remarksLabelAr: 'ملاحظات الفحص الداخلي',
@@ -161,11 +272,11 @@ export const INSPECTION_SECTION_SPECS: readonly InspectionSectionSpec[] = [
     resultSet: PASS_FAIL_NA,
     items: [
       { key: 'exterior.windows', labelEn: 'Windows & Windshield', labelAr: 'النوافذ والزجاج الأمامي' },
-      { key: 'exterior.lights', labelEn: 'Head, Reverse & Fog Lights', labelAr: 'الأنوار الأمامية والخلفية وضباب' },
-      { key: 'exterior.indicators', labelEn: 'Indicator Lights', labelAr: 'أنوار الإشارة' },
-      { key: 'exterior.wipers', labelEn: 'Wipers & Spray Jets', labelAr: 'المساحات ومرشات الماء' },
-      { key: 'exterior.mirrors', labelEn: 'Side Mirrors & Fold Mechanism', labelAr: 'المرايا الجانبية وآلية الطي' },
-      { key: 'exterior.tiresRims', labelEn: 'Tires Condition & Rims', labelAr: 'حالة الإطارات والجنوط' },
+      { key: 'exterior.lights', labelEn: 'Head, Reverse & Fog Lights', labelAr: 'الإضاءة الأمامية والخلفية' },
+      { key: 'exterior.indicators', labelEn: 'Indicator Lights', labelAr: 'أضواء الإشارات والمؤشرات' },
+      { key: 'exterior.wipers', labelEn: 'Wipers & Spray Jets', labelAr: 'ماسحات الزجاج الأمامي' },
+      { key: 'exterior.mirrors', labelEn: 'Side Mirrors & Fold Mechanism', labelAr: 'المرايا الجانبية والتحكم' },
+      { key: 'exterior.tiresRims', labelEn: 'Tires Condition & Rims', labelAr: 'الإطارات والعجلات' },
     ],
     remarksLabelEn: 'Exterior Inspection Remarks',
     remarksLabelAr: 'ملاحظات الفحص الخارجي',
@@ -173,26 +284,26 @@ export const INSPECTION_SECTION_SPECS: readonly InspectionSectionSpec[] = [
   {
     key: 'ENGINE_COMPARTMENT',
     labelEn: 'Engine Compartment',
-    labelAr: 'حجرة المحرك',
+    labelAr: 'مقصورة المحرك',
     summaryEn: 'Fluids, electrical, mechanical and intake systems.',
     summaryAr: 'السوائل والكهرباء والأنظمة الميكانيكية والسحب.',
     page: 4,
     kind: 'ITEMS',
     resultSet: PASS_FAIL,
     items: [
-      { key: 'engine.fluids', labelEn: 'Fluids — Oil, Coolant, Brake', labelAr: 'السوائل — الزيت والمبرد والفرامل' },
+      { key: 'engine.fluids', labelEn: 'Fluids — Oil, Coolant, Brake', labelAr: 'السوائل والزيوت' },
       { key: 'engine.wiring', labelEn: 'Wiring & Connectors', labelAr: 'الأسلاك والموصلات' },
-      { key: 'engine.hoses', labelEn: 'Hoses & Lines', labelAr: 'الخراطيم والخطوط' },
-      { key: 'engine.fluidLeaks', labelEn: 'Fluid Leaks — Engine / Transmission', labelAr: 'تسريبات السوائل — المحرك / ناقل الحركة' },
-      { key: 'engine.mounts', labelEn: 'Engine & Transmission Mounts', labelAr: 'كراسي المحرك وناقل الحركة' },
-      { key: 'engine.caps', labelEn: 'Caps & Reservoir Covers', labelAr: 'الأغطية وأغطية الخزانات' },
+      { key: 'engine.hoses', labelEn: 'Hoses & Lines', labelAr: 'الخراطيم والوصلات' },
+      { key: 'engine.fluidLeaks', labelEn: 'Fluid Leaks — Engine / Transmission', labelAr: 'التسريبات والتهريب' },
+      { key: 'engine.mounts', labelEn: 'Engine & Transmission Mounts', labelAr: 'كراسي المحرك والقير' },
+      { key: 'engine.caps', labelEn: 'Caps & Reservoir Covers', labelAr: 'الأغطية وسدادات السوائل' },
       { key: 'engine.suspension', labelEn: 'Suspension System', labelAr: 'نظام التعليق' },
-      { key: 'engine.rubberBoots', labelEn: 'Rubber Boots & Bushings', labelAr: 'الأكياس المطاطية والجلبات' },
+      { key: 'engine.rubberBoots', labelEn: 'Rubber Boots & Bushings', labelAr: 'جلد وأغطية المطاط' },
       { key: 'engine.brakeSystem', labelEn: 'Brake System', labelAr: 'نظام الفرامل' },
-      { key: 'engine.airbox', labelEn: 'Airbox & Intake Duct', labelAr: 'صندوق الهواء ومجرى السحب' },
-      { key: 'engine.driveBelts', labelEn: 'Engine Drive Belts', labelAr: 'أحزمة تشغيل المحرك' },
-      { key: 'engine.exhaustManifold', labelEn: 'Exhaust Manifold', labelAr: 'مانيفولد العادم' },
-      { key: 'engine.battery', labelEn: 'Battery State of Health', labelAr: 'حالة صحة البطارية' },
+      { key: 'engine.airbox', labelEn: 'Airbox & Intake Duct', labelAr: 'فلتر ومجرى الهواء' },
+      { key: 'engine.driveBelts', labelEn: 'Engine Drive Belts', labelAr: 'أحزمة وسيور المحرك' },
+      { key: 'engine.exhaustManifold', labelEn: 'Exhaust Manifold', labelAr: 'منظومة العادم' },
+      { key: 'engine.battery', labelEn: 'Battery State of Health', labelAr: 'البطارية وكفاءة الشحن' },
     ],
     remarksLabelEn: 'Engine Compartment Remarks',
     remarksLabelAr: 'ملاحظات حجرة المحرك',
@@ -200,26 +311,26 @@ export const INSPECTION_SECTION_SPECS: readonly InspectionSectionSpec[] = [
   {
     key: 'ROAD_TEST',
     labelEn: 'Road Test',
-    labelAr: 'اختبار الطريق',
+    labelAr: 'تجربة القيادة',
     summaryEn: 'Road test drive observations recorded while driving.',
     summaryAr: 'ملاحظات اختبار القيادة على الطريق.',
     page: 4,
     kind: 'ITEMS',
     resultSet: PASS_FAIL,
     items: [
-      { key: 'road.suspensionNoise', labelEn: 'Suspension Noise', labelAr: 'ضجيج نظام التعليق' },
-      { key: 'road.rpmIdleStability', labelEn: 'RPM Idle Stability', labelAr: 'استقرار دوران المحرك على الوضع الحر' },
-      { key: 'road.engineRunningNoise', labelEn: 'Engine Running Noise', labelAr: 'ضجيج تشغيل المحرك' },
-      { key: 'road.vibrations', labelEn: 'Body & Drivetrain Vibrations', labelAr: 'اهتزازات الهيكل وناقل الحركة' },
-      { key: 'road.brakingPerformance', labelEn: 'Braking Performance', labelAr: 'أداء الفرملة' },
-      { key: 'road.steeringAlignment', labelEn: 'Steering Alignment & Center', labelAr: 'اتزان المقود وتمركزه' },
-      { key: 'road.climateControl', labelEn: 'Climate Control System', labelAr: 'نظام التحكم بالمناخ' },
-      { key: 'road.transmissionShifting', labelEn: 'Transmission Shifting', labelAr: 'تعشيق ناقل الحركة' },
-      { key: 'road.clusterWarningLamps', labelEn: 'Cluster Warning Lamps', labelAr: 'أضواء التحذير في العدّاد' },
-      { key: 'road.overallPerformance', labelEn: 'Overall Vehicle Performance', labelAr: 'الأداء العام للمركبة' },
-      { key: 'road.exhaustSmoke', labelEn: 'Exhaust Smoke Emission', labelAr: 'انبعاث دخان العادم' },
-      { key: 'road.tireRollingNoise', labelEn: 'Tire Rolling Noise', labelAr: 'ضجيج دحرجة الإطارات' },
-      { key: 'road.windNoise', labelEn: 'Cabin Wind Noise & Sealing', labelAr: 'ضجيج الهواء وإحكام المقصورة' },
+      { key: 'road.suspensionNoise', labelEn: 'Suspension Noise', labelAr: 'ضوضاء نظام التعليق' },
+      { key: 'road.rpmIdleStability', labelEn: 'RPM Idle Stability', labelAr: 'قياس RPM' },
+      { key: 'road.engineRunningNoise', labelEn: 'Engine Running Noise', labelAr: 'صوت وضجيج المحرك' },
+      { key: 'road.vibrations', labelEn: 'Body & Drivetrain Vibrations', labelAr: 'الاهتزازات' },
+      { key: 'road.brakingPerformance', labelEn: 'Braking Performance', labelAr: 'استجابة الفرامل ABS' },
+      { key: 'road.steeringAlignment', labelEn: 'Steering Alignment & Center', labelAr: 'ميزانية ومحاذاة المقود' },
+      { key: 'road.climateControl', labelEn: 'Climate Control System', labelAr: 'تبريد وكفاءة التكييف' },
+      { key: 'road.transmissionShifting', labelEn: 'Transmission Shifting', labelAr: 'تبديلات ناقل الحركة القير' },
+      { key: 'road.clusterWarningLamps', labelEn: 'Cluster Warning Lamps', labelAr: 'تحذيرات العدادات واللمبات' },
+      { key: 'road.overallPerformance', labelEn: 'Overall Vehicle Performance', labelAr: 'الأداء العام والتسارع' },
+      { key: 'road.exhaustSmoke', labelEn: 'Exhaust Smoke Emission', labelAr: 'انبعاثات وعادم الدخان' },
+      { key: 'road.tireRollingNoise', labelEn: 'Tire Rolling Noise', labelAr: 'ضجيج دوران الإطارات' },
+      { key: 'road.windNoise', labelEn: 'Cabin Wind Noise & Sealing', labelAr: 'عزل الصوت وضوضاء الرياح داخل المقصورة' },
     ],
     remarksLabelEn: 'Road Test Remarks',
     remarksLabelAr: 'ملاحظات اختبار الطريق',
@@ -277,7 +388,7 @@ export interface PaintConditionSpec {
 export type PaintCondition = 'PAINT' | 'FILLER' | 'CHANGE' | 'SECTIONED';
 
 export const PAINT_CONDITIONS: readonly PaintConditionSpec[] = [
-  { key: 'PAINT', labelEn: 'Paint', labelAr: 'صبغ / رش', color: 'green', cross: false },
+  { key: 'PAINT', labelEn: 'Paint', labelAr: 'صبغ (رش)', color: 'green', cross: false },
   { key: 'FILLER', labelEn: 'Filler', labelAr: 'معجون', color: 'orange', cross: false },
   { key: 'CHANGE', labelEn: 'Change', labelAr: 'تبديل', color: 'red', cross: false },
   { key: 'SECTIONED', labelEn: 'Sectioned', labelAr: 'مقطوع', color: 'red', cross: true },
@@ -316,14 +427,14 @@ export interface ChassisRegionSpec {
 }
 
 export const CHASSIS_REGIONS: readonly ChassisRegionSpec[] = [
-  { key: 'FRONT', labelEn: 'Front', labelAr: 'أمامي', x: 0.5, y: 0.06 },
-  { key: 'FRONT_LEFT', labelEn: 'Front Left', labelAr: 'أمامي يسار', x: 0.22, y: 0.2 },
-  { key: 'FRONT_RIGHT', labelEn: 'Front Right', labelAr: 'أمامي يمين', x: 0.78, y: 0.2 },
-  { key: 'MIDDLE_LEFT', labelEn: 'Middle Left', labelAr: 'وسط يسار', x: 0.2, y: 0.42 },
-  { key: 'MIDDLE_RIGHT', labelEn: 'Middle Right', labelAr: 'وسط يمين', x: 0.8, y: 0.42 },
-  { key: 'REAR_LEFT', labelEn: 'Rear Left', labelAr: 'خلفي يسار', x: 0.22, y: 0.68 },
-  { key: 'REAR_RIGHT', labelEn: 'Rear Right', labelAr: 'خلفي يمين', x: 0.78, y: 0.68 },
-  { key: 'REAR', labelEn: 'Rear', labelAr: 'خلفي', x: 0.5, y: 0.94 },
+  { key: 'FRONT', labelEn: 'Front', labelAr: 'الامام', x: 0.5, y: 0.06 },
+  { key: 'FRONT_LEFT', labelEn: 'Front Left', labelAr: 'الجهة الأمامية اليسرى', x: 0.22, y: 0.2 },
+  { key: 'FRONT_RIGHT', labelEn: 'Front Right', labelAr: 'الجهة الأمامية اليمنى', x: 0.78, y: 0.2 },
+  { key: 'MIDDLE_LEFT', labelEn: 'Middle Left', labelAr: 'الجهة الوسطى اليسرى', x: 0.2, y: 0.42 },
+  { key: 'MIDDLE_RIGHT', labelEn: 'Middle Right', labelAr: 'الجهة الوسطى اليمنى', x: 0.8, y: 0.42 },
+  { key: 'REAR_LEFT', labelEn: 'Rear Left', labelAr: 'الجهة الخلفية اليسرى', x: 0.22, y: 0.68 },
+  { key: 'REAR_RIGHT', labelEn: 'Rear Right', labelAr: 'الجهة الخلفية اليمنى', x: 0.78, y: 0.68 },
+  { key: 'REAR', labelEn: 'Rear', labelAr: 'الخلف', x: 0.5, y: 0.94 },
 ] as const;
 
 export type ChassisRegionCondition = 'OK' | 'DAMAGE' | 'UNSET';

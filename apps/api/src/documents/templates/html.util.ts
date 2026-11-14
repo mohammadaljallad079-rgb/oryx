@@ -92,6 +92,32 @@ export function docDate(value: Date | string | null | undefined): string {
   }).format(date);
 }
 
+/**
+ * The approved documents' date stamp: "Sat 20/09/2026, 3:30 PM".
+ *
+ * The reference prints a short weekday, a dd/mm/yyyy date and a 12-hour clock
+ * with an AM/PM suffix, all in Bahrain time. It is used by both the financial
+ * sheets and the inspection report so the two read as one family.
+ */
+export function docStamp(value: Date | string | null | undefined): string {
+  if (!value) return '—';
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return '—';
+  const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'Asia/Bahrain' }).format(date);
+  const day = new Intl.DateTimeFormat('en-GB', { day: '2-digit', timeZone: 'Asia/Bahrain' }).format(date);
+  const month = new Intl.DateTimeFormat('en-GB', { month: '2-digit', timeZone: 'Asia/Bahrain' }).format(date);
+  const year = new Intl.DateTimeFormat('en-GB', { year: 'numeric', timeZone: 'Asia/Bahrain' }).format(date);
+  const time = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Bahrain',
+  })
+    .format(date)
+    .replace(/\u202f/g, ' ');
+  return `${weekday} ${day}/${month}/${year}, ${time}`;
+}
+
 /** A date and time, to the minute. */
 export function docDateTime(value: Date | string | null | undefined): string {
   if (!value) return '—';

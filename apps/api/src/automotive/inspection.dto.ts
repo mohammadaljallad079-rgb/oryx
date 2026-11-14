@@ -18,6 +18,7 @@ import {
 import {
   CHASSIS_REGIONS,
   INSPECTION_SECTION_KEYS,
+  INSPECTION_TYPE_KEYS,
   PAINT_CONDITIONS,
   type InspectionSectionKey,
 } from '@oryx/shared';
@@ -31,6 +32,7 @@ import {
  * accepted by the API before the interface can render it.
  */
 const SECTION_KEYS = [...INSPECTION_SECTION_KEYS];
+const TYPE_KEYS = [...INSPECTION_TYPE_KEYS];
 const PAINT_KEYS = PAINT_CONDITIONS.map((c) => c.key);
 const CHASSIS_KEYS = CHASSIS_REGIONS.map((r) => r.key);
 
@@ -60,8 +62,11 @@ export class CreateInspectionSessionDto {
   @IsOptional() @IsString() bookingId?: string;
   @IsOptional() @IsString() branchId?: string;
 
-  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(7) @IsIn(SECTION_KEYS, { each: true })
-  selectedAreas!: InspectionSectionKey[];
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(4) @IsIn(TYPE_KEYS, { each: true })
+  selectedTypes?: string[];
+
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(7) @IsIn(SECTION_KEYS, { each: true })
+  selectedAreas?: InspectionSectionKey[];
 
   @IsOptional() @IsString() @MaxLength(200) customerName?: string;
   @IsOptional() @IsString() @MaxLength(40) contactNumber?: string;
@@ -93,6 +98,9 @@ export class UpdateInspectionSessionDto {
   @IsOptional() @IsString() @MaxLength(40) color?: string;
   @IsOptional() @IsString() @MaxLength(40) vin?: string;
   @IsOptional() @IsString() branchId?: string;
+
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(4) @IsIn(TYPE_KEYS, { each: true })
+  selectedTypes?: string[];
 
   @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(7) @IsIn(SECTION_KEYS, { each: true })
   selectedAreas?: InspectionSectionKey[];

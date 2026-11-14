@@ -38,6 +38,7 @@ const FACES: readonly FontFace[] = [
   { family: 'ORYX Naskh', weight: 700, file: 'NotoNaskhArabic-Bold.ttf' },
   { family: 'ORYX Sans', weight: 400, file: 'NotoSans-Regular.ttf' },
   { family: 'ORYX Sans', weight: 700, file: 'NotoSans-Bold.ttf' },
+  { family: 'ORYX Display', weight: 700, file: 'CodecPro-Bold.ttf' },
 ];
 
 /**

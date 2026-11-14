@@ -1,4 +1,5 @@
-import { esc, escMultiline, money, moneyPlain, quantity, countryName } from './html.util';
+import { docStamp, esc, escMultiline, money, moneyPlain, quantity, countryName } from './html.util';
+import { oryxLogoMark } from './oryx-logo.asset';
 import { CHROME_CSS } from './chrome';
 import { DOCUMENT_LATIN_STACK } from '../pdf/document-fonts.service';
 import type {
@@ -109,32 +110,6 @@ function paymentFieldLabel(payload: FinancialDocumentPayload): string {
 }
 
 /**
- * The reference's date stamp: "Sat 20/09/2026, 3:30 PM" in Bahrain time.
- *
- * The approved invoice prints a weekday, a dd/mm/yyyy date and a 12-hour clock;
- * `docDate` produces a different (day-month-year) shape, so the official layout
- * has its own formatter rather than reusing the report one.
- */
-function docStamp(value: string | null | undefined): string {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'Asia/Bahrain' }).format(date);
-  const day = new Intl.DateTimeFormat('en-GB', { day: '2-digit', timeZone: 'Asia/Bahrain' }).format(date);
-  const month = new Intl.DateTimeFormat('en-GB', { month: '2-digit', timeZone: 'Asia/Bahrain' }).format(date);
-  const year = new Intl.DateTimeFormat('en-GB', { year: 'numeric', timeZone: 'Asia/Bahrain' }).format(date);
-  const time = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-    timeZone: 'Asia/Bahrain',
-  })
-    .format(date)
-    .replace(/\u202f/g, ' ');
-  return `${weekday} ${day}/${month}/${year}, ${time}`;
-}
-
-/**
  * The bilingual document title exactly as the approved reference prints it.
  *
  * The reference names the page "فاتورة / INVOICE" and "تسعيرة / QUOTATION" — the
@@ -170,6 +145,21 @@ function documentTaxRate(payload: FinancialDocumentPayload): number {
 }
 
 /**
+ * The faint "AUTO SERVICES" wordmark the approved sheet lays behind the priced
+ * body, exactly as the reference prints it.
+ *
+ * The reference sets the identity wordmark in the brand display face (Codec Pro
+ * Bold) at 51.75pt with a 6.72pt tracking, centred on the sheet (measured
+ * x 57.5-533.6, y 374.4-426.1 of a 595x842pt page) at ~9.7% opacity, in the
+ * identity navy. It repeats on every sheet, so the layer is position:fixed — an
+ * absolutely positioned mark would paint on page one only and leave continuation
+ * pages blank.
+ */
+export function watermark(): string {
+  return '<div class="of-watermark" aria-hidden="true">AUTO SERVICES</div>';
+}
+
+/**
  * The identity band: the official logo on the leading edge and the tagline on
  * the trailing edge, measured from the approved reference (logo lockup at
  * x 16.5-154, y 16.3-49.5; tagline right-aligned at the same height).
@@ -181,9 +171,14 @@ function documentTaxRate(payload: FinancialDocumentPayload): number {
 export function identityBand(issuer: DocumentIssuer): string {
   const logo = issuer.logoDataUri
     ? `<img class="of-logo" src="${esc(issuer.logoDataUri)}" alt="${esc(issuer.nameEn)}">`
-    : `<div class="of-wordmark">
-         <div class="of-wordmark-ar">اوريكس لخـدمات السيارات</div>
-         <div class="of-wordmark-en">AUTO SERVICES</div>
+    : `<div class="of-lockup">
+         ${oryxLogoMark('31.3pt', 'of-logo-mark')}
+         <div class="of-wordmark">
+           <div class="of-wordmark-ar">اوريكس</div>
+           <div class="of-wordmark-ar">لخـدمات</div>
+           <div class="of-wordmark-ar">السيارات</div>
+           <div class="of-wordmark-en">AUTO SERVICES</div>
+         </div>
        </div>`;
   return `
   <div class="of-band">
@@ -191,6 +186,12 @@ export function identityBand(issuer: DocumentIssuer): string {
     <div class="of-band-trail">
       <div class="of-tag-ar">خبراء فحص المركبات</div>
       <div class="of-tag-en">VEHICLE INSPECTION EXPERTS</div>
+    </div>
+    <div class="of-badge" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="11" fill="#0e4477"/>
+        <path d="M6.9 12.5 10.4 16 17.2 7.8" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
     </div>
   </div>`;
 }
@@ -353,7 +354,6 @@ function lineTable(
         <td class="of-c-desc">
           <span class="of-line-name">${esc(name)}</span>
           ${note ? `<span class="of-line-sub">${esc(note)}</span>` : ''}
-          ${line.sku ? `<span class="of-line-sku num">${esc(line.sku)}</span>` : ''}
         </td>
         <td class="of-c-qty num">${esc(quantity(line.quantity))}</td>
         <td class="of-c-price num">${esc(moneyPlain(line.unitPriceMinor, payload.currency))}</td>
@@ -432,8 +432,9 @@ ${OFFICIAL_FINANCIAL_CSS}
 </head>
 <body>
 <section class="of-page">
-  <div class="of-watermark" aria-hidden="true">AUTO SERVICES</div>
+  ${watermark()}
   ${identityBand(input.issuer)}
+  <div class="of-body">
   ${titleBlock(payload)}
   ${trnStrip(input.issuer)}
   ${infoPanel(numbered, counterpartyName, dateLabel)}
@@ -447,40 +448,10 @@ ${OFFICIAL_FINANCIAL_CSS}
       : ''
   }
   ${verificationStrip(input.verification)}
-  <div class="of-bottom">
-    ${signatureStrip()}
-    <div class="of-thanks">
-      <div class="of-thanks-ar">شكراً لثقتكم بنا.</div>
-      <div class="of-thanks-en">Thank you for your trust.</div>
-    </div>
   </div>
 </section>
 </body>
 </html>`;
-}
-
-/**
- * The signature strip exactly as the approved reference prints it.
- *
- * The reference places the English and Arabic labels of each signatory on one
- * line — "Authorized Stamp & Signature اعتماد المركز" on the leading edge and
- * "Customer Signature توقيع العميل" on the trailing edge — rather than the
- * stacked three-line block the shared `signatureBlock` renders. This local strip
- * keeps the approved wording and geometry without changing the shared chrome
- * used by the other document kinds.
- */
-function signatureStrip(): string {
-  return `
-  <div class="of-signrow">
-    <div class="of-sign">
-      <span class="of-sign-en">Authorized Stamp &amp; Signature</span>
-      <span class="of-sign-ar">اعتماد المركز</span>
-    </div>
-    <div class="of-sign">
-      <span class="of-sign-en">Customer Signature</span>
-      <span class="of-sign-ar">توقيع العميل</span>
-    </div>
-  </div>`;
 }
 
 /**
@@ -496,46 +467,83 @@ export const OFFICIAL_FINANCIAL_CSS = `
      printable area (842.25 - 5.7mm top - 14mm bottom ≈ 786pt) and the bottom
      strip is pinned to its end, so a short invoice still prints its signatures
      where the reference does. */
-  .of-page{ position:relative; min-height:796pt; box-sizing:border-box;
-    display:flex; flex-direction:column; padding-bottom:0;
+  .of-page{ position:relative; min-height:746pt; box-sizing:border-box;
+    display:flex; flex-direction:column; padding:0;
     /* The approved sheet sets its Latin labels and figures in a Latin face
        (Verdana/CodecPro) and its Arabic in an Arabic face. The base print CSS
        is Arabic-first, which would set every Latin word in the wide Naskh face
        and widen the labels; the official sheet therefore leads with the Latin
        stack and falls back to the Arabic face for the Arabic runs. */
     font-family:${DOCUMENT_LATIN_STACK}; }
-  /* The reference watermark is the "AUTO SERVICES" wordmark set in the identity
-     navy at ~52pt, centred on the page (measured y 374-426 on an 842pt sheet). */
-  .of-watermark{ position:absolute; left:0; right:0; top:45%;
-    text-align:center; font-size:52pt; font-weight:700; letter-spacing:1px;
-    color:#0a1f44; opacity:0.055; pointer-events:none; z-index:-1;
-    font-family:Verdana,Arial,Helvetica,sans-serif; }
+  /* The reference prints the identity band wider than the priced content: the
+     logotype starts 9.9pt left of the table's left edge and the quality badge
+     ends 8.1pt right of it. The page margin is therefore measured to the band
+     (5.7mm / 5.6mm, matching the reference band edges) and the priced body is
+     inset back to the table's own 26.5pt / 571.5pt columns. A negative margin
+     on the band cannot be used: Chromium clips a child that overhangs the page
+     content box and the band loses its outer edge. */
+  .of-body{ padding-inline:10pt 8pt; flex:1 1 auto; }
+  /* The reference watermark is the "AUTO SERVICES" wordmark set in the brand
+     display face (Codec Pro Bold) at 51.75pt with a 6.72pt tracking, so the run
+     measures the reference's 476pt ink width, in the identity navy at ~9.7%
+     opacity (measured from the approved PDF), centred on the sheet.
+
+     A position:fixed mark makes Chromium repaint it on every printed page; an
+     absolutely positioned mark would paint on page one only and leave
+     continuation pages blank. */
+  .of-watermark{ position:fixed; left:0; right:0; top:349.8pt;
+    text-align:center; pointer-events:none; z-index:0;
+    font-family:'ORYX Display',Verdana,Arial,Helvetica,sans-serif;
+    font-size:51.747pt; font-weight:700; letter-spacing:6.72pt; white-space:pre;
+    color:#0a1f44; opacity:0.101; }
+  /* The approved invoice prints the identity band wider than the priced table:
+     the logotype starts ~10pt left of the content box and the quality badge ends
+     ~8pt right of it (measured logo x16.5, badge x579.5 against a content box of
+     26.5–571.5). The of-body wrapper insets the priced rows back to the table
+     columns, so the band sits at the page edge exactly as the reference does. */
   .of-band{ display:flex; justify-content:space-between; align-items:center;
-    min-height:37pt; }
+    min-height:44.5pt; position:relative; }
+  /* The reference prints the same 22pt circled tick at the top-right of the
+     invoice header as on the report (measured x557-579, y29-51). It must sit
+     inside the printable box: a negative offset made the page wider than the
+     sheet, which made Chromium shrink the whole invoice ~1.6%. */
+  .of-badge{ position:absolute; right:0; top:13pt; line-height:0; }
+  .of-badge svg{ display:block; width:24pt; height:24pt; }
   .of-band-lead{ flex:0 0 auto; }
-  .of-band-trail{ text-align:end; }
-  .of-logo{ height:33pt; width:auto; }
+  /* The quality badge is anchored to the paper's right edge, so the tagline is
+     inset to clear the disc — without this it ran under the badge (the reference
+     stops the tagline at x553, leaving a 4pt gap before the disc at x557). */
+  .of-band-trail{ text-align:end; padding-inline-end:28pt; }
+  /* The reference stacks the official logotype (icon + three Arabic lines +
+     the Latin AUTO SERVICES line) in a single left-hand lockup. */
+  .of-lockup{ display:flex; align-items:center; gap:6pt; }
+  .of-logo-mark{ display:block; width:auto; }
+  .of-wordmark{ display:flex; flex-direction:column; line-height:1.0; }
+  .of-logo{ height:44.5pt; width:auto; }
   .of-wordmark-ar{ font-size:14.5pt; font-weight:700; color:#0a1f44; }
   .of-wordmark-en{ font-size:14.2pt; font-weight:700; color:#0a1f44; letter-spacing:.5px; }
   .of-tag-ar{ font-size:11.8pt; font-weight:700; color:#102749; }
   .of-tag-en{ font-size:7.9pt; font-weight:700; color:#102749; letter-spacing:.4px; }
-  .of-title{ text-align:center; margin-top:31.5pt; }
-  .of-title-ar{ font-size:12.3pt; font-weight:700; color:#0f2b48; line-height:1.0; }
-  .of-title-en{ font-size:12.3pt; font-weight:700; color:#0f2b48; letter-spacing:.6px; line-height:1.0; }
+  .of-title{ text-align:center; margin-top:15.3pt; }
+  /* The reference stacks the Arabic title and the Latin title 14.2pt apart
+     (measured 79.7 → 93.9), which is looser than the 12.3pt type's own line box,
+     so the two lines carry an explicit line height rather than the default. */
+  .of-title-ar{ font-size:12.3pt; font-weight:700; color:#0f2b48; line-height:1.15; }
+  .of-title-en{ font-size:12.3pt; font-weight:700; color:#0f2b48; letter-spacing:.6px; line-height:1.15; }
   .of-trn{ margin-top:1pt; background:#0f2b48; color:#fff; font-size:8.8pt;
     font-weight:700; text-align:end; padding:2pt 10pt; line-height:1.0; }
   /* The reference panel has a hairline light border and no internal divider:
      the left column is wide, the customer column is a label/value grid. */
-  .of-panel{ display:flex; border:0.75px solid #c2c9d5; border-top:none;
+  .of-panel{ display:flex; border:1.5px solid #94a3b8; border-top:none;
     line-height:1.2; }
   /* Measured from the reference: the customer column's labels begin at x≈327
      on a 545pt content width, so the left column is ~51% (not an even split). */
-  .of-panel-left{ flex:0 0 51%; padding:7pt 10pt; }
+  .of-panel-left{ flex:0 0 52%; padding:7pt 10pt; }
   /* The approved quotation sets its field block 3.3pt lower than the invoice's
      (Quotation Date 155.3 against Order Date 152.0) while the document number
      stays at the same height, so only the field grid is inset. */
   .of-panel-left-quote .of-lgrid{ margin-top:3.3pt; }
-  .of-panel-right{ flex:1 1 auto; padding:4pt 10pt; }
+  .of-panel-right{ flex:1 1 auto; padding:1.5pt 10pt; }
   .of-docno{ font-size:13.3pt; font-weight:700; color:#0f2b48; margin-bottom:2pt; }
   .of-field{ margin-top:4.5pt; }
   /* The reference prints the date and the expiration date side by side in one
@@ -548,7 +556,7 @@ export const OFFICIAL_FINANCIAL_CSS = `
      right-aligned (every label ends on the same x, ≈392) with the values on a
      common left edge (≈400), exactly as the approved sheet prints them. */
   .of-cp-row{ display:grid; grid-template-columns:72pt 1fr; gap:0 8pt;
-    margin-top:3pt; align-items:baseline; }
+    margin-top:6pt; align-items:baseline; }
   .of-cp-row-top{ align-items:start; }
   .of-cp-label{ font-size:7.3pt; color:#64748b; font-weight:700; text-align:end; }
   .of-cp-value{ font-size:8.8pt; color:#0f2b48; font-weight:700; }
@@ -590,7 +598,6 @@ export const OFFICIAL_FINANCIAL_CSS = `
   /* The line's note prints on its own line under the name, smaller and lighter,
      exactly as the approved sheet prints a product's warranty note. */
   .of-line-sub{ display:block; font-size:7.5pt; color:#64748b; font-weight:400; }
-  .of-line-sku{ display:block; font-size:7.5pt; color:#64748b; font-weight:400; }
   /* The reference totals block is a right-aligned table with only two rules:
      one above the first row and one above the grand Total. */
   .of-totals{ width:59.6%; margin-inline-start:auto; margin-top:6pt;
@@ -604,28 +611,6 @@ export const OFFICIAL_FINANCIAL_CSS = `
      so the box height is exactly the note text and its padding. */
   .of-notes{ margin-top:9pt; border:1px solid #c2c9d5; padding:7pt 10pt; }
   .of-notes-body{ font-size:9pt; color:#334155; }
-  .of-thanks{ margin-top:10pt; text-align:center; }
-  .of-thanks-ar{ font-size:9pt; font-weight:700; color:#05162b; }
-  .of-thanks-en{ font-size:8.5pt; font-weight:700; color:#05162b; }
-  /* The thanks/signature strip is pinned to the foot of the page box, as the
-     approved reference prints it, rather than trailing the last table row. The
-     reference leaves ~3.5pt more clearance below the strip than the box end, so
-     a small bottom margin lifts the strip and the thank-you line onto the
-     measured reference positions (signature 761.1, thanks 797.9). */
-  .of-bottom{ margin-top:auto; margin-bottom:3.5pt; }
-  /* The reference leaves a clear gap between the signature strip and the
-     thank-you line (measured 761pt to 798pt), so the strip is not cramped. */
-  .of-bottom .of-thanks{ margin-top:10pt; }
-  /* The reference signature strip is a single row. Each signatory's English and
-     Arabic label sit inline on one line; the first label starts at the content
-     edge and the second at ~60% across, exactly as the approved sheet prints
-     them (measured x 24.3 and 351.1 on a 595.5pt page). */
-  .of-signrow{ display:flex; margin-top:12pt; }
-  .of-sign{ display:flex; gap:8pt; justify-content:flex-start; align-items:baseline; }
-  .of-sign:first-child{ flex:0 0 60%; }
-  .of-sign:last-child{ flex:1 1 auto; }
-  .of-sign-en{ font-size:8.8pt; font-weight:700; color:#0f2b48; }
-  .of-sign-ar{ font-size:8.8pt; font-weight:700; color:#0f2b48; }
   /* The verification strip: a compact ruled box above the signature strip. It is
      deliberately restrained so it reads as a security footnote and never
      competes with the priced table or the approved identity band. */

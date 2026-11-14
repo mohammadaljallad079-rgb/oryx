@@ -109,6 +109,23 @@ export class CreateInspectionServiceDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) priceMinor?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) taxPercentBp?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) durationMinutes?: number;
+  /** Optional media-library asset id to show as the service picture. */
+  @IsOptional() @IsString() @MaxLength(40) imageAssetId?: string | null;
+}
+
+export class UpdateInspectionServiceDto {
+  @IsOptional() @IsString() @MinLength(2) @MaxLength(160) nameEn?: string;
+  @IsOptional() @IsString() @MinLength(2) @MaxLength(160) nameAr?: string;
+  @IsOptional() @IsString() @MaxLength(600) description?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) priceMinor?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) taxPercentBp?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) durationMinutes?: number;
+  @IsOptional() @IsBoolean() isActive?: boolean;
+  /**
+   * The media-library asset id to show as the service picture. An empty string
+   * clears the picture; a string links the stored asset.
+   */
+  @IsOptional() @IsString() @MaxLength(40) imageAssetId?: string | null;
 }
 
 export class CreateChecklistItemDto {
