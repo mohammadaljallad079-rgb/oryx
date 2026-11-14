@@ -103,6 +103,15 @@ Security baseline (do not regress):
 - Report incomplete work honestly. Never claim a module works, or that something
   is deployed, without verification.
 
+## Current full-stack preview recovery (dashboard-modules-redesign-unified)
+
+- This is an **ephemeral review preview**, not production. Keep all work on `feature/dashboard-modules-redesign-unified`; do not merge or deploy it to `main` or any `release/*` branch without a separate approval.
+- Recover a recycled sandbox from the repository root with `RUNTIME_ID=gypyysqmmdjouhyu bash .run/start-stack.sh`. The script restores PostgreSQL 17, starts the API (`:3001`), admin (`:3000`), customer (`:3002`), mobile web (`:8081`), and same-origin proxies (`:12000` admin, `:12001` customer). The supplied admin preview is `https://work-1-gypyysqmmdjouhyu.prod-runtime.all-hands.dev`.
+- The seeded preview database is `oryx_e20`; preserve `.run/pgdata` and the existing `.env`. Do **not** run `db:seed`, reset the database, or point this preview at production. The recovery script intentionally reuses the existing data and compiled output.
+- After source changes, rebuild only affected workspaces, then restart the matching app (`bash .run/restart-app.sh admin` or `bash .run/restart-customer.sh`; rebuild API with `pnpm --filter @oryx/api build` before restarting it). Recheck `/api/health`, login, and the relevant feature through the proxy origin.
+- Preview credentials are documented in the task handoff, not repeated here. Rotate development defaults before any real deployment.
+- Before continuing after a restart, verify `git status`, the checked-out branch, and `git rev-parse HEAD`. The handoff mentioned `a7631c6`, but that short SHA was not resolvable in GitHub at the time this note was added; do not assume it is pushed or deployable until confirmed.
+
 ## Working in this repository
 
 ```bash
