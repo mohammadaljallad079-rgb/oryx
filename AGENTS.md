@@ -1191,6 +1191,21 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   it on the first keystroke (the vehicle modal resetting `customerId` to `''`
   was the visible symptom). A reduced copy of the form is not acceptable either
   — the popup runs the same validation, permissions and API call.
+- **A picker without a create path degrades, it does not offer a dead button.**
+  `EntityPicker`'s `renderCreate` is optional: when it is absent (a fixed tax a
+  user may not author, a status filter) the "+ Add new" is not rendered at all.
+  Do not pass an empty `renderCreate` to keep the affordance — that shows a
+  button that opens nothing.
+- **Extract a modal before wiring it inline.** The tax form was extracted from
+  `tax-rates-panel.tsx` into `tax-modal.tsx` so the settings list and the sales/
+  purchasing line pickers share one component; a second copy would drift. The
+  same pattern produced `branch-modal`, `pipeline-modal` and `leave-type-modal`.
+  A line's tax option `value` is the rate in basis points and the `label` is the
+  display percentage the line parses back, so `TaxPicker` passes
+  `defaultScope` (`SALES`/`PURCHASES`) to preselect the side.
+- **`useTaxOptions` returns `{ options, reload }`.** An inline-created rate must
+  be reloaded into the list before the new id is selected, or the line selects
+  an option the list does not yet contain. Destructure it at every call site.
 - **A searchable picker's options sit inside the `Field` label.** The label
   re-dispatches a click to its trigger, so `SearchableSelect` calls
   `preventDefault()` on the option and the create/clear buttons; without it the
