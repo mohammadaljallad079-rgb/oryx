@@ -71,9 +71,7 @@ test.describe('branding and direction', () => {
     expect(english).not.toMatch(/[\u0600-\u06FF]/);
   });
 
-  test('the sidebar lockup keeps the on-dark colourway on the navy rail in both themes', async ({
-    page,
-  }) => {
+  test('the sidebar lockup swaps its colourway with the themed rail', async ({ page }) => {
     await setLocale(page, 'ar');
     await setTheme(page, 'dark');
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
@@ -101,24 +99,25 @@ test.describe('branding and direction', () => {
     await setTheme(page, 'light');
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
 
-    // The navigation rail is navy in *both* themes (the brief asks for "navy
-    // navigation"), so the sidebar keeps the on-dark lockup on ivory too. The
-    // theme swap must not print the navy-ink lockup on the navy rail.
-    await expect(onDark).toBeVisible();
-    await expect(onLight).toBeHidden();
+    // Execution 20 requires the sidebar to switch with the theme: the light
+    // rail is an ivory field, so its lockup uses the on-light (navy/gold)
+    // colourway. The theme swap must not keep the on-dark lockup, which would
+    // print a white mark on the light field.
+    await expect(onLight).toBeVisible();
+    await expect(onDark).toBeHidden();
 
-    // And the rail must actually paint a navy field, not the ivory page colour,
-    // so the light-theme navigation cannot silently revert to a light sidebar.
+    // And the rail must paint a light field, not a fixed navy slab, so the
+    // light-theme navigation cannot silently keep the dark rail.
     const railBg = await shell.evaluate((el) => getComputedStyle(el).backgroundImage);
     expect(railBg).toContain('gradient');
     const navText = await shell.locator('.oryx-nav-item').first().evaluate(
       (el) => getComputedStyle(el).color,
     );
-    // A light ink on the navy rail: red and green stay high, blue is not low.
+    // A dark ink on the ivory rail: every channel stays low.
     const [r, g, b] = navText.match(/\d+/g)!.map(Number);
-    expect(r).toBeGreaterThan(150);
-    expect(g).toBeGreaterThan(150);
-    expect(b).toBeGreaterThan(150);
+    expect(r).toBeLessThan(120);
+    expect(g).toBeLessThan(120);
+    expect(b).toBeLessThan(120);
   });
 
   test('the dashboard banner carries no vehicle image and centres the ORYX mark', async ({ page }) => {
