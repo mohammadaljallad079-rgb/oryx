@@ -1300,3 +1300,20 @@ so nothing else needs changing.
 - **`apps/admin/build` clears `.next`.** `next start` keeps serving the old
   build from memory, so restart the admin (and customer) server after a build
   before running the UI suites, or the suite exercises stale chunks.
+
+### Preview-host and evidence traps (Execution 19 sessions)
+
+- **Next snapshots `public/` at boot.** `next start` builds its static manifest
+  when the server starts, so a file added to `apps/admin/public/` afterwards
+  returns `404` until the server restarts — and the work-host proxy caches that
+  `404`, so a fresh name is needed too. Add the files first, then start the
+  server, or restart and re-verify every link.
+- **The work hosts serve `.run/evidence/` as `/evidence/`.** The preview host
+  that the Execution 19 report links (`work-1-…`) is not the admin app; it maps
+  the workspace `.run/evidence/exec19/` tree to `/evidence/exec19/`. Put the
+  curated parity sheets there, not in the admin app's `public/` dir.
+- **Never serve the raw reference documents.** `oryx 22.pdf` and
+  `oryx out put.pdf` carry a real customer's name, phone and address. Link the
+  side-by-side comparison sheets instead; the PDFs stay gitignored.
+- **Ignore the generated preview bytes.** `apps/admin/public/exec19/` and any
+  `apps/admin/public/evidence/` tree are generated evidence, never source.
