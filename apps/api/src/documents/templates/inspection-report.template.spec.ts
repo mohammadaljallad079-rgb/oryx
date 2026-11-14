@@ -420,7 +420,7 @@ describe('inspection report template — reference page parity (Execution 19)', 
       area: 'COMPUTER_UNIT',
       labelEn: 'Computer Unit',
       labelAr: 'وحدة الكمبيوتر',
-      kind: 'DIAGNOSTICS',
+      kind: 'DIAGNOSTIC',
       remarks: null,
       remarksLabelEn: 'Remarks',
       remarksLabelAr: 'ملاحظات',
@@ -440,10 +440,13 @@ describe('inspection report template — reference page parity (Execution 19)', 
       verification: { url: 'https://oryxbhr.com/verify/tok-1', token: 'tok-1', qrDataUri: 'data:image/png;base64,QRQR' },
       baseCss: '',
     });
-    // The approved sheet carries the verification QR only in the running footer,
-    // never as a block inside the page body.
+    // The approved sheet carries the verification QR only on the cover
+    // photograph band, never as a block inside a section page. Assert the
+    // computer-unit sheet has no QR and that the cover is its only home.
+    const qrOccurrences = html.split('data:image/png;base64,QRQR').length - 1;
+    expect(qrOccurrences).toBe(1);
+    expect(html).toContain('class="cover-qr"');
     expect(html).not.toContain('p5-verify');
     expect(html).not.toContain('class="verify"');
-    expect(html).not.toContain('data:image/png;base64,QRQR');
   });
 });

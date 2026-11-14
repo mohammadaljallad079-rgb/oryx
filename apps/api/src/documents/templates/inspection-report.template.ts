@@ -743,15 +743,25 @@ export const INSPECTION_REPORT_CSS = `
   .lg-chip{ display:inline-flex; align-items:center; gap:4px; font-size:8pt; color:var(--ink); margin-inline-start:10px; }
   .legend-row{ display:flex; gap:6px; margin-top:6px; }
   /* ---- cover ---- */
-  .cover-info{ width:100%; }
+  /* The approved cover insets the vehicle-information card ~9.5pt inside the
+     page content box (its banner spans x25-570 of a 595pt sheet, while the
+     header and footer run to x15) and drops it ~7.4pt below the section title
+     (banner top y111.1 of the reference). */
+  .cover-info{ width:100%; padding:0 9.5pt; margin-top:7.4pt; }
   .cover-sec-title{ background:var(--navy); color:#fff; font-size:9.5pt; font-weight:700; padding:2.2px 10px; border-radius:5px 5px 0 0; }
   .cover-sec-title .ltr{ margin-inline-start:8px; color:var(--gold-soft); font-size:8pt; font-weight:400; }
-  .vinfo{ width:100%; border:1px solid var(--line); border-top:none; border-collapse:collapse; direction:ltr; }
-  .vinfo td{ border:1px solid var(--line); padding:3px 8px; width:25%; vertical-align:top; }
+  .vinfo{ width:100%; border:1px solid var(--line); border-top:none; border-collapse:collapse; direction:ltr; table-layout:fixed; }
+  /* The approved cover gives the first column the extra width its longest value
+     ("Ahmed mohamad Alhaddad", 135pt) needs; the remaining three columns share
+     the rest equally (measured rules at x174.4 / 305.4 / 437.0). The values are
+     printed on one line and are allowed to sit slightly past the cell padding
+     rather than wrap, which is what keeps every row at the reference's 28pt. */
+  .vinfo td{ border:1px solid var(--line); padding:3px 8px; vertical-align:top; width:24.1%; }
+  .vinfo td:first-child{ width:27.7%; }
   .vlab{ display:flex; align-items:baseline; gap:6px; font-size:7.3pt; color:var(--muted); line-height:1.2; }
   .vlab .ltr{ font-weight:700; color:var(--navy-soft); }
   .vlab .var{ direction:rtl; color:var(--muted); }
-  .vval{ display:block; margin-top:1px; font-size:8.8pt; font-weight:700; color:var(--ink); }
+  .vval{ display:block; margin-top:1px; font-size:8.8pt; font-weight:700; color:var(--ink); white-space:nowrap; }
   /* The approved cover prints the verification QR inside the photograph band,
    * bottom-right, over a white card so the modules stay scannable. Physical
    * right/bottom is used because the page is RTL and the reference anchors the
@@ -785,8 +795,8 @@ export const INSPECTION_REPORT_CSS = `
    * and the terms block land where the approved sheet puts them. The verification
    * QR floats over it, anchored bottom-right. */
   .vphoto-art{ position:relative; width:595.5pt; margin-left:-15.87pt;
-    height:334pt; margin-top:-37pt; background-repeat:no-repeat;
-    background-size:100% auto; background-position:center 5pt; }
+    height:330pt; margin-top:-29pt; background-repeat:no-repeat;
+    background-size:94% auto; background-position:calc(50% + 7pt) 5pt; }
   .vphoto-empty .vphoto-ph{ position:absolute; top:0; inset-inline:-12mm;
     width:calc(100% + 24mm); height:var(--vphoto-h);
     display:flex; flex-direction:column; align-items:center; justify-content:center;

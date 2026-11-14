@@ -362,6 +362,14 @@ describe('official financial template — reference watermark parity (Execution 
     expect(html).toMatch(/opacity:0\.10/);
   });
 
+  it('fixes the watermark so it repeats on every printed page', () => {
+    const html = render();
+    // The approved two-page invoice prints the watermark on both sheets; a
+    // `position:absolute` mark paints only on page one.
+    expect(html).toContain('.of-watermark{ position:fixed');
+    expect(html).not.toContain('.of-watermark{ position:absolute');
+  });
+
   it('keeps the header badge inside the printable box so the sheet is not scaled', () => {
     const html = render();
     // A negative right offset made the page wider than the sheet, which made

@@ -471,8 +471,13 @@ export const OFFICIAL_FINANCIAL_CSS = `
   /* The reference watermark is the "AUTO SERVICES" wordmark set in the brand
      display face (Codec Pro Bold) at 51.75pt with a 6.9pt tracking, so the run
      measures the reference's 476pt ink width, in the identity navy at ~9.6%
-     opacity (measured from the approved PDF), centred on the sheet. */
-  .of-watermark{ position:absolute; left:0; right:0; top:350.2pt;
+     opacity (measured from the approved PDF), centred on the sheet.
+
+     The approved sheet repeats the watermark on every page (its two-page
+     invoice carries it on both), so the mark is position:fixed, which
+     Chromium repaints on each printed page. An absolutely positioned mark would
+     paint once, on page one only, and leave every continuation page blank. */
+  .of-watermark{ position:fixed; left:0; right:0; top:350.2pt;
     text-align:center; white-space:pre;
     font-size:51.747pt; font-weight:700; letter-spacing:6.72pt;
     color:#0a1f44; opacity:0.101; pointer-events:none; z-index:0;
@@ -491,7 +496,10 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-badge{ position:absolute; right:0; top:13pt; line-height:0; }
   .of-badge svg{ display:block; width:24pt; height:24pt; }
   .of-band-lead{ flex:0 0 auto; }
-  .of-band-trail{ text-align:end; }
+  /* The quality badge is anchored to the paper's right edge, so the tagline is
+     inset to clear the disc — without this it ran under the badge (the reference
+     stops the tagline at x553, leaving a 4pt gap before the disc at x557). */
+  .of-band-trail{ text-align:end; padding-inline-end:28pt; }
   /* The reference stacks the official logotype (icon + three Arabic lines +
      the Latin AUTO SERVICES line) in a single left-hand lockup. */
   .of-lockup{ display:flex; align-items:center; gap:6pt; }
