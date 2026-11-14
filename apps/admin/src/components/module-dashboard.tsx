@@ -186,9 +186,9 @@ export function ModuleDashboard({
                 className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] px-4 py-2.5 last:border-b-0"
                 data-testid={`module-activity-row-${a.id}`}
               >
-                <span className="flex items-center gap-2 text-[12.5px]">
+                <span className="flex min-w-0 items-center gap-2 text-[12.5px]">
                   <Icon name="activity" size={14} />
-                  <span className="font-mono text-[11.5px]">{a.action}</span>
+                  <span className="font-mono text-[11.5px] break-all">{a.action}</span>
                   <span className="oryx-faint">{a.targetType}</span>
                 </span>
                 <span className="oryx-faint flex items-center gap-3 text-[11.5px]">

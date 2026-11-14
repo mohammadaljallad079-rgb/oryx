@@ -79,7 +79,8 @@ test.describe('Super Admin sees every module and section', () => {
     // demo tenant deliberately does not license automotive.
     const companySelect = page.getByTestId('context-selector').locator('select').first();
     await companySelect.selectOption({ label: 'ORYX Auto Services — Internal ORYX' });
-    await expect(page.getByTestId('context-selector').locator('select').nth(1)).toBeEnabled();
+    // The branch scope is a searchable picker, enabled once a company is chosen.
+    await expect(page.getByTestId('context-branch').locator('button')).toBeEnabled();
 
     const nav = page.locator('.oryx-sidebar');
     for (const label of ERP_GROUP_LABELS) {
@@ -109,7 +110,8 @@ test.describe('Super Admin sees every module and section', () => {
 
     const companySelect = page.getByTestId('context-selector').locator('select').first();
     await companySelect.selectOption({ label: 'ORYX Auto Services — Internal ORYX' });
-    await expect(page.getByTestId('context-selector').locator('select').nth(1)).toBeEnabled();
+    // The branch scope is a searchable picker, enabled once a company is chosen.
+    await expect(page.getByTestId('context-branch').locator('button')).toBeEnabled();
 
     for (const mod of MODULES) {
       await page.goto(mod.route);
