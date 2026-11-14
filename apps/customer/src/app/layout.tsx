@@ -4,11 +4,37 @@ import { dictionaries } from '@/i18n/dictionaries';
 import { UiProvider } from '@/lib/ui-context';
 import { CustomerAuthProvider } from '@/lib/auth-context';
 import { SiteFooter, SiteHeader } from '@/components/site-chrome';
+import { JsonLd } from '@/components/json-ld';
+import { SITE_URL, organizationJsonLd, websiteJsonLd } from '@/lib/structured-data';
 
 export const metadata: Metadata = {
-  title: 'ORYX — Automotive Services',
+  // Absolute base so a relative canonical or Open Graph image resolves against
+  // the real origin rather than the build host.
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: 'ORYX — Automotive Services',
+    template: '%s | ORYX',
+  },
   description:
     'ORYX automotive customer platform: book inspections and maintenance at ORYX service centres, track your garage and pay securely.',
+  applicationName: 'ORYX',
+  alternates: { canonical: '/' },
+  openGraph: {
+    type: 'website',
+    siteName: 'ORYX Auto Services',
+    title: 'ORYX — Automotive Services',
+    description:
+      'Book inspections and maintenance at ORYX service centres, track your garage and shop genuine spare parts.',
+    url: SITE_URL,
+    locale: 'ar_BH',
+    alternateLocale: ['en_US'],
+    images: [{ url: '/media/auto-service.jpg', width: 1600, height: 1067, alt: 'ORYX Auto Services' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'ORYX — Automotive Services',
+    description: 'Book inspections and maintenance at ORYX service centres and shop spare parts.',
+  },
   robots: { index: true, follow: true },
 };
 
@@ -39,6 +65,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ar" dir="rtl" data-theme="light" data-dir="rtl" suppressHydrationWarning>
       <body>
         <script dangerouslySetInnerHTML={{ __html: PREFERENCE_BOOTSTRAP }} />
+        <JsonLd data={organizationJsonLd()} />
+        <JsonLd data={websiteJsonLd()} />
         <UiProvider dictionaries={dictionaries} initialLocale="ar" initialTheme="light">
           <CustomerAuthProvider>
             <div className="oryx-page">

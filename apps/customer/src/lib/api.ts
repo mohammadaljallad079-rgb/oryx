@@ -322,6 +322,13 @@ export interface AvailableSlot {
   resourceId?: string | null;
 }
 
+/** One day's bookability, as `GET /customer/bookings/availability-days` returns it. */
+export interface AvailableDay {
+  date: string;
+  slots: number;
+  firstSlot: string | null;
+}
+
 export interface NotificationItem {
   id: string;
   title?: string | null;
@@ -718,6 +725,23 @@ export const customerApi = {
     });
     if (params.serviceRef) qs.set('serviceRef', params.serviceRef);
     return request<AvailableSlot[]>(`/customer/bookings/availability?${qs.toString()}`);
+  },
+  /**
+   * Which of the next days are bookable.
+   *
+   * The booking form uses this to disable closed days and jump to the first
+   * open one, so a customer never lands on a day the engine will answer with an
+   * empty slot list.
+   */
+  availabilityDays: (params: { from: string; durationMinutes: number; days?: number; serviceRef?: string }) => {
+    if (IS_STATIC_PREVIEW) return Promise.resolve([] as AvailableDay[]);
+    const qs = new URLSearchParams({
+      from: params.from,
+      durationMinutes: String(params.durationMinutes),
+    });
+    if (params.days) qs.set('days', String(params.days));
+    if (params.serviceRef) qs.set('serviceRef', params.serviceRef);
+    return request<AvailableDay[]>(`/customer/bookings/availability-days?${qs.toString()}`);
   },
   createBooking: (body: {
     bookingType: 'INSPECTION' | 'MAINTENANCE' | 'PROVIDER_SERVICE';
