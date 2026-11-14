@@ -862,6 +862,31 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   and `apps/api/storage/` are gitignored. `ATTACHMENT_MIME_TYPES` accepts PDF,
   JPEG and PNG only.
 
+### Document parity gotchas (Executions 18/19)
+
+- **Chromium footer/header templates cannot load webfonts.** A
+  `displayHeaderFooter` footer is rendered in a separate document that ignores
+  every `@font-face`, so any text there falls back to the OS default (DejaVuSans)
+  and silently differs from the body. Images *do* render there. If footer text
+  must use the ORYX faces, draw the band as an inline SVG/PNG instead of HTML
+  text — do not expect the embedded `@font-face` to apply.
+- **`pymupdf` page rasterisation is the only honest parity metric.** Render both
+  the reference and our output at the same DPI and diff the greyscale rasters.
+  A residual ~8-12% is anti-aliasing noise from a different PDF engine and will
+  not reach zero even when the same file is drawn twice; judge element presence,
+  order and geometry, not the raw percentage.
+- **Verify the QR by decoding, not by eye.** Rasterise the produced PDF and
+  decode it with `jsQR` (available in `node_modules`). A QR that looks right can
+  fail to scan; the only proof is a decoded string matching the verification URL.
+- **The inspection cover overflows to a sixth page very easily.** The photo band
+  and the info card fight for the printable height; a few points too tall pushes
+  the Important Remarks block onto page 2. Check the page count after every
+  cover change (`pymupdf` `page_count` must be 5).
+- **Report/print money is computed once.** `computeDocumentTotals` in
+  `apps/api/src/common/document-totals.ts` is the single source for subtotal,
+  discount, VAT and total in integer minor units; the UI, PDF and print path all
+  consume it. Never recompute a figure in a template.
+
 ### Mobile gotchas
 
 - **An access token expires mid-session, not at start-up.** Cold-start restore is
