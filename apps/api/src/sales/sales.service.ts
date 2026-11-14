@@ -6,6 +6,7 @@ import { AccountingPostingService, SYSTEM_ROLES } from '../common/accounting-pos
 import { DocumentSequenceService, type Tx } from '../common/document-sequence.service';
 import { ErpContextService } from '../common/erp-context.service';
 import { InventoryService } from '../inventory/inventory.service';
+import { CompanySettingsService } from '../settings/company-settings.service';
 import { computeDocumentTotals, type PricedLineInput } from '../common/document-totals';
 import { badRequest, conflict, ERROR_CODES, forbidden, notFound } from '../common/errors';
 import type { ActorContext } from '../organizations/organizations.service';
@@ -73,6 +74,7 @@ export class SalesService {
     private readonly sequences: DocumentSequenceService,
     private readonly context: ErpContextService,
     private readonly inventory: InventoryService,
+    private readonly settings: CompanySettingsService,
   ) {}
 
   // --------------------------------------------------------------- customers
@@ -83,6 +85,7 @@ export class SalesService {
     const pageSize = Math.min(query.pageSize ?? 200, 500);
     const where = {
       companyId,
+      ...(query.type ? { type: query.type as never } : {}),
       ...(query.search
         ? {
             OR: [
@@ -91,6 +94,8 @@ export class SalesService {
               { nameAr: { contains: query.search } },
               { phone: { contains: query.search } },
               { email: { contains: query.search, mode: 'insensitive' as const } },
+              { crNumber: { contains: query.search, mode: 'insensitive' as const } },
+              { taxNumber: { contains: query.search, mode: 'insensitive' as const } },
             ],
           }
         : {}),
@@ -106,23 +111,52 @@ export class SalesService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const dup = await this.prisma.customer.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Customer code ${dto.code} already exists.`);
-    const customer = await this.prisma.customer.create({
-      data: {
-        companyId,
-        code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
-        email: dto.email ?? null,
-        phone: dto.phone ?? null,
-        taxNumber: dto.taxNumber ?? null,
-        addressLine: dto.addressLine ?? null,
-        city: dto.city ?? null,
-        countryCode: dto.countryCode ?? 'SA',
-        creditLimitMinor: dto.creditLimitMinor ?? 0,
-        paymentTermsDays: dto.paymentTermsDays ?? 0,
-        currency: dto.currency ?? 'SAR',
-        notes: dto.notes ?? null,
-      },
+    const customer = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.customer.create({
+        data: {
+          companyId,
+          code: dto.code,
+          type: (dto.type as never) ?? 'INDIVIDUAL',
+          nameEn: dto.nameEn,
+          nameAr: dto.nameAr,
+          email: dto.email ?? null,
+          phone: dto.phone ?? null,
+          taxNumber: dto.taxNumber ?? null,
+          crNumber: dto.crNumber ?? null,
+          crExpiresAt: dto.crExpiresAt ? new Date(dto.crExpiresAt) : null,
+          website: dto.website ?? null,
+          contactPersonName: dto.contactPersonName ?? null,
+          contactPersonPhone: dto.contactPersonPhone ?? null,
+          contactPersonEmail: dto.contactPersonEmail ?? null,
+          nationalId: dto.nationalId ?? null,
+          addressLine: dto.addressLine ?? null,
+          city: dto.city ?? null,
+          state: dto.state ?? null,
+          postalCode: dto.postalCode ?? null,
+          countryCode: dto.countryCode ?? 'SA',
+          creditLimitMinor: dto.creditLimitMinor ?? 0,
+          paymentTermsDays: dto.paymentTermsDays ?? 0,
+          currency: dto.currency ?? 'SAR',
+          notes: dto.notes ?? null,
+        },
+      });
+      if (dto.branches?.length) {
+        await tx.customerBranch.createMany({
+          data: dto.branches.map((b, index) => ({
+            companyId,
+            customerId: created.id,
+            name: b.name,
+            contactName: b.contactName ?? null,
+            phone: b.phone ?? null,
+            email: b.email ?? null,
+            addressLine: b.addressLine ?? null,
+            city: b.city ?? null,
+            countryCode: b.countryCode ?? null,
+            isHeadOffice: b.isHeadOffice ?? index === 0,
+          })),
+        });
+      }
+      return created;
     });
     await this.audit.record({
       actorUserId: actor.userId,
@@ -139,21 +173,57 @@ export class SalesService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const customer = await this.prisma.customer.findFirst({ where: { id, companyId } });
     if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
-    const updated = await this.prisma.customer.update({
-      where: { id },
-      data: {
-        ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
-        ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
-        ...(dto.email !== undefined ? { email: dto.email } : {}),
-        ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
-        ...(dto.taxNumber !== undefined ? { taxNumber: dto.taxNumber } : {}),
-        ...(dto.addressLine !== undefined ? { addressLine: dto.addressLine } : {}),
-        ...(dto.city !== undefined ? { city: dto.city } : {}),
-        ...(dto.creditLimitMinor !== undefined ? { creditLimitMinor: dto.creditLimitMinor } : {}),
-        ...(dto.paymentTermsDays !== undefined ? { paymentTermsDays: dto.paymentTermsDays } : {}),
-        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
-        ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.customer.update({
+        where: { id },
+        data: {
+          ...(dto.type !== undefined ? { type: dto.type as never } : {}),
+          ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
+          ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
+          ...(dto.email !== undefined ? { email: dto.email } : {}),
+          ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
+          ...(dto.taxNumber !== undefined ? { taxNumber: dto.taxNumber } : {}),
+          ...(dto.crNumber !== undefined ? { crNumber: dto.crNumber } : {}),
+          ...(dto.crExpiresAt !== undefined ? { crExpiresAt: dto.crExpiresAt ? new Date(dto.crExpiresAt) : null } : {}),
+          ...(dto.website !== undefined ? { website: dto.website } : {}),
+          ...(dto.contactPersonName !== undefined ? { contactPersonName: dto.contactPersonName } : {}),
+          ...(dto.contactPersonPhone !== undefined ? { contactPersonPhone: dto.contactPersonPhone } : {}),
+          ...(dto.contactPersonEmail !== undefined ? { contactPersonEmail: dto.contactPersonEmail } : {}),
+          ...(dto.nationalId !== undefined ? { nationalId: dto.nationalId } : {}),
+          ...(dto.addressLine !== undefined ? { addressLine: dto.addressLine } : {}),
+          ...(dto.city !== undefined ? { city: dto.city } : {}),
+          ...(dto.state !== undefined ? { state: dto.state } : {}),
+          ...(dto.postalCode !== undefined ? { postalCode: dto.postalCode } : {}),
+          ...(dto.countryCode !== undefined ? { countryCode: dto.countryCode } : {}),
+          ...(dto.creditLimitMinor !== undefined ? { creditLimitMinor: dto.creditLimitMinor } : {}),
+          ...(dto.paymentTermsDays !== undefined ? { paymentTermsDays: dto.paymentTermsDays } : {}),
+          ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+          ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+        },
+      });
+      // Branches are replaced wholesale when the caller sends the list: the form
+      // always submits the complete set, so a delete-then-insert keeps the two in
+      // step without diffing.
+      if (dto.branches) {
+        await tx.customerBranch.deleteMany({ where: { customerId: id } });
+        if (dto.branches.length) {
+          await tx.customerBranch.createMany({
+            data: dto.branches.map((b, index) => ({
+              companyId,
+              customerId: id,
+              name: b.name,
+              contactName: b.contactName ?? null,
+              phone: b.phone ?? null,
+              email: b.email ?? null,
+              addressLine: b.addressLine ?? null,
+              city: b.city ?? null,
+              countryCode: b.countryCode ?? null,
+              isHeadOffice: b.isHeadOffice ?? index === 0,
+            })),
+          });
+        }
+      }
+      return row;
     });
     await this.audit.record({
       actorUserId: actor.userId,
@@ -164,6 +234,17 @@ export class SalesService {
       summary: `Updated customer ${updated.code}`,
     });
     return toCustomerDto(updated);
+  }
+
+  /** One customer with its branch list, for the detail/edit form. */
+  async getCustomer(id: string, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const customer = await this.prisma.customer.findFirst({
+      where: { id, companyId },
+      include: { customerBranches: { orderBy: [{ isHeadOffice: 'desc' }, { createdAt: 'asc' }] } },
+    });
+    if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+    return { ...toCustomerDto(customer), branches: customer.customerBranches };
   }
 
   // -------------------------------------------------------------- quotations
@@ -391,6 +472,16 @@ export class SalesService {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
 
+    // Company settings drive the default VAT rate and the invoice prefix. They
+    // are read for this company only, so two tenants issue different documents.
+    const [taxSettings, invoicingSettings] = await Promise.all([
+      this.settings.get(companyId, 'TAX'),
+      this.settings.get(companyId, 'INVOICING'),
+    ]);
+    const defaultTaxBp = taxSettings.vatEnabled ? taxSettings.vatRateBp : 0;
+    const applyTax = (line: { taxPercentBp?: number }) =>
+      line.taxPercentBp ?? defaultTaxBp;
+
     const result = await this.posting.withTransaction(async (tx) => {
       let customerId = dto.customerId ?? null;
       let orderId: string | null = null;
@@ -421,7 +512,7 @@ export class SalesService {
           quantity: l.quantity,
           unitPriceMinor: l.unitPriceMinor,
           discountPercentBp: l.discountPercentBp,
-          taxPercentBp: l.taxPercentBp,
+          taxPercentBp: applyTax(l),
         }));
       } else {
         if (!customerId) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'customerId or orderId is required.');
@@ -434,7 +525,7 @@ export class SalesService {
           quantity: l.quantity,
           unitPriceMinor: l.unitPriceMinor,
           discountPercentBp: l.discountPercentBp,
-          taxPercentBp: l.taxPercentBp,
+          taxPercentBp: applyTax(l),
         }));
       }
 
@@ -447,7 +538,9 @@ export class SalesService {
         await this.assertCreditLimit(tx, companyId, customerId!, totals.totalMinor);
       }
 
-      const invoiceNumber = await this.sequences.next(tx, companyId, 'salesInvoice');
+      const invoiceNumber = await this.sequences.next(tx, companyId, 'salesInvoice', {
+        prefix: invoicingSettings.numberPrefix,
+      });
       const invoiceDate = new Date(dto.invoiceDate);
       const dueDate = dto.dueDate
         ? new Date(dto.dueDate)
@@ -1189,13 +1282,23 @@ function buildLineRows(
 function toCustomerDto(c: {
   id: string;
   code: string;
+  type: string;
   nameEn: string;
   nameAr: string;
   email: string | null;
   phone: string | null;
   taxNumber: string | null;
+  crNumber: string | null;
+  crExpiresAt: Date | null;
+  website: string | null;
+  contactPersonName: string | null;
+  contactPersonPhone: string | null;
+  contactPersonEmail: string | null;
+  nationalId: string | null;
   addressLine: string | null;
   city: string | null;
+  state: string | null;
+  postalCode: string | null;
   countryCode: string | null;
   creditLimitMinor: number;
   paymentTermsDays: number;
@@ -1203,7 +1306,10 @@ function toCustomerDto(c: {
   isActive: boolean;
   notes: string | null;
 }) {
-  return { ...c };
+  return {
+    ...c,
+    crExpiresAt: c.crExpiresAt ? c.crExpiresAt.toISOString() : null,
+  };
 }
 
 function toQuotationDto(q: {

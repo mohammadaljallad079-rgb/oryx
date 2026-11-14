@@ -65,8 +65,47 @@ const DEMO_PRODUCTS = [
 ];
 
 const DEMO_CUSTOMERS = [
-  { code: 'CUST-001', nameEn: 'Al Noor Trading Est.', nameAr: 'مؤسسة النور التجارية', creditLimitMinor: 5000000 },
-  { code: 'CUST-002', nameEn: 'Gulf Motors LLC', nameAr: 'خليج موتورز ذ.م.م', creditLimitMinor: 8000000 },
+  {
+    code: 'CUST-001',
+    type: 'COMPANY' as const,
+    nameEn: 'Al Noor Trading Est.',
+    nameAr: 'مؤسسة النور التجارية',
+    creditLimitMinor: 5000000,
+    crNumber: '1010123456',
+    taxNumber: '300012345600003',
+    website: 'https://alnoor.example',
+    contactPersonName: 'Fahad Al Otaibi',
+    contactPersonPhone: '+966501234567',
+    city: 'Riyadh',
+    branches: [
+      { name: 'Head office', city: 'Riyadh', isHeadOffice: true },
+      { name: 'Olaya showroom', city: 'Riyadh', isHeadOffice: false },
+    ],
+  },
+  {
+    code: 'CUST-002',
+    type: 'COMPANY' as const,
+    nameEn: 'Gulf Motors LLC',
+    nameAr: 'خليج موتورز ذ.م.م',
+    creditLimitMinor: 8000000,
+    crNumber: '1010987654',
+    taxNumber: '300098765400003',
+    contactPersonName: 'Sara Al Harbi',
+    contactPersonPhone: '+966551112222',
+    city: 'Jeddah',
+    branches: [{ name: 'Main branch', city: 'Jeddah', isHeadOffice: true }],
+  },
+  {
+    code: 'CUST-003',
+    type: 'INDIVIDUAL' as const,
+    nameEn: 'Mohammed Al Qahtani',
+    nameAr: 'محمد القحطاني',
+    creditLimitMinor: 0,
+    nationalId: '1098765432',
+    phone: '+966533334444',
+    city: 'Dammam',
+    branches: [],
+  },
 ];
 
 const DEMO_SUPPLIERS = [
@@ -856,18 +895,52 @@ async function seedErpBaseline(idByCode: Map<string, string>, superAdminId: stri
     }
 
     for (const c of DEMO_CUSTOMERS) {
-      await prisma.customer.upsert({
+      const customer = await prisma.customer.upsert({
         where: { companyId_code: { companyId: company.id, code: c.code } },
-        update: {},
+        update: {
+          type: c.type,
+          crNumber: 'crNumber' in c ? c.crNumber : null,
+          taxNumber: 'taxNumber' in c ? c.taxNumber : null,
+          website: 'website' in c ? c.website : null,
+          contactPersonName: 'contactPersonName' in c ? c.contactPersonName : null,
+          contactPersonPhone: 'contactPersonPhone' in c ? c.contactPersonPhone : null,
+          nationalId: 'nationalId' in c ? c.nationalId : null,
+          phone: 'phone' in c ? c.phone : null,
+          city: 'city' in c ? c.city : null,
+        },
         create: {
           companyId: company.id,
           code: c.code,
+          type: c.type,
           nameEn: c.nameEn,
           nameAr: c.nameAr,
           creditLimitMinor: c.creditLimitMinor,
           paymentTermsDays: 30,
+          crNumber: 'crNumber' in c ? c.crNumber : null,
+          taxNumber: 'taxNumber' in c ? c.taxNumber : null,
+          website: 'website' in c ? c.website : null,
+          contactPersonName: 'contactPersonName' in c ? c.contactPersonName : null,
+          contactPersonPhone: 'contactPersonPhone' in c ? c.contactPersonPhone : null,
+          nationalId: 'nationalId' in c ? c.nationalId : null,
+          phone: 'phone' in c ? c.phone : null,
+          city: 'city' in c ? c.city : null,
+          countryCode: 'SA',
         },
       });
+      for (const b of c.branches) {
+        const existing = await prisma.customerBranch.findFirst({ where: { customerId: customer.id, name: b.name } });
+        if (existing) continue;
+        await prisma.customerBranch.create({
+          data: {
+            companyId: company.id,
+            customerId: customer.id,
+            name: b.name,
+            city: b.city,
+            countryCode: 'SA',
+            isHeadOffice: b.isHeadOffice,
+          },
+        });
+      }
       customers += 1;
     }
 
@@ -1167,6 +1240,49 @@ async function seedExecution03Baseline(idByCode: Map<string, string>, superAdmin
   );
 }
 
+async function seedCompanySettings(idByCode: Map<string, string>) {
+  const { defaultSettingsFor } = await import('@oryx/shared');
+  const namespaces = ['GENERAL', 'INVOICING', 'ACCOUNTING', 'TAX', 'HR', 'INVENTORY', 'SALES', 'MAINTENANCE', 'DOCUMENTS'] as const;
+
+  let written = 0;
+  for (const [code, companyId] of idByCode) {
+    const company = await prisma.company.findUnique({ where: { id: companyId } });
+    if (!company) continue;
+
+    for (const ns of namespaces) {
+      const existing = await prisma.companySetting.findUnique({
+        where: { companyId_namespace: { companyId, namespace: ns } },
+      });
+      // Never overwrite settings an operator has already changed.
+      if (existing) continue;
+
+      const value = defaultSettingsFor(ns) as unknown as Record<string, unknown>;
+      if (ns === 'GENERAL') {
+        value.companyNameEn = company.nameEn;
+        value.companyNameAr = company.nameAr;
+        value.tradeName = company.nameEn;
+        value.currency = company.currency;
+        value.countryCode = company.countryCode ?? 'SA';
+      }
+      if (ns === 'TAX') {
+        // A second tenant with a different VAT rate proves settings isolation:
+        // documents issued for each company carry their own rate.
+        value.taxNumber = company.taxNumber ?? '';
+        if (code === 'DEMO-GULFAUTO') value.vatRateBp = 500;
+      }
+      if (ns === 'INVOICING') {
+        value.numberPrefix = code === 'DEMO-GULFAUTO' ? 'GA' : 'INV';
+      }
+
+      await prisma.companySetting.create({
+        data: { companyId, namespace: ns, value: value as never },
+      });
+      written += 1;
+    }
+  }
+  console.log(`  company settings: ${written} namespace rows seeded`);
+}
+
 async function main() {
   console.log('ORYX seed — start');
   await seedModules();
@@ -1179,6 +1295,7 @@ async function main() {
   await seedCms();
   await seedErpBaseline(idByCode, superAdmin.id);
   await seedExecution03Baseline(idByCode, superAdmin.id);
+  await seedCompanySettings(idByCode);
   await seedAuditBaseline(superAdmin.id, idByCode);
   console.log('ORYX seed — done');
 }

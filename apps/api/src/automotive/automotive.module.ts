@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ErpCommonModule } from '../common/erp-common.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { SalesModule } from '../sales/sales.module';
+import { SettingsModule } from '../settings/settings.module';
 import { VehicleController } from './vehicle.controller';
 import { WorkshopController } from './workshop.controller';
 import { VehicleService } from './vehicle.service';
@@ -13,7 +14,7 @@ import { WorkshopService } from './workshop.service';
  * and one accounting system across the platform.
  */
 @Module({
-  imports: [ErpCommonModule, InventoryModule, SalesModule],
+  imports: [ErpCommonModule, InventoryModule, SalesModule, SettingsModule],
   controllers: [VehicleController, WorkshopController],
   providers: [VehicleService, WorkshopService],
   exports: [VehicleService, WorkshopService],

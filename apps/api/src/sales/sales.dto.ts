@@ -39,6 +39,11 @@ export class ListQueryDto {
   @IsString()
   companyId?: string;
 
+  /** Filter customers by INDIVIDUAL or COMPANY. */
+  @IsOptional()
+  @IsString()
+  type?: string;
+
   @IsOptional()
   @IsString()
   branchId?: string;
@@ -49,6 +54,11 @@ export class CreateCustomerDto {
   @MinLength(1)
   @MaxLength(40)
   code!: string;
+
+  /** INDIVIDUAL (default) or COMPANY. Chooses which form the UI presents. */
+  @IsOptional()
+  @IsIn(['INDIVIDUAL', 'COMPANY'])
+  type?: string;
 
   @IsString()
   @MinLength(2)
@@ -77,6 +87,40 @@ export class CreateCustomerDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(40)
+  crNumber?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  crExpiresAt?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  website?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  contactPersonName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  contactPersonPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  contactPersonEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  nationalId?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(240)
   addressLine?: string;
 
@@ -84,6 +128,16 @@ export class CreateCustomerDto {
   @IsString()
   @MaxLength(80)
   city?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  state?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  postalCode?: string;
 
   @IsOptional()
   @IsString()
@@ -111,9 +165,60 @@ export class CreateCustomerDto {
   @IsString()
   @MaxLength(400)
   notes?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CustomerBranchInputDto)
+  branches?: CustomerBranchInputDto[];
+}
+
+export class CustomerBranchInputDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(160)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  contactName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  addressLine?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(3)
+  countryCode?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isHeadOffice?: boolean;
 }
 
 export class UpdateCustomerDto {
+  @IsOptional()
+  @IsIn(['INDIVIDUAL', 'COMPANY'])
+  type?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(200)
@@ -141,6 +246,40 @@ export class UpdateCustomerDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(40)
+  crNumber?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  crExpiresAt?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  website?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  contactPersonName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  contactPersonPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  contactPersonEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  nationalId?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(240)
   addressLine?: string;
 
@@ -148,6 +287,21 @@ export class UpdateCustomerDto {
   @IsString()
   @MaxLength(80)
   city?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  state?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  postalCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(3)
+  countryCode?: string;
 
   @IsOptional()
   @Type(() => Number)
@@ -169,6 +323,12 @@ export class UpdateCustomerDto {
   @IsString()
   @MaxLength(400)
   notes?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CustomerBranchInputDto)
+  branches?: CustomerBranchInputDto[];
 }
 
 export class SalesLineDto {

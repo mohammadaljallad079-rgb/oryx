@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
+import { ModuleBanner } from '@/components/module-banner';
 import { money, qty } from '@/lib/erp-format';
 import {
   Badge,
@@ -27,7 +29,13 @@ type Tab = 'accounting' | 'sales' | 'purchasing' | 'inventory';
 
 export default function ReportsPage() {
   const { t } = useUi();
+  const { companyId, branchId } = useAuth();
   const [tab, setTab] = useState<Tab>('sales');
+
+  const dashboard = useAsync(
+    () => api.moduleDashboard('reports_analytics', { companyId: companyId ?? undefined, branchId: branchId ?? undefined }),
+    [companyId, branchId],
+  );
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
 
@@ -54,6 +62,8 @@ export default function ReportsPage() {
 
   return (
     <div className="flex flex-col gap-5" data-testid="reports-page">
+      <ModuleBanner data={dashboard.data} loading={dashboard.loading} moduleKey="reports_analytics" />
+
       <SectionHeader
         title={t('nav.reports_analytics')}
         subtitle={t('erp.reports.subtitle')}

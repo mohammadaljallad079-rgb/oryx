@@ -132,6 +132,30 @@ export const ERP_NAV: NavGroup[] = [
   { key: 'administration', labelKey: 'nav.group.administration', items: ADMIN.map(erpItem) },
 ];
 
+/** Group key that should hold the customers entry, whatever the catalogue says. */
+const CUSTOMERS_GROUP_KEY = 'commerce';
+
+/**
+ * Customers are a cross-cutting record (sales, CRM, maintenance and accounting
+ * all reference them), so they get a first-class entry of their own rather than
+ * living inside one module's page.
+ */
+const CUSTOMERS_NAV_ITEM: NavItem = {
+  key: 'customers',
+  labelKey: 'nav.customers',
+  href: '/customers',
+  icon: 'users',
+  permission: 'erp.sales.read',
+  moduleKey: 'sales_pos',
+};
+
+for (const group of ERP_NAV) {
+  if (group.key !== CUSTOMERS_GROUP_KEY) continue;
+  const crmIndex = group.items.findIndex((i) => i.key === 'crm');
+  if (crmIndex >= 0) group.items.splice(crmIndex + 1, 0, CUSTOMERS_NAV_ITEM);
+  else group.items.unshift(CUSTOMERS_NAV_ITEM);
+}
+
 export const ALL_NAV_GROUPS: NavGroup[] = [PLATFORM_NAV, WEBSITE_APP_NAV, ...ERP_NAV];
 
 /** Resolve the module that owns a route, used by the planned-module page. */

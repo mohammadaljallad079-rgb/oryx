@@ -7,6 +7,7 @@ import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, qty, toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { ModuleBanner } from '@/components/module-banner';
 import {
   Badge,
   Button,
@@ -42,8 +43,13 @@ const emptyLine = (): LineDraft => ({ productId: '', description: '', quantity: 
 
 export default function SalesPage() {
   const { t } = useUi();
-  const { can } = useAuth();
+  const { can, companyId, branchId } = useAuth();
   const [tab, setTab] = useState<Tab>('invoices');
+
+  const dashboard = useAsync(
+    () => api.moduleDashboard('sales_pos', { companyId: companyId ?? undefined, branchId: branchId ?? undefined }),
+    [companyId, branchId],
+  );
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'invoices', label: t('erp.sales.invoices') },
@@ -56,6 +62,8 @@ export default function SalesPage() {
 
   return (
     <div className="flex flex-col gap-5" data-testid="sales-page">
+      <ModuleBanner data={dashboard.data} loading={dashboard.loading} moduleKey="sales_pos" />
+
       <SectionHeader
         title={t('nav.sales_pos')}
         subtitle={t('erp.sales.subtitle')}
