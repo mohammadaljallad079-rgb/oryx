@@ -273,6 +273,22 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
     .join('');
 
   const totalTop = TOTAL_TOP[3] + tableShift;
+
+  // The verification strip is drawn only for an issued record, and it carries
+  // the QR the public endpoint already resolves. The URL is printed in full
+  // beside it so a photocopied or angled sheet — where the code is unreadable —
+  // can still be verified by typing the address.
+  const verificationHtml = doc.verification
+    ? `
+    <div class="verify">
+      <div class="verify-qr"><img src="${esc(doc.verification.qrDataUri)}" alt="Document verification QR code"></div>
+      <div class="verify-text">
+        <div class="verify-title">التحقق من صحة المستند · Document authenticity</div>
+        <p class="verify-body">امسح رمز الاستجابة السريعة أو افتح الرابط للتأكد من أن هذا المستند صادر رسميًا عن النظام ولم يُعدّل. / Scan the QR code or open the address to confirm this document was issued by the system and has not been altered.</p>
+        <div class="verify-url">${esc(doc.verification.url)}</div>
+      </div>
+    </div>`
+    : '';
   const CONTACT_TOP = 820.15;
   // The reference prints small vector icons before the phone and the website.
   // An emoji (U+1F4DE / U+1F310) is absent from every installed face and prints
@@ -376,6 +392,19 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
   .notes-text { position:absolute; left:8.95pt; top:5.83pt; right:10.0pt; font-size:8.79pt;
                 font-weight:700; color:var(--ink); line-height:1.25; white-space:normal; }
 
+  /* verification strip - the QR a reader scans to confirm the document. It sits
+     in the whitespace the reference leaves between the notes box and the
+     signature plates, so it never disturbs the approved layout, and it is drawn
+     only when the record has actually been issued (see doc.verification). */
+  .verify { position:absolute; left:29.02pt; top:520.5pt; width:544.99pt; display:flex; gap:12pt;
+            align-items:center; border:0.75pt solid var(--border); border-radius:4pt; padding:7pt 10pt; }
+  .verify-qr { flex:0 0 auto; line-height:0; }
+  .verify-qr img { width:64pt; height:64pt; display:block; }
+  .verify-text { flex:1 1 auto; }
+  .verify-title { font-size:8.8pt; font-weight:700; color:var(--navy); line-height:1.2; }
+  .verify-body { font-size:7.2pt; color:var(--contact); margin:3pt 0 0; line-height:1.35; white-space:normal; }
+  .verify-url { font-size:7.2pt; color:var(--navy); margin-top:3pt; word-break:break-all; }
+
   /* signature plates and footer identity */
   .footer-plate-l { position:absolute; left:14.13pt; top:755.06pt; width:239.79pt; height:51.8pt; }
   .footer-plate-r { position:absolute; left:340.78pt; top:755.06pt; width:239.79pt; height:51.8pt; }
@@ -431,6 +460,8 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
     <div class="notes">
       <div class="notes-text">${dash(doc.notes ?? doc.amountInWords)}</div>
     </div>
+
+    ${verificationHtml}
 
     <img class="footer-plate-l" alt="" src="${PRINT_FOOTER_LEFT}" />
     <img class="footer-plate-r" alt="" src="${PRINT_FOOTER_RIGHT}" />

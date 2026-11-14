@@ -438,6 +438,16 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   production now refuses to issue without it. Verify with
   `.run/verify-qr-in-pdf.mjs`, which decodes the printed code and opens the
   decoded URL in a session-less browser context.
+- **`/verify` lives in the customer app, not the admin app.** The public
+  verification page is `apps/customer/src/app/verify/[[...token]]/page.tsx`
+  (`:3002` in the preview). Pointing `DOCUMENT_VERIFY_BASE_URL` at the admin
+  origin (`:3000`) yields a 404 for every scan even though the API returns a
+  perfectly valid token. In the preview set it to the customer origin.
+- **A duplicate variable definition silently wins with the last value.** Both
+  `.env` and the tracked `.env.example` once declared `DOCUMENT_VERIFY_BASE_URL`
+  twice; the later `:3000` line overrode the correct `:3002` one, so the printed
+  QR was dead while the source "looked" right. When a printed-code or config
+  value misbehaves, `grep -n` the key in every env file before anything else.
 - **The verification page namespaces its keys under `verify.`.** The outcome
   key template must be `` `verify.${outcome}Title` ``, not `` `${outcome}Title` ``;
   without the prefix the page renders the raw key. `apps/customer/test/i18n-status.test.ts`
@@ -852,6 +862,31 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   and `apps/api/storage/` are gitignored. `ATTACHMENT_MIME_TYPES` accepts PDF,
   JPEG and PNG only.
 
+### Document parity gotchas (Executions 18/19)
+
+- **Chromium footer/header templates cannot load webfonts.** A
+  `displayHeaderFooter` footer is rendered in a separate document that ignores
+  every `@font-face`, so any text there falls back to the OS default (DejaVuSans)
+  and silently differs from the body. Images *do* render there. If footer text
+  must use the ORYX faces, draw the band as an inline SVG/PNG instead of HTML
+  text — do not expect the embedded `@font-face` to apply.
+- **`pymupdf` page rasterisation is the only honest parity metric.** Render both
+  the reference and our output at the same DPI and diff the greyscale rasters.
+  A residual ~8-12% is anti-aliasing noise from a different PDF engine and will
+  not reach zero even when the same file is drawn twice; judge element presence,
+  order and geometry, not the raw percentage.
+- **Verify the QR by decoding, not by eye.** Rasterise the produced PDF and
+  decode it with `jsQR` (available in `node_modules`). A QR that looks right can
+  fail to scan; the only proof is a decoded string matching the verification URL.
+- **The inspection cover overflows to a sixth page very easily.** The photo band
+  and the info card fight for the printable height; a few points too tall pushes
+  the Important Remarks block onto page 2. Check the page count after every
+  cover change (`pymupdf` `page_count` must be 5).
+- **Report/print money is computed once.** `computeDocumentTotals` in
+  `apps/api/src/common/document-totals.ts` is the single source for subtotal,
+  discount, VAT and total in integer minor units; the UI, PDF and print path all
+  consume it. Never recompute a figure in a template.
+
 ### Mobile gotchas
 
 - **An access token expires mid-session, not at start-up.** Cold-start restore is
@@ -1089,6 +1124,51 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   code resolves to its display name; do not hard-code a name or a timezone
   offset.
 
+### Execution 18 gotchas
+
+- **The report and the financial forms print to different edges.**
+  `REPORT_PDF_MARGINS` lifts only the inspection report's top edge (the brand
+  band sits ~5.6mm from the paper). Its side margins stay at the default because
+  the cover photograph bleeds to the paper edges by cancelling exactly that
+  inset. Do not fold the report onto `OFFICIAL_PDF_MARGINS`; the header drops
+  ~20pt.
+- **A full-bleed band must not widen the layout box.** A negative `margin`, or a
+  wider in-flow box, enlarges Chromium's printable area and shifts every element
+  on the sheet sideways. Paint the bleed with an absolutely positioned image that
+  overflows an in-flow figure — absolute overflow is clipped by the paper edge
+  and does not resize the page.
+
+### Execution 19 gotchas
+
+- **The report footer is the invoice footer.** The approved inspection report
+  prints the same contacts row as the tax invoice — hairline rule, bilingual
+  page counter left, phone and email centre, website right, registered address
+  and CR beneath — so `documents.service.ts` routes both through
+  `officialFooterTemplate`. Only the internal statements keep the compact
+  `footerTemplate`. Do not reintroduce a report-specific footer; it drifts.
+- **Report `REPORT_PDF_MARGINS.bottom` is 11mm, not 20mm.** The official footer
+  template paints inside the bottom margin; a 20mm bottom margin pushed the
+  contacts row off the page. The footer template lives in the margin, so it
+  consumes no content height — keep the margin tight enough to show it.
+- **The chassis page distributes its boxes *around* the drawing.** The approved
+  sheet centres the chassis artwork and places the eight region cards Front
+  above, Rear below, three pairs down the sides — not a side list. The board is
+  forced `direction:ltr` because the arrangement is physical; in RTL the left
+  cards would otherwise flip to the right.
+- **The paint legend prints in the reverse of the catalogue order.** The
+  approved key reads sectioned, Change, Filler, Paint left to right, so
+  `paintDiagram` reverses `PAINT_CONDITIONS` and the row is `direction:ltr`.
+  There is no marker table on the approved sheet — do not add one back.
+- **The cover photograph carries the ORYX wordmark as a watermark.** The
+  approved cover lays the logo over the photo band at low opacity; the QR sits
+  in the lower-right of the same band. Both come from the issuer/verification
+  already in the payload — no new fields.
+- **Render the report through the product path to verify parity.** The
+  `.run/render-report2.mts` harness imports the compiled template, the product
+  `QrService` and `officialFooterTemplate`, so a rendered sheet can be decoded
+  (jsQR) and measured (PyMuPDF) against the reference. It is scratch, not
+  committed.
+
 ### Adding a new ERP module
 
 1. Add a `ModuleDefinition` to `packages/shared/src/modules.ts`.
@@ -1171,3 +1251,69 @@ so nothing else needs changing.
 - **Never leave the admin app on `:3000` down after touching the customer
   app.** Both preview hosts share the same ingress; a dead upstream turns every
   admin capture into a `502` screenshot.
+
+### Execution 08 remediation gotchas
+
+- **A FormData checkbox posts a string, not a boolean.** `multipart/form-data`
+  has no scalar types, so the HR document form's confidential checkbox arrives
+  as `"true"` / `"false"` and `@IsBoolean()` rejects it with a 400 before the
+  handler runs. `ToBoolean()` in `apps/api/src/common/transformers.ts` coerces
+  it before validation and leaves anything else untouched, so a genuinely bad
+  value still fails. Any new multipart boolean DTO needs it.
+- **The printed QR must be the issued token, not a fresh one.** `PrintService`
+  reads `OfficialDocument.verificationToken`; issuing creates the token, so a
+  reprint and the issued PDF carry the same code. A record with no issued
+  document prints no code rather than one that scans to nothing. Do not render
+  a QR from anything other than the stored token.
+- **`jsQR` cannot read the PDF directly.** The QR is a compressed image XObject;
+  `apps/api/test/pdf-qr.ts` inflates it (`zlib`) and hands the raw pixels to
+  `jsQR`. A test that only checks for a QR-looking block is not a verification —
+  decode it and open the decoded URL.
+- **`<input type="date">` yields a bare `YYYY-MM-DD`.** Leave-request DTOs must
+  run `NormaliseIsoDate()` before `@IsISO8601()` or every create/edit/approve
+  fails validation. The same applies to any date field posted from the form.
+- **The Execution 08 UI spec mutates a seeded employee's leave balance.** A
+  leave request has no delete endpoint, so the global setup
+  (`scripts/reset-seed-mfa.mjs`) removes the rows tagged `E08UI-` and reconciles
+  only the balances they touched. Tag any new mutating fixture the same way or
+  the seeded baseline drifts on every run.
+- **Run the API with raised throttle limits before the UI suites.** Without
+  `AUTH_THROTTLE_LIMIT=100000 THROTTLE_LIMIT=1000000 REFRESH_THROTTLE_LIMIT=100000`
+  the later specs fail intermittently in `signIn` with a `waitForURL **/dashboard`
+  timeout — a login 429, not a product defect. It looks like flakiness because
+  the failure moves between specs as the login count crosses the ceiling.
+
+### Execution 09 gotchas
+
+- **Execution 09 is a stack, not a branch off production.** The Execution 08
+  remediation was never merged into `release/oryx-latest`, so
+  `fix/oryx-remaining-requirements` builds directly on `897f428`. A PR against
+  the production branch therefore shows the Execution 08 commits too until PR
+  #13 merges; the diff self-heals to the Execution 09 commits afterward. Do not
+  "fix" that by rebasing onto release — it would drop the Execution 08 fixes the
+  branch depends on.
+- **The browser suite rewrites the `docs/**` evidence PNGs.** A full
+  `playwright test` run re-encodes every capture under `docs/audit/**` and
+  `docs/execution-reports/screenshots/**`, so `git status` shows dozens of
+  modified images that differ only by PNG recompression. `git checkout --` them
+  before committing, or the PR carries meaningless binary churn.
+- **`apps/admin/build` clears `.next`.** `next start` keeps serving the old
+  build from memory, so restart the admin (and customer) server after a build
+  before running the UI suites, or the suite exercises stale chunks.
+
+### Preview-host and evidence traps (Execution 19 sessions)
+
+- **Next snapshots `public/` at boot.** `next start` builds its static manifest
+  when the server starts, so a file added to `apps/admin/public/` afterwards
+  returns `404` until the server restarts — and the work-host proxy caches that
+  `404`, so a fresh name is needed too. Add the files first, then start the
+  server, or restart and re-verify every link.
+- **The work hosts serve `.run/evidence/` as `/evidence/`.** The preview host
+  that the Execution 19 report links (`work-1-…`) is not the admin app; it maps
+  the workspace `.run/evidence/exec19/` tree to `/evidence/exec19/`. Put the
+  curated parity sheets there, not in the admin app's `public/` dir.
+- **Never serve the raw reference documents.** `oryx 22.pdf` and
+  `oryx out put.pdf` carry a real customer's name, phone and address. Link the
+  side-by-side comparison sheets instead; the PDFs stay gitignored.
+- **Ignore the generated preview bytes.** `apps/admin/public/exec19/` and any
+  `apps/admin/public/evidence/` tree are generated evidence, never source.

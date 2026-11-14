@@ -224,7 +224,10 @@ test.describe('Execution Phase 3 — official documents', () => {
     );
     expect(pdf.status).toBe(200);
     expect(pdf.contentType).toContain('pdf');
-    expect(pdf.head).toBe('%PDF-1.4');
+    // The Chromium build that renders the PDF chooses the version it writes, so
+    // the assertion pins the signature, not one particular revision; a newer
+    // Chromium emits `%PDF-1.7` for the same document.
+    expect(pdf.head).toMatch(/^%PDF-1\.\d/);
     expect(pdf.hasMediaBox).toBe(true);
     expect(pdf.hasArabicFace).toBe(true);
     expect(pdf.storedPageCount).toBe(pdf.pageCount);
@@ -312,11 +315,25 @@ test.describe('Execution Phase 3 — official documents', () => {
   });
 
   test('the public verification page is served by the customer site', async ({ request }) => {
-    // The admin app does not own the public route; the customer site does. A
-    // request to the customer origin proves the page ships and does not 500 on
-    // an unknown token, without conflating the two surfaces.
+    // The customer site owns the canonical public verification page. A request
+    // to that origin proves the page ships and does not 500 on an unknown
+    // token, without conflating the two surfaces.
     const customerBase = process.env.ORYX_CUSTOMER_URL ?? 'http://localhost:3002';
     const res = await request.get(`${customerBase}/verify/this-token-does-not-exist-0000000000`);
+    expect(res.status()).toBeLessThan(500);
+    const body = await res.text();
+    expect(body).not.toContain('Internal Server Error');
+  });
+
+  test('the admin origin also answers a scanned QR code', async ({ request }) => {
+    // A printed document's QR embeds `<origin>/verify/<token>`. Documents were
+    // issued against the admin origin, and a printed code cannot be recalled,
+    // so a scan of an already-printed report or invoice must resolve on the
+    // admin host too. The admin app therefore serves the same read-only page;
+    // this guards against dropping it and reviving the 404 that made every
+    // printed code a dead link.
+    const adminBase = process.env.ORYX_ADMIN_URL ?? 'http://localhost:3000';
+    const res = await request.get(`${adminBase}/verify/this-token-does-not-exist-0000000000`);
     expect(res.status()).toBeLessThan(500);
     const body = await res.text();
     expect(body).not.toContain('Internal Server Error');

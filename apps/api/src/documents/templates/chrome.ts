@@ -173,53 +173,172 @@ export const CONTACT_ICON_GLOBE =
   '<path d="M12 2a15.3 15.3 0 0 1 0 20 15.3 15.3 0 0 1 0-20z"/></svg>';
 
 /**
+ * The brand band the approved sheets print above the contact row.
+ *
+ * Both the tax invoice and the inspection report carry the same band: the ORYX
+ * lockup on both outer edges with the closing line centred between them
+ * (measured y 755-807 of an 842pt page). It is a Chromium page template, so it
+ * lives inside the bottom margin and repeats at the same height on every page
+ * regardless of how full that page is.
+ *
+ * The template is its own document: Chromium ignores an `@font-face` declared
+ * there, so the Arabic closing line relies on the host's fallback face and the
+ * logo is a data URI rather than an embedded file.
+ */
+function brandBand(issuer: DocumentIssuer): string {
+  // The reference prints two bordered signature boxes on the outer edges with a
+  // compact ORYX lockup and the closing line centred between them (measured
+  // boxes x14-254 and x341-581, y755-807; the centre lockup at x257-337). The
+  // outer edges are *not* the full logotype — the signature labels sit inside
+  // those boxes — so the band renders the boxes and the small centred mark.
+  const mark = issuer.logoDataUri
+    ? `<img src="${esc(issuer.logoDataUri)}" alt="" style="height:19pt;width:auto;display:block;margin:0 auto">`
+    : '';
+  const box =
+    'flex:0 0 auto;width:239.8pt;height:51.8pt;box-sizing:border-box;' +
+    'border:0.75px solid #a3b1c2;border-radius:6pt;padding:5pt 9pt;white-space:nowrap;';
+  const label = 'font-size:7.5pt;font-weight:700;color:#0f2b48;';
+  const labelAr = 'font-size:7.5pt;font-weight:700;color:#0f2b48;direction:rtl;unicode-bidi:embed;';
+  return `
+  <div style="padding:0 14pt;display:flex;align-items:flex-start;justify-content:space-between;">
+    <div style="${box}">
+      <span style="${label}">Authorized Stamp &amp; Signature</span>
+      <span style="${labelAr}">اعتماد المركز</span>
+    </div>
+    <div style="flex:0 0 auto;width:80pt;text-align:center;padding-top:1pt;line-height:1.15;">
+      ${mark}
+      <div style="font-size:8.3pt;font-weight:700;letter-spacing:.5px;color:#0f2b48;">AUTO SERVICES</div>
+      <div style="font-size:5.6pt;font-weight:700;color:#0f2b48;direction:rtl;unicode-bidi:embed;margin-top:3pt;">شكراً لثقتكم بنا.</div>
+      <div style="font-size:5.6pt;color:#64748b;">Thank you for your trust.</div>
+    </div>
+    <div style="${box}">
+      <span style="${label}">Customer Signature</span>
+      <span style="${labelAr}">توقيع العميل</span>
+    </div>
+  </div>`;
+}
+
+/**
  * The contact footer for the official financial layout.
  *
- * Reproduces the printed reference: a hairline rule, then the phone, email and
- * website on one line with the page counter, and the registered address beneath.
- * Like `footerTemplate` it is a Chromium page template, so it lives inside the
- * bottom margin and cannot push content onto a blank page.
+ * Reproduces the printed reference: the brand band (see `brandBand`), a hairline
+ * rule, then the phone, email and website on one line with the page counter, and
+ * the registered address beneath. Like `footerTemplate` it is a Chromium page
+ * template, so it lives inside the bottom margin and cannot push content onto a
+ * blank page.
  */
 export function officialFooterTemplate(issuer: DocumentIssuer): string {
   const base = [
-    'font-family:Verdana,Arial,Helvetica,sans-serif',
-    'color:#1f2d3d',
+    "font-family:'ORYX Latin','ORYX Arabic','ORYX Sans',Verdana,Arial,sans-serif",
+    'color:#64748b',
     '-webkit-print-color-adjust:exact',
   ].join(';');
-  // The reference footer spreads the contacts across one row — the page counter
-  // on the left, the phone and email in the middle, the website on the right —
-  // over a hairline rule, with the registered address (and its CR number)
-  // centred beneath. The VAT/TRN is the navy strip at the top of the page, so it
-  // is deliberately not repeated here.
-  //
-  // The contact icons are inline SVG, not emoji. A footer template is its own
-  // document: Chromium ignores an `@font-face` declared there, so the glyphs
-  // come from the host's fallback face, and a phone/globe emoji (U+1F4DE /
-  // U+1F310) is absent from every installed face — it printed as a broken box.
-  // A vector icon needs no font and renders identically everywhere.
+  return `
+<div style="${base};width:100%;box-sizing:border-box;position:relative;top:14.8pt;">
+  ${brandBand(issuer)}
+  ${contactRow(issuer)}
+</div>`;
+}
+
+/**
+ * The contacts row the footer templates share: a hairline rule, then the page
+ * counter, the phone and email, and the website on one line, with the
+ * registered address (and its CR number) flush right beneath.
+ *
+ * The VAT/TRN is the navy strip at the top of the page, so it is deliberately
+ * not repeated here. The contact icons are inline SVG, not emoji: a footer
+ * template is its own document, so Chromium ignores an `@font-face` declared
+ * there and the glyphs come from the host's fallback face, where a phone/globe
+ * emoji (U+1F4DE / U+1F310) is absent and printed as a broken box.
+ *
+ * The reference prints the page counter bilingually. The Arabic clause is set
+ * so it reads right-to-left as `صفحة <n> من <total>`, the visual order the
+ * approved sheet uses; writing the words in the opposite logical order
+ * (`<n> من <total> صفحة`) inside an RTL embed reverses them on the page, so the
+ * counter reads "2 من 5 صفحة" instead of "صفحة 2 من 5". Both counters carry the
+ * same placeholders, which Chromium fills on every page. The contact figures
+ * are 7.2pt in the reference (measured), a step heavier and darker than the
+ * 6.5pt counter and address.
+ */
+function contactRow(issuer: DocumentIssuer): string {
   const phone = issuer.phone ? `${CONTACT_ICON_PHONE} ${esc(issuer.phone)}` : '';
   const email = issuer.email ? `${CONTACT_ICON_MAIL} ${esc(issuer.email)}` : '';
   const website = issuer.websiteUrl ? `${CONTACT_ICON_GLOBE} ${esc(issuer.websiteUrl)}` : '';
   const address = [issuer.addressLine, issuer.city].filter(Boolean).join(' - ');
   const registration = issuer.crNumber ? `CR ${esc(issuer.crNumber)}` : '';
   const addressLine = [address, registration].filter(Boolean).join(' | ');
-  // The reference prints the page counter bilingually ("Page 1 of 1 • 1 من 1
-  // صفحة"); both counters carry the same placeholders, which Chromium fills on
-  // every page. The insets match the measured reference footer (left ≈ 15mm,
-  // right ≈ 13mm), so the counter, the contacts and the website land on the same
-  // x-positions the approved sheet uses.
+  const contact = 'font-size:7.2pt;font-weight:700;color:#475569;white-space:nowrap;';
+  // The approved sheet prints the phone, email and website as three separate
+  // figures on one line (measured x 294 / 380 / 483 of a 595pt page), not the
+  // phone+email pair the first revision grouped with the website pushed to the
+  // far edge. They are laid out as one right-hand group so the spacing follows
+  // the reference rather than being spread by `space-between`.
+  const item = (html: string, gap: string) =>
+    html ? `<span style="${contact}${gap}">${html}</span>` : '';
   return `
-<div style="${base};width:100%;padding:0 16.8mm 0 15mm;box-sizing:border-box;position:relative;top:11pt;">
-  <div style="border-top:0.75px solid #94a3b8;padding-top:5px;display:flex;justify-content:space-between;align-items:baseline;font-size:6.5pt;font-weight:700;">
-    <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span> &bull; <span style="direction:rtl;unicode-bidi:embed;display:inline-block;"><span class="pageNumber"></span> من <span class="totalPages"></span> صفحة</span></span>
-    <span>${phone}${phone && email ? ' &nbsp; ' : ''}${email}</span>
-    <span>${website}</span>
+  <div style="border-top:0.75px solid #94a3b8;margin:20px 15.8pt 0 13.7pt;"></div>
+  <div style="padding:0 13.3mm 0 15mm;display:flex;align-items:baseline;font-size:6.5pt;font-weight:700;">
+    <span style="flex:0 0 auto;position:relative;top:-5pt;">Page <span class="pageNumber"></span> of <span class="totalPages"></span> &bull; <span style="direction:rtl;unicode-bidi:embed;display:inline-block;">صفحة <span class="pageNumber"></span> من <span class="totalPages"></span></span></span>
+    <span style="flex:1 1 auto;"></span>
+    <span style="flex:0 0 auto;display:flex;align-items:baseline;">
+      ${item(phone, '')}${item(email, 'margin-inline-start:14pt;')}${item(website, 'margin-inline-start:6pt;')}
+    </span>
   </div>
   ${
     addressLine
-      ? `<div style="margin-top:9px;text-align:center;font-size:6.5pt;color:#334155;">${esc(addressLine)}</div>`
+      ? `<div style="margin-top:2px;padding-inline-end:13.3mm;text-align:end;font-size:6.5pt;color:#64748b;">${esc(addressLine)}</div>`
       : ''
-  }
+  }`;
+}
+
+/**
+ * The inspection report's page footer.
+ *
+ * The approved report prints a *different* footer on the cover than on the
+ * section pages: the cover carries the two bordered signature boxes flanking
+ * the centred lockup (reproduced in flow by the cover section itself), while
+ * pages two to five carry a compact left-aligned lockup, the closing line and a
+ * small verification QR captioned `للتأكد من صحة التقرير`. Chromium paints one
+ * footer template on every page, so the boxes cannot live here — a template
+ * would repeat them on the inner pages, which the approved sheet does not do.
+ * The template therefore prints the section-page shape, and the cover supplies
+ * its own boxes in flow.
+ *
+ * The QR is the document's own verification code, so scanning any section page
+ * resolves the same report. It is painted from a data URI because a page
+ * template is its own document and cannot read the fonts or images of the page.
+ */
+export function reportFooterTemplate(issuer: DocumentIssuer, qrDataUri?: string): string {
+  const base = [
+    "font-family:'ORYX Latin','ORYX Arabic','ORYX Sans',Verdana,Arial,sans-serif",
+    'color:#64748b',
+    '-webkit-print-color-adjust:exact',
+  ].join(';');
+  // The lockup band is kept at the invoice band's height (see `brandBand`) so
+  // the contacts row lands on the reference's measured y positions on every
+  // page rather than riding up when the band is short.
+  const lockup = `
+  <div style="line-height:1.15;">
+    <div style="font-size:8.3pt;font-weight:700;letter-spacing:.5px;color:#0f2b48;">AUTO SERVICES</div>
+    <div style="font-size:5.6pt;font-weight:700;color:#0f2b48;direction:rtl;unicode-bidi:embed;margin-top:3pt;">شكراً لثقتكم بنا.</div>
+    <div style="font-size:5.6pt;color:#64748b;">Thank you for your trust.</div>
+  </div>`;
+  // The reference prints the verify caption above a 33pt QR at x137-170, y774-807
+  // (measured), i.e. to the right of the lockup and a step lower.
+  const verify = qrDataUri
+    ? `
+  <div style="text-align:center;line-height:1;">
+    <div style="font-size:4.9pt;font-weight:700;color:#0f2b48;direction:rtl;unicode-bidi:embed;margin-bottom:8pt;">للتأكد من صحة التقرير</div>
+    <img src="${esc(qrDataUri)}" alt="" style="width:33pt;height:33pt;display:block;">
+  </div>`
+    : '';
+  return `
+<div style="${base};width:100%;box-sizing:border-box;position:relative;top:14.8pt;">
+  <div style="padding:0 15.8pt;min-height:52pt;display:flex;align-items:flex-end;">
+    <div style="flex:0 0 auto;margin-left:26pt;">${lockup}</div>
+    ${verify ? `<div style="flex:0 0 auto;margin-left:17pt;">${verify}</div>` : ''}
+  </div>
+  ${contactRow(issuer)}
 </div>`;
 }
 
@@ -249,7 +368,7 @@ export function footerTemplate(chrome: DocumentFooterInput): string {
     .join(' · ');
   const meta = [address, registration, contact].filter(Boolean).join('  ·  ');
   const style = [
-    'font-family:Verdana,Arial,Helvetica,sans-serif',
+    "font-family:'ORYX Latin','ORYX Arabic','ORYX Sans',Verdana,Arial,sans-serif",
     'font-size:8px',
     'color:#5b6472',
     'width:100%',
@@ -280,7 +399,10 @@ export const CHROME_CSS = `
   .doc-issuer-en{ font-size:15pt; font-weight:700; color:var(--navy); }
   .doc-issuer-ar{ font-size:12pt; color:var(--navy-soft); }
   .doc-issuer-meta{ margin-top:4px; font-size:8.5pt; color:var(--muted); display:flex; gap:10px; flex-wrap:wrap; }
-  .doc-logo{ height:46px; width:auto; }
+  /* The approved lockup prints the mark at 136pt wide (its 41.8pt height is
+   * driven by the mark's own aspect). The previous 46px box printed it at
+   * 124pt, visibly smaller than the reference. */
+  .doc-logo{ height:51px; width:auto; }
   .doc-monogram{ width:46px; height:46px; border-radius:8px; background:var(--navy);
     color:var(--gold); display:flex; align-items:center; justify-content:center;
     font-weight:700; font-size:17pt; letter-spacing:.5px; }

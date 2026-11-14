@@ -1,4 +1,4 @@
-import { quantity } from './html.util';
+import { docStamp, quantity } from './html.util';
 
 /**
  * The invoice/quotation quantity column.
@@ -27,5 +27,30 @@ describe('document html quantity', () => {
 
   it('prints zero for an empty line', () => {
     expect(quantity(0)).toBe('0');
+  });
+});
+
+/**
+ * The approved documents' date stamp.
+ *
+ * The reference prints "Sat 20/09/2026, 3:30 PM" — a short weekday, dd/mm/yyyy
+ * and a 12-hour clock in Bahrain time. Both the financial sheets and the
+ * inspection report must agree on that shape, so the formatter lives in one
+ * place and this pins it.
+ */
+describe('document date stamp', () => {
+  it('formats an instant as weekday, dd/mm/yyyy and a 12-hour time', () => {
+    expect(docStamp(new Date('2026-09-20T12:30:00.000Z'))).toBe('Sun 20/09/2026, 3:30 PM');
+  });
+
+  it('keeps a late-evening instant on the same Bahrain day', () => {
+    // 23:30 in Bahrain is 20:30 UTC; a naive formatter would print 8:30 PM and
+    // may roll the calendar day, which would misdate a document issued at night.
+    expect(docStamp(new Date('2026-09-20T20:30:00.000Z'))).toBe('Sun 20/09/2026, 11:30 PM');
+  });
+
+  it('renders an em dash for a missing or invalid value', () => {
+    expect(docStamp(null)).toBe('—');
+    expect(docStamp('not-a-date')).toBe('—');
   });
 });

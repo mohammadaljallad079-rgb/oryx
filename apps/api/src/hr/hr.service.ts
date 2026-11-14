@@ -3,6 +3,7 @@ import { fromMinor, sumMinor } from '@oryx/shared';
 import type { Prisma } from '@oryx/database';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
+import { AttachmentsService, type UploadedFileLike } from '../attachments/attachments.service';
 import { AccountingPostingService, SYSTEM_ROLES } from '../common/accounting-posting.service';
 import { DocumentSequenceService, type Tx } from '../common/document-sequence.service';
 import { ErpContextService } from '../common/erp-context.service';
@@ -32,6 +33,7 @@ import type {
   SettleAdvanceDto,
   StartLifecycleDto,
   UpdateEmployeeDto,
+  UpdateLeaveRequestDto,
   CreateWorkSiteDto,
   UpdateWorkSiteDto,
   UpdateAttendancePolicyDto,
@@ -67,6 +69,7 @@ export class HrService {
     private readonly posting: AccountingPostingService,
     private readonly sequences: DocumentSequenceService,
     private readonly context: ErpContextService,
+    private readonly attachments: AttachmentsService,
   ) {}
 
   // ------------------------------------------------------------ departments
@@ -182,6 +185,7 @@ export class HrService {
           fullNameAr: dto.fullNameAr,
           email: dto.email ?? null,
           phone: dto.phone ?? null,
+          secondaryPhone: dto.secondaryPhone ?? null,
           nationalId: dto.nationalId ?? null,
           departmentId: dto.departmentId ?? null,
           jobTitleId: dto.jobTitleId ?? null,
@@ -226,6 +230,7 @@ export class HrService {
         ...(dto.fullNameAr !== undefined ? { fullNameAr: dto.fullNameAr } : {}),
         ...(dto.email !== undefined ? { email: dto.email } : {}),
         ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
+        ...(dto.secondaryPhone !== undefined ? { secondaryPhone: dto.secondaryPhone } : {}),
         ...(dto.departmentId !== undefined ? { departmentId: dto.departmentId } : {}),
         ...(dto.jobTitleId !== undefined ? { jobTitleId: dto.jobTitleId } : {}),
         ...(dto.branchId !== undefined ? { branchId: dto.branchId } : {}),
@@ -319,12 +324,56 @@ export class HrService {
       where: { companyId, employeeId, ...(canSeeConfidential ? {} : { isConfidential: false }) },
       orderBy: { createdAt: 'desc' },
     });
-    return { items: rows, total: rows.length, page: 1, pageSize: rows.length };
+    // Attach the stored-file metadata so the list can offer preview/download
+    // without a second round trip. The bytes never travel here — only the
+    // name, type and size of the file the record points at.
+    const assetIds = rows.map((r) => r.fileAssetId).filter((x): x is string => Boolean(x));
+    const assets = assetIds.length
+      ? await this.prisma.entityAttachment.findMany({ where: { companyId, id: { in: assetIds } } })
+      : [];
+    const byId = new Map(assets.map((a) => [a.id, a]));
+    return {
+      items: rows.map((r) => {
+        const asset = r.fileAssetId ? byId.get(r.fileAssetId) : undefined;
+        return {
+          ...r,
+          fileName: asset?.fileName ?? null,
+          mimeType: asset?.mimeType ?? null,
+          sizeBytes: asset?.sizeBytes ?? null,
+          hasFile: Boolean(asset),
+        };
+      }),
+      total: rows.length,
+      page: 1,
+      pageSize: rows.length,
+    };
   }
 
-  async createDocument(employeeId: string, dto: CreateDocumentDto, principal: RequestPrincipal, actor: ActorContext) {
+  /**
+   * Create an employee document, optionally with a real uploaded file.
+   *
+   * The binary goes through the shared attachment store (which validates the
+   * MIME type, enforces the size ceiling and writes an opaque server-named
+   * file); the document row keeps only the attachment id. A document may still
+   * be recorded with no file — a physical certificate that lives in a folder —
+   * in which case `fileRef` carries the free-text reference.
+   */
+  async createDocument(
+    employeeId: string,
+    dto: CreateDocumentDto,
+    file: UploadedFileLike | undefined,
+    principal: RequestPrincipal,
+    actor: ActorContext,
+  ) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     await this.assertEmployee(companyId, employeeId);
+
+    let fileAssetId: string | null = null;
+    if (file && file.size > 0) {
+      const asset = await this.attachments.upload('EMPLOYEE', employeeId, file, principal);
+      fileAssetId = asset.id;
+    }
+
     const doc = await this.prisma.employeeDocument.create({
       data: {
         companyId,
@@ -332,14 +381,55 @@ export class HrService {
         category: dto.category as never,
         title: dto.title,
         fileRef: dto.fileRef ?? null,
+        fileAssetId,
         issuedAt: dto.issuedAt ? new Date(dto.issuedAt) : null,
         expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
         isConfidential: dto.isConfidential ?? false,
         notes: dto.notes ?? null,
       },
     });
-    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.document_created', targetType: 'EMPLOYEE_DOCUMENT', targetId: doc.id, summary: `Added document ${doc.title} for employee` });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.document_created', targetType: 'EMPLOYEE_DOCUMENT', targetId: doc.id, summary: `Added document ${doc.title} for employee${fileAssetId ? ' (file attached)' : ''}` });
     return doc;
+  }
+
+  /**
+   * Resolve a document's stored file for streaming.
+   *
+   * The confidential flag is re-checked here, not only in the list: a caller
+   * who knows the document id must not be able to read a confidential file
+   * without the explicit permission, exactly as the list hides it.
+   */
+  async resolveDocumentFile(employeeId: string, documentId: string, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    await this.assertEmployee(companyId, employeeId);
+    const doc = await this.prisma.employeeDocument.findFirst({ where: { id: documentId, companyId, employeeId } });
+    if (!doc) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Employee document not found.');
+    if (doc.isConfidential && !principal.grantedPermissions.includes('erp.hr.document.confidential')) {
+      throw forbidden(ERROR_CODES.FORBIDDEN_PERMISSION, 'This document is confidential.');
+    }
+    if (!doc.fileAssetId) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'This document has no stored file.');
+    return this.attachments.resolveForDownload('EMPLOYEE', employeeId, doc.fileAssetId, principal);
+  }
+
+  /** A readable stream of a resolved document file. */
+  streamDocumentFile(path: string): ReturnType<AttachmentsService['stream']> {
+    return this.attachments.stream(path);
+  }
+
+  /** Remove an employee document and any file it stored. */
+  async deleteDocument(employeeId: string, documentId: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    await this.assertEmployee(companyId, employeeId);
+    const doc = await this.prisma.employeeDocument.findFirst({ where: { id: documentId, companyId, employeeId } });
+    if (!doc) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Employee document not found.');
+    await this.prisma.employeeDocument.delete({ where: { id: doc.id } });
+    if (doc.fileAssetId) {
+      // The attachment row and its bytes go with the document; a failure here
+      // must not resurrect the deleted record, so it is best-effort.
+      await this.attachments.remove('EMPLOYEE', employeeId, doc.fileAssetId, principal).catch(() => undefined);
+    }
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.document_deleted', targetType: 'EMPLOYEE_DOCUMENT', targetId: documentId, summary: `Deleted document ${doc.title}` });
+    return { deleted: true };
   }
 
   // -------------------------------------------------------------- lifecycle
@@ -512,6 +602,89 @@ export class HrService {
 
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.leave_requested', targetType: 'LEAVE_REQUEST', targetId: request.id, summary: `Leave requested for ${fromMinor(days, 2)} days` });
     return request;
+  }
+
+  /**
+   * Edit a pending leave request.
+   *
+   * Only a request that is still `SUBMITTED` may be edited: once a decision has
+   * moved days between pending and used, changing the dates would desynchronise
+   * the balance from the request. The days are recomputed and the balance
+   * adjusted by the difference, so the reservation stays exactly in step with
+   * the request. A leave-type change moves the reservation between balances.
+   */
+  async updateLeaveRequest(requestId: string, dto: UpdateLeaveRequestDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const result = await this.posting.withTransaction(async (tx) => {
+      const request = await tx.leaveRequest.findFirst({ where: { id: requestId, companyId } });
+      if (!request) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Leave request not found.');
+      if (request.status !== 'SUBMITTED') throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Only a submitted request can be edited.');
+
+      const leaveTypeId = dto.leaveTypeId ?? request.leaveTypeId;
+      const start = dto.startDate ? new Date(dto.startDate) : request.startDate;
+      const end = dto.endDate ? new Date(dto.endDate) : request.endDate;
+      if (end < start) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'End date must not precede the start date.');
+      const days = leaveDaysBetween(start, end);
+      const year = start.getUTCFullYear();
+
+      if (leaveTypeId !== request.leaveTypeId) {
+        const leaveType = await tx.leaveType.findFirst({ where: { id: leaveTypeId, companyId } });
+        if (!leaveType) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Leave type not found.');
+      }
+
+      // Release the old reservation before checking the new one, so an edit that
+      // keeps the same dates is never rejected against itself.
+      const oldBalance = await tx.leaveBalance.findUnique({
+        where: { employeeId_leaveTypeId_year: { employeeId: request.employeeId, leaveTypeId: request.leaveTypeId, year: request.startDate.getUTCFullYear() } },
+      });
+      if (oldBalance) {
+        await tx.leaveBalance.update({ where: { id: oldBalance.id }, data: { pendingDays: { decrement: request.days } } });
+      }
+
+      const overlap = await tx.leaveRequest.findFirst({
+        where: {
+          companyId,
+          employeeId: request.employeeId,
+          id: { not: request.id },
+          status: { in: ['SUBMITTED', 'APPROVED'] },
+          startDate: { lte: end },
+          endDate: { gte: start },
+        },
+      });
+      if (overlap) throw conflict(ERROR_CODES.LEAVE_OVERLAP, 'An overlapping leave request already exists.');
+
+      const leaveType = await tx.leaveType.findUniqueOrThrow({ where: { id: leaveTypeId } });
+      const balance = await tx.leaveBalance.upsert({
+        where: { employeeId_leaveTypeId_year: { employeeId: request.employeeId, leaveTypeId, year } },
+        create: {
+          companyId,
+          employeeId: request.employeeId,
+          leaveTypeId,
+          year,
+          entitledDays: leaveType.annualEntitlementDays,
+          accruedDays: leaveType.annualEntitlementDays,
+        },
+        update: {},
+      });
+      const available = balance.entitledDays + balance.accruedDays - balance.usedDays - balance.pendingDays;
+      if (days > available) {
+        throw forbidden(
+          ERROR_CODES.LEAVE_INSUFFICIENT_BALANCE,
+          `Insufficient leave balance: requested ${fromMinor(days, 2)} days, available ${fromMinor(available, 2)}.`,
+          { requested: days, available },
+        );
+      }
+
+      const updated = await tx.leaveRequest.update({
+        where: { id: request.id },
+        data: { leaveTypeId, startDate: start, endDate: end, days, reason: dto.reason ?? request.reason },
+      });
+      await tx.leaveBalance.update({ where: { id: balance.id }, data: { pendingDays: { increment: days } } });
+      return updated;
+    });
+
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.leave_updated', targetType: 'LEAVE_REQUEST', targetId: requestId, summary: 'Leave request edited' });
+    return result;
   }
 
   /** Approve or reject a pending request, moving days between pending and used. */
@@ -754,6 +927,15 @@ export class HrService {
     });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.worksite_updated', targetType: 'WORK_SITE', targetId: site.id, summary: `Updated work site ${site.code}` });
     return site;
+  }
+
+  async deleteWorkSite(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const existing = await this.prisma.workSite.findFirst({ where: { id, companyId } });
+    if (!existing) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Work site not found.');
+    await this.prisma.workSite.delete({ where: { id } });
+    await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.worksite_deleted', targetType: 'WORK_SITE', targetId: id, summary: `Deleted work site ${existing.code}` });
+    return { id, deleted: true };
   }
 
   /** The current rotating QR token for a worksite, for a kiosk display. */
@@ -1794,6 +1976,8 @@ function toEmployeeDto(e: {
   fullNameAr: string;
   email: string | null;
   phone: string | null;
+  secondaryPhone?: string | null;
+  terminationDate?: Date | null;
   status: string;
   hireDate: Date;
   departmentId: string | null;
@@ -1810,8 +1994,10 @@ function toEmployeeDto(e: {
     fullNameAr: e.fullNameAr,
     email: e.email,
     phone: e.phone,
+    secondaryPhone: e.secondaryPhone ?? null,
     status: e.status,
     hireDate: e.hireDate.toISOString(),
+    terminationDate: e.terminationDate ? e.terminationDate.toISOString() : null,
     departmentId: e.departmentId,
     departmentNameEn: e.department?.nameEn ?? null,
     departmentNameAr: e.department?.nameAr ?? null,

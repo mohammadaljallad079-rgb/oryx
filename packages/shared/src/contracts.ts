@@ -3,6 +3,7 @@ import type {
   IntegrationImplementation,
   IntegrationProviderState,
 } from './integrations';
+import type { InspectionTypeKey } from './inspection';
 import type { RoundingMode } from './money';
 
 /** Shared API contracts between the ORYX API and the admin app. */
@@ -18,6 +19,9 @@ export type SubscriptionStatus =
   | 'CANCELLED';
 export type BillingPeriod = 'MONTHLY' | 'ANNUAL';
 export type UserStatus = 'INVITED' | 'ACTIVE' | 'SUSPENDED' | 'DISABLED';
+/** UI text scale, persisted per user and applied at the document root. */
+export type FontScale = 'SM' | 'MD' | 'LG';
+export const FONT_SCALES: readonly FontScale[] = ['SM', 'MD', 'LG'];
 
 export interface ApiErrorBody {
   statusCode: number;
@@ -44,6 +48,7 @@ export interface SessionUser {
   kind: 'PLATFORM' | 'COMPANY';
   preferredLocale: 'ar' | 'en';
   preferredTheme: 'dark' | 'light';
+  preferredFontScale: FontScale;
   isSuperAdmin: boolean;
 }
 
@@ -303,6 +308,7 @@ export interface UserDto {
   isSuperAdmin: boolean;
   preferredLocale: 'ar' | 'en';
   preferredTheme: 'dark' | 'light';
+  preferredFontScale: FontScale;
   lastLoginAt: string | null;
   createdAt: string;
   memberships: MembershipSummary[];
@@ -1174,8 +1180,10 @@ export interface EmployeeDto {
   fullNameAr: string;
   email: string | null;
   phone: string | null;
+  secondaryPhone: string | null;
   status: string;
   hireDate: string;
+  terminationDate: string | null;
   departmentId: string | null;
   departmentNameEn: string | null;
   departmentNameAr: string | null;
@@ -1194,6 +1202,26 @@ export interface LeaveTypeDto {
   annualEntitlementDays: number;
   isPaid: boolean;
   requiresApproval: boolean;
+}
+
+/** An HR document record; `fileName`/`sizeBytes` describe the stored upload when present. */
+export interface EmployeeDocumentDto {
+  id: string;
+  employeeId: string;
+  category: string;
+  title: string;
+  fileRef: string | null;
+  fileAssetId: string | null;
+  issuedAt: string | null;
+  expiresAt: string | null;
+  isConfidential: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  hasFile: boolean;
+  fileName: string | null;
+  mimeType: string | null;
+  sizeBytes: number | null;
 }
 
 export interface LeaveRequestDto {
@@ -1530,9 +1558,14 @@ export interface InspectionServiceDto {
   code: string;
   nameEn: string;
   nameAr: string;
+  description: string | null;
   priceMinor: number;
   taxPercentBp: number;
   durationMinutes: number;
+  isActive: boolean;
+  /** Public media-library URL for the service picture, or null when none. */
+  imageUrl: string | null;
+  items: Array<{ id: string; code: string; labelEn: string; labelAr: string; category: string; sortOrder: number }>;
 }
 
 export interface InspectionBookingDto {
@@ -2121,6 +2154,8 @@ export interface InspectionSessionSummaryDto {
   plateNumber: string | null;
   vin: string;
   selectedAreas: InspectionAreaKey[];
+  /** The operator-facing inspection types the stored areas map back to. */
+  selectedTypes: InspectionTypeKey[];
   inspectorUserId: string | null;
   inspectedAt: string;
   createdAt: string;

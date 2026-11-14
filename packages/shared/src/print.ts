@@ -57,6 +57,21 @@ export interface PrintTotalsDto {
   total: string;
 }
 
+/**
+ * The verification block a printed document may carry.
+ *
+ * It is present only when the document has actually been issued, so the code on
+ * the sheet is the same token the public verification endpoint resolves. A
+ * document that was never issued prints no code rather than inventing one that
+ * would scan to nothing.
+ */
+export interface PrintVerificationDto {
+  /** The public verification URL the QR encodes. */
+  url: string;
+  /** The PNG data URI drawn on the sheet. */
+  qrDataUri: string;
+}
+
 export interface PrintDocumentDto {
   kind: PrintDocumentKind;
   /** Human-facing document number, e.g. SI-00001 or PMT-00001. */
@@ -79,5 +94,10 @@ export interface PrintDocumentDto {
   amountInWords: string;
   notes: string | null;
   currency: string;
+  /**
+   * The issued document's verification code, when the record has been issued.
+   * `null` for a record that has not been issued yet.
+   */
+  verification: PrintVerificationDto | null;
 }
 

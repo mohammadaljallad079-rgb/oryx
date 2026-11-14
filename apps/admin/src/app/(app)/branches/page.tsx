@@ -242,7 +242,7 @@ function EditBranchModal({
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ nameEn: '', nameAr: '', city: '', addressLine: '', phone: '' });
+  const [form, setForm] = useState({ nameEn: '', nameAr: '', city: '', countryCode: 'BH', addressLine: '', phone: '', timezone: 'Asia/Bahrain' });
 
   // Re-seed the form whenever a different branch is opened.
   useEffect(() => {
@@ -251,8 +251,10 @@ function EditBranchModal({
       nameEn: branch.nameEn,
       nameAr: branch.nameAr,
       city: branch.city ?? '',
+      countryCode: branch.countryCode ?? 'BH',
       addressLine: branch.addressLine ?? '',
       phone: branch.phone ?? '',
+      timezone: branch.timezone ?? 'Asia/Bahrain',
     });
     setError(null);
   }, [branch]);
@@ -266,8 +268,10 @@ function EditBranchModal({
         nameEn: form.nameEn,
         nameAr: form.nameAr,
         city: form.city || undefined,
+        countryCode: form.countryCode || undefined,
         addressLine: form.addressLine || undefined,
         phone: form.phone || undefined,
+        timezone: form.timezone || undefined,
       });
       await onSaved();
     } catch (err) {
@@ -348,6 +352,23 @@ function EditBranchModal({
             data-testid="edit-branch-address"
           />
         </Field>
+        <Field label={t('branches.country')}>
+          <input
+            className="oryx-input"
+            value={form.countryCode}
+            maxLength={2}
+            onChange={(e) => setForm({ ...form, countryCode: e.target.value.toUpperCase() })}
+            data-testid="edit-branch-country"
+          />
+        </Field>
+        <Field label={t('branches.timezone')}>
+          <input
+            className="oryx-input"
+            value={form.timezone}
+            onChange={(e) => setForm({ ...form, timezone: e.target.value })}
+            data-testid="edit-branch-timezone"
+          />
+        </Field>
       </div>
     </Modal>
   );
@@ -369,7 +390,8 @@ function CreateBranchModal({
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', city: '', phone: '' });
+  const emptyForm = { code: '', nameEn: '', nameAr: '', city: '', countryCode: 'BH', addressLine: '', phone: '', timezone: 'Asia/Bahrain' };
+  const [form, setForm] = useState(emptyForm);
 
   async function submit() {
     setBusy(true);
@@ -380,10 +402,13 @@ function CreateBranchModal({
         nameEn: form.nameEn,
         nameAr: form.nameAr,
         city: form.city || undefined,
+        countryCode: form.countryCode || undefined,
+        addressLine: form.addressLine || undefined,
         phone: form.phone || undefined,
+        timezone: form.timezone || undefined,
       });
       await onCreated();
-      setForm({ code: '', nameEn: '', nameAr: '', city: '', phone: '' });
+      setForm(emptyForm);
     } catch (err) {
       // Localise the failure so the plan-limit rejection reads naturally in
       // both Arabic and English rather than leaking the raw API message.
@@ -444,13 +469,6 @@ function CreateBranchModal({
             data-testid="branch-code"
           />
         </Field>
-        <Field label={t('common.city')}>
-          <input
-            className="oryx-input"
-            value={form.city}
-            onChange={(e) => setForm({ ...form, city: e.target.value })}
-          />
-        </Field>
         <Field label={`${t('common.name')} (EN)`} required>
           <input
             className="oryx-input"
@@ -465,6 +483,47 @@ function CreateBranchModal({
             value={form.nameAr}
             onChange={(e) => setForm({ ...form, nameAr: e.target.value })}
             data-testid="branch-name-ar"
+          />
+        </Field>
+        <Field label={t('common.city')}>
+          <input
+            className="oryx-input"
+            value={form.city}
+            onChange={(e) => setForm({ ...form, city: e.target.value })}
+            data-testid="branch-city"
+          />
+        </Field>
+        <Field label={t('branches.phone')}>
+          <input
+            className="oryx-input"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            data-testid="branch-phone"
+          />
+        </Field>
+        <Field label={t('branches.addressLine')}>
+          <input
+            className="oryx-input"
+            value={form.addressLine}
+            onChange={(e) => setForm({ ...form, addressLine: e.target.value })}
+            data-testid="branch-address"
+          />
+        </Field>
+        <Field label={t('branches.country')}>
+          <input
+            className="oryx-input"
+            value={form.countryCode}
+            maxLength={2}
+            onChange={(e) => setForm({ ...form, countryCode: e.target.value.toUpperCase() })}
+            data-testid="branch-country"
+          />
+        </Field>
+        <Field label={t('branches.timezone')}>
+          <input
+            className="oryx-input"
+            value={form.timezone}
+            onChange={(e) => setForm({ ...form, timezone: e.target.value })}
+            data-testid="branch-timezone"
           />
         </Field>
       </div>

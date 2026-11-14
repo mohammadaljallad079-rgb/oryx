@@ -148,4 +148,383 @@ describe('inspection report template — font independence', () => {
       }
     }
   });
+
+  it('prints the vehicle photograph as a full-width band on the cover', () => {
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload: { ...payload, vehiclePhotoDataUri: 'data:image/png;base64,AAAA' },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    // The approved cover prints the photograph as a bleeding band, not a thumbnail.
+    expect(html).toContain('vphoto--bleed');
+    expect(html).toContain('class="vphoto-img"');
+    expect(html).toContain('data:image/png;base64,AAAA');
+    // The vehicle information band spans the full content width, as in the
+    // reference, rather than sharing a row with the QR card.
+    expect(html).toContain('class="cover-info"');
+    expect(html).not.toContain('class="cover-grid"');
+  });
+
+  it('overlays the verification QR on the cover photograph band', () => {
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload: { ...payload, vehiclePhotoDataUri: 'data:image/png;base64,AAAA' },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: {
+        token: 'tok-1',
+        url: 'https://oryxbhr.com/verify/tok-1',
+        qrDataUri: 'data:image/png;base64,QRQR',
+      },
+      baseCss: '',
+    });
+    expect(html).toContain('class="cover-qr"');
+    expect(html).toContain('data:image/png;base64,QRQR');
+    expect(html).toContain('للتأكد من صحة التقرير');
+  });
+
+  it('prints the approved cover illustration when no photograph was attached', () => {
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload,
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    // With no attached photograph the approved sheet prints its own faint
+    // vehicle illustration in the band, not a text placeholder. The illustration
+    // is painted as a CSS background so it bleeds past the side margins without
+    // widening the document.
+    expect(html).toContain('class="vphoto-art"');
+    expect(html).toMatch(/class="vphoto-art" style="background-image:url\('data:image\/png;base64,/);
+    expect(html).not.toContain('class="vphoto-img"');
+    expect(html).not.toContain('No vehicle photograph attached');
+  });
+
+  it('anchors the interior fittings drawing to the physical left inside the cabin block', () => {
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload,
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    // The drawing is the approved artwork, painted out of flow behind the
+    // lower-left checklist. `left` (not `inset-inline-start`) is deliberate:
+    // this page is RTL, so the logical property would resolve to the right and
+    // the drawing would sit under the wrong column.
+    expect(html).toContain('class="interior-art"');
+    expect(html).toMatch(/class="interior-art"><img src="data:image\/png;base64,/);
+    expect(html).toMatch(/\.cabin\{\s*position:relative;/);
+    expect(html).toMatch(/\.interior-art\{\s*position:absolute;\s*left:0;/);
+    expect(html).not.toMatch(/\.interior-art\{[^}]*inset-inline-start/);
+  });
+
+  it('drops the interior drawing entirely when the cabin checklist is absent', () => {
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload: {
+        ...payload,
+        sections: payload.sections.filter((s) => s.area !== 'INTERIOR'),
+      },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    expect(html).not.toContain('class="interior-art"');
+  });
+
+  it('prints the approved wordmark alone when a logo is configured', () => {
+    const html = renderInspectionReportHtml({
+      issuer: { ...issuer, logoDataUri: 'data:image/png;base64,AAAA' },
+      payload,
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    // The wordmark already carries the company name, so the name stack beside it
+    // must not be printed — the approved header shows the mark only.
+    expect(html).toContain('class="rh-logo"');
+    expect(html).not.toContain('class="rh-name"');
+  });
+
+  it('draws the official ORYX logotype as vector art when no logo is configured', () => {
+    const html = renderInspectionReportHtml({
+      issuer: { ...issuer, logoDataUri: null },
+      payload,
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    // The official logotype, traced from the approved sheet, replaces the old
+    // monogram placeholder rather than inventing a brand mark.
+    expect(html).toContain('class="rh-logo-mark"');
+    expect(html).toContain('<path fill="#0a1f44"');
+    expect(html).not.toContain('class="rh-monogram"');
+  });
+});
+
+describe('inspection report template — reference page parity (Execution 19)', () => {
+  const render = (payloadOverride: Partial<InspectionReportPayload> = {}) =>
+    renderInspectionReportHtml({
+      issuer,
+      payload: { ...payload, ...payloadOverride },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+
+  it('centres the chassis drawing and distributes the eight region boxes around it', () => {
+    const html = render();
+    // The approved sheet places the eight boxes around a centred drawing, not in
+    // a two-column list beside it.
+    expect(html).toContain('class="ch-board"');
+    expect(html).toContain('class="ch-row ch-row-edge"');
+    expect(html).toContain('class="ch-row ch-row-mid"');
+    expect(html).toContain('class="ch-side"');
+    expect(html).toContain('class="ch-art"');
+    // The old side-list grid must be gone.
+    expect(html).not.toContain('class="chassis-wrap"');
+    expect(html).not.toContain('class="chassis-grid"');
+    expect(html).not.toContain('class="ch-region"');
+  });
+
+  it('lays the chassis boxes out physically (LTR) so left cards stay on the left in RTL', () => {
+    const html = render();
+    expect(html).toMatch(/\.ch-board\{[^}]*direction:ltr/);
+  });
+
+  it('prints the paint legend on one row in the reference order, with no marker table', () => {
+    const html = render();
+    expect(html).toContain('class="legend legend--row"');
+    // The reference order is sectioned, Change, Filler, Paint left to right.
+    const row = html.slice(html.indexOf('legend legend--row'));
+    const order = ['مقطوع', 'تبديل', 'معجون', 'صبغ'].map((w) => row.indexOf(w));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    // The invented marker table must not be printed.
+    expect(html).not.toContain('marker-table');
+  });
+
+  it('prints each paint condition as a navy chip with its colour swatch, per the reference', () => {
+    const html = render();
+    // The approved key is four navy chips carrying the label in white and the
+    // condition's own colour swatch (green/orange/red, cross on sectioned).
+    expect(html).toContain('class="legend-chip"');
+    expect(html).toContain('legend-chip-mark lm-green');
+    expect(html).toContain('legend-chip-mark lm-orange');
+    expect((html.match(/legend-chip-mark lm-red/g) ?? []).length).toBe(2);
+    // The reference prints four equal 107.9pt chips with a hairline border.
+    expect(html).toContain('width:107.9pt; background:var(--navy); border:0.5pt solid #000;');
+    expect(html).toContain('.legend--row{ justify-content:center; gap:12pt;');
+  });
+
+  it('prints the paint remarks box after the legend, as in the reference', () => {
+    const withRemarks: InspectionReportPayload = {
+      ...payload,
+      sections: payload.sections.map((s) =>
+        s.area === 'PAINT_BODY' ? { ...s, remarks: '• خط ملاحظة' } : s,
+      ),
+    };
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload: withRemarks,
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    const legendAt = html.indexOf('class="legend legend--row"');
+    const remarksAt = html.indexOf('class="sec-remarks"');
+    expect(legendAt).toBeGreaterThan(-1);
+    expect(remarksAt).toBeGreaterThan(legendAt);
+  });
+
+  it('overlays the ORYX watermark on the cover photograph band', () => {
+    const html = renderInspectionReportHtml({
+      issuer: { ...issuer, logoDataUri: 'data:image/png;base64,LOGO' },
+      payload: { ...payload, vehiclePhotoDataUri: 'data:image/png;base64,PHOTO' },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    expect(html).toContain('class="vphoto-mark"');
+    expect(html).toContain('data:image/png;base64,LOGO');
+    // The watermark is painted over the photograph inside the band.
+    const band = html.slice(html.indexOf('vphoto--bleed'), html.indexOf('</figure>'));
+    expect(band).toContain('vphoto-mark');
+    expect(band).toContain('vphoto-img');
+  });
+
+  it('spreads each bilingual title bar between the two physical edges, per the reference', () => {
+    const html = render();
+    // The approved sheet prints the Arabic title flush to the visual right and
+    // the English title flush to the visual left of the same full-width navy
+    // band. Packing both to the right (the old behaviour) moved every English
+    // label ~30-400pt away from its reference position, so the bars must push
+    // the two apart.
+    for (const sel of ['.cover-sec-title', '.remarks-title', '.grp-title', '.diagram-title']) {
+      const rule = html.slice(html.indexOf(`${sel}{`));
+      const body = rule.slice(0, rule.indexOf('}'));
+      expect(body).toContain('justify-content:space-between');
+    }
+  });
+
+  it('gives the checklist item column the reference proportion so results share the rest', () => {
+    const html = render();
+    // Measured from the approved sheet: the item column takes about a third of
+    // the checklist width and the three result columns split the remainder. The
+    // old 62%/12.66% split pushed the Pass/Fail columns far from the reference.
+    expect(html).toContain('.c-item{ width:33%; }');
+    expect(html).toMatch(/\.c-res\{ text-align:center; \}/);
+    expect(html).not.toContain('.c-item{ width:62%; }');
+  });
+
+  it('prints the AUTO SERVICES watermark on the cover page only', () => {
+    const html = render();
+    const marks = html.match(/class="rp-watermark"/g) ?? [];
+    expect(marks).toHaveLength(1);
+    // The single mark must sit inside the first page section, not the body.
+    const cover = html.slice(0, html.indexOf('</section>'));
+    expect(cover).toContain('rp-watermark');
+  });
+
+  it('sets the watermark in the brand display face at the measured reference size', () => {
+    const css = render();
+    expect(css).toContain("font-family:'ORYX Display'");
+    expect(css).toContain('font-size:51.747pt');
+    expect(css).toContain('letter-spacing:6.72pt');
+    // A low-opacity mark so the printed data stays legible on top of it.
+    expect(css).toMatch(/opacity:0\.10/);
+  });
+
+  it('sizes each page title to the measurement the approved sheet uses', () => {
+    const html = render();
+    // The cover and the paint/chassis pages carry the wide setting; the long
+    // interior/exterior heading drops a step, exactly as the reference prints
+    // it. The computer-unit page adds a second 8.7pt heading when that section
+    // is present, which this fixture does not include.
+    expect(html).toContain('--p-title-size:10.3pt');
+    expect(html).toContain('--p-title-size:10pt');
+    expect((html.match(/--p-title-size:8\.7pt/g) ?? []).length).toBe(1);
+    // The size is applied through the variable, so no rule pins a fixed size.
+    expect(html).toContain('font-size:var(--p-title-size,10.3pt)');
+  });
+
+  it('sets the Latin page titles in the brand display face, as the reference prints them', () => {
+    const html = render();
+    // The approved sheet sets the Latin title bars in the brand display face
+    // (Codec Pro Bold); its per-glyph advances match the reference to under
+    // 0.5pt, where the Verdana fallback is 1.5pt wide per glyph. The rule must
+    // therefore lead with the display face and keep a Latin fallback behind it.
+    expect(html).toMatch(
+      /\.p-title-en\{[^}]*font-family:'ORYX Display','ORYX Latin',Verdana/,
+    );
+    // The tagline and the header wordmark are display-face runs too.
+    expect(html).toMatch(/\.rh-tag-en\{[^}]*font-family:'ORYX Display'/);
+    expect(html).toMatch(/\.rh-wordmark-en\{[^}]*font-family:'ORYX Display'/);
+  });
+
+  it('applies the reference tracking to the section titles that carry it', () => {
+    const html = render();
+    // Measured from the reference: the paint/chassis headings are tracked
+    // -0.052em and the interior/computer headings -0.047em, which is what
+    // brings the run widths onto the reference's 136.0 / 179.9 / 113.5pt.
+    expect(html).toContain('--p-title-track:-0.052em');
+    expect(html).toContain('--p-title-track:-0.047em');
+    // The cover title carries no tracking (the reference prints it untracked).
+    expect(html).toMatch(/--p-title-size:10\.3pt;--p-title-track:0em/);
+    expect(html).toContain('letter-spacing:var(--p-title-track,0)');
+  });
+
+  it('centres each cover-card value and spreads its bilingual label, per the reference', () => {
+    const css = render();
+    // The approved cover centres every value in its cell (the short "37702020"
+    // and "2020" sit at the cell midpoint, not the left edge) and pushes the
+    // Latin label and the Arabic label to the two cell edges. Measured against
+    // the reference this brings each value within ~2pt of its printed x, where
+    // left alignment was 40-70pt out.
+    expect(css).toMatch(/\.vinfo td\{[^}]*text-align:center/);
+    expect(css).toMatch(/\.vlab\{[^}]*justify-content:space-between/);
+    // Column rules measured from the reference at x174.4 / 305.4 / 437.0 on a
+    // 545pt content width, so the first cell is wider than the three even ones.
+    expect(css).toMatch(/\.vinfo td:first-child\{ width:26\.8%/);
+    expect(css).toMatch(/\.vinfo td\{[^}]*width:24\.4%/);
+  });
+
+  it('sets the disclaimer and remarks body at the measured reference sizes', () => {
+    const html = render();
+    // The Arabic disclaimer column prints at 8pt and its English translation at
+    // 6pt (measured y566-660 of page 1); the remarks list at 6.6pt.
+    expect(html).toContain('.terms-ar{ margin:0; font-size:8pt;');
+    expect(html).toContain('.terms-en{ margin:0; font-size:6pt;');
+    expect(html).toContain('.remarks-list{ flex:1 1 0; margin:0; padding-inline-start:15px; font-size:6.6pt;');
+  });
+
+  it('prints the disclaimer heading as a full-width navy banner', () => {
+    const html = render();
+    // The approved sheet prints the heading as a navy banner with the English
+    // title on the physical left and the Arabic on the physical right, over two
+    // bordered columns.
+    expect(html).toContain('class="terms-banner"');
+    expect(html).toContain('terms-banner-en');
+    expect(html).toContain('terms-banner-ar');
+    expect(html).toMatch(/\.terms-banner\{ display:flex; direction:ltr;[^}]*background:#0f2b48; color:#fff;/);
+    expect(html).toContain('Terms, Conditions &amp; Liability Disclaimer');
+  });
+
+  it('does not print a verification QR inside the report body', () => {
+    const computerSection: InspectionReportSection = {
+      area: 'COMPUTER_UNIT',
+      labelEn: 'Computer Unit',
+      labelAr: 'وحدة الكمبيوتر',
+      kind: 'DIAGNOSTIC',
+      remarks: null,
+      remarksLabelEn: 'Remarks',
+      remarksLabelAr: 'ملاحظات',
+      noFindings: false,
+      items: [],
+      markers: [],
+      chassisRegions: [],
+      diagnostics: [],
+      attachments: [],
+    };
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload: { ...payload, selectedAreas: [...payload.selectedAreas, 'COMPUTER_UNIT'], sections: [...payload.sections, computerSection] },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: { url: 'https://oryxbhr.com/verify/tok-1', token: 'tok-1', qrDataUri: 'data:image/png;base64,QRQR' },
+      baseCss: '',
+    });
+    // The approved sheet carries the verification QR only on the cover
+    // photograph band, never as a block inside a section page. Assert the
+    // computer-unit sheet has no QR and that the cover is its only home.
+    const qrOccurrences = html.split('data:image/png;base64,QRQR').length - 1;
+    expect(qrOccurrences).toBe(1);
+    expect(html).toContain('class="cover-qr"');
+    expect(html).not.toContain('p5-verify');
+    expect(html).not.toContain('class="verify"');
+  });
 });

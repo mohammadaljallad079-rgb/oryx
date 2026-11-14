@@ -141,6 +141,28 @@ describe('official financial template — reference columns', () => {
     expect(html).toContain('of-line-sub">1 Years Warranty Car Battry (AMARON 55).</span>');
   });
 
+  it('never prints a line SKU under the description', () => {
+    // The approved reference sheet carries no SKU column and no SKU line, so a
+    // product code must not leak into the printed form even when the payload
+    // still carries one from the source record.
+    const html = render({
+      lines: [
+        {
+          description: 'Oil (Havoline 5w20)',
+          sku: 'AC-REFRIGERANT',
+          quantity: 10_000,
+          unitPriceMinor: 7_500,
+          discountMinor: 0,
+          taxMinor: 750,
+          lineTotalMinor: 8_250,
+          taxPercentBp: 1000,
+        },
+      ],
+    });
+    expect(html).not.toContain('AC-REFRIGERANT');
+    expect(html).not.toContain('of-line-sku');
+  });
+
   it('splits a legacy description that carries its note after a newline', () => {
     const html = render({
       lines: [
@@ -309,6 +331,15 @@ describe('official financial template — identity', () => {
     expect(html).toContain('<img class="of-logo"');
   });
 
+  it('draws the official ORYX logotype as vector art when no logo is uploaded', () => {
+    const html = render({}, { ...issuer, logoDataUri: null });
+    // Traced from the approved sheet, so it stays sharp and font-independent.
+    expect(html).toContain('class="of-logo-mark"');
+    expect(html).toContain('<svg');
+    expect(html).toContain('<path fill="#0a1f44"');
+    expect(html).not.toContain('<img class="of-logo"');
+  });
+
   it('escapes a customer name rather than emitting raw markup', () => {
     const html = render({
       counterparty: {
@@ -318,5 +349,43 @@ describe('official financial template — identity', () => {
     });
     expect(html).not.toContain('<script>alert(1)</script>');
     expect(html).toContain('&lt;script&gt;');
+  });
+});
+
+describe('official financial template — reference watermark parity (Execution 19)', () => {
+  it('prints the "AUTO SERVICES" wordmark exactly as the reference, not a logo', () => {
+    const html = render({}, { ...issuer, logoDataUri: 'data:image/png;base64,LOGO' });
+    expect(html).toContain('class="of-watermark" aria-hidden="true">AUTO SERVICES</div>');
+    // The reference prints a typed wordmark, not the issuer logo, so the mark
+    // must not depend on a configured logo image.
+    expect(html).not.toContain('class="of-watermark-img"');
+    expect(html).not.toContain('class="of-watermark-mark"');
+    expect(html).toMatch(/opacity:0\.10/);
+    // Measured off the reference: brand display face, 51.747pt, 6.72pt tracking.
+    expect(html).toContain('font-size:51.747pt');
+    expect(html).toContain('letter-spacing:6.72pt');
+  });
+
+  it('prints the same wordmark regardless of a configured tenant logo', () => {
+    const withLogo = render({}, { ...issuer, logoDataUri: 'data:image/png;base64,LOGO' });
+    const noLogo = render({}, { ...issuer, logoDataUri: null });
+    const extract = (h: string) => h.match(/<div class="of-watermark"[^>]*>[^<]*<\/div>/)![0];
+    expect(extract(withLogo)).toBe(extract(noLogo));
+  });
+
+  it('fixes the watermark so it repeats on every printed page', () => {
+    const html = render();
+    // The approved two-page invoice prints the watermark on both sheets; a
+    // `position:absolute` mark paints only on page one.
+    expect(html).toContain('.of-watermark{ position:fixed');
+    expect(html).not.toContain('.of-watermark{ position:absolute');
+  });
+
+  it('keeps the header badge inside the printable box so the sheet is not scaled', () => {
+    const html = render();
+    // A negative right offset made the page wider than the sheet, which made
+    // Chromium shrink the whole invoice and drift every measured size.
+    expect(html).toContain('.of-badge{ position:absolute; right:0; top:13pt');
+    expect(html).not.toContain('right:-8.6pt');
   });
 });
