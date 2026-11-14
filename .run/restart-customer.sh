@@ -10,7 +10,9 @@
 set -u
 
 PORT="${1:-3002}"
-ROOT=/workspace/project/oryx
+# Self-locating so a restart targets the checkout it was invoked from, not a
+# sibling checkout on another branch. `ORYX_ROOT` overrides it.
+ROOT="${ORYX_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 
 port_open() { (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null && exec 3>&- && return 0; return 1; }
 

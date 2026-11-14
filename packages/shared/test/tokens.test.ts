@@ -416,12 +416,13 @@ describe('the admin control plane shares the one theme contract', () => {
     expect(light['--gold-hover']).toBe(LIGHT_THEME.goldHover);
   });
 
-  it('keeps the navigation rail navy in both themes', () => {
-    // The brief asks for "navy navigation" in the light theme, and the approved
-    // dark reference already renders a navy rail. The rail is therefore the one
-    // surface that does not follow the page field: it must stay navy on ivory,
-    // carrying the on-dark lockup and the gold active marker. This guards the
-    // regression where the light theme painted an ivory sidebar.
+  it('themes the navigation rail: navy in dark, ivory in light', () => {
+    // Execution 20 requires the sidebar to switch with the theme, and the
+    // owner's directive forbids a fixed navy background in the light theme: the
+    // rail is the brand navy in the dark theme and an ivory field in the light
+    // theme, carrying the on-light (navy/gold) lockup. This supersedes the
+    // earlier "navy in both themes" rule. Whatever the field, each rail's ink
+    // must clear WCAG AA on that rail's own surface.
     const dark = readThemeBlock(ADMIN_CSS, 'dark');
     const light = readThemeBlock(ADMIN_CSS, 'light');
     for (const [name, block] of [
@@ -429,16 +430,27 @@ describe('the admin control plane shares the one theme contract', () => {
       ['light', light],
     ] as const) {
       expect(block['--nav-bg'], `${name} rail background`).toContain('linear-gradient');
-      // The rail ink must be a light neutral, not the page's dark charcoal.
+      // The rail is its own surface, never the page's ink.
       expect(block['--nav-text']).not.toBe(block['--text']);
-      expect(block['--nav-text-strong']).toBe('#ffffff');
+      expect(block['--nav-text-strong']).toBeDefined();
       expect(block['--nav-text-faint']).toBeDefined();
     }
-    // The light rail must not resolve to the ivory page field or its surface.
-    expect(light['--nav-bg']).not.toContain(LIGHT_THEME.background);
-    expect(light['--nav-bg']).not.toContain(LIGHT_THEME.surface);
-    // And the rail is a single navy field in both themes.
+    for (const [name, block] of [
+      ['dark', dark],
+      ['light', light],
+    ] as const) {
+      const field = block['--nav-solid'];
+      expect(contrast(block['--nav-text'], field), `${name} nav text`).toBeGreaterThanOrEqual(4.5);
+      expect(
+        contrast(block['--nav-text-strong'], field),
+        `${name} nav strong`,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+    // The dark rail is the brand navy; the light rail is the ivory page field,
+    // not a navy slab carried over from the dark theme.
     expect(dark['--nav-solid']).toBe('#0f2b48');
-    expect(light['--nav-solid']).toBe('#0f2b48');
+    expect(light['--nav-solid']).toBe(LIGHT_THEME.background);
+    expect(light['--nav-bg']).toContain(LIGHT_THEME.surface);
+    expect(light['--nav-bg']).not.toContain('#0f2b48');
   });
 });

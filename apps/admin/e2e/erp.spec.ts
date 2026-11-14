@@ -52,6 +52,8 @@ test.describe('Execution 02 — ERP core interfaces', () => {
   test('1. accounting chart of accounts loads real seeded accounts', async ({ page }) => {
     await page.goto('/accounting');
     await expect(page.getByTestId('accounting-page')).toBeVisible();
+    // The module opens on its dashboard; the chart of accounts is its own tab.
+    await page.getByTestId('accounting-tab-accounts').click();
     await expect(page.getByTestId('accounting-tab-accounts')).toBeVisible();
     // The seeded chart contains the AR control account.
     await expect(page.getByTestId('account-row-1100')).toBeVisible({ timeout: 20_000 });
@@ -67,19 +69,20 @@ test.describe('Execution 02 — ERP core interfaces', () => {
     await expect(page.getByTestId('journal-balanced')).toBeVisible();
 
     // Fill two lines with unequal sides: the indicator must read "not balanced"
-    // and the post button must stay disabled. The chart of accounts loads
-    // asynchronously, so wait for the select to carry its options before
-    // reading them; a plain `.all()` on a still-empty select is a race that
-    // passes against a warm API and fails against a cold one.
-    const accountSelect = page.getByTestId('journal-line-account-0');
-    await expect
-      .poll(async () => accountSelect.locator('option').count(), { timeout: 20_000 })
-      .toBeGreaterThanOrEqual(3);
-    const accountOptions = await accountSelect.locator('option').all();
-    const firstValue = await accountOptions[1].getAttribute('value');
-    const secondValue = await accountOptions[2].getAttribute('value');
-    await page.getByTestId('journal-line-account-0').selectOption(firstValue!);
-    await page.getByTestId('journal-line-account-1').selectOption(secondValue!);
+    // and the post button must stay disabled. Each account row is a searchable
+    // picker (with an inline create action), not a native select; the chart of
+    // accounts loads asynchronously, so wait for the options to appear before
+    // picking them — reading a still-empty list is a race that passes against a
+    // warm API and fails against a cold one.
+    const lineAccount = (i: number) => page.getByTestId(`journal-line-account-${i}`);
+    const pickAccount = async (i: number, index: number) => {
+      await lineAccount(i).locator('button').click();
+      const options = lineAccount(i).locator('[role="option"]');
+      await expect.poll(async () => options.count(), { timeout: 20_000 }).toBeGreaterThan(index);
+      await options.nth(index).click();
+    };
+    await pickAccount(0, 0);
+    await pickAccount(1, 1);
     await page.getByTestId('journal-line-debit-0').fill('100.00');
     await page.getByTestId('journal-line-credit-1').fill('99.00');
 
@@ -102,6 +105,8 @@ test.describe('Execution 02 — ERP core interfaces', () => {
   test('4. inventory valuation shows seeded stock', async ({ page }) => {
     await page.goto('/inventory');
     await expect(page.getByTestId('inventory-page')).toBeVisible();
+    // The module opens on its dashboard; valuation is its own tab.
+    await page.getByTestId('inventory-tab-valuation').click();
     await expect(page.getByTestId('valuation-row-OIL-5W30')).toBeVisible({ timeout: 20_000 });
 
     const valuation = await apiCall<{ totalValueMinor: number; rows: unknown[] }>(page, '/inventory/valuation');

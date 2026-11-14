@@ -52,7 +52,9 @@ test.describe('Execution 20 — module dashboards', () => {
 
   test('an unknown deep-link tab falls back to the default', async ({ page }) => {
     await page.goto('/accounting?tab=not-a-real-tab');
-    await expect(page.getByTestId('accounting-tab-accounts')).toHaveAttribute('aria-selected', 'true');
+    // The module's default tab is its dashboard; an unknown `?tab=` value must
+    // leave that selection untouched rather than blanking the page.
+    await expect(page.getByTestId('accounting-tab-dashboard')).toHaveAttribute('aria-selected', 'true');
   });
 
   test('the banner switches with the theme and keeps its artwork', async ({ page }) => {

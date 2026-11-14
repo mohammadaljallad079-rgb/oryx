@@ -205,6 +205,18 @@ export interface ModuleSummaryShortcut {
   permission: string;
 }
 
+/** A main functional area of the module, rendered as a card on its dashboard. */
+export interface ModuleSummaryFunction {
+  labelEn: string;
+  labelAr: string;
+  route: string;
+  icon: string;
+  permission: string;
+  /** Optional one-line description of what the area covers. */
+  descriptionEn?: string;
+  descriptionAr?: string;
+}
+
 export interface ModuleSummaryActivity {
   id: string;
   action: string;
@@ -234,6 +246,8 @@ export interface ModuleSummaryDto {
   isDemoData: boolean;
   stats: ModuleSummaryStat[];
   shortcuts: ModuleSummaryShortcut[];
+  /** The module's main functional areas, shown as cards beneath the shortcuts. */
+  functions: ModuleSummaryFunction[];
   activity: ModuleSummaryActivity[];
 }
 
