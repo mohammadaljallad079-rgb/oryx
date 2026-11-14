@@ -106,8 +106,10 @@ test.describe('Execution 21 — customer master data', () => {
     await page.getByTestId('customer-name-en').fill('Execution 21 Customer');
     await page.getByTestId('customer-name-ar').fill('عميل التنفيذ ٢١');
 
-    // Inline-create a lead source from inside the customer form.
-    await page.getByTestId('inline-create-source').click();
+    // Inline-create a lead source from inside the customer form: the "+ Add
+    // new" lives inside the source dropdown now.
+    await page.getByTestId('customer-source').locator('button').click();
+    await page.getByTestId('customer-source-create').click();
     await page.getByTestId('inline-create-code').fill(sourceCode);
     await page.getByTestId('inline-create-name-en').fill('Workshop Referral');
     await page.getByTestId('inline-create-name-ar').fill('إحالة ورشة');

@@ -2,7 +2,6 @@
 
 import { useState, type ReactNode } from 'react';
 import { useUi } from '@/lib/ui-context';
-import { Icon } from '@/components/icons';
 import {
   Button,
   ErrorBanner,
@@ -89,22 +88,25 @@ export function EntityPicker({
 }
 
 /**
- * A compact "+" that opens a small create dialog for a two-name catalogue
- * (code + English name + Arabic name) such as a lead source, department or
- * product category. It performs a real create through `onCreate` and hands the
- * new id back so the caller can select it.
+ * The create dialog for a two-name catalogue (code + English name + Arabic
+ * name) such as a lead source or department. Extracted so the same form backs
+ * both the compact `InlineCatalogButton` and an `EntityPicker`'s inline create.
  */
-export function InlineCatalogButton({
+export function CatalogModal({
+  open,
   label,
   onCreate,
-  testId,
+  onClose,
+  onSaved,
 }: {
+  open: boolean;
   label: string;
   onCreate: (code: string, nameEn: string, nameAr: string) => Promise<unknown>;
-  testId?: string;
+  onClose: () => void;
+  /** Report the created id so a picker can select the new record. */
+  onSaved?: (createdId: string) => void | Promise<void>;
 }) {
   const { t } = useUi();
-  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '' });
@@ -113,9 +115,12 @@ export function InlineCatalogButton({
     setBusy(true);
     setError(null);
     try {
-      await onCreate(form.code, form.nameEn, form.nameAr);
+      const created = (await onCreate(form.code, form.nameEn, form.nameAr)) as
+        | { id?: string }
+        | undefined;
       setForm({ code: '', nameEn: '', nameAr: '' });
-      setOpen(false);
+      await onSaved?.(created?.id ?? '');
+      onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
@@ -124,47 +129,37 @@ export function InlineCatalogButton({
   };
 
   return (
-    <>
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={() => setOpen(true)}
-        aria-label={`${t('common.create')} ${label}`}
-        data-testid={testId ?? 'inline-create'}
-      >
-        <Icon name="plus" size={15} />
-      </Button>
-      <Modal
-        open={open}
-        title={`${t('common.create')} — ${label}`}
-        onClose={() => setOpen(false)}
-        footer={
-          <>
-            <Button onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
-            <Button
-              variant="primary"
-              disabled={busy || !form.code || !form.nameEn || !form.nameAr}
-              onClick={submit}
-              data-testid="inline-create-save"
-            >
-              {busy ? t('common.loading') : t('common.save')}
-            </Button>
-          </>
-        }
-      >
-        {error ? <ErrorBanner message={error} /> : null}
-        <div className="grid gap-3">
-          <Field label={t('common.code')} required>
-            <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="inline-create-code" />
-          </Field>
-          <Field label={`${t('common.name')} (EN)`} required>
-            <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="inline-create-name-en" />
-          </Field>
-          <Field label={`${t('common.name')} (AR)`} required>
-            <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="inline-create-name-ar" />
-          </Field>
-        </div>
-      </Modal>
-    </>
+    <Modal
+      open={open}
+      title={`${t('common.create')} — ${label}`}
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            variant="primary"
+            disabled={busy || !form.code || !form.nameEn || !form.nameAr}
+            onClick={submit}
+            data-testid="inline-create-save"
+          >
+            {busy ? t('common.loading') : t('common.save')}
+          </Button>
+        </>
+      }
+    >
+      {error ? <ErrorBanner message={error} /> : null}
+      <div className="grid gap-3">
+        <Field label={t('common.code')} required>
+          <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="inline-create-code" />
+        </Field>
+        <Field label={`${t('common.name')} (EN)`} required>
+          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="inline-create-name-en" />
+        </Field>
+        <Field label={`${t('common.name')} (AR)`} required>
+          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="inline-create-name-ar" />
+        </Field>
+      </div>
+    </Modal>
   );
 }
+

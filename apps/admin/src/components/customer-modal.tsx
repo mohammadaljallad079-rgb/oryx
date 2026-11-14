@@ -5,13 +5,12 @@ import { api } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
 import { minorToInput, toMinorInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
-import { InlineCatalogButton, type EntityOption } from '@/components/inline-create';
+import { CatalogModal, EntityPicker, type EntityOption } from '@/components/inline-create';
 import {
   Button,
   ErrorBanner,
   Field,
   Modal,
-  SearchableSelect,
 } from '@/components/ui';
 import type { CustomerDto } from '@oryx/shared';
 
@@ -299,50 +298,46 @@ export function CustomerModal({
           </>
         )}
         <Field label={t('erp.sales.customerSource')} hint={t('erp.sales.customerSourceHint')}>
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
-              <SearchableSelect
-                value={form.sourceId}
-                options={sourceOptions}
-                onChange={(v) => setForm({ ...form, sourceId: v })}
-                placeholder={t('common.select')}
-                emptyLabel={t('common.none')}
-                testId="customer-source"
+          <EntityPicker
+            value={form.sourceId}
+            options={sourceOptions}
+            onChange={(v) => setForm((f) => ({ ...f, sourceId: v }))}
+            placeholder={t('common.select')}
+            emptyLabel={t('common.none')}
+            testId="customer-source"
+            createLabel={t('erp.sales.customerSource')}
+            reloadOptions={onCreatedSource}
+            renderCreate={({ onClose, onSaved }) => (
+              <CatalogModal
+                open
+                label={t('erp.sales.customerSource')}
+                onClose={onClose}
+                onCreate={(code, nameEn, nameAr) => api.createLeadSource({ code, nameEn, nameAr })}
+                onSaved={onSaved}
               />
-            </div>
-            <InlineCatalogButton
-              testId="inline-create-source"
-              label={t('erp.sales.customerSource')}
-              onCreate={async (code, nameEn, nameAr) => {
-                const created = await api.createLeadSource({ code, nameEn, nameAr });
-                await onCreatedSource?.();
-                setForm((f) => ({ ...f, sourceId: created.id }));
-              }}
-            />
-          </div>
+            )}
+          />
         </Field>
         <Field label={t('erp.sales.customerDepartment')} hint={t('erp.sales.customerDepartmentHint')}>
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
-              <SearchableSelect
-                value={form.departmentId}
-                options={departmentOptions}
-                onChange={(v) => setForm({ ...form, departmentId: v })}
-                placeholder={t('common.select')}
-                emptyLabel={t('common.none')}
-                testId="customer-department"
+          <EntityPicker
+            value={form.departmentId}
+            options={departmentOptions}
+            onChange={(v) => setForm((f) => ({ ...f, departmentId: v }))}
+            placeholder={t('common.select')}
+            emptyLabel={t('common.none')}
+            testId="customer-department"
+            createLabel={t('erp.sales.customerDepartment')}
+            reloadOptions={onCreatedDepartment}
+            renderCreate={({ onClose, onSaved }) => (
+              <CatalogModal
+                open
+                label={t('erp.sales.customerDepartment')}
+                onClose={onClose}
+                onCreate={(code, nameEn, nameAr) => api.createDepartment({ code, nameEn, nameAr })}
+                onSaved={onSaved}
               />
-            </div>
-            <InlineCatalogButton
-              testId="inline-create-department"
-              label={t('erp.sales.customerDepartment')}
-              onCreate={async (code, nameEn, nameAr) => {
-                const created = await api.createDepartment({ code, nameEn, nameAr });
-                await onCreatedDepartment?.();
-                setForm((f) => ({ ...f, departmentId: created.id }));
-              }}
-            />
-          </div>
+            )}
+          />
         </Field>
         <Field label={t('erp.sales.creditLimit')}>
           <input className="oryx-input" value={form.creditLimit} onChange={(e) => setForm({ ...form, creditLimit: e.target.value })} />
