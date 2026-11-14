@@ -258,16 +258,21 @@ export class DocumentsService {
     // The report prints its own footer band (the ORYX lockups with the closing
     // line) above the shared contact row; every other layout uses the financial
     // footer as-is.
-    const footerHtml =
-      layout === 'official'
+    // A Chromium footer template is a separate document, so it does not inherit
+    // the page's `@font-face` rules and would fall back to a host font (DejaVu).
+    // The faces are spliced in so the footer renders in the same embedded stack
+    // as the body, on any machine.
+    const footerFaces = `<style>${await this.renderer.baseStyles()}</style>`;
+    const footerHtml = footerFaces +
+      (layout === 'official'
         ? officialFooterTemplate(args.issuer)
-        : reportFooterTemplate(args.issuer, spec.verifiable ? verification.qrDataUri : undefined);
+        : reportFooterTemplate(args.issuer, spec.verifiable ? verification.qrDataUri : undefined));
     // The report's cover prints the signature-box band while its section pages
     // print only the compact lockup, so the cover footer is a second template
     // the renderer splices onto page one. Financial layouts paint one band on
     // every page and need no second pass.
     const coverFooterHtml =
-      layout === 'official' ? undefined : officialFooterTemplate(args.issuer);
+      layout === 'official' ? undefined : footerFaces + officialFooterTemplate(args.issuer);
     const { pdf, pageCount } = await this.renderer.render(html, {
       footerHtml,
       coverFooterHtml,

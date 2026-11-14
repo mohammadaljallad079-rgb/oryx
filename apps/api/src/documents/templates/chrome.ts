@@ -229,12 +229,12 @@ function brandBand(issuer: DocumentIssuer): string {
  */
 export function officialFooterTemplate(issuer: DocumentIssuer): string {
   const base = [
-    'font-family:Verdana,Arial,Helvetica,sans-serif',
+    "font-family:'ORYX Latin','ORYX Arabic','ORYX Sans',Verdana,Arial,sans-serif",
     'color:#64748b',
     '-webkit-print-color-adjust:exact',
   ].join(';');
   return `
-<div style="${base};width:100%;box-sizing:border-box;position:relative;top:11pt;">
+<div style="${base};width:100%;box-sizing:border-box;position:relative;top:14.8pt;">
   ${brandBand(issuer)}
   ${contactRow(issuer)}
 </div>`;
@@ -310,7 +310,7 @@ function contactRow(issuer: DocumentIssuer): string {
  */
 export function reportFooterTemplate(issuer: DocumentIssuer, qrDataUri?: string): string {
   const base = [
-    'font-family:Verdana,Arial,Helvetica,sans-serif',
+    "font-family:'ORYX Latin','ORYX Arabic','ORYX Sans',Verdana,Arial,sans-serif",
     'color:#64748b',
     '-webkit-print-color-adjust:exact',
   ].join(';');
@@ -333,7 +333,7 @@ export function reportFooterTemplate(issuer: DocumentIssuer, qrDataUri?: string)
   </div>`
     : '';
   return `
-<div style="${base};width:100%;box-sizing:border-box;position:relative;top:11pt;">
+<div style="${base};width:100%;box-sizing:border-box;position:relative;top:14.8pt;">
   <div style="padding:0 15.8pt;min-height:52pt;display:flex;align-items:flex-end;">
     <div style="flex:0 0 auto;margin-left:26pt;">${lockup}</div>
     ${verify ? `<div style="flex:0 0 auto;margin-left:17pt;">${verify}</div>` : ''}
@@ -368,7 +368,7 @@ export function footerTemplate(chrome: DocumentFooterInput): string {
     .join(' · ');
   const meta = [address, registration, contact].filter(Boolean).join('  ·  ');
   const style = [
-    'font-family:Verdana,Arial,Helvetica,sans-serif',
+    "font-family:'ORYX Latin','ORYX Arabic','ORYX Sans',Verdana,Arial,sans-serif",
     'font-size:8px',
     'color:#5b6472',
     'width:100%',

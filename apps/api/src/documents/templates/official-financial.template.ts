@@ -513,7 +513,7 @@ export const OFFICIAL_FINANCIAL_CSS = `
   /* The quality badge is anchored to the paper's right edge, so the tagline is
      inset to clear the disc — without this it ran under the badge (the reference
      stops the tagline at x553, leaving a 4pt gap before the disc at x557). */
-  .of-band-trail{ text-align:end; padding-inline-end:28pt; }
+  .of-band-trail{ text-align:end; padding-inline-end:27.8pt; }
   /* The reference stacks the official logotype (icon + three Arabic lines +
      the Latin AUTO SERVICES line) in a single left-hand lockup. */
   .of-lockup{ display:flex; align-items:center; gap:6pt; }
@@ -523,7 +523,7 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-wordmark-ar{ font-size:14.5pt; font-weight:700; color:#0a1f44; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
   .of-wordmark-en{ font-size:14.2pt; font-weight:700; color:#0a1f44; letter-spacing:.5px; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
   .of-tag-ar{ font-size:11.8pt; font-weight:700; color:#102749; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
-  .of-tag-en{ font-size:7.9pt; font-weight:700; color:#102749; letter-spacing:.4px; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
+  .of-tag-en{ font-size:7.9pt; font-weight:700; color:#102749; letter-spacing:0; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
   .of-title{ text-align:center; margin-top:15.3pt; }
   /* The reference sets the title and the document number in the brand display
      face (Codec Pro Bold); the Latin labels and figures stay in Verdana. */
@@ -550,7 +550,10 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-field{ margin-top:6pt; }
   /* The reference prints the date and the expiration date side by side in one
      row (invoice has only the date). */
-  .of-lgrid{ display:grid; grid-template-columns:1fr 1fr; gap:0 10pt; }
+  /* The reference starts the second field column at a fixed 114.5pt from the
+     first (measured Quotation Date x37.2, Expiration Date x161.7), not at an
+     equal split of the panel, so the first track is fixed. */
+  .of-lgrid{ display:grid; grid-template-columns:114.5pt 1fr; gap:0 10pt; }
   .of-field-label{ display:block; font-size:7.3pt; color:#64748b; font-weight:700; }
   .of-field-value{ display:block; font-size:8.8pt; color:#0f2b48; font-weight:700;
     white-space:nowrap; }
@@ -566,10 +569,10 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-cp-label{ font-size:7.3pt; color:#64748b; font-weight:700; text-align:end; }
   .of-cp-value{ font-size:8.8pt; color:#0f2b48; font-weight:700; }
   .of-addr-line{ display:block; line-height:1.6; }
-  .of-table{ margin-top:1pt; table-layout:fixed; }
+  .of-table{ margin-top:0; table-layout:fixed; }
   /* The approved quotation sheet leaves a wider gap between the info panel
      and the table than the invoice does (measured 31pt vs 17.5pt). */
-  .of-table-quote{ margin-top:18.4pt; }
+  .of-table-quote{ margin-top:13.9pt; }
   .of-table th{ font-size:8.8pt; font-weight:700; color:#0f2b48; text-align:start;
     padding:10pt 7pt; background:transparent; white-space:nowrap;
     border-top:1.5px solid #94a3b8; border-bottom:1.5px solid #94a3b8; }
@@ -583,13 +586,15 @@ export const OFFICIAL_FINANCIAL_CSS = `
     vertical-align:middle; }
   /* The reference insets the description column a little further than the
      numeric columns, so its text starts at x≈37.5 rather than the cell edge. */
-  .of-table th.of-c-desc,.of-table td.of-c-desc{ padding-inline-start:10pt; }
+  .of-table th.of-c-desc,.of-table td.of-c-desc{ padding-inline-start:13pt; }
   .of-table td.of-c-price,.of-table td.of-c-amt{ white-space:nowrap; }
   /* The reference right-aligns the unit-price and amount figures a little inside
      the column edge (measured price x414.6, amount x519.1); the default cell
      padding pushed them ~8-10pt right. */
-  .of-table td.of-c-price{ padding-inline-end:17pt; }
-  .of-table td.of-c-amt{ padding-inline-end:15pt; }
+  .of-table td.of-c-price,.of-table th.of-c-price{ padding-right:15.8pt; }
+  /* The reference insets the tax and amount figures a touch further left than
+     their column header, so the body cells carry a smaller start inset. */
+  .of-table td.of-c-tax,.of-table td.of-c-amt{ padding-left:1.5pt; }
   /* The approved sheet prints the tax label on one line inside a body row
      ("VAT 10%"); without this it wraps and the row doubles in height. */
   .of-table td.of-c-tax{ white-space:nowrap; }
@@ -600,17 +605,17 @@ export const OFFICIAL_FINANCIAL_CSS = `
      columns are close to equal. Matching them keeps every label and figure on
      the same x-position the printed document uses. */
   .of-c-desc{ width:58.2%; }
-  .of-c-qty{ width:9.49%; text-align:center !important; }
-  .of-c-price{ width:11.58%; text-align:end !important; }
-  .of-c-tax{ width:11.03%; text-align:start !important; }
-  .of-c-amt{ width:9.7%; text-align:end !important; }
+  .of-c-qty{ width:9.58%; text-align:center !important; }
+  .of-c-price{ width:11.58%; text-align:right !important; }
+  .of-c-tax{ width:10.64%; text-align:left !important; }
+  .of-c-amt{ width:10.0%; text-align:left !important; }
   .of-line-name{ display:block; }
   /* The line's note prints on its own line under the name, smaller and lighter,
      exactly as the approved sheet prints a product's warranty note. */
-  .of-line-sub{ display:block; font-size:7.5pt; color:#64748b; font-weight:400; }
+  .of-line-sub{ display:block; font-size:7.3pt; color:#64748b; font-weight:400; }
   /* The reference totals block is a right-aligned table with only two rules:
      one above the first row and one above the grand Total. */
-  .of-totals{ width:59.6%; margin-inline-start:auto; margin-top:6pt;
+  .of-totals{ width:59.6%; margin-inline-start:auto; margin-top:8pt;
     border-top:0.75px solid #0f2b48; }
   .of-totals th{ font-size:8.8pt; font-weight:700; color:#0f2b48; text-align:start;
     padding:3.5pt 9pt; }
@@ -619,8 +624,8 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-total-grand th,.of-total-grand td{ border-top:0.75px solid #0f2b48; }
   /* The approved reference prints the note as a bordered box with no heading,
      so the box height is exactly the note text and its padding. */
-  .of-notes{ margin-top:9pt; border:1px solid #c2c9d5; padding:7pt 10pt; }
-  .of-notes-body{ font-size:9pt; color:#334155; }
+  .of-notes{ margin-top:27.7pt; border:1px solid #c2c9d5; padding:7pt 12.3pt; }
+  .of-notes-body{ font-size:8.8pt; color:#334155; }
   /* The verification strip: a compact ruled box above the signature strip. It is
      deliberately restrained so it reads as a security footnote and never
      competes with the priced table or the approved identity band. */
