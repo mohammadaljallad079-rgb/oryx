@@ -825,6 +825,75 @@ function DetailRow({ label, value }: { label: string; value: string | null | und
   );
 }
 
+/** One priced line as the API stores it inside a sales document. */
+type SalesLine = {
+  description?: string;
+  quantity?: number;
+  unitPriceMinor?: number;
+  discountPercentBp?: number;
+  taxPercentBp?: number;
+  lineTotalMinor?: number;
+};
+
+/**
+ * The read-only pricing breakdown of an issued invoice: every line with its own
+ * quantity, unit price, discount, VAT rate and line total, then the document
+ * totals. Every figure is a stored integer rendered through `money`, so the
+ * panel and the printed PDF read the same numbers and can never disagree.
+ */
+function InvoiceLineBreakdown({ document: doc }: { document: SalesDocumentDto }) {
+  const { t } = useUi();
+  const lines = (doc.lines ?? []) as SalesLine[];
+  const currency = doc.currency;
+  return (
+    <div className="flex flex-col gap-3" data-testid="invoice-line-details">
+      <p className="oryx-panel-title m-0">{t('erp.sales.lineDetails')}</p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[12.5px]">
+          <thead>
+            <tr className="text-[11px] uppercase text-[var(--muted)]">
+              <th className="py-1 text-start font-semibold">{t('erp.sales.form.description')}</th>
+              <th className="py-1 text-end font-semibold">{t('erp.sales.form.quantity')}</th>
+              <th className="py-1 text-end font-semibold">{t('erp.sales.form.unitPrice')}</th>
+              <th className="py-1 text-end font-semibold">{t('erp.sales.discount')}</th>
+              <th className="py-1 text-end font-semibold">{t('erp.sales.form.tax')}</th>
+              <th className="py-1 text-end font-semibold">{t('erp.sales.form.amount')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map((line, i) => (
+              <tr key={i} className="border-t border-[var(--border)]" data-testid={`invoice-line-${i}`}>
+                <td className="py-1.5 text-start">{line.description || '—'}</td>
+                <td className="py-1.5 text-end tabular-nums">{qty(line.quantity)}</td>
+                <td className="py-1.5 text-end tabular-nums">{money(line.unitPriceMinor, currency)}</td>
+                <td className="py-1.5 text-end tabular-nums">{((line.discountPercentBp ?? 0) / 100).toFixed(2)}%</td>
+                <td className="py-1.5 text-end tabular-nums">{((line.taxPercentBp ?? 0) / 100).toFixed(2)}%</td>
+                <td className="py-1.5 text-end tabular-nums font-semibold">{money(line.lineTotalMinor, currency)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <dl className="ms-auto grid w-full max-w-xs grid-cols-2 gap-x-6 gap-y-1 text-[12.5px]" data-testid="invoice-totals">
+        <dt className="oryx-muted">{t('erp.sales.form.untaxedAmount')}</dt>
+        <dd className="m-0 text-end tabular-nums font-semibold">{money(doc.subtotalMinor, currency)}</dd>
+        <dt className="oryx-muted">{t('erp.sales.form.discount')}</dt>
+        <dd className="m-0 text-end tabular-nums font-semibold">{money(doc.discountMinor, currency)}</dd>
+        <dt className="oryx-muted">{t('erp.sales.form.tax')}</dt>
+        <dd className="m-0 text-end tabular-nums font-semibold">{money(doc.taxMinor, currency)}</dd>
+        {doc.roundingMinor !== 0 ? (
+          <>
+            <dt className="oryx-muted">{t('erp.sales.rounding')}</dt>
+            <dd className="m-0 text-end tabular-nums font-semibold">{money(doc.roundingMinor, currency)}</dd>
+          </>
+        ) : null}
+        <dt className="font-semibold text-[var(--text)]">{t('erp.sales.form.total')}</dt>
+        <dd className="m-0 text-end tabular-nums text-[13.5px] font-bold text-[var(--text)]">{money(doc.totalMinor, currency)}</dd>
+      </dl>
+    </div>
+  );
+}
+
 // ------------------------------------------------------------------ invoices
 
 function InvoicesTab({ canManage }: { canManage: boolean }) {
@@ -1002,6 +1071,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
               <span className="text-[13px] font-semibold">{detail.customerNameEn}</span>
               <DocumentPrintActions kind="SALES_INVOICE" id={detail.id} />
             </div>
+            <InvoiceLineBreakdown document={detail} />
             <AttachmentsPanel entityType="SALES_INVOICE" entityId={detail.id} canManage={canManage} />
           </div>
         ) : null}

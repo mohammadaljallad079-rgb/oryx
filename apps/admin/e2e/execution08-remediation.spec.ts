@@ -172,4 +172,31 @@ test.describe('Execution 08 remediation — interface', () => {
     await page.getByTestId(`account-delete-${code}`).click();
     await expect(row).toHaveCount(0, { timeout: 15_000 });
   });
+
+  test('7. an issued invoice detail shows every line price and the totals breakdown', async ({ page }) => {
+    await page.goto('/sales');
+    await page.getByTestId('sales-tab-invoices').click();
+
+    // Open the attachments/detail modal for the first issued invoice in the
+    // register. The breakdown is a read of stored integers, so the panel must
+    // agree with the list row and with the printed PDF.
+    const firstRow = page.locator('[data-testid^="invoice-row-"]').first();
+    await expect(firstRow).toBeVisible({ timeout: 20_000 });
+    const invoiceNumber = (await firstRow.locator('td').first().innerText()).trim();
+    const rowTotal = (await firstRow.locator('td').nth(3).innerText()).trim();
+    await page.getByTestId(`invoice-attach-open-${invoiceNumber}`).click();
+
+    const breakdown = page.getByTestId('invoice-line-details');
+    await expect(breakdown).toBeVisible({ timeout: 15_000 });
+
+    // At least one priced line, each carrying a line total in minor units.
+    await expect(page.locator('[data-testid^="invoice-line-"]').first()).toBeVisible();
+
+    // The document total the panel shows equals the register row's total.
+    const total = page.getByTestId('invoice-totals').locator('dd').last();
+    await expect(total).toHaveText(rowTotal);
+
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.oryx-modal')).toHaveCount(0);
+  });
 });

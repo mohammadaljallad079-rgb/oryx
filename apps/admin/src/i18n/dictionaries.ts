@@ -1210,6 +1210,8 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     'erp.sales.total': 'Total',
     'erp.sales.rounding': 'Rounding',
     'erp.sales.discount': 'Discount %',
+    'erp.sales.lineDetails': 'Line details',
+    'erp.sales.lineNumber': 'Line',
     // The document form mirrors the printed official document, so its sections
     // and columns carry the same names the PDF prints.
     'erp.sales.form.documentInfo': 'Document information',
@@ -3039,6 +3041,8 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     'erp.sales.total': 'الإجمالي',
     'erp.sales.rounding': 'التقريب',
     'erp.sales.discount': 'الخصم %',
+    'erp.sales.lineDetails': 'تفاصيل البنود',
+    'erp.sales.lineNumber': 'البند',
     // The document form mirrors the printed official document, so its sections
     // and columns carry the same names the PDF prints.
     'erp.sales.form.documentInfo': 'بيانات المستند',
