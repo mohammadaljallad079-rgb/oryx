@@ -1182,6 +1182,23 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   (`--font-size-*`, `--oryx-heading-weight`, `--oryx-label-tracking`); every
   component derives from those tokens. Changing the section in the settings
   centre calls `refreshTypography()` so the shell updates without a reload.
+- **Inline-create pickers must write state functionally.** `EntityPicker`'s
+  inline "add new" opens the *same* modal the standalone screen uses and
+  selects the saved record in the form underneath. Every field handler in
+  `entity-modals.tsx` must use `setForm((prev) => ({ ...prev, X }))`, never
+  `setForm({ ...form, X })`: the mount effect writes the parent's preselected
+  id, and a stale-closure handler that captured the pre-effect `form` clobbers
+  it on the first keystroke (the vehicle modal resetting `customerId` to `''`
+  was the visible symptom). A reduced copy of the form is not acceptable either
+  — the popup runs the same validation, permissions and API call.
+- **A searchable picker's options sit inside the `Field` label.** The label
+  re-dispatches a click to its trigger, so `SearchableSelect` calls
+  `preventDefault()` on the option and the create/clear buttons; without it the
+  popover the pick just closed reopens instantly.
+- **Every module now opens on its dashboard tab.** Specs that used to land
+  straight on a list must click the tab that carries the widget first
+  (`accounting-tab-accounts`, `inventory-tab-valuation`, `payments-tab-intents`,
+  …); the module-dashboards work made `dashboard` the default for each.
 
 ### Adding a new ERP module
 
