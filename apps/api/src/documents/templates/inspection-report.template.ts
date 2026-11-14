@@ -751,7 +751,7 @@ export const INSPECTION_REPORT_CSS = `
      header and footer run to x15) and drops it ~7.4pt below the section title
      (banner top y111.1 of the reference). */
   .cover-info{ width:100%; padding:0 9.5pt; margin-top:7.4pt; }
-  .cover-sec-title{ background:var(--navy); color:#fff; font-size:9.5pt; font-weight:700; padding:2.2px 10px; border-radius:5px 5px 0 0; }
+  .cover-sec-title{ display:flex; align-items:baseline; justify-content:space-between; background:var(--navy); color:#fff; font-size:9.5pt; font-weight:700; padding:2.2px 10px; border-radius:5px 5px 0 0; }
   .cover-sec-title .ltr{ margin-inline-start:8px; color:var(--gold-soft); font-size:8pt; font-weight:400; }
   .vinfo{ width:100%; border:1px solid var(--line); border-top:none; border-collapse:collapse; direction:ltr; table-layout:fixed; }
   /* The approved cover gives the first column the extra width its longest value
@@ -829,7 +829,7 @@ export const INSPECTION_REPORT_CSS = `
   .terms-ar{ margin:0; font-size:8pt; line-height:1.2; color:var(--ink); }
   .terms-en{ margin:0; font-size:6pt; line-height:1.2; color:var(--muted); text-align:left; }
   .remarks-block{ margin-top:9px; border:1px solid var(--line); border-radius:6px; padding:5px 10px; }
-  .remarks-title{ font-size:10pt; font-weight:700; color:var(--navy); margin-bottom:4px; }
+  .remarks-title{ display:flex; align-items:baseline; justify-content:space-between; font-size:10pt; font-weight:700; color:var(--navy); margin-bottom:4px; }
   .remarks-title .ltr{ margin-inline-start:8px; font-size:8.3pt; color:var(--muted); font-weight:400; }
   .remarks-cols{ display:flex; gap:14px; }
   .remarks-list{ flex:1 1 0; margin:0; padding-inline-start:15px; font-size:6.6pt; line-height:1.22; color:var(--ink); }
@@ -839,8 +839,11 @@ export const INSPECTION_REPORT_CSS = `
   /* The reference paints each checklist heading as a flat bar in the softer
    * identity navy (#1b375a) with white text, no radius, and a hairline underline
    * (measured y161-186 on page 4). */
-  .grp-title{ display:flex; align-items:baseline; flex-wrap:wrap; background:#1b375a; color:#fff;
-    font-size:9pt; font-weight:700; padding:3px 9px; border-radius:0; }
+  /* The approved bar prints the Arabic title flush to the visual right and the
+   * English title flush to the visual left of the same full-width navy band, so
+   * the two are pushed apart rather than packed together. */
+  .grp-title{ display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap;
+    background:#1b375a; color:#fff; font-size:9pt; font-weight:700; padding:3px 9px; border-radius:0; }
   .grp-title .ltr{ margin-inline-start:7px; font-size:7.6pt; color:#cbd5e1; font-weight:400; }
   .grp-legend{ margin-inline-start:auto; display:flex; gap:2px; }
   .grp-legend .lg-chip{ color:#fff; font-size:7pt; }
@@ -873,8 +876,8 @@ export const INSPECTION_REPORT_CSS = `
   .items thead th.c-item .ltr{ display:inline; margin-inline-start:6px; }
   .items th:last-child,.items td:last-child{ border-inline-end:none; }
   .items tr:last-child td{ border-bottom:none; }
-  .c-item{ width:62%; }
-  .c-res{ width:12.66%; text-align:center; }
+  .c-item{ width:33%; }
+  .c-res{ text-align:center; }
   .item-ar{ display:block; font-size:7.1pt; line-height:1.04; color:var(--ink); }
   .item-en{ display:block; font-size:5.9pt; line-height:1.04; color:var(--muted); }
   .rm{ display:inline-flex; align-items:center; justify-content:center; font-size:7pt; font-weight:700; }
@@ -893,7 +896,7 @@ export const INSPECTION_REPORT_CSS = `
   .diagram-block,.chassis-block,.diag-block{ margin-top:8px; }
   /* The reference paints each diagram heading as a full-width bar in the softer
    * identity navy with white text (measured y144-160 of page 2). */
-  .diagram-title{ display:flex; align-items:baseline; background:#1b375a; color:#fff;
+  .diagram-title{ display:flex; align-items:baseline; justify-content:space-between; background:#1b375a; color:#fff;
     font-size:9pt; font-weight:700; padding:3px 9px; margin-bottom:6px; }
   .diagram-title .ltr{ margin-inline-start:7px; font-size:7.6pt; color:#cbd5e1; font-weight:400; }
   /* The approved form prints the body-panel scheme at its full size, centred,
