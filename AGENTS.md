@@ -317,6 +317,20 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   admin, 12001 → customer, with a `/mobile` route). It needs no nginx and no
   re-seed — the seeded cluster is preserved. Playwright still needs
   `playwright install chromium` once more after a recycle.
+- **The mobile export is not committed and must be built after a clean checkout.**
+  `serve-mobile-web.mjs` serves `apps/mobile/dist/web`, which a fresh checkout does
+  not have, so port 8081 answers 500. Build it once:
+  `cd apps/mobile && EXPO_BASE_PATH=/mobile EXPO_PUBLIC_API_BASE_URL=/api \
+  node ../../node_modules/.bin/expo export --platform web --output-dir dist/web`.
+  This needs `apps/mobile/node_modules` (the workspace link to `@oryx/shared`), so
+  run `pnpm install --filter @oryx/mobile...` first on a checkout that skipped it.
+- **`CORS_ORIGINS` is the login-CSRF origin allowlist.** The browser suite's
+  documented `ORYX_ADMIN_URL=http://localhost:12000` only signs in when the proxy
+  origins are listed; otherwise login answers `403 auth.csrf_token_invalid`
+  ("Request origin is not allowed") while a `curl` login still passes — curl sends
+  no `Origin` header. `.env.example` lists the localhost and 127.0.0.1 proxy
+  origins; add the public `https://work-1-<id>…` hosts in `.env` for the owner's
+  browser.
 - **`ss`, `netstat` and `lsof` are not installed.** Readiness checks must not use
   them, or a healthy stack reports every port as closed. `start-stack.sh` uses a
   bash `/dev/tcp` probe (`port_open`) instead, which needs no external binary.
