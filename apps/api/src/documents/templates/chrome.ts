@@ -234,7 +234,7 @@ export function officialFooterTemplate(issuer: DocumentIssuer): string {
     '-webkit-print-color-adjust:exact',
   ].join(';');
   return `
-<div style="${base};width:100%;box-sizing:border-box;position:relative;top:4pt;">
+<div style="${base};width:100%;box-sizing:border-box;position:relative;top:11pt;">
   ${brandBand(issuer)}
   ${contactRow(issuer)}
 </div>`;
@@ -267,13 +267,22 @@ function contactRow(issuer: DocumentIssuer): string {
   const address = [issuer.addressLine, issuer.city].filter(Boolean).join(' - ');
   const registration = issuer.crNumber ? `CR ${esc(issuer.crNumber)}` : '';
   const addressLine = [address, registration].filter(Boolean).join(' | ');
-  const contact = 'font-size:7.2pt;font-weight:700;color:#475569';
+  const contact = 'font-size:7.2pt;font-weight:700;color:#475569;white-space:nowrap;';
+  // The approved sheet prints the phone, email and website as three separate
+  // figures on one line (measured x 294 / 380 / 483 of a 595pt page), not the
+  // phone+email pair the first revision grouped with the website pushed to the
+  // far edge. They are laid out as one right-hand group so the spacing follows
+  // the reference rather than being spread by `space-between`.
+  const item = (html: string, gap: string) =>
+    html ? `<span style="${contact}${gap}">${html}</span>` : '';
   return `
   <div style="border-top:0.75px solid #94a3b8;margin:10px 15.8pt 0 13.7pt;"></div>
-  <div style="padding:0 13.3mm 0 15mm;display:flex;justify-content:space-between;align-items:baseline;font-size:6.5pt;font-weight:700;">
-    <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span> &bull; <span style="direction:rtl;unicode-bidi:embed;display:inline-block;">صفحة <span class="pageNumber"></span> من <span class="totalPages"></span></span></span>
-    <span style="${contact}">${phone}${phone && email ? ' &nbsp; ' : ''}${email}</span>
-    <span style="${contact}">${website}</span>
+  <div style="padding:0 13.3mm 0 15mm;display:flex;align-items:baseline;font-size:6.5pt;font-weight:700;">
+    <span style="flex:0 0 auto;position:relative;top:-5pt;">Page <span class="pageNumber"></span> of <span class="totalPages"></span> &bull; <span style="direction:rtl;unicode-bidi:embed;display:inline-block;">صفحة <span class="pageNumber"></span> من <span class="totalPages"></span></span></span>
+    <span style="flex:1 1 auto;"></span>
+    <span style="flex:0 0 auto;display:flex;align-items:baseline;">
+      ${item(phone, '')}${item(email, 'margin-inline-start:14pt;')}${item(website, 'margin-inline-start:6pt;')}
+    </span>
   </div>
   ${
     addressLine

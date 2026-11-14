@@ -282,13 +282,13 @@ function infoPanel(
       <div class="of-lgrid">
         <div class="of-field">
           <span class="of-field-label">${esc(dateLabel)}</span>
-          <span class="of-field-value num">${esc(docStamp(payload.documentDate))}</span>
+          <span class="of-field-value of-date num">${esc(docStamp(payload.documentDate))}</span>
         </div>
         ${
           isQuotation && payload.dueDate
             ? `<div class="of-field">
                  <span class="of-field-label">Expiration Date</span>
-                 <span class="of-field-value num">${esc(docStamp(payload.dueDate))}</span>
+                 <span class="of-field-value of-date num">${esc(docStamp(payload.dueDate))}</span>
                </div>`
             : ''
         }
@@ -520,16 +520,15 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-logo-mark{ display:block; width:auto; }
   .of-wordmark{ display:flex; flex-direction:column; line-height:1.0; }
   .of-logo{ height:44.5pt; width:auto; }
-  .of-wordmark-ar{ font-size:14.5pt; font-weight:700; color:#0a1f44; }
-  .of-wordmark-en{ font-size:14.2pt; font-weight:700; color:#0a1f44; letter-spacing:.5px; }
-  .of-tag-ar{ font-size:11.8pt; font-weight:700; color:#102749; }
-  .of-tag-en{ font-size:7.9pt; font-weight:700; color:#102749; letter-spacing:.4px; }
+  .of-wordmark-ar{ font-size:14.5pt; font-weight:700; color:#0a1f44; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
+  .of-wordmark-en{ font-size:14.2pt; font-weight:700; color:#0a1f44; letter-spacing:.5px; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
+  .of-tag-ar{ font-size:11.8pt; font-weight:700; color:#102749; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
+  .of-tag-en{ font-size:7.9pt; font-weight:700; color:#102749; letter-spacing:.4px; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
   .of-title{ text-align:center; margin-top:15.3pt; }
-  /* The reference stacks the Arabic title and the Latin title 14.2pt apart
-     (measured 79.7 → 93.9), which is looser than the 12.3pt type's own line box,
-     so the two lines carry an explicit line height rather than the default. */
-  .of-title-ar{ font-size:12.3pt; font-weight:700; color:#0f2b48; line-height:1.15; }
-  .of-title-en{ font-size:12.3pt; font-weight:700; color:#0f2b48; letter-spacing:.6px; line-height:1.15; }
+  /* The reference sets the title and the document number in the brand display
+     face (Codec Pro Bold); the Latin labels and figures stay in Verdana. */
+  .of-title-ar{ font-size:12.3pt; font-weight:700; color:#0f2b48; line-height:1.15; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
+  .of-title-en{ font-size:12.3pt; font-weight:700; color:#0f2b48; letter-spacing:.6px; line-height:1.15; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
   .of-trn{ margin-top:1pt; background:#0f2b48; color:#fff; font-size:8.8pt;
     font-weight:700; text-align:end; padding:2pt 10pt; line-height:1.0; }
   /* The reference panel has a hairline light border and no internal divider:
@@ -544,7 +543,10 @@ export const OFFICIAL_FINANCIAL_CSS = `
      stays at the same height, so only the field grid is inset. */
   .of-panel-left-quote .of-lgrid{ margin-top:3.3pt; }
   .of-panel-right{ flex:1 1 auto; padding:1.5pt 10pt; }
-  .of-docno{ font-size:13.3pt; font-weight:700; color:#0f2b48; margin-bottom:2pt; }
+  .of-docno{ font-size:13.3pt; font-weight:700; color:#0f2b48; margin-bottom:2pt; font-family:'ORYX Display','ORYX Latin','ORYX Arabic','ORYX Sans',sans-serif; }
+  /* The document number itself is a display-face run, so the shared numeric
+     Latin override (which would set it in Verdana) is reset for it. */
+  .of-docno .num{ font-family:inherit; }
   .of-field{ margin-top:4.5pt; }
   /* The reference prints the date and the expiration date side by side in one
      row (invoice has only the date). */
@@ -552,6 +554,9 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-field-label{ display:block; font-size:7.3pt; color:#64748b; font-weight:700; }
   .of-field-value{ display:block; font-size:8.8pt; color:#0f2b48; font-weight:700;
     white-space:nowrap; }
+  /* The reference prints the date and expiration values a step smaller than the
+     other field values (measured 7.7pt against 8.8pt). */
+  .of-field-value.of-date{ font-size:7.7pt; }
   /* The reference customer column is a label/value grid whose labels are
      right-aligned (every label ends on the same x, ≈392) with the values on a
      common left edge (≈400), exactly as the approved sheet prints them. */
