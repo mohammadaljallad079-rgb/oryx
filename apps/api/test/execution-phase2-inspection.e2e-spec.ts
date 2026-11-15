@@ -827,4 +827,57 @@ describe('Execution Phase 2 — inspection engine (e2e)', () => {
       expect([400, 403]).toContain(res.status);
     });
   });
+
+  describe('optional inspection notes', () => {
+    it('submits a fully passing inspection with no notes recorded', async () => {
+      const created = await createSession(['EXTERIOR']);
+      await completeItems(created.id, 'EXTERIOR', [
+        'exterior.windows',
+        'exterior.lights',
+        'exterior.indicators',
+        'exterior.wipers',
+        'exterior.mirrors',
+        'exterior.tiresRims',
+      ]);
+      const submit = await companyCall(ctx.base, companyId, `/automotive/inspections/${created.id}/submit`, {
+        method: 'POST',
+        token: writerToken,
+      });
+      // Notes are never a prerequisite: an all-PASS inspection with no notes
+      // submits.
+      expect(submit.status).toBe(201);
+
+      const detail = await companyCall<{ generalRemarks: string | null }>(
+        ctx.base,
+        companyId,
+        `/automotive/inspections/${created.id}`,
+        auth(writerToken),
+      );
+      expect(detail.body.generalRemarks).toBeNull();
+    });
+
+    it('round-trips the single notes field through the API', async () => {
+      const created = await createSession(['EXTERIOR']);
+      const saved = await companyCall<{ generalRemarks: string | null }>(
+        ctx.base,
+        companyId,
+        `/automotive/inspections/${created.id}`,
+        {
+          method: 'PATCH',
+          token: writerToken,
+          body: { generalRemarks: 'Minor stone chips on the front bumper.' },
+        },
+      );
+      expect(saved.status).toBe(200);
+      expect(saved.body.generalRemarks).toBe('Minor stone chips on the front bumper.');
+
+      const detail = await companyCall<{ generalRemarks: string | null }>(
+        ctx.base,
+        companyId,
+        `/automotive/inspections/${created.id}`,
+        auth(writerToken),
+      );
+      expect(detail.body.generalRemarks).toBe('Minor stone chips on the front bumper.');
+    });
+  });
 });

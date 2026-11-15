@@ -93,13 +93,19 @@ const CHECKS = [
   ['white tile title on scrim', L.onMedia, L.scrim, 4.5],
   ['gold tile eyebrow on scrim', L.onMediaAccent, L.scrim, 3],
 
-  ['NAVIGATION RAIL (navy in both themes)'],
+  ['NAVIGATION RAIL (dark theme: navy field)'],
   ['nav text on navy rail', L.navText, L.navy, 4.5],
   ['nav strong on navy rail', L.navStrong, L.navy, 4.5],
   ['nav group label on navy rail', L.navFaint, L.navy, 4.5],
   ['nav logout on navy rail', L.navDanger, L.navy, 4.5],
   ['nav text on deeper rail stop', L.navText, L.navDeep, 4.5],
   ['nav group label on deeper rail stop', L.navFaint, L.navDeep, 4.5],
+
+  ['NAVIGATION RAIL (light theme: ivory field)'],
+  ['nav text on ivory rail', '#33465c', L.bg, 4.5],
+  ['nav strong on ivory rail', '#0f2b48', L.bg, 4.5],
+  ['nav logout on ivory rail', '#b42318', L.bg, 4.5],
+  ['nav active marker border on ivory rail', '#7d5f10', L.bg, 3],
 
   ['NON-TEXT UI'],
   ['card border on ivory page', L.text, L.bg, 1.2],

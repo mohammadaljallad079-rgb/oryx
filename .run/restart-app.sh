@@ -11,7 +11,7 @@
 # Usage: bash .run/restart-admin.sh [--build]
 set -u
 
-ROOT=/workspace/project/oryx
+ROOT="${ORYX_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 APP="${1:-admin}"
 DO_BUILD="${2:-}"
 

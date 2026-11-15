@@ -40,6 +40,7 @@ import { TaxModule } from './tax/tax.module';
 import { PrintModule } from './print/print.module';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { CompanySettingsModule } from './company-settings/company-settings.module';
+import { StorefrontModule } from './storefront/storefront.module';
 
 @Module({
   imports: [
@@ -88,7 +89,7 @@ import { CompanySettingsModule } from './company-settings/company-settings.modul
     EcosystemModule,
     TaxModule,
     PrintModule,
-
+    StorefrontModule,
   ],
   providers: [
     // Global rate limiting; sensitive auth routes override with @Throttle.

@@ -410,11 +410,11 @@ export function inspectionGroupPage(
     ? `<figure class="interior-art"><img src="${INTERIOR_DIAGRAM_DATA_URI}" alt=""></figure>`
     : '';
 
-  // The approved sheet prints three separate remark blocks in the left column
-  // beneath the exterior checklist: the general inspection remarks, the
-  // additional exterior inspection remarks, and the final result and technical
-  // assessment. They are three stored fields, so each prints under its own
-  // heading rather than being merged into one.
+  // The approved sheet prints a single remarks box in the left column beneath
+  // the exterior checklist. It carries the inspection's one optional notes
+  // field; the former "additional exterior remarks" and "final assessment"
+  // blocks were duplicate surfaces for the same note and are no longer offered
+  // on screen, so they are no longer printed either.
   const remarkBlock = (titleAr: string, titleEn: string, body: string | null): string =>
     body
       ? `<div class="grp remark-block">
@@ -423,19 +423,11 @@ export function inspectionGroupPage(
       </div>`
       : '';
 
-  const remarks = [
-    remarkBlock('الملاحظات والتعليقات العامة', 'General Inspection Remarks', input.payload.generalRemarks),
-    remarkBlock(
-      'ملاحظات الفحص الخارجي الإضافية',
-      'Additional Exterior Inspection Remarks',
-      input.payload.exteriorRemarks,
-    ),
-    remarkBlock(
-      'النتيجة النهائية والتقييم العام للفحص الفني',
-      'Final Result &amp; General Assessment',
-      input.payload.finalAssessment,
-    ),
-  ].join('');
+  const remarks = remarkBlock(
+    'الملاحظات والتعليقات العامة',
+    'General Inspection Remarks',
+    input.payload.generalRemarks,
+  );
 
   const cabin = `
   <div class="grp cabin">

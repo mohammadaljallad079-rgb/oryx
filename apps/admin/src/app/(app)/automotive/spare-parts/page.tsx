@@ -9,6 +9,8 @@ import { money } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import { ModuleDashboard } from '@/components/module-dashboard';
 import { TabDeepLink } from '@/components/tab-deep-link';
+import { EntityPicker } from '@/components/inline-create';
+import { ProductModal } from '@/components/entity-modals';
 import {
   Badge,
   Button,
@@ -152,7 +154,13 @@ function ReferencesTab({ canManage }: { canManage: boolean }) {
           </tbody>
         </TableShell>
       )}
-      <CreateReferenceModal open={open} products={products.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <CreateReferenceModal
+        open={open}
+        products={products.data?.items ?? []}
+        onProductCreated={products.reload}
+        onClose={() => setOpen(false)}
+        onCreated={list.reload}
+      />
     </Card>
   );
 }
@@ -160,11 +168,13 @@ function ReferencesTab({ canManage }: { canManage: boolean }) {
 function CreateReferenceModal({
   open,
   products,
+  onProductCreated,
   onClose,
   onCreated,
 }: {
   open: boolean;
   products: Array<{ id: string; sku: string; nameEn: string }>;
+  onProductCreated: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
@@ -186,10 +196,23 @@ function CreateReferenceModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.inventory.product')} required>
-          <select className="oryx-select" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })} data-testid="reference-product">
-            <option value="">—</option>
-            {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.productId || null}
+            options={products.map((p) => ({ value: p.id, label: `${p.sku} — ${p.nameEn}` }))}
+            onChange={(v) => setForm({ ...form, productId: v ?? '' })}
+            placeholder={t('common.select')}
+            testId="reference-product"
+            createLabel={t('erp.inventory.newProduct')}
+            reloadOptions={onProductCreated}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <ProductModal
+                open
+                onClose={closeCreate}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.parts.partNumber')} required>
           <input className="oryx-input" value={form.partNumber} onChange={(e) => setForm({ ...form, partNumber: e.target.value })} data-testid="reference-number" />
@@ -276,7 +299,13 @@ function CompatibilityTab({ canManage }: { canManage: boolean }) {
         ) : null}
       </Card>
 
-      <CreateCompatibilityModal open={open} products={products.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <CreateCompatibilityModal
+        open={open}
+        products={products.data?.items ?? []}
+        onProductCreated={products.reload}
+        onClose={() => setOpen(false)}
+        onCreated={list.reload}
+      />
     </div>
   );
 }
@@ -284,11 +313,13 @@ function CompatibilityTab({ canManage }: { canManage: boolean }) {
 function CreateCompatibilityModal({
   open,
   products,
+  onProductCreated,
   onClose,
   onCreated,
 }: {
   open: boolean;
   products: Array<{ id: string; sku: string; nameEn: string }>;
+  onProductCreated: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
@@ -316,10 +347,23 @@ function CreateCompatibilityModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.inventory.product')} required>
-          <select className="oryx-select" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })} data-testid="compatibility-product">
-            <option value="">—</option>
-            {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.nameEn}</option>)}
-          </select>
+          <EntityPicker
+            value={form.productId || null}
+            options={products.map((p) => ({ value: p.id, label: `${p.sku} — ${p.nameEn}` }))}
+            onChange={(v) => setForm({ ...form, productId: v ?? '' })}
+            placeholder={t('common.select')}
+            testId="compatibility-product"
+            createLabel={t('erp.inventory.newProduct')}
+            reloadOptions={onProductCreated}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <ProductModal
+                open
+                onClose={closeCreate}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
         </Field>
         <Field label={t('erp.automotive.make')} required><input className="oryx-input" value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} data-testid="compatibility-make" /></Field>
         <Field label={t('erp.automotive.model')} required><input className="oryx-input" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} data-testid="compatibility-model" /></Field>

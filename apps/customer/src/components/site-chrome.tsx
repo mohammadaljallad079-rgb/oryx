@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
+import { useSiteContent } from '@/lib/site-content-context';
 import { IS_STATIC_PREVIEW, previewNotice } from '@/lib/preview-data';
 import { BrandLogo } from '@/components/brand-logo';
 import { Icon } from '@/components/icons';
@@ -312,6 +313,8 @@ export function SiteHeader() {
 
 export function SiteFooter() {
   const { t, locale, setLocale } = useUi();
+  const { content, pick } = useSiteContent();
+  const contact = content.contact;
 
   const columns = [
     {
@@ -339,13 +342,45 @@ export function SiteFooter() {
     },
   ];
 
+  const phone = contact.phone.trim();
+  const email = contact.email.trim();
+  const address = pick(contact.addressEn, contact.addressAr).trim();
+
   return (
     <footer className="oryx-footer">
       <div className="oryx-container">
         <div className="oryx-footer__grid">
           <div className="oryx-footer__brand">
             <BrandLogo height={30} />
-            <p className="oryx-footer__tagline">{t('home.subtitle')}</p>
+            <p className="oryx-footer__tagline">
+              {pick(content.footer.introEn, content.footer.introAr) || t('home.subtitle')}
+            </p>
+            {phone || email || address ? (
+              <ul className="oryx-footer__contact">
+                {phone && (
+                  <li>
+                    <Icon name="phone" size={14} />
+                    <a href={`tel:${phone.replace(/\s+/g, '')}`} dir="ltr">
+                      {phone}
+                    </a>
+                  </li>
+                )}
+                {email && (
+                  <li>
+                    <Icon name="mail" size={14} />
+                    <a href={`mailto:${email}`} dir="ltr">
+                      {email}
+                    </a>
+                  </li>
+                )}
+                {address && (
+                  <li>
+                    <Icon name="pin" size={14} />
+                    <span>{address}</span>
+                  </li>
+                )}
+              </ul>
+            ) : null}
           </div>
           {columns.map((col) => (
             <div key={col.title} className="oryx-footer__col">

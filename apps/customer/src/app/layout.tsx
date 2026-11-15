@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { dictionaries } from '@/i18n/dictionaries';
 import { UiProvider } from '@/lib/ui-context';
+import { SiteContentProvider } from '@/lib/site-content-context';
 import { CustomerAuthProvider } from '@/lib/auth-context';
 import { SiteFooter, SiteHeader } from '@/components/site-chrome';
 import { JsonLd } from '@/components/json-ld';
@@ -68,15 +69,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <JsonLd data={organizationJsonLd()} />
         <JsonLd data={websiteJsonLd()} />
         <UiProvider dictionaries={dictionaries} initialLocale="ar" initialTheme="light">
-          <CustomerAuthProvider>
-            <div className="oryx-page">
-              <SiteHeader />
-              <main className="oryx-main" id="main">
-                {children}
-              </main>
-              <SiteFooter />
-            </div>
-          </CustomerAuthProvider>
+          <SiteContentProvider>
+            <CustomerAuthProvider>
+              <div className="oryx-page">
+                <SiteHeader />
+                <main className="oryx-main" id="main">
+                  {children}
+                </main>
+                <SiteFooter />
+              </div>
+            </CustomerAuthProvider>
+          </SiteContentProvider>
         </UiProvider>
       </body>
     </html>

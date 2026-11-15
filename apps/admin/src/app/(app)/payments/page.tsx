@@ -66,7 +66,7 @@ export default function PaymentsPage() {
 function PaymentsInner() {
   const { t } = useUi();
   const { can } = useAuth();
-  const [tab, setTab] = useState<Tab>('intents');
+  const [tab, setTab] = useState<Tab>('dashboard');
 
   const tabs = [
     { key: 'dashboard' as const, label: t('erp.payments.dashboard') },

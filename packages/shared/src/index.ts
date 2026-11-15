@@ -16,6 +16,8 @@ export * from './integrations';
 export * from './branding';
 export * from './contracts';
 export * from './documents';
+export * from './storefront';
+export * from './site-content';
 
 export * from './print';
 export * from './attachments';

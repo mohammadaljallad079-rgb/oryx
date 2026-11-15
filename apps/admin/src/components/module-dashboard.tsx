@@ -59,6 +59,7 @@ export function ModuleDashboard({
   const name = locale === 'ar' ? d.nameAr : d.nameEn;
   const description = locale === 'ar' ? d.descriptionAr : d.descriptionEn;
   const shortcuts = d.shortcuts.filter((s) => can(s.permission));
+  const functions = (d.functions ?? []).filter((f) => can(f.permission));
   const stats = d.stats;
 
   return (
@@ -141,6 +142,34 @@ export function ModuleDashboard({
         </section>
       ) : null}
 
+      {/* ------------------------------------------------ function cards */}
+      {functions.length > 0 ? (
+        <section className="flex flex-col gap-2" data-testid={`module-functions-${moduleKey}`}>
+          <p className="oryx-panel-title m-0">{t('module.summary.functions')}</p>
+          <div className="oryx-function-grid">
+            {functions.map((f) => (
+              <Link
+                key={`${f.route}-${f.labelEn}`}
+                href={f.route}
+                className="oryx-function-card"
+                data-testid={`module-function-${moduleKey}-${f.route}`}
+              >
+                <span className="oryx-function-card__icon" aria-hidden>
+                  <Icon name={f.icon} size={18} />
+                </span>
+                <span className="oryx-function-card__body">
+                  <span className="oryx-function-card__title">{locale === 'ar' ? f.labelAr : f.labelEn}</span>
+                  <span className="oryx-function-card__desc">
+                    {locale === 'ar' ? f.descriptionAr : f.descriptionEn}
+                  </span>
+                </span>
+                <Icon name="arrowForward" size={16} className="oryx-function-card__chevron" />
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {/* ---------------------------------------------------- activity */}
       <Card data-testid={`module-activity-${moduleKey}`}>
         <div className="flex items-center justify-between border-b border-[var(--border)] p-4">
@@ -157,9 +186,9 @@ export function ModuleDashboard({
                 className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] px-4 py-2.5 last:border-b-0"
                 data-testid={`module-activity-row-${a.id}`}
               >
-                <span className="flex items-center gap-2 text-[12.5px]">
+                <span className="flex min-w-0 items-center gap-2 text-[12.5px]">
                   <Icon name="activity" size={14} />
-                  <span className="font-mono text-[11.5px]">{a.action}</span>
+                  <span className="font-mono text-[11.5px] break-all">{a.action}</span>
                   <span className="oryx-faint">{a.targetType}</span>
                 </span>
                 <span className="oryx-faint flex items-center gap-3 text-[11.5px]">
