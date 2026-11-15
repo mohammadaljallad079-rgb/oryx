@@ -334,10 +334,43 @@ history and the schema: `EntityAttachment.updatedAt` carried a database
 `@updatedAt`). A new additive migration drops the default; the diff is now
 "No difference detected" and the change is safe for already-migrated databases.
 
+**Unified pickers extended across the module forms (commit `a18d500`)**
+
+The searchable picker with in-place create now covers every entity dropdown in
+the admin forms, not just the maintenance job card. A new shared
+`apps/admin/src/components/entity-forms.tsx` holds the original create forms as
+reusable modals (supplier, warehouse, product, account, department, employee,
+project); each calls the real create endpoint, so a new record is written to the
+database and selected in place — no component-state-only popup.
+
+- Purchasing: requisition, purchase order and supplier-invoice supplier and
+  warehouse fields.
+- Inventory: stock-movement warehouse and product fields.
+- Accounting: journal-line account field.
+- CRM: opportunity customer field.
+- Operations: work-order project field.
+- Sales: the sales document modal's customer and warehouse fields.
+- Maintenance: customer and vehicle fields (already converted) now share the
+  common label set.
+
+`usePickerLabels` gives every picker the same search placeholder, add action and
+empty state in both languages. `erp.spec.ts` was updated to drive the journal
+account field as a picker; all other suites are unchanged and green.
+
+**Verified results (fresh database, commit `a18d500`)**
+
+| Suite | Result |
+| --- | --- |
+| `@oryx/shared test` | 102 passed |
+| `@oryx/api test:e2e` | 242 passed |
+| `@oryx/admin test:ui` (Playwright) | 134 passed |
+| `@oryx/admin` typecheck (`tsc --noEmit`) | clean |
+| `@oryx/admin` lint (`eslint . --max-warnings=0`) | clean |
+
 **Known limits (unchanged, not defects)**
 
 - Document storage is local disk; an object-store adapter is a later increment.
-- The unified searchable picker with in-place create is wired into the
-  maintenance job card (customer and vehicle) today; the other module dropdowns
-  are still native selects. Extending the picker across them is follow-up work,
-  not a regression.
+- A handful of remaining native selects are enum/status filters or fields with
+  no standalone create form (booking type, resource kind, leave type, payment
+  provider, priority, locale, plan/role pickers on the platform pages); they are
+  intentionally not pickers because there is no "add new" record to create.
