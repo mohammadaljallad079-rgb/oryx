@@ -31,6 +31,9 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
 import { PaymentsModule } from './payments/payments.module';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { SettingsModule } from './settings/settings.module';
+import { DocumentsModule } from './documents/documents.module';
+import { PrintModule } from './print/print.module';
 
 @Module({
   imports: [
@@ -70,6 +73,9 @@ import { IntegrationsModule } from './integrations/integrations.module';
     MarketplaceModule,
     PaymentsModule,
     IntegrationsModule,
+    SettingsModule,
+    DocumentsModule,
+    PrintModule,
   ],
   providers: [
     // Global rate limiting; sensitive auth routes override with @Throttle.

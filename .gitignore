@@ -22,3 +22,6 @@ tsconfig.build.tsbuildinfo
 apps/admin/test-results/
 apps/admin/playwright-report/
 .env.local
+
+# Local preview tooling
+.run/

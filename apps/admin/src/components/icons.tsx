@@ -245,6 +245,19 @@ export const Icons = {
       <circle cx="16.5" cy="14.5" r="1.2" />
     </Base>
   ),
+  eye: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </Base>
+  ),
+  print: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M7 8V3.5h10V8" />
+      <path d="M7 17H4.5A1.5 1.5 0 0 1 3 15.5v-5A1.5 1.5 0 0 1 4.5 9h15A1.5 1.5 0 0 1 21 10.5v5a1.5 1.5 0 0 1-1.5 1.5H17" />
+      <rect x="7" y="14" width="10" height="6.5" rx="1" />
+    </Base>
+  ),
 } as const;
 
 export type IconName = keyof typeof Icons;

@@ -105,12 +105,15 @@ export function Modal({
   onClose,
   children,
   footer,
+  wide,
 }: {
   open: boolean;
   title: string;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  /** Renders a wider dialog, for forms with tabs and many fields. */
+  wide?: boolean;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -124,7 +127,7 @@ export function Modal({
   if (!open) return null;
   return (
     <div className="oryx-modal-backdrop" role="dialog" aria-modal="true" aria-label={title} onClick={onClose}>
-      <div className="oryx-modal" onClick={(e) => e.stopPropagation()}>
+      <div className={`oryx-modal ${wide ? 'oryx-modal--wide' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
           <h2 className="m-0 text-[16px] font-bold">{title}</h2>
           <button

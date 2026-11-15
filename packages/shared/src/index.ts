@@ -6,4 +6,6 @@ export * from './scheduling';
 export * from './tokens';
 export * from './authorization';
 export * from './integrations';
+export * from './settings';
 export * from './contracts';
+export * from './print';

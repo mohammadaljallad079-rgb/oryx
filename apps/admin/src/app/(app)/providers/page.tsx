@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
+import { ModuleBanner } from '@/components/module-banner';
 import {
   Badge,
   Button,
@@ -66,8 +67,13 @@ type Tab = 'providers' | 'requests' | 'settlements';
  */
 export default function ProvidersPage() {
   const { t } = useUi();
-  const { can } = useAuth();
+  const { can, companyId, branchId } = useAuth();
   const [tab, setTab] = useState<Tab>('providers');
+
+  const dashboard = useAsync(
+    () => api.moduleDashboard('provider_portal', { companyId: companyId ?? undefined, branchId: branchId ?? undefined }),
+    [companyId, branchId],
+  );
 
   const tabs = [
     { key: 'providers' as const, label: t('erp.providers.directory') },
@@ -77,6 +83,8 @@ export default function ProvidersPage() {
 
   return (
     <div className="flex flex-col gap-5" data-testid="providers-page">
+      <ModuleBanner data={dashboard.data} loading={dashboard.loading} moduleKey="provider_portal" />
+
       <SectionHeader
         title={t('nav.provider_portal')}
         subtitle={t('erp.providers.subtitle')}

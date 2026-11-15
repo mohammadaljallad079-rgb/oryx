@@ -237,6 +237,14 @@ export const PERMISSIONS: PermissionDefinition[] = [
   P('erp.payments.manage', 'ERP', 'Manage payments', 'إدارة المدفوعات', 'COMPANY', true, 'Create payment intents, confirm payments and process refunds.', 'payments'),
   P('erp.payments.reconcile', 'ERP', 'Reconcile payments', 'مطابقة المدفوعات', 'COMPANY', true, 'Run and resolve provider reconciliation.', 'payments'),
   P('erp.notifications.manage', 'ERP', 'Manage notifications', 'إدارة الإشعارات', 'COMPANY', true, 'Manage notification templates and delivery channels.', 'customer_portal'),
+
+  // ------------------------------------- Execution 20 — settings & documents
+  P('erp.settings.read', 'Settings', 'View company settings', 'عرض إعدادات الشركة', 'COMPANY', true, 'Read the company settings control center.'),
+  P('erp.settings.update', 'Settings', 'Update company settings', 'تعديل إعدادات الشركة', 'COMPANY', true, 'Change the company settings control center.'),
+  P('erp.document.read', 'Documents', 'View documents', 'عرض المستندات', 'COMPANY', true, 'Read attachments linked to records.'),
+  P('erp.document.upload', 'Documents', 'Upload documents', 'رفع المستندات', 'COMPANY', true, 'Upload and replace documents linked to records.'),
+  P('erp.document.delete', 'Documents', 'Delete documents', 'حذف المستندات', 'COMPANY', true, 'Remove documents linked to records.'),
+  P('erp.customer.company.manage', 'ERP', 'Manage company customers', 'إدارة العملاء من الشركات', 'COMPANY', true, 'Create and edit company (business) customer records.', 'sales_pos'),
 ];
 
 export const PERMISSION_BY_CODE: ReadonlyMap<string, PermissionDefinition> = new Map(

@@ -7,6 +7,7 @@ import { DocumentSequenceService } from '../common/document-sequence.service';
 import { ErpContextService } from '../common/erp-context.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { SalesService } from '../sales/sales.service';
+import { CompanySettingsService } from '../settings/company-settings.service';
 import { computeDocumentTotals } from '../common/document-totals';
 import { badRequest, conflict, ERROR_CODES, forbidden, notFound } from '../common/errors';
 import type { ActorContext } from '../organizations/organizations.service';
@@ -61,6 +62,7 @@ export class WorkshopService {
     private readonly context: ErpContextService,
     private readonly inventory: InventoryService,
     private readonly sales: SalesService,
+    private readonly settings: CompanySettingsService,
   ) {}
 
   // ------------------------------------------------------------------ bays
@@ -182,7 +184,12 @@ export class WorkshopService {
       if (!booking) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Maintenance booking not found.');
     }
     const job = await this.posting.withTransaction(async (tx) => {
-      const jobNumber = await this.sequences.next(tx, companyId, 'jobCard');
+      // The maintenance namespace owns the job-card prefix, so two companies
+      // number their job cards from their own settings.
+      const maintenance = await this.settings.get(companyId, 'MAINTENANCE');
+      const jobNumber = await this.sequences.next(tx, companyId, 'jobCard', {
+        prefix: maintenance.jobNumberPrefix,
+      });
       return tx.jobCard.create({
         data: {
           companyId,
@@ -265,7 +272,17 @@ export class WorkshopService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const job = await this.prisma.jobCard.findFirst({ where: { id: jobCardId, companyId } });
     if (!job) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Job card not found.');
-    const totals = computeDocumentTotals(dto.lines.map((l) => ({ quantity: l.quantity, unitPriceMinor: l.unitPriceMinor, discountPercentBp: 0, taxPercentBp: l.taxPercentBp ?? 0 })));
+    // A line without an explicit rate uses this company's maintenance VAT rate.
+    const maintenance = await this.settings.get(companyId, 'MAINTENANCE');
+    const maintenanceTaxBp = maintenance.vatEnabled ? maintenance.defaultTaxRateBp : 0;
+    const totals = computeDocumentTotals(
+      dto.lines.map((l) => ({
+        quantity: l.quantity,
+        unitPriceMinor: l.unitPriceMinor,
+        discountPercentBp: 0,
+        taxPercentBp: l.taxPercentBp ?? maintenanceTaxBp,
+      })),
+    );
 
     const estimate = await this.posting.withTransaction(async (tx) => {
       const estimateNumber = await this.sequences.next(tx, companyId, 'repairEstimate');
@@ -289,7 +306,7 @@ export class WorkshopService {
               description: l.description,
               quantity: l.quantity,
               unitPriceMinor: l.unitPriceMinor,
-              taxPercentBp: l.taxPercentBp ?? 0,
+              taxPercentBp: l.taxPercentBp ?? maintenanceTaxBp,
               lineTotalMinor: totals.lines[i].lineTotalMinor,
               sortOrder: i,
             })),

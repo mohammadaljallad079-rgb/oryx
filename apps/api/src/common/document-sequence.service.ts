@@ -54,12 +54,22 @@ export class DocumentSequenceService {
    *
    * Must be called with the transaction client so the number is only consumed
    * if the surrounding business transaction commits.
+   *
+   * `override` lets a company setting replace the catalogue prefix (and, in
+   * future, padding) without changing the catalogue itself. The sequence row is
+   * still keyed by `name`, so changing the prefix never restarts numbering.
    */
-  async next(tx: Tx, companyId: string, name: DocumentSequenceName): Promise<string> {
+  async next(
+    tx: Tx,
+    companyId: string,
+    name: DocumentSequenceName,
+    override?: { prefix?: string | null },
+  ): Promise<string> {
     const { key, prefix } = DOCUMENT_SEQUENCE_KEYS[name];
+    const effectivePrefix = override?.prefix?.trim() ? override.prefix.trim() : prefix;
     const sequence = await tx.documentSequence.upsert({
       where: { companyId_key: { companyId, key } },
-      create: { companyId, key, prefix, nextNumber: 1, padding: 5 },
+      create: { companyId, key, prefix: effectivePrefix, nextNumber: 1, padding: 5 },
       update: {},
     });
     const allocated = await tx.documentSequence.update({
@@ -69,6 +79,9 @@ export class DocumentSequenceService {
     // `allocated.nextNumber` is already the *next* value, so the number we hand
     // out is one less than what is now stored.
     const number = allocated.nextNumber - 1;
-    return `${allocated.prefix}-${String(number).padStart(allocated.padding, '0')}`;
+    // A stored prefix is authoritative once a sequence exists; the override only
+    // applies to a sequence that has never issued a number.
+    const usedPrefix = sequence.nextNumber === 1 ? effectivePrefix : sequence.prefix;
+    return `${usedPrefix}-${String(number).padStart(allocated.padding, '0')}`;
   }
 }

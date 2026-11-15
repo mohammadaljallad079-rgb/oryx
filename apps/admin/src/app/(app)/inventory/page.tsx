@@ -1,12 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, qty, toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { ModuleBanner } from '@/components/module-banner';
+import { SearchableSelect, usePickerLabels, type PickerOption } from '@/components/searchable-select';
+import { ProductFormModal, WarehouseFormModal } from '@/components/entity-forms';
 import {
   Badge,
   Button,
@@ -34,8 +37,13 @@ type Tab = 'valuation' | 'products' | 'warehouses' | 'movements' | 'transfers' |
 
 export default function InventoryPage() {
   const { t } = useUi();
-  const { can } = useAuth();
+  const { can, companyId, branchId } = useAuth();
   const [tab, setTab] = useState<Tab>('valuation');
+
+  const dashboard = useAsync(
+    () => api.moduleDashboard('warehouses_inventory', { companyId: companyId ?? undefined, branchId: branchId ?? undefined }),
+    [companyId, branchId],
+  );
 
   const canItem = can('erp.inventory.item.manage');
   const canWarehouse = can('erp.inventory.warehouse.manage');
@@ -55,6 +63,8 @@ export default function InventoryPage() {
 
   return (
     <div className="flex flex-col gap-5" data-testid="inventory-page">
+      <ModuleBanner data={dashboard.data} loading={dashboard.loading} moduleKey="warehouses_inventory" />
+
       <SectionHeader
         title={t('nav.warehouses_inventory')}
         subtitle={t('erp.inventory.subtitle')}
@@ -205,80 +215,8 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
           </tbody>
         </TableShell>
       )}
-      <CreateProductModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <ProductFormModal open={open} onClose={() => setOpen(false)} onSaved={() => void list.reload()} />
     </Card>
-  );
-}
-
-function CreateProductModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => Promise<void> }) {
-  const { t } = useUi();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
-  });
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await api.createProduct({
-        sku: form.sku,
-        nameEn: form.nameEn,
-        nameAr: form.nameAr,
-        unit: form.unit,
-        salesPriceMinor: toMinorInput(form.salesPrice),
-        costPriceMinor: toMinorInput(form.costPrice),
-        taxRateBp: Math.round(Number(form.taxRate) * 100),
-      });
-      await onCreated();
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      title={t('erp.inventory.newProduct')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy} onClick={submit} data-testid="save-product">
-            {busy ? t('common.loading') : t('common.save')}
-          </Button>
-        </>
-      }
-    >
-      {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('erp.inventory.sku')} required>
-          <input className="oryx-input" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} data-testid="product-sku" />
-        </Field>
-        <Field label={t('erp.inventory.unit')}>
-          <input className="oryx-input" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
-        </Field>
-        <Field label={`${t('common.name')} (EN)`} required>
-          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="product-name-en" />
-        </Field>
-        <Field label={`${t('common.name')} (AR)`} required>
-          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="product-name-ar" />
-        </Field>
-        <Field label={t('erp.inventory.salesPrice')}>
-          <input className="oryx-input" value={form.salesPrice} onChange={(e) => setForm({ ...form, salesPrice: e.target.value })} />
-        </Field>
-        <Field label={t('erp.inventory.costPrice')}>
-          <input className="oryx-input" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: e.target.value })} />
-        </Field>
-        <Field label={t('erp.inventory.taxRate')}>
-          <input className="oryx-input" value={form.taxRate} onChange={(e) => setForm({ ...form, taxRate: e.target.value })} />
-        </Field>
-      </div>
-    </Modal>
   );
 }
 
@@ -323,58 +261,8 @@ function WarehousesTab({ canManage }: { canManage: boolean }) {
           </tbody>
         </TableShell>
       )}
-      <CreateWarehouseModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <WarehouseFormModal open={open} onClose={() => setOpen(false)} onSaved={() => void list.reload()} />
     </Card>
-  );
-}
-
-function CreateWarehouseModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => Promise<void> }) {
-  const { t } = useUi();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '' });
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await api.createWarehouse(form);
-      await onCreated();
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      title={t('erp.inventory.newWarehouse')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy} onClick={submit} data-testid="save-warehouse">
-            {busy ? t('common.loading') : t('common.save')}
-          </Button>
-        </>
-      }
-    >
-      {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="warehouse-code" />
-        </Field>
-        <Field label={`${t('common.name')} (EN)`} required>
-          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="warehouse-name-en" />
-        </Field>
-        <Field label={`${t('common.name')} (AR)`} required>
-          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="warehouse-name-ar" />
-        </Field>
-      </div>
-    </Modal>
   );
 }
 
@@ -452,9 +340,21 @@ function RecordMovementModal({
   onDone: () => Promise<void>;
 }) {
   const { t } = useUi();
+  const { can } = useAuth();
+  const pickerLabels = usePickerLabels();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ warehouseId: '', productId: '', direction: 'IN', quantity: '1', unitCost: '0.00' });
+  const [warehouseOptions, setWarehouseOptions] = useState<PickerOption[]>([]);
+  const [productOptions, setProductOptions] = useState<PickerOption[]>([]);
+
+  useEffect(() => {
+    setWarehouseOptions(warehouses.map((w) => ({ id: w.id, label: `${w.code} — ${w.nameEn}`, sublabel: w.nameAr, keywords: w.nameAr })));
+  }, [warehouses]);
+
+  useEffect(() => {
+    setProductOptions(products.map((p) => ({ id: p.id, label: `${p.sku} — ${p.nameEn}`, sublabel: p.nameAr, keywords: `${p.nameAr} ${p.sku}` })));
+  }, [products]);
 
   const submit = async () => {
     setBusy(true);
@@ -494,16 +394,52 @@ function RecordMovementModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.inventory.warehouse')} required>
-          <select className="oryx-select" value={form.warehouseId} onChange={(e) => setForm({ ...form, warehouseId: e.target.value })} data-testid="movement-warehouse">
-            <option value="">—</option>
-            {warehouses.map((w) => <option key={w.id} value={w.id}>{w.code} — {w.nameEn}</option>)}
-          </select>
+          <SearchableSelect
+            testId="movement-warehouse"
+            value={form.warehouseId}
+            onChange={(id) => setForm({ ...form, warehouseId: id })}
+            options={warehouseOptions}
+            placeholder={t('common.selectPlaceholder')}
+            labels={pickerLabels}
+            renderCreate={
+              can('erp.inventory.warehouse.manage')
+                ? (props) => (
+                    <WarehouseFormModal
+                      open={props.open}
+                      onClose={props.onClose}
+                      onSaved={(w) => {
+                        setWarehouseOptions((prev) => [...prev, { id: w.id, label: `${w.code} — ${w.nameEn}`, sublabel: w.nameAr, keywords: w.nameAr }]);
+                        props.onCreated({ id: w.id, label: `${w.code} — ${w.nameEn}` });
+                      }}
+                    />
+                  )
+                : undefined
+            }
+          />
         </Field>
         <Field label={t('erp.inventory.product')} required>
-          <select className="oryx-select" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })} data-testid="movement-product">
-            <option value="">—</option>
-            {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.nameEn}</option>)}
-          </select>
+          <SearchableSelect
+            testId="movement-product"
+            value={form.productId}
+            onChange={(id) => setForm({ ...form, productId: id })}
+            options={productOptions}
+            placeholder={t('common.selectPlaceholder')}
+            labels={pickerLabels}
+            renderCreate={
+              can('erp.inventory.item.manage')
+                ? (props) => (
+                    <ProductFormModal
+                      open={props.open}
+                      onClose={props.onClose}
+                      onSaved={(p) => {
+                        setProductOptions((prev) => [...prev, { id: p.id, label: `${p.sku} — ${p.nameEn}`, sublabel: p.nameAr, keywords: `${p.nameAr} ${p.sku}` }]);
+                        props.onCreated({ id: p.id, label: `${p.sku} — ${p.nameEn}` });
+                      }}
+                    />
+                  )
+                : undefined
+            }
+          />
         </Field>
         <Field label={t('erp.inventory.movementType')} required>
           <select className="oryx-select" value={form.direction} onChange={(e) => setForm({ ...form, direction: e.target.value })}>

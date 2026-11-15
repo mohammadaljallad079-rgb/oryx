@@ -43,6 +43,18 @@
     rgba(0, 15, 30, 0.72) 55%,
     rgba(0, 18, 34, 0.94) 100%
   );
+  /*
+   * The information band along the bottom of a module tile. Unlike the artwork
+   * above it, this band tracks the theme: the dark theme leaves the full-cover
+   * scrim to carry the card (`none` here), while the light block paints an ivory
+   * fade with dark ink so no fixed navy plate survives a theme switch. The
+   * artwork itself is untouched in both themes.
+   */
+  --tile-band: none;
+  --tile-band-ink: #ffffff;
+  --tile-band-ink-muted: rgba(233, 240, 248, 0.82);
+  --tile-band-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
+  --tile-band-shadow-soft: 0 1px 10px rgba(0, 0, 0, 0.75);
   --shadow-card: 0 18px 40px -24px rgba(0, 0, 0, 0.85);
   --header-h: 68px;
   --sidebar-w: 268px;
@@ -75,6 +87,14 @@
     rgba(0, 22, 43, 0.62) 55%,
     rgba(0, 22, 43, 0.9) 100%
   );
+  /* The module-tile information band in the light theme: an ivory fade with dark
+   * ink, so the card bottom switches with the theme while the artwork above it
+   * stays put. The scrim stops short, so the photograph still reads. */
+  --tile-band: linear-gradient(180deg, transparent 0%, rgba(247, 244, 237, 0.94) 60%);
+  --tile-band-ink: #1a1712;
+  --tile-band-ink-muted: #4a443a;
+  --tile-band-shadow: none;
+  --tile-band-shadow-soft: none;
   --shadow-card: 0 16px 36px -26px rgba(0, 22, 43, 0.45);
 }
 
@@ -389,6 +409,24 @@ body::before {
   background: var(--tile-overlay);
 }
 
+/*
+ * The bottom information band. A separate layer rather than part of the scrim,
+ * because only this band tracks the theme: the dark theme resolves
+ * `--tile-band` to `none` and lets the full-cover scrim carry the card, while
+ * the light theme paints an ivory fade here so the card bottom switches without
+ * touching the artwork above it. It is a child of the tile (a block) rather than
+ * of the flex body, so it never becomes a flex item.
+ */
+.oryx-tile::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 62%;
+  z-index: -1;
+  background: var(--tile-band);
+  pointer-events: none;
+}
+
 .oryx-tile__body {
   position: relative;
   display: flex;
@@ -416,14 +454,15 @@ body::before {
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.01em;
-  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
+  color: var(--tile-band-ink);
+  text-shadow: var(--tile-band-shadow);
 }
 
 .oryx-tile__desc {
   font-size: 12.5px;
-  color: rgba(233, 240, 248, 0.82);
+  color: var(--tile-band-ink-muted);
   line-height: 1.5;
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.75);
+  text-shadow: var(--tile-band-shadow-soft);
 }
 
 .oryx-tile--planned .oryx-tile__media {
@@ -580,6 +619,10 @@ body::before {
   box-shadow: 0 40px 80px -40px rgba(0, 0, 0, 0.9);
 }
 
+.oryx-modal--wide {
+  width: min(1000px, 100%);
+}
+
 /* -------------------------------------------------------------------- misc */
 
 .oryx-kpi-value {
@@ -633,6 +676,167 @@ body::before {
 .oryx-focus-ring:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
+}
+
+/* --------------------------------------------------- module hero + monogram */
+
+.oryx-hero--module {
+  min-height: 188px;
+}
+
+.oryx-monogram {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: rgba(212, 175, 55, 0.16);
+  color: var(--gold-soft);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* ------------------------------------------------------- searchable picker */
+
+.oryx-picker {
+  position: relative;
+}
+
+.oryx-picker__control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.oryx-picker__control:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.oryx-picker__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oryx-picker__placeholder {
+  color: var(--text-faint);
+}
+
+.oryx-picker__menu {
+  position: absolute;
+  z-index: 60;
+  inset-inline: 0;
+  margin-top: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  box-shadow: 0 22px 48px rgba(0, 10, 22, 0.42);
+  overflow: hidden;
+}
+
+.oryx-picker__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.oryx-picker__search-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+
+.oryx-picker__clear {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.oryx-picker__list {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.oryx-picker__empty {
+  margin: 0;
+  padding: 14px;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+
+.oryx-picker__option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+  font: inherit;
+}
+
+.oryx-picker__option:hover {
+  background: var(--surface-hover);
+}
+
+.oryx-picker__option.is-selected {
+  background: color-mix(in srgb, var(--gold) 16%, transparent);
+}
+
+.oryx-picker__option-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.oryx-picker__option-sub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.oryx-picker__add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--gold);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.oryx-picker__add:hover {
+  background: var(--surface-hover);
+}
+
+.oryx-select--sm {
+  min-height: 32px;
+  padding: 4px 8px;
+  font-size: 12.5px;
+  width: auto;
 }
 
 /* ------------------------------------------------------------- responsive */

@@ -1,12 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { ModuleBanner } from '@/components/module-banner';
+import { SearchableSelect, usePickerLabels, type PickerOption } from '@/components/searchable-select';
+import { SupplierFormModal, WarehouseFormModal } from '@/components/entity-forms';
 import {
   Badge,
   Button,
@@ -36,8 +39,13 @@ const emptyLine = (): LineDraft => ({ productId: '', description: '', quantity: 
 
 export default function PurchasingPage() {
   const { t } = useUi();
-  const { can } = useAuth();
+  const { can, companyId, branchId } = useAuth();
   const [tab, setTab] = useState<Tab>('orders');
+
+  const dashboard = useAsync(
+    () => api.moduleDashboard('purchasing_procurement', { companyId: companyId ?? undefined, branchId: branchId ?? undefined }),
+    [companyId, branchId],
+  );
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'orders', label: t('erp.purchasing.orders') },
@@ -50,6 +58,8 @@ export default function PurchasingPage() {
 
   return (
     <div className="flex flex-col gap-5" data-testid="purchasing-page">
+      <ModuleBanner data={dashboard.data} loading={dashboard.loading} moduleKey="purchasing_procurement" />
+
       <SectionHeader
         title={t('nav.purchasing_procurement')}
         subtitle={t('erp.purchasing.subtitle')}
@@ -132,70 +142,8 @@ function SuppliersTab({ canManage }: { canManage: boolean }) {
           </tbody>
         </TableShell>
       )}
-      <SupplierModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <SupplierFormModal open={open} onClose={() => setOpen(false)} onSaved={() => void list.reload()} />
     </Card>
-  );
-}
-
-function SupplierModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => Promise<void> }) {
-  const { t } = useUi();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', phone: '', paymentTermsDays: '30' });
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await api.createSupplier({
-        code: form.code,
-        nameEn: form.nameEn,
-        nameAr: form.nameAr,
-        phone: form.phone || undefined,
-        paymentTermsDays: Number(form.paymentTermsDays) || 0,
-      });
-      await onCreated();
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      title={t('erp.purchasing.newSupplier')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy} onClick={submit} data-testid="save-supplier">
-            {busy ? t('common.loading') : t('common.save')}
-          </Button>
-        </>
-      }
-    >
-      {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="supplier-code" />
-        </Field>
-        <Field label={t('erp.sales.phone')}>
-          <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-        </Field>
-        <Field label={`${t('common.name')} (EN)`} required>
-          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="supplier-name-en" />
-        </Field>
-        <Field label={`${t('common.name')} (AR)`} required>
-          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="supplier-name-ar" />
-        </Field>
-        <Field label={t('erp.sales.paymentTerms')}>
-          <input className="oryx-input" value={form.paymentTermsDays} onChange={(e) => setForm({ ...form, paymentTermsDays: e.target.value })} />
-        </Field>
-      </div>
-    </Modal>
   );
 }
 
@@ -296,10 +244,17 @@ function RequisitionModal({
   onCreated: () => Promise<void>;
 }) {
   const { t } = useUi();
+  const { can } = useAuth();
+  const pickerLabels = usePickerLabels();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [supplierId, setSupplierId] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
+  const [supplierOptions, setSupplierOptions] = useState<PickerOption[]>([]);
+
+  useEffect(() => {
+    setSupplierOptions(suppliers.map((s) => ({ id: s.id, label: `${s.code} — ${s.nameEn}`, sublabel: s.nameAr, keywords: `${s.nameAr} ${s.phone ?? ''}` })));
+  }, [suppliers]);
 
   const submit = async () => {
     setBusy(true);
@@ -339,14 +294,28 @@ function RequisitionModal({
     >
       {error ? <ErrorBanner message={error} /> : null}
       <Field label={t('erp.purchasing.supplier')}>
-        <select className="oryx-select" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} data-testid="requisition-supplier">
-          <option value="">—</option>
-          {suppliers.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.code} — {s.nameEn}
-            </option>
-          ))}
-        </select>
+        <SearchableSelect
+          testId="requisition-supplier"
+          value={supplierId}
+          onChange={setSupplierId}
+          options={supplierOptions}
+          placeholder={t('common.selectPlaceholder')}
+          labels={pickerLabels}
+          renderCreate={
+            can('erp.purchasing.supplier.manage')
+              ? (props) => (
+                  <SupplierFormModal
+                    open={props.open}
+                    onClose={props.onClose}
+                    onSaved={(s) => {
+                      setSupplierOptions((prev) => [...prev, { id: s.id, label: `${s.code} — ${s.nameEn}`, sublabel: s.nameAr, keywords: `${s.nameAr} ${s.phone ?? ''}` }]);
+                      props.onCreated({ id: s.id, label: `${s.code} — ${s.nameEn}` });
+                    }}
+                  />
+                )
+              : undefined
+          }
+        />
       </Field>
       <div className="mt-4">
         <CostLineEditor lines={lines} setLines={setLines} products={products} testIdPrefix="requisition-line" costLabel={t('erp.inventory.estimatedCost')} />
@@ -446,11 +415,23 @@ function PurchaseOrderModal({
   onCreated: () => Promise<void>;
 }) {
   const { t } = useUi();
+  const { can } = useAuth();
+  const pickerLabels = usePickerLabels();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [supplierId, setSupplierId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
+  const [supplierOptions, setSupplierOptions] = useState<PickerOption[]>([]);
+  const [warehouseOptions, setWarehouseOptions] = useState<PickerOption[]>([]);
+
+  useEffect(() => {
+    setSupplierOptions(suppliers.map((s) => ({ id: s.id, label: `${s.code} — ${s.nameEn}`, sublabel: s.nameAr, keywords: `${s.nameAr} ${s.phone ?? ''}` })));
+  }, [suppliers]);
+
+  useEffect(() => {
+    setWarehouseOptions(warehouses.map((w) => ({ id: w.id, label: `${w.code} — ${w.nameEn}`, sublabel: w.nameAr, keywords: w.nameAr })));
+  }, [warehouses]);
 
   const submit = async () => {
     setBusy(true);
@@ -495,24 +476,52 @@ function PurchaseOrderModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.purchasing.supplier')} required>
-          <select className="oryx-select" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} data-testid="purchase-order-supplier">
-            <option value="">—</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code} — {s.nameEn}
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            testId="purchase-order-supplier"
+            value={supplierId}
+            onChange={setSupplierId}
+            options={supplierOptions}
+            placeholder={t('common.selectPlaceholder')}
+            labels={pickerLabels}
+            renderCreate={
+              can('erp.purchasing.supplier.manage')
+                ? (props) => (
+                    <SupplierFormModal
+                      open={props.open}
+                      onClose={props.onClose}
+                      onSaved={(s) => {
+                        setSupplierOptions((prev) => [...prev, { id: s.id, label: `${s.code} — ${s.nameEn}`, sublabel: s.nameAr, keywords: `${s.nameAr} ${s.phone ?? ''}` }]);
+                        props.onCreated({ id: s.id, label: `${s.code} — ${s.nameEn}` });
+                      }}
+                    />
+                  )
+                : undefined
+            }
+          />
         </Field>
         <Field label={t('erp.inventory.warehouse')}>
-          <select className="oryx-select" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} data-testid="purchase-order-warehouse">
-            <option value="">—</option>
-            {warehouses.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.code} — {w.nameEn}
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            testId="purchase-order-warehouse"
+            value={warehouseId}
+            onChange={setWarehouseId}
+            options={warehouseOptions}
+            placeholder={t('common.selectPlaceholder')}
+            labels={pickerLabels}
+            renderCreate={
+              can('erp.inventory.warehouse.manage')
+                ? (props) => (
+                    <WarehouseFormModal
+                      open={props.open}
+                      onClose={props.onClose}
+                      onSaved={(w) => {
+                        setWarehouseOptions((prev) => [...prev, { id: w.id, label: `${w.code} — ${w.nameEn}`, sublabel: w.nameAr, keywords: w.nameAr }]);
+                        props.onCreated({ id: w.id, label: `${w.code} — ${w.nameEn}` });
+                      }}
+                    />
+                  )
+                : undefined
+            }
+          />
         </Field>
       </div>
       <div className="mt-4">
@@ -655,11 +664,18 @@ function SupplierInvoiceModal({
   onCreated: () => Promise<void>;
 }) {
   const { t } = useUi();
+  const { can } = useAuth();
+  const pickerLabels = usePickerLabels();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [supplierId, setSupplierId] = useState('');
   const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
+  const [supplierOptions, setSupplierOptions] = useState<PickerOption[]>([]);
+
+  useEffect(() => {
+    setSupplierOptions(suppliers.map((s) => ({ id: s.id, label: `${s.code} — ${s.nameEn}`, sublabel: s.nameAr, keywords: `${s.nameAr} ${s.phone ?? ''}` })));
+  }, [suppliers]);
 
   const submit = async () => {
     setBusy(true);
@@ -703,14 +719,28 @@ function SupplierInvoiceModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.purchasing.supplier')} required>
-          <select className="oryx-select" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} data-testid="supplier-invoice-supplier">
-            <option value="">—</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code} — {s.nameEn}
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            testId="supplier-invoice-supplier"
+            value={supplierId}
+            onChange={setSupplierId}
+            options={supplierOptions}
+            placeholder={t('common.selectPlaceholder')}
+            labels={pickerLabels}
+            renderCreate={
+              can('erp.purchasing.supplier.manage')
+                ? (props) => (
+                    <SupplierFormModal
+                      open={props.open}
+                      onClose={props.onClose}
+                      onSaved={(s) => {
+                        setSupplierOptions((prev) => [...prev, { id: s.id, label: `${s.code} — ${s.nameEn}`, sublabel: s.nameAr, keywords: `${s.nameAr} ${s.phone ?? ''}` }]);
+                        props.onCreated({ id: s.id, label: `${s.code} — ${s.nameEn}` });
+                      }}
+                    />
+                  )
+                : undefined
+            }
+          />
         </Field>
         <Field label={t('erp.purchasing.supplierInvoiceNumber')} required>
           <input

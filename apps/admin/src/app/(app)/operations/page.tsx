@@ -1,11 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
+import { ModuleBanner } from '@/components/module-banner';
+import { SearchableSelect, usePickerLabels, type PickerOption } from '@/components/searchable-select';
+import { ProjectFormModal } from '@/components/entity-forms';
 import {
   Badge,
   Button,
@@ -25,8 +28,13 @@ type Tab = 'dashboard' | 'projects' | 'tasks' | 'work-orders' | 'approvals' | 'c
 
 export default function OperationsPage() {
   const { t } = useUi();
-  const { can } = useAuth();
+  const { can, companyId, branchId } = useAuth();
   const [tab, setTab] = useState<Tab>('dashboard');
+
+  const dashboard = useAsync(
+    () => api.moduleDashboard('operations', { companyId: companyId ?? undefined, branchId: branchId ?? undefined }),
+    [companyId, branchId],
+  );
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'dashboard', label: t('erp.operations.dashboard') },
@@ -40,6 +48,8 @@ export default function OperationsPage() {
 
   return (
     <div className="flex flex-col gap-5" data-testid="operations-page">
+      <ModuleBanner data={dashboard.data} loading={dashboard.loading} moduleKey="operations" />
+
       <SectionHeader
         title={t('nav.operations')}
         subtitle={t('erp.operations.subtitle')}
@@ -134,34 +144,8 @@ function ProjectsTab({ canManage }: { canManage: boolean }) {
           </tbody>
         </TableShell>
       )}
-      <CreateProjectModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <ProjectFormModal open={open} onClose={() => setOpen(false)} onSaved={() => void list.reload()} />
     </Card>
-  );
-}
-
-function CreateProjectModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => Promise<void> }) {
-  const { t } = useUi();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '' });
-  const submit = async () => {
-    setBusy(true); setError(null);
-    try {
-      await api.createOperationsProject(form);
-      await onCreated();
-      onClose();
-    } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); } finally { setBusy(false); }
-  };
-  return (
-    <Modal open={open} title={t('erp.operations.newProject')} onClose={onClose}
-      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy} onClick={submit} data-testid="save-project">{busy ? t('common.loading') : t('common.save')}</Button></>}>
-      {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('common.code')} required><input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="project-code" /></Field>
-        <Field label={`${t('common.name')} (EN)`} required><input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="project-name-en" /></Field>
-        <Field label={`${t('common.name')} (AR)`} required><input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="project-name-ar" /></Field>
-      </div>
-    </Modal>
   );
 }
 
@@ -268,9 +252,17 @@ function CreateWorkOrderModal({
   onCreated: () => Promise<void>;
 }) {
   const { t } = useUi();
+  const { can } = useAuth();
+  const pickerLabels = usePickerLabels();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ title: '', description: '', projectId: '', priority: 'NORMAL', checklist: '' });
+  const [projectOptions, setProjectOptions] = useState<PickerOption[]>([]);
+
+  useEffect(() => {
+    setProjectOptions(projects.map((p) => ({ id: p.id, label: `${p.code} — ${p.nameEn}`, keywords: p.code })));
+  }, [projects]);
+
   const submit = async () => {
     setBusy(true); setError(null);
     try {
@@ -297,10 +289,28 @@ function CreateWorkOrderModal({
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.operations.title')} required><input className="oryx-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="work-order-title" /></Field>
         <Field label={t('erp.operations.project')}>
-          <select className="oryx-select" value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })} data-testid="work-order-project">
-            <option value="">—</option>
-            {projects.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.nameEn}</option>)}
-          </select>
+          <SearchableSelect
+            testId="work-order-project"
+            value={form.projectId}
+            onChange={(id) => setForm({ ...form, projectId: id })}
+            options={projectOptions}
+            placeholder={t('common.selectPlaceholder')}
+            labels={pickerLabels}
+            renderCreate={
+              can('erp.operations.project.manage')
+                ? (props) => (
+                    <ProjectFormModal
+                      open={props.open}
+                      onClose={props.onClose}
+                      onSaved={(p) => {
+                        setProjectOptions((prev) => [...prev, { id: p.id, label: `${p.code} — ${p.nameEn}`, keywords: p.code }]);
+                        props.onCreated({ id: p.id, label: `${p.code} — ${p.nameEn}` });
+                      }}
+                    />
+                  )
+                : undefined
+            }
+          />
         </Field>
         <Field label={t('erp.crm.priority')}>
           <select className="oryx-select" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>

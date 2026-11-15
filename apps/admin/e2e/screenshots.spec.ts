@@ -383,4 +383,53 @@ test.describe('required screenshots', () => {
     await page.waitForTimeout(600);
     await page.screenshot({ path: `${OUT}/e05-integrations-mobile-en-light.png`, fullPage: true });
   });
+  test('execution 20 module dashboards, settings, customers and documents', async ({ page }) => {
+    await signIn(page, COMPANY_ADMIN);
+    await setLocale(page, 'en');
+    await setTheme(page, 'dark');
+    await page.setViewportSize({ width: 1440, height: 1000 });
+
+    // A module dashboard banner in both themes.
+    for (const [theme, suffix] of [['dark', 'dark'], ['light', 'light']] as const) {
+      await setTheme(page, theme);
+      for (const [route, name] of [
+        ['/accounting', 'accounting'],
+        ['/inventory', 'inventory'],
+        ['/purchasing', 'purchasing'],
+        ['/sales', 'sales'],
+      ] as const) {
+        await page.goto(route);
+        await page.waitForTimeout(900);
+        await page.screenshot({ path: `${OUT}/e20-${name}-${suffix}.png`, fullPage: true });
+      }
+    }
+
+    // The settings control center: one namespace panel per section.
+    await setTheme(page, 'dark');
+    await page.goto('/settings');
+    await page.waitForTimeout(1000);
+    await page.screenshot({ path: `${OUT}/e20-settings-general-dark.png`, fullPage: true });
+    for (const ns of ['INVOICING', 'TAX', 'HR', 'MAINTENANCE'] as const) {
+      await page.getByTestId(`settings-tab-${ns}`).click();
+      await page.waitForTimeout(600);
+      await page.screenshot({ path: `${OUT}/e20-settings-${ns.toLowerCase()}-dark.png`, fullPage: true });
+    }
+
+    // Customers: the split list and the two distinct forms.
+    await page.goto('/customers');
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: `${OUT}/e20-customers-list-dark.png`, fullPage: true });
+    await page.getByTestId('new-company').click();
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: `${OUT}/e20-customer-company-form-dark.png` });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+
+    // The unified document panel on a customer record.
+    await page.locator('[data-testid^="edit-customer-"]').first().click();
+    await page.getByTestId('customer-tab-documents').click();
+    await page.waitForTimeout(700);
+    await page.screenshot({ path: `${OUT}/e20-customer-documents-dark.png` });
+    await page.keyboard.press('Escape');
+  });
 });

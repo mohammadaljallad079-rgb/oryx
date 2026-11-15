@@ -68,11 +68,17 @@ test.describe('Execution 02 — ERP core interfaces', () => {
 
     // Fill two lines with unequal sides: the indicator must read "not balanced"
     // and the post button must stay disabled.
-    const accountOptions = await page.getByTestId('journal-line-account-0').locator('option').all();
-    const firstValue = await accountOptions[1].getAttribute('value');
-    const secondValue = await accountOptions[2].getAttribute('value');
-    await page.getByTestId('journal-line-account-0').selectOption(firstValue!);
-    await page.getByTestId('journal-line-account-1').selectOption(secondValue!);
+    // The account field is a searchable picker; choose two distinct accounts
+    // from its menu.
+    const pickAccount = async (line: number, which: number) => {
+      const testId = `journal-line-account-${line}`;
+      await page.getByTestId(testId).click();
+      const options = page.getByTestId(`${testId}-menu`).locator('[role="option"]');
+      await expect(options.nth(which)).toBeVisible({ timeout: 10_000 });
+      await options.nth(which).click();
+    };
+    await pickAccount(0, 0);
+    await pickAccount(1, 1);
     await page.getByTestId('journal-line-debit-0').fill('100.00');
     await page.getByTestId('journal-line-credit-1').fill('99.00');
 

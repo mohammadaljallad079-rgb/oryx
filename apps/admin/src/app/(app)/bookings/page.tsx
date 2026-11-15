@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
+import { ModuleBanner } from '@/components/module-banner';
 import {
   Badge,
   Button,
@@ -54,8 +55,13 @@ const BOOKING_TYPES = ['INSPECTION', 'MAINTENANCE', 'PROVIDER_SERVICE'] as const
  */
 export default function BookingsPage() {
   const { t } = useUi();
-  const { can } = useAuth();
+  const { can, companyId, branchId } = useAuth();
   const [tab, setTab] = useState<'bookings' | 'calendar' | 'resources'>('bookings');
+
+  const dashboard = useAsync(
+    () => api.moduleDashboard('booking_engine', { companyId: companyId ?? undefined, branchId: branchId ?? undefined }),
+    [companyId, branchId],
+  );
   const [status, setStatus] = useState('');
   const [bookingType, setBookingType] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
@@ -73,6 +79,8 @@ export default function BookingsPage() {
 
   return (
     <div className="flex flex-col gap-5" data-testid="bookings-page">
+      <ModuleBanner data={dashboard.data} loading={dashboard.loading} moduleKey="booking_engine" />
+
       <SectionHeader
         title={t('nav.booking_engine')}
         subtitle={t('erp.booking.subtitle')}
