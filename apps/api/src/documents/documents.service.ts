@@ -318,6 +318,10 @@ export class DocumentsService {
     // The faces are spliced in so the footer renders in the same embedded stack
     // as the body, on any machine.
     const footerFaces = `<style>${await this.renderer.baseStyles()}</style>`;
+    // The faint Auto Park seal inside the ORYX authorisation box is part of the
+    // vehicle-inspection cover only, so the financial documents (which share the
+    // same footer band) keep their approved signature boxes untouched.
+    const signatureSeal = args.payload.kind === 'INSPECTION_REPORT';
     const footerHtml = footerFaces +
       (layout === 'official'
         ? officialFooterTemplate(args.issuer)
@@ -327,7 +331,7 @@ export class DocumentsService {
     // the renderer splices onto page one. Financial layouts paint one band on
     // every page and need no second pass.
     const coverFooterHtml =
-      layout === 'official' ? undefined : footerFaces + officialFooterTemplate(args.issuer);
+      layout === 'official' ? undefined : footerFaces + officialFooterTemplate(args.issuer, signatureSeal);
     const { pdf, pageCount } = await this.renderer.render(html, {
       footerHtml,
       coverFooterHtml,
@@ -497,7 +501,9 @@ export class DocumentsService {
           documentNumber,
         });
     const coverFooterHtml =
-      payload.kind === 'INSPECTION_REPORT' ? officialFooterTemplate(issuer) : undefined;
+      payload.kind === 'INSPECTION_REPORT'
+        ? officialFooterTemplate(issuer, true)
+        : undefined;
     const { pdf, pageCount } = await this.renderer.render(html, {
       footerHtml,
       coverFooterHtml,

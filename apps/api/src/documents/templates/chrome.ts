@@ -185,7 +185,7 @@ export const CONTACT_ICON_GLOBE =
  * there, so the Arabic closing line relies on the host's fallback face and the
  * logo is a data URI rather than an embedded file.
  */
-function brandBand(issuer: DocumentIssuer): string {
+function brandBand(issuer: DocumentIssuer, signatureWatermark = false): string {
   // The reference prints two bordered signature boxes on the outer edges with a
   // compact ORYX lockup and the closing line centred between them (measured
   // boxes x14-254 and x341-581, y755-807; the centre lockup at x257-337). The
@@ -197,13 +197,22 @@ function brandBand(issuer: DocumentIssuer): string {
   const box =
     'flex:0 0 auto;width:239.8pt;height:51.8pt;box-sizing:border-box;' +
     'border:0.75px solid #a3b1c2;border-radius:6pt;padding:5pt 9pt;white-space:nowrap;';
+  // The faint brand mark laid inside the ORYX authorisation box is opt-in: only
+  // the vehicle-inspection cover asks for it, so the financial documents keep
+  // their approved signature boxes untouched.
+  const seal = signatureWatermark && issuer.logoDataUri
+    ? `<img class="issuer-signature-watermark" src="${esc(issuer.logoDataUri)}" alt="" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:112pt;max-height:39pt;object-fit:contain;opacity:0.11;pointer-events:none;">`
+    : '';
   const label = 'font-size:7.5pt;font-weight:700;color:#0f2b48;';
   const labelAr = 'font-size:7.5pt;font-weight:700;color:#0f2b48;direction:rtl;unicode-bidi:embed;';
   return `
   <div style="padding:0 14pt;display:flex;align-items:flex-start;justify-content:space-between;">
-    <div style="${box}">
-      <span style="${label}">Authorized Stamp &amp; Signature</span>
-      <span style="${labelAr}">اعتماد المركز</span>
+    <div style="${box}position:relative;overflow:hidden;">
+      ${seal}
+      <div style="position:relative;z-index:1;">
+        <span style="${label}">Authorized Stamp &amp; Signature</span>
+        <span style="${labelAr}">اعتماد المركز</span>
+      </div>
     </div>
     <div style="flex:0 0 auto;width:80pt;text-align:center;padding-top:1pt;line-height:1.15;">
       ${mark}
@@ -227,7 +236,7 @@ function brandBand(issuer: DocumentIssuer): string {
  * template, so it lives inside the bottom margin and cannot push content onto a
  * blank page.
  */
-export function officialFooterTemplate(issuer: DocumentIssuer): string {
+export function officialFooterTemplate(issuer: DocumentIssuer, signatureWatermark = false): string {
   const base = [
     "font-family:'ORYX Latin','ORYX Arabic','ORYX Sans',Verdana,Arial,sans-serif",
     'color:#64748b',
@@ -235,7 +244,7 @@ export function officialFooterTemplate(issuer: DocumentIssuer): string {
   ].join(';');
   return `
 <div style="${base};width:100%;box-sizing:border-box;position:relative;top:14.8pt;">
-  ${brandBand(issuer)}
+  ${brandBand(issuer, signatureWatermark)}
   ${contactRow(issuer)}
 </div>`;
 }
