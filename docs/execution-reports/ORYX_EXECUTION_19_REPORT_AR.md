@@ -530,3 +530,61 @@ http://localhost:3002/verify/gnIdQw7_Hm9OnX7ZQQfFxripqJwscrbtZH0YQ24TXVQ
 - **لم يُنشر إلى الإنتاج** — يتطلب تفويضاً صريحاً.
 
 > أُنشئ هذا الملحق بواسطة وكيل ذكاء اصطناعي (OpenHands) نيابةً عن مالك المستودع.
+
+---
+
+## ملحق — روابط المعاينة المباشرة (الفحوصات، صور الفورم، ملفات PDF)
+
+جميع الروابط التالية مُتحقَّق منها وتعمل (HTTP 200) على مضيف المعاينة:
+
+### 1) ملفات PDF المُنتَجة والمراجع
+
+| الملف | الرابط |
+| --- | --- |
+| تقرير الفحص المُنتَج (5 صفحات) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/inspection-report-rendered.pdf |
+| تقرير الفحص مع صورة ورمز QR | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/inspection-report-with-photo-qr.pdf |
+| المرجع المعتمد لتقرير الفحص | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/reference-inspection.pdf |
+| الفاتورة الضريبية المُنتَجة | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/tax-invoice-rendered.pdf |
+| الفاتورة (نسخة الجلسة الثانية) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/session2/invoice-rendered.pdf |
+| عرض السعر المُنتَج | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/session2/quotation-rendered.pdf |
+| تقرير الفحص (نسخة الجلسة الثانية) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/session2/report-rendered.pdf |
+
+### 2) صور الفورم (فحوصات السيارات)
+
+| الصورة | الرابط |
+| --- | --- |
+| نموذج الخدمات — كل الحقول | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/form-inspections-services.png |
+| نموذج الحجوزات — كل الحقول | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/form-inspections-bookings.png |
+| نموذج أوامر العمل — كل الحقول | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/form-inspections-jobs.png |
+| نموذج المركبات — كل الحقول | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/form-inspections-vehicles.png |
+| سجل الفحوصات (حي) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/live/07-inspections.png |
+| نافذة إنشاء الفحص (حي) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/live/08-inspection-create-modal.png |
+
+### 3) صور شاشات الفحوصات (فاتح/داكن)
+
+| الصورة | الرابط |
+| --- | --- |
+| خدمات الفحص — فاتح | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/inspection-services-light-en.png |
+| خدمات الفحص — داكن | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/inspection-services-dark-en.png |
+| حجز الفحص — فاتح | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/inspection-booking-light-en.png |
+| حجز الفحص — داكن | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/inspection-booking-dark-en.png |
+
+### 4) تفاصيل بنود الفاتورة
+
+| الصورة | الرابط |
+| --- | --- |
+| تفاصيل البنود — فاتح | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/invoice-breakdown-light-en.png |
+| تفاصيل البنود — داكن | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/invoice-breakdown-dark-en.png |
+
+### 5) صفحات ومقارنات
+
+| الغرض | الرابط |
+| --- | --- |
+| صفحة الأدلة الكاملة (كل الصور والملفات) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/index.html |
+| مقارنة تقرير الفحص صفحة بصفحة (1) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/sbs-p1.png |
+| مقارنة الفاتورة (مرجع/نظامنا) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/invoice-sbs.png |
+| مقارنة التذييل | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/footer-compare.png |
+| لوحة الإدارة (معاينة حية) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/login |
+| قسم فحوصات السيارات (حي) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/automotive/inspections |
+
+> أُنشئ هذا الملحق بواسطة وكيل ذكاء اصطناعي (OpenHands) نيابةً عن مالك المستودع.
