@@ -667,3 +667,79 @@ https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/index
 - لوحة المرفقات (مكان رفع الملف): https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/inspection-computer-attachments.png
 
 > أُنشئ هذا الملحق بواسطة وكيل ذكاء اصطناعي (OpenHands) نيابةً عن مالك المستودع.
+
+---
+
+## ملحق الجلسة السادسة — إغلاق الأدلة المفقودة وإثبات فكّ QR بصورة مركبة
+
+استُكملت في هذه الجلسة الثغرات الثلاث التي كانت مذكورة كـ«متبقية»: الأدلة التي
+يشير إليها التقرير ولم تكن مُلتزمة في التحكم بالإصدار، وتقرير الفحص المصوّر،
+ومقارنة العلامة المائية.
+
+### 1) الأدلة المنشورة (كانت 404)
+
+كان التقرير يشير إلى **38 مسار دليل** تُرجع `404` لأن الملفات أُنتجت أثناء العمل
+ولم تُلتزم. التُزمت الآن **117 ملف دليل** تحت `.run/evidence/exec19`، وصار كل
+مسار في التقرير يُرجع **200**.
+
+| ما كان | ما صار |
+| --- | --- |
+| 38 مساراً يرجع 404 | **0 مسار يرجع 404** |
+| صور الفورم في الجذر | `screens/form-inspections-*.png` (4 صور) |
+| فهرس الأدلة | `index.html` يربط **116 عنصراً** |
+
+**فحص التكرار:** كل صورة بصمة `md5` فريدة — **صفر تكرار**، فلا تُنشر صورة واحدة
+تحت اسمين.
+
+### 2) تقرير الفحص المصوّر مع QR (`inspection-report-with-photo-qr.pdf`)
+
+أُصدر التقرير عبر **الـ API الحقيقي** للمركبة `JN1TBNT32Z0123456` التي تحمل مرفق
+صورة فعلية (`vehicle-photo`)، فظهرت الصورة الحقيقية في شريط الغلاف ورمز QR
+فوقها. **لم تُصنع صورة وهمية**؛ الصورة مرفوعة في قاعدة البيانات.
+
+- رقم المستند: `Z00460` — **5 صفحات** — 1,070,542 بايت.
+- فُكّ رمز QR من الملف المُنتَج بمُفكِّك OpenCV حقيقي، فأعاد:
+  `http://localhost:3002/verify/j7Ss3TeX5ZTSK1TeqMLrJR2dQt3M0HbjVXzOGGyAvZI`
+- الرمز موجود على **كل الصفحات الخمس**، وفتح الرابط أعاد حالة **VALID**.
+- عنوان التحقق يأتي من `DOCUMENT_VERIFY_BASE_URL` (والإنتاج يرفض `localhost`).
+
+### 3) العلامة المائية — إثبات بالقياس
+
+قِيست العلامة المائية في المرجع `oryx 22.pdf` وفي فاتورتنا المُنتَجة، فكانتا
+**متطابقتين هندسياً**: النص `AUTO SERVICES`، حجم الخط `51.7pt`، الموضع
+`y≈374.4`، والعرض `57.5→533.6` مقابل `57.1→533.1` — فرق ≤ 0.5 نقطة.
+
+### 4) الفحوصات في هذه الجلسة (كلها فعلية على الكود الحالي)
+
+| الحزمة | النتيجة |
+| --- | --- |
+| تكامل الـ API (`test:e2e`) | **41 حزمة / 749 اختباراً ناجحاً** |
+| وحدة المشترك (`@oryx/shared`) | **12 ملفاً / 236 اختباراً ناجحاً** |
+| واجهة Playwright (اللوحة كاملة) | **280 ناجحاً، 1 متجاوَز، 0 فشل** |
+| وحدة الجوال (`@oryx/mobile`) | **10 ملفات / 206 اختباراً ناجحاً** |
+| وحدة المستندات وQR | **4 حزم / 72 اختباراً ناجحاً** |
+| بناء الإنتاج (api + admin + customer) | **ناجح** |
+| فحص Lint (admin + customer) | **ناجح** |
+
+### 5) روابط المعاينة
+
+- فهرس الأدلة الكامل: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/index.html
+- تقرير الفحص المصوّر مع QR: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/inspection-report-with-photo-qr.pdf
+- تقرير الفحص المُنتَج: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/inspection-report-rendered.pdf
+- الفاتورة المُنتَجة: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/tax-invoice-rendered.pdf
+- المرجع `oryx 22.pdf`: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/reference-invoice-quotation.pdf
+- نموذج الفحص: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/form-inspections-bookings.png
+- هيكل الشاسيه: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/verify-chassis-diagram.png
+- مخطط الصبغ (Body): https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/verify-body-diagram.png
+- أنواع الفحص: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/inspection-type-paint.png
+- مرفقات فحص الكمبيوتر: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/inspection-computer-attachments.png
+
+### 6) الحالة الصريحة
+
+- **لم يُنشر إلى الإنتاج** (يتطلب تفويضاً صريحاً).
+- الفرع `fix/execution-19-inspection-parity` وطلب الدمج **#17** قائمان، والقاعدة
+  `release/oryx-latest`.
+- المتطلبات 1–7 مغطاة باختبارات حقيقية؛ لم يبقَ بند وظيفي معلّق، والفروق البصرية
+  المتبقية طفيفة في تباعد بكسلي لا تمسّ المحتوى ولا الحسابات.
+
+> أُنشئ هذا الملحق بواسطة وكيل ذكاء اصطناعي (OpenHands) نيابةً عن مالك المستودع.
