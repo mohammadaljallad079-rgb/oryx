@@ -54,7 +54,13 @@ export function money(minor: number, scale = 3): string {
   return (minor / 10 ** scale).toFixed(scale);
 }
 
-/** The shape `GET /customer/catalog/products/:id` returns. */
+/**
+ * The marketplace catalogue projection (`GET /customer/catalog/products/:id`).
+ *
+ * The legacy `/products` storefront reads this shape; the new `/store`
+ * storefront reads `ProductLike` below. Both are kept because both routes are
+ * live.
+ */
 export interface CatalogProductLike {
   id: string;
   sku: string;
@@ -73,8 +79,46 @@ export interface CatalogCategoryLike {
   imageUrl: string | null;
 }
 
+/** The public storefront product projection (`GET /storefront/products/:sku`). */
+export interface ProductLike {
+  sku: string;
+  partNumber: string | null;
+  nameEn: string;
+  nameAr: string;
+  brand: string | null;
+  categoryKey: string | null;
+  condition: 'NEW' | 'REFURBISHED';
+  priceMinor: number;
+  currency: string;
+  currencyScale: number;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
+  image: string;
+  inStock: boolean;
+}
+
+export interface ServiceLike {
+  key: string;
+  nameEn: string;
+  nameAr: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  image: string;
+}
+
+export interface BranchLike {
+  id: string;
+  nameEn: string;
+  nameAr: string;
+  city: string | null;
+  addressLine: string | null;
+  phone: string | null;
+  email: string | null;
+  image: string | null;
+}
+
 /**
- * Product structured data.
+ * Product structured data for the marketplace catalogue.
  *
  * Prices are published in BHD (ISO 4217, three decimals). An out-of-stock item
  * is emitted as `OutOfStock` rather than omitted, so a search engine does not
@@ -103,6 +147,36 @@ export function productJsonLd(product: CatalogProductLike): Record<string, unkno
   };
 }
 
+/** Product structured data for the storefront `/store/:sku` projection. */
+export function storefrontProductJsonLd(product: ProductLike): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.nameEn,
+    ...(product.nameAr ? { alternateName: product.nameAr } : {}),
+    sku: product.sku,
+    ...(product.partNumber ? { mpn: product.partNumber } : {}),
+    ...(product.brand ? { brand: { '@type': 'Brand', name: product.brand } } : {}),
+    ...(product.descriptionEn ? { description: product.descriptionEn } : {}),
+    image: absoluteAsset(product.image),
+    ...(product.categoryKey ? { category: product.categoryKey } : {}),
+    itemCondition:
+      product.condition === 'NEW'
+        ? 'https://schema.org/NewCondition'
+        : 'https://schema.org/RefurbishedCondition',
+    offers: {
+      '@type': 'Offer',
+      url: `${SITE_URL}/store/${product.sku}`,
+      priceCurrency: product.currency,
+      price: money(product.priceMinor, product.currencyScale),
+      availability: product.inStock
+        ? 'https://schema.org/InStock'
+        : 'https://schema.org/OutOfStock',
+      seller: { '@type': 'Organization', name: 'ORYX Auto Services' },
+    },
+  };
+}
+
 /** ItemList of a catalogue page, so search engines understand the listing. */
 export function productListJsonLd(
   products: CatalogProductLike[],
@@ -122,13 +196,8 @@ export function productListJsonLd(
   };
 }
 
-/** A single ORYX service offering. */
-export function serviceJsonLd(service: {
-  key: string;
-  nameEn: string;
-  nameAr: string;
-  descriptionEn?: string | null;
-}): Record<string, unknown> {
+/** A single ORYX service offering, from the storefront service record. */
+export function serviceJsonLd(service: ServiceLike): Record<string, unknown> {
   return {
     '@context': 'https://schema.org',
     '@type': 'Service',
@@ -136,7 +205,8 @@ export function serviceJsonLd(service: {
     ...(service.nameAr ? { alternateName: service.nameAr } : {}),
     ...(service.descriptionEn ? { description: service.descriptionEn } : {}),
     serviceType: service.nameEn,
-    url: `${SITE_URL}/services?category=${encodeURIComponent(service.key)}`,
+    url: `${SITE_URL}/services/${service.key}`,
+    ...(service.image ? { image: absoluteAsset(service.image) } : {}),
     provider: { '@type': 'Organization', name: 'ORYX Auto Services' },
     areaServed: { '@type': 'Country', name: 'Bahrain' },
   };
@@ -160,6 +230,37 @@ export function localBusinessJsonLd(): Record<string, unknown> {
       'ORYX automotive services: inspections, maintenance, repair and genuine spare parts in Bahrain.',
     areaServed: { '@type': 'Country', name: 'Bahrain' },
     priceRange: 'BHD',
+  };
+}
+
+/**
+ * AutoRepair with the real published branches as departments.
+ *
+ * Emitted from the branches/home layouts, which read the same public branch
+ * endpoint the pages do, so a department is only advertised when the owner has
+ * published that branch.
+ */
+export function autoRepairJsonLd(branches: BranchLike[]): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'AutoRepair',
+    name: 'ORYX Auto Services',
+    url: SITE_URL,
+    image: `${SITE_URL}/media/hero-services.jpg`,
+    logo: `${SITE_URL}/brand/oryx-logo.png`,
+    address: { '@type': 'PostalAddress', addressCountry: 'BH' },
+    department: branches.map((branch) => ({
+      '@type': 'AutoRepair',
+      name: branch.nameEn,
+      ...(branch.phone ? { telephone: branch.phone } : {}),
+      ...(branch.email ? { email: branch.email } : {}),
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: branch.addressLine ?? undefined,
+        addressLocality: branch.city ?? undefined,
+        addressCountry: 'BH',
+      },
+    })),
   };
 }
 

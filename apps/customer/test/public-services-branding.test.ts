@@ -66,7 +66,7 @@ describe('public services branding', () => {
   it('never links the customer chrome or public pages into a supplier directory', () => {
     const files = [
       ['components', 'site-chrome.tsx'],
-      ['app', 'page.tsx'],
+      ['app', '(home)', 'page.tsx'],
       ['app', 'services', 'page.tsx'],
       ['app', 'categories', 'page.tsx'],
       ['app', 'products', '(list)', 'page.tsx'],

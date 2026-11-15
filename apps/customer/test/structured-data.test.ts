@@ -125,9 +125,11 @@ describe('serviceJsonLd', () => {
       nameEn: 'Vehicle inspection',
       nameAr: 'فحص المركبات',
       descriptionEn: 'Periodic inspection.',
+      descriptionAr: 'فحص دوري.',
+      image: '/media/hero-inspection.jpg',
     }) as unknown as ServiceLd;
     expect(ld['@type']).toBe('Service');
-    expect(ld.url).toBe('http://localhost:3002/services?category=vehicle_inspection');
+    expect(ld.url).toBe('http://localhost:3002/services/vehicle_inspection');
     expect(ld.provider.name).toBe('ORYX Auto Services');
   });
 });

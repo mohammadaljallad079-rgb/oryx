@@ -1306,6 +1306,67 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   (`accounting-tab-accounts`, `inventory-tab-valuation`, `payments-tab-intents`,
   …); the module-dashboards work made `dashboard` the default for each.
 
+### Customer website (Execution 04) gotchas
+
+- **The customer browser must never be given an absolute API base.**
+  `NEXT_PUBLIC_*` values are inlined at build time, and the shared root `.env`
+  sets `NEXT_PUBLIC_API_BASE_URL="http://localhost:3001/api"` for the staff
+  apps. The customer site always has its own `/api` rewrite (see
+  `apps/customer/next.config.ts`), so `apps/customer/src/lib/api.ts` reads a
+  customer-specific `NEXT_PUBLIC_CUSTOMER_API_BASE_URL ?? '/api'`. Reusing the
+  staff variable bakes `http://…` into the client bundle, which becomes mixed
+  content the moment the site is served over HTTPS.
+- **Server-side SEO fetches need an absolute origin.** Node's `fetch` cannot
+  resolve `/api`. `apps/customer/src/lib/structured-data.ts` exports
+  `SERVER_API_BASE`, which ignores a relative base and falls back to
+  `ORYX_API_BASE_URL` / `http://127.0.0.1:3001/api`. `publicFetch` and
+  `apps/customer/src/app/sitemap.ts` both use it; without it the sitemap loses
+  the whole catalogue and product pages lose their Product/Offer JSON-LD.
+- **Never put two `product-grid` test ids on one page.** The store page renders
+  a featured rail and the main grid; `ProductGrid` takes a `testId` prop and the
+  featured rail passes `featured-grid`, so the E2E selector stays unambiguous.
+- **The booking wizard must not default to a closed day.** Bahrain's weekend is
+  Friday/Saturday, so "tomorrow" often has zero slots. The wizard loads day
+  availability from `GET /storefront/availability/days` (which reuses
+  `BookingService.availableSlots`), disables closed days and auto-selects the
+  first open one. Keep the availability engine as the single source of truth for
+  what is bookable.
+- **Interior page banners are theme-aware.** `PageHead` with an `image` renders
+  `.oryx-page-head--banner`; its background, veil and text colours come from the
+  `--banner-*` tokens, which differ per theme (navy veil + white text in dark,
+  ivory veil + navy text in light). Never hard-code `var(--navy)` or white text
+  in that rule — the banner then ignores the light theme and stays dark.
+
+### Public storefront: the WhatsApp contact channel
+
+- **The WhatsApp number is site content, not a constant.** It lives in
+  `SiteContent.contact.whatsapp` (`packages/shared/src/site-content.ts`), is
+  edited in the admin console (`apps/admin/src/app/(app)/website`), and is read
+  by the website through `useSiteContent()`. The approved default is
+  `+973 3885 8595`. Do not hard-code a number in a component; a change must be
+  possible from the console.
+- **Display value and dial value differ.** `whatsappLink()` in the shared
+  package strips everything but digits before building `https://wa.me/<digits>`,
+  so `+973 3885 8595` becomes `97338858595`. Always route a WhatsApp link
+  through it (or the app-side `siteWhatsappLink`), never string-concatenate a
+  `wa.me` URL.
+- **Product enquiry text is built on the server and the client.** Use
+  `productEnquiryMessage` plus the deterministic `productUrl(sku)` helper (it
+  reads `NEXT_PUBLIC_SITE_URL`, not `window.location`) so the pre-filled chat
+  text is identical on both renders and hydration does not mismatch.
+- **Hide the action when no number is configured.** `whatsappLink` returns
+  `null` for an empty or too-short number, and every WhatsApp component renders
+  nothing in that case — a dead `wa.me` link is worse than no button.
+- **`.oryx-desktop-only` must be hidden by a class, not an inline style.** The
+  header's signed-in/guest group once carried `style={{display:'inline-flex'}}`,
+  which beat the `max-width: 920px` `display:none` rule and produced horizontal
+  overflow on small English screens. It is now the `.oryx-header-auth` class;
+  keep the display in CSS so the media query wins.
+- **Do not select the checkout gate by the text "Sign in".** The header's own
+  sign-in link is hidden on mobile, so a `getByText(/sign in/i).first()` match
+  lands on a hidden node and times out. The checkout page's gate carries
+  `data-testid="checkout-signin"`; assert on that.
+
 ### Adding a new ERP module
 
 1. Add a `ModuleDefinition` to `packages/shared/src/modules.ts`.

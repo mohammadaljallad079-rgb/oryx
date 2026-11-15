@@ -11,6 +11,7 @@ import {
 } from 'react';
 import {
   resolveSiteContent,
+  type Locale,
   type SectionHeadingContent,
   type SiteContent,
 } from '@oryx/shared';
@@ -39,15 +40,14 @@ const SiteContentContext = createContext<SiteContentContextValue | null>(null);
  * Website content provider.
  *
  * The site renders the approved defaults on the server so the first paint is
- * never empty; after hydration this fetches the administrator's stored document
- * from the canonical CMS endpoint and swaps it in. A fetch failure keeps the
- * defaults rather than blanking a section. The brand palette is applied to the
- * document root so the admin can retune the gold/navy/ivory accents without a
- * rebuild.
+ * never empty; after hydration this fetches the administrator's stored
+ * document and swaps it in. A fetch failure keeps the defaults rather than
+ * blanking a section. The brand palette is applied to the document root so the
+ * admin can retune the gold/navy/ivory accents without a rebuild.
  */
 export function SiteContentProvider({ children }: { children: ReactNode }) {
   const { locale } = useUi();
-  const [documents, setDocuments] = useState<Partial<Record<'ar' | 'en', SiteContent>>>({});
+  const [documents, setDocuments] = useState<Partial<Record<Locale, SiteContent>>>({});
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -74,6 +74,7 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
     [documents, locale],
   );
 
+  // Apply the administrator's palette to the document root as CSS variables.
   useEffect(() => {
     const root = document.documentElement;
     const p = content.palette;

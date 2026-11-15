@@ -1,86 +1,72 @@
 'use client';
 
 import Link from 'next/link';
-import { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useUi } from '@/lib/ui-context';
-import { SERVICE_CATEGORIES } from '@/lib/api';
-import { LoadingPanel } from '@/components/premium';
-import { Icon } from '@/components/icons';
+import { publicApi, type StorefrontService } from '@/lib/api';
+import { EmptyState, Loading, PageHead, SectionHead } from '@/components/ui';
+import { FeaturedProducts, ServiceCard } from '@/components/storefront';
 
-/**
- * ORYX service catalogue.
- *
- * A customer books an ORYX service directly, so this page lists the services
- * the company offers and routes each one into booking — there is no supplier
- * directory between the customer and the service. The category filter reads
- * `useSearchParams`, which forces a client bail-out during prerender, so the
- * interactive part sits behind Suspense.
- */
+/** The ten automotive services, from the shared taxonomy via the storefront API. */
 export default function ServicesPage() {
+  const { t } = useUi();
+  const [services, setServices] = useState<StorefrontService[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    publicApi
+      .storefrontServices()
+      .then((rows) => {
+        if (active) setServices(rows);
+      })
+      .catch(() => {
+        if (active) setServices([]);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
-    <Suspense
-      fallback={
+    <>
+      <PageHead
+        eyebrow={t('home.services')}
+        title={t('services.title')}
+        subtitle={t('services.subtitle')}
+        image="/media/hero-maintenance.jpg"
+        breadcrumb={[{ label: t('common.home'), href: '/' }, { label: t('nav.services') }]}
+      />
+
+      <section className="oryx-section">
         <div className="oryx-container">
-          <LoadingPanel rows={4} />
-        </div>
-      }
-    >
-      <ServicesCatalogue />
-    </Suspense>
-  );
-}
-
-function ServicesCatalogue() {
-  const { t, locale } = useUi();
-  const params = useSearchParams();
-  const selected = params.get('category');
-  const categories = selected
-    ? SERVICE_CATEGORIES.filter((c) => c.key === selected)
-    : SERVICE_CATEGORIES;
-
-  return (
-    <div className="oryx-container">
-      <header className="oryx-section-head">
-        <h1 className="oryx-section-title">{t('services.title')}</h1>
-        <p className="oryx-muted">{t('services.subtitle')}</p>
-      </header>
-
-      <div className="oryx-grid oryx-grid--cards">
-        {categories.map((category) => (
-          <article key={category.key} className="oryx-service-card">
-            <span
-              className="oryx-service-card__art"
-              style={{ backgroundImage: `url(${category.art})` }}
-              aria-hidden
-            />
-            <div className="oryx-service-card__body">
-              <h2 className="oryx-card-title">
-                {locale === 'ar' ? category.nameAr : category.nameEn}
-              </h2>
-              <p className="oryx-muted oryx-service-card__desc">
-                {locale === 'ar' ? category.descAr : category.descEn}
-              </p>
-              <div className="oryx-service-card__actions">
-                <Link
-                  href={`/products?category=${category.key}`}
-                  className="oryx-btn oryx-btn-sm"
-                >
-                  <Icon name="cart" size={15} />
-                  {t('nav.products')}
-                </Link>
-                <Link
-                  href={`/bookings?category=${category.key}`}
-                  className="oryx-btn oryx-btn-sm oryx-btn-primary"
-                >
-                  <Icon name="calendar" size={15} />
-                  {t('home.ctaBook')}
-                </Link>
-              </div>
+          <SectionHead
+            title={t('home.services')}
+            subtitle={t('home.servicesSub')}
+            action={
+              <Link href="/booking" className="oryx-btn oryx-btn-primary">
+                {t('nav.book')}
+              </Link>
+            }
+          />
+          {loading ? (
+            <Loading />
+          ) : services.length === 0 ? (
+            <EmptyState message={t('services.none')} />
+          ) : (
+            <div className="oryx-grid oryx-grid-3" data-testid="service-grid">
+              {services.map((service) => (
+                <ServiceCard key={service.key} service={service} />
+              ))}
             </div>
-          </article>
-        ))}
-      </div>
-    </div>
+          )}
+        </div>
+      </section>
+
+      <FeaturedProducts title={t('store.featured')} subtitle={t('store.featuredSubtitle')} limit={4} />
+    </>
   );
 }

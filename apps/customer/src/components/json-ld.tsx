@@ -1,16 +1,16 @@
-/**
- * Renders a JSON-LD block.
- *
- * The data is JSON we build ourselves from catalogue rows, so it is safe to
- * inline; `<` is escaped anyway so a product name containing `</script>` cannot
- * break out of the element. It is a server component, so the block is present in
- * the first HTML response a crawler sees.
- */
-export function JsonLd({ data }: { data: Record<string, unknown> }) {
+/** Renders one or more JSON-LD blocks into the document head/body. */
+export function JsonLd({ data }: { data: Record<string, unknown> | Array<Record<string, unknown>> }) {
+  const blocks = Array.isArray(data) ? data : [data];
   return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, '\\u003c') }}
-    />
+    <>
+      {blocks.map((block, index) => (
+        <script
+          key={index}
+          type="application/ld+json"
+          // The payload is built from our own typed data, never user HTML.
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(block) }}
+        />
+      ))}
+    </>
   );
 }

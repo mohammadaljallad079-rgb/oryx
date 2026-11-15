@@ -1,152 +1,83 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useUi } from '@/lib/ui-context';
-import { useCustomerAuth } from '@/lib/auth-context';
 import { useSiteContent } from '@/lib/site-content-context';
-import { IS_STATIC_PREVIEW, previewNotice } from '@/lib/preview-data';
-import { BrandLogo } from '@/components/brand-logo';
-import { Icon } from '@/components/icons';
+import { useCustomerAuth } from '@/lib/auth-context';
+import { useCart } from '@/lib/cart-context';
 
-/**
- * The notice that marks the static GitHub Pages build.
- *
- * It is rendered once, at the top of every page, rather than per screen, so a
- * visitor cannot mistake the exported preview for the live platform. It renders
- * nothing in a normal build.
- */
-function PreviewStrip() {
-  const { t, locale } = useUi();
-  if (!IS_STATIC_PREVIEW) return null;
-  return (
-    <div className="oryx-preview-strip" role="note" data-testid="preview-strip">
-      <div className="oryx-container oryx-preview-strip__inner">
-        <span className="oryx-preview-strip__badge">{t('preview.badge')}</span>
-        <span className="oryx-preview-strip__text">{previewNotice(locale)}</span>
-      </div>
-    </div>
-  );
-}
-
-/**
- * The public navigation.
- *
- * These are the browsing destinations a visitor — signed in or not — can use.
- * The private account functions (bookings, orders, invoices, quotations,
- * returns, the garage, notifications and the profile) deliberately do not
- * appear here; they live in the account menu so a visitor is never offered a
- * link the API would refuse. See `ACCOUNT_LINKS` below.
- */
-const PUBLIC_LINKS = [
+const NAV = [
   { href: '/', key: 'nav.home' },
-  { href: '/categories', key: 'nav.categories' },
-  { href: '/products', key: 'nav.products' },
   { href: '/services', key: 'nav.services' },
+  { href: '/booking', key: 'nav.book' },
+  { href: '/store', key: 'nav.store' },
+  { href: '/offers', key: 'nav.offers' },
+  { href: '/branches', key: 'nav.branches' },
   { href: '/about', key: 'nav.about' },
   { href: '/contact', key: 'nav.contact' },
 ];
 
-/** Account destinations, in the order the menu presents them. */
-const ACCOUNT_LINKS = [
-  { href: '/dashboard', key: 'account.nav.overview', icon: 'grid' as const },
-  { href: '/bookings', key: 'account.nav.bookings', icon: 'calendar' as const },
-  { href: '/garage', key: 'account.nav.garage', icon: 'car' as const },
-  { href: '/orders', key: 'account.nav.orders', icon: 'cart' as const },
-  { href: '/rfqs', key: 'account.nav.rfqs', icon: 'clipboard' as const },
-  { href: '/quotations', key: 'account.nav.quotations', icon: 'file' as const },
-  { href: '/invoices', key: 'account.nav.invoices', icon: 'wallet' as const },
-  { href: '/returns', key: 'account.nav.returns', icon: 'arrow' as const },
-  { href: '/my-credits', key: 'account.nav.credits', icon: 'wallet' as const },
-  { href: '/notifications', key: 'account.nav.notifications', icon: 'bell' as const },
-  { href: '/profile', key: 'account.nav.profile', icon: 'user' as const },
-  { href: '/support', key: 'account.nav.support', icon: 'headset' as const },
-];
+/** The approved ORYX wordmark, themed for the current surface. */
+function BrandLogo({ theme }: { theme: 'dark' | 'light' }) {
+  const src = theme === 'dark' ? '/brand/oryx-logo-dark.png' : '/brand/oryx-logo.png';
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img className="oryx-brand-logo" src={src} alt="ORYX" width={140} height={35} />
+  );
+}
 
 /**
  * Public site header.
  *
- * Two rows: a brand/search/actions row and a browsing row. Navigation is
- * identical in both directions — the markup order is fixed and the document
- * direction flips it, so nothing is duplicated for RTL.
- *
- * Below 900px the browsing row is replaced by a disclosure panel and the
- * account menu becomes a section of that panel, so no destination is
- * unreachable on a phone.
+ * Navigation is identical in both directions: the markup order is fixed and the
+ * document direction flips it, so nothing is duplicated for RTL. The bar is
+ * sticky and collapses into a full-screen panel below the tablet breakpoint.
  */
 export function SiteHeader() {
   const { t, locale, toggleLocale, theme, toggleTheme } = useUi();
   const { isAuthenticated, profile, signOut } = useCustomerAuth();
+  const { count } = useCart();
   const pathname = usePathname();
-  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [accountOpen, setAccountOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const accountRef = useRef<HTMLDivElement | null>(null);
 
-  // A navigation always closes every panel, so the next page is not covered.
   useEffect(() => {
     setMenuOpen(false);
-    setAccountOpen(false);
   }, [pathname]);
 
-  // Close the account menu on an outside click or Escape, so it cannot be left
-  // floating over the page.
   useEffect(() => {
-    if (!accountOpen) return;
-    function onPointer(event: MouseEvent) {
-      if (accountRef.current && !accountRef.current.contains(event.target as Node)) {
-        setAccountOpen(false);
-      }
-    }
-    function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') setAccountOpen(false);
-    }
-    document.addEventListener('mousedown', onPointer);
-    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = menuOpen ? 'hidden' : '';
     return () => {
-      document.removeEventListener('mousedown', onPointer);
-      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
     };
-  }, [accountOpen]);
-
-  function submitSearch(event: React.FormEvent) {
-    event.preventDefault();
-    const trimmed = query.trim();
-    router.push(trimmed ? `/products?query=${encodeURIComponent(trimmed)}` : '/products');
-  }
-
-  const firstName = profile?.fullName?.split(' ')[0];
+  }, [menuOpen]);
 
   return (
     <header className="oryx-header">
-      <PreviewStrip />
       <div className="oryx-container oryx-header-inner">
-        <Link href="/" className="oryx-brand" aria-label="ORYX">
-          <BrandLogo height={30} />
-          <span className="oryx-brand__tagline oryx-muted">{t('brand.tagline')}</span>
+        <Link href="/" className="oryx-brand" aria-label="ORYX Auto Services">
+          <BrandLogo theme={theme} />
         </Link>
 
-        <form className="oryx-search" role="search" onSubmit={submitSearch}>
-          <Icon name="search" size={16} />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t('nav.search')}
-            aria-label={t('nav.search')}
-            data-testid="site-search"
-          />
-          <button type="submit" className="oryx-search__submit">
-            {t('nav.searchAction')}
-          </button>
-        </form>
+        <nav className="oryx-nav" aria-label={t('nav.menu')}>
+          {NAV.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              aria-current={
+                link.href === '/' ? (pathname === '/' ? 'page' : undefined) : pathname.startsWith(link.href) ? 'page' : undefined
+              }
+            >
+              {t(link.key)}
+            </Link>
+          ))}
+        </nav>
 
         <div className="oryx-header-actions">
           <button
             type="button"
-            className="oryx-btn oryx-btn-ghost"
+            className="oryx-btn oryx-btn-ghost oryx-icon-btn"
             onClick={toggleLocale}
             aria-label={t('common.language')}
             data-testid="locale-toggle"
@@ -155,7 +86,7 @@ export function SiteHeader() {
           </button>
           <button
             type="button"
-            className="oryx-btn oryx-btn-ghost"
+            className="oryx-btn oryx-btn-ghost oryx-icon-btn"
             onClick={toggleTheme}
             aria-label={t('common.theme')}
             data-testid="theme-toggle"
@@ -163,248 +94,209 @@ export function SiteHeader() {
             {theme === 'dark' ? '☀' : '☾'}
           </button>
 
-          {isAuthenticated ? (
-            <>
-              <Link
-                href="/cart"
-                className="oryx-btn oryx-btn-ghost oryx-header-icon"
-                aria-label={t('nav.cart')}
-                data-testid="header-cart"
-              >
-                <Icon name="cart" size={18} />
-              </Link>
-              <div className="oryx-account" ref={accountRef}>
+          <Link
+            href="/cart"
+            className="oryx-btn oryx-btn-ghost oryx-icon-btn oryx-cart-link"
+            aria-label={t('nav.cart')}
+            data-testid="cart-link"
+          >
+            <span aria-hidden>🛒</span>
+            {count > 0 && (
+              <span className="oryx-cart-count" data-testid="cart-count">
+                {count}
+              </span>
+            )}
+          </Link>
+
+          <span className="oryx-desktop-only oryx-header-auth">
+            {isAuthenticated ? (
+              <>
+                <Link href="/dashboard" className="oryx-btn">
+                  {profile?.fullName?.split(' ')[0] ?? t('nav.account')}
+                </Link>
                 <button
                   type="button"
-                  className="oryx-btn oryx-header-auth oryx-account__trigger"
-                  onClick={() => setAccountOpen((v) => !v)}
-                  aria-expanded={accountOpen}
-                  aria-haspopup="menu"
-                  aria-label={t('nav.accountMenu')}
-                  data-testid="account-menu-trigger"
+                  className="oryx-btn oryx-btn-ghost"
+                  onClick={() => void signOut()}
                 >
-                  <Icon name="user" size={16} />
-                  <span className="oryx-account__name">{firstName ?? t('nav.account')}</span>
-                  <Icon name="chevron" size={14} />
+                  {t('nav.logout')}
                 </button>
-                {accountOpen && (
-                  <div className="oryx-account__menu" role="menu" data-testid="account-menu">
-                    <p className="oryx-account__header">
-                      <strong>{profile?.fullName}</strong>
-                      <span className="oryx-muted">{profile?.email}</span>
-                    </p>
-                    {ACCOUNT_LINKS.map((link) => (
-                      <Link
-                        key={link.href}
-                        href={link.href}
-                        role="menuitem"
-                        className="oryx-account__item"
-                        aria-current={pathname === link.href ? 'page' : undefined}
-                      >
-                        <Icon name={link.icon} size={16} />
-                        {t(link.key)}
-                      </Link>
-                    ))}
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="oryx-account__item oryx-account__item--danger"
-                      onClick={() => void signOut()}
-                    >
-                      <Icon name="logout" size={16} />
-                      {t('nav.logout')}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </>
-          ) : (
-            <>
-              <Link href="/login" className="oryx-btn oryx-header-auth">
-                {t('nav.login')}
-              </Link>
-              <Link href="/register" className="oryx-btn oryx-btn-primary oryx-header-auth">
-                {t('nav.register')}
-              </Link>
-            </>
-          )}
+              </>
+            ) : (
+              <>
+                <Link href="/login" className="oryx-btn">
+                  {t('nav.login')}
+                </Link>
+                <Link href="/register" className="oryx-btn oryx-btn-primary">
+                  {t('nav.register')}
+                </Link>
+              </>
+            )}
+          </span>
 
           <button
             type="button"
-            className="oryx-btn oryx-btn-ghost oryx-menu-toggle"
+            className="oryx-btn oryx-btn-ghost oryx-icon-btn oryx-mobile-toggle"
             onClick={() => setMenuOpen((v) => !v)}
             aria-expanded={menuOpen}
-            aria-controls="oryx-mobile-nav"
-            aria-label={t('nav.home')}
-            data-testid="menu-toggle"
+            aria-label={t('nav.menu')}
+            data-testid="mobile-menu-toggle"
           >
-            <Icon name={menuOpen ? 'close' : 'menu'} size={20} />
+            {menuOpen ? '✕' : '☰'}
           </button>
         </div>
       </div>
 
-      <nav className="oryx-navbar" aria-label={t('nav.home')}>
-        <div className="oryx-container oryx-navbar__inner">
-          {PUBLIC_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              aria-current={pathname === link.href ? 'page' : undefined}
-            >
+      <div className="oryx-mobile-panel" data-open={menuOpen} data-testid="mobile-menu">
+        <nav aria-label={t('nav.menu')}>
+          {NAV.map((link) => (
+            <Link key={link.href} href={link.href}>
               {t(link.key)}
             </Link>
           ))}
-        </div>
-      </nav>
-
-      {menuOpen && (
-        <nav id="oryx-mobile-nav" className="oryx-mobile-nav" aria-label={t('nav.home')}>
-          <form className="oryx-search oryx-search--mobile" role="search" onSubmit={submitSearch}>
-            <Icon name="search" size={16} />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('nav.search')}
-              aria-label={t('nav.search')}
-            />
-            <button type="submit" className="oryx-search__submit">
-              {t('nav.searchAction')}
-            </button>
-          </form>
-          {PUBLIC_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              aria-current={pathname === link.href ? 'page' : undefined}
-            >
-              {t(link.key)}
-            </Link>
-          ))}
-
+          <Link href="/cart">{t('nav.cart')}</Link>
           {isAuthenticated ? (
-            <div className="oryx-mobile-nav__section">
-              <p className="oryx-mobile-nav__title">{t('account.nav.title')}</p>
-              {ACCOUNT_LINKS.map((link) => (
-                <Link key={link.href} href={link.href} className="oryx-mobile-nav__account">
-                  <Icon name={link.icon} size={16} />
-                  {t(link.key)}
-                </Link>
-              ))}
-              <button type="button" className="oryx-btn" onClick={() => void signOut()}>
-                {t('nav.logout')}
-              </button>
-            </div>
+            <>
+              <Link href="/dashboard">{t('nav.account')}</Link>
+              <Link href="/account/orders">{t('account.orders')}</Link>
+              <Link href="/account/appointments">{t('account.appointments')}</Link>
+              <Link href="/account/wishlist">{t('account.wishlist')}</Link>
+            </>
           ) : (
-            <div className="oryx-mobile-nav__auth">
-              <Link href="/login" className="oryx-btn">
-                {t('nav.login')}
-              </Link>
-              <Link href="/register" className="oryx-btn oryx-btn-primary">
-                {t('nav.register')}
-              </Link>
-            </div>
+            <>
+              <Link href="/login">{t('nav.login')}</Link>
+              <Link href="/register">{t('nav.register')}</Link>
+            </>
           )}
         </nav>
-      )}
+      </div>
     </header>
   );
 }
 
+/**
+ * Public site footer.
+ *
+ * Branch contact details are the real published branches fetched from the
+ * storefront API, so the footer never shows a phone number the database does
+ * not hold.
+ */
 export function SiteFooter() {
-  const { t, locale, setLocale } = useUi();
+  const { t, locale } = useUi();
   const { content, pick } = useSiteContent();
-  const contact = content.contact;
+  const [branches, setBranches] = useState<
+    Array<{ id: string; nameEn: string; nameAr: string; phone: string | null; city: string | null }>
+  >([]);
 
-  const columns = [
-    {
-      title: t('footer.services'),
-      links: [
-        { href: '/categories', label: t('nav.categories') },
-        { href: '/products', label: t('nav.products') },
-        { href: '/services', label: t('nav.services') },
-      ],
-    },
-    {
-      title: t('footer.company'),
-      links: [
-        { href: '/about', label: t('footer.about') },
-        { href: '/#how', label: t('footer.howItWorks') },
-        { href: '/credits', label: t('footer.credits') },
-      ],
-    },
-    {
-      title: t('footer.support'),
-      links: [
-        { href: '/contact', label: t('footer.contact') },
-        { href: '/support', label: t('nav.support') },
-      ],
-    },
-  ];
-
-  const phone = contact.phone.trim();
-  const email = contact.email.trim();
-  const address = pick(contact.addressEn, contact.addressAr).trim();
+  useEffect(() => {
+    let active = true;
+    import('@/lib/api')
+      .then(({ publicApi }) => publicApi.storefrontBranches())
+      .then((rows) => {
+        if (active) setBranches(rows.filter((b) => b.isPublished).slice(0, 3));
+      })
+      .catch(() => {
+        if (active) setBranches([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <footer className="oryx-footer">
       <div className="oryx-container">
-        <div className="oryx-footer__grid">
-          <div className="oryx-footer__brand">
-            <BrandLogo height={30} />
-            <p className="oryx-footer__tagline">
-              {pick(content.footer.introEn, content.footer.introAr) || t('home.subtitle')}
+        <div className="oryx-footer-grid">
+          <div>
+            <BrandLogo theme="dark" />
+            <p className="oryx-muted" style={{ marginTop: 16, maxWidth: 340 }}>
+              {pick(content.footer.introEn, content.footer.introAr) || t('footer.intro')}
             </p>
-            {phone || email || address ? (
-              <ul className="oryx-footer__contact">
-                {phone && (
-                  <li>
-                    <Icon name="phone" size={14} />
-                    <a href={`tel:${phone.replace(/\s+/g, '')}`} dir="ltr">
-                      {phone}
-                    </a>
-                  </li>
-                )}
-                {email && (
-                  <li>
-                    <Icon name="mail" size={14} />
-                    <a href={`mailto:${email}`} dir="ltr">
-                      {email}
-                    </a>
-                  </li>
-                )}
-                {address && (
-                  <li>
-                    <Icon name="pin" size={14} />
-                    <span>{address}</span>
-                  </li>
-                )}
-              </ul>
-            ) : null}
+            {(content.contact.phone || content.contact.email) && (
+              <div className="oryx-muted" style={{ marginTop: 8, direction: 'ltr' }}>
+                {content.contact.phone && <div>{content.contact.phone}</div>}
+                {content.contact.email && <div>{content.contact.email}</div>}
+              </div>
+            )}
           </div>
-          {columns.map((col) => (
-            <div key={col.title} className="oryx-footer__col">
-              <h3>{col.title}</h3>
-              <ul>
-                {col.links.map((link) => (
-                  <li key={link.href + link.label}>
-                    <Link href={link.href}>{link.label}</Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+
+          <div>
+            <h4>{t('footer.quick')}</h4>
+            <Link href="/">{t('nav.home')}</Link>
+            <Link href="/services">{t('nav.services')}</Link>
+            <Link href="/booking">{t('nav.book')}</Link>
+            <Link href="/store">{t('nav.store')}</Link>
+            <Link href="/offers">{t('nav.offers')}</Link>
+          </div>
+
+          <div>
+            <h4>{t('footer.branches')}</h4>
+            {branches.length === 0 ? (
+              <Link href="/branches">{t('nav.branches')}</Link>
+            ) : (
+              branches.map((branch) => (
+                <span key={branch.id} style={{ display: 'block', padding: '4px 0' }}>
+                  <Link href={`/branches#${branch.id}`}>
+                    {locale === 'ar' ? branch.nameAr : branch.nameEn}
+                  </Link>
+                  {branch.phone && (
+                    <span className="oryx-faint" style={{ display: 'block', direction: 'ltr' }}>
+                      {branch.phone}
+                    </span>
+                  )}
+                </span>
+              ))
+            )}
+          </div>
+
+          <div>
+            <h4>{t('footer.account')}</h4>
+            <Link href="/about">{t('nav.about')}</Link>
+            <Link href="/contact">{t('nav.contact')}</Link>
+            <Link href="/account/orders">{t('account.orders')}</Link>
+            <Link href="/account/appointments">{t('account.appointments')}</Link>
+            <Link href="/privacy">{t('footer.privacy')}</Link>
+            <Link href="/terms">{t('footer.terms')}</Link>
+          </div>
         </div>
-        <div className="oryx-footer__bar">
-          <span>{t('footer.legal', { year: new Date().getFullYear() })}</span>
-          <button
-            type="button"
-            className="oryx-btn oryx-btn-ghost oryx-btn-sm"
-            onClick={() => setLocale(locale === 'ar' ? 'en' : 'ar')}
-            aria-label={t('common.language')}
-          >
-            {locale === 'ar' ? 'English' : 'العربية'}
-          </button>
+
+        <div className="oryx-footer-bottom">
+          <span>
+            © {new Date().getFullYear()} {content.brand.nameEn}. {t('footer.rights')}.
+          </span>
+          <div className="oryx-social">
+            {content.contact.social.instagram && (
+              <a href={content.contact.social.instagram} target="_blank" rel="noreferrer noopener" aria-label="Instagram">
+                Instagram
+              </a>
+            )}
+            {content.contact.social.facebook && (
+              <a href={content.contact.social.facebook} target="_blank" rel="noreferrer noopener" aria-label="Facebook">
+                Facebook
+              </a>
+            )}
+            {content.contact.social.twitter && (
+              <a href={content.contact.social.twitter} target="_blank" rel="noreferrer noopener" aria-label="X">
+                X
+              </a>
+            )}
+            {content.contact.social.youtube && (
+              <a href={content.contact.social.youtube} target="_blank" rel="noreferrer noopener" aria-label="YouTube">
+                YouTube
+              </a>
+            )}
+            {content.contact.social.linkedin && (
+              <a href={content.contact.social.linkedin} target="_blank" rel="noreferrer noopener" aria-label="LinkedIn">
+                LinkedIn
+              </a>
+            )}
+            <a href="/contact" aria-label={t('nav.contact')}>
+              ✉
+            </a>
+            <a href="/branches" aria-label={t('nav.branches')}>
+              ⌖
+            </a>
+          </div>
         </div>
       </div>
     </footer>
