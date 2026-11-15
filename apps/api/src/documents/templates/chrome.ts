@@ -197,13 +197,19 @@ function brandBand(issuer: DocumentIssuer): string {
   const box =
     'flex:0 0 auto;width:239.8pt;height:51.8pt;box-sizing:border-box;' +
     'border:0.75px solid #a3b1c2;border-radius:6pt;padding:5pt 9pt;white-space:nowrap;';
+  const signatureWatermark = issuer.logoDataUri
+    ? `<img class="issuer-signature-watermark" src="${esc(issuer.logoDataUri)}" alt="" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:112pt;max-height:39pt;object-fit:contain;opacity:0.11;pointer-events:none;">`
+    : '';
   const label = 'font-size:7.5pt;font-weight:700;color:#0f2b48;';
   const labelAr = 'font-size:7.5pt;font-weight:700;color:#0f2b48;direction:rtl;unicode-bidi:embed;';
   return `
   <div style="padding:0 14pt;display:flex;align-items:flex-start;justify-content:space-between;">
-    <div style="${box}">
-      <span style="${label}">Authorized Stamp &amp; Signature</span>
-      <span style="${labelAr}">اعتماد المركز</span>
+    <div style="${box}position:relative;overflow:hidden;">
+      ${signatureWatermark}
+      <div style="position:relative;z-index:1;">
+        <span style="${label}">Authorized Stamp &amp; Signature</span>
+        <span style="${labelAr}">اعتماد المركز</span>
+      </div>
     </div>
     <div style="flex:0 0 auto;width:80pt;text-align:center;padding-top:1pt;line-height:1.15;">
       ${mark}
