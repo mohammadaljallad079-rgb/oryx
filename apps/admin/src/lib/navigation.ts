@@ -112,6 +112,7 @@ export const WEBSITE_APP_NAV: NavGroup = {
   labelKey: 'nav.group.website',
   platformOnly: true,
   items: [
+    { key: 'websiteSettings', labelKey: 'nav.websiteSettings', href: '/website/settings', icon: 'settings', permission: 'platform.cms.manage', platformOnly: true },
     { key: 'cms', labelKey: 'nav.cms', href: '/website', icon: 'globe', permission: 'platform.cms.manage', platformOnly: true },
     { key: 'appCms', labelKey: 'nav.appCms', href: '/application', icon: 'smartphone', permission: 'platform.cms.manage', platformOnly: true },
     { key: 'featureFlags', labelKey: 'nav.featureFlags', href: '/application/flags', icon: 'flag', permission: 'platform.api.manage', platformOnly: true },
