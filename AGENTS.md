@@ -1326,6 +1326,10 @@ so nothing else needs changing.
   curated parity sheets there, not in the admin app's `public/` dir.
 - **Never serve the raw reference documents.** `oryx 22.pdf` and
   `oryx out put.pdf` carry a real customer's name, phone and address. Link the
-  side-by-side comparison sheets instead; the PDFs stay gitignored.
+  side-by-side comparison sheets instead; the PDFs stay gitignored. The publish
+  script copies no `reference-*.pdf` for this reason — a session had published
+  both raw files off the preview host, and they were reachable until removed.
+  Check the served tree with `curl -o /dev/null -w '%{http_code}'` on
+  `/evidence/exec19/reference-*.pdf`; it must be `404`.
 - **Ignore the generated preview bytes.** `apps/admin/public/exec19/` and any
   `apps/admin/public/evidence/` tree are generated evidence, never source.

@@ -543,7 +543,7 @@ http://localhost:3002/verify/gnIdQw7_Hm9OnX7ZQQfFxripqJwscrbtZH0YQ24TXVQ
 | --- | --- |
 | تقرير الفحص المُنتَج (5 صفحات) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/inspection-report-rendered.pdf |
 | تقرير الفحص مع صورة ورمز QR | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/inspection-report-with-photo-qr.pdf |
-| المرجع المعتمد لتقرير الفحص | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/reference-inspection.pdf |
+| المرجع المعتمد لتقرير الفحص (شرائح مقارنة، لا الملف الخام) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/parity/report-p1.png |
 | الفاتورة الضريبية المُنتَجة | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/tax-invoice-rendered.pdf |
 | الفاتورة (نسخة الجلسة الثانية) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/session2/invoice-rendered.pdf |
 | عرض السعر المُنتَج | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/session2/quotation-rendered.pdf |
@@ -727,7 +727,7 @@ https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/index
 - تقرير الفحص المصوّر مع QR: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/inspection-report-with-photo-qr.pdf
 - تقرير الفحص المُنتَج: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/inspection-report-rendered.pdf
 - الفاتورة المُنتَجة: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/tax-invoice-rendered.pdf
-- المرجع `oryx 22.pdf`: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/reference-invoice-quotation.pdf
+- المرجع `oryx 22.pdf` (شرائح مقارنة، لا الملف الخام): https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/parity/invoice.png
 - نموذج الفحص: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/form-inspections-bookings.png
 - هيكل الشاسيه: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/verify-chassis-diagram.png
 - مخطط الصبغ (Body): https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/verify-body-diagram.png
