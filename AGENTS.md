@@ -1552,3 +1552,37 @@ carries the approved redesign-unified dashboard (identical to `833c6f1b`) plus
 CMS. The `feature/dashboard-modules-redesign` branch's only *unique* dashboard
 value is the image-led module tiles with the media+scrim band; that pattern is
 already present on `HEAD`. So the remaining work is verification, not a re-port.
+
+### Merge gotchas (release storefront + Website Settings)
+
+- **A merge of two independently-redesigned surfaces is a union, never a
+  one-sided pick.** `release/oryx-consolidated-2026-11-14` and
+  `feature/website-settings-sidebar` both rewrote `globals.css`, `ui.tsx`,
+  `layout.tsx`, `dictionaries.ts`, `api.ts` and `structured-data.ts`. Taking
+  either side wholesale breaks the other's routes. Resolve each as a deliberate
+  union and re-run typecheck/build/tests, which is what caught the duplicate
+  members below.
+- **`git checkout --theirs` on `dictionaries.ts` silently duplicates keys.** The
+  premium dictionary lacks the release keys, so concatenating the two blocks
+  produces two entries for every shared key (the later one wins, but the file
+  has duplicate keys). Rebuild it as `release keys ∪ premium-only keys`, with a
+  small explicit allow-list for the keys where the premium wording must win.
+- **The public-services branding guard constrains dictionary wording.** The
+  `apps/customer/test/public-services-branding.test.ts` suite fails if
+  `nav.providers`, `providers.title`, `services.subtitle`, `home.ctaBrowse` and
+  friends say "provider" / "مزود". Keep the release wording for those keys even
+  when porting premium copy; the guard reads `app/(home)/page.tsx` after the
+  home route moved into the `(home)` group.
+- **A merge can leave duplicate object members that typecheck alone reports.**
+  Both `apps/api/src/cms/cms.controller.ts` (duplicate `site-content` route) and
+  `apps/admin/src/lib/api.ts` (duplicate `SiteContentDto` import and duplicate
+  `siteContent`/`upsertSiteContent` members) auto-merged into a file with two
+  copies. `tsc` flags them as `TS2393`/`TS1117`; remove the later copy.
+- **`vitest run` with no config collects Playwright specs.** The customer app
+  has no `vitest.config.*`, so once `e2e/*.spec.ts` exists Vitest tries to run
+  the Playwright suites and fails with "Playwright Test did not expect test()".
+  Scope the unit tests with an `include: ['test/**/*.test.ts']` config.
+- **`NEXT_PUBLIC_SITE_URL` leaks the work host into SEO test assertions.** When
+  it is set, `SITE_URL` becomes the sandbox origin and the structured-data tests
+  that assert `http://localhost:3002` fail. Run the suite with
+  `env -u NEXT_PUBLIC_SITE_URL` or those failures look like merge regressions.
