@@ -18,6 +18,7 @@ import type {
   ContextResponse,
   CouponDto,
   CouponValidationResponse,
+  SiteContentDto,
   CustomerDto,
   CustomerDetailDto,
   CustomerAttachmentDto,
@@ -731,6 +732,10 @@ export const api = {
   cmsBanners: (placement?: string) =>
     request<CmsBannerDto[]>(`/cms/banners${placement ? `?placement=${placement}` : ''}`),
   upsertCmsBanner: (body: Record<string, unknown>) => request<CmsBannerDto>('/cms/banners', { method: 'PUT', body }),
+  // ------------------------------------------------------------ site content
+  siteContent: (locale: 'ar' | 'en') => request<SiteContentDto>(`/cms/site-content?locale=${locale}`),
+  upsertSiteContent: (locale: 'ar' | 'en', data: unknown) =>
+    request<SiteContentDto>('/cms/site-content', { method: 'PUT', body: { locale, data } }),
   featureFlags: () => request<FeatureFlagDto[]>('/cms/feature-flags'),
   upsertFeatureFlag: (body: Record<string, unknown>) =>
     request<FeatureFlagDto>('/cms/feature-flags', { method: 'PUT', body }),

@@ -29,6 +29,14 @@ export interface CreateBookingInput {
   entityType?: string | null;
   entityId?: string | null;
   notes?: string | null;
+  /**
+   * Contact details captured from the public website when the booking is made
+   * by a visitor rather than a signed-in customer. A staff-created or
+   * account-backed booking leaves these null.
+   */
+  guestName?: string | null;
+  guestPhone?: string | null;
+  guestEmail?: string | null;
   createdById?: string | null;
   /** When true the slot is held for checkout rather than confirmed outright. */
   hold?: boolean;
@@ -346,6 +354,9 @@ export class BookingService {
             : null,
           reference,
           notes: input.notes ?? null,
+          guestName: input.guestName ?? null,
+          guestPhone: input.guestPhone ?? null,
+          guestEmail: input.guestEmail ?? null,
           createdById: input.createdById ?? null,
           events: {
             create: {
