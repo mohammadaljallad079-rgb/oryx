@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -8,6 +8,8 @@ import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput, todayIso } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import { ModuleBanner } from '@/components/module-banner';
+import { SearchableSelect, usePickerLabels, type PickerOption } from '@/components/searchable-select';
+import { AccountFormModal } from '@/components/entity-forms';
 import {
   Badge,
   Button,
@@ -170,88 +172,8 @@ function AccountsTab({ canManage }: { canManage: boolean }) {
         </TableShell>
       )}
 
-      <CreateAccountModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={list.reload} />
+      <AccountFormModal open={createOpen} onClose={() => setCreateOpen(false)} onSaved={() => void list.reload()} />
     </Card>
-  );
-}
-
-function CreateAccountModal({
-  open,
-  onClose,
-  onCreated,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onCreated: () => Promise<void>;
-}) {
-  const { t } = useUi();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    code: '',
-    nameEn: '',
-    nameAr: '',
-    type: 'ASSET',
-    normalBalance: 'DEBIT',
-  });
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await api.createAccount(form);
-      await onCreated();
-      onClose();
-      setForm({ code: '', nameEn: '', nameAr: '', type: 'ASSET', normalBalance: 'DEBIT' });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      title={t('erp.accounting.newAccount')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy} onClick={submit} data-testid="save-account">
-            {busy ? t('common.loading') : t('common.save')}
-          </Button>
-        </>
-      }
-    >
-      {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="account-code" />
-        </Field>
-        <Field label={t('erp.accounting.type')} required>
-          <select className="oryx-select" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-            {['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'].map((x) => (
-              <option key={x} value={x}>
-                {x}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label={`${t('common.name')} (EN)`} required>
-          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="account-name-en" />
-        </Field>
-        <Field label={`${t('common.name')} (AR)`} required>
-          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="account-name-ar" />
-        </Field>
-        <Field label={t('erp.accounting.normalBalance')}>
-          <select className="oryx-select" value={form.normalBalance} onChange={(e) => setForm({ ...form, normalBalance: e.target.value })}>
-            <option value="DEBIT">DEBIT</option>
-            <option value="CREDIT">CREDIT</option>
-          </select>
-        </Field>
-      </div>
-    </Modal>
   );
 }
 
@@ -364,6 +286,8 @@ function PostJournalModal({
   onPosted: () => Promise<void>;
 }) {
   const { t } = useUi();
+  const { can } = useAuth();
+  const pickerLabels = usePickerLabels();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [entryDate, setEntryDate] = useState(todayIso());
@@ -372,6 +296,15 @@ function PostJournalModal({
     { accountId: '', debit: '', credit: '' },
     { accountId: '', debit: '', credit: '' },
   ]);
+  const [accountOptions, setAccountOptions] = useState<PickerOption[]>([]);
+
+  useEffect(() => {
+    setAccountOptions(
+      accounts
+        .filter((a) => a.isPostable)
+        .map((a) => ({ id: a.id, label: `${a.code} — ${a.nameEn}`, sublabel: a.nameAr, keywords: `${a.nameAr} ${a.code}` })),
+    );
+  }, [accounts]);
 
   const totalDebit = lines.reduce((s, l) => s + toMinorInput(l.debit), 0);
   const totalCredit = lines.reduce((s, l) => s + toMinorInput(l.credit), 0);
@@ -426,25 +359,34 @@ function PostJournalModal({
       <div className="mt-4 flex flex-col gap-2">
         {lines.map((line, i) => (
           <div key={i} className="grid grid-cols-12 gap-2">
-            <select
-              className="oryx-select col-span-5"
-              value={line.accountId}
-              onChange={(e) => {
-                const next = [...lines];
-                next[i] = { ...next[i], accountId: e.target.value };
-                setLines(next);
-              }}
-              data-testid={`journal-line-account-${i}`}
-            >
-              <option value="">{t('erp.accounting.selectAccount')}</option>
-              {accounts
-                .filter((a) => a.isPostable)
-                .map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.code} — {a.nameEn}
-                  </option>
-                ))}
-            </select>
+            <div className="col-span-5">
+              <SearchableSelect
+                testId={`journal-line-account-${i}`}
+                value={line.accountId}
+                onChange={(id) => {
+                  const next = [...lines];
+                  next[i] = { ...next[i], accountId: id };
+                  setLines(next);
+                }}
+                options={accountOptions}
+                placeholder={t('erp.accounting.selectAccount')}
+                labels={pickerLabels}
+                renderCreate={
+                  can('erp.accounting.coa.manage')
+                    ? (props) => (
+                        <AccountFormModal
+                          open={props.open}
+                          onClose={props.onClose}
+                          onSaved={(a) => {
+                            setAccountOptions((prev) => [...prev, { id: a.id, label: `${a.code} — ${a.nameEn}`, sublabel: a.nameAr, keywords: `${a.nameAr} ${a.code}` }]);
+                            props.onCreated({ id: a.id, label: `${a.code} — ${a.nameEn}` });
+                          }}
+                        />
+                      )
+                    : undefined
+                }
+              />
+            </div>
             <input
               className="oryx-input col-span-3"
               placeholder={t('erp.accounting.debit')}
@@ -728,6 +670,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function LedgerTab() {
   const { t, locale } = useUi();
+  const pickerLabels = usePickerLabels();
   const accounts = useAsync(() => api.accountingAccounts(), []);
   const [accountId, setAccountId] = useState<string>('');
   const ledger = useAsync<{ accounts: LedgerAccountDto[] }>(
@@ -737,20 +680,25 @@ function LedgerTab() {
 
   const selected = ledger.data?.accounts.find((a) => a.accountId === accountId) ?? ledger.data?.accounts[0];
 
+  const accountOptions = useMemo<PickerOption[]>(
+    () => (accounts.data?.items ?? []).map((a) => ({ id: a.id, label: `${a.code} — ${a.nameEn}`, sublabel: a.nameAr, keywords: `${a.nameAr} ${a.code}` })),
+    [accounts.data],
+  );
+
   return (
     <Card className="p-4">
       <div className="mb-3 flex flex-wrap items-end gap-3">
-        <label className="min-w-[260px] flex-1">
+        <div className="min-w-[260px] flex-1">
           <span className="oryx-label">{t('erp.accounting.account')}</span>
-          <select className="oryx-select" value={accountId} onChange={(e) => setAccountId(e.target.value)} data-testid="ledger-account">
-            <option value="">{t('common.all')}</option>
-            {accounts.data?.items.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.code} — {a.nameEn}
-              </option>
-            ))}
-          </select>
-        </label>
+          <SearchableSelect
+            testId="ledger-account"
+            value={accountId}
+            onChange={setAccountId}
+            options={accountOptions}
+            placeholder={t('common.all')}
+            labels={pickerLabels}
+          />
+        </div>
       </div>
 
       {ledger.loading ? (

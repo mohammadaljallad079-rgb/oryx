@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -8,6 +8,8 @@ import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import { ModuleBanner } from '@/components/module-banner';
+import { SearchableSelect, usePickerLabels, type PickerOption } from '@/components/searchable-select';
+import { CustomerFormModal } from '@/components/customer-form';
 import {
   Badge,
   Button,
@@ -304,9 +306,16 @@ function CreateOpportunityModal({
   onCreated: () => Promise<void>;
 }) {
   const { t } = useUi();
+  const { can } = useAuth();
+  const pickerLabels = usePickerLabels();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ code: '', title: '', pipelineId: '', stageId: '', customerId: '', amount: '0.00' });
+  const [customerOptions, setCustomerOptions] = useState<PickerOption[]>([]);
+
+  useEffect(() => {
+    setCustomerOptions(customers.map((c) => ({ id: c.id, label: `${c.code} — ${c.nameEn}`, keywords: c.code })));
+  }, [customers]);
 
   const stages = pipelines.find((p) => p.id === form.pipelineId)?.stages ?? [];
 
@@ -364,10 +373,29 @@ function CreateOpportunityModal({
           </select>
         </Field>
         <Field label={t('erp.sales.customer')}>
-          <select className="oryx-select" value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })} data-testid="opportunity-customer">
-            <option value="">—</option>
-            {customers.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.nameEn}</option>)}
-          </select>
+          <SearchableSelect
+            testId="opportunity-customer"
+            value={form.customerId}
+            onChange={(id) => setForm({ ...form, customerId: id })}
+            options={customerOptions}
+            placeholder={t('common.selectPlaceholder')}
+            labels={pickerLabels}
+            renderCreate={
+              can('erp.sales.customer.manage')
+                ? (props) => (
+                    <CustomerFormModal
+                      open={props.open}
+                      type="INDIVIDUAL"
+                      onClose={props.onClose}
+                      onSaved={(c) => {
+                        setCustomerOptions((prev) => [...prev, { id: c.id, label: `${c.code} — ${c.nameEn}`, keywords: c.code }]);
+                        props.onCreated({ id: c.id, label: `${c.code} — ${c.nameEn}` });
+                      }}
+                    />
+                  )
+                : undefined
+            }
+          />
         </Field>
         <Field label={t('erp.crm.amount')} required>
           <input className="oryx-input" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} data-testid="opportunity-amount" />

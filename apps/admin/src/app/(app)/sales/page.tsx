@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -8,6 +8,9 @@ import { useAsync } from '@/lib/hooks';
 import { money, qty, toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import { ModuleBanner } from '@/components/module-banner';
+import { SearchableSelect, usePickerLabels, type PickerOption } from '@/components/searchable-select';
+import { CustomerFormModal } from '@/components/customer-form';
+import { WarehouseFormModal } from '@/components/entity-forms';
 import {
   Badge,
   Button,
@@ -895,12 +898,32 @@ function DocumentModal({
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
 }) {
   const { t } = useUi();
+  const { can } = useAuth();
+  const pickerLabels = usePickerLabels();
+  // The create actions mirror the standalone pages' permissions: the picker
+  // only offers "add new" when the caller could create the record anyway, and
+  // the server re-checks regardless.
+  const canCreateCustomer = can('erp.sales.customer.manage');
+  const canCreateWarehouse = can('erp.inventory.warehouse.manage');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [customerId, setCustomerId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
   const [restock, setRestock] = useState(true);
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
+  // The picker options are seeded from the parent list and extended in place
+  // when a record is created from the modal, so the new item is selectable
+  // without a full list reload.
+  const [customerOptions, setCustomerOptions] = useState<PickerOption[]>([]);
+  const [warehouseOptions, setWarehouseOptions] = useState<PickerOption[]>([]);
+
+  useEffect(() => {
+    setCustomerOptions(customers.map((c) => ({ id: c.id, label: `${c.code} — ${c.nameEn}`, sublabel: c.nameAr, keywords: `${c.nameAr} ${c.phone ?? ''}` })));
+  }, [customers]);
+
+  useEffect(() => {
+    setWarehouseOptions(warehouses.map((w) => ({ id: w.id, label: `${w.code} — ${w.nameEn}`, sublabel: w.nameAr, keywords: w.nameAr })));
+  }, [warehouses]);
 
   const submit = async () => {
     setBusy(true);
@@ -948,25 +971,60 @@ function DocumentModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.sales.customer')} required>
-          <select className="oryx-select" value={customerId} onChange={(e) => setCustomerId(e.target.value)} data-testid={`${testIdPrefix}-customer`}>
-            <option value="">—</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.code} — {c.nameEn}
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            testId={`${testIdPrefix}-customer`}
+            value={customerId}
+            onChange={setCustomerId}
+            options={customerOptions}
+            placeholder={t('common.selectPlaceholder')}
+            labels={pickerLabels}
+            renderCreate={
+              canCreateCustomer
+                ? (props) => (
+                    <CustomerFormModal
+                      open={props.open}
+                      type="INDIVIDUAL"
+                      onClose={props.onClose}
+                      onSaved={(c) => {
+                        setCustomerOptions((prev) => [
+                          ...prev,
+                          { id: c.id, label: `${c.code} — ${c.nameEn}`, sublabel: c.nameAr, keywords: `${c.nameAr} ${c.phone ?? ''}` },
+                        ]);
+                        props.onCreated({ id: c.id, label: `${c.code} — ${c.nameEn}` });
+                      }}
+                    />
+                  )
+                : undefined
+            }
+          />
         </Field>
         {showWarehouse ? (
           <Field label={t('erp.inventory.warehouse')}>
-            <select className="oryx-select" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} data-testid={`${testIdPrefix}-warehouse`}>
-              <option value="">—</option>
-              {warehouses.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.code} — {w.nameEn}
-                </option>
-              ))}
-            </select>
+            <SearchableSelect
+              testId={`${testIdPrefix}-warehouse`}
+              value={warehouseId}
+              onChange={setWarehouseId}
+              options={warehouseOptions}
+              placeholder={t('common.selectPlaceholder')}
+              labels={pickerLabels}
+              renderCreate={
+                canCreateWarehouse
+                  ? (props) => (
+                      <WarehouseFormModal
+                        open={props.open}
+                        onClose={props.onClose}
+                        onSaved={(w) => {
+                          setWarehouseOptions((prev) => [
+                            ...prev,
+                            { id: w.id, label: `${w.code} — ${w.nameEn}`, sublabel: w.nameAr, keywords: w.nameAr },
+                          ]);
+                          props.onCreated({ id: w.id, label: `${w.code} — ${w.nameEn}` });
+                        }}
+                      />
+                    )
+                  : undefined
+              }
+            />
           </Field>
         ) : null}
         {showRestock ? (

@@ -8,7 +8,7 @@ import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import { ModuleBanner } from '@/components/module-banner';
-import { SearchableSelect, type PickerOption } from '@/components/searchable-select';
+import { SearchableSelect, usePickerLabels, type PickerOption } from '@/components/searchable-select';
 import { CustomerFormModal } from '@/components/customer-form';
 import { VehicleFormModal } from '@/components/vehicle-form';
 import {
@@ -359,6 +359,7 @@ function CreateJobCardModal({
   const [form, setForm] = useState({ customerId: '', vehicleId: '', complaint: '', odometer: '' });
   const [customerOptions, setCustomerOptions] = useState<PickerOption[]>([]);
   const [vehicleOptions, setVehicleOptions] = useState<PickerOption[]>([]);
+  const pickerLabels = usePickerLabels();
   const canManageCustomers = can('erp.sales.customer.manage');
 
   useEffect(() => {
@@ -414,7 +415,7 @@ function CreateJobCardModal({
             onChange={(id) => setForm({ ...form, customerId: id, vehicleId: '' })}
             options={customerOptions}
             placeholder={t('common.selectPlaceholder')}
-            labels={{ search: t('common.search'), addNew: t('settings.list.add'), noResults: t('common.empty') }}
+            labels={pickerLabels}
             renderCreate={
               canManageCustomers
                 ? (props) => (
@@ -443,7 +444,7 @@ function CreateJobCardModal({
             options={vehicleOptions}
             disabled={!form.customerId}
             placeholder={t('common.selectPlaceholder')}
-            labels={{ search: t('common.search'), addNew: t('settings.list.add'), noResults: t('common.empty') }}
+            labels={pickerLabels}
             renderCreate={
               form.customerId
                 ? (props) => (

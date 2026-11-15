@@ -2,6 +2,19 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Icon } from './icons';
+import { useUi } from '@/lib/ui-context';
+
+/**
+ * The standard label set every picker uses, so the search field, the "add new"
+ * action and the empty state read the same in every form.
+ */
+export function usePickerLabels() {
+  const { t } = useUi();
+  return useMemo(
+    () => ({ search: t('common.search'), addNew: t('settings.list.add'), noResults: t('common.empty') }),
+    [t],
+  );
+}
 
 export interface PickerOption {
   id: string;
