@@ -588,3 +588,47 @@ http://localhost:3002/verify/gnIdQw7_Hm9OnX7ZQQfFxripqJwscrbtZH0YQ24TXVQ
 | قسم فحوصات السيارات (حي) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/automotive/inspections |
 
 > أُنشئ هذا الملحق بواسطة وكيل ذكاء اصطناعي (OpenHands) نيابةً عن مالك المستودع.
+
+---
+
+## ملحق — أين يوجد نموذج الفحص، والهياكل، وقائمة العملاء المنسدلة
+
+### 1) نموذج الفحص (حجز الفحص)
+**المسار:** لوحة الإدارة → السيارات (Automotive) → الفحوصات (Inspections) → تبويب
+«حجوزات الفحص» (Inspection Bookings) → زر «جديد» (New).
+
+**الحقول الموجودة فعلاً:** المركبة، الخدمة، التاريخ والوقت، الفرع، قراءة العدّاد،
+ملاحظات — مع صندوق ملخّص السعر الحيّ أسفل النموذج.
+
+- صورة النموذج: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/verify-booking-form.png
+
+### 2) الهياكل (الشاسيه)
+**المسار:** السيارات → الفحوصات → افتح مهمة فحص (Open) → التبويب «الشاسيه وأسفل
+المركبة» (Chassis & Undercarriage). يظهر **مخطّط الشاسيه بثماني مناطق** مع أداتَي
+«سليم / تلف» (OK / Damage).
+
+**مخطّط جسم السيارة (الطلاء):** نفس مهمة الفحص → التبويب «الطلاء والجسم»
+(Paint & Body) → علامات الطلاء على الألواح.
+
+- مخطّط الشاسيه: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/verify-chassis-diagram.png
+- مخطّط الجسم/الطلاء: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/verify-body-diagram.png
+- صفحة مهمة الفحص كاملة: https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/verify-chassis-page.png
+
+### 3) قائمة العملاء المنسدلة — هل فيها بحث وإضافة؟
+**نعم، الاثنان موجودان**، وهذا مؤكَّد في الكود لا في الواجهة فقط:
+
+- **البحث:** حقل بحث داخل القائمة يمرّر الاستعلام إلى الخادم
+  (`SearchableSelect`، حقل `data-testid="…-search"`).
+- **الإضافة:** صفّ «إنشاء» (Create) أسفل القائمة يفتح نموذجاً مضمَّناً بحقول
+  (الرمز، الاسم EN، الاسم AR، الهاتف) — `data-testid="…-create"`.
+
+القائمة مشتركة عبر النظام: تُستخدم في المبيعات، والمحاسبة، وCRM، والفحوصات —
+وكل موضع منها مُفعَّل بخيار الإضافة (`allowCreate`).
+
+- صورة القائمة مفتوحة (بحث + إنشاء): https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/verify-customer-dropdown.png
+
+### خريطة التنقّل الكاملة
+أُضيفت في صفحة الأدلة (القسم 7):
+https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/index.html
+
+> أُنشئ هذا الملحق بواسطة وكيل ذكاء اصطناعي (OpenHands) نيابةً عن مالك المستودع.
