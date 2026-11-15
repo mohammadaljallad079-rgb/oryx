@@ -1,35 +1,32 @@
 /**
  * The ORYX inspection diagram geometry.
  *
- * This module is the single source of truth for the *shape* of the two
- * interactive inspection drawings — the body-panel diagnostic scheme and the
- * eight-zone chassis safety diagram. The admin form and the official PDF
- * template both render from this file, so a marker the inspector places on
- * screen lands on the same panel of the same drawing in the printed report.
+ * This module is the single source of truth for the two interactive inspection
+ * drawings — the body-panel diagnostic scheme and the eight-zone chassis safety
+ * diagram. The admin form and the official PDF template both render from here,
+ * so a marker the inspector places on screen lands on the same panel of the
+ * same drawing in the printed report.
  *
- * The geometry is expressed as SVG path data in a fixed viewBox, not as an
- * image. Three reasons:
+ * Both drawings are the owner-approved ORYX artwork, embedded as images rather
+ * than reconstructed as vector paths:
  *
- *   1. There is no authentic ORYX diagram artwork in the repository. Every
- *      asset that exists is a generic vector tile or a photograph, so an
- *      original drawing had to be reconstructed. Keeping it as vectors makes
- *      that provenance explicit and reviewable rather than hiding it inside an
- *      opaque raster.
- *   2. A raster would not let the report place a marker on a named panel at
- *      print resolution; a path can carry a `panelKey`, so a marker stores which
- *      panel it sits on as well as where.
- *   3. Vector art stays crisp at any page size and cannot fail to load in the
- *      PDF renderer.
+ *   1. The approved artwork exists in the repository
+ *      (`apps/api/assets/inspection/*.png`, extracted from `oryx out put.pdf`),
+ *      so there is nothing to reconstruct. An earlier revision of this file
+ *      carried a hand-drawn stand-in; it was rejected because the admin screen
+ *      and the reference form must show the same vehicle.
+ *   2. A raster still supports named hotspots: the panel and chassis-region
+ *      catalogues below and in `inspection.ts` carry the normalised coordinates,
+ *      so a marker stores which panel or region it sits on as well as where.
+ *   3. The same image renders in the browser and in the PDF, so the two surfaces
+ *      cannot drift onto two different drawings.
  *
- * The drawing is a neutral technical elevation, not a brand mark and not stock
- * imagery. It is drawn once here and reused everywhere, which is the invariant
- * that matters: admin and PDF can never drift onto two different vehicles.
- *
- * This is a *provisional* reconstruction. If the original ORYX illustration is
- * recovered, replace the path data below; every consumer follows automatically.
+ * `BODY_VIEWBOX` / `CHASSIS_VIEWBOX` remain the normalisation boxes for the
+ * marker and panel coordinates; they are independent of the pixel size of the
+ * artwork.
  */
 
-import type { ChassisRegionKey } from './inspection';
+
 
 /** The drawing identity stored alongside each marker. */
 export const BODY_DIAGRAM_ID = 'oryx-original-body';
@@ -184,53 +181,17 @@ function pathBounds(d: string): { x1: number; y1: number; x2: number; y2: number
   return { x1, y1, x2, y2 };
 }
 
-/** A chassis zone hotspot: an SVG path in `CHASSIS_VIEWBOX` units. */
-export interface ChassisZoneSpec {
-  /** Must match a key in `CHASSIS_REGIONS` in `inspection.ts`. */
-  key: ChassisRegionKey;
-  /** SVG path data for the zone, drawn filled and clickable. */
-  d: string;
-  /** Where the zone's number badge sits, in viewBox units. */
-  labelX: number;
-  labelY: number;
-}
-
 /**
- * The chassis outline: a plan view of the underbody, front at the top.
+ * The chassis-zone colour by condition, shared by screen and report.
  *
- * The outline and the longitudinal rails are drawn once; the eight zones tile
- * the floor plan on top of them. The numbering runs front-centre, then down the
- * left rail, up the right rail and across the rear — the order the report's own
- * checklist uses.
+ * The drawing itself is *not* reconstructed here: both the admin editor and the
+ * official PDF render the owner-approved underbody artwork
+ * (`apps/api/assets/inspection/chassis-diagram.png`, extracted from
+ * `oryx out put.pdf`). `CHASSIS_REGIONS` in `inspection.ts` holds the normalised
+ * position of each assessed region on that artwork, so a region the inspector
+ * marks on screen prints on the same spot of the same drawing. Only the
+ * condition colours live here.
  */
-export const CHASSIS_OUTLINE =
-  'M210 26 Q306 26 344 78 Q366 128 366 200 L366 520 Q366 592 344 642 Q306 694 210 694 Q114 694 76 642 Q54 592 54 520 L54 200 Q54 128 76 78 Q114 26 210 26 Z';
-
-/** The structural rails and cross-members drawn under the zones. */
-export const CHASSIS_STRUCTURE_PATHS: readonly string[] = [
-  'M120 150 L300 150',
-  'M120 570 L300 570',
-  'M210 40 L210 680',
-];
-
-/**
- * The eight assessed zones, in the report's reading order.
- *
- * Each zone is a band of the floor plan. They tile the outline without overlap,
- * so clicking anywhere on the chassis selects exactly one zone.
- */
-export const CHASSIS_ZONES: readonly ChassisZoneSpec[] = [
-  { key: 'FRONT', d: 'M210 26 Q306 26 344 78 L344 150 L76 150 L76 78 Q114 26 210 26 Z', labelX: 210, labelY: 96 },
-  { key: 'FRONT_LEFT', d: 'M76 150 L210 150 L210 290 L76 290 Z', labelX: 143, labelY: 226 },
-  { key: 'FRONT_RIGHT', d: 'M210 150 L344 150 L344 290 L210 290 Z', labelX: 277, labelY: 226 },
-  { key: 'MIDDLE_LEFT', d: 'M76 290 L210 290 L210 430 L76 430 Z', labelX: 143, labelY: 366 },
-  { key: 'MIDDLE_RIGHT', d: 'M210 290 L344 290 L344 430 L210 430 Z', labelX: 277, labelY: 366 },
-  { key: 'REAR_LEFT', d: 'M76 430 L210 430 L210 570 L76 570 Z', labelX: 143, labelY: 506 },
-  { key: 'REAR_RIGHT', d: 'M210 430 L344 430 L344 570 L210 570 Z', labelX: 277, labelY: 506 },
-  { key: 'REAR', d: 'M76 570 L344 570 L344 642 Q306 694 210 694 Q114 694 76 642 Z', labelX: 210, labelY: 636 },
-] as const;
-
-/** The chassis-zone colour by condition, shared by screen and report. */
 export const CHASSIS_ZONE_COLORS = {
   OK: INSPECTION_MARKER_COLORS.green,
   DAMAGE: INSPECTION_MARKER_COLORS.red,

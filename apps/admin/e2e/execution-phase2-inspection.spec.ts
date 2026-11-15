@@ -268,8 +268,8 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     ]) {
       await page.getByTestId(`item-${key}-PASS`).click();
     }
-    await page.getByTestId('remarks-EXTERIOR').fill('Bodywork sound.');
-    await page.getByTestId('save-section-EXTERIOR').click();
+    await page.getByTestId('general-remarks').fill('Bodywork sound.');
+    await page.getByTestId('save-section').click();
 
     // The rail and the submit button both react to the saved state.
     await expect(page.getByTestId('inspection-rail-EXTERIOR')).toHaveAttribute('data-complete', 'true');
@@ -285,7 +285,7 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await expect(page.getByTestId('inspection-workspace')).toBeVisible();
 
     await page.getByTestId('item-road.suspensionNoise-PASS').click();
-    await page.getByTestId('save-section-ROAD_TEST').click();
+    await page.getByTestId('save-section').click();
 
     await expect(page.getByTestId('inspection-rail-ROAD_TEST')).toHaveAttribute('data-complete', 'false');
     await expect(page.getByTestId('inspection-submit')).toBeDisabled();
@@ -307,7 +307,7 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await surface.click({ position: { x: box!.width * 0.4, y: box!.height * 0.5 } });
 
     await expect(page.locator('[data-testid^="paint-marker-"]').first()).toBeVisible();
-    await page.getByTestId('save-section-PAINT_BODY').click();
+    await page.getByTestId('save-section').click();
     await expect(page.getByTestId('inspection-submit')).toBeEnabled();
   });
 
@@ -320,7 +320,7 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await page.getByTestId('chassis-tool-OK').click();
     await page.getByTestId('chassis-region-FRONT').click();
     await page.getByTestId('chassis-region-REAR').click();
-    await page.getByTestId('save-section-CHASSIS_UNDERCARRIAGE').click();
+    await page.getByTestId('save-section').click();
     await expect(page.getByTestId('inspection-submit')).toBeEnabled();
   });
 
@@ -340,6 +340,24 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
 
     await entry.locator('[data-testid^="diagnostic-remove-"]').click();
     await expect(page.locator('[data-testid^="diagnostic-"]').filter({ hasText: 'P0171' })).toHaveCount(0);
+  });
+
+  test('adds an inspection type after creation but before approval', async ({ page }) => {
+    const id = await seedJob(page, ['EXTERIOR']);
+    await page.goto(`/automotive/inspections/${id}`);
+    await expect(page.getByTestId('inspection-workspace')).toBeVisible();
+
+    // The job started with the exterior section only; the paint rail entry is
+    // absent until the operator adds the type that records it.
+    await expect(page.getByTestId('inspection-rail-EXTERIOR')).toBeVisible();
+    await expect(page.getByTestId('inspection-rail-PAINT_BODY')).toHaveCount(0);
+
+    await page.getByTestId('type-toggle-PAINT_BODY').click();
+
+    // The new section appears on the rail with its own empty data, and the type
+    // is now marked selected.
+    await expect(page.getByTestId('inspection-rail-PAINT_BODY')).toBeVisible();
+    await expect(page.getByTestId('type-PAINT_BODY')).toHaveAttribute('data-selected', 'true');
   });
 
   test('approves a submitted inspection and then freezes it', async ({ page }) => {
@@ -385,7 +403,7 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await expect(page.locator('.oryx-modal')).toHaveCount(0);
 
     // Approved: the checklist is no longer editable and submit is gone.
-    await expect(page.getByTestId('save-section-INTERIOR')).toHaveCount(0);
+    await expect(page.getByTestId('save-section')).toHaveCount(0);
     await expect(page.getByTestId('inspection-submit')).toHaveCount(0);
   });
 

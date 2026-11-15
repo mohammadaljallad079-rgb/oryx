@@ -4,12 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   BODY_DIAGRAM_ID,
   CHASSIS_DIAGRAM_ID,
-  CHASSIS_OUTLINE,
   CHASSIS_REGIONS,
-  CHASSIS_STRUCTURE_PATHS,
-  CHASSIS_VIEWBOX,
-  CHASSIS_ZONE_COLORS,
-  CHASSIS_ZONES,
   INSPECTION_MARKER_COLORS,
   PAINT_CONDITIONS,
   bodyPanelAt,
@@ -368,7 +363,26 @@ export interface ChassisRegionValue {
   note?: string | null;
 }
 
-/** Plan view of the underbody with the eight assessed zones, drawn from shared geometry. */
+/**
+ * The approved ORYX underbody chassis safety drawing, from the owner's reference
+ * form (`oryx out put.pdf` page 3).
+ *
+ * This is the authentic artwork itself, not a reconstruction: the file is the
+ * approved image extracted from the reference PDF, so the admin screen and the
+ * printed report show the same vehicle. It is served from
+ * `/inspection/chassis-diagram.png`.
+ */
+const CHASSIS_ART_SRC = '/inspection/chassis-diagram.png';
+
+/**
+ * Plan view of the underbody with the eight assessed regions, drawn over the
+ * approved artwork.
+ *
+ * The drawing is the reference image; the eight regions are positioned on it by
+ * their normalised coordinates from `CHASSIS_REGIONS`, exactly as the PDF places
+ * its condition dots. A region is a circular hotspot, so what the inspector
+ * clicks is what the report marks.
+ */
 export function ChassisDiagram({
   value,
   onChange,
@@ -390,11 +404,6 @@ export function ChassisDiagram({
       ? value.map((r) => (r.regionKey === regionKey ? { ...r, condition } : r))
       : [...value, { regionKey, condition }];
     onChange(next);
-  };
-
-  const regionFill = (key: ChassisRegionKey) => {
-    const c = byKey.get(key)?.condition ?? 'UNSET';
-    return CHASSIS_ZONE_COLORS[c] ?? undefined;
   };
 
   return (
@@ -425,40 +434,31 @@ export function ChassisDiagram({
       </div>
 
       <div className="oryx-chassis" data-testid="chassis-canvas">
-        <svg viewBox={`0 0 ${CHASSIS_VIEWBOX.width} ${CHASSIS_VIEWBOX.height}`} className="oryx-diagram__svg">
-          <path className="oryx-chassis__outline" d={CHASSIS_OUTLINE} />
-          {CHASSIS_STRUCTURE_PATHS.map((d) => (
-            <path key={d} className="oryx-diagram__seam" d={d} />
-          ))}
-          {CHASSIS_ZONES.map((z, idx) => {
-            const condition = byKey.get(z.key)?.condition ?? 'UNSET';
-            const spec = CHASSIS_REGIONS.find((r) => r.key === z.key);
-            return (
-              <g
-                key={z.key}
-                className={`oryx-chassis-zone is-${condition.toLowerCase()}`}
-                data-testid={`chassis-region-${z.key}`}
-                data-condition={condition}
-                role="button"
-                tabIndex={disabled ? -1 : 0}
-                aria-label={`${spec?.labelEn ?? z.key}: ${condition}`}
-                onClick={() => apply(z.key as ChassisRegionKey, tool)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    apply(z.key as ChassisRegionKey, tool);
-                  }
-                }}
-                style={{ cursor: disabled ? 'default' : 'pointer' }}
-              >
-                <path d={z.d} fill={regionFill(z.key as ChassisRegionKey) ?? 'transparent'} />
-                <text x={z.labelX} y={z.labelY} className="oryx-chassis-zone__num">
-                  {idx + 1}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="oryx-chassis__art" src={CHASSIS_ART_SRC} alt="" aria-hidden="true" draggable={false} />
+        {CHASSIS_REGIONS.map((region) => {
+          const condition = byKey.get(region.key)?.condition ?? 'UNSET';
+          return (
+            <button
+              key={region.key}
+              type="button"
+              className={`oryx-chassis-hotspot is-${condition.toLowerCase()}`}
+              style={{
+                left: `${region.x * 100}%`,
+                top: `${region.y * 100}%`,
+                ...(condition === 'OK' ? { background: INSPECTION_MARKER_COLORS.green } : {}),
+                ...(condition === 'DAMAGE' ? { background: INSPECTION_MARKER_COLORS.red } : {}),
+              }}
+              disabled={disabled}
+              onClick={() => apply(region.key, tool)}
+              aria-label={`${region.labelEn}: ${condition}`}
+              data-testid={`chassis-region-${region.key}`}
+              data-condition={condition}
+            >
+              {condition === 'OK' ? '✓' : condition === 'DAMAGE' ? '✕' : ''}
+            </button>
+          );
+        })}
       </div>
 
       <div className="oryx-chassis-list" data-testid="chassis-controls">

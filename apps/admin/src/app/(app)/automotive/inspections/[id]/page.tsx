@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { inspectionSectionSpec, sectionsForReportPage, type InspectionSectionKey } from '@oryx/shared';
+import {
+  INSPECTION_TYPES,
+  inspectionSectionSpec,
+  type InspectionSectionKey,
+  type InspectionTypeKey,
+} from '@oryx/shared';
 import type {
   InspectionSessionDto,
   InspectionProgressDto,
@@ -20,15 +25,6 @@ import { DocumentsPanel } from '@/components/documents-panel';
 import { inspectionFieldLabelParts, INSPECTION_COVER_ROWS, INSPECTION_VEHICLE_INFO, type InspectionIdentityKey } from '@/lib/inspection-fields';
 
 /**
- * The sections the report's shared interior/exterior/engine/road page carries.
- *
- * Derived from the report's own page plan rather than a second list, so the
- * general-remarks input appears exactly when the printed document carries the
- * remarks block it feeds.
- */
-const GROUP_PAGE_AREAS = sectionsForReportPage(4).map((s) => s.key);
-
-/**
  * The inspection workspace.
  *
  * One page per inspection, with a rail of the sections the customer actually
@@ -44,6 +40,13 @@ export default function InspectionWorkspacePage() {
   const [session, setSession] = useState<InspectionSessionDto | null>(null);
   const [progress, setProgress] = useState<InspectionProgressDto | null>(null);
   const [active, setActive] = useState<InspectionSectionKey | null>(null);
+  // The report prints three remark blocks on the shared page 4 — the general
+  // inspection remarks, the additional exterior remarks and the final result.
+  // They belong to that page, not to one checklist, so they live here and are
+  // saved by whichever page-4 section is open.
+  const [generalRemarks, setGeneralRemarks] = useState('');
+  const [exteriorRemarks, setExteriorRemarks] = useState('');
+  const [finalAssessment, setFinalAssessment] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -63,6 +66,9 @@ export default function InspectionWorkspacePage() {
       setSession(s);
       setProgress(p);
       setActive((prev) => prev ?? s.selectedAreas[0] ?? null);
+      setGeneralRemarks(s.generalRemarks ?? '');
+      setExteriorRemarks(s.exteriorRemarks ?? '');
+      setFinalAssessment(s.finalAssessment ?? '');
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
@@ -123,6 +129,16 @@ export default function InspectionWorkspacePage() {
 
       {progress ? <ProgressRail progress={progress} active={active} onSelect={setActive} /> : null}
 
+      <TypesCard
+        session={session}
+        editable={editable && canWrite}
+        onSaved={(s) => {
+          applySession(s);
+          setActive((prev) => (prev && s.selectedAreas.includes(prev) ? prev : s.selectedAreas[0] ?? null));
+        }}
+        onError={setError}
+      />
+
       <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-4">
           {spec && section ? (
@@ -133,24 +149,18 @@ export default function InspectionWorkspacePage() {
               spec={spec}
               section={section}
               editable={editable && canWrite}
+              generalRemarks={generalRemarks}
+              exteriorRemarks={exteriorRemarks}
+              finalAssessment={finalAssessment}
+              onGeneralRemarksChange={setGeneralRemarks}
+              onExteriorRemarksChange={setExteriorRemarks}
+              onFinalAssessmentChange={setFinalAssessment}
               onSaved={applySession}
               onError={setError}
             />
           ) : (
             <Card>{t('inspection.noSections')}</Card>
           )}
-          {/* The report prints the general remarks block on its inspection-group
-              page, so the input is offered whenever a section that page carries
-              was selected — the same rule the printed document follows. */}
-          {session.selectedAreas.some((a) => GROUP_PAGE_AREAS.includes(a)) ? (
-            <GeneralRemarksCard
-              sessionId={id}
-              session={session}
-              editable={editable && canWrite}
-              onSaved={applySession}
-              onError={setError}
-            />
-          ) : null}
         </div>
 
         <div className="flex flex-col gap-4">
@@ -283,22 +293,21 @@ function IdentityCard({ session }: { session: InspectionSessionDto }) {
 }
 
 /**
- * The general remarks the report prints on its inspection-group page.
+ * The inspection types the job covers, editable while it is still a draft.
  *
- * The printed document carries a "General Inspection Remarks" block after the
- * checklist tables, composed from the session's general remarks and its final
- * assessment. This card is that block's input: both fields map to the exact
- * lines the report renders, so nothing the report prints is left without a
- * source, and the screen carries no field the document would drop.
+ * A job is created from a set of types, but the operator often learns about an
+ * extra check after the customer arrives. Adding a type here extends the stored
+ * areas (`updateInspectionSession`) and the API creates the new sections with
+ * their own empty data, so the rail, the progress and the report all pick them up.
+ * A type can only be added or removed before approval — an approved report is a
+ * frozen document.
  */
-function GeneralRemarksCard({
-  sessionId,
+function TypesCard({
   session,
   editable,
   onSaved,
   onError,
 }: {
-  sessionId: string;
   session: InspectionSessionDto;
   editable: boolean;
   onSaved: (s: InspectionSessionDto) => void;
@@ -306,18 +315,16 @@ function GeneralRemarksCard({
 }) {
   const { t, locale } = useUi();
   const [busy, setBusy] = useState(false);
-  const [remarks, setRemarks] = useState(session.generalRemarks ?? '');
-  const [assessment, setAssessment] = useState(session.finalAssessment ?? '');
+  const selected = new Set<InspectionTypeKey>(session.selectedTypes);
 
-  useEffect(() => {
-    setRemarks(session.generalRemarks ?? '');
-    setAssessment(session.finalAssessment ?? '');
-  }, [session.generalRemarks, session.finalAssessment]);
-
-  const save = async () => {
+  const persist = async (nextTypes: InspectionTypeKey[]) => {
+    if (nextTypes.length === 0) {
+      onError(t('inspection.selectTypesHint'));
+      return;
+    }
     setBusy(true);
     try {
-      onSaved(await api.updateInspectionSession(sessionId, { generalRemarks: remarks, finalAssessment: assessment }));
+      onSaved(await api.updateInspectionSession(session.id, { selectedTypes: nextTypes }));
     } catch (e) {
       onError(e instanceof Error ? e.message : t('common.error'));
     } finally {
@@ -325,35 +332,48 @@ function GeneralRemarksCard({
     }
   };
 
+  const toggle = (key: InspectionTypeKey) => {
+    const next = new Set(selected);
+    if (next.has(key)) {
+      if (!window.confirm(t('inspection.removeTypeConfirm'))) return;
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
+    void persist(INSPECTION_TYPES.filter((spec) => next.has(spec.key)).map((spec) => spec.key));
+  };
+
   return (
-    <Card data-testid="inspection-general-remarks">
-      <Field label={locale === 'ar' ? 'الملاحظات والتعليقات العامة' : 'General Inspection Remarks'}>
-        <textarea
-          className="oryx-input"
-          rows={3}
-          value={remarks}
-          disabled={!editable}
-          onChange={(e) => setRemarks(e.target.value)}
-          data-testid="general-remarks"
-        />
-      </Field>
-      <Field label={locale === 'ar' ? 'التقييم النهائي' : 'Final Assessment'}>
-        <textarea
-          className="oryx-input"
-          rows={2}
-          value={assessment}
-          disabled={!editable}
-          onChange={(e) => setAssessment(e.target.value)}
-          data-testid="final-assessment"
-        />
-      </Field>
-      {editable ? (
-        <div className="mt-2 flex justify-end">
-          <Button size="sm" variant="primary" disabled={busy} onClick={() => void save()} data-testid="save-general-remarks">
-            {busy ? t('common.loading') : t('common.save')}
-          </Button>
-        </div>
-      ) : null}
+    <Card data-testid="inspection-types">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="oryx-h2 m-0">{t('inspection.addTypes')}</h2>
+        <span className="oryx-faint text-[12px]">{t('inspection.addTypesHint')}</span>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2" data-testid="inspection-types-list">
+        {INSPECTION_TYPES.map((spec) => {
+          const on = selected.has(spec.key);
+          return (
+            <label
+              key={spec.key}
+              className={`oryx-job-type${on ? ' is-selected' : ''}`}
+              data-testid={`type-${spec.key}`}
+              data-selected={on}
+            >
+              <input
+                type="checkbox"
+                checked={on}
+                disabled={!editable || busy}
+                onChange={() => toggle(spec.key)}
+                data-testid={`type-toggle-${spec.key}`}
+              />
+              <span>
+                <span className="block font-semibold">{locale === 'ar' ? spec.labelAr : spec.labelEn}</span>
+                <span className="oryx-faint block text-[11.5px]">{locale === 'ar' ? spec.summaryAr : spec.summaryEn}</span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
     </Card>
   );
 }
@@ -399,9 +419,12 @@ function ProgressRail({
  *
  * The section kind decides the interface: a checklist for the item sections, the
  * body diagram for the paint section, the chassis diagram for the chassis
- * section, and the diagnostic list for the computer unit. The section's own
- * remarks box is present on all of them, because the report prints remarks for
- * every section.
+ * section, and the diagnostic list for the computer unit.
+ *
+ * The approved form prints a remarks block per section page — Paint & Body on
+ * page 2, Chassis & Underbody on page 3, the three shared blocks on page 4 — so
+ * this editor carries the box for its own section and, on the page-4 sections,
+ * the three page-level blocks as well. All persist through this section's Save.
  */
 function SectionEditor({
   sessionId,
@@ -409,6 +432,12 @@ function SectionEditor({
   spec,
   section,
   editable,
+  generalRemarks,
+  exteriorRemarks,
+  finalAssessment,
+  onGeneralRemarksChange,
+  onExteriorRemarksChange,
+  onFinalAssessmentChange,
   onSaved,
   onError,
 }: {
@@ -417,6 +446,12 @@ function SectionEditor({
   spec: ReturnType<typeof inspectionSectionSpec>;
   section: InspectionSessionDto['sections'][number];
   editable: boolean;
+  generalRemarks: string;
+  exteriorRemarks: string;
+  finalAssessment: string;
+  onGeneralRemarksChange: (value: string) => void;
+  onExteriorRemarksChange: (value: string) => void;
+  onFinalAssessmentChange: (value: string) => void;
   onSaved: (s: InspectionSessionDto) => void;
   onError: (message: string) => void;
 }) {
@@ -469,20 +504,45 @@ function SectionEditor({
   const setResult = (itemKey: string, result: InspectionResultValue) =>
     setResults((prev) => ({ ...prev, [itemKey]: { itemKey, result, note: prev[itemKey]?.note ?? null } }));
 
-  const saveItems = () =>
-    run(() =>
-      api.saveInspectionSection(sessionId, area, {
-        remarks,
+  const onPageFour = spec.page === 4;
+
+  // One Save button persists the open section and the remarks blocks the report
+  // prints. A diagram section used to drop its remarks because its endpoint only
+  // carried markers/regions, so the section's own remarks column is saved through
+  // the section endpoint alongside the page-4 blocks. A page-4 checklist has no
+  // section remarks box of its own, so its remarks column is left untouched
+  // rather than being cleared.
+  const saveSection = async () => {
+    const sectionPatch: Record<string, unknown> = onPageFour ? {} : { remarks };
+    if (spec.kind === 'DIAGRAM_PAINT') {
+      await api.saveInspectionSection(sessionId, area, sectionPatch);
+      await api.saveInspectionMarkers(sessionId, markers);
+    } else if (spec.kind === 'DIAGRAM_CHASSIS') {
+      await api.saveInspectionSection(sessionId, area, sectionPatch);
+      await api.saveInspectionChassis(sessionId, regions);
+    } else if (spec.kind === 'ITEMS') {
+      await api.saveInspectionSection(sessionId, area, {
+        ...sectionPatch,
         noFindings,
         items: spec.items.map(
           (item) => results[item.key] ?? { itemKey: item.key, result: 'UNSET' as InspectionResultValue, note: null },
         ),
-      }),
-    );
+      });
+    } else {
+      await api.saveInspectionSection(sessionId, area, { ...sectionPatch, noFindings });
+    }
+    const patch: Record<string, string> = {};
+    if (onPageFour) {
+      patch.generalRemarks = generalRemarks;
+      patch.exteriorRemarks = exteriorRemarks;
+      patch.finalAssessment = finalAssessment;
+    }
+    return Object.keys(patch).length
+      ? api.updateInspectionSession(sessionId, patch)
+      : api.inspectionSession(sessionId);
+  };
 
-  const saveMarkers = () => run(() => api.saveInspectionMarkers(sessionId, markers));
-  const saveRegions = () => run(() => api.saveInspectionChassis(sessionId, regions));
-  const save = spec.kind === 'DIAGRAM_PAINT' ? saveMarkers : spec.kind === 'DIAGRAM_CHASSIS' ? saveRegions : saveItems;
+  const save = () => run(saveSection);
 
   return (
     <Card data-testid={`inspection-section-${area}`}>
@@ -571,20 +631,60 @@ function SectionEditor({
         </label>
       ) : null}
 
-      <Field label={locale === 'ar' ? spec.remarksLabelAr : spec.remarksLabelEn}>
-        <textarea
-          className="oryx-input oryx-textarea"
-          rows={3}
-          value={remarks}
-          disabled={!editable || busy}
-          onChange={(e) => setRemarks(e.target.value)}
-          data-testid={`remarks-${area}`}
-        />
-      </Field>
+      {/* The approved form prints a remarks block for this section's own page
+          only on the paint, chassis and computer-unit sheets; the page-4
+          checklists share the three page-level blocks below instead. */}
+      {!onPageFour ? (
+        <Field label={locale === 'ar' ? spec.remarksLabelAr : spec.remarksLabelEn}>
+          <textarea
+            className="oryx-input oryx-textarea"
+            rows={3}
+            value={remarks}
+            disabled={!editable || busy}
+            onChange={(e) => setRemarks(e.target.value)}
+            data-testid={`remarks-${area}`}
+          />
+        </Field>
+      ) : null}
+
+      {onPageFour ? (
+        <>
+          <Field label={t('inspection.generalRemarks')}>
+            <textarea
+              className="oryx-input oryx-textarea"
+              rows={3}
+              value={generalRemarks}
+              disabled={!editable || busy}
+              onChange={(e) => onGeneralRemarksChange(e.target.value)}
+              data-testid="general-remarks"
+            />
+          </Field>
+          <Field label={t('inspection.exteriorRemarks')}>
+            <textarea
+              className="oryx-input oryx-textarea"
+              rows={3}
+              value={exteriorRemarks}
+              disabled={!editable || busy}
+              onChange={(e) => onExteriorRemarksChange(e.target.value)}
+              data-testid="exterior-remarks"
+            />
+          </Field>
+          <Field label={t('inspection.finalAssessment')}>
+            <textarea
+              className="oryx-input oryx-textarea"
+              rows={2}
+              value={finalAssessment}
+              disabled={!editable || busy}
+              onChange={(e) => onFinalAssessmentChange(e.target.value)}
+              data-testid="final-assessment"
+            />
+          </Field>
+        </>
+      ) : null}
 
       {editable ? (
         <div className="mt-3 flex justify-end">
-          <Button variant="primary" disabled={busy} onClick={save} data-testid={`save-section-${area}`}>
+          <Button variant="primary" disabled={busy} onClick={save} data-testid="save-section">
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </div>

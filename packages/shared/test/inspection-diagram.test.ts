@@ -3,8 +3,6 @@ import {
   BODY_PANELS,
   BODY_VIEWBOX,
   BODY_WHEELS,
-  CHASSIS_VIEWBOX,
-  CHASSIS_ZONES,
   CHASSIS_ZONE_COLORS,
   INSPECTION_MARKER_COLORS,
   bodyPanelAt,
@@ -56,18 +54,38 @@ describe('inspection diagram geometry — body panels', () => {
   });
 });
 
-describe('inspection diagram geometry — chassis zones', () => {
-  it('covers exactly the eight catalogue regions, in order', () => {
-    expect(CHASSIS_ZONES.map((z) => z.key)).toEqual(CHASSIS_REGIONS.map((r) => r.key));
+describe('inspection diagram geometry — chassis regions', () => {
+  it('declares a normalised position on the artwork for every catalogue region', () => {
+    // The chassis drawing is the approved ORYX artwork, not a reconstructed
+    // path set, so the contract that matters is that every assessed region has a
+    // position on that artwork inside the 0–1 normalisation box.
+    expect(CHASSIS_REGIONS.length).toBe(8);
+    for (const region of CHASSIS_REGIONS) {
+      expect(region.x).toBeGreaterThan(0);
+      expect(region.x).toBeLessThan(1);
+      expect(region.y).toBeGreaterThan(0);
+      expect(region.y).toBeLessThan(1);
+    }
   });
 
-  it('keeps every zone and its badge inside the drawing box', () => {
-    for (const zone of CHASSIS_ZONES) {
-      expect(zone.d.startsWith('M')).toBe(true);
-      expect(zone.labelX).toBeGreaterThan(0);
-      expect(zone.labelX).toBeLessThan(CHASSIS_VIEWBOX.width);
-      expect(zone.labelY).toBeGreaterThan(0);
-      expect(zone.labelY).toBeLessThan(CHASSIS_VIEWBOX.height);
+  it('gives every region a distinct position and both labels', () => {
+    const spots = CHASSIS_REGIONS.map((r) => `${r.x},${r.y}`);
+    expect(new Set(spots).size).toBe(spots.length);
+    for (const region of CHASSIS_REGIONS) {
+      expect(region.labelEn.trim()).not.toBe('');
+      expect(region.labelAr.trim()).not.toBe('');
+    }
+  });
+
+  it('places every region marker on the drawn body of the approved artwork', () => {
+    // A hotspot that floats on empty paper is invisible in the report. The
+    // approved chassis drawing keeps its structure inside this band, so every
+    // normalised marker must fall within it to sit on the vehicle.
+    for (const region of CHASSIS_REGIONS) {
+      expect(region.x).toBeGreaterThanOrEqual(0.25);
+      expect(region.x).toBeLessThanOrEqual(0.76);
+      expect(region.y).toBeGreaterThanOrEqual(0.1);
+      expect(region.y).toBeLessThanOrEqual(0.92);
     }
   });
 });

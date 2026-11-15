@@ -2068,6 +2068,18 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   pointer-events: none;
 }
 
+/*
+ * The paint & body drawing is a white-background plan view whose panel colours
+ * are the point of the scheme. On the dark theme the canvas would sit behind it
+ * in navy, so the vehicle is placed on a white plate — otherwise the translucent
+ * panel fills and the paint markers lose their contrast against the artwork.
+ * The light theme already renders the drawing on a light surface, so the plate
+ * is scoped to the dark theme only.
+ */
+:root[data-theme='dark'] .oryx-diagram__canvas--body {
+  background: #ffffff;
+}
+
 .oryx-diagram__body {
   fill: color-mix(in srgb, var(--text) 8%, transparent);
   stroke: var(--border-strong);
@@ -2149,53 +2161,59 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   width: 100%;
   max-width: 340px;
   margin: 0 auto;
-  aspect-ratio: 420 / 720;
+  aspect-ratio: 1567 / 2144;
   border: 1px solid var(--border-soft);
   border-radius: 12px;
   background: var(--surface-raised);
   padding: 6px;
 }
 
-.oryx-chassis__outline {
-  fill: color-mix(in srgb, var(--text) 7%, transparent);
-  stroke: var(--border-strong);
-  stroke-width: 3;
-}
-
-/* A chassis zone is filled by its condition; the marker colours are fixed
- * technical indicators, so they do not follow the theme. */
-.oryx-chassis-zone path {
-  stroke: var(--border-soft);
-  stroke-width: 1.5;
-  transition: fill 0.12s ease;
-}
-
-.oryx-chassis-zone:hover path {
-  stroke: var(--border-strong);
-}
-
-.oryx-chassis-zone__num {
-  font-size: 26px;
-  font-weight: 800;
-  fill: color-mix(in srgb, var(--text) 55%, transparent);
-  text-anchor: middle;
-  dominant-baseline: middle;
-  pointer-events: none;
+/* The approved ORYX underbody drawing, served as an image. `contain` keeps its
+ * aspect inside the canvas, which is authored at the same ratio. */
+.oryx-chassis__art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   user-select: none;
+  pointer-events: none;
 }
 
-.oryx-chassis-zone.is-ok .oryx-chassis-zone__num,
-.oryx-chassis-zone.is-damage .oryx-chassis-zone__num {
-  fill: #fff;
+/* A chassis region is a circular hotspot placed on the artwork by its
+ * normalised coordinates — the same coordinates the PDF uses for its condition
+ * dots, so what the inspector clicks is what the report marks. */
+.oryx-chassis-hotspot {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 2px solid var(--border-strong);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface) 75%, transparent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  transition: transform 0.12s ease, border-color 0.12s ease;
 }
 
-.oryx-chassis-zone:focus-visible {
+.oryx-chassis-hotspot:hover:not(:disabled) {
+  transform: translate(-50%, -50%) scale(1.12);
+  border-color: var(--gold);
+}
+
+.oryx-chassis-hotspot.is-ok,
+.oryx-chassis-hotspot.is-damage {
+  border-color: transparent;
+}
+
+.oryx-chassis-hotspot:focus-visible {
   outline: none;
-}
-
-.oryx-chassis-zone:focus-visible path {
-  stroke: var(--gold);
-  stroke-width: 3;
+  box-shadow: 0 0 0 3px var(--tint-ring);
 }
 
 /* The accessible control list mirrors the diagram, so a region can be set with

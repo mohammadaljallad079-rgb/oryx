@@ -427,14 +427,14 @@ export interface ChassisRegionSpec {
 }
 
 export const CHASSIS_REGIONS: readonly ChassisRegionSpec[] = [
-  { key: 'FRONT', labelEn: 'Front', labelAr: 'الامام', x: 0.5, y: 0.06 },
-  { key: 'FRONT_LEFT', labelEn: 'Front Left', labelAr: 'الجهة الأمامية اليسرى', x: 0.22, y: 0.2 },
-  { key: 'FRONT_RIGHT', labelEn: 'Front Right', labelAr: 'الجهة الأمامية اليمنى', x: 0.78, y: 0.2 },
-  { key: 'MIDDLE_LEFT', labelEn: 'Middle Left', labelAr: 'الجهة الوسطى اليسرى', x: 0.2, y: 0.42 },
-  { key: 'MIDDLE_RIGHT', labelEn: 'Middle Right', labelAr: 'الجهة الوسطى اليمنى', x: 0.8, y: 0.42 },
-  { key: 'REAR_LEFT', labelEn: 'Rear Left', labelAr: 'الجهة الخلفية اليسرى', x: 0.22, y: 0.68 },
-  { key: 'REAR_RIGHT', labelEn: 'Rear Right', labelAr: 'الجهة الخلفية اليمنى', x: 0.78, y: 0.68 },
-  { key: 'REAR', labelEn: 'Rear', labelAr: 'الخلف', x: 0.5, y: 0.94 },
+  { key: 'FRONT', labelEn: 'Front', labelAr: 'الامام', x: 0.5, y: 0.145 },
+  { key: 'FRONT_LEFT', labelEn: 'Front Left', labelAr: 'الجهة الأمامية اليسرى', x: 0.275, y: 0.235 },
+  { key: 'FRONT_RIGHT', labelEn: 'Front Right', labelAr: 'الجهة الأمامية اليمنى', x: 0.725, y: 0.235 },
+  { key: 'MIDDLE_LEFT', labelEn: 'Middle Left', labelAr: 'الجهة الوسطى اليسرى', x: 0.275, y: 0.47 },
+  { key: 'MIDDLE_RIGHT', labelEn: 'Middle Right', labelAr: 'الجهة الوسطى اليمنى', x: 0.725, y: 0.47 },
+  { key: 'REAR_LEFT', labelEn: 'Rear Left', labelAr: 'الجهة الخلفية اليسرى', x: 0.275, y: 0.72 },
+  { key: 'REAR_RIGHT', labelEn: 'Rear Right', labelAr: 'الجهة الخلفية اليمنى', x: 0.725, y: 0.72 },
+  { key: 'REAR', labelEn: 'Rear', labelAr: 'الخلف', x: 0.5, y: 0.875 },
 ] as const;
 
 export type ChassisRegionCondition = 'OK' | 'DAMAGE' | 'UNSET';

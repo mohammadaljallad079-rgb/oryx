@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test';
-import { ENTERPRISE_ADMIN, setLocale, setTheme, signIn } from './helpers';
+import { expect, test, type Page } from '@playwright/test';
+import { ENTERPRISE_ADMIN, apiToken, setLocale, setTheme, signIn } from './helpers';
 
 /**
  * Execution 19 evidence capture.
@@ -10,6 +10,41 @@ import { ENTERPRISE_ADMIN, setLocale, setTheme, signIn } from './helpers';
  * behavioural assertions live in execution08-remediation.spec.ts.
  */
 const OUT = '../../docs/execution-reports/exec19/screens';
+
+const API = process.env.ORYX_API ?? 'http://localhost:3001/api/v1';
+
+/** Create a draft inspection with the given areas, for the remarks evidence. */
+async function seedInspection(page: Page, areas: string[]): Promise<string> {
+  const token = await apiToken(page, ENTERPRISE_ADMIN);
+  return page.evaluate(
+    async ({ api, token, areas }) => {
+      const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+      const customers = (await (await fetch(`${api}/sales/customers?pageSize=50`, { headers })).json()) as {
+        items: Array<{ id: string }>;
+      };
+      let customerId = '';
+      let vehicleId = '';
+      for (const candidate of customers.items) {
+        const vehicles = (await (
+          await fetch(`${api}/automotive/vehicles?customerId=${candidate.id}`, { headers })
+        ).json()) as { items: Array<{ id: string }> };
+        if (vehicles.items.length > 0) {
+          customerId = candidate.id;
+          vehicleId = vehicles.items[0].id;
+          break;
+        }
+      }
+      const created = await fetch(`${api}/automotive/inspections`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ customerId, vehicleId, selectedAreas: areas }),
+      });
+      if (!created.ok) throw new Error(`Job creation failed: ${created.status} ${await created.text()}`);
+      return ((await created.json()) as { id: string }).id;
+    },
+    { api: API, token, areas },
+  );
+}
 
 test.describe('Execution 19 evidence', () => {
   for (const theme of ['light', 'dark'] as const) {
@@ -87,4 +122,31 @@ test.describe('Execution 19 evidence', () => {
     await expect(page.getByTestId('branch-name-en')).toBeVisible();
     await page.screenshot({ path: `${OUT}/branch-create-light-ar.png` });
   });
+
+  // The approved report prints a remarks block per section page. Capture the
+  // paint section's own box and the three page-4 blocks so the evidence shows
+  // the reference-faithful arrangement rather than the single collapsed box.
+  for (const theme of ['light', 'dark'] as const) {
+    test(`inspection section remarks blocks (${theme})`, async ({ page }) => {
+      await signIn(page, ENTERPRISE_ADMIN);
+      await setLocale(page, 'en');
+      await setTheme(page, theme);
+      const id = await seedInspection(page, ['PAINT_BODY', 'EXTERIOR']);
+      await page.goto(`/automotive/inspections/${id}`);
+      await expect(page.getByTestId('inspection-workspace')).toBeVisible({ timeout: 20_000 });
+
+      // Paint section: its own page-2 remarks box, no page-4 blocks.
+      await expect(page.getByTestId('remarks-PAINT_BODY')).toBeVisible();
+      await expect(page.getByTestId('general-remarks')).toHaveCount(0);
+      await page.screenshot({ path: `${OUT}/inspection-remarks-paint-${theme}-en.png` });
+
+      // Exterior (page 4): the three page-level blocks, no section box.
+      await page.getByTestId('inspection-rail-EXTERIOR').click();
+      await expect(page.getByTestId('general-remarks')).toBeVisible();
+      await expect(page.getByTestId('exterior-remarks')).toBeVisible();
+      await expect(page.getByTestId('final-assessment')).toBeVisible();
+      await expect(page.getByTestId('remarks-EXTERIOR')).toHaveCount(0);
+      await page.screenshot({ path: `${OUT}/inspection-remarks-page4-${theme}-en.png` });
+    });
+  }
 });
