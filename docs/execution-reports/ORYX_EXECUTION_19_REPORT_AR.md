@@ -553,10 +553,10 @@ http://localhost:3002/verify/gnIdQw7_Hm9OnX7ZQQfFxripqJwscrbtZH0YQ24TXVQ
 
 | الصورة | الرابط |
 | --- | --- |
-| نموذج الخدمات — كل الحقول | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/form-inspections-services.png |
-| نموذج الحجوزات — كل الحقول | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/form-inspections-bookings.png |
-| نموذج أوامر العمل — كل الحقول | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/form-inspections-jobs.png |
-| نموذج المركبات — كل الحقول | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/form-inspections-vehicles.png |
+| نموذج الخدمات — كل الحقول | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/form-inspections-services.png |
+| نموذج الحجوزات — كل الحقول | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/form-inspections-bookings.png |
+| نموذج أوامر العمل — كل الحقول | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/form-inspections-jobs.png |
+| نموذج المركبات — كل الحقول | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/form-inspections-vehicles.png |
 | سجل الفحوصات (حي) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/live/07-inspections.png |
 | نافذة إنشاء الفحص (حي) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/live/08-inspection-create-modal.png |
 
