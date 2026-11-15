@@ -156,13 +156,28 @@ function qualityBadge(): string {
  * printed data stays fully legible on top of it. It appears on the cover only;
  * the section pages carry no watermark.
  */
-export function reportWatermark(issuer: DocumentIssuer): string {
+export function reportWatermark(): string {
+  return '<div class="rp-watermark" aria-hidden="true">AUTO SERVICES</div>';
+}
+
+/**
+ * The faint "Auto Park" logo watermark laid behind the printed data on *every*
+ * page of the inspection report, including the cover.
+ *
+ * This is a second, independent layer: the approved `reportWatermark` above is
+ * the ORYX identity wordmark the reference prints on the cover only, and this
+ * one repeats the customer's brand mark (the configured logo, or the official
+ * ORYX logotype when none is uploaded) with its name so the whole sheet carries
+ * the Auto Park identity. It sits behind the content (z-index 0) so every
+ * printed value stays fully legible on top of it.
+ */
+export function parkWatermark(issuer: DocumentIssuer): string {
   const logo = issuer.logoDataUri
-    ? `<img class="rp-watermark-logo" src="${esc(issuer.logoDataUri)}" alt="">`
-    : oryxLogoMark('65pt', 'rp-watermark-logo');
-  return `<div class="rp-watermark" aria-hidden="true">
+    ? `<img class="rp-park-wm-logo" src="${esc(issuer.logoDataUri)}" alt="">`
+    : oryxLogoMark('58pt', 'rp-park-wm-logo');
+  return `<div class="rp-park-wm" aria-hidden="true">
     ${logo}
-    <span class="rp-watermark-text">AUTO PARK</span>
+    <span class="rp-park-wm-text">AUTO PARK</span>
   </div>`;
 }
 
@@ -316,7 +331,8 @@ export function identificationPage(input: InspectionReportInput, chrome: Documen
   const stamp = docStamp(p.inspectedAt);
   return `
   <section class="doc-page">
-    ${reportWatermark(input.issuer)}
+    ${reportWatermark()}
+    ${parkWatermark(input.issuer)}
     ${reportHeader(chrome.issuer)}
     ${pageTitleBar('تقرير فحص المركبة', 'VEHICLE INSPECTION REPORT')}
     <div class="cover-info">
@@ -355,7 +371,7 @@ export function paintSectionPage(
   if (!section) return '';
   return `
   <section class="doc-page">
-    ${reportWatermark(input.issuer)}
+    ${parkWatermark(input.issuer)}
     ${reportHeader(input.issuer)}
     ${pageTitleBar('فحص الصبغ وبدن المركبة', 'VEHICLE PAINT & BODY CHECK', 10, -0.052)}
     ${jobStrip(input.payload)}
@@ -371,7 +387,7 @@ export function chassisSectionPage(
   if (!section) return '';
   return `
   <section class="doc-page">
-    ${reportWatermark(input.issuer)}
+    ${parkWatermark(input.issuer)}
     ${reportHeader(input.issuer)}
     ${pageTitleBar('فحص الشاصي وأسفل المركبة', 'CHASSIS & UNDERCARRIAGE CONDITION', 10, -0.052)}
     ${jobStrip(input.payload)}
@@ -458,7 +474,7 @@ export function inspectionGroupPage(
 
   return `
   <section class="doc-page">
-    ${reportWatermark(input.issuer)}
+    ${parkWatermark(input.issuer)}
     ${reportHeader(input.issuer)}
     ${pageTitleBar('الفحص الداخلي والخارجي / مقصورة المحرك / تجربة القيادة', 'INTERIOR & EXTERIOR INSPECTION / ENGINE COMPARTMENT / ROAD TEST', 8.7, -0.047)}
     ${jobStrip(input.payload)}
@@ -473,7 +489,7 @@ export function computerSectionPage(
 ): string {
   return `
   <section class="doc-page p5-page">
-    ${reportWatermark(input.issuer)}
+    ${parkWatermark(input.issuer)}
     ${reportHeader(input.issuer)}
     ${pageTitleBar('فحص وحدة الكمبيوتر', 'COMPUTER UNIT INSPECTION', 8.7, -0.047)}
     ${jobStrip(input.payload)}
@@ -690,17 +706,34 @@ function diagnosticSection(section: InspectionReportSection | undefined): string
 
 
 export const INSPECTION_REPORT_CSS = `
-  /* ---- repeated logo + AUTO PARK watermark on every inspection page ---- */
-  .rp-watermark{ position:absolute; left:0; right:0; top:330pt;
-    display:flex; align-items:center; justify-content:center; gap:14pt;
-    white-space:nowrap; color:#0a1f44; opacity:0.085;
+  /* ---- page watermark (approved: cover only) ---- */
+  /* The approved sheet prints the identity wordmark on the *cover only* (the
+   * section pages carry no watermark), so the layer is scoped to the first
+   * page rather than the document body. */
+  /* The mark is the brand display face (Codec Pro Bold), 51.75pt, with a
+   * 6.9pt tracking so the run measures the reference's 476pt ink width, set in
+   * the identity navy at ~9.6% opacity (measured from the approved PDF). */
+  .rp-watermark{ position:absolute; left:0; right:0; top:349.8pt;
+    text-align:center; white-space:pre;
+    font-size:51.747pt; font-weight:700; letter-spacing:6.72pt;
+    color:#0a1f44; opacity:0.101; pointer-events:none; z-index:0;
+    font-family:'ORYX Display',Verdana,Arial,Helvetica,sans-serif; }
+  /* ---- Auto Park brand watermark (every page) ---- */
+  /* A second, independent layer: the customer's logo plus the "AUTO PARK" name,
+   * repeated on every page including the cover, set low enough that all printed
+   * data stays legible on top of it. Positioned in the lower-middle of the sheet
+   * so it clears the approved wordmark band (top ~350pt, cover only) and never
+   * stacks on top of it. */
+  .rp-park-wm{ position:absolute; left:0; right:0; top:452pt;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:8pt; white-space:nowrap; color:#0a1f44; opacity:0.08;
     pointer-events:none; z-index:0; }
-  .rp-watermark-logo{ display:block; width:auto; max-width:135pt; max-height:66pt;
+  .rp-park-wm-logo{ display:block; width:auto; max-width:130pt; max-height:56pt;
     object-fit:contain; }
-  .rp-watermark svg{ display:block; width:65pt; height:auto; }
-  .rp-watermark-text{ font-family:'ORYX Display',Verdana,Arial,Helvetica,sans-serif;
-    font-size:40pt; font-weight:700; letter-spacing:2.5pt; }
-  .doc-page > :not(.rp-watermark){ position:relative; z-index:1; }
+  .rp-park-wm svg{ display:block; width:56pt; height:auto; }
+  .rp-park-wm-text{ font-family:'ORYX Display',Verdana,Arial,Helvetica,sans-serif;
+    font-size:36pt; font-weight:700; letter-spacing:2.5pt; }
+  .doc-page > :not(.rp-watermark):not(.rp-park-wm){ position:relative; z-index:1; }
   /* ---- brand band ---- */
   /* The approved form prints the brand lockup on the visual left and the
    * "inspection experts" tagline on the visual right. The document is RTL, so

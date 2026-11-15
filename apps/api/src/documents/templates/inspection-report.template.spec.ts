@@ -532,7 +532,7 @@ describe('inspection report template — reference page parity (Execution 19)', 
 
 
 describe('inspection report branding watermark', () => {
-  it('renders the logo and AUTO PARK watermark on every report page, including the cover', () => {
+  it('repeats the Auto Park logo watermark on every report page, including the cover', () => {
     const html = renderInspectionReportHtml({
       issuer: { ...issuer, logoDataUri: 'data:image/png;base64,LOGO' },
       payload,
@@ -543,20 +543,44 @@ describe('inspection report branding watermark', () => {
       baseCss: '',
     });
     const pageCount = (html.match(/<section class="doc-page(?: p5-page)?">/g) ?? []).length;
-    const watermarkCount = (html.match(/class="rp-watermark"/g) ?? []).length;
+    const parkCount = (html.match(/class="rp-park-wm"/g) ?? []).length;
     expect(pageCount).toBeGreaterThan(1);
-    expect(watermarkCount).toBe(pageCount);
-    expect(html).toContain('class="rp-watermark-logo"');
+    expect(parkCount).toBe(pageCount);
+    expect(html).toContain('class="rp-park-wm-logo"');
     expect(html).toContain('AUTO PARK');
   });
 
-  it('places a faint logo watermark inside the ORYX authorised-signature footer box', () => {
-    const footer = officialFooterTemplate({
-      ...issuer,
-      logoDataUri: 'data:image/png;base64,LOGO',
+  it('keeps the approved AUTO SERVICES wordmark on the cover only, unchanged', () => {
+    // The Auto Park layer is additive: the approved identity wordmark must stay
+    // exactly where the reference prints it (cover only, measured size/opacity).
+    const html = renderInspectionReportHtml({
+      issuer: { ...issuer, logoDataUri: 'data:image/png;base64,LOGO' },
+      payload,
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
     });
+    expect((html.match(/class="rp-watermark"/g) ?? []).length).toBe(1);
+    expect(html).toContain("font-size:51.747pt");
+    expect(html).toContain('letter-spacing:6.72pt');
+  });
+
+  it('places a faint logo seal inside the ORYX authorised-signature footer box when asked', () => {
+    const footer = officialFooterTemplate(
+      { ...issuer, logoDataUri: 'data:image/png;base64,LOGO' },
+      true,
+    );
     expect(footer).toContain('class="issuer-signature-watermark"');
     expect(footer).toContain('data:image/png;base64,LOGO');
     expect(footer).toContain('Authorized Stamp &amp; Signature');
+  });
+
+  it('does not paint the seal in the shared footer unless the report opts in', () => {
+    // The invoice and the inspection report share this footer band, so the seal
+    // must be off by default or the approved invoice signature boxes change.
+    const footer = officialFooterTemplate({ ...issuer, logoDataUri: 'data:image/png;base64,LOGO' });
+    expect(footer).not.toContain('class="issuer-signature-watermark"');
   });
 });
