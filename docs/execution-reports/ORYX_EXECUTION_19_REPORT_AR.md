@@ -632,3 +632,38 @@ http://localhost:3002/verify/gnIdQw7_Hm9OnX7ZQQfFxripqJwscrbtZH0YQ24TXVQ
 https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/index.html
 
 > أُنشئ هذا الملحق بواسطة وكيل ذكاء اصطناعي (OpenHands) نيابةً عن مالك المستودع.
+
+---
+
+## ملحق — كل نوع فحص كيف يطلع، ودمج ملف فحص الكمبيوتر مع التقرير
+
+### 1) صفحة الفحص: كل نوع كيف يظهر
+عند فتح مهمة فحص من **السيارات → الفحوصات → فتح (Open)**، يظهر شريط التبويبات
+في أعلى الصفحة — تبويب لكل نوع مختار، ولكل نوع محرّره الخاص:
+
+| نوع الفحص | ما يظهر على الصفحة | صورة |
+| --- | --- | --- |
+| الشاصي وأسفل المركبة | مخطّط الشاسيه بثماني مناطق + أداتا «سليم/تلف» + قائمة المناطق | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/inspection-type-chassis.png |
+| الصبغ وبدن المركبة | مخطّط الجسم مع علامات الصبغ + مفتاح الألواح | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/inspection-type-paint.png |
+| الداخلي والخارجي / مقصورة المحرك / تجربة القيادة | قوائم فحص بثلاث حالات (سليم/خلل/لا ينطبق) | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/inspection-type-interior.png |
+| وحدة الكمبيوتر | إدخال أعطال حُرّ + لوحة المرفقات لملف التشخيص الخارجي | https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/inspection-type-computer.png |
+
+### 2) ملف فحص الكمبيوتر — هل يندمج مع التقرير؟
+**نعم، يندمج فعلاً.** عند إصدار تقرير الفحص، يبحث النظام عن أي مرفق من نوع PDF
+على مهمة الفحص ويدمجه في نهاية التقرير، فيصدران **كملف واحد**. الصور تُستثنى من
+الدمج (تُعرض كصور داخل التقرير، لا كملفات تُلحَق).
+
+**مسار الكود:** `apps/api/src/documents/documents.service.ts` → عند الإصدار
+تُجمع مرفقات الـ PDF وتُلحَق بالترتيب عبر `appendPdf`، ويُعاد كتابة عدد الصفحات
+ليصف الملف المدموج فعلاً.
+
+**الدليل:** اختبار تكامل حقيقي
+«appends the uploaded PDF to the issued report so the page count grows» يرفع
+ملف PDF من صفحة واحدة، يصدر التقرير، ثم يقارن **عدد صفحات الملف المدموج = عدد
+صفحات التقرير بدون الملحق + 1**.
+
+**النتيجة الفعلية:** حزمة `execution-phase3-documents` — **35/35 ✅**.
+
+- لوحة المرفقات (مكان رفع الملف): https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec19/screens/inspection-computer-attachments.png
+
+> أُنشئ هذا الملحق بواسطة وكيل ذكاء اصطناعي (OpenHands) نيابةً عن مالك المستودع.
