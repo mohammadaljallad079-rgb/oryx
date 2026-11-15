@@ -1168,6 +1168,18 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `QrService` and `officialFooterTemplate`, so a rendered sheet can be decoded
   (jsQR) and measured (PyMuPDF) against the reference. It is scratch, not
   committed.
+- **Remarks are one block per section page, not one merged box.** The approved
+  report prints five remark blocks: Paint & Body on page 2, Chassis & Underbody
+  on page 3, the computer-unit remarks on page 5, and three shared blocks on
+  page 4 (General Inspection Remarks, Additional Exterior Inspection Remarks,
+  Final Result & General Assessment). The first three come from the section's
+  own `remarks` column; the page-4 three come from `session.generalRemarks`,
+  `session.exteriorRemarks` and `session.finalAssessment`. The workspace renders
+  a section box only on non-page-4 sections (`onPageFour = spec.page === 4`) and
+  the three page-level blocks only on page 4, all saved by the section's single
+  Save button. Collapsing these into one box silently drops stored findings —
+  do not do it. `apps/admin/e2e/execution19-evidence.spec.ts` captures both
+  arrangements in both themes.
 
 ### Adding a new ERP module
 
