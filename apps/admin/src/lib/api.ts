@@ -110,6 +110,8 @@ import type {
   DocumentVerificationView,
   PrintDocumentDto,
   PrintDocumentKind,
+  ReportResultDto,
+  ReportDefinition,
 } from '@oryx/shared';
 
 /**
@@ -1040,6 +1042,49 @@ export const api = {
     request<PurchasingReportDto>(`/reports/purchasing?${toQuery(params)}`),
   reportInventory: (params: Record<string, unknown> = {}) =>
     request<InventoryReportDto>(`/reports/inventory?${toQuery(params)}`),
+  /** The catalogue: every report this platform can produce. */
+  reportCatalogue: () => request<{ reports: ReportDefinition[] }>('/reports/catalogue'),
+  /** Resolve one catalogue report from live data. */
+  reportData: (kind: string, params: Record<string, unknown> = {}) =>
+    request<ReportResultDto>(`/reports/${kind}/data?${toQuery(params)}`),
+  /** Open one catalogue report as a print-ready PDF (preview or print). */
+  reportPdfBlobUrl: async (kind: string, params: Record<string, unknown> = {}): Promise<string> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    const branchId = tokenStore.branchId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    if (branchId) headers['x-oryx-branch-id'] = branchId;
+    const res = await fetch(`${API_BASE}/v1/reports/${kind}/pdf?${toQuery(params)}`, {
+      headers,
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new ApiError(res.status, 'report_pdf_failed', 'The report PDF could not be generated.');
+    return URL.createObjectURL(await res.blob());
+  },
+  /** Download one catalogue report as CSV. */
+  downloadReportCsv: async (kind: string, params: Record<string, unknown> = {}): Promise<void> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    const branchId = tokenStore.branchId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    if (branchId) headers['x-oryx-branch-id'] = branchId;
+    const res = await fetch(`${API_BASE}/v1/reports/${kind}/export?${toQuery(params)}`, {
+      headers,
+      credentials: 'include',
+    });
+    if (!res.ok) throw new ApiError(res.status, 'report_export_failed', 'The report could not be exported.');
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `oryx-report-${kind}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
 
   // ------------------------------------------------------------- HR (E03)
   hrDepartments: (params: { companyId?: string } = {}) =>
@@ -1431,11 +1476,29 @@ export const api = {
     request<InspectionSessionDto>(`/automotive/inspections/${id}/cancel`, { method: 'POST', body: {} }),
   workshopBays: (params: { companyId?: string } = {}) =>
     request<Paginated<Record<string, unknown>>>(`/automotive/bays?${toQuery(params)}`),
+  workshopDashboard: (params: { companyId?: string } = {}) =>
+    request<{
+      bays: number;
+      activeBays: number;
+      jobCards: number;
+      openJobCards: number;
+      awaitingApproval: number;
+      completedJobCards: number;
+      invoicedJobCards: number;
+      bookings: number;
+      scheduledBookings: number;
+      reservations: number;
+      outstandingReservations: number;
+      warranties: number;
+      activeWarranties: number;
+    }>(`/automotive/workshop/dashboard?${toQuery(params)}`),
   createWorkshopBay: (body: Record<string, unknown>) => request<Record<string, unknown>>('/automotive/bays', { method: 'POST', body }),
   maintenanceBookings: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<Record<string, unknown>>>(`/automotive/maintenance-bookings?${toQuery(params)}`),
   createMaintenanceBooking: (body: Record<string, unknown>) =>
     request<Record<string, unknown>>('/automotive/maintenance-bookings', { method: 'POST', body }),
+  updateMaintenanceBooking: (id: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/automotive/maintenance-bookings/${id}`, { method: 'PATCH', body }),
   jobCards: (params: { companyId?: string; status?: string; page?: number } = {}) =>
     request<Paginated<JobCardDto>>(`/automotive/job-cards?${toQuery(params)}`),
   jobCard: (id: string) => request<Record<string, unknown>>(`/automotive/job-cards/${id}`),
@@ -1455,6 +1518,12 @@ export const api = {
     request<PartsReservationDto>('/automotive/reservations', { method: 'POST', body }),
   issuePartReservation: (id: string, body: Record<string, unknown> = {}) =>
     request<PartsReservationDto>(`/automotive/reservations/${id}/issue`, { method: 'POST', body }),
+  cancelPartReservation: (id: string) =>
+    request<PartsReservationDto>(`/automotive/reservations/${id}/cancel`, { method: 'POST', body: {} }),
+  reservedStock: (params: { companyId?: string; warehouseId?: string; productId?: string } = {}) =>
+    request<Paginated<{ warehouseId: string; productId: string; sku: string; nameEn: string; reservedQuantity: number }>>(
+      `/automotive/reservations/reserved-stock?${toQuery(params)}`,
+    ),
   warranties: (params: { companyId?: string; vehicleId?: string } = {}) =>
     request<Paginated<Record<string, unknown>>>(`/automotive/warranties?${toQuery(params)}`),
   createWarranty: (body: Record<string, unknown>) => request<Record<string, unknown>>('/automotive/warranties', { method: 'POST', body }),

@@ -6,6 +6,7 @@ import { DocumentsService } from './documents.service';
 import { DocumentStorageService } from './document-storage.service';
 import { DocumentFontService } from './pdf/document-fonts.service';
 import { PdfRendererService } from './pdf/pdf-renderer.service';
+import { ReportPdfService } from './report-pdf.service';
 
 /**
  * Official documents, PDF printing and QR verification.
@@ -21,7 +22,7 @@ import { PdfRendererService } from './pdf/pdf-renderer.service';
 @Module({
   imports: [ErpCommonModule, CmsModule],
   controllers: [DocumentsController],
-  providers: [DocumentsService, DocumentStorageService, DocumentFontService, PdfRendererService],
-  exports: [DocumentsService, PdfRendererService, DocumentFontService],
+  providers: [DocumentsService, DocumentStorageService, DocumentFontService, PdfRendererService, ReportPdfService],
+  exports: [DocumentsService, PdfRendererService, DocumentFontService, ReportPdfService],
 })
 export class DocumentsModule {}

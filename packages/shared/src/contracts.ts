@@ -1602,6 +1602,7 @@ export interface JobCardDto {
   technicianUserId: string | null;
   odometer: number | null;
   complaint: string | null;
+  diagnosis: string | null;
   invoiceId: string | null;
   labourCount?: number;
   estimateCount?: number;

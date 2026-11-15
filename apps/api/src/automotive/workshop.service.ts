@@ -66,6 +66,62 @@ export class WorkshopService {
 
   // ------------------------------------------------------------------ bays
 
+  /**
+   * The workshop dashboard: live counts for the workshop landing screen.
+   *
+   * Every figure is a count from the tenant's own rows, so the screen shows
+   * what the database holds rather than a cached total. `openJobCards` counts
+   * the states that still need workshop attention, which is the number an
+   * operator acts on, not the lifetime total.
+   */
+  async dashboard(query: ListQueryDto, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
+    const [
+      bays,
+      activeBays,
+      jobCards,
+      openJobCards,
+      awaitingApproval,
+      completedJobCards,
+      invoicedJobCards,
+      bookings,
+      scheduledBookings,
+      reservations,
+      outstandingReservations,
+      warranties,
+      activeWarranties,
+    ] = await Promise.all([
+      this.prisma.workshopBay.count({ where: { companyId } }),
+      this.prisma.workshopBay.count({ where: { companyId, isActive: true } }),
+      this.prisma.jobCard.count({ where: { companyId } }),
+      this.prisma.jobCard.count({ where: { companyId, status: { in: ['OPEN', 'AWAITING_APPROVAL', 'APPROVED', 'IN_PROGRESS'] } } }),
+      this.prisma.jobCard.count({ where: { companyId, status: 'AWAITING_APPROVAL' } }),
+      this.prisma.jobCard.count({ where: { companyId, status: 'COMPLETED' } }),
+      this.prisma.jobCard.count({ where: { companyId, status: 'INVOICED' } }),
+      this.prisma.maintenanceBooking.count({ where: { companyId } }),
+      this.prisma.maintenanceBooking.count({ where: { companyId, status: { in: ['REQUESTED', 'SCHEDULED', 'IN_PROGRESS'] } } }),
+      this.prisma.partsReservation.count({ where: { companyId } }),
+      this.prisma.partsReservation.count({ where: { companyId, status: { in: ['RESERVED', 'PARTIALLY_ISSUED'] } } }),
+      this.prisma.warrantyRecord.count({ where: { companyId } }),
+      this.prisma.warrantyRecord.count({ where: { companyId, isActive: true } }),
+    ]);
+    return {
+      bays,
+      activeBays,
+      jobCards,
+      openJobCards,
+      awaitingApproval,
+      completedJobCards,
+      invoicedJobCards,
+      bookings,
+      scheduledBookings,
+      reservations,
+      outstandingReservations,
+      warranties,
+      activeWarranties,
+    };
+  }
+
   async listBays(query: ListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const rows = await this.prisma.workshopBay.findMany({ where: { companyId }, orderBy: { code: 'asc' } });
@@ -844,6 +900,7 @@ function toJobCardDto(j: {
   technicianUserId: string | null;
   odometer: number | null;
   complaint: string | null;
+  diagnosis: string | null;
   invoiceId: string | null;
   vehicle?: { vin: string; make: string; model: string; plateNumber: string | null } | null;
   _count?: { labour: number; estimates: number; reservations: number };
@@ -862,6 +919,7 @@ function toJobCardDto(j: {
     technicianUserId: j.technicianUserId,
     odometer: j.odometer,
     complaint: j.complaint,
+    diagnosis: j.diagnosis,
     invoiceId: j.invoiceId,
     labourCount: j._count?.labour,
     estimateCount: j._count?.estimates,

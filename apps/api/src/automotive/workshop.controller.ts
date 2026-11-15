@@ -48,6 +48,14 @@ export class WorkshopController {
   constructor(private readonly workshop: WorkshopService) {}
 
   // -------------------------------------------------------------- bays
+  @Get('workshop/dashboard')
+  @RequireModule('automotive_maintenance')
+  @RequireAnyPermission('erp.maintenance.read', 'erp.maintenance.jobcard.manage', 'erp.maintenance.booking.manage')
+  @ApiOperation({ summary: 'Workshop dashboard: live counts for bays, job cards, bookings and warranties' })
+  dashboard(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.workshop.dashboard(query, p);
+  }
+
   @Get('bays')
   @RequireModule('automotive_maintenance')
   @RequireAnyPermission('erp.maintenance.read', 'erp.maintenance.booking.manage')
