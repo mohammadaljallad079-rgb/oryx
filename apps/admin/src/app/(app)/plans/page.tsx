@@ -48,7 +48,7 @@ function PlansPageInner() {
         actions={
           <>
             <Button size="sm" onClick={() => void plans.reload()}>
-              <Icon name="search" size={15} />
+              <Icon name="refresh" size={15} />
               {t('common.refresh')}
             </Button>
             <Button variant="primary" onClick={() => setCreating(true)} data-testid="new-plan">

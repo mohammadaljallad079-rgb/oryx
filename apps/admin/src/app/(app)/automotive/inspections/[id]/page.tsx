@@ -116,7 +116,7 @@ export default function InspectionWorkspacePage() {
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={session.status} label={t(`inspection.status.${session.status}`)} />
             <Button onClick={load} data-testid="inspection-refresh">
-              <Icon name="search" size={14} />
+              <Icon name="refresh" size={15} />
               {t('common.refresh')}
             </Button>
           </div>

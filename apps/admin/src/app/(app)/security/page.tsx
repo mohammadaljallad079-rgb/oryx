@@ -56,7 +56,7 @@ export default function SecurityPage() {
         subtitle={t('mfa.subtitle')}
         actions={
           <Button size="sm" onClick={() => void load()}>
-            <Icon name="search" size={15} />
+            <Icon name="refresh" size={15} />
             {t('common.refresh')}
           </Button>
         }

@@ -26,7 +26,7 @@ function ModulesPageInner() {
         subtitle={t('modules.subtitle')}
         actions={
           <Button size="sm" onClick={() => void modules.reload()}>
-            <Icon name="search" size={15} />
+            <Icon name="refresh" size={15} />
             {t('common.refresh')}
           </Button>
         }

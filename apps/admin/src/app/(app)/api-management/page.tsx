@@ -36,7 +36,7 @@ function ApiManagementPageInner() {
         actions={
           <>
             <Button size="sm" onClick={() => void clients.reload()}>
-              <Icon name="search" size={15} />
+              <Icon name="refresh" size={15} />
               {t('common.refresh')}
             </Button>
             <Button variant="primary" onClick={() => setOpen(true)} data-testid="new-api-client">

@@ -109,7 +109,7 @@ function ReceiptsTab({ canManage }: { canManage: boolean }) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.accounting.receipts')}</p>
         <Button size="sm" onClick={() => void list.reload()} data-testid="receipts-refresh">
-          <Icon name="search" size={15} />
+          <Icon name="refresh" size={15} />
           {t('common.refresh')}
         </Button>
       </div>
@@ -219,7 +219,7 @@ function AccountsTab({ canManage }: { canManage: boolean }) {
           />
         </label>
         <Button size="sm" onClick={() => void list.reload()}>
-          <Icon name="search" size={15} />
+          <Icon name="refresh" size={15} />
           {t('common.refresh')}
         </Button>
         {canManage ? (
@@ -518,7 +518,7 @@ function JournalsTab({ canPost }: { canPost: boolean }) {
         <p className="oryx-muted m-0 text-[12.5px]">{t('erp.accounting.journalsHint')}</p>
         <div className="flex gap-2">
           <Button size="sm" onClick={() => void list.reload()}>
-            <Icon name="search" size={15} />
+            <Icon name="refresh" size={15} />
             {t('common.refresh')}
           </Button>
           {canPost ? (
