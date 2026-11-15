@@ -2179,6 +2179,14 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   pointer-events: none;
 }
 
+/* The underbody drawing is a white-background plan view, so on the dark theme
+ * it would sit as a bright rectangle on the navy plate. The body canvas already
+ * solves this with a white plate; the chassis gets the same treatment so the
+ * two diagrams read as one scheme and the hotspot dots keep their contrast. */
+:root[data-theme='dark'] .oryx-chassis {
+  background: #ffffff;
+}
+
 /* A chassis region is a circular hotspot placed on the artwork by its
  * normalised coordinates — the same coordinates the PDF uses for its condition
  * dots, so what the inspector clicks is what the report marks. */
