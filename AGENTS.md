@@ -80,6 +80,16 @@ Security baseline (do not regress):
   operational providers) plus platform-completion work.
 - **Scaffolded only:** nothing. Every ERP module catalog entry is implemented and
   DB-backed across Executions 01–05.
+- **Execution 21 (implemented and tested):** the Reports workspace was rebuilt
+  around a 13-report catalogue (`packages/shared/src/reports.ts`) that the API
+  resolves from live data and streams as a print-ready PDF (through the shared
+  Chromium renderer and the official footer) and a BOM-prefixed CSV, with the
+  admin page offering search, group filters, a date range, a totals-bearing
+  detail table and an in-page PDF preview. The automotive maintenance screen was
+  rebuilt as a workshop landing page: a live dashboard
+  (`GET /automotive/workshop/dashboard`), tabbed job cards / bays / warranties /
+  providers / service requests, and the full job-card lifecycle (diagnosis,
+  labour, estimates, parts reservations, the enforced state machine, invoicing).
 - **Missing assets:** the official ORYX logo and the approved dashboard
   photography are not in the repository. The UI uses a neutral monogram
   placeholder and generated vector tile art. Do not invent brand marks.
@@ -886,6 +896,29 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `apps/api/src/common/document-totals.ts` is the single source for subtotal,
   discount, VAT and total in integer minor units; the UI, PDF and print path all
   consume it. Never recompute a figure in a template.
+
+### Execution 21 gotchas
+
+- **The report catalogue lives once.** `REPORT_DEFINITIONS` in
+  `packages/shared/src/reports.ts` feeds the API catalogue route, the admin
+  Reports page and every export. Add a report there, not in a second list. A new
+  kind also needs a builder branch in
+  `apps/api/src/reports/report-builder.service.ts`, or `:kind/data` returns an
+  unknown-kind error.
+- **A report is generated, not stored.** `ReportPdfService` renders on demand
+  through the shared Chromium renderer and the official footer and never writes
+  to the document store or mints a QR token — a report is a view of live data,
+  not an issued document. Do not give it a QR or a persisted id.
+- **The workshop dashboard counts live rows.** `WorkshopService.dashboard`
+  returns tenant-scoped `count()`s (open job cards are the states that still need
+  attention, not the lifetime total). It is not a cached aggregate; recompute it
+  per request rather than adding a table.
+- **Rebuild the admin app, then restart `next start`, before UI tests.** A stale
+  `next start` keeps serving old chunks after `next build`, and the login page
+  then hangs on "Loading…" while the reports/workshop selectors never appear —
+  the suite fails with a `locator.waitFor` timeout that looks like a routing bug.
+  `NEXT_PUBLIC_API_BASE_URL` is inlined into the browser bundle, so a localhost
+  value bakes the wrong API origin into a preview build; use `/api`.
 
 ### Mobile gotchas
 
