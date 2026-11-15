@@ -1,7 +1,8 @@
 'use client';
 
 import clsx from 'clsx';
-import type { ReactNode } from 'react';
+import Link from 'next/link';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { DEFAULT_CURRENCY } from '@oryx/shared';
 import { useUi, type Translator } from '@/lib/ui-context';
 
@@ -191,4 +192,172 @@ export function formatDay(value: string, locale: 'ar' | 'en'): string {
   return new Date(value).toLocaleDateString(locale === 'ar' ? 'ar-BH' : 'en-GB', {
     dateStyle: 'medium',
   });
+}
+
+/* ------------------------------------------------------------ hero slider */
+
+export interface HeroSlide {
+  image: string;
+  alt: string;
+  headline: string;
+  description: string;
+  ctaLabel: string;
+  ctaHref: string;
+  secondaryLabel: string;
+  secondaryHref: string;
+}
+
+/**
+ * The homepage hero: a real, functional image slider.
+ *
+ * Every slide carries its own photograph, headline, description and calls to
+ * action. It advances on a timer, pauses on hover and on focus, supports
+ * previous/next controls, pagination, keyboard arrows and touch swipes, and
+ * renders the first slide on the server so the hero is never empty.
+ */
+export function HeroSlider({ slides }: { slides: HeroSlide[] }) {
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const touchStart = useRef<number | null>(null);
+
+  const go = useCallback(
+    (next: number) => {
+      setIndex(((next % slides.length) + slides.length) % slides.length);
+    },
+    [slides.length],
+  );
+
+  useEffect(() => {
+    if (paused || slides.length < 2) return;
+    const timer = window.setInterval(() => setIndex((i) => (i + 1) % slides.length), 6500);
+    return () => window.clearInterval(timer);
+  }, [paused, slides.length]);
+
+  if (slides.length === 0) return null;
+
+  return (
+    <section
+      className="oryx-hero oryx-hero--slider"
+      data-hero-slider
+      aria-roledescription="carousel"
+      aria-label="ORYX Auto Services"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+      onTouchStart={(e) => {
+        touchStart.current = e.touches[0].clientX;
+      }}
+      onTouchEnd={(e) => {
+        if (touchStart.current === null) return;
+        const delta = e.changedTouches[0].clientX - touchStart.current;
+        if (Math.abs(delta) > 45) go(delta < 0 ? index + 1 : index - 1);
+        touchStart.current = null;
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowRight') go(index - 1);
+        if (e.key === 'ArrowLeft') go(index + 1);
+      }}
+      tabIndex={0}
+      data-testid="hero-slider"
+    >
+      {slides.map((slide, i) => (
+        <div
+          key={slide.image}
+          className="oryx-hero-slide"
+          data-active={i === index}
+          aria-hidden={i !== index}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={slide.image}
+            alt={slide.alt}
+            loading={i === 0 ? 'eager' : 'lazy'}
+            fetchPriority={i === 0 ? 'high' : 'auto'}
+          />
+        </div>
+      ))}
+
+      <div className="oryx-hero__content">
+        {slides.map((slide, i) =>
+          i === index ? (
+            <div className="oryx-hero__body oryx-hero-slide-fade" key={slide.headline}>
+              <h1 className="oryx-hero__title">{slide.headline}</h1>
+              <p className="oryx-hero__lede">{slide.description}</p>
+              <div className="oryx-hero__actions">
+                <Link href={slide.ctaHref} className="oryx-btn oryx-btn-primary oryx-btn-lg">
+                  {slide.ctaLabel}
+                </Link>
+                {slide.secondaryLabel ? (
+                  <Link href={slide.secondaryHref} className="oryx-btn oryx-btn-lg oryx-btn-secondary">
+                    {slide.secondaryLabel}
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+          ) : null,
+        )}
+      </div>
+
+      <div className="oryx-hero__controls">
+        <div className="oryx-hero__dots" role="tablist" aria-label="Slides">
+          {slides.map((slide, i) => (
+            <button
+              key={slide.image}
+              type="button"
+              className="oryx-hero__dot"
+              aria-current={i === index}
+              aria-label={slide.headline}
+              role="tab"
+              onClick={() => go(i)}
+            />
+          ))}
+        </div>
+        <div className="oryx-hero__arrows">
+          <button
+            type="button"
+            className="oryx-hero__arrow"
+            onClick={() => go(index - 1)}
+            aria-label="Previous slide"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            className="oryx-hero__arrow"
+            onClick={() => go(index + 1)}
+            aria-label="Next slide"
+          >
+            ›
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** The trust strip under the hero, driven by the editable site document. */
+export function TrustStrip({
+  items,
+}: {
+  items: Array<{ icon: string; title: string; subtitle: string }>;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <section className="oryx-trust" data-testid="trust-strip">
+      <div className="oryx-trust-grid">
+        {items.map((item) => (
+          <div className="oryx-trust-item" key={item.title}>
+            <span className="oryx-trust-icon" aria-hidden>
+              {item.icon}
+            </span>
+            <span className="oryx-trust-text">
+              <strong>{item.title}</strong>
+              <span>{item.subtitle}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }

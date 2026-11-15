@@ -1460,3 +1460,34 @@ so nothing else needs changing.
   page into or out of a route group, `tsc --noEmit` fails with
   `Cannot find module '…/products/layout.js'` until `rm -rf apps/customer/.next`
   and a fresh build regenerate the validator.
+
+## Owner directive — "Option A" (2026-11-15)
+
+The owner approved **Option A** and asked for one final unified version on the
+base of commit `24949b3b`, porting only the *useful* improvements from
+`feature/dashboard-modules-redesign` without duplicating or replacing any
+existing functionality. Priorities, in order:
+
+1. Restore the admin dashboard with the newest approved design.
+2. Restore **Website Settings** and wire it end-to-end to the website, the API
+   and the database.
+3. Keep every existing admin/website feature from Executions 19–22.
+4. Merge the settings revision log and the tile images where compatible.
+5. Prove there are no duplicate systems or pages.
+6. Fix every build and test error.
+7. Unify the project on a single branch in the ORYX repository.
+
+No new analysis report or extra decision requests — do the work, test every app,
+then push the final branch and open a PR. Do **not** touch production before the
+owner's final approval, and never delete prior changes, data or features.
+
+Report must state: branch name and final commit, PR link, per-app build results,
+test results, and confirmation that the dashboard, Website Settings and the
+public website all work.
+
+**Reconciled state:** `HEAD` (`feature/oryx-unified-release`, `24949b3b`) already
+carries the approved redesign-unified dashboard (identical to `833c6f1b`) plus
+`dashboard/overview`, `charts.tsx`, `company-settings-*` and the `site-content`
+CMS. The `feature/dashboard-modules-redesign` branch's only *unique* dashboard
+value is the image-led module tiles with the media+scrim band; that pattern is
+already present on `HEAD`. So the remaining work is verification, not a re-port.

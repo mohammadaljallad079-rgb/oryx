@@ -2,39 +2,49 @@
 
 import Link from 'next/link';
 import { useUi } from '@/lib/ui-context';
+import { useSiteContent } from '@/lib/site-content-context';
 import { Card } from '@/components/ui';
 import { PageHeader } from '@/components/premium';
 import { Icon, type IconName } from '@/components/icons';
 
 /**
- * About the platform.
+ * About ORYX.
  *
- * Every claim here describes something the code actually does — the approved
- * provider workflow, the append-only ledger, verified payment confirmation and
- * the data export/deletion requests. Nothing is aspirational marketing.
+ * The introduction, photograph and value blocks are authored in the admin
+ * "Website Settings" and read here from the editable site document; the
+ * approved defaults are merged in by the provider so the page is never empty.
+ * The icon set is the platform's own drawing language and is not editable.
  */
-const PILLARS: Array<{ titleKey: string; bodyKey: string; icon: IconName }> = [
-  { titleKey: 'about.missionTitle', bodyKey: 'about.missionBody', icon: 'shield' },
-  { titleKey: 'about.whoTitle', bodyKey: 'about.whoBody', icon: 'grid' },
-  { titleKey: 'about.howTitle', bodyKey: 'about.howBody', icon: 'wrench' },
-  { titleKey: 'about.trustTitle', bodyKey: 'about.trustBody', icon: 'lock' },
-];
+const PILLAR_ICONS: IconName[] = ['shield', 'grid', 'wrench', 'lock'];
 
 export default function AboutPage() {
   const { t } = useUi();
+  const { content, pick } = useSiteContent();
+  const about = content.about;
 
   return (
     <div className="oryx-container">
-      <PageHeader eyebrow={t('brand.tagline')} title={t('about.title')} subtitle={t('about.subtitle')} />
+      <PageHeader
+        eyebrow={t('brand.tagline')}
+        title={pick(about.titleEn, about.titleAr)}
+        subtitle={pick(about.introEn, about.introAr)}
+      />
+
+      {about.image ? (
+        <figure className="oryx-about__media">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={about.image} alt={pick(about.titleEn, about.titleAr)} loading="lazy" />
+        </figure>
+      ) : null}
 
       <div className="oryx-grid oryx-grid--two">
-        {PILLARS.map((pillar) => (
-          <Card key={pillar.titleKey} className="oryx-pillar">
+        {about.blocks.map((block, i) => (
+          <Card key={`${block.titleEn}-${i}`} className="oryx-pillar">
             <span className="oryx-pillar__icon" aria-hidden>
-              <Icon name={pillar.icon} size={20} />
+              <Icon name={PILLAR_ICONS[i % PILLAR_ICONS.length]} size={20} />
             </span>
-            <h2 className="oryx-card-title">{t(pillar.titleKey)}</h2>
-            <p className="oryx-muted">{t(pillar.bodyKey)}</p>
+            <h2 className="oryx-card-title">{pick(block.titleEn, block.titleAr)}</h2>
+            <p className="oryx-muted">{pick(block.bodyEn, block.bodyAr)}</p>
           </Card>
         ))}
       </div>
