@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { renderInspectionReportHtml } from './report-html';
+import { officialFooterTemplate } from './chrome';
 import type {
   DocumentIssuer,
   InspectionReportPayload,
@@ -526,5 +527,36 @@ describe('inspection report template — reference page parity (Execution 19)', 
     expect(html).toContain('class="cover-qr"');
     expect(html).not.toContain('p5-verify');
     expect(html).not.toContain('class="verify"');
+  });
+});
+
+
+describe('inspection report branding watermark', () => {
+  it('renders the logo and AUTO PARK watermark on every report page, including the cover', () => {
+    const html = renderInspectionReportHtml({
+      issuer: { ...issuer, logoDataUri: 'data:image/png;base64,LOGO' },
+      payload,
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    const pageCount = (html.match(/<section class="doc-page(?: p5-page)?">/g) ?? []).length;
+    const watermarkCount = (html.match(/class="rp-watermark"/g) ?? []).length;
+    expect(pageCount).toBeGreaterThan(1);
+    expect(watermarkCount).toBe(pageCount);
+    expect(html).toContain('class="rp-watermark-logo"');
+    expect(html).toContain('AUTO PARK');
+  });
+
+  it('places a faint logo watermark inside the ORYX authorised-signature footer box', () => {
+    const footer = officialFooterTemplate({
+      ...issuer,
+      logoDataUri: 'data:image/png;base64,LOGO',
+    });
+    expect(footer).toContain('class="issuer-signature-watermark"');
+    expect(footer).toContain('data:image/png;base64,LOGO');
+    expect(footer).toContain('Authorized Stamp &amp; Signature');
   });
 });
