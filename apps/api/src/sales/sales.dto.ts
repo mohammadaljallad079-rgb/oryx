@@ -390,6 +390,11 @@ export class CreateQuotationDto {
   @MaxLength(400)
   notes?: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  salespersonName?: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
@@ -432,6 +437,11 @@ export class CreateSalesOrderDto {
   @MaxLength(400)
   notes?: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  salespersonName?: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
@@ -472,6 +482,21 @@ export class CreateInvoiceDto {
   @IsString()
   @MaxLength(400)
   notes?: string;
+
+  @IsOptional()
+  @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER'])
+  paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  salespersonName?: string;
+
+  /** The bank/reference printed beneath "Payment at Account" on the invoice. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  paymentReference?: string;
 
   @IsOptional()
   @IsBoolean()

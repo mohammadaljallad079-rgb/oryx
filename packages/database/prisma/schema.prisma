@@ -1166,6 +1166,13 @@ model Payment {
   currency       String           @default("SAR")
   reference      String?
   notes          String?
+  /**
+   * Who took the money. The printed receipt/voucher carries a "المستلم /
+   * Received By" line, so the name is stored rather than left blank; it is the
+   * operator's own name unless the caller names someone else (a cashier may hand
+   * the slip to a named colleague).
+   */
+  receivedByName String?
   paidAt         DateTime
   journalEntryId String?
   idempotencyKey String?
@@ -1500,6 +1507,8 @@ model Quotation {
   totalMinor       Int             @default(0)
   currency         String          @default("SAR")
   notes            String?
+  /** The salesperson credited on the printed quotation. */
+  salespersonName  String?
   convertedOrderId String?
   createdById      String
   createdAt        DateTime        @default(now())
@@ -1546,6 +1555,8 @@ model SalesOrder {
   totalMinor    Int              @default(0)
   currency      String           @default("SAR")
   notes         String?
+  /** The salesperson credited on the printed sales order. */
+  salespersonName String?
   createdById   String
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
@@ -1595,6 +1606,16 @@ model SalesInvoice {
   amountPaidMinor Int                @default(0)
   currency        String             @default("SAR")
   notes           String?
+  /**
+   * How the invoice was settled. The printed invoice carries a "Payment" line
+   * (see the approved ORYX form), so the method is captured on the document
+   * itself rather than only on the cash receipt that later settles it.
+   */
+  paymentMethod   PaymentMethod      @default(CASH)
+  /** The salesperson credited on the printed invoice. */
+  salespersonName String?
+  /** The bank/reference printed beneath "Payment at Account" on the invoice. */
+  paymentReference String?
   journalEntryId  String?
   createdById     String
   postedAt        DateTime?

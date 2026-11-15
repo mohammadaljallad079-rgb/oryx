@@ -11,6 +11,7 @@ import { ModuleBanner } from '@/components/module-banner';
 import { SearchableSelect, usePickerLabels, type PickerOption } from '@/components/searchable-select';
 import { CustomerFormModal } from '@/components/customer-form';
 import { WarehouseFormModal } from '@/components/entity-forms';
+import { DocumentPrintActions } from '@/components/document-print';
 import {
   Badge,
   Button,
@@ -260,6 +261,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.sales.total')}</th>
               <th>{t('erp.sales.outstanding')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -271,6 +273,9 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(inv.totalMinor, inv.currency)}</td>
                 <td className="tabular-nums text-[12.5px]">{money(inv.outstandingMinor ?? 0, inv.currency)}</td>
                 <td><StatusBadge status={inv.status} label={inv.status} /></td>
+                <td>
+                  <DocumentPrintActions kind="SALES_INVOICE" id={inv.id} compact />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -474,6 +479,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.sales.total')}</th>
               <th>{t('erp.sales.restock')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -485,6 +491,9 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(n.totalMinor, n.currency)}</td>
                 <td className="text-[12.5px]">{(n as { restockInventory?: boolean }).restockInventory ? '✓' : '—'}</td>
                 <td><StatusBadge status={n.status} label={n.status} /></td>
+                <td>
+                  <DocumentPrintActions kind="CREDIT_NOTE" id={n.id} compact />
+                </td>
               </tr>
             ))}
           </tbody>

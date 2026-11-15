@@ -23,6 +23,7 @@ const OWNER_MODEL: Record<string, string> = {
   INSPECTION: 'inspectionBooking',
   PURCHASE_ORDER: 'purchaseOrder',
   SUPPLIER_INVOICE: 'supplierInvoice',
+  CREDIT_NOTE: 'creditNote',
   JOURNAL_ENTRY: 'journalEntry',
   WORK_ORDER: 'workOrder',
   PROJECT: 'project',

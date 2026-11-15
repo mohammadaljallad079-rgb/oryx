@@ -119,6 +119,30 @@ refreshes, and the new item is selected automatically. The maintenance job card
 uses it for the customer (with the full individual customer form) and the vehicle
 (with the full vehicle form). No popup writes to component state only.
 
+### 2.6 Document print
+
+Issued sales documents print the approved ORYX form. A single route resolves a
+`PrintDocumentDto` from the document's **own persisted rows**, and the shared
+template in `packages/shared/src/print.ts` renders it in the browser, so the
+printed page (and "Save as PDF") matches the reference form and carries the
+issuing company's own letterhead. Five kinds are supported: `SALES_INVOICE`,
+`QUOTATION`, `SALES_ORDER`, `CREDIT_NOTE` and `RECEIPT`.
+
+- The letterhead (name, TRN, CR, address, contact) comes from the company's own
+  `GENERAL` settings, falling back to the provisioning row, so each tenant's
+  document carries its own details.
+- The issue date is formatted in the **issuing company's** time zone, with the
+  weekday and a 12-hour clock the approved form shows.
+- The printed invoice carries a "Payment" line naming the settlement method and
+  the salesperson; the printed receipt carries a "المستلم / Received By" line.
+  Those values are stored on the document itself (`SalesInvoice.paymentMethod`,
+  `paymentReference`, `salespersonName`; `Quotation`/`SalesOrder.salespersonName`;
+  `Payment.receivedByName`) rather than read from the record that later settles
+  it, so a reprint shows what was actually issued.
+- `DocumentPrintActions` (admin) offers preview and print from the sales invoice,
+  sales credit-note and accounting receipt rows; the popup is opened same-origin
+  so the print dialog works, and a blocked popup surfaces a message.
+
 ## 3. Database changes
 
 New migration
@@ -136,6 +160,18 @@ New migration
 
 All new tables carry `companyId` and are indexed on it. `prisma migrate status`
 reports the database schema is up to date (13 migrations).
+
+A second, additive migration for the print model —
+`packages/database/prisma/migrations/20261115021810_execution_20_sales_documents_print/migration.sql`:
+
+| Change | Detail |
+| --- | --- |
+| `ALTER TABLE "SalesInvoice"` | adds `paymentMethod` (default `CASH`), `salespersonName`, `paymentReference` |
+| `ALTER TABLE "Quotation"` | adds `salespersonName` |
+| `ALTER TABLE "SalesOrder"` | adds `salespersonName` |
+| `ALTER TABLE "Payment"` | adds `receivedByName` |
+
+`prisma migrate diff` reports "No difference detected" against the schema.
 
 ## 4. API changes
 
@@ -158,6 +194,13 @@ New and modified endpoints (all under `/api/v1`, all permission-guarded):
 | DELETE | `/documents/:id` | `erp.document.delete` |
 | GET | `/dashboard/modules/:moduleKey` | `erp.dashboard.read` / `platform.company.read` |
 | GET | `/sales/customers/:id` | `erp.sales.read` / `erp.sales.customer.manage` |
+| GET | `/print/:kind/:id` | `erp.sales.read` / `erp.sales.invoice.manage` / `erp.sales.order.manage` / `erp.sales.credit_note.manage` / `erp.sales.payment.manage` / `erp.accounting.read` / `erp.accounting.payment.manage` |
+
+The print route deliberately requires no module: it only returns data the caller
+could already read through the owning module's own endpoints, and a tenant whose
+plan has lapsed must still be able to reprint a document it already issued.
+`kind` is one of `SALES_INVOICE`, `QUOTATION`, `SALES_ORDER`, `CREDIT_NOTE`,
+`RECEIPT`.
 
 New permissions (`packages/shared/src/permissions.ts`): `erp.settings.read`,
 `erp.settings.update`, `erp.document.read`, `erp.document.upload`,
@@ -177,6 +220,8 @@ permissions only.
 - `CustomerFormModal` — type-aware customer form with tabs.
 - `VehicleFormModal` — vehicle create form used by the maintenance picker.
 - `DocumentsPanel` — the reusable upload/preview/download/replace/delete panel.
+- `DocumentPrintActions` — the print toolbar (preview + print) placed on the
+  sales invoice, sales credit-note and accounting receipt rows.
 - `settings/page.tsx` — the settings control center: one independent panel per
   namespace, with save, reset and change history.
 - `customers/page.tsx` — the split list and the individual/company forms.
@@ -191,11 +236,11 @@ permissions only.
 | Suite | Command | Result |
 | --- | --- | --- |
 | Shared unit | `pnpm --filter @oryx/shared test` | **102 passed** (6 files; includes the new `settings.test.ts`) |
-| API integration | `pnpm --filter @oryx/api test:e2e` | **242 passed** (9 suites; includes the new `execution20.e2e-spec.ts`, 24 tests) |
-| Browser (admin) | `pnpm --filter @oryx/admin test:ui` | **129 passed** (includes the new `execution20.spec.ts`, 8 tests) |
+| API integration | `pnpm --filter @oryx/api test:e2e` | **248 passed** (10 suites; includes the new `execution20.e2e-spec.ts`, 24 tests, and `print.e2e-spec.ts`, 6 tests) |
+| Browser (admin) | `pnpm --filter @oryx/admin test:ui` | **136 passed** (includes the new `execution20.spec.ts`, 8 tests, and `print.spec.ts`, 2 tests) |
 | Mobile | `pnpm --filter @oryx/mobile test` | **17 passed** |
 
-Total: **490 automated tests**.
+Total: **503 automated tests**.
 
 The Execution 20 API suite covers, against the real HTTP surface, guards and
 Prisma layer: settings read/merge, cross-company isolation, unknown-key drop,
@@ -212,6 +257,14 @@ banner and KPIs; the settings control center listing every namespace and
 persisting a change; settings change history; the customers split and the two
 forms; the document panel on a record; light and dark themes; Arabic RTL; and the
 maintenance job card picking a customer from the searchable list.
+
+The print suites cover, through the real HTTP surface and a real browser: an
+invoice, a credit note, a quotation and a receipt resolving to complete print
+models (title in both languages, seller TRN/CR, party, totals at the currency's
+own scale); a receipt carrying the stored "Received By" name; a cross-tenant
+print refused; an unknown id returning 404 rather than 500; and the sales invoice
+and credit-note rows opening a popup preview with the approved form and no server
+error.
 
 Build and static checks: `@oryx/shared` typecheck, `@oryx/admin` typecheck and
 lint (`eslint . --max-warnings=0`) and the admin build all pass; `nest build` for
@@ -252,10 +305,11 @@ the API passes.
 
 ## 9. Handoff
 
-Branch `feature/dashboard-modules-redesign`, base `main` @ `75bb08a`. The change
-is 75 tracked files modified plus 30 new paths (settings, documents, dashboards,
-customer pages, the two new e2e specs, the migration and the Execution 20
-screenshots). No commit has been made; nothing is pushed.
+Branch `feature/dashboard-modules-redesign`, base `main` @ `75bb08a`. Across
+Execution 20 the change is 75 tracked files modified plus 30 new paths (settings,
+documents, dashboards, customer pages, the print model and template, the print
+e2e and browser specs, the migrations and the Execution 20 screenshots). No
+commit has been made; nothing is pushed.
 
 To verify locally:
 

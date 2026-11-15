@@ -34,6 +34,8 @@ import type {
   PaymentDto,
   PlanDto,
   PosSaleDto,
+  PrintDocumentDto,
+  PrintDocumentKind,
   ProductDto,
   PurchaseDocumentDto,
   PurchasingReportDto,
@@ -626,6 +628,16 @@ export const api = {
     request<Paginated<SalesDocumentDto>>(`/sales/credit-notes?${toQuery(params)}`),
   createCreditNote: (body: Record<string, unknown>) =>
     request<SalesDocumentDto>('/sales/credit-notes', { method: 'POST', body }),
+
+  // ---------------------------------------------------- print (E20 documents)
+  /**
+   * Resolve the printable model for an issued document. The API builds every
+   * field from the document's own persisted rows, so a reprint shows what was
+   * actually issued rather than the current state of the source record.
+   */
+  printDocument: (kind: PrintDocumentKind, id: string) =>
+    request<PrintDocumentDto>(`/print/${kind}/${id}`),
+
   cashierSessions: (params: { companyId?: string } = {}) =>
     request<Paginated<CashierSessionDto>>(`/sales/cashier-sessions?${toQuery(params)}`),
   openCashierSession: (body: Record<string, unknown>) =>

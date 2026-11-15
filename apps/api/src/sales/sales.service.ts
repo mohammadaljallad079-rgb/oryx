@@ -290,6 +290,7 @@ export class SalesService {
           totalMinor: totals.totalMinor,
           currency: dto.currency ?? 'SAR',
           notes: dto.notes ?? null,
+          salespersonName: dto.salespersonName ?? null,
           createdById: actor.userId,
           lines: { create: buildSimpleLineRows(totals, dto.lines) },
         },
@@ -406,6 +407,7 @@ export class SalesService {
           totalMinor: totals.totalMinor,
           currency: dto.currency ?? 'SAR',
           notes: dto.notes ?? null,
+          salespersonName: dto.salespersonName ?? null,
           createdById: actor.userId,
           lines: { create: buildSimpleLineRows(totals, dto.lines) },
         },
@@ -563,6 +565,9 @@ export class SalesService {
           totalMinor: totals.totalMinor,
           currency,
           notes: dto.notes ?? null,
+          paymentMethod: (dto.paymentMethod ?? 'CASH') as never,
+          salespersonName: dto.salespersonName ?? null,
+          paymentReference: dto.paymentReference ?? null,
           createdById: actor.userId,
           lines: { create: buildLineRows(totals, lineInputs) },
         },
@@ -1397,6 +1402,9 @@ function toInvoiceDto(inv: {
   amountPaidMinor: number;
   currency: string;
   notes: string | null;
+  paymentMethod: string;
+  salespersonName: string | null;
+  paymentReference: string | null;
   journalEntryId: string | null;
   customer: { nameEn: string; nameAr: string; code: string };
   lines: Array<Record<string, unknown>>;
@@ -1419,6 +1427,9 @@ function toInvoiceDto(inv: {
     outstandingMinor: inv.totalMinor - inv.amountPaidMinor,
     currency: inv.currency,
     notes: inv.notes,
+    paymentMethod: inv.paymentMethod,
+    salespersonName: inv.salespersonName,
+    paymentReference: inv.paymentReference,
     journalEntryId: inv.journalEntryId,
     lines: inv.lines,
   };
