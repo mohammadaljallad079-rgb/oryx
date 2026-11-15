@@ -409,3 +409,16 @@ so nothing else needs changing.
   modules.
 - Never modify or delete pre-existing project code without auditing it first.
 - Do not commit production credentials, tokens or secret keys.
+
+### Local verification gotcha
+
+- **A running API/DB may belong to a different checkout.** This workspace keeps
+  several checkouts (`oryx`, `oryx-unified`, `oryx-e20`, …) and only one process
+  can hold port 3001. Before trusting a Playwright run, confirm the API answers
+  with *this* branch's contract (for example `GET /api/v1/dashboard/modules/:key`
+  must return `kpis`/`recentActivity`, not the older `functions`/`activity`) and
+  that the database it points at was migrated and seeded from this branch
+  (`pnpm db:migrate && pnpm db:seed`). A stale API from another branch produced
+  five misleading `execution20` failures that all vanished once the API and DB
+  matched the checkout. Stop the stray process (`pkill -f "node dist/main.js"`)
+  and start `apps/api/dist/main.js` with the checkout's own `DATABASE_URL`.
