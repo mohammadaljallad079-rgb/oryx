@@ -2248,6 +2248,7 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   aspect-ratio: 323 / 436;
   max-width: 420px;
   margin: 0 auto;
+  background: #fff;
 }
 
 .oryx-diagram__svg {

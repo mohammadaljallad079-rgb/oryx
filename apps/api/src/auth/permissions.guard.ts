@@ -120,7 +120,7 @@ export class ModuleEntitlementGuard implements CanActivate {
     const principal = req.principal;
     if (!principal) throw forbidden(ERROR_CODES.FORBIDDEN_PERMISSION, 'No authenticated principal.');
 
-    if (principal.kind === 'PLATFORM' && !principal.company) return true;
+    if (principal.kind === 'PLATFORM') return true;
     const companyId = principal.company?.companyId;
     if (!companyId) throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'No company context for module access.');
 

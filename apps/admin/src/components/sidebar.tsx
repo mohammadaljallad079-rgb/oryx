@@ -18,6 +18,10 @@ function visible(item: NavItem, ctx: {
   hasModule: (m: string) => boolean;
   companySelected: boolean;
 }): boolean {
+  // Super Admin can see every navigation item, regardless of
+  // tenant module licensing or individual menu permissions.
+  if (ctx.isPlatform) return true;
+
   if (item.platformOnly && !ctx.isPlatform) return false;
   if (item.moduleKey && ctx.companySelected && !ctx.hasModule(item.moduleKey)) return false;
   if (item.anyPermission) {

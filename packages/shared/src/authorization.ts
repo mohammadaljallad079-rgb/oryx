@@ -79,15 +79,10 @@ export function resolveEffectivePermissions(principal: Principal): EffectivePerm
     // perform inside the selected company, never *which companies* it reaches.
     const platformCompany = principal.company;
     if (platformCompany && platformCompany.membershipActive) {
-      const licensed = new Set(platformCompany.licensedModuleKeys);
       for (const code of granted) {
         const def = PERMISSION_BY_CODE.get(code);
         if (!def) continue;
         if (def.scope === 'PLATFORM') continue;
-        if (!moduleLicensed(code, licensed)) {
-          suppressed.push(code);
-          continue;
-        }
         out.push(code);
       }
     }
