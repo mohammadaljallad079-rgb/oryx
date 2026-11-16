@@ -347,6 +347,11 @@ model User {
   nationalId                String?
   nationality               String?
   address                   String?
+  /**
+   * Primary reachable number for the staff account. Optional, like the other
+   * identity fields, so existing accounts stay valid.
+   */
+  phone                     String?
   status                    UserStatus @default(INVITED)
   isSuperAdmin              Boolean    @default(false)
   preferredLocale           Locale     @default(ar)
