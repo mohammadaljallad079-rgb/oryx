@@ -15,7 +15,12 @@
  * no staff route is reachable with a consumer token.
  */
 
-import { SERVICE_CATEGORIES as SHARED_SERVICE_CATEGORIES, categoryArt } from '@oryx/shared';
+import {
+  resolveSiteContent,
+  SERVICE_CATEGORIES as SHARED_SERVICE_CATEGORIES,
+  categoryArt,
+  type SiteContent,
+} from '@oryx/shared';
 import { assetUrl } from './asset-url';
 import { sitePhotoForCategory } from './site-media';
 import {
@@ -320,6 +325,13 @@ export interface AvailableSlot {
   startsAt: string;
   endsAt: string;
   resourceId?: string | null;
+}
+
+/** One day's bookability, as `GET /customer/bookings/availability-days` returns it. */
+export interface AvailableDay {
+  date: string;
+  slots: number;
+  firstSlot: string | null;
 }
 
 export interface NotificationItem {
@@ -719,6 +731,23 @@ export const customerApi = {
     if (params.serviceRef) qs.set('serviceRef', params.serviceRef);
     return request<AvailableSlot[]>(`/customer/bookings/availability?${qs.toString()}`);
   },
+  /**
+   * Which of the next days are bookable.
+   *
+   * The booking form uses this to disable closed days and jump to the first
+   * open one, so a customer never lands on a day the engine will answer with an
+   * empty slot list.
+   */
+  availabilityDays: (params: { from: string; durationMinutes: number; days?: number; serviceRef?: string }) => {
+    if (IS_STATIC_PREVIEW) return Promise.resolve([] as AvailableDay[]);
+    const qs = new URLSearchParams({
+      from: params.from,
+      durationMinutes: String(params.durationMinutes),
+    });
+    if (params.days) qs.set('days', String(params.days));
+    if (params.serviceRef) qs.set('serviceRef', params.serviceRef);
+    return request<AvailableDay[]>(`/customer/bookings/availability-days?${qs.toString()}`);
+  },
   createBooking: (body: {
     bookingType: 'INSPECTION' | 'MAINTENANCE' | 'PROVIDER_SERVICE';
     startsAt: string;
@@ -1062,6 +1091,21 @@ export const publicApi = {
     if (IS_STATIC_PREVIEW) return previewWebsiteContent(locale);
     return publicGet<WebsiteContent>(`/cms/public/website?locale=${locale}`);
   },
+  /**
+   * The editable website document authored in the admin "Website Settings".
+   *
+   * Distinct from `website`: this is the site-content document (hero slider,
+   * trust strip, About, Contact, footer) the admin edits, exposed through the
+   * canonical CMS endpoint. The API merges the stored document over the
+   * approved defaults, so the caller always receives a complete document.
+   */
+  siteContent: async (locale: string): Promise<SiteContentDocument> => {
+    const resolved = locale === 'en' ? 'en' : 'ar';
+    if (IS_STATIC_PREVIEW) {
+      return { locale: resolved, site: resolveSiteContent(resolved, null) };
+    }
+    return publicGet<SiteContentDocument>(`/cms/public/content?locale=${resolved}`);
+  },
   applyAsProvider: (body: {
     legalNameEn: string;
     legalNameAr: string;
@@ -1148,6 +1192,17 @@ export interface WebsiteContent {
 
 /** Empty payload used when the CMS is unreachable, so a page still renders. */
 export const EMPTY_WEBSITE: WebsiteContent = { locale: 'ar', blocks: [], banners: [], categories: [] };
+
+/**
+ * The editable website document as returned by `/cms/public/content`.
+ *
+ * `site` is always a complete `SiteContent`: the API merges the stored document
+ * over the approved defaults before it responds.
+ */
+export interface SiteContentDocument {
+  locale: string;
+  site: SiteContent;
+}
 
 /**
  * Resolves a CMS image to a servable URL at the requested size.

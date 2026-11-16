@@ -69,7 +69,7 @@ describe('public services branding', () => {
       ['app', 'page.tsx'],
       ['app', 'services', 'page.tsx'],
       ['app', 'categories', 'page.tsx'],
-      ['app', 'products', 'page.tsx'],
+      ['app', 'products', '(list)', 'page.tsx'],
       ['app', 'about', 'page.tsx'],
     ] as const;
     for (const parts of files) {

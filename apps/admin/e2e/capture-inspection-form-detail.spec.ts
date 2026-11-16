@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { ENTERPRISE_ADMIN, setLocale, setTheme, signIn } from './helpers';
 

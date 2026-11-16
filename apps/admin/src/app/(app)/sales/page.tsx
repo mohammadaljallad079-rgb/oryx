@@ -2477,8 +2477,9 @@ function DocumentModal({
             </Field>
           ) : null}
           <Field label={t('common.notes')}>
-            <input
-              className="oryx-input"
+            <textarea
+              className="oryx-input oryx-textarea"
+              rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               data-testid={`${testIdPrefix}-notes`}

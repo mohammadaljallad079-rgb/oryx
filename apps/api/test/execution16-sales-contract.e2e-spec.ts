@@ -183,4 +183,27 @@ describe('Execution 16 — sales document date contract (e2e)', () => {
     expect(invoice.body.subtotalMinor).toBe(expectedSubtotal);
     expect(invoice.body.totalMinor).toBe(expectedSubtotal + invoice.body.taxMinor);
   });
+
+  it('persists a multiline optional notes value on the invoice', async () => {
+    const notes = 'Delivered to site office.\nSecond line kept as typed.\nThird line.';
+    const invoice = await erp<{ id: string; notes: string | null }>('/sales/invoices', {
+      method: 'POST',
+      body: { customerId, warehouseId, invoiceDate: now, issueStock: false, notes, lines: [line()] },
+    });
+    expect(invoice.status).toBe(201);
+    // Newlines survive the round trip, so a multiline note is not flattened.
+    expect(invoice.body.notes).toBe(notes);
+
+    const fetched = await erp<{ notes: string | null }>(`/sales/invoices/${invoice.body.id}`);
+    expect(fetched.body.notes).toBe(notes);
+  });
+
+  it('creates an invoice with no notes, because the field is optional', async () => {
+    const invoice = await erp<{ id: string; notes: string | null }>('/sales/invoices', {
+      method: 'POST',
+      body: { customerId, warehouseId, invoiceDate: now, issueStock: false, lines: [line()] },
+    });
+    expect(invoice.status).toBe(201);
+    expect(invoice.body.notes).toBeNull();
+  });
 });

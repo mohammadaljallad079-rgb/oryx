@@ -9,6 +9,7 @@ import {
   UpsertBannerDto,
   UpsertCmsPageDto,
   UpsertFeatureFlagDto,
+  UpsertSiteContentDto,
 } from './cms.dto';
 
 interface RequestLike {
@@ -39,6 +40,27 @@ export class CmsController {
   @ApiOperation({ summary: 'Public published content for the website and app shells' })
   publicContent(@Query('locale') locale = 'ar') {
     return this.cms.publicContent(locale === 'en' ? 'en' : 'ar');
+  }
+
+  // ------------------------------------------------------- website content doc
+  @ApiBearerAuth()
+  @Get('site-content')
+  @RequirePermissions('platform.cms.manage')
+  @ApiOperation({ summary: 'Read the editable public-website content document' })
+  siteContent(@Query('locale') locale = 'ar') {
+    return this.cms.getSiteContent(locale === 'en' ? 'en' : 'ar');
+  }
+
+  @ApiBearerAuth()
+  @Put('site-content')
+  @RequirePermissions('platform.cms.manage')
+  @ApiOperation({ summary: 'Update the editable public-website content document' })
+  upsertSiteContent(
+    @Body() dto: UpsertSiteContentDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.cms.upsertSiteContent(dto, actorFrom(p, req));
   }
 
   // ---------------------------------------------------------------- admin CMS

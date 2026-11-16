@@ -21,6 +21,7 @@ import { ERROR_CODES, forbidden } from '../common/errors';
 import { BookingService } from './booking.service';
 import { CustomerAuthGuard, CurrentCustomer, type CustomerPrincipal } from './customer-auth.guard';
 import {
+  AvailabilityDaysQueryDto,
   AvailabilityQueryDto,
   CalendarQueryDto,
   CancelBookingDto,
@@ -318,6 +319,32 @@ export class CustomerBookingController {
       serviceRef: query.serviceRef ?? null,
       dayStart: dayStartFrom(query.date),
       durationMinutes: query.durationMinutes,
+      stepMinutes: query.stepMinutes,
+      minimumNoticeMinutes: query.minimumNoticeMinutes,
+      bufferMinutes: query.bufferMinutes,
+    });
+  }
+
+  /**
+   * Which of the next `days` days are bookable.
+   *
+   * Declared before `@Get(':id')` so Nest does not treat the literal
+   * `availability-days` segment as a booking id.
+   */
+  @Get('availability-days')
+  @ApiOperation({ summary: 'List the days that have bookable slots' })
+  async availabilityDays(
+    @Query() query: AvailabilityDaysQueryDto,
+    @CurrentCustomer() customer: CustomerPrincipal,
+  ) {
+    return this.bookings.availableDays({
+      companyId: await this.tenants.resolveForCustomer(customer.defaultCompanyId),
+      branchId: query.branchId ?? null,
+      resourceId: query.resourceId ?? null,
+      serviceRef: query.serviceRef ?? null,
+      fromDate: dayStartFrom(query.from),
+      durationMinutes: query.durationMinutes,
+      days: query.days ?? 21,
       stepMinutes: query.stepMinutes,
       minimumNoticeMinutes: query.minimumNoticeMinutes,
       bufferMinutes: query.bufferMinutes,

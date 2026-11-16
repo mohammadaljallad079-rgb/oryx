@@ -906,6 +906,24 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   `ATTACHMENT_STORAGE_DIR` (default `apps/api/storage/attachments`); `storage/`
   and `apps/api/storage/` are gitignored. `ATTACHMENT_MIME_TYPES` accepts PDF,
   JPEG and PNG only.
+- **A browser test that creates a sales document must delete it.** The suites run
+  against the shared seeded tenant, and `print-attachments.spec.ts` picks the
+  newest sales invoice from the list. A fixture draft left behind becomes that
+  invoice, and the print tests then fail because a draft has no posted preview.
+  Clean the fixture up in a `finally` block through the API from Node.
+
+### Inspection gotchas
+
+- **An inspection has one optional notes field.** Session-level notes are the
+  single `generalRemarks` column, printed under one "General Inspection Remarks"
+  heading. The former `finalAssessment` and `exteriorRemarks` blocks were
+  duplicate surfaces for the same note and are no longer offered or printed.
+  Notes are never required: a fully passing inspection submits with the field
+  empty. Do not reintroduce a second notes field or a submit-time requirement.
+- **The inspections module is re-activated, not seeded active.** `automotive_inspections`
+  was retired (`isActive = false`) and restored through the audited catalog
+  endpoint (`PATCH /modules/:id`, which writes `module.restored`). If its
+  dashboard tile disappears, check the module row's `isActive` before the code.
 
 ### Document parity gotchas (Executions 18/19)
 
@@ -1485,3 +1503,56 @@ so nothing else needs changing.
   `/evidence/exec19/reference-*.pdf`; it must be `404`.
 - **Ignore the generated preview bytes.** `apps/admin/public/exec19/` and any
   `apps/admin/public/evidence/` tree are generated evidence, never source.
+### Customer storefront SEO gotchas
+
+- **The customer `(account)` route group adds no path segment.** Those pages
+  serve at the site root (`/dashboard`, `/bookings`, `/orders`, …), not under
+  `/account`. A `robots.ts` or a link that disallows `/account` names a path
+  that does not exist and leaves the real account pages crawlable. List each
+  route by its real path.
+- **A shared JSON-LD layout leaks onto nested routes.** `products/page.tsx` and
+  `products/[id]/page.tsx` are siblings under `products/`, so an `ItemList` in
+  `products/layout.tsx` is inherited by every product detail page. The listing
+  markup lives in the `products/(list)/layout.tsx` route group, which the
+  detail route does not enter.
+- **Server-side SEO fetches need an absolute API origin.** The browser client
+  uses a relative `/api` on purpose, but Node's `fetch` cannot resolve a
+  relative URL, so `structured-data.ts` resolves an absolute origin from
+  `ORYX_API_BASE_URL`/`NEXT_PUBLIC_API_BASE_URL` and degrades to no data rather
+  than throwing when the API is down. Sitemap and JSON-LD therefore never fail
+  a build.
+- **A stale `.next/types/validator.ts` survives a route move.** After moving a
+  page into or out of a route group, `tsc --noEmit` fails with
+  `Cannot find module '…/products/layout.js'` until `rm -rf apps/customer/.next`
+  and a fresh build regenerate the validator.
+
+## Owner directive — "Option A" (2026-11-15)
+
+The owner approved **Option A** and asked for one final unified version on the
+base of commit `24949b3b`, porting only the *useful* improvements from
+`feature/dashboard-modules-redesign` without duplicating or replacing any
+existing functionality. Priorities, in order:
+
+1. Restore the admin dashboard with the newest approved design.
+2. Restore **Website Settings** and wire it end-to-end to the website, the API
+   and the database.
+3. Keep every existing admin/website feature from Executions 19–22.
+4. Merge the settings revision log and the tile images where compatible.
+5. Prove there are no duplicate systems or pages.
+6. Fix every build and test error.
+7. Unify the project on a single branch in the ORYX repository.
+
+No new analysis report or extra decision requests — do the work, test every app,
+then push the final branch and open a PR. Do **not** touch production before the
+owner's final approval, and never delete prior changes, data or features.
+
+Report must state: branch name and final commit, PR link, per-app build results,
+test results, and confirmation that the dashboard, Website Settings and the
+public website all work.
+
+**Reconciled state:** `HEAD` (`feature/oryx-unified-release`, `24949b3b`) already
+carries the approved redesign-unified dashboard (identical to `833c6f1b`) plus
+`dashboard/overview`, `charts.tsx`, `company-settings-*` and the `site-content`
+CMS. The `feature/dashboard-modules-redesign` branch's only *unique* dashboard
+value is the image-led module tiles with the media+scrim band; that pattern is
+already present on `HEAD`. So the remaining work is verification, not a re-port.

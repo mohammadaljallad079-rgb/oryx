@@ -399,6 +399,44 @@ describe('Execution 09 — customer integration (e2e)', () => {
       expect(res.status).toBeGreaterThanOrEqual(400);
       expect(res.status).toBeLessThan(500);
     });
+
+    it('validates the availability-days query', async () => {
+      const res = await call(base, '/customer/bookings/availability-days?from=not-a-date', {
+        token: tokenA,
+      });
+      expect(res.status).toBeGreaterThanOrEqual(400);
+      expect(res.status).toBeLessThan(500);
+    });
+
+    it('reports which of the coming days are bookable', async () => {
+      const from = new Date().toISOString().slice(0, 10);
+      const res = await call<
+        Array<{ date: string; slots: number; firstSlot: string | null }>
+      >(base, `/customer/bookings/availability-days?from=${from}&durationMinutes=60&days=7`, {
+        token: tokenA,
+      });
+      expect(res.status).toBe(200);
+      // One row per requested day, each a plain calendar date. `slots` is a real
+      // count from the scheduling engine, never a fabricated one; a day the
+      // engine cannot fill reports zero rather than being omitted, so the client
+      // can tell "closed" from "past the horizon".
+      expect(res.body).toHaveLength(7);
+      for (const day of res.body) {
+        expect(day.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        expect(day.slots).toBeGreaterThanOrEqual(0);
+        if (day.slots === 0) expect(day.firstSlot).toBeNull();
+        else expect(typeof day.firstSlot).toBe('string');
+      }
+    });
+
+    it('caps the number of days it will walk', async () => {
+      const from = new Date().toISOString().slice(0, 10);
+      const res = await call(base, `/customer/bookings/availability-days?from=${from}&durationMinutes=60&days=999`, {
+        token: tokenA,
+      });
+      // The DTO ceiling rejects an unbounded horizon outright.
+      expect(res.status).toBe(400);
+    });
   });
 
   // -------------------------------------------------------------- sessions

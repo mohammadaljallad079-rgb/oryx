@@ -400,6 +400,7 @@ model User {
   mfaRecoveryCodes   MfaRecoveryCode[]
   mediaAssetsCreated CmsMediaAsset[]
   contentUpdated     CmsContentBlock[]
+  contactMessages    ContactMessage[]
 
   @@index([status])
 }
@@ -667,6 +668,10 @@ model Company {
   recoveryRequests     RecoveryRequest[]
   aiSuggestions        AiSuggestion[]
 
+  // Public storefront
+  webOrders       WebOrder[]
+  contactMessages ContactMessage[]
+
   @@index([type])
   @@index([status])
   @@index([parentCompanyId])
@@ -728,6 +733,19 @@ model Branch {
   phone       String?
   timezone    String   @default("Asia/Bahrain")
   isActive    Boolean  @default(true)
+  // Storefront details. Only filled in for branches that are published on the
+  // public website; a branch with no image is simply not advertised.
+  email           String?
+  whatsapp        String?
+  latitude        Decimal?  @db.Decimal(10, 7)
+  longitude       Decimal?  @db.Decimal(10, 7)
+  imageUrl        String?
+  descriptionEn   String?
+  descriptionAr   String?
+  /// Service category keys this branch performs, from SERVICE_CATEGORIES.
+  servicesOffered String[]  @default([])
+  /// Whether the branch is shown in the public branch directory.
+  isPublished     Boolean   @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -767,6 +785,10 @@ model Branch {
 
   // Attendance check-in worksites attached to this branch.
   workSites WorkSite[]
+
+  // Public storefront
+  contactMessages ContactMessage[]
+  webOrders       WebOrder[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -1292,6 +1314,33 @@ enum ProductType {
   SERVICE
 }
 
+/// Condition of a spare part shown on the public web store.
+enum PartCondition {
+  NEW
+  REFURBISHED
+}
+
+/// How a web order is fulfilled.
+enum FulfilmentMethod {
+  COLLECTION
+  DELIVERY
+}
+
+/// Lifecycle of an order placed on the public web store.
+enum WebOrderStatus {
+  PENDING
+  CONFIRMED
+  PAID
+  CANCELLED
+}
+
+/// Handling state of a message submitted through the public contact form.
+enum ContactMessageStatus {
+  NEW
+  READ
+  HANDLED
+}
+
 enum StockMovementType {
   OPENING
   RECEIPT
@@ -1719,6 +1768,20 @@ model Product {
   inventoryAccountId String?
   cogsAccountId      String?
   isActive           Boolean     @default(true)
+  // Storefront presentation. `partCategoryKey` null keeps the item off the web
+  // store; a published product is the only one the public API will list.
+  partCategoryKey     String?
+  partCondition       PartCondition @default(NEW)
+  brand               String?
+  descriptionEn       String?
+  descriptionAr       String?
+  warrantyEn          String?
+  warrantyAr          String?
+  engineType          String?
+  isPublished         Boolean       @default(false)
+  isFeatured          Boolean       @default(false)
+  compareAtPriceMinor Int?
+  imageUrl            String?
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 
@@ -1744,6 +1807,8 @@ model Product {
   orderLines  CustomerOrderLine[]
   /// Execution 20 — return lines that reference this product.
   returnLines CustomerOrderReturnLine[]
+  wishlistItems CustomerWishlistItem[]
+  webOrderLines WebOrderLine[]
 
   @@unique([companyId, sku])
   @@index([companyId, isActive])
@@ -1956,6 +2021,7 @@ model Customer {
   bookingSlots       BookingSlot[]
   paymentIntents     PaymentIntent[]
   inspectionSessions InspectionSession[]
+  webOrders          WebOrder[]
 
   @@unique([companyId, code])
   @@index([companyId, isActive])
@@ -2149,6 +2215,7 @@ model SalesInvoice {
   lines       SalesInvoiceLine[]
   allocations PaymentAllocation[]
   creditNotes CreditNote[]
+  webOrders   WebOrder[]
 
   @@unique([companyId, invoiceNumber])
   @@unique([companyId, orderId])
@@ -5183,6 +5250,8 @@ model CustomerAccount {
    * Marketplace orders this consumer placed.
    */
   orders                 CustomerOrder[]
+  wishlist               CustomerWishlistItem[]
+  webOrders              WebOrder[]
 
   @@index([status])
   @@index([defaultCompanyId])
@@ -5494,6 +5563,14 @@ model BookingSlot {
   vehicle         Vehicle?         @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
 
   events BookingEvent[]
+  /**
+   * Contact details captured from the public website when the booking was made
+   * by a visitor rather than a signed-in customer. A staff-created or
+   * account-backed booking leaves these null.
+   */
+  guestName  String?
+  guestPhone String?
+  guestEmail String?
 
   @@unique([companyId, reference])
   @@index([companyId, status])
@@ -5748,6 +5825,7 @@ model PaymentIntent {
    * Consumer orders settled through this intent.
    */
   orders       CustomerOrder[]
+  webOrders    WebOrder[]
 
   @@unique([companyId, intentNumber])
   @@unique([companyId, idempotencyKey])
@@ -6784,4 +6862,122 @@ model OfficialDocumentEvent {
 
   @@index([documentId, createdAt])
   @@index([companyId])
+}
+
+/// A CMS-authored block of public website copy. One row per (key, locale); the
+/// `data` blob is validated against the shared `SiteContent` shape before it is
+/// stored, so the public site never renders an untyped payload.
+model SiteContent {
+  id        String   @id @default(cuid())
+  key       String   @default("website")
+  locale    Locale
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([key, locale])
+}
+
+/// A message submitted through the public website contact form.
+model ContactMessage {
+  id          String               @id @default(cuid())
+  companyId   String
+  fullName    String
+  email       String
+  phone       String?
+  subject     String?
+  message     String
+  /// The branch the visitor addressed the message to, when they chose one.
+  branchId    String?
+  locale      String               @default("ar")
+  status      ContactMessageStatus @default(NEW)
+  handledById String?
+  handledAt   DateTime?
+  createdAt   DateTime             @default(now())
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch    Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  handledBy User?   @relation(fields: [handledById], references: [id], onDelete: SetNull)
+
+  @@index([companyId, status, createdAt])
+}
+
+/// An order placed on the public web store. It is raised against the same
+/// customer, invoice and payment-intent records the rest of the platform uses,
+/// so a web sale posts to the shared ledger like any other sale.
+model WebOrder {
+  id                String           @id @default(cuid())
+  companyId         String
+  branchId          String?
+  orderNumber       String
+  customerAccountId String
+  /// Tenant customer record the invoice is raised against.
+  customerId        String?
+  salesInvoiceId    String?
+  paymentIntentId   String?
+  fulfilment        FulfilmentMethod @default(COLLECTION)
+  /// Snapshot of the delivery address, so a later edit does not rewrite history.
+  deliveryAddress   Json?
+  contactName       String
+  contactPhone      String
+  contactEmail      String?
+  notes             String?
+  subtotalMinor     Int              @default(0)
+  discountMinor     Int              @default(0)
+  taxMinor          Int              @default(0)
+  shippingMinor     Int              @default(0)
+  totalMinor        Int              @default(0)
+  currency          String           @default("BHD")
+  currencyScale     Int              @default(3)
+  status            WebOrderStatus   @default(PENDING)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch          Branch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  customer        Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerAccount CustomerAccount @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+  salesInvoice    SalesInvoice?   @relation(fields: [salesInvoiceId], references: [id], onDelete: SetNull)
+  paymentIntent   PaymentIntent?  @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
+  lines           WebOrderLine[]
+
+  @@unique([companyId, orderNumber])
+  @@index([customerAccountId, createdAt])
+  @@index([companyId, status])
+}
+
+/// A line of a web order. It snapshots the product name, SKU and price so a
+/// later catalogue edit never rewrites a placed order.
+model WebOrderLine {
+  id             String @id @default(cuid())
+  orderId        String
+  productId      String
+  sku            String
+  nameEn         String
+  nameAr         String
+  quantity       Int
+  unitPriceMinor Int
+  taxPercentBp   Int    @default(0)
+  lineTotalMinor Int
+  sortOrder      Int    @default(0)
+
+  order   WebOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+/// A product saved to a signed-in customer's wishlist on the web store.
+model CustomerWishlistItem {
+  id        String   @id @default(cuid())
+  accountId String
+  productId String
+  createdAt DateTime @default(now())
+
+  account CustomerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, productId])
+  @@index([accountId])
 }
