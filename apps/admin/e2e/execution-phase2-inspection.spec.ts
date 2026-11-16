@@ -268,8 +268,8 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     ]) {
       await page.getByTestId(`item-${key}-PASS`).click();
     }
-    await page.getByTestId('general-remarks').fill('Bodywork sound.');
-    await page.getByTestId('save-section').click();
+    await page.getByTestId('remarks-EXTERIOR').fill('Bodywork sound.');
+    await page.getByTestId('save-section-EXTERIOR').click();
 
     // The rail and the submit button both react to the saved state.
     await expect(page.getByTestId('inspection-rail-EXTERIOR')).toHaveAttribute('data-complete', 'true');
@@ -285,7 +285,7 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await expect(page.getByTestId('inspection-workspace')).toBeVisible();
 
     await page.getByTestId('item-road.suspensionNoise-PASS').click();
-    await page.getByTestId('save-section').click();
+    await page.getByTestId('save-section-ROAD_TEST').click();
 
     await expect(page.getByTestId('inspection-rail-ROAD_TEST')).toHaveAttribute('data-complete', 'false');
     await expect(page.getByTestId('inspection-submit')).toBeDisabled();
@@ -307,7 +307,7 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await surface.click({ position: { x: box!.width * 0.4, y: box!.height * 0.5 } });
 
     await expect(page.locator('[data-testid^="paint-marker-"]').first()).toBeVisible();
-    await page.getByTestId('save-section').click();
+    await page.getByTestId('save-section-PAINT_BODY').click();
     await expect(page.getByTestId('inspection-submit')).toBeEnabled();
   });
 
@@ -320,7 +320,7 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await page.getByTestId('chassis-tool-OK').click();
     await page.getByTestId('chassis-region-FRONT').click();
     await page.getByTestId('chassis-region-REAR').click();
-    await page.getByTestId('save-section').click();
+    await page.getByTestId('save-section-CHASSIS_UNDERCARRIAGE').click();
     await expect(page.getByTestId('inspection-submit')).toBeEnabled();
   });
 
@@ -403,7 +403,7 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await expect(page.locator('.oryx-modal')).toHaveCount(0);
 
     // Approved: the checklist is no longer editable and submit is gone.
-    await expect(page.getByTestId('save-section')).toHaveCount(0);
+    await expect(page.getByTestId('save-section-INTERIOR')).toHaveCount(0);
     await expect(page.getByTestId('inspection-submit')).toHaveCount(0);
   });
 

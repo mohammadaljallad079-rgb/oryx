@@ -98,9 +98,6 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
     await page.getByTestId('new-job-card').click();
     await expect(page.getByTestId('job-card-customer')).toBeVisible();
 
-    // The vehicle picker is unusable until a customer is chosen.
-    await expect(page.getByTestId('job-vehicle').locator('button').first()).toBeDisabled();
-
     // Inline-create the customer through the same full form the sales screen uses.
     await openCreate(page, 'job-card-customer');
     await fillCustomer(page, customerCode, customerName, 'عميل إنشاء داخلي');
@@ -123,8 +120,8 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
       }, { timeout: 20_000 })
       .not.toBeNull();
 
-    // Now the vehicle picker is enabled; inline-create a vehicle for that customer.
-    await expect(page.getByTestId('job-vehicle').locator('button').first()).toBeEnabled();
+    // The vehicle picker is narrowed to the chosen customer; inline-create a
+    // vehicle for that customer through the same form the vehicle register uses.
     await openCreate(page, 'job-vehicle');
     await expect(page.getByTestId('vehicle-vin')).toBeVisible();
     await page.getByTestId('vehicle-vin').fill(vin);

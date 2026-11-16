@@ -1378,7 +1378,7 @@ export const api = {
     request<OperationsDashboardDto>(`/operations/dashboard${companyId ? `?companyId=${companyId}` : ''}`),
 
   // ----------------------------------------------------- Automotive (E03)
-  vehicles: (params: { companyId?: string; search?: string; status?: string; customerId?: string; page?: number } = {}) =>
+  vehicles: (params: { companyId?: string; search?: string; status?: string; customerId?: string; page?: number; pageSize?: number } = {}) =>
     request<Paginated<VehicleDto>>(`/automotive/vehicles?${toQuery(params)}`),
   vehicle: (id: string) => request<Record<string, unknown>>(`/automotive/vehicles/${id}`),
   createVehicle: (body: Record<string, unknown>) => request<VehicleDto>('/automotive/vehicles', { method: 'POST', body }),

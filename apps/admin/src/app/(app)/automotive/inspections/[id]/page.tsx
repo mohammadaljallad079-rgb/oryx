@@ -891,6 +891,20 @@ function AttachmentsPanel({
                 // The media route is authorised; no public storage URL is exposed.
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={api.resolveImage(a.url) ?? undefined} alt={a.caption ?? a.originalName} className="oryx-attachment__thumb" />
+              ) : a.url ? (
+                // A non-image attachment (a scanned diagnostic PDF, say) opens
+                // from the list instead of rendering as a broken thumbnail.
+                <a
+                  className="oryx-attachment__file"
+                  href={api.resolveImage(a.url) ?? undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={a.originalName}
+                  data-testid={`attachment-open-${a.id}`}
+                >
+                  <Icon name="scroll" size={18} />
+                  <span className="truncate">{a.originalName}</span>
+                </a>
               ) : (
                 <div className="oryx-attachment__file">
                   <Icon name="scroll" size={18} />

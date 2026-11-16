@@ -7,6 +7,9 @@ import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { minorToInput, money, qty, toBasisPoints, toMinorInput, toQuantityInput } from '@/lib/erp-format';
 import { EntitySelect } from '@/components/entity-select';
+import { EntityPicker } from '@/components/inline-create';
+import { CustomerModal } from '@/components/customer-modal';
+import { VehicleModal } from '@/components/entity-modals';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -1121,6 +1124,7 @@ function CreateJobCardModal({
   const { companyId } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [customerId, setCustomerId] = useState('');
   const [form, setForm] = useState({
     vehicleId: '',
     complaint: '',
@@ -1138,8 +1142,28 @@ function CreateJobCardModal({
     () => (companyId ? api.listUsers(companyId, { pageSize: 100 }).catch(() => null) : Promise.resolve(null)),
     [companyId],
   );
+  // The vehicle catalogue is fetched unfiltered so the inline-create flow can
+  // reload it after a new vehicle is saved; the list is narrowed to the chosen
+  // customer's vehicles below, which also stops a job being raised against a
+  // vehicle that belongs to someone else.
+  const vehicles = useAsync(
+    () => (companyId ? api.vehicles({ companyId, pageSize: 200 }).catch(() => null) : Promise.resolve(null)),
+    [companyId],
+  );
+  const customerOptions = useAsync(
+    () => api.salesCustomers({ companyId: companyId ?? undefined, search: undefined }).catch(() => null),
+    [companyId],
+  );
+  // Choosing a customer narrows the picker to that customer's vehicles; with no
+  // customer chosen the whole company catalogue is offered, so a job can still
+  // be raised directly against a known vehicle.
+  const vehicleOptions = useMemo(() => {
+    const all = vehicles.data?.items ?? [];
+    return customerId ? all.filter((v) => v.customerId === customerId) : all;
+  }, [vehicles.data, customerId]);
 
-  const reset = () =>
+  const reset = () => {
+    setCustomerId('');
     setForm({
       vehicleId: '',
       complaint: '',
@@ -1149,6 +1173,7 @@ function CreateJobCardModal({
       technicianUserId: '',
       branchId: '',
     });
+  };
 
   const submit = async () => {
     setBusy(true);
@@ -1194,13 +1219,60 @@ function CreateJobCardModal({
     >
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
+        <Field label={t('erp.sales.customer')} required>
+          <EntityPicker
+            value={customerId || null}
+            options={(customerOptions.data?.items ?? []).map((c) => ({
+              value: c.id,
+              label: c.nameEn || c.nameAr || c.code,
+              hint: c.phone ?? undefined,
+            }))}
+            onChange={(v) => {
+              setCustomerId(v ?? '');
+              // The previously chosen vehicle may belong to a different
+              // customer, so it is cleared whenever the customer changes.
+              setForm((f) => ({ ...f, vehicleId: '' }));
+            }}
+            placeholder={t('common.select')}
+            testId="job-card-customer"
+            createLabel={t('erp.sales.newCustomer')}
+            reloadOptions={customerOptions.reload}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <CustomerModal
+                open
+                customer={null}
+                onClose={closeCreate}
+                onCreated={() => undefined}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
+          />
+        </Field>
         <Field label={t('erp.automotive.vehicle')} required>
-          <EntitySelect
-            catalogue="vehicle"
+          <EntityPicker
             value={form.vehicleId || null}
+            options={vehicleOptions.map((v) => ({ value: v.id, label: `${v.vin} — ${v.make} ${v.model}` }))}
             onChange={(v) => setForm({ ...form, vehicleId: v ?? '' })}
             placeholder={t('common.select')}
             testId="job-vehicle"
+            createLabel={t('erp.automotive.newVehicle')}
+            reloadOptions={vehicles.reload}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <VehicleModal
+                open
+                customers={(customerOptions.data?.items ?? []).map((c) => ({
+                  id: c.id,
+                  code: c.code,
+                  nameEn: c.nameEn,
+                  nameAr: c.nameAr,
+                }))}
+                defaultCustomerId={customerId}
+                onCustomerCreated={customerOptions.reload}
+                onClose={closeCreate}
+                onCreated={() => undefined}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
           />
         </Field>
         <Field label={t('erp.automotive.ws.technician')}>
