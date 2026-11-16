@@ -4,7 +4,11 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   COMPANY_SETTING_DEFAULTS,
   COMPANY_SETTING_SECTIONS,
+  DOCUMENT_NUMBERING_TYPES,
+  defaultNumberingRule,
   type CompanySettingSection,
+  type DocumentNumberingRule,
+  type DocumentNumberingSettings,
 } from '@oryx/shared';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -294,6 +298,15 @@ const SECTION_META: Record<CompanySettingSection, { labelEn: string; labelAr: st
       },
     ],
   },
+  numbering: {
+    labelEn: 'Document numbering',
+    labelAr: 'ترقيم المستندات',
+    icon: 'list',
+    // The numbering section is not a flat field list; its dedicated renderer
+    // (see `NumberingEditor`) lays one row out per document type. The field list
+    // is empty so the generic renderer is never used for it.
+    fields: [],
+  },
 };
 
 export function CompanySettingsCentre({ canEdit }: { canEdit: boolean }) {
@@ -406,6 +419,12 @@ export function CompanySettingsCentre({ canEdit }: { canEdit: boolean }) {
               <Skeleton key={i} height={40} />
             ))}
           </div>
+        ) : active === 'numbering' ? (
+          <NumberingEditor
+            value={(current as DocumentNumberingSettings) ?? {}}
+            canEdit={canEdit}
+            onChange={(key, rule) => setField(key, rule)}
+          />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
             {meta.fields.map((f) => (
@@ -461,6 +480,80 @@ export function CompanySettingsCentre({ canEdit }: { canEdit: boolean }) {
           </div>
         ) : null}
       </Card>
+    </div>
+  );
+}
+
+/**
+ * The document-numbering editor.
+ *
+ * One row per document type: the leading letter, the zero-padding and the next
+ * number. A type with no stored rule shows its catalogue default, so an
+ * untouched tenant reads as configured rather than blank. The counters are held
+ * by `DocumentSequence` rows and only ever increase, so changing the letter here
+ * never rewinds or duplicates an already-issued number.
+ */
+function NumberingEditor({
+  value,
+  canEdit,
+  onChange,
+}: {
+  value: DocumentNumberingSettings;
+  canEdit: boolean;
+  onChange: (key: string, rule: DocumentNumberingRule) => void;
+}) {
+  const { locale } = useUi();
+  return (
+    <div className="flex flex-col gap-2" data-testid="numbering-editor">
+      <div className="hidden gap-3 px-1 text-[11.5px] font-semibold uppercase tracking-wide opacity-70 sm:grid sm:grid-cols-[1fr_5rem_6rem_7rem]">
+        <span>{locale === 'ar' ? 'النوع' : 'Type'}</span>
+        <span>{locale === 'ar' ? 'الحرف' : 'Letter'}</span>
+        <span>{locale === 'ar' ? 'عدد الخانات' : 'Digits'}</span>
+        <span>{locale === 'ar' ? 'الرقم التالي' : 'Next number'}</span>
+      </div>
+      {DOCUMENT_NUMBERING_TYPES.map((type) => {
+        const rule = value[type.key] ?? defaultNumberingRule(type.key);
+        const preview = `${rule.prefix}${String(rule.nextNumber).padStart(rule.padding, '0')}`;
+        return (
+          <div
+            key={type.key}
+            className="grid items-center gap-3 rounded-lg border border-[var(--border)] px-3 py-2 sm:grid-cols-[1fr_5rem_6rem_7rem]"
+            data-testid={`numbering-row-${type.key}`}
+          >
+            <span className="text-[12.5px] font-semibold">
+              {locale === 'ar' ? type.labelAr : type.labelEn}
+              <span className="ms-2 font-mono text-[11px] opacity-60">{preview}</span>
+            </span>
+            <input
+              className="oryx-input"
+              maxLength={4}
+              disabled={!canEdit}
+              value={rule.prefix}
+              onChange={(e) => onChange(type.key, { ...rule, prefix: e.target.value.toUpperCase() })}
+              data-testid={`numbering-prefix-${type.key}`}
+            />
+            <input
+              className="oryx-input"
+              type="number"
+              min={1}
+              max={12}
+              disabled={!canEdit}
+              value={rule.padding}
+              onChange={(e) => onChange(type.key, { ...rule, padding: Number(e.target.value) })}
+              data-testid={`numbering-padding-${type.key}`}
+            />
+            <input
+              className="oryx-input"
+              type="number"
+              min={1}
+              disabled={!canEdit}
+              value={rule.nextNumber}
+              onChange={(e) => onChange(type.key, { ...rule, nextNumber: Number(e.target.value) })}
+              data-testid={`numbering-next-${type.key}`}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }

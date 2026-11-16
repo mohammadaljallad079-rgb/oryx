@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   COMPANY_SETTING_DEFAULTS,
   COMPANY_SETTING_SECTIONS,
+  DOCUMENT_NUMBERING_TYPES,
   withDefaults,
   type CompanySettingSection,
   type CompanySettingsMap,
@@ -73,7 +74,8 @@ export class CompanySettingsService {
     const existing = await this.prisma.companySetting.findUnique({
       where: { companyId_section: { companyId, section } },
     });
-    const merged = { ...withDefaults(section, existing?.value), ...patch };
+    const incoming = section === 'numbering' ? sanitiseNumbering(patch) : patch;
+    const merged = { ...withDefaults(section, existing?.value), ...incoming };
     await this.prisma.companySetting.upsert({
       where: { companyId_section: { companyId, section } },
       update: { value: merged as never, updatedById: actorUserId },
@@ -105,3 +107,37 @@ export class CompanySettingsService {
     return COMPANY_SETTING_DEFAULTS;
   }
 }
+
+/**
+ * Keep only well-formed numbering rules from a patch.
+ *
+ * The section is an open map keyed by document type, so an arbitrary body could
+ * otherwise store a negative padding, a zero next-number or a key that is not a
+ * document type. Only catalogue keys are kept, the prefix is capped at a short
+ * token (a printed number is one letter plus digits, not a sentence) and the
+ * numeric fields are clamped to sane bounds. A rule that arrives empty is
+ * dropped so the type falls back to its catalogue default rather than printing
+ * a blank number.
+ */
+function sanitiseNumbering(patch: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, raw] of Object.entries(patch)) {
+    if (!KNOWN_NUMBERING_KEYS.has(key)) continue;
+    if (!raw || typeof raw !== 'object') continue;
+    const rule = raw as Record<string, unknown>;
+    const prefix = String(rule.prefix ?? '').trim().slice(0, 4);
+    if (!prefix) continue;
+    const padding = clampInt(rule.padding, 1, 12);
+    const nextNumber = clampInt(rule.nextNumber, 1, Number.MAX_SAFE_INTEGER);
+    out[key] = { prefix, padding, nextNumber };
+  }
+  return out;
+}
+
+function clampInt(value: unknown, min: number, max: number): number {
+  const n = Math.trunc(Number(value));
+  if (!Number.isFinite(n)) return min;
+  return Math.min(Math.max(n, min), max);
+}
+
+const KNOWN_NUMBERING_KEYS = new Set(DOCUMENT_NUMBERING_TYPES.map((t) => t.key));

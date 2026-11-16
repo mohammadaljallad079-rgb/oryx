@@ -628,6 +628,40 @@ async function seedCompanies(superAdminId: string) {
       });
     }
 
+    // Mirror the identity into the Settings → General section, which the settings
+    // screen and the printed document read first. `update: {}` is deliberate: a
+    // re-seed must never clobber an operator's edits, so the row is only written
+    // when it does not exist yet. Only the approved values are set — a field with
+    // no known value stays blank rather than showing a placeholder.
+    await prisma.companySetting.upsert({
+      where: { companyId_section: { companyId: company.id, section: 'general' } },
+      update: {},
+      create: {
+        companyId: company.id,
+        section: 'general',
+        value: {
+          nameEn: spec.nameEn,
+          nameAr: spec.nameAr,
+          tradeNameEn: spec.legalNameEn ?? '',
+          tradeNameAr: '',
+          crNumber: spec.crNumber ?? '',
+          taxNumber: spec.taxNumber ?? '',
+          phone: spec.phone ?? spec.supportPhone ?? '',
+          email: spec.email ?? spec.supportEmail ?? '',
+          website: spec.website ?? spec.websiteUrl ?? '',
+          addressLine: spec.addressLine ?? '',
+          city: spec.branches[0]?.city ?? '',
+          countryCode: DEFAULT_COUNTRY_CODE,
+          currency: DEFAULT_CURRENCY,
+          timezone: 'Asia/Bahrain',
+          defaultLocale: 'ar',
+          dateFormat: 'dd/MM/yyyy',
+          numberFormat: '1,234.56',
+          logoUrl: '',
+        },
+      },
+    });
+
     for (const b of spec.branches) {
       await prisma.branch.upsert({
         where: { companyId_code: { companyId: company.id, code: b.code } },

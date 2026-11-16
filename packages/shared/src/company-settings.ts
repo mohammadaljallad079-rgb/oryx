@@ -11,6 +11,8 @@
  * all read it, so a new section is added in exactly one place.
  */
 
+import type { DocumentNumberingSettings } from './document-numbering';
+
 export const COMPANY_SETTING_SECTIONS = [
   'general',
   'typography',
@@ -23,6 +25,7 @@ export const COMPANY_SETTING_SECTIONS = [
   'sales',
   'maintenance',
   'documents',
+  'numbering',
 ] as const;
 
 export type CompanySettingSection = (typeof COMPANY_SETTING_SECTIONS)[number];
@@ -185,6 +188,13 @@ export interface CompanySettingsMap {
   sales: SalesSettings;
   maintenance: MaintenanceSettings;
   documents: DocumentsSettings;
+  /**
+   * Per-document-type numbering overrides, keyed by `DocumentNumberingType.key`
+   * (see `document-numbering.ts`). A type absent from the map uses its
+   * catalogue default, so a tenant that never opens this screen numbers exactly
+   * as before.
+   */
+  numbering: DocumentNumberingSettings;
 }
 
 export const MAINTENANCE_STATUSES = [
@@ -334,6 +344,9 @@ export const COMPANY_SETTING_DEFAULTS: CompanySettingsMap = {
     signatureUrl: '',
     paperSize: 'A4',
   },
+  // Empty by default: every type falls back to its catalogue rule, so an
+  // untouched tenant numbers exactly as it did before this section existed.
+  numbering: {},
 };
 
 export interface CompanySettingsResponse {
