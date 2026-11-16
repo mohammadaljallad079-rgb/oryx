@@ -978,6 +978,45 @@ describe('ORYX API authorization (e2e)', () => {
       );
       expect(res.status).toBe(403);
     });
+
+    it('refuses to create a user whose email already belongs to another company, without touching that account', async () => {
+      const roles = await companyCall<Array<{ id: string; code: string }>>(
+        ctx.base,
+        authzTenantId,
+        `/companies/${authzTenantId}/roles`,
+        { token: companyToken },
+      );
+      const staffRole = roles.body.find((r) => r.code === 'staff_viewer')!;
+
+      // A user of a different tenant (ORYX-AUTO), not a member of the caller's company.
+      const victimEmail = SEED_ORYX_AUTO_ADMIN.email;
+      const before = await ctx.prisma.user.findUniqueOrThrow({ where: { email: victimEmail } });
+
+      const res = await companyCall(ctx.base, authzTenantId, `/companies/${authzTenantId}/users`, {
+        method: 'POST',
+        token: companyToken,
+        body: {
+          email: victimEmail,
+          fullNameEn: 'Takeover Attempt',
+          fullNameAr: 'محاولة استيلاء',
+          password: 'Attacker-password-2026',
+          nationalId: '0000000000',
+          roleId: staffRole.id,
+        },
+      });
+      // The request is refused with a conflict rather than silently taking over
+      // the sign-in or editing a profile owned by another tenant.
+      expect(res.status).toBe(409);
+
+      const after = await ctx.prisma.user.findUniqueOrThrow({ where: { email: victimEmail } });
+      expect(after.id).toBe(before.id);
+      expect(after.passwordHash).toBe(before.passwordHash);
+      expect(after.fullNameEn).toBe(before.fullNameEn);
+      expect(after.nationalId).toBe(before.nationalId);
+
+      // The attacker-chosen password must not now sign in to the victim account.
+      await expect(login(ctx.base, victimEmail, 'Attacker-password-2026')).rejects.toBeTruthy();
+    });
   });
 
   // ------------------------------------------------------- cross-tenant access

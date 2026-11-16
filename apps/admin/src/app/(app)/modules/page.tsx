@@ -86,9 +86,6 @@ function ModulesPageInner() {
                       />
                     </span>
                     <div className="flex flex-col items-end gap-1">
-                      <Badge tone={m.status === 'AVAILABLE' ? 'success' : 'warning'}>
-                        {m.status === 'AVAILABLE' ? t('modules.available') : t('modules.planned')}
-                      </Badge>
                       <Badge tone={licensed ? 'gold' : 'neutral'}>
                         {licensed ? t('modules.licensed') : t('modules.notLicensed')}
                       </Badge>
@@ -105,10 +102,6 @@ function ModulesPageInner() {
                     <div className="flex justify-between gap-2">
                       <dt className="oryx-faint">{t('modules.group')}</dt>
                       <dd className="m-0 font-semibold">{m.group}</dd>
-                    </div>
-                    <div className="flex justify-between gap-2">
-                      <dt className="oryx-faint">{t('modules.phase')}</dt>
-                      <dd className="m-0 font-semibold">{m.deliveryPhase}</dd>
                     </div>
                     <div className="flex justify-between gap-2">
                       <dt className="oryx-faint">{t('modules.readPermission')}</dt>

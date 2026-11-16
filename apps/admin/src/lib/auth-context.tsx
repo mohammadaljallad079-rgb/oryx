@@ -338,7 +338,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [state.permissions],
   );
   const hasModule = useCallback(
-    (moduleKey: string) => isPlatform || state.licensedModules.includes(moduleKey),
+    (moduleKey: string) => (isPlatform && !state.companyId ? true : state.licensedModules.includes(moduleKey)),
     [isPlatform, state.companyId, state.licensedModules],
   );
 

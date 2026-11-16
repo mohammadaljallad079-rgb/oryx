@@ -1301,6 +1301,7 @@ export class SalesService {
           roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
           reason: dto.reason ?? null,
+          refundMethod: dto.refundMethod ?? 'CREDIT_ACCOUNT',
           currency: dto.currency ?? companyCurrency,
           restockInventory: dto.restockInventory ?? false,
           createdById: actor.userId,
@@ -1322,6 +1323,16 @@ export class SalesService {
 
       const revenueAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.SALES_REVENUE);
       const arAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.AR_CONTROL);
+      // The credit side depends on how the money is actually returned. The
+      // default keeps it on the customer's account (AR); a real refund settles
+      // to cash or bank in the same posting, so the ledger reflects the payout.
+      const refundMethod = dto.refundMethod ?? 'CREDIT_ACCOUNT';
+      const creditAccount =
+        refundMethod === 'CASH'
+          ? await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.CASH)
+          : refundMethod === 'BANK_TRANSFER' || refundMethod === 'CARD'
+            ? await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.BANK)
+            : arAccount;
       const roundingAccount =
         totals.roundingMinor !== 0
           ? await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.ROUNDING_GAIN_LOSS)
@@ -1337,7 +1348,7 @@ export class SalesService {
         ...(roundingAccount && totals.roundingMinor < 0
           ? [{ accountId: roundingAccount, credit: -totals.roundingMinor }]
           : []),
-        { accountId: arAccount, credit: totals.totalMinor },
+        { accountId: creditAccount, credit: totals.totalMinor },
       ];
       const journal = await this.posting.postJournal(tx, {
         companyId,
@@ -1986,6 +1997,7 @@ function toCreditNoteDto(n: {
   roundingMinor: number;
   totalMinor: number;
   reason: string | null;
+  refundMethod: string;
   currency: string;
   restockInventory: boolean;
   customer: { nameEn: string; nameAr: string; code: string };
@@ -2005,6 +2017,7 @@ function toCreditNoteDto(n: {
     roundingMinor: n.roundingMinor,
     totalMinor: n.totalMinor,
     reason: n.reason,
+    refundMethod: n.refundMethod,
     currency: n.currency,
     restockInventory: n.restockInventory,
     lines: n.lines,

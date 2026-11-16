@@ -385,6 +385,7 @@ export interface UserDto {
   nationalId: string | null;
   nationality: string | null;
   address: string | null;
+  phone: string | null;
   status: UserStatus;
   isSuperAdmin: boolean;
   preferredLocale: 'ar' | 'en';
@@ -1050,6 +1051,9 @@ export interface SalesDocumentDto {
   outstandingMinor?: number;
   currency: string;
   notes: string | null;
+  /** How a return's credited amount is given back (returns only). */
+  refundMethod?: 'CREDIT_ACCOUNT' | 'CASH' | 'BANK_TRANSFER' | 'CARD';
+  restockInventory?: boolean;
   journalEntryId?: string | null;
   warehouseId?: string | null;
   paymentMethod?: string;

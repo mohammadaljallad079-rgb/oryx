@@ -361,6 +361,11 @@ model User {
   nationalId                String?
   nationality               String?
   address                   String?
+  /**
+   * Primary reachable number for the staff account. Optional, like the other
+   * identity fields, so existing accounts stay valid.
+   */
+  phone                     String?
   status                    UserStatus @default(INVITED)
   isSuperAdmin              Boolean    @default(false)
   preferredLocale           Locale     @default(ar)
@@ -2244,6 +2249,13 @@ model SalesInvoiceLine {
   @@index([invoiceId])
 }
 
+enum RefundMethod {
+  CREDIT_ACCOUNT
+  CASH
+  BANK_TRANSFER
+  CARD
+}
+
 model CreditNote {
   id               String         @id @default(cuid())
   companyId        String
@@ -2260,6 +2272,12 @@ model CreditNote {
   roundingMinor    Int            @default(0)
   totalMinor       Int            @default(0)
   reason           String?
+  /**
+   * How the refunded amount leaves the business. CREDIT_ACCOUNT keeps the value
+   * on the customer's account (the historical behaviour); every other value
+   * settles the credit to a real account in the same posting.
+   */
+  refundMethod     RefundMethod   @default(CREDIT_ACCOUNT)
   currency         String         @default("BHD")
   restockInventory Boolean        @default(false)
   journalEntryId   String?

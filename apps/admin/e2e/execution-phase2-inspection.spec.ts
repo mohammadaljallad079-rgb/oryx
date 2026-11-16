@@ -449,6 +449,8 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     expect(served.status()).toBe(200);
     expect(served.headers()['content-type']).toContain('application/pdf');
     expect((await served.body()).subarray(0, 5).toString('ascii')).toBe('%PDF-');
+  });
+
   test('offers a single optional notes field and submits a fully passing inspection with it empty', async ({ page }) => {
     const id = await seedJob(page, ['EXTERIOR']);
     await page.goto(`/automotive/inspections/${id}`);

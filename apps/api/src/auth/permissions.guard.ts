@@ -120,8 +120,14 @@ export class ModuleEntitlementGuard implements CanActivate {
     const principal = req.principal;
     if (!principal) throw forbidden(ERROR_CODES.FORBIDDEN_PERMISSION, 'No authenticated principal.');
 
-    if (principal.kind === 'PLATFORM') return true;
+    // A platform principal acting outside tenant context governs the platform
+    // itself and is not plan-limited. Once it selects a tenant — a company
+    // header or an explicit support session — it is bound by that tenant's
+    // entitlements exactly like a member, so "platform" never means "ignores
+    // every plan". An ORYX internal company is not plan-gated, which
+    // `EntitlementService` already expresses by returning the full catalogue.
     const companyId = principal.company?.companyId;
+    if (principal.kind === 'PLATFORM' && !companyId) return true;
     if (!companyId) throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'No company context for module access.');
 
     const licensed = await this.entitlements.licensedModulesFor(companyId);

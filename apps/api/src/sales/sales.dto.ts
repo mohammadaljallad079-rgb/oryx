@@ -745,6 +745,14 @@ export class CreateCreditNoteDto extends SalesDocumentDateDto {
   @MaxLength(300)
   reason?: string;
 
+  /**
+   * How the credited amount is given back. Defaults to `CREDIT_ACCOUNT`, which
+   * keeps the value on the customer's account (the historical behaviour).
+   */
+  @IsOptional()
+  @IsIn(['CREDIT_ACCOUNT', 'CASH', 'BANK_TRANSFER', 'CARD'])
+  refundMethod?: 'CREDIT_ACCOUNT' | 'CASH' | 'BANK_TRANSFER' | 'CARD';
+
   @IsOptional()
   @IsString()
   @MaxLength(3)

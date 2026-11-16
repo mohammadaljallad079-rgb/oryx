@@ -11,6 +11,7 @@ import { EntityPicker } from '@/components/inline-create';
 import { LeadModal } from '@/components/entity-modals';
 import { PipelineModal } from '@/components/pipeline-modal';
 import { CustomerModal } from '@/components/customer-modal';
+import { CustomersTab } from '@/components/customers-tab';
 import { ModuleDashboard } from '@/components/module-dashboard';
 import { TabDeepLink } from '@/components/tab-deep-link';
 import {
@@ -28,9 +29,9 @@ import {
 } from '@/components/ui';
 import type { LeadDto, OpportunityDto, SupportTicketDto } from '@oryx/shared';
 
-type Tab = 'dashboard' | 'leads' | 'opportunities' | 'tickets' | 'activities';
+type Tab = 'dashboard' | 'leads' | 'opportunities' | 'tickets' | 'activities' | 'customers';
 
-const TAB_KEYS = ['dashboard', 'leads', 'opportunities', 'tickets', 'activities'] as const;
+const TAB_KEYS = ['dashboard', 'leads', 'opportunities', 'tickets', 'activities', 'customers'] as const;
 
 export default function CrmPage() {
   return (
@@ -51,6 +52,7 @@ function CrmInner() {
     { key: 'opportunities', label: t('erp.crm.opportunities') },
     { key: 'tickets', label: t('erp.crm.tickets') },
     { key: 'activities', label: t('erp.crm.activities') },
+    { key: 'customers', label: t('erp.sales.customers') },
   ];
 
   return (
@@ -83,6 +85,7 @@ function CrmInner() {
       {tab === 'opportunities' ? <OpportunitiesTab canManage={can('erp.crm.opportunity.manage')} canConvert={can('erp.crm.opportunity.convert')} /> : null}
       {tab === 'tickets' ? <TicketsTab canManage={can('erp.crm.ticket.manage')} /> : null}
       {tab === 'activities' ? <ActivitiesTab canManage={can('erp.crm.activity.manage')} /> : null}
+      {tab === 'customers' ? <CustomersTab canManage={can('erp.sales.customer.manage')} /> : null}
     </div>
   );
 }
