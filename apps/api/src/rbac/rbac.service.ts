@@ -11,6 +11,7 @@ import {
 import { PrismaService } from '../common/prisma.service';
 import { EntitlementService } from '../common/entitlement.service';
 import { AuditService } from '../common/audit.service';
+import { AuthService } from '../auth/auth.service';
 import { findPlatformSuperAdminRole } from '../common/platform-role';
 import {
   badRequest,
@@ -22,9 +23,11 @@ import {
 import type { ActorContext } from '../organizations/organizations.service';
 import type {
   CreateRoleDto,
+  CreateUserDto,
   InviteUserDto,
   UpdateMembershipDto,
   UpdateRoleDto,
+  UpdateUserDto,
 } from './rbac.dto';
 
 const INVITATION_TTL_DAYS = 7;
@@ -37,6 +40,7 @@ export class RbacService {
     private readonly prisma: PrismaService,
     private readonly entitlements: EntitlementService,
     private readonly audit: AuditService,
+    private readonly auth: AuthService,
   ) {}
 
   // ------------------------------------------------------------------- context
@@ -316,6 +320,9 @@ export class RbacService {
         email: m.user.email,
         fullNameEn: m.user.fullNameEn,
         fullNameAr: m.user.fullNameAr,
+        nationalId: m.user.nationalId,
+        nationality: m.user.nationality,
+        address: m.user.address,
         status: m.user.status,
         isSuperAdmin: m.user.isSuperAdmin,
         preferredLocale: m.user.preferredLocale,
@@ -500,6 +507,168 @@ export class RbacService {
       invitedByEmail: null,
       // Returned exactly once; only the hash is persisted.
       inviteToken: rawToken,
+    };
+  }
+
+  /**
+   * Create a user directly, with an active account and a membership.
+   *
+   * This is the deliberate alternative to an invitation: the administrator sets
+   * the initial password and the account is usable immediately. It shares the
+   * invitation path's guards — same-company role, delegable permissions, seat
+   * limit and reachable branches — so the two cannot diverge on what a company
+   * administrator is allowed to hand out.
+   */
+  async createUser(companyId: string, dto: CreateUserDto, actor: ActorContext) {
+    if (actor.kind === 'COMPANY' && actor.companyId !== companyId) {
+      throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'Cross-tenant access is not permitted.');
+    }
+    const email = dto.email.toLowerCase().trim();
+    const role = await this.prisma.role.findFirst({ where: { id: dto.roleId, companyId } });
+    if (!role) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Role does not belong to this company.');
+    if (role.isPlatform) throw forbidden(ERROR_CODES.FORBIDDEN_PLATFORM_ONLY, 'Platform roles cannot be assigned to company users.');
+
+    const rolePermissions = (
+      await this.prisma.rolePermission.findMany({ where: { roleId: role.id } })
+    ).map((p) => p.permissionCode);
+    await this.assertDelegation(companyId, actor, rolePermissions);
+
+    const ent = await this.entitlements.forCompany(companyId);
+    const usage = await this.entitlements.usageFor(companyId);
+    const limits: PlanLimits = { ...ent.limits };
+    const check = checkLimit(limits, 'maxUsers', usage.users, 1);
+    if (!check.ok) {
+      throw forbidden(ERROR_CODES.PLAN_LIMIT_EXCEEDED, `Plan user limit reached (${check.limit}).`, {
+        limit: check.limit,
+        current: check.current,
+        limitName: 'maxUsers',
+      });
+    }
+
+    const branchIds = dto.branchIds ?? [];
+    if (branchIds.length > 0) {
+      const branches = await this.prisma.branch.findMany({ where: { id: { in: branchIds } } });
+      for (const b of branches) {
+        if (b.companyId !== companyId) {
+          throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'Branch belongs to another company.');
+        }
+      }
+      if (branches.length !== branchIds.length) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'One or more branches were not found.');
+      }
+    }
+
+    const existingUser = await this.prisma.user.findUnique({ where: { email } });
+    if (existingUser?.isSuperAdmin) {
+      throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'That account is a platform administrator.');
+    }
+    if (existingUser) {
+      const existingMembership = await this.prisma.membership.findUnique({
+        where: { userId_companyId: { userId: existingUser.id, companyId } },
+      });
+      if (existingMembership) {
+        throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'That user is already a member of this company.');
+      }
+    }
+
+    const passwordHash = await AuthService.hashPassword(dto.password);
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = existingUser
+        ? await tx.user.update({
+            where: { id: existingUser.id },
+            data: {
+              passwordHash,
+              status: 'ACTIVE',
+              fullNameEn: dto.fullNameEn,
+              fullNameAr: dto.fullNameAr,
+              nationalId: dto.nationalId ?? null,
+              nationality: dto.nationality ?? null,
+              address: dto.address ?? null,
+            },
+          })
+        : await tx.user.create({
+            data: {
+              email,
+              passwordHash,
+              status: 'ACTIVE',
+              fullNameEn: dto.fullNameEn,
+              fullNameAr: dto.fullNameAr,
+              nationalId: dto.nationalId ?? null,
+              nationality: dto.nationality ?? null,
+              address: dto.address ?? null,
+            },
+          });
+
+      const membership = await tx.membership.create({
+        data: { userId: created.id, companyId, roleId: role.id, invitedById: actor.userId },
+      });
+      for (const branchId of branchIds) {
+        await tx.membershipBranch.create({ data: { membershipId: membership.id, branchId } });
+      }
+      return created;
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'user.created',
+      targetType: 'USER',
+      targetId: user.id,
+      summary: `Created ${email} as ${role.nameEn}`,
+      metadata: { roleId: role.id, branchIds },
+    });
+
+    return {
+      id: user.id,
+      email: user.email,
+      fullNameEn: user.fullNameEn,
+      fullNameAr: user.fullNameAr,
+      nationalId: user.nationalId,
+      nationality: user.nationality,
+      address: user.address,
+      status: user.status,
+    };
+  }
+
+  /** Edit the identity/contact details of a user in the caller's company. */
+  async updateUser(companyId: string, userId: string, dto: UpdateUserDto, actor: ActorContext) {
+    if (actor.kind === 'COMPANY' && actor.companyId !== companyId) {
+      throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'Cross-tenant access is not permitted.');
+    }
+    const membership = await this.prisma.membership.findUnique({
+      where: { userId_companyId: { userId, companyId } },
+    });
+    if (!membership) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Membership not found.');
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(dto.fullNameEn !== undefined ? { fullNameEn: dto.fullNameEn } : {}),
+        ...(dto.fullNameAr !== undefined ? { fullNameAr: dto.fullNameAr } : {}),
+        ...(dto.nationalId !== undefined ? { nationalId: dto.nationalId || null } : {}),
+        ...(dto.nationality !== undefined ? { nationality: dto.nationality || null } : {}),
+        ...(dto.address !== undefined ? { address: dto.address || null } : {}),
+      },
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'user.updated',
+      targetType: 'USER',
+      targetId: userId,
+      summary: `Updated profile for ${updated.email}`,
+    });
+
+    return {
+      id: updated.id,
+      email: updated.email,
+      fullNameEn: updated.fullNameEn,
+      fullNameAr: updated.fullNameAr,
+      nationalId: updated.nationalId,
+      nationality: updated.nationality,
+      address: updated.address,
+      status: updated.status,
     };
   }
 

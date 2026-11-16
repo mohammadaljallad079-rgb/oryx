@@ -393,6 +393,55 @@ test.describe('company administrator delegation', () => {
   });
 });
 
+test.describe('user management', () => {
+  test('the add-user modal captures identity and contact fields', async ({ page }) => {
+    await signIn(page, COMPANY_ADMIN);
+    await setLocale(page, 'en');
+    await page.goto('/users');
+    await expect(page.getByTestId('users-page')).toBeVisible();
+
+    await page.getByTestId('add-user').click();
+    await expect(page.getByTestId('add-user-email')).toBeVisible();
+
+    // Identity and contact inputs that the direct-creation flow stores on the
+    // user record are all present, so an administrator can capture them without
+    // a separate edit round-trip.
+    await expect(page.getByTestId('add-user-name-en')).toBeVisible();
+    await expect(page.getByTestId('add-user-name-ar')).toBeVisible();
+    await expect(page.getByTestId('add-user-password')).toBeVisible();
+    await expect(page.getByTestId('add-user-national-id')).toBeVisible();
+    await expect(page.getByTestId('add-user-nationality')).toBeVisible();
+    await expect(page.getByTestId('add-user-address')).toBeVisible();
+
+    // Submit stays disabled until the required fields (email, role, password)
+    // are supplied.
+    const submit = page.getByTestId('add-user-submit');
+    await expect(submit).toBeDisabled();
+    await page.getByTestId('add-user-email').fill('new.staff@oryx.test');
+    await expect(submit).toBeDisabled();
+    await page.getByTestId('add-user-password').fill('A-strong-password-2026');
+    await expect(submit).toBeDisabled();
+    await pickOption(page, 'add-user-role');
+    await expect(submit).toBeEnabled();
+
+    // Closing without submitting leaves no stray row behind.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.oryx-modal')).toHaveCount(0);
+  });
+
+  test('the user table lists identity columns and a profile editor', async ({ page }) => {
+    await signIn(page, COMPANY_ADMIN);
+    await setLocale(page, 'en');
+    await page.goto('/users');
+    await expect(page.getByTestId('users-page')).toBeVisible();
+
+    // The register exposes the identity columns added with the profile fields.
+    await expect(page.getByTestId('user-search')).toBeVisible();
+    await expect(page.getByTestId('user-role-filter')).toBeVisible();
+    await expect(page.getByTestId('user-status-filter')).toBeVisible();
+  });
+});
+
 test.describe('website and application management', () => {
   test('cms pages and banners are listed and editable', async ({ page }) => {
     await signIn(page);

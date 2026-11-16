@@ -236,4 +236,40 @@ test.describe('Execution 21 — workshop redesign', () => {
     await page.keyboard.press('Escape');
     await expect(page.locator('.oryx-modal')).toHaveCount(0, { timeout: 15_000 });
   });
+
+  test('9. the job card register filters by search and names the customer and technician', async ({ page }) => {
+    await signIn(page, ENTERPRISE_ADMIN);
+    await setLocale(page, 'en');
+    await page.goto('/automotive/maintenance');
+    await expect(page.getByTestId('maintenance-page')).toBeVisible();
+    await page.getByTestId('maintenance-tab-job-cards').click();
+
+    // The register exposes a free-text filter over the job number, complaint
+    // and the vehicle's VIN/plate.
+    const search = page.getByTestId('job-search-filter');
+    await expect(search).toBeVisible({ timeout: 20_000 });
+
+    // A filter that cannot match anything must empty the register rather than
+    // silently keep the full list.
+    await search.fill('no-such-job-zzz-999');
+    await expect
+      .poll(async () => page.locator('[data-testid^="job-row-"]').count(), { timeout: 20_000 })
+      .toBe(0);
+
+    // Clearing the filter restores the list and removes the clear control.
+    await page.getByTestId('job-clear-filters').click();
+    await expect(search).toHaveValue('');
+    await expect(page.getByTestId('job-clear-filters')).toHaveCount(0);
+
+    // Every rendered row carries the customer and technician columns that the
+    // API decorates, so the register is readable without opening a detail view.
+    const rows = page.locator('[data-testid^="job-row-"]');
+    if ((await rows.count()) > 0) {
+      const firstRow = rows.first();
+      const headers = (await page.locator('table thead th').allInnerTexts()).join(' ').toUpperCase();
+      expect(headers).toContain('CUSTOMER');
+      expect(headers).toContain('TECHNICIAN');
+      await expect(firstRow.locator('td')).toHaveCount(8);
+    }
+  });
 });

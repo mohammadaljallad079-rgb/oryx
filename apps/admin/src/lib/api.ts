@@ -638,6 +638,10 @@ export const api = {
     request<Paginated<UserDto>>(`/companies/${companyId}/users?${toQuery(params)}`),
   inviteUser: (companyId: string, body: Record<string, unknown>) =>
     request<InvitationDto>(`/companies/${companyId}/users/invitations`, { method: 'POST', body }),
+  createUser: (companyId: string, body: Record<string, unknown>) =>
+    request<UserDto>(`/companies/${companyId}/users`, { method: 'POST', body }),
+  updateUser: (companyId: string, userId: string, body: Record<string, unknown>) =>
+    request<UserDto>(`/companies/${companyId}/users/${userId}`, { method: 'PATCH', body }),
   listInvitations: (companyId: string) => request<InvitationDto[]>(`/companies/${companyId}/users/invitations`),
   revokeInvitation: (id: string) =>
     request<{ ok: boolean }>(`/invitations/${id}/revoke`, { method: 'POST' }),
@@ -1499,7 +1503,7 @@ export const api = {
     request<Record<string, unknown>>('/automotive/maintenance-bookings', { method: 'POST', body }),
   updateMaintenanceBooking: (id: string, body: Record<string, unknown>) =>
     request<Record<string, unknown>>(`/automotive/maintenance-bookings/${id}`, { method: 'PATCH', body }),
-  jobCards: (params: { companyId?: string; status?: string; page?: number } = {}) =>
+  jobCards: (params: { companyId?: string; status?: string; search?: string; page?: number } = {}) =>
     request<Paginated<JobCardDto>>(`/automotive/job-cards?${toQuery(params)}`),
   jobCard: (id: string) => request<Record<string, unknown>>(`/automotive/job-cards/${id}`),
   createJobCard: (body: Record<string, unknown>) => request<JobCardDto>('/automotive/job-cards', { method: 'POST', body }),

@@ -23,9 +23,11 @@ import type { ActorContext } from '../organizations/organizations.service';
 import {
   AssignPermissionsDto,
   CreateRoleDto,
+  CreateUserDto,
   InviteUserDto,
   UpdateMembershipDto,
   UpdateRoleDto,
+  UpdateUserDto,
   UpdateUserStatusDto,
 } from './rbac.dto';
 import { PrismaService } from '../common/prisma.service';
@@ -245,6 +247,18 @@ export class CompanyUsersController {
     return this.rbac.inviteUser(companyId, dto, actorFrom(p, req));
   }
 
+  @Post()
+  @RequireAnyPermission('platform.user.manage', 'company.user.invite')
+  @ApiOperation({ summary: 'Create a user directly with an active account, role and branch scope' })
+  create(
+    @Param('companyId') companyId: string,
+    @Body() dto: CreateUserDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.rbac.createUser(companyId, dto, actorFrom(p, req));
+  }
+
   @Get('invitations')
   @RequireAnyPermission('platform.user.read', 'company.user.read')
   @ApiOperation({ summary: 'List invitations for a company' })
@@ -275,6 +289,19 @@ export class CompanyUsersController {
     @Req() req: RequestLike,
   ) {
     return this.rbac.updateMembership(companyId, userId, dto, actorFrom(p, req));
+  }
+
+  @Patch(':userId')
+  @RequireAnyPermission('platform.user.manage', 'company.user.update')
+  @ApiOperation({ summary: 'Edit a user\'s identity and contact details' })
+  updateProfile(
+    @Param('companyId') companyId: string,
+    @Param('userId') userId: string,
+    @Body() dto: UpdateUserDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.rbac.updateUser(companyId, userId, dto, actorFrom(p, req));
   }
 }
 

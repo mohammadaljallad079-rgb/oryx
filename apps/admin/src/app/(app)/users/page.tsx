@@ -38,15 +38,24 @@ function UsersInner() {
   const scopeCompanyId = params.get('companyId') ?? companyId;
 
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [editProfile, setEditProfile] = useState<UserDto | null>(null);
   const [selectedUser, setSelectedUser] = useState<UserDto | null>(null);
   const [manageUser, setManageUser] = useState<UserDto | null>(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
 
   const users = useAsync(
-    () => (scopeCompanyId ? api.listUsers(scopeCompanyId) : Promise.resolve(null)),
-    [scopeCompanyId],
+    () => (scopeCompanyId ? api.listUsers(scopeCompanyId, { search: search || undefined, status: statusFilter || undefined }) : Promise.resolve(null)),
+    [scopeCompanyId, search, statusFilter],
   );
   const invitations = useAsync(
     () => (scopeCompanyId ? api.listInvitations(scopeCompanyId) : Promise.resolve([] as InvitationDto[])),
+    [scopeCompanyId],
+  );
+  const roles = useAsync(
+    () => (scopeCompanyId ? api.listRoles(scopeCompanyId) : Promise.resolve([] as RoleDto[])),
     [scopeCompanyId],
   );
 
@@ -64,6 +73,12 @@ function UsersInner() {
   const canInvite = can('company.user.invite') || can('platform.user.manage');
   const canManage = can('company.user.update') || can('platform.user.manage');
 
+  // Role filtering is client-side: a user has exactly one membership per company
+  // in this view, so it narrows the already-fetched page without another round-trip.
+  const visibleUsers = (users.data?.items ?? []).filter(
+    (u) => !roleFilter || u.memberships[0]?.roleId === roleFilter,
+  );
+
   return (
     <div className="flex flex-col gap-4" data-testid="users-page">
       <SectionHeader
@@ -76,9 +91,15 @@ function UsersInner() {
               {t('common.refresh')}
             </Button>
             {canInvite ? (
-              <Button variant="primary" onClick={() => setInviteOpen(true)} data-testid="invite-user">
-                <Icon name="plus" size={16} />
+              <Button size="sm" onClick={() => setInviteOpen(true)} data-testid="invite-user">
+                <Icon name="mail" size={16} />
                 {t('users.invite')}
+              </Button>
+            ) : null}
+            {canInvite ? (
+              <Button variant="primary" onClick={() => setAddOpen(true)} data-testid="add-user">
+                <Icon name="plus" size={16} />
+                {t('users.add')}
               </Button>
             ) : null}
           </>
@@ -97,6 +118,61 @@ function UsersInner() {
 
       {users.error ? <ErrorBanner message={users.error} onRetry={users.reload} retryLabel={t('common.retry')} /> : null}
 
+      <Card data-testid="users-filters">
+        <div className="flex flex-wrap items-end gap-3 p-4">
+          <Field label={t('common.search')}>
+            <input
+              className="oryx-input"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('users.nationalId') + ' / ' + t('auth.email')}
+              data-testid="user-search"
+            />
+          </Field>
+          <Field label={t('users.role')}>
+            <select
+              className="oryx-input"
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              data-testid="user-role-filter"
+            >
+              <option value="">{t('users.allRoles')}</option>
+              {(roles.data ?? []).map((r) => (
+                <option key={r.id} value={r.id}>
+                  {locale === 'ar' ? r.nameAr : r.nameEn}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label={t('common.status')}>
+            <select
+              className="oryx-input"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              data-testid="user-status-filter"
+            >
+              <option value="">{t('users.allStatuses')}</option>
+              <option value="ACTIVE">{t('common.active')}</option>
+              <option value="INVITED">{t('users.invited')}</option>
+              <option value="SUSPENDED">{t('companies.suspended')}</option>
+              <option value="DISABLED">{t('users.disabled')}</option>
+            </select>
+          </Field>
+          <Button
+            size="sm"
+            onClick={() => {
+              setSearch('');
+              setStatusFilter('');
+              setRoleFilter('');
+            }}
+            data-testid="user-clear-filters"
+          >
+            <Icon name="refresh" size={14} />
+            {t('users.clearFilters')}
+          </Button>
+        </div>
+      </Card>
+
       <Card data-testid="users-table">
         {users.loading ? (
           <div className="flex flex-col gap-3 p-4">
@@ -111,6 +187,8 @@ function UsersInner() {
             <thead>
               <tr>
                 <th>{t('common.name')}</th>
+                <th>{t('users.nationalId')}</th>
+                <th>{t('users.nationality')}</th>
                 <th>{t('users.role')}</th>
                 <th>{t('users.branchScope')}</th>
                 <th>{t('common.status')}</th>
@@ -118,7 +196,14 @@ function UsersInner() {
               </tr>
             </thead>
             <tbody>
-              {users.data!.items.map((u) => {
+              {visibleUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={7}>
+                    <EmptyState title={t('common.empty')} hint={t('common.emptyHint')} />
+                  </td>
+                </tr>
+              ) : null}
+              {visibleUsers.map((u) => {
                 const m = u.memberships[0];
                 return (
                   <tr key={u.id} data-testid={`user-row-${u.email}`}>
@@ -126,6 +211,8 @@ function UsersInner() {
                       <span className="block font-semibold">{locale === 'ar' ? u.fullNameAr : u.fullNameEn}</span>
                       <span className="oryx-faint block text-[11.5px]">{u.email}</span>
                     </td>
+                    <td className="font-mono text-[12px]">{u.nationalId ?? '—'}</td>
+                    <td className="text-[12.5px]">{u.nationality ?? '—'}</td>
                     <td>{m ? (locale === 'ar' ? m.roleNameAr : m.roleNameEn) : '—'}</td>
                     <td>
                       {(m?.branchIds.length ?? 0) === 0 ? (
@@ -143,8 +230,14 @@ function UsersInner() {
                           {t('users.effective')}
                         </Button>
                         {canManage ? (
-                          <Button size="sm" variant="ghost" onClick={() => setManageUser(u)} data-testid={`manage-access-${u.email}`}>
+                          <Button size="sm" variant="ghost" onClick={() => setEditProfile(u)} data-testid={`edit-profile-${u.email}`}>
                             <Icon name="edit" size={14} />
+                            {t('users.editProfile')}
+                          </Button>
+                        ) : null}
+                        {canManage ? (
+                          <Button size="sm" variant="ghost" onClick={() => setManageUser(u)} data-testid={`manage-access-${u.email}`}>
+                            <Icon name="shield" size={14} />
                             {t('users.manageAccess')}
                           </Button>
                         ) : null}
@@ -212,6 +305,26 @@ function UsersInner() {
           setInviteOpen(false);
           await users.reload();
           await invitations.reload();
+        }}
+      />
+
+      <AddUserModal
+        open={addOpen}
+        companyId={scopeCompanyId}
+        onClose={() => setAddOpen(false)}
+        onDone={async () => {
+          setAddOpen(false);
+          await users.reload();
+        }}
+      />
+
+      <EditProfileModal
+        user={editProfile}
+        companyId={scopeCompanyId}
+        onClose={() => setEditProfile(null)}
+        onSaved={async () => {
+          setEditProfile(null);
+          await users.reload();
         }}
       />
 
@@ -567,6 +680,339 @@ function InviteModal({
           </div>
         </>
       )}
+    </Modal>
+  );
+}
+
+/**
+ * Direct user creation. Unlike `InviteModal`, this sets a password and creates
+ * an active account in one step, and it captures the identity/contact fields the
+ * tenant asked for. The role list is filtered to delegable roles for the same
+ * reason the invitation form is: a company administrator cannot hand out a
+ * permission it does not hold.
+ */
+function AddUserModal({
+  open,
+  companyId,
+  onClose,
+  onDone,
+}: {
+  open: boolean;
+  companyId: string;
+  onClose: () => void;
+  onDone: () => Promise<void>;
+}) {
+  const { t, locale } = useUi();
+  const [roles, setRoles] = useState<RoleDto[]>([]);
+  const [branches, setBranches] = useState<BranchDto[]>([]);
+  const [delegable, setDelegable] = useState<string[]>([]);
+  const [form, setForm] = useState({
+    email: '',
+    fullNameEn: '',
+    fullNameAr: '',
+    password: '',
+    nationalId: '',
+    nationality: '',
+    address: '',
+    roleId: '',
+  });
+  const [branchIds, setBranchIds] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setForm({
+      email: '',
+      fullNameEn: '',
+      fullNameAr: '',
+      password: '',
+      nationalId: '',
+      nationality: '',
+      address: '',
+      roleId: '',
+    });
+    setBranchIds([]);
+    void (async () => {
+      try {
+        const [r, b, d] = await Promise.all([
+          api.listRoles(companyId),
+          api.listBranches(companyId, { pageSize: 100 }),
+          api.delegablePermissions(companyId).catch(() => ({ companyId, permissions: [] })),
+        ]);
+        setRoles(r);
+        setBranches(b.items);
+        setDelegable(d.permissions);
+      } catch {
+        setRoles([]);
+        setBranches([]);
+      }
+    })();
+  }, [open, companyId]);
+
+  const assignableRoles = roles.filter(
+    (r) => r.isSystem || r.permissions.every((p) => delegable.includes(p)),
+  );
+
+  const toggleBranch = (id: string) =>
+    setBranchIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.createUser(companyId, {
+        email: form.email,
+        fullNameEn: form.fullNameEn || form.email,
+        fullNameAr: form.fullNameAr || form.email,
+        password: form.password,
+        nationalId: form.nationalId || undefined,
+        nationality: form.nationality || undefined,
+        address: form.address || undefined,
+        roleId: form.roleId,
+        branchIds,
+      });
+      await onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const canSubmit =
+    !busy && Boolean(form.email) && Boolean(form.roleId) && form.password.length >= 8;
+
+  return (
+    <Modal
+      open={open}
+      title={t('users.add')}
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button variant="primary" disabled={!canSubmit} onClick={submit} data-testid="add-user-submit">
+            {busy ? t('common.loading') : t('users.add')}
+          </Button>
+        </>
+      }
+    >
+      {error ? <ErrorBanner message={error} /> : null}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label={t('auth.email')} required>
+          <input
+            className="oryx-input"
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            data-testid="add-user-email"
+          />
+        </Field>
+        <Field label={t('users.role')} required hint={t('users.delegationNote')}>
+          <SearchableSelect
+            value={form.roleId || null}
+            options={assignableRoles.map((r) => ({
+              value: r.id,
+              label: locale === 'ar' ? r.nameAr : r.nameEn,
+            }))}
+            onChange={(v) => setForm({ ...form, roleId: v ?? '' })}
+            placeholder={t('common.select')}
+            testId="add-user-role"
+          />
+        </Field>
+        <Field label={`${t('common.name')} (EN)`}>
+          <input
+            className="oryx-input"
+            value={form.fullNameEn}
+            onChange={(e) => setForm({ ...form, fullNameEn: e.target.value })}
+            data-testid="add-user-name-en"
+          />
+        </Field>
+        <Field label={`${t('common.name')} (AR)`}>
+          <input
+            className="oryx-input"
+            value={form.fullNameAr}
+            onChange={(e) => setForm({ ...form, fullNameAr: e.target.value })}
+            data-testid="add-user-name-ar"
+          />
+        </Field>
+        <Field label={t('users.password')} required hint="8+">
+          <input
+            className="oryx-input"
+            type="password"
+            autoComplete="new-password"
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            data-testid="add-user-password"
+          />
+        </Field>
+        <Field label={t('users.nationalId')}>
+          <input
+            className="oryx-input"
+            value={form.nationalId}
+            onChange={(e) => setForm({ ...form, nationalId: e.target.value })}
+            data-testid="add-user-national-id"
+          />
+        </Field>
+        <Field label={t('users.nationality')}>
+          <input
+            className="oryx-input"
+            value={form.nationality}
+            onChange={(e) => setForm({ ...form, nationality: e.target.value })}
+            data-testid="add-user-nationality"
+          />
+        </Field>
+        <Field label={t('users.address')}>
+          <input
+            className="oryx-input"
+            value={form.address}
+            onChange={(e) => setForm({ ...form, address: e.target.value })}
+            data-testid="add-user-address"
+          />
+        </Field>
+      </div>
+
+      <div className="mt-3">
+        <Field label={t('users.branchScope')} hint={t('users.branchScopeHint')}>
+          <div className="flex flex-wrap gap-2" data-testid="add-user-branches">
+            {branches.length === 0 ? (
+              <span className="oryx-faint text-[12px]">—</span>
+            ) : (
+              branches.map((b) => (
+                <label
+                  key={b.id}
+                  className="flex items-center gap-2 rounded-lg border border-[var(--border)] px-2 py-1 text-[12px]"
+                >
+                  <input
+                    type="checkbox"
+                    checked={branchIds.includes(b.id)}
+                    onChange={() => toggleBranch(b.id)}
+                    data-testid={`add-user-branch-${b.code}`}
+                  />
+                  {locale === 'ar' ? b.nameAr : b.nameEn}
+                </label>
+              ))
+            )}
+          </div>
+        </Field>
+      </div>
+    </Modal>
+  );
+}
+
+/** Edit a user's identity and contact details (not their access). */
+function EditProfileModal({
+  user,
+  companyId,
+  onClose,
+  onSaved,
+}: {
+  user: UserDto | null;
+  companyId: string;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const { t } = useUi();
+  const [form, setForm] = useState({
+    fullNameEn: '',
+    fullNameAr: '',
+    nationalId: '',
+    nationality: '',
+    address: '',
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    setError(null);
+    setForm({
+      fullNameEn: user.fullNameEn,
+      fullNameAr: user.fullNameAr,
+      nationalId: user.nationalId ?? '',
+      nationality: user.nationality ?? '',
+      address: user.address ?? '',
+    });
+  }, [user]);
+
+  async function submit() {
+    if (!user) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.updateUser(companyId, user.id, {
+        fullNameEn: form.fullNameEn,
+        fullNameAr: form.fullNameAr,
+        nationalId: form.nationalId,
+        nationality: form.nationality,
+        address: form.address,
+      });
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal
+      open={Boolean(user)}
+      title={user ? `${t('users.editProfile')} — ${user.email}` : t('users.editProfile')}
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button variant="primary" disabled={busy} onClick={submit} data-testid="edit-profile-submit">
+            {busy ? t('common.loading') : t('common.save')}
+          </Button>
+        </>
+      }
+    >
+      {error ? <ErrorBanner message={error} /> : null}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label={`${t('common.name')} (EN)`}>
+          <input
+            className="oryx-input"
+            value={form.fullNameEn}
+            onChange={(e) => setForm({ ...form, fullNameEn: e.target.value })}
+            data-testid="edit-profile-name-en"
+          />
+        </Field>
+        <Field label={`${t('common.name')} (AR)`}>
+          <input
+            className="oryx-input"
+            value={form.fullNameAr}
+            onChange={(e) => setForm({ ...form, fullNameAr: e.target.value })}
+            data-testid="edit-profile-name-ar"
+          />
+        </Field>
+        <Field label={t('users.nationalId')}>
+          <input
+            className="oryx-input"
+            value={form.nationalId}
+            onChange={(e) => setForm({ ...form, nationalId: e.target.value })}
+            data-testid="edit-profile-national-id"
+          />
+        </Field>
+        <Field label={t('users.nationality')}>
+          <input
+            className="oryx-input"
+            value={form.nationality}
+            onChange={(e) => setForm({ ...form, nationality: e.target.value })}
+            data-testid="edit-profile-nationality"
+          />
+        </Field>
+        <Field label={t('users.address')}>
+          <input
+            className="oryx-input"
+            value={form.address}
+            onChange={(e) => setForm({ ...form, address: e.target.value })}
+            data-testid="edit-profile-address"
+          />
+        </Field>
+      </div>
     </Modal>
   );
 }

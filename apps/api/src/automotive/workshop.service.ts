@@ -200,18 +200,87 @@ export class WorkshopService {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-    const where = { companyId, ...(query.status ? { status: query.status as never } : {}), ...(query.vehicleId ? { vehicleId: query.vehicleId } : {}) };
+    const where = {
+      companyId,
+      ...(query.status ? { status: query.status as never } : {}),
+      ...(query.vehicleId ? { vehicleId: query.vehicleId } : {}),
+      ...(query.search
+        ? {
+            OR: [
+              { jobNumber: { contains: query.search, mode: 'insensitive' as const } },
+              { complaint: { contains: query.search, mode: 'insensitive' as const } },
+              { vehicle: { vin: { contains: query.search, mode: 'insensitive' as const } } },
+              { vehicle: { plateNumber: { contains: query.search, mode: 'insensitive' as const } } },
+            ],
+          }
+        : {}),
+    };
     const [rows, total] = await Promise.all([
       this.prisma.jobCard.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
-        include: { vehicle: { select: { vin: true, make: true, model: true, plateNumber: true } }, _count: { select: { labour: true, estimates: true, reservations: true } } },
+        include: {
+          vehicle: { select: { vin: true, make: true, model: true, plateNumber: true } },
+          _count: { select: { labour: true, estimates: true, reservations: true } },
+        },
       }),
       this.prisma.jobCard.count({ where }),
     ]);
-    return { items: rows.map(toJobCardDto), total, page, pageSize };
+    return { items: await this.decorateJobCards(rows), total, page, pageSize };
+  }
+
+  /**
+   * Resolve the customer and technician names for a page of job cards in two
+   * batched queries rather than joining per row. The JobCard model deliberately
+   * carries raw ids for these (no relation), so the names are looked up here.
+   */
+  private async decorateJobCards<T extends {
+    id: string;
+    jobNumber: string;
+    vehicleId: string;
+    customerId: string;
+    status: string;
+    technicianUserId: string | null;
+    odometer: number | null;
+    complaint: string | null;
+    diagnosis: string | null;
+    invoiceId: string | null;
+    vehicle?: { vin: string; make: string; model: string; plateNumber: string | null } | null;
+    _count?: { labour: number; estimates: number; reservations: number };
+    createdAt: Date;
+  }>(rows: T[]) {
+    const customerIds = [...new Set(rows.map((r) => r.customerId))];
+    const technicianIds = [...new Set(rows.map((r) => r.technicianUserId).filter((v): v is string => Boolean(v)))];
+    const [customers, technicians] = await Promise.all([
+      customerIds.length
+        ? this.prisma.customer.findMany({
+            where: { id: { in: customerIds } },
+            select: { id: true, nameEn: true, nameAr: true, phone: true },
+          })
+        : Promise.resolve([]),
+      technicianIds.length
+        ? this.prisma.user.findMany({
+            where: { id: { in: technicianIds } },
+            select: { id: true, fullNameEn: true, fullNameAr: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const customerById = new Map(customers.map((c) => [c.id, c]));
+    const technicianById = new Map(technicians.map((u) => [u.id, u]));
+    return rows.map((r) => {
+      const customer = customerById.get(r.customerId);
+      const technician = r.technicianUserId ? technicianById.get(r.technicianUserId) : undefined;
+      return {
+        ...toJobCardDto(r),
+        customerNameEn: customer?.nameEn ?? null,
+        customerNameAr: customer?.nameAr ?? null,
+        customerPhone: customer?.phone ?? null,
+        technicianNameEn: technician?.fullNameEn ?? null,
+        technicianNameAr: technician?.fullNameAr ?? null,
+      };
+    });
   }
 
   async getJobCard(id: string, principal: RequestPrincipal) {

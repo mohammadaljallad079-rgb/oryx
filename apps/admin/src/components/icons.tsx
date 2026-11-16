@@ -390,6 +390,12 @@ export const Icons = {
       <path d="M9.5 12h5" />
     </Base>
   ),
+  mail: (p: IconProps) => (
+    <Base {...p}>
+      <path d="M3.5 5.5h17v13h-17z" />
+      <path d="M3.5 6.5l8.5 6.5 8.5-6.5" />
+    </Base>
+  ),
 } as const;
 
 export type IconName = keyof typeof Icons;

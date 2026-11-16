@@ -165,7 +165,11 @@ function JobCardsTab({
 }) {
   const { t } = useUi();
   const [status, setStatus] = useState('');
-  const list = useAsync(() => api.jobCards(status ? { status } : {}), [status]);
+  const [search, setSearch] = useState('');
+  const list = useAsync(
+    () => api.jobCards({ ...(status ? { status } : {}), ...(search ? { search } : {}) }),
+    [status, search],
+  );
   const [open, setOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
 
@@ -176,6 +180,14 @@ function JobCardsTab({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <div className="flex flex-wrap items-center gap-3">
           <p className="oryx-panel-title m-0">{t('erp.automotive.jobCards')}</p>
+          <input
+            className="oryx-input"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={`${t('erp.automotive.jobNumber')} / ${t('erp.automotive.vehicle')}`}
+            aria-label={t('common.search')}
+            data-testid="job-search-filter"
+          />
           <select
             className="oryx-input"
             value={status}
@@ -190,6 +202,19 @@ function JobCardsTab({
               </option>
             ))}
           </select>
+          {search || status ? (
+            <Button
+              size="sm"
+              onClick={() => {
+                setSearch('');
+                setStatus('');
+              }}
+              data-testid="job-clear-filters"
+            >
+              <Icon name="refresh" size={14} />
+              {t('users.clearFilters')}
+            </Button>
+          ) : null}
         </div>
         {canManage ? (
           <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-job-card">
@@ -218,6 +243,8 @@ function JobCardsTab({
             <tr>
               <th>{t('erp.automotive.jobNumber')}</th>
               <th>{t('erp.automotive.vehicle')}</th>
+              <th>{t('erp.sales.customer')}</th>
+              <th>{t('erp.automotive.ws.technician')}</th>
               <th>{t('erp.automotive.complaint')}</th>
               <th>{t('erp.automotive.ws.diagnosis')}</th>
               <th>{t('common.status')}</th>
@@ -227,13 +254,23 @@ function JobCardsTab({
           <tbody>
             {rows.map((j: JobCardDto) => (
               <tr key={j.id} data-testid={`job-row-${j.jobNumber}`}>
-                <td className="font-mono text-[12px]">{j.jobNumber}</td>
+                <td className="font-mono text-[12px]">
+                  {j.jobNumber}
+                  <span className="oryx-faint block text-[11px]">{j.createdAt.slice(0, 10)}</span>
+                </td>
                 <td className="text-[12.5px]">
                   {j.make} {j.model}
                   <span className="oryx-faint block font-mono text-[11px]">{j.plateNumber ?? j.vin}</span>
                 </td>
-                <td className="max-w-[220px] text-[12.5px]">{j.complaint ?? '—'}</td>
-                <td className="max-w-[220px] text-[12.5px]">{j.diagnosis ?? '—'}</td>
+                <td className="text-[12.5px]">
+                  {j.customerNameEn ?? '—'}
+                  {j.customerPhone ? (
+                    <span className="oryx-faint block font-mono text-[11px]">{j.customerPhone}</span>
+                  ) : null}
+                </td>
+                <td className="text-[12.5px]">{j.technicianNameEn ?? '—'}</td>
+                <td className="max-w-[200px] text-[12.5px]">{j.complaint ?? '—'}</td>
+                <td className="max-w-[200px] text-[12.5px]">{j.diagnosis ?? '—'}</td>
                 <td>
                   <StatusBadge status={j.status} label={t(`erp.automotive.ws.jobStatus.${j.status}`)} />
                 </td>
@@ -1081,9 +1118,37 @@ function CreateJobCardModal({
   onCreated: () => Promise<void>;
 }) {
   const { t } = useUi();
+  const { companyId } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ vehicleId: '', complaint: '', odometer: '', bayId: '' });
+  const [form, setForm] = useState({
+    vehicleId: '',
+    complaint: '',
+    diagnosis: '',
+    odometer: '',
+    bayId: '',
+    technicianUserId: '',
+    branchId: '',
+  });
+  const branches = useAsync(
+    () => (companyId ? api.listBranches(companyId, { pageSize: 100 }) : Promise.resolve(null)),
+    [companyId],
+  );
+  const technicians = useAsync(
+    () => (companyId ? api.listUsers(companyId, { pageSize: 100 }).catch(() => null) : Promise.resolve(null)),
+    [companyId],
+  );
+
+  const reset = () =>
+    setForm({
+      vehicleId: '',
+      complaint: '',
+      diagnosis: '',
+      odometer: '',
+      bayId: '',
+      technicianUserId: '',
+      branchId: '',
+    });
 
   const submit = async () => {
     setBusy(true);
@@ -1092,11 +1157,14 @@ function CreateJobCardModal({
       await api.createJobCard({
         vehicleId: form.vehicleId,
         complaint: form.complaint || undefined,
+        diagnosis: form.diagnosis || undefined,
         odometer: form.odometer ? Number(form.odometer) : undefined,
         bayId: form.bayId || undefined,
+        technicianUserId: form.technicianUserId || undefined,
+        branchId: form.branchId || undefined,
       });
       await onCreated();
-      setForm({ vehicleId: '', complaint: '', odometer: '', bayId: '' });
+      reset();
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
@@ -1135,23 +1203,62 @@ function CreateJobCardModal({
             testId="job-vehicle"
           />
         </Field>
+        <Field label={t('erp.automotive.ws.technician')}>
+          <select
+            className="oryx-input"
+            value={form.technicianUserId}
+            onChange={(e) => setForm({ ...form, technicianUserId: e.target.value })}
+            data-testid="job-technician"
+          >
+            <option value="">{t('common.select')}</option>
+            {(technicians.data?.items ?? []).map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.fullNameEn || u.email}
+              </option>
+            ))}
+          </select>
+        </Field>
         <Field label={t('erp.automotive.ws.bay')}>
           <BaySelect value={form.bayId || null} onChange={(v) => setForm({ ...form, bayId: v ?? '' })} testId="job-bay" />
+        </Field>
+        <Field label={t('erp.automotive.branch')}>
+          <select
+            className="oryx-input"
+            value={form.branchId}
+            onChange={(e) => setForm({ ...form, branchId: e.target.value })}
+            data-testid="job-branch"
+          >
+            <option value="">{t('common.select')}</option>
+            {(branches.data?.items ?? []).map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.nameEn}
+              </option>
+            ))}
+          </select>
         </Field>
         <Field label={t('erp.automotive.odometer')}>
           <input
             className="oryx-input"
+            inputMode="numeric"
             value={form.odometer}
             onChange={(e) => setForm({ ...form, odometer: e.target.value })}
             data-testid="job-odometer"
           />
         </Field>
         <Field label={t('erp.automotive.complaint')}>
-          <input
-            className="oryx-input"
+          <textarea
+            className="oryx-input min-h-[70px]"
             value={form.complaint}
             onChange={(e) => setForm({ ...form, complaint: e.target.value })}
             data-testid="job-complaint"
+          />
+        </Field>
+        <Field label={t('erp.automotive.ws.diagnosis')}>
+          <textarea
+            className="oryx-input min-h-[70px]"
+            value={form.diagnosis}
+            onChange={(e) => setForm({ ...form, diagnosis: e.target.value })}
+            data-testid="job-diagnosis"
           />
         </Field>
       </div>

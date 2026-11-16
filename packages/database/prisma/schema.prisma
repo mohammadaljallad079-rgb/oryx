@@ -340,6 +340,13 @@ model User {
   passwordHash              String
   fullNameEn                String
   fullNameAr                String
+  /**
+   * Identity and contact details captured when staff create a user directly.
+   * All optional so existing accounts and invitations remain valid.
+   */
+  nationalId                String?
+  nationality               String?
+  address                   String?
   status                    UserStatus @default(INVITED)
   isSuperAdmin              Boolean    @default(false)
   preferredLocale           Locale     @default(ar)

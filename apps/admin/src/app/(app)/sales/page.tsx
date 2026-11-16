@@ -45,6 +45,13 @@ import { DocumentActions } from '@/components/document-actions';
 
 type Tab = 'invoices' | 'orders' | 'quotations' | 'credit-notes' | 'pos' | 'customers';
 
+/** Localise a sales document status, never printing the raw enum in the UI. */
+function salesStatusLabel(status: string, t: (k: string) => string): string {
+  const key = `erp.sales.invoiceStatus.${status}`;
+  const label = t(key);
+  return label === key ? status : label;
+}
+
 interface LineDraft {
   productId: string;
   description: string;
@@ -905,7 +912,12 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
   const [editingInvoice, setEditingInvoice] = useState<SalesDocumentDto | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [creditNoteSource, setCreditNoteSource] = useState<SalesDocumentDto | null>(null);
-  const list = useAsync(() => api.salesInvoices({ page: 1 }), []);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [customerFilter, setCustomerFilter] = useState('');
+  const list = useAsync(
+    () => api.salesInvoices({ page: 1, ...(statusFilter ? { status: statusFilter } : {}), ...(customerFilter ? { customerId: customerFilter } : {}) }),
+    [statusFilter, customerFilter],
+  );
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
@@ -919,6 +931,51 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
           <Button variant="primary" size="sm" onClick={() => { setEditingInvoice(null); setOpen(true); }} data-testid="new-invoice">
             <Icon name="plus" size={16} />
             {t('erp.sales.newInvoice')}
+          </Button>
+        ) : null}
+      </div>
+      <div className="flex flex-wrap items-end gap-3 border-b border-[var(--border)] px-4 py-3" data-testid="invoice-filters">
+        <Field label={t('erp.sales.invoiceStatus')}>
+          <select
+            className="oryx-input"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            data-testid="invoice-status-filter"
+          >
+            <option value="">{t('users.allStatuses')}</option>
+            <option value="DRAFT">{t('erp.sales.invoiceStatus.DRAFT')}</option>
+            <option value="POSTED">{t('erp.sales.invoiceStatus.POSTED')}</option>
+            <option value="PARTIALLY_PAID">{t('erp.sales.invoiceStatus.PARTIALLY_PAID')}</option>
+            <option value="PAID">{t('erp.sales.invoiceStatus.PAID')}</option>
+            <option value="VOID">{t('erp.sales.invoiceStatus.VOID')}</option>
+          </select>
+        </Field>
+        <Field label={t('erp.sales.filterByCustomer')}>
+          <select
+            className="oryx-input"
+            value={customerFilter}
+            onChange={(e) => setCustomerFilter(e.target.value)}
+            data-testid="invoice-customer-filter"
+          >
+            <option value="">{t('common.all')}</option>
+            {(customers.data?.items ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nameEn || c.nameAr}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {statusFilter || customerFilter ? (
+          <Button
+            size="sm"
+            onClick={() => {
+              setStatusFilter('');
+              setCustomerFilter('');
+            }}
+            data-testid="invoice-clear-filters"
+          >
+            <Icon name="refresh" size={14} />
+            {t('users.clearFilters')}
           </Button>
         ) : null}
       </div>
@@ -949,7 +1006,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{inv.customerNameEn}</td>
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(inv.totalMinor, inv.currency)}</td>
                 <td className="tabular-nums text-[12.5px]">{money(inv.outstandingMinor ?? 0, inv.currency)}</td>
-                <td><StatusBadge status={inv.status} label={inv.status} /></td>
+                <td><StatusBadge status={inv.status} label={salesStatusLabel(inv.status, t)} /></td>
                 <td>
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     {canManage && inv.status === 'DRAFT' ? (
@@ -1125,7 +1182,7 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{o.orderDate?.slice(0, 10)}</td>
                 <td className="text-[12.5px]">{o.customerNameEn}</td>
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(o.totalMinor, o.currency)}</td>
-                <td><StatusBadge status={o.status} label={o.status} /></td>
+                <td><StatusBadge status={o.status} label={salesStatusLabel(o.status, t)} /></td>
                 <td>
                   <DocumentActions
                     sourceType="SalesOrder"

@@ -304,6 +304,9 @@ export interface UserDto {
   email: string;
   fullNameEn: string;
   fullNameAr: string;
+  nationalId: string | null;
+  nationality: string | null;
+  address: string | null;
   status: UserStatus;
   isSuperAdmin: boolean;
   preferredLocale: 'ar' | 'en';
@@ -1604,6 +1607,11 @@ export interface JobCardDto {
   complaint: string | null;
   diagnosis: string | null;
   invoiceId: string | null;
+  customerNameEn: string | null;
+  customerNameAr: string | null;
+  customerPhone: string | null;
+  technicianNameEn: string | null;
+  technicianNameAr: string | null;
   labourCount?: number;
   estimateCount?: number;
   reservationCount?: number;
