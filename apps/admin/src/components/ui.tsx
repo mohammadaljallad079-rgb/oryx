@@ -399,6 +399,7 @@ export interface SearchableOption {
   /** Optional secondary text shown under the label (a code, a phone number). */
   hint?: string;
   disabled?: boolean;
+  data?: Record<string, unknown>;
 }
 
 /**
@@ -417,6 +418,10 @@ export function SearchableSelect({
   ariaLabel,
   onCreateNew,
   createLabel,
+  create,
+  onSearch,
+  loading = false,
+  onSelectData,
 }: {
   value: string | null;
   options: SearchableOption[];
@@ -427,6 +432,14 @@ export function SearchableSelect({
   disabled?: boolean;
   testId?: string;
   ariaLabel?: string;
+  create?: {
+    actionLabel: string;
+    fields: Array<{ key: string; label: string; required?: boolean; placeholder?: string }>;
+    onSubmit: (values: Record<string, string>) => Promise<string>;
+  };
+  onSearch?: (value: string) => void;
+  loading?: boolean;
+  onSelectData?: (data: Record<string, unknown>) => void;
   /**
    * When set, a "+ Add new" action is shown inside the popover. It opens the
    * record's own create form over the current one; on success the caller
@@ -438,6 +451,10 @@ export function SearchableSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createValues, setCreateValues] = useState<Record<string, string>>({});
+  const [createError, setCreateError] = useState('');
+  const [creating, setCreating] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -467,6 +484,8 @@ export function SearchableSelect({
 
   const pick = (next: string | null) => {
     onChange(next);
+    const option = options.find((o) => o.value === next);
+    if (option?.data && onSelectData) onSelectData(option.data as Record<string, unknown>);
     setOpen(false);
     setQuery('');
   };
@@ -496,7 +515,10 @@ export function SearchableSelect({
             autoFocus
             className="oryx-input mb-2"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              onSearch?.(e.target.value);
+            }}
             placeholder={placeholder}
             data-testid={testId ? `${testId}-search` : undefined}
           />
@@ -513,7 +535,7 @@ export function SearchableSelect({
                 {emptyLabel}
               </button>
             ) : null}
-            {onCreateNew ? (
+            {(onCreateNew || create) ? (
               <button
                 type="button"
                 className="mb-1 flex w-full items-center gap-2 rounded-lg border border-dashed border-[var(--border-strong)] px-3 py-2 text-start text-[12.5px] font-semibold"
@@ -522,15 +544,18 @@ export function SearchableSelect({
                   e.preventDefault();
                   setOpen(false);
                   setQuery('');
-                  onCreateNew();
+                  onCreateNew?.();
+                  if (create) setCreateOpen(true);
                 }}
                 data-testid={testId ? `${testId}-create` : undefined}
               >
                 <Icon name="plus" size={14} />
-                {createLabel ?? '+ Add new'}
+                {createLabel ?? create?.actionLabel ?? '+ Add new'}
               </button>
             ) : null}
-            {filtered.length === 0 ? (
+            {loading ? (
+              <p className="oryx-faint m-0 px-3 py-2 text-[12px]">Loading…</p>
+            ) : filtered.length === 0 ? (
               <p className="oryx-faint m-0 px-3 py-2 text-[12px]">—</p>
             ) : (
               filtered.map((o) => (
@@ -556,6 +581,52 @@ export function SearchableSelect({
             )}
           </div>
         </div>
+      ) : null}
+      {createOpen && create ? (
+        <Modal
+          open
+          title={create.actionLabel}
+          onClose={() => setCreateOpen(false)}
+          footer={
+            <div className="flex justify-end gap-2">
+              <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
+              <Button
+                variant="primary"
+                disabled={creating || create.fields.some((f) => f.required !== false && !createValues[f.key]?.trim())}
+                onClick={async () => {
+                  setCreating(true);
+                  setCreateError('');
+                  try {
+                    const id = await create.onSubmit(createValues);
+                    setCreateOpen(false);
+                    setCreateValues({});
+                    pick(id);
+                  } catch (error) {
+                    setCreateError(error instanceof Error ? error.message : 'Could not create record');
+                  } finally {
+                    setCreating(false);
+                  }
+                }}
+              >
+                {creating ? 'Saving…' : 'Save'}
+              </Button>
+            </div>
+          }
+        >
+          {createError ? <ErrorBanner message={createError} /> : null}
+          <div className="grid gap-3">
+            {create.fields.map((field) => (
+              <Field key={field.key} label={field.label} required={field.required !== false}>
+                <input
+                  className="oryx-input"
+                  value={createValues[field.key] ?? ''}
+                  placeholder={field.placeholder}
+                  onChange={(e) => setCreateValues((v) => ({ ...v, [field.key]: e.target.value }))}
+                />
+              </Field>
+            ))}
+          </div>
+        </Modal>
       ) : null}
     </div>
   );
