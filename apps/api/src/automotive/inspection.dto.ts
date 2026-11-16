@@ -170,9 +170,15 @@ export class ChassisRegionInputDto {
   @IsOptional() @IsString() @MaxLength(500) note?: string;
 }
 
-/** Add one computer-unit diagnostic entry. */
+/**
+ * Add one computer-unit diagnostic entry.
+ *
+ * The module name and fault code are accepted but optional: the inspection form
+ * no longer collects them, while a stored entry or an external caller may still
+ * carry them.
+ */
 export class CreateDiagnosticEntryDto {
-  @IsString() @MinLength(1) @MaxLength(120) module!: string;
+  @IsOptional() @IsString() @MaxLength(120) module?: string;
   @IsOptional() @IsString() @MaxLength(40) faultCode?: string;
   @IsString() @MinLength(1) @MaxLength(2000) description!: string;
   @IsOptional() @IsString() @MaxLength(2000) observation?: string;

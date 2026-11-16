@@ -434,11 +434,11 @@ export function inspectionGroupPage(
     ? `<figure class="interior-art"><img src="${INTERIOR_DIAGRAM_DATA_URI}" alt=""></figure>`
     : '';
 
-  // The approved sheet prints three separate remark blocks in the left column
-  // beneath the exterior checklist: the general inspection remarks, the
-  // additional exterior inspection remarks, and the final result and technical
-  // assessment. They are three stored fields, so each prints under its own
-  // heading rather than being merged into one.
+  // The approved sheet prints a single remarks box in the left column beneath
+  // the exterior checklist. It carries the inspection's one optional notes
+  // field; the former "additional exterior remarks" and "final assessment"
+  // blocks were duplicate surfaces for the same note and are no longer offered
+  // on screen, so they are no longer printed either.
   const remarkBlock = (titleAr: string, titleEn: string, body: string | null): string =>
     body
       ? `<div class="grp remark-block">
@@ -447,19 +447,11 @@ export function inspectionGroupPage(
       </div>`
       : '';
 
-  const remarks = [
-    remarkBlock('الملاحظات والتعليقات العامة', 'General Inspection Remarks', input.payload.generalRemarks),
-    remarkBlock(
-      'ملاحظات الفحص الخارجي الإضافية',
-      'Additional Exterior Inspection Remarks',
-      input.payload.exteriorRemarks,
-    ),
-    remarkBlock(
-      'النتيجة النهائية والتقييم العام للفحص الفني',
-      'Final Result &amp; General Assessment',
-      input.payload.finalAssessment,
-    ),
-  ].join('');
+  const remarks = remarkBlock(
+    'الملاحظات والتعليقات العامة',
+    'General Inspection Remarks',
+    input.payload.generalRemarks,
+  );
 
   const cabin = `
   <div class="grp cabin">
@@ -680,7 +672,7 @@ function diagnosticSection(section: InspectionReportSection | undefined): string
     <table class="diag-table">
       <thead>
         <tr>
-          <th>#</th><th>الوحدة / Module</th><th>الرمز / Code</th>
+          <th>#</th>
           <th>الوصف / Description</th><th>الملاحظة / Observation</th><th>الأهمية / Severity</th>
         </tr>
       </thead>
@@ -690,8 +682,6 @@ function diagnosticSection(section: InspectionReportSection | undefined): string
             (d, i) => `
         <tr>
           <td class="num">${i + 1}</td>
-          <td>${esc(d.module)}</td>
-          <td class="num">${esc(orDash(d.faultCode))}</td>
           <td>${esc(d.description)}</td>
           <td>${esc(orDash(d.observation))}</td>
           <td><span class="sev sev-${d.severity.toLowerCase()}">${esc(d.severity)}</span></td>

@@ -148,8 +148,11 @@ export interface DashboardTile {
   descriptionAr: string;
   route: string;
   tileImage: string;
+  icon: string;
   status: string;
   available: boolean;
+  /** False when a platform operator has retired the module. */
+  isActive: boolean;
 }
 
 export interface DashboardResponse {
@@ -176,6 +179,78 @@ export interface DashboardResponse {
   tiles: DashboardTile[];
 }
 
+// ------------------------------------------------- per-module dashboard (Ex. 20)
+
+/** One headline figure on a module dashboard. Every value is a real DB aggregate. */
+export interface ModuleSummaryStat {
+  key: string;
+  labelEn: string;
+  labelAr: string;
+  value: number;
+  /** `count` renders as an integer, `money` as minor-unit currency, `percent` with a % sign. */
+  format: 'count' | 'money' | 'percent';
+  /** ISO code for a `money` stat; the company's currency. */
+  currency?: string;
+  tone?: 'default' | 'gold' | 'success' | 'danger';
+  icon?: string;
+}
+
+/** A primary operation offered as a jump on the module dashboard. */
+export interface ModuleSummaryShortcut {
+  labelEn: string;
+  labelAr: string;
+  route: string;
+  icon: string;
+  /** The permission that gates the shortcut; the UI hides it when it is absent. */
+  permission: string;
+}
+
+/** A main functional area of the module, rendered as a card on its dashboard. */
+export interface ModuleSummaryFunction {
+  labelEn: string;
+  labelAr: string;
+  route: string;
+  icon: string;
+  permission: string;
+  /** Optional one-line description of what the area covers. */
+  descriptionEn?: string;
+  descriptionAr?: string;
+}
+
+export interface ModuleSummaryActivity {
+  id: string;
+  action: string;
+  actorEmail: string | null;
+  targetType: string;
+  targetId: string | null;
+  createdAt: string;
+}
+
+export interface ModuleSummaryDto {
+  moduleKey: string;
+  nameEn: string;
+  nameAr: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  group: string;
+  icon: string;
+  tileImage: string;
+  route: string;
+  scope: {
+    companyId: string;
+    companyNameEn: string;
+    companyNameAr: string;
+    branchId: string | null;
+    currency: string;
+  };
+  isDemoData: boolean;
+  stats: ModuleSummaryStat[];
+  shortcuts: ModuleSummaryShortcut[];
+  /** The module's main functional areas, shown as cards beneath the shortcuts. */
+  functions: ModuleSummaryFunction[];
+  activity: ModuleSummaryActivity[];
+}
+
 export interface ModuleDto {
   id: string;
   key: string;
@@ -185,11 +260,14 @@ export interface ModuleDto {
   descriptionAr: string;
   group: string;
   icon: string;
+  tileImage: string | null;
   route: string;
   status: string;
   deliveryPhase: string;
   readPermission: string;
   writePermission: string | null;
+  sortOrder: number;
+  isActive: boolean;
 }
 
 export interface PlanModuleDto {
@@ -307,6 +385,7 @@ export interface UserDto {
   nationalId: string | null;
   nationality: string | null;
   address: string | null;
+  phone: string | null;
   status: UserStatus;
   isSuperAdmin: boolean;
   preferredLocale: 'ar' | 'en';
@@ -827,12 +906,24 @@ export interface CustomerDto {
   code: string;
   nameEn: string;
   nameAr: string;
+  /** Individual or company. Drives which form the UI shows; both share this row. */
+  kind: CustomerKind;
   email: string | null;
   phone: string | null;
   taxNumber: string | null;
   addressLine: string | null;
   city: string | null;
   countryCode: string | null;
+  /** Individual: national id / personal number. */
+  nationalId: string | null;
+  /** Company: commercial registration number and expiry. */
+  crNumber: string | null;
+  crExpiryDate: string | null;
+  website: string | null;
+  contactPersonName: string | null;
+  contactPersonPhone: string | null;
+  /** Head-office customer a secondary branch rolls up to; null for a head office. */
+  parentCustomerId: string | null;
   /** Lead-source catalogue id and the resolved bilingual label. */
   sourceId: string | null;
   sourceNameEn: string | null;
@@ -859,6 +950,25 @@ export interface AccountStatementRowDto {
 }
 
 /** A document reference attached to a customer record. */
+export type CustomerKind = 'INDIVIDUAL' | 'COMPANY';
+
+/** A secondary branch of a company customer. */
+export interface CustomerBranchDto {
+  id: string;
+  customerId: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  contactName: string | null;
+  phone: string | null;
+  email: string | null;
+  addressLine: string | null;
+  city: string | null;
+  countryCode: string | null;
+  isActive: boolean;
+  notes: string | null;
+}
+
 export interface CustomerAttachmentDto {
   id: string;
   companyId: string;
@@ -941,6 +1051,9 @@ export interface SalesDocumentDto {
   outstandingMinor?: number;
   currency: string;
   notes: string | null;
+  /** How a return's credited amount is given back (returns only). */
+  refundMethod?: 'CREDIT_ACCOUNT' | 'CASH' | 'BANK_TRANSFER' | 'CARD';
+  restockInventory?: boolean;
   journalEntryId?: string | null;
   warehouseId?: string | null;
   paymentMethod?: string;
@@ -2099,7 +2212,8 @@ export interface InspectionChassisRegionDto {
 
 export interface InspectionDiagnosticEntryDto {
   id: string;
-  module: string;
+  /** Optional: entries created before the form stopped asking for it. */
+  module: string | null;
   faultCode: string | null;
   description: string;
   observation: string | null;

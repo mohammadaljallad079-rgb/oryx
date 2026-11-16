@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { fromMinor, currencyScale, currencySymbol, type PrintDocumentDto, type PrintDocumentKind, type PrintPartyDto, type PrintVerificationDto } from '@oryx/shared';
+import { fromMinor, currencyScale, currencySymbol, withDefaults, type PrintDocumentDto, type PrintDocumentKind, type PrintPartyDto, type PrintVerificationDto } from '@oryx/shared';
 import { notFound, ERROR_CODES } from '../common/errors';
 import { ErpContextService } from '../common/erp-context.service';
 import { PrismaService } from '../common/prisma.service';
@@ -109,24 +109,33 @@ export class PrintService {
     });
     if (!company) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Company not found.');
 
-    // The footer's legal line prints the registered address, so it resolves the
-    // same way the API-rendered document does (`DocumentsService.issuerFor`):
-    // the operator-entered branch address wins, and the branch supplies the city
-    // that sits between the street address and the CR number.
+    // The printed identity follows the same precedence as the API-rendered
+    // document (`DocumentsService.issuerFor`): the Settings → General section is
+    // authoritative, then the branding panel, then the company row and its first
+    // active branch. The footer's legal line prints the registered address, so
+    // the branch supplies the city that sits between the street address and the
+    // CR number when settings do not override it.
+    const generalRow = await this.prisma.companySetting.findUnique({
+      where: { companyId_section: { companyId, section: 'general' } },
+    });
+    const general = withDefaults('general', generalRow?.value);
+    const pick = (...values: Array<string | null | undefined>): string | null =>
+      values.find((v) => typeof v === 'string' && v.trim().length > 0)?.trim() ?? null;
+
     const branch = company.branches[0];
     const meta = {
-      nameEn: company.nameEn,
-      nameAr: company.nameAr,
-      legalNameEn: company.legalNameEn,
-      taxNumber: company.taxNumber,
-      currency: company.currency,
-      countryCode: company.countryCode,
-      phone: company.phone,
-      email: company.email,
-      website: company.website,
-      addressLine: branch?.addressLine || company.addressLine,
-      city: branch?.city ?? null,
-      crNumber: company.crNumber,
+      nameEn: pick(general.nameEn, company.nameEn) ?? company.nameEn,
+      nameAr: pick(general.nameAr, company.nameAr) ?? company.nameAr,
+      legalNameEn: pick(general.tradeNameEn, company.legalNameEn),
+      taxNumber: pick(general.taxNumber, company.taxNumber),
+      currency: pick(general.currency, company.currency) ?? company.currency,
+      countryCode: pick(general.countryCode, company.countryCode),
+      phone: pick(general.phone, company.phone),
+      email: pick(general.email, company.email),
+      website: pick(general.website, company.website),
+      addressLine: pick(general.addressLine, branch?.addressLine, company.addressLine),
+      city: pick(general.city, branch?.city),
+      crNumber: pick(general.crNumber, company.crNumber),
     };
 
     switch (kind) {

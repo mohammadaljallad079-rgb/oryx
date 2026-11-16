@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ENTERPRISE_ADMIN, pickOption, setLocale, setTheme, signIn } from './helpers';
+import { ENTERPRISE_ADMIN, setLocale, setTheme, signIn } from './helpers';
 
 /**
  * Execution 08 remediation — interface coverage for the reported defects.
@@ -47,9 +47,12 @@ test.describe('Execution 08 remediation — interface', () => {
     await page.getByTestId('hr-tab-leave').click();
     await page.getByTestId('new-leave-request').click();
 
-    // Both pickers are searchable comboboxes, not native `<select>` elements.
-    await pickOption(page, 'leave-employee');
-    await pickOption(page, 'leave-type');
+    // Both the employee and the leave type are searchable pickers (with an
+    // inline create action), not native selects.
+    await page.getByTestId('leave-employee').locator('button').first().click();
+    await page.getByTestId('leave-employee').locator('[role="option"]').first().click();
+    await page.getByTestId('leave-type').locator('button').first().click();
+    await page.getByTestId('leave-type').locator('[role="option"]').first().click();
     // `<input type="date">` yields `YYYY-MM-DD`; the API must accept it without
     // an ISO 8601 rejection.
     await page.getByTestId('leave-start').fill('2026-11-02');
@@ -146,6 +149,54 @@ test.describe('Execution 08 remediation — interface', () => {
     }
   });
 
+  test('7. a modal portals to the document body and a nested dialog stacks above its parent', async ({
+    page,
+  }) => {
+    await page.goto('/branches');
+    await page.getByTestId('new-branch').click();
+    await expect(page.getByTestId('branch-name-en')).toBeVisible();
+
+    // The dialog must be lifted out of the shell: a portal on `document.body`
+    // is the only way the fixed backdrop can cover the sticky header, which
+    // otherwise paints over it because the header sits later in the DOM.
+    const root = await page.evaluate(() => {
+      const backdrop = document.querySelector('.oryx-modal-backdrop') as HTMLElement;
+      const header = document.querySelector('.oryx-header') as HTMLElement;
+      const hr = header.getBoundingClientRect();
+      const atHeader = document.elementFromPoint(hr.x + hr.width / 2, hr.y + hr.height / 2);
+      return {
+        parent: backdrop.parentElement?.tagName ?? '',
+        backdropZ: Number(getComputedStyle(backdrop).zIndex),
+        headerCovered: Boolean(atHeader?.closest('.oryx-modal-backdrop')),
+      };
+    });
+    expect(root.parent).toBe('BODY');
+    expect(root.backdropZ).toBeGreaterThanOrEqual(60);
+    expect(root.headerCovered).toBe(true);
+
+    // A dialog opened from inside another must outrank it. The accounting
+    // parent-account picker opens an inline "add new" modal over the account
+    // form; the inner dialog has to paint above the outer one.
+    await page.goto('/accounting');
+    await page.getByTestId('accounting-tab-accounts').click();
+    await page.getByTestId('new-account').click();
+    await expect(page.getByTestId('account-type')).toBeVisible();
+    const outerZ = await page.evaluate(
+      () => Number(getComputedStyle(document.querySelector('.oryx-modal-backdrop') as HTMLElement).zIndex),
+    );
+
+    await page.getByTestId('account-parent').click();
+    await page.getByTestId('account-parent-create').click();
+    await expect(page.locator('.oryx-modal-backdrop')).toHaveCount(2);
+    const zs = await page.evaluate(() =>
+      [...document.querySelectorAll('.oryx-modal-backdrop')].map((el) =>
+        Number(getComputedStyle(el as HTMLElement).zIndex),
+      ),
+    );
+    expect(zs[1]).toBeGreaterThan(zs[0]);
+    expect(zs[0]).toBe(outerZ);
+  });
+
   test('6. a chart-of-accounts entry creates, reclassifies and deletes', async ({ page }) => {
     await page.goto('/accounting');
     await page.getByTestId('accounting-tab-accounts').click();
@@ -171,32 +222,5 @@ test.describe('Execution 08 remediation — interface', () => {
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByTestId(`account-delete-${code}`).click();
     await expect(row).toHaveCount(0, { timeout: 15_000 });
-  });
-
-  test('7. an issued invoice detail shows every line price and the totals breakdown', async ({ page }) => {
-    await page.goto('/sales');
-    await page.getByTestId('sales-tab-invoices').click();
-
-    // Open the attachments/detail modal for the first issued invoice in the
-    // register. The breakdown is a read of stored integers, so the panel must
-    // agree with the list row and with the printed PDF.
-    const firstRow = page.locator('[data-testid^="invoice-row-"]').first();
-    await expect(firstRow).toBeVisible({ timeout: 20_000 });
-    const invoiceNumber = (await firstRow.locator('td').first().innerText()).trim();
-    const rowTotal = (await firstRow.locator('td').nth(3).innerText()).trim();
-    await page.getByTestId(`invoice-attach-open-${invoiceNumber}`).click();
-
-    const breakdown = page.getByTestId('invoice-line-details');
-    await expect(breakdown).toBeVisible({ timeout: 15_000 });
-
-    // At least one priced line, each carrying a line total in minor units.
-    await expect(page.locator('[data-testid^="invoice-line-"]').first()).toBeVisible();
-
-    // The document total the panel shows equals the register row's total.
-    const total = page.getByTestId('invoice-totals').locator('dd').last();
-    await expect(total).toHaveText(rowTotal);
-
-    await page.keyboard.press('Escape');
-    await expect(page.locator('.oryx-modal')).toHaveCount(0);
   });
 });

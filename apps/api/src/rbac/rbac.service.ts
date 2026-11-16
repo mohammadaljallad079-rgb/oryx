@@ -283,20 +283,29 @@ export class RbacService {
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
 
-    const where = {
-      companyId,
-      ...(query.status ? { user: { status: query.status as never } } : {}),
-      ...(query.search
+    const search = query.search?.trim();
+    // The status and search conditions both target the related `user`, so they
+    // must be merged into a single filter object. Assigning them separately
+    // silently dropped whichever came second, which is why a status filter
+    // appeared to ignore the search box.
+    const userFilter = {
+      ...(query.status ? { status: query.status as never } : {}),
+      ...(search
         ? {
-            user: {
-              OR: [
-                { email: { contains: query.search, mode: 'insensitive' as const } },
-                { fullNameEn: { contains: query.search, mode: 'insensitive' as const } },
-                { fullNameAr: { contains: query.search } },
-              ],
-            },
+            OR: [
+              { email: { contains: search, mode: 'insensitive' as const } },
+              { fullNameEn: { contains: search, mode: 'insensitive' as const } },
+              { fullNameAr: { contains: search } },
+              { nationalId: { contains: search, mode: 'insensitive' as const } },
+              { nationality: { contains: search, mode: 'insensitive' as const } },
+              { phone: { contains: search } },
+            ],
           }
         : {}),
+    };
+    const where = {
+      companyId,
+      ...(Object.keys(userFilter).length > 0 ? { user: userFilter } : {}),
     };
 
     const [memberships, total] = await Promise.all([
@@ -323,6 +332,7 @@ export class RbacService {
         nationalId: m.user.nationalId,
         nationality: m.user.nationality,
         address: m.user.address,
+        phone: m.user.phone,
         status: m.user.status,
         isSuperAdmin: m.user.isSuperAdmin,
         preferredLocale: m.user.preferredLocale,
@@ -569,35 +579,34 @@ export class RbacService {
       if (existingMembership) {
         throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'That user is already a member of this company.');
       }
+      // The email already belongs to an account that is not a member of this
+      // company — in practice, a user of another tenant. Adding a membership to
+      // it must never mutate the account: overwriting the password would let a
+      // company administrator take over a sign-in that belongs to another
+      // company, and rewriting the profile would leak edits across the tenant
+      // boundary. The administrator must use the platform path for a shared
+      // identity, so this is refused outright.
+      throw conflict(
+        ERROR_CODES.RESOURCE_CONFLICT,
+        'That email already belongs to an account in another company; it cannot be taken over by adding a membership.',
+      );
     }
 
     const passwordHash = await AuthService.hashPassword(dto.password);
     const user = await this.prisma.$transaction(async (tx) => {
-      const created = existingUser
-        ? await tx.user.update({
-            where: { id: existingUser.id },
-            data: {
-              passwordHash,
-              status: 'ACTIVE',
-              fullNameEn: dto.fullNameEn,
-              fullNameAr: dto.fullNameAr,
-              nationalId: dto.nationalId ?? null,
-              nationality: dto.nationality ?? null,
-              address: dto.address ?? null,
-            },
-          })
-        : await tx.user.create({
-            data: {
-              email,
-              passwordHash,
-              status: 'ACTIVE',
-              fullNameEn: dto.fullNameEn,
-              fullNameAr: dto.fullNameAr,
-              nationalId: dto.nationalId ?? null,
-              nationality: dto.nationality ?? null,
-              address: dto.address ?? null,
-            },
-          });
+      const created = await tx.user.create({
+        data: {
+          email,
+          passwordHash,
+          status: 'ACTIVE',
+          fullNameEn: dto.fullNameEn,
+          fullNameAr: dto.fullNameAr,
+          nationalId: dto.nationalId ?? null,
+          nationality: dto.nationality ?? null,
+          address: dto.address ?? null,
+          phone: dto.phone ?? null,
+        },
+      });
 
       const membership = await tx.membership.create({
         data: { userId: created.id, companyId, roleId: role.id, invitedById: actor.userId },
@@ -626,6 +635,7 @@ export class RbacService {
       nationalId: user.nationalId,
       nationality: user.nationality,
       address: user.address,
+      phone: user.phone,
       status: user.status,
     };
   }
@@ -648,6 +658,7 @@ export class RbacService {
         ...(dto.nationalId !== undefined ? { nationalId: dto.nationalId || null } : {}),
         ...(dto.nationality !== undefined ? { nationality: dto.nationality || null } : {}),
         ...(dto.address !== undefined ? { address: dto.address || null } : {}),
+        ...(dto.phone !== undefined ? { phone: dto.phone || null } : {}),
       },
     });
 
@@ -668,6 +679,7 @@ export class RbacService {
       nationalId: updated.nationalId,
       nationality: updated.nationality,
       address: updated.address,
+      phone: updated.phone,
       status: updated.status,
     };
   }

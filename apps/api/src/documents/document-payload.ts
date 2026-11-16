@@ -74,8 +74,6 @@ export interface InspectionReportChassisRegion {
 }
 
 export interface InspectionReportDiagnostic {
-  module: string;
-  faultCode: string | null;
   description: string;
   observation: string | null;
   severity: 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { readFile } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
-import { basisPointsOfMinor, lineAmountMinor, toQuantity } from '@oryx/shared';
+import { basisPointsOfMinor, lineAmountMinor, toQuantity, withDefaults } from '@oryx/shared';
 import {
   CHASSIS_REGIONS,
   INSPECTION_SECTION_SPECS,
@@ -881,34 +881,48 @@ export class DocumentsService {
     // approved design, not a per-tenant preference.
     logoDataUri ??= await this.brandLogoDataUri();
 
-    // The document footer prints the issuer's contact details (see
-    // `footerTemplate`), so they must come from a real record. The branding
-    // panel owns the support phone/email/website; the physical address lives on
-    // the company's first active branch, which is where an operator enters it.
-    // Falling back to the branch phone keeps a tenant that only filled the
-    // branch record from printing an empty footer.
+    // The printed identity is the tenant's own configuration. The Settings →
+    // General section is the authoritative source an administrator edits; the
+    // company row and the first active branch are the fallback for a tenant that
+    // configured its identity before that section existed or through the older
+    // panel. A non-empty settings value always wins, so what the operator sees on
+    // the settings screen is exactly what is printed.
+    const generalRow = await this.prisma.companySetting.findUnique({
+      where: { companyId_section: { companyId, section: 'general' } },
+    });
+    const general = withDefaults('general', generalRow?.value);
+    const pick = (...values: Array<string | null | undefined>): string | null =>
+      values.find((v) => typeof v === 'string' && v.trim().length > 0)?.trim() ?? null;
+
     const branch = company.branches[0];
-    // The printed address is the issuer's registered address: prefer the
-    // operator-entered branch address, but fall back to the company's own record
-    // so a tenant that filled only the company keeps a real address in the
-    // footer instead of a bare city name.
-    const addressLine = branch?.addressLine || company.addressLine || null;
-    const city = branch?.city || null;
+    const addressLine = pick(general.addressLine, branch?.addressLine, company.addressLine);
+    const city = pick(general.city, branch?.city);
+    const phone = pick(general.phone, company.branding?.supportPhone, branch?.phone);
+    const email = pick(general.email, company.branding?.supportEmail);
+    const websiteUrl = pick(general.website, company.branding?.websiteUrl);
+    // The registered legal name and the VAT/CR numbers are identity fields, not
+    // contact details: they fall back to the company record the seed and the
+    // company panel write.
+    const nameEn = pick(general.nameEn, company.branding?.nameEn, company.nameEn) ?? company.nameEn;
+    const nameAr = pick(general.nameAr, company.branding?.nameAr, company.nameAr) ?? company.nameAr;
+    const legalNameEn = pick(general.tradeNameEn, company.legalNameEn);
+    const taxNumber = pick(general.taxNumber, company.taxNumber);
+    const crNumber = pick(general.crNumber, company.crNumber);
     return {
       companyId,
-      nameEn: company.branding?.nameEn ?? company.nameEn,
-      nameAr: company.branding?.nameAr ?? company.nameAr,
+      nameEn,
+      nameAr,
       code: company.code,
-      legalNameEn: company.legalNameEn,
-      taxNumber: company.taxNumber,
-      crNumber: company.crNumber,
+      legalNameEn,
+      taxNumber,
+      crNumber,
       addressLine,
       city,
-      countryCode: company.countryCode,
-      phone: company.branding?.supportPhone ?? branch?.phone ?? null,
-      email: company.branding?.supportEmail ?? null,
-      websiteUrl: company.branding?.websiteUrl ?? null,
-      currency: company.currency,
+      countryCode: pick(general.countryCode, company.countryCode),
+      phone,
+      email,
+      websiteUrl,
+      currency: pick(general.currency, company.currency) ?? company.currency,
       logoDataUri,
       primaryColor: company.branding?.primaryColor ?? null,
       accentColor: company.branding?.accentColor ?? null,
@@ -1001,8 +1015,6 @@ export class DocumentsService {
         markers: Array<{ condition: string; x: number; y: number; panelKey: string | null; note: string | null }>;
         chassisRegions: Array<{ regionKey: string; condition: string; note: string | null }>;
         diagnostics: Array<{
-          module: string;
-          faultCode: string | null;
           description: string;
           observation: string | null;
           severity: string;
@@ -1077,8 +1089,6 @@ export class DocumentsService {
           };
         }),
         diagnostics: (row?.diagnostics ?? []).map((d) => ({
-          module: d.module,
-          faultCode: d.faultCode,
           description: d.description,
           observation: d.observation,
           severity: d.severity as 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL',

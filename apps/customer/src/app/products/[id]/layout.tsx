@@ -1,4 +1,12 @@
+import type { Metadata } from 'next';
 import { IS_STATIC_PREVIEW, previewProductIds } from '@/lib/preview-data';
+import { JsonLd } from '@/components/json-ld';
+import {
+  SITE_URL,
+  productJsonLd,
+  publicFetch,
+  type CatalogProductLike,
+} from '@/lib/structured-data';
 
 /**
  * Enumerates the product pages the static export should generate.
@@ -15,6 +23,57 @@ export const generateStaticParams = IS_STATIC_PREVIEW
   ? () => previewProductIds().map((id) => ({ id }))
   : undefined;
 
-export default function ProductDetailLayout({ children }: { children: React.ReactNode }) {
-  return children;
+/**
+ * Per-product metadata and Product structured data.
+ *
+ * The page itself is a client component, so the crawler-facing tags are built
+ * here on the server from the same public endpoint the page uses. When the
+ * product cannot be read the title falls back to a generic one rather than
+ * failing the render.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const product = await publicFetch<CatalogProductLike>(
+    `/customer/catalog/products/${encodeURIComponent(id)}`,
+  );
+  const canonical = `/products/${id}`;
+  if (!product) {
+    return { title: 'Product', alternates: { canonical } };
+  }
+  const description = `${product.nameEn} — ${product.store?.name ?? 'ORYX'}. Available from ORYX Auto Services in Bahrain.`;
+  return {
+    title: product.nameEn || product.name,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      type: 'website',
+      title: product.nameEn || product.name,
+      description,
+      url: `${SITE_URL}${canonical}`,
+      images: product.imageUrl ? [{ url: product.imageUrl }] : undefined,
+    },
+  };
+}
+
+export default async function ProductDetailLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const product = await publicFetch<CatalogProductLike>(
+    `/customer/catalog/products/${encodeURIComponent(id)}`,
+  );
+  return (
+    <>
+      {product && <JsonLd data={productJsonLd(product)} />}
+      {children}
+    </>
+  );
 }

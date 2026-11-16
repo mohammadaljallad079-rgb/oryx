@@ -6,6 +6,8 @@ import { money } from '@/lib/erp-format';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
+import { EntityPicker } from '@/components/inline-create';
+import { MarketplaceProviderModal } from '@/components/entity-modals';
 import {
   Badge,
   Button,
@@ -14,7 +16,6 @@ import {
   ErrorBanner,
   Field,
   Modal,
-  SearchableSelect,
   SectionHeader,
   Skeleton,
   StatusBadge,
@@ -367,6 +368,7 @@ function ProviderModal({
 
 function RequestsTab({ canAssign }: { canAssign: boolean }) {
   const { t } = useUi();
+  const { can } = useAuth();
   const [status, setStatus] = useState('');
   const list = useAsync(() => api.serviceRequests({ status: status || undefined }), [status]);
   const providers = useAsync(() => api.marketplaceProviders({ status: 'APPROVED' }), []);
@@ -456,7 +458,7 @@ function RequestsTab({ canAssign }: { canAssign: boolean }) {
       >
         {error ? <ErrorBanner message={error} /> : null}
         <Field label={t('erp.providers.provider')} required>
-          <SearchableSelect
+          <EntityPicker
             value={providerId || null}
             options={(providers.data?.items ?? []).map((p) => ({
               value: (p as ProviderRow).id,
@@ -465,6 +467,17 @@ function RequestsTab({ canAssign }: { canAssign: boolean }) {
             onChange={(v) => setProviderId(v ?? '')}
             placeholder={t('common.select')}
             testId="assign-provider"
+            createLabel={t('erp.automotive.newProvider')}
+            reloadOptions={providers.reload}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <MarketplaceProviderModal
+                open
+                autoApprove={can('erp.marketplace.provider.manage')}
+                onClose={closeCreate}
+                onCreated={providers.reload}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
           />
         </Field>
       </Modal>

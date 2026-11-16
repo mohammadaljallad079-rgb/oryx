@@ -199,24 +199,15 @@ const DEMO_VEHICLES: Array<{
 
 
 async function seedModules() {
+  // Create-only: the module catalog is editable from the platform UI, so a
+  // reseed must not overwrite an operator's names, descriptions or artwork. A
+  // module that already exists is left exactly as it was.
+  let created = 0;
   for (const [index, m] of MODULES.entries()) {
-    await prisma.module.upsert({
-      where: { key: m.key },
-      update: {
-        nameEn: m.nameEn,
-        nameAr: m.nameAr,
-        descriptionEn: m.descriptionEn,
-        descriptionAr: m.descriptionAr,
-        group: m.group,
-        icon: m.icon,
-        route: m.route,
-        status: m.status,
-        deliveryPhase: m.deliveryPhase,
-        readPermission: m.readPermission,
-        writePermission: m.writePermission ?? null,
-        sortOrder: index,
-      },
-      create: {
+    const existing = await prisma.module.findUnique({ where: { key: m.key } });
+    if (existing) continue;
+    await prisma.module.create({
+      data: {
         key: m.key,
         nameEn: m.nameEn,
         nameAr: m.nameAr,
@@ -224,6 +215,7 @@ async function seedModules() {
         descriptionAr: m.descriptionAr,
         group: m.group,
         icon: m.icon,
+        tileImage: m.tileImage,
         route: m.route,
         status: m.status,
         deliveryPhase: m.deliveryPhase,
@@ -232,8 +224,9 @@ async function seedModules() {
         sortOrder: index,
       },
     });
+    created += 1;
   }
-  console.log(`  modules: ${MODULES.length} upserted`);
+  console.log(`  modules: ${created} created, ${MODULES.length - created} already present`);
 }
 
 async function seedPlans() {
@@ -634,6 +627,40 @@ async function seedCompanies(superAdminId: string) {
         },
       });
     }
+
+    // Mirror the identity into the Settings → General section, which the settings
+    // screen and the printed document read first. `update: {}` is deliberate: a
+    // re-seed must never clobber an operator's edits, so the row is only written
+    // when it does not exist yet. Only the approved values are set — a field with
+    // no known value stays blank rather than showing a placeholder.
+    await prisma.companySetting.upsert({
+      where: { companyId_section: { companyId: company.id, section: 'general' } },
+      update: {},
+      create: {
+        companyId: company.id,
+        section: 'general',
+        value: {
+          nameEn: spec.nameEn,
+          nameAr: spec.nameAr,
+          tradeNameEn: spec.legalNameEn ?? '',
+          tradeNameAr: '',
+          crNumber: spec.crNumber ?? '',
+          taxNumber: spec.taxNumber ?? '',
+          phone: spec.phone ?? spec.supportPhone ?? '',
+          email: spec.email ?? spec.supportEmail ?? '',
+          website: spec.website ?? spec.websiteUrl ?? '',
+          addressLine: spec.addressLine ?? '',
+          city: spec.branches[0]?.city ?? '',
+          countryCode: DEFAULT_COUNTRY_CODE,
+          currency: DEFAULT_CURRENCY,
+          timezone: 'Asia/Bahrain',
+          defaultLocale: 'ar',
+          dateFormat: 'dd/MM/yyyy',
+          numberFormat: '1,234.56',
+          logoUrl: '',
+        },
+      },
+    });
 
     for (const b of spec.branches) {
       await prisma.branch.upsert({

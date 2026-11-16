@@ -3,8 +3,11 @@
 import { useState } from 'react';
 import { api } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
+import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { PermissionGate } from '@/components/permission-gate';
+import { EntityPicker } from '@/components/inline-create';
+import { MarketplaceProviderModal } from '@/components/entity-modals';
 import {
   Badge,
   Button,
@@ -13,7 +16,6 @@ import {
   ErrorBanner,
   Field,
   Modal,
-  SearchableSelect,
   SectionHeader,
   Skeleton,
   StatusBadge,
@@ -31,6 +33,7 @@ import type { RecoveryRequestDto } from '@oryx/shared';
  */
 function RecoveryInner() {
   const { t } = useUi();
+  const { can } = useAuth();
   const [status, setStatus] = useState('');
   const [detail, setDetail] = useState<RecoveryRequestDto | null>(null);
   const [providerId, setProviderId] = useState('');
@@ -143,12 +146,23 @@ function RecoveryInner() {
             {detail.status === 'REQUESTED' ? (
               <div className="flex flex-col gap-2 border-t border-[var(--border)] pt-3">
                 <Field label={t('recovery.assignProvider')} hint={t('recovery.assignHint')}>
-                  <SearchableSelect
+                  <EntityPicker
                     value={providerId || null}
                     options={(providers.data?.items ?? []).map((p) => ({ value: p.id, label: p.nameEn }))}
                     onChange={(v) => setProviderId(v ?? '')}
                     placeholder={t('common.select')}
                     testId="recovery-provider"
+                    createLabel={t('erp.automotive.newProvider')}
+                    reloadOptions={providers.reload}
+                    renderCreate={({ onClose: closeCreate, onSaved }) => (
+                      <MarketplaceProviderModal
+                        open
+                        autoApprove={can('erp.marketplace.provider.manage')}
+                        onClose={closeCreate}
+                        onCreated={providers.reload}
+                        onSaved={(saved) => void onSaved(saved.id)}
+                      />
+                    )}
                   />
                 </Field>
                 <div>

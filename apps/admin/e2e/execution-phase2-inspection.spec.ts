@@ -268,8 +268,8 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     ]) {
       await page.getByTestId(`item-${key}-PASS`).click();
     }
-    await page.getByTestId('general-remarks').fill('Bodywork sound.');
-    await page.getByTestId('save-section').click();
+    await page.getByTestId('remarks-EXTERIOR').fill('Bodywork sound.');
+    await page.getByTestId('save-section-EXTERIOR').click();
 
     // The rail and the submit button both react to the saved state.
     await expect(page.getByTestId('inspection-rail-EXTERIOR')).toHaveAttribute('data-complete', 'true');
@@ -285,7 +285,7 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await expect(page.getByTestId('inspection-workspace')).toBeVisible();
 
     await page.getByTestId('item-road.suspensionNoise-PASS').click();
-    await page.getByTestId('save-section').click();
+    await page.getByTestId('save-section-ROAD_TEST').click();
 
     await expect(page.getByTestId('inspection-rail-ROAD_TEST')).toHaveAttribute('data-complete', 'false');
     await expect(page.getByTestId('inspection-submit')).toBeDisabled();
@@ -307,7 +307,7 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await surface.click({ position: { x: box!.width * 0.4, y: box!.height * 0.5 } });
 
     await expect(page.locator('[data-testid^="paint-marker-"]').first()).toBeVisible();
-    await page.getByTestId('save-section').click();
+    await page.getByTestId('save-section-PAINT_BODY').click();
     await expect(page.getByTestId('inspection-submit')).toBeEnabled();
   });
 
@@ -320,7 +320,7 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await page.getByTestId('chassis-tool-OK').click();
     await page.getByTestId('chassis-region-FRONT').click();
     await page.getByTestId('chassis-region-REAR').click();
-    await page.getByTestId('save-section').click();
+    await page.getByTestId('save-section-CHASSIS_UNDERCARRIAGE').click();
     await expect(page.getByTestId('inspection-submit')).toBeEnabled();
   });
 
@@ -330,16 +330,19 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await expect(page.getByTestId('inspection-workspace')).toBeVisible();
 
     await expect(page.getByTestId('diagnostic-list')).toBeVisible();
-    await page.getByTestId('diagnostic-module').fill('ECM');
-    await page.getByTestId('diagnostic-code').fill('P0171');
+    // The form collects a description and an optional note only: the module name
+    // and fault code are no longer asked for.
+    await expect(page.getByTestId('diagnostic-module')).toHaveCount(0);
+    await expect(page.getByTestId('diagnostic-code')).toHaveCount(0);
     await page.getByTestId('diagnostic-description').fill('System too lean (bank 1)');
+    await page.getByTestId('diagnostic-observation').fill('Bank 1 sensor drift');
     await page.getByTestId('diagnostic-add').click();
 
-    const entry = page.locator('[data-testid^="diagnostic-"]').filter({ hasText: 'P0171' }).first();
+    const entry = page.locator('[data-testid^="diagnostic-"]').filter({ hasText: 'System too lean' }).first();
     await expect(entry).toBeVisible();
 
     await entry.locator('[data-testid^="diagnostic-remove-"]').click();
-    await expect(page.locator('[data-testid^="diagnostic-"]').filter({ hasText: 'P0171' })).toHaveCount(0);
+    await expect(page.locator('[data-testid^="diagnostic-"]').filter({ hasText: 'System too lean' })).toHaveCount(0);
   });
 
   test('adds an inspection type after creation but before approval', async ({ page }) => {
@@ -403,7 +406,7 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await expect(page.locator('.oryx-modal')).toHaveCount(0);
 
     // Approved: the checklist is no longer editable and submit is gone.
-    await expect(page.getByTestId('save-section')).toHaveCount(0);
+    await expect(page.getByTestId('save-section-INTERIOR')).toHaveCount(0);
     await expect(page.getByTestId('inspection-submit')).toHaveCount(0);
   });
 
@@ -449,5 +452,49 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     expect(served.status()).toBe(200);
     expect(served.headers()['content-type']).toContain('application/pdf');
     expect((await served.body()).subarray(0, 5).toString('ascii')).toBe('%PDF-');
+  });
+
+  test('offers a single optional notes field and submits a fully passing inspection with it empty', async ({ page }) => {
+    const id = await seedJob(page, ['EXTERIOR']);
+    await page.goto(`/automotive/inspections/${id}`);
+    await expect(page.getByTestId('inspection-workspace')).toBeVisible();
+
+    // Exactly one session-level notes field: the former second field (final
+    // assessment) is gone, so there is no duplicate surface for the same note.
+    await expect(page.getByTestId('inspection-notes')).toBeVisible();
+    await expect(page.getByTestId('inspection-notes-input')).toHaveCount(1);
+    await expect(page.getByTestId('final-assessment')).toHaveCount(0);
+
+    // Notes are optional: a fully passing inspection submits with the field
+    // untouched. Answer every item, save the section and submit without notes.
+    for (const key of [
+      'exterior.windows',
+      'exterior.lights',
+      'exterior.indicators',
+      'exterior.wipers',
+      'exterior.mirrors',
+      'exterior.tiresRims',
+    ]) {
+      await page.getByTestId(`item-${key}-PASS`).click();
+    }
+    await page.getByTestId('save-section-EXTERIOR').click();
+    await expect(page.getByTestId('inspection-submit')).toBeEnabled();
+    await page.getByTestId('inspection-submit').click();
+    await expect(page.getByTestId('inspection-review-open')).toBeVisible();
+  });
+
+  test('persists the inspection notes and reloads them', async ({ page }) => {
+    const id = await seedJob(page, ['EXTERIOR']);
+    await page.goto(`/automotive/inspections/${id}`);
+    await expect(page.getByTestId('inspection-workspace')).toBeVisible();
+
+    await page.getByTestId('inspection-notes-input').fill('Minor stone chips on the front bumper.');
+    await page.getByTestId('save-inspection-notes').click();
+    await expect(page.getByTestId('inspection-notes-input')).toHaveValue('Minor stone chips on the front bumper.');
+
+    // Reload from the server: the note is stored, not held in component state.
+    await page.reload();
+    await expect(page.getByTestId('inspection-workspace')).toBeVisible();
+    await expect(page.getByTestId('inspection-notes-input')).toHaveValue('Minor stone chips on the front bumper.');
   });
 });

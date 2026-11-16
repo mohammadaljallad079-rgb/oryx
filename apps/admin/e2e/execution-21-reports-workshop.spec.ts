@@ -41,10 +41,19 @@ test.describe('Execution 21 — reports workspace', () => {
     await expect(page.getByTestId('report-tile-sales-summary')).toBeVisible();
     await expect(page.getByTestId('report-tile-trial-balance')).toBeVisible();
 
+    // The overview counts the catalogue and the filter bar narrows it.
+    await expect(page.getByTestId('reports-overview-count')).toBeVisible();
+    await expect(page.getByTestId('reports-filters')).toBeVisible();
+    await expect(page.getByTestId('report-range-month')).toBeVisible();
+    await expect(page.getByTestId('report-group-select')).toBeVisible();
+
     // The detail panel resolves the selected report and shows its row count.
     await page.getByTestId('report-tile-sales-summary').click();
     await expect(page.getByTestId('report-detail')).toBeVisible();
     await expect(page.getByTestId('report-row-count')).toBeVisible({ timeout: 20_000 });
+    // The detail offers the PDF download, distinct from the preview.
+    await expect(page.getByTestId('report-pdf')).toBeVisible();
+    await expect(page.getByTestId('report-csv')).toBeVisible();
   });
 
   test('2. a report opens a real PDF preview', async ({ page }) => {
@@ -104,39 +113,34 @@ test.describe('Execution 21 — workshop redesign', () => {
     await page.goto('/automotive/maintenance');
     await expect(page.getByTestId('maintenance-page')).toBeVisible();
 
-    // The dashboard resolves before the tiles paint; the bays tile is always
-    // present because a tenant can have zero bays and still render the row.
+    // The dashboard resolves before the tiles paint; the open-job tile is always
+    // present because a tenant can have zero jobs and still render the row.
     await expect(page.getByTestId('workshop-dashboard')).toBeVisible();
-    await expect(page.getByTestId('ws-kpi-bays')).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByTestId('ws-kpi-open')).toBeVisible();
+    await expect(page.getByTestId('ws-kpi-open')).toBeVisible({ timeout: 20_000 });
 
-    await page.getByTestId('maintenance-tab-bay').click();
-    await expect(page.getByTestId('new-bay')).toBeVisible({ timeout: 20_000 });
-    await page.getByTestId('maintenance-tab-warranties').click();
-    await expect(page.getByTestId('maintenance-tab-warranties')).toHaveAttribute('aria-selected', 'true');
+    // The service-bay and warranty surfaces were removed by request.
+    await expect(page.getByTestId('maintenance-tab-bay')).toHaveCount(0);
+    await expect(page.getByTestId('maintenance-tab-warranties')).toHaveCount(0);
+
+    await page.getByTestId('maintenance-tab-providers').click();
+    await expect(page.getByTestId('maintenance-tab-providers')).toHaveAttribute('aria-selected', 'true');
     await page.getByTestId('maintenance-tab-job-cards').click();
     await expect(page.getByTestId('new-job-card')).toBeVisible({ timeout: 20_000 });
   });
 
-  test('5. a service bay can be created and appears in the list', async ({ page }) => {
+  test('5. the removed service-bay and warranty surfaces are gone', async ({ page }) => {
     await signIn(page, ENTERPRISE_ADMIN);
     await setLocale(page, 'en');
     await page.goto('/automotive/maintenance');
     await expect(page.getByTestId('maintenance-page')).toBeVisible();
-    await page.getByTestId('maintenance-tab-bay').click();
-    await expect(page.getByTestId('new-bay')).toBeVisible({ timeout: 20_000 });
 
-    // A unique code keeps the test re-runnable; a conflict would fail the save.
-    const code = `E21-${Date.now().toString().slice(-6)}`;
-    await page.getByTestId('new-bay').click();
-    await expect(page.getByTestId('bay-code')).toBeVisible();
-    await page.getByTestId('bay-code').fill(code);
-    await page.getByTestId('bay-name-en').fill('E2E Bay');
-    await page.getByTestId('bay-name-ar').fill('ورشة اختبار');
-    await page.getByTestId('save-bay').click();
+    await expect(page.getByTestId('maintenance-tab-bay')).toHaveCount(0);
+    await expect(page.getByTestId('maintenance-tab-warranties')).toHaveCount(0);
+    await expect(page.getByTestId('ws-kpi-bays')).toHaveCount(0);
+    await expect(page.getByTestId('ws-kpi-warranties')).toHaveCount(0);
 
-    await expect(page.locator('.oryx-modal')).toHaveCount(0, { timeout: 20_000 });
-    await expect(page.getByTestId(`bay-row-${code}`)).toBeVisible({ timeout: 20_000 });
+    await page.getByTestId('maintenance-tab-requests').click();
+    await expect(page.getByTestId('maintenance-tab-requests')).toHaveAttribute('aria-selected', 'true');
   });
 
   test('6. a job card moves through the enforced workshop state machine', async ({ page }) => {
@@ -219,7 +223,7 @@ test.describe('Execution 21 — workshop redesign', () => {
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   });
 
-  test('8. the new job card form offers the vehicle and bay pickers', async ({ page }) => {
+  test('8. the new job card form offers the vehicle picker', async ({ page }) => {
     await signIn(page, ENTERPRISE_ADMIN);
     await setLocale(page, 'en');
     await page.goto('/automotive/maintenance');
@@ -227,7 +231,6 @@ test.describe('Execution 21 — workshop redesign', () => {
     await page.getByTestId('new-job-card').click();
 
     await expect(page.getByTestId('job-vehicle')).toBeVisible();
-    await expect(page.getByTestId('job-bay')).toBeVisible();
     await expect(page.getByTestId('job-complaint')).toBeVisible();
 
     // The vehicle picker is the searchable catalogue control; picking one fills

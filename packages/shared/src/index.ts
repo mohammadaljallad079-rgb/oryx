@@ -17,6 +17,10 @@ export * from './branding';
 export * from './contracts';
 export * from './documents';
 export * from './reports';
+export * from './storefront';
+export * from './site-content';
 
 export * from './print';
 export * from './attachments';
+export * from './company-settings';
+export * from './document-numbering';

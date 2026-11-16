@@ -18,11 +18,15 @@ import type {
   ContextResponse,
   CouponDto,
   CouponValidationResponse,
+  SiteContentDto,
   CustomerDto,
   CustomerDetailDto,
   CustomerAttachmentDto,
+  CustomerBranchDto,
+  CompanySettingsResponse,
   CustomerReturnDto,
   DashboardResponse,
+  ModuleSummaryDto,
   EcosystemOverviewResponse,
   ErpAccountDto,
   FeatureFlagDto,
@@ -544,6 +548,19 @@ export const api = {
     return request<DashboardResponse>(`/dashboard${qs ? `?${qs}` : ''}`);
   },
 
+  moduleSummary: (
+    moduleKey: string,
+    params: { companyId?: string | null; branchId?: string | null } = {},
+  ) => {
+    const q = new URLSearchParams();
+    if (params.companyId) q.set('companyId', params.companyId);
+    if (params.branchId) q.set('branchId', params.branchId);
+    const qs = q.toString();
+    return request<ModuleSummaryDto>(
+      `/dashboard/modules/${encodeURIComponent(moduleKey)}${qs ? `?${qs}` : ''}`,
+    );
+  },
+
   // -------------------------------------------------------------- companies
   listCompanies: (params: { page?: number; pageSize?: number; search?: string; status?: string; type?: string } = {}) =>
     request<Paginated<CompanyDto>>(`/companies?${toQuery(params)}`),
@@ -661,6 +678,10 @@ export const api = {
 
   // ----------------------------------------------------------------- modules
   listModules: () => request<{ items: Array<ModuleDto & { licensed: boolean }> }>('/modules'),
+  updateModule: (id: string, body: Record<string, unknown>) =>
+    request<ModuleDto>(`/modules/${id}`, { method: 'PATCH', body }),
+  restoreModule: (id: string) =>
+    request<ModuleDto>(`/modules/${id}/restore-defaults`, { method: 'POST' }),
   entitlements: (companyId?: string) =>
     request<{
       companyId: string;
@@ -717,6 +738,10 @@ export const api = {
   cmsBanners: (placement?: string) =>
     request<CmsBannerDto[]>(`/cms/banners${placement ? `?placement=${placement}` : ''}`),
   upsertCmsBanner: (body: Record<string, unknown>) => request<CmsBannerDto>('/cms/banners', { method: 'PUT', body }),
+  // ------------------------------------------------------------ site content
+  siteContent: (locale: 'ar' | 'en') => request<SiteContentDto>(`/cms/site-content?locale=${locale}`),
+  upsertSiteContent: (locale: 'ar' | 'en', data: unknown) =>
+    request<SiteContentDto>('/cms/site-content', { method: 'PUT', body: { locale, data } }),
   featureFlags: () => request<FeatureFlagDto[]>('/cms/feature-flags'),
   upsertFeatureFlag: (body: Record<string, unknown>) =>
     request<FeatureFlagDto>('/cms/feature-flags', { method: 'PUT', body }),
@@ -922,6 +947,33 @@ export const api = {
     request<CustomerAttachmentDto>(`/sales/customers/${id}/attachments`, { method: 'POST', body }),
   removeCustomerAttachment: (id: string, attachmentId: string) =>
     request<{ removed: boolean }>(`/sales/customers/${id}/attachments/${attachmentId}`, { method: 'DELETE' }),
+  customerBranches: (id: string) =>
+    request<CustomerBranchDto[]>(`/sales/customers/${id}/branches`),
+  createCustomerBranch: (id: string, body: Record<string, unknown>) =>
+    request<CustomerBranchDto>(`/sales/customers/${id}/branches`, { method: 'POST', body }),
+  updateCustomerBranch: (id: string, branchId: string, body: Record<string, unknown>) =>
+    request<CustomerBranchDto>(`/sales/customers/${id}/branches/${branchId}`, { method: 'POST', body }),
+  deleteCustomerBranch: (id: string, branchId: string) =>
+    request<{ deleted: true }>(`/sales/customers/${id}/branches/${branchId}`, { method: 'DELETE' }),
+
+  // ------------------------------------------------------ company settings
+  companySettings: (companyId?: string) =>
+    request<CompanySettingsResponse>(
+      `/company-settings${companyId ? `?companyId=${companyId}` : ''}`,
+    ),
+  companySettingsCatalogue: () =>
+    request<{ sections: string[]; defaults: Record<string, Record<string, unknown>> }>(
+      '/company-settings/catalogue',
+    ),
+  companySettingSection: (section: string, companyId?: string) =>
+    request<Record<string, unknown>>(
+      `/company-settings/${section}${companyId ? `?companyId=${companyId}` : ''}`,
+    ),
+  updateCompanySettingSection: (section: string, body: Record<string, unknown>, companyId?: string) =>
+    request<Record<string, unknown>>(
+      `/company-settings/${section}${companyId ? `?companyId=${companyId}` : ''}`,
+      { method: 'PUT', body },
+    ),
   quotations: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<SalesDocumentDto>>(`/sales/quotations?${toQuery(params)}`),
   createQuotation: (body: Record<string, unknown>) =>
@@ -953,9 +1005,10 @@ export const api = {
   // ----------------------------------------------------------- attachments
   attachments: (entityType: string, entityId: string) =>
     request<AttachmentDto[]>(`/attachments/${entityType}/${entityId}`),
-  uploadAttachment: (entityType: string, entityId: string, file: File) => {
+  uploadAttachment: (entityType: string, entityId: string, file: File, category?: string) => {
     const form = new FormData();
     form.append('file', file);
+    if (category) form.append('category', category);
     return request<AttachmentDto>(`/attachments/${entityType}/${entityId}`, {
       method: 'POST',
       body: form,
@@ -1067,6 +1120,28 @@ export const api = {
     });
     if (!res.ok) throw new ApiError(res.status, 'report_pdf_failed', 'The report PDF could not be generated.');
     return URL.createObjectURL(await res.blob());
+  },
+  /** Download one catalogue report as a print-ready PDF file. */
+  downloadReportPdf: async (kind: string, params: Record<string, unknown> = {}): Promise<void> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    const branchId = tokenStore.branchId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    if (branchId) headers['x-oryx-branch-id'] = branchId;
+    const res = await fetch(`${API_BASE}/v1/reports/${kind}/pdf?${toQuery(params)}`, {
+      headers,
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new ApiError(res.status, 'report_pdf_failed', 'The report PDF could not be generated.');
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `oryx-report-${kind}-${new Date().toISOString().slice(0, 10)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
   },
   /** Download one catalogue report as CSV. */
   downloadReportCsv: async (kind: string, params: Record<string, unknown> = {}): Promise<void> => {
@@ -1325,7 +1400,7 @@ export const api = {
     request<OperationsDashboardDto>(`/operations/dashboard${companyId ? `?companyId=${companyId}` : ''}`),
 
   // ----------------------------------------------------- Automotive (E03)
-  vehicles: (params: { companyId?: string; search?: string; status?: string; customerId?: string; page?: number } = {}) =>
+  vehicles: (params: { companyId?: string; search?: string; status?: string; customerId?: string; page?: number; pageSize?: number } = {}) =>
     request<Paginated<VehicleDto>>(`/automotive/vehicles?${toQuery(params)}`),
   vehicle: (id: string) => request<Record<string, unknown>>(`/automotive/vehicles/${id}`),
   createVehicle: (body: Record<string, unknown>) => request<VehicleDto>('/automotive/vehicles', { method: 'POST', body }),

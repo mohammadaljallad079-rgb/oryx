@@ -8,6 +8,10 @@ coverage/
 .env
 .env.local
 .env.*.local
+# Editor/backup copies of the env file (e.g. `.env.bak`) carry the same secrets
+# and must never be committed either.
+.env.*
+!.env.example
 # Production and staging secrets live in a real env file and must never be
 # committed. The templates in deploy/env/ are the committed examples.
 .env.production
@@ -50,6 +54,8 @@ apps/admin/playwright-report/
 .run/*.tok
 # Scratch renders served locally for inspection; committed evidence lives in docs/audit/
 .run/evidence/
+.run/exec25-evidence/
+.run/exec25-inspect/
 
 # The owner-supplied design reference (the printed invoice/quotation and the
 # five-page inspection report) carries a real customer's name, phone and

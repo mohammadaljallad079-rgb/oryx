@@ -253,13 +253,62 @@ describe('Document attachments (e2e)', () => {
       type: 'application/x-msdownload',
     });
     expect(res.status).toBe(400);
-    expect(JSON.stringify(res.body)).toContain('Only PDF, JPG, PNG');
+    expect(JSON.stringify(res.body)).toContain('Only PDF, Word, Excel');
   });
 
   it('rejects an unsupported entity type', async () => {
-    const res = await upload(companyId, token, 'CUSTOMER', customerId, pdf);
+    const res = await upload(companyId, token, 'NOT_A_REAL_ENTITY', customerId, pdf);
     expect(res.status).toBe(400);
     expect(JSON.stringify(res.body)).toContain('Unsupported attachment entity type');
+  });
+
+  it('attaches a categorised document to a customer record', async () => {
+    const docx = {
+      name: 'cr.pdf',
+      data: Buffer.from('%PDF-1.4\n%%EOF\n'),
+      type: 'application/pdf',
+    };
+    const { body, contentType } = multipart(docx);
+    const form = Buffer.concat([
+      Buffer.from(
+        `--${contentType.split('boundary=')[1]}\r\nContent-Disposition: form-data; name="category"\r\n\r\nIDENTITY\r\n`,
+      ),
+      body,
+    ]);
+    const res = await fetch(`${ctx.base}/api/v1/attachments/CUSTOMER/${customerId}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'x-oryx-company-id': companyId,
+        'Content-Type': contentType,
+      },
+      body: form,
+    });
+    const parsed = await res.json();
+    expect(res.status === 201 ? '' : JSON.stringify(parsed)).toBe('');
+    expect(parsed.entityType).toBe('CUSTOMER');
+    expect(parsed.category).toBe('IDENTITY');
+    createdAttachmentIds.push(parsed.id);
+  });
+
+  it('rejects an unknown document category', async () => {
+    const { body, contentType } = multipart(pdf);
+    const form = Buffer.concat([
+      Buffer.from(
+        `--${contentType.split('boundary=')[1]}\r\nContent-Disposition: form-data; name="category"\r\n\r\nNOT_A_CATEGORY\r\n`,
+      ),
+      body,
+    ]);
+    const res = await fetch(`${ctx.base}/api/v1/attachments/CUSTOMER/${customerId}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'x-oryx-company-id': companyId,
+        'Content-Type': contentType,
+      },
+      body: form,
+    });
+    expect(res.status).toBe(400);
   });
 
   it('refuses a document that belongs to another tenant', async () => {

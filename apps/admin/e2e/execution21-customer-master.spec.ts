@@ -79,8 +79,8 @@ test.describe('Execution 21 — customer master data', () => {
   });
 
   test('1. the customers list renders source and department columns', async ({ page }) => {
-    await page.goto('/sales');
-    await page.getByTestId('sales-tab-customers').click();
+    await page.goto('/crm?tab=customers');
+    await expect(page.getByTestId('crm-tab-customers')).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByTestId('customer-row-CUST-001')).toBeVisible({ timeout: 20_000 });
 
     // The seeded customer has a source and a department on the row.
@@ -97,8 +97,8 @@ test.describe('Execution 21 — customer master data', () => {
   });
 
   test('2. creates a customer with an inline-created lead source', async ({ page }) => {
-    await page.goto('/sales');
-    await page.getByTestId('sales-tab-customers').click();
+    await page.goto('/crm?tab=customers');
+    await expect(page.getByTestId('crm-tab-customers')).toHaveAttribute('aria-selected', 'true');
     await page.getByTestId('new-customer').click();
     await expect(page.getByTestId('customer-code')).toBeVisible();
 
@@ -106,8 +106,10 @@ test.describe('Execution 21 — customer master data', () => {
     await page.getByTestId('customer-name-en').fill('Execution 21 Customer');
     await page.getByTestId('customer-name-ar').fill('عميل التنفيذ ٢١');
 
-    // Inline-create a lead source from inside the customer form.
-    await page.getByTestId('inline-create-source').click();
+    // Inline-create a lead source from inside the customer form: the "+ Add
+    // new" lives inside the source dropdown now.
+    await page.getByTestId('customer-source').locator('button').click();
+    await page.getByTestId('customer-source-create').click();
     await page.getByTestId('inline-create-code').fill(sourceCode);
     await page.getByTestId('inline-create-name-en').fill('Workshop Referral');
     await page.getByTestId('inline-create-name-ar').fill('إحالة ورشة');
@@ -131,16 +133,19 @@ test.describe('Execution 21 — customer master data', () => {
 
   test('3. the detail view shows history, invoices and attachments', async ({ page }) => {
     test.skip(!customerId, 'customer was not created');
-    await page.goto('/sales');
-    await page.getByTestId('sales-tab-customers').click();
+    await page.goto('/crm?tab=customers');
+    await expect(page.getByTestId('crm-tab-customers')).toHaveAttribute('aria-selected', 'true');
     await page.getByTestId('customer-search').fill(customerCode);
     await page.getByTestId(`customer-view-${customerCode}`).click();
     await expect(page.getByTestId('customer-detail')).toBeVisible({ timeout: 20_000 });
 
-    // Add an attachment through the UI, then assert it is persisted.
-    await page.getByTestId('add-customer-attachment').click();
-    await page.getByTestId('attachment-file-name').fill('trade-licence.pdf');
-    await page.getByTestId('save-customer-attachment').click();
+    // Upload a real file through the unified attachments panel and assert it is
+    // persisted by the API.
+    await page.getByTestId(`attach-input-${customerId}`).setInputFiles({
+      name: 'trade-licence.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4\n% trade licence\n'),
+    });
 
     await expect
       .poll(async () => {
@@ -155,8 +160,8 @@ test.describe('Execution 21 — customer master data', () => {
 
   test('4. the list toggle deactivates and reactivates the customer', async ({ page }) => {
     test.skip(!customerId, 'customer was not created');
-    await page.goto('/sales');
-    await page.getByTestId('sales-tab-customers').click();
+    await page.goto('/crm?tab=customers');
+    await expect(page.getByTestId('crm-tab-customers')).toHaveAttribute('aria-selected', 'true');
     await page.getByTestId('customer-search').fill(customerCode);
 
     page.on('dialog', (d) => void d.accept());

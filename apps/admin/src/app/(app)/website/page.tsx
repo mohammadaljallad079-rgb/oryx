@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
+import { SiteContentEditor } from './site-content-editor';
 import {
   Badge,
   Button,
@@ -23,7 +24,7 @@ import {
 
 function WebsiteCmsPageInner() {
   const { t } = useUi();
-  const [tab, setTab] = useState<'pages' | 'banners' | 'media'>('pages');
+  const [tab, setTab] = useState<'pages' | 'banners' | 'content' | 'media'>('pages');
   const pages = useAsync(() => api.cmsPages(), []);
   const banners = useAsync(() => api.cmsBanners(), []);
   const [editingPage, setEditingPage] = useState<CmsPageDto | null>(null);
@@ -43,24 +44,32 @@ function WebsiteCmsPageInner() {
             <Button
               size="sm"
               onClick={() =>
-                void (tab === 'pages' ? pages.reload() : tab === 'banners' ? banners.reload() : media.reload())
+                void (tab === 'pages'
+                  ? pages.reload()
+                  : tab === 'banners'
+                    ? banners.reload()
+                    : tab === 'media'
+                      ? media.reload()
+                      : Promise.resolve())
               }
             >
               <Icon name="refresh" size={15} />
               {t('common.refresh')}
             </Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                if (tab === 'pages') setCreatingPage(true);
-                else if (tab === 'banners') setCreatingBanner(true);
-                else setUploadingMedia(true);
-              }}
-              data-testid={tab === 'pages' ? 'new-cms-page' : tab === 'banners' ? 'new-cms-banner' : 'upload-media'}
-            >
-              <Icon name="plus" size={16} />
-              {tab === 'pages' ? t('cms.newPage') : tab === 'banners' ? t('cms.newBanner') : t('cms.upload')}
-            </Button>
+            {tab !== 'content' ? (
+              <Button
+                variant="primary"
+                onClick={() => {
+                  if (tab === 'pages') setCreatingPage(true);
+                  else if (tab === 'banners') setCreatingBanner(true);
+                  else setUploadingMedia(true);
+                }}
+                data-testid={tab === 'pages' ? 'new-cms-page' : tab === 'banners' ? 'new-cms-banner' : 'upload-media'}
+              >
+                <Icon name="plus" size={16} />
+                {tab === 'pages' ? t('cms.newPage') : tab === 'banners' ? t('cms.newBanner') : t('cms.upload')}
+              </Button>
+            ) : null}
           </>
         }
       />
@@ -82,6 +91,14 @@ function WebsiteCmsPageInner() {
             data-testid="cms-tab-banners"
           >
             {t('cms.banners')}
+          </Button>
+          <Button
+            size="sm"
+            variant={tab === 'content' ? 'primary' : 'ghost'}
+            onClick={() => setTab('content')}
+            data-testid="cms-tab-content"
+          >
+            {t('cms.siteContent')}
           </Button>
           <Button
             size="sm"
@@ -221,6 +238,8 @@ function WebsiteCmsPageInner() {
             </TableShell>
           )}
         </Card>
+      ) : tab === 'content' ? (
+        <SiteContentEditor />
       ) : (
         <MediaLibrary
           data={media.data ?? null}

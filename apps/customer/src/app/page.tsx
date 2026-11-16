@@ -3,52 +3,54 @@
 import Link from 'next/link';
 import { useUi } from '@/lib/ui-context';
 import { useCustomerAuth } from '@/lib/auth-context';
+import { useSiteContent } from '@/lib/site-content-context';
 import {
-  assetUrl,
   blockValue,
   categoryImage,
   mediaAlt,
-  mediaUrl,
-  resolveImage,
   SERVICE_CATEGORIES,
   type WebsiteCategory,
 } from '@/lib/api';
 import { useWebsiteContent } from '@/lib/use-website-content';
-import { Card } from '@/components/ui';
+import { Card, HeroSlider, TrustStrip, type HeroSlide } from '@/components/ui';
 import { Icon } from '@/components/icons';
 
 /**
  * Customer homepage.
  *
- * The service cards are the ORYX service catalogue itself — a customer books an
- * ORYX service, not a third-party supplier — so the page never routes a visitor
- * into a supplier directory. Photography and headline copy come from the admin
- * CMS when an administrator has authored them, and fall back to the bundled
- * design otherwise, so a page never renders empty because the CMS is
- * unreachable.
+ * The hero is a real image slider and the trust strip is authored in the admin
+ * "Website Settings"; both read the editable site document, whose defaults the
+ * provider has already merged in. The service cards remain the ORYX service
+ * catalogue itself — a customer books an ORYX service, not a third-party
+ * supplier — so the page never routes a visitor into a supplier directory.
+ * Photography and headline copy come from the admin CMS when an administrator
+ * has authored them, and fall back to the bundled design otherwise, so a page
+ * never renders empty because the CMS is unreachable.
  */
 export default function HomePage() {
   const { t, locale } = useUi();
   const { isAuthenticated } = useCustomerAuth();
   const { content } = useWebsiteContent(locale);
+  const { content: site, pick } = useSiteContent();
 
-  // Hero photography: the first active banner, else the first CMS category
-  // image, else the bundled photograph, else the vector art. Every branch
-  // yields a servable URL so the hero can never render as an empty panel.
-  const heroBanner = content.banners.find((b) => b.media || b.imageUrl) ?? null;
-  // A banner image can be a CMS media id or a plain path; both are normalised
-  // to a servable URL, and the bundled asset prefix is applied to the latter.
-  const bannerImage = heroBanner?.imageUrl ? resolveImage(heroBanner.imageUrl) : null;
-  const heroImage =
-    mediaUrl(heroBanner?.media ?? null, 'hero') ??
-    bannerImage ??
-    mediaUrl(content.categories[0]?.media ?? null, 'hero') ??
-    (content.categories[0]
-      ? categoryImage(null, content.categories[0].key, 'hero')
-      : assetUrl('/art/hero-automotive.svg'));
-  const heroAlt = heroBanner
-    ? heroBanner.subtitle || heroBanner.title
-    : mediaAlt(content.categories[0]?.media ?? null, locale, t('home.heroAlt'));
+  // Hero slider slides: every slide carries its own photograph, headline,
+  // description and calls to action from the editable site document.
+  const slides: HeroSlide[] = site.hero.slides.map((slide) => ({
+    image: slide.image,
+    alt: pick(slide.altEn, slide.altAr),
+    headline: pick(slide.headlineEn, slide.headlineAr),
+    description: pick(slide.descriptionEn, slide.descriptionAr),
+    ctaLabel: pick(slide.ctaLabelEn, slide.ctaLabelAr),
+    ctaHref: slide.ctaHref,
+    secondaryLabel: pick(slide.secondaryLabelEn, slide.secondaryLabelAr),
+    secondaryHref: slide.secondaryHref,
+  }));
+
+  const trust = site.trust.items.map((item) => ({
+    icon: item.icon,
+    title: pick(item.titleEn, item.titleAr),
+    subtitle: pick(item.subtitleEn, item.subtitleAr),
+  }));
 
   // Category cards prefer the administrator's photograph, then their copy,
   // then the bundled catalogue entry.
@@ -72,24 +74,11 @@ export default function HomePage() {
     };
   });
 
-  const stats = [
-    { value: `${SERVICE_CATEGORIES.length}`, label: t('home.statServices') },
-    { value: '24/7', label: t('home.statTracking') },
-    { value: '100%', label: t('home.statSecure') },
-  ];
-
   const values = [
     { icon: 'shield', title: t('home.value1Title'), body: t('home.value1Body') },
     { icon: 'calendar', title: t('home.value2Title'), body: t('home.value2Body') },
     { icon: 'car', title: t('home.value3Title'), body: t('home.value3Body') },
     { icon: 'wallet', title: t('home.value4Title'), body: t('home.value4Body') },
-  ];
-
-  const trust = [
-    { icon: 'check', title: t('home.trust1Title'), body: t('home.trust1Body') },
-    { icon: 'star', title: t('home.trust2Title'), body: t('home.trust2Body') },
-    { icon: 'lock', title: t('home.trust3Title'), body: t('home.trust3Body') },
-    { icon: 'headset', title: t('home.trust4Title'), body: t('home.trust4Body') },
   ];
 
   const faqs = [
@@ -102,37 +91,8 @@ export default function HomePage() {
   return (
     <div className="oryx-home">
       {/* ------------------------------------------------------ hero */}
-      <section className="oryx-hero oryx-hero--home">
-        <div
-          className="oryx-hero__media"
-          style={{ backgroundImage: `url(${heroImage})` }}
-          role="img"
-          aria-label={heroAlt}
-        />
-        <div className="oryx-hero__scrim" />
-        <div className="oryx-hero__content">
-          <p className="oryx-eyebrow">{blockValue(content, 'home.hero.eyebrow', t('home.eyebrow'))}</p>
-          <h1 className="oryx-hero__title">{blockValue(content, 'home.hero.title', t('home.title'))}</h1>
-          <p className="oryx-hero__lede">{blockValue(content, 'home.hero.subtitle', t('home.subtitle'))}</p>
-          <div className="oryx-hero__actions">
-            <Link href="/bookings" className="oryx-btn oryx-btn-primary oryx-btn-lg">
-              <Icon name="calendar" size={17} />
-              {blockValue(content, 'home.cta.book', t('home.ctaBook'))}
-            </Link>
-            <Link href="/services" className="oryx-btn oryx-btn-lg">
-              {blockValue(content, 'home.cta.browse', t('home.ctaBrowse'))}
-            </Link>
-          </div>
-          <dl className="oryx-stat-row">
-            {stats.map((s) => (
-              <div key={s.label} className="oryx-stat">
-                <dt className="oryx-stat__label">{s.label}</dt>
-                <dd className="oryx-stat__value">{s.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </section>
+      <HeroSlider slides={slides} />
+      <TrustStrip items={trust} />
 
       {/* -------------------------------------------------- categories */}
       <section className="oryx-section" id="services">
@@ -210,25 +170,6 @@ export default function HomePage() {
             </Link>
           </div>
         )}
-      </section>
-
-      {/* ------------------------------------------------------ trust */}
-      <section className="oryx-section">
-        <header className="oryx-section-head">
-          <h2 className="oryx-section-title">{blockValue(content, 'home.trust.title', t('home.trustTitle'))}</h2>
-          <p className="oryx-muted">{t('home.trustSubtitle')}</p>
-        </header>
-        <div className="oryx-grid oryx-grid--cards">
-          {trust.map((item) => (
-            <Card key={item.title} className="oryx-feature oryx-feature--compact">
-              <span className="oryx-feature__icon" aria-hidden>
-                <Icon name={item.icon} size={18} />
-              </span>
-              <h3 className="oryx-card-title">{item.title}</h3>
-              <p className="oryx-muted oryx-feature__body">{item.body}</p>
-            </Card>
-          ))}
-        </div>
       </section>
 
       {/* -------------------------------------------------------- faq */}
