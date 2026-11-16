@@ -1,8 +1,17 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from './icons';
 import { useUi } from '@/lib/ui-context';
+
+/**
+ * `useLayoutEffect` on the client, `useEffect` on the server (where it is a
+ * no-op and React warns about the layout variant). The modal registers its
+ * stacking depth in a layout effect so the depth is committed before the first
+ * paint, rather than a frame later.
+ */
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 export function Card({
   children,
@@ -142,32 +151,59 @@ export function Modal({
   const { t } = useUi();
   const idRef = useRef<symbol>(Symbol('oryx-modal'));
   const id = idRef.current;
+  // The dialog is mounted at the depth it had when it opened, so a modal opened
+  // from inside another (a preview from a form, a confirm from a list) always
+  // paints above the one that spawned it instead of losing the paint race to a
+  // sibling that happens to sit later in the DOM.
+  const [depth, setDepth] = useState(0);
+  // Keep the latest `onClose` in a ref so the stack effect below does not depend
+  // on it: call sites pass a fresh arrow each render, and re-running the effect
+  // on every render would pop and re-push this modal, letting a nested dialog
+  // briefly see an empty stack and mount at depth 0 (z-index 60).
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
-    openModals.push(id);
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       // Only the top-most modal reacts, so a nested preview closes alone.
       if (openModals[openModals.length - 1] !== id) return;
       e.stopPropagation();
-      onClose();
+      onCloseRef.current();
     };
     window.addEventListener('keydown', onKey, true);
     return () => {
       window.removeEventListener('keydown', onKey, true);
+    };
+  }, [open, id]);
+
+  // The stack registration runs in a layout effect so the depth is committed
+  // before the browser paints. A plain effect would paint the dialog at the
+  // default depth for one frame, and a nested dialog opened in that window
+  // would resolve to the base z-index and lose the paint race to its parent.
+  useIsomorphicLayoutEffect(() => {
+    if (!open) return;
+    openModals.push(id);
+    setDepth(openModals.length);
+    return () => {
       const at = openModals.indexOf(id);
       if (at !== -1) openModals.splice(at, 1);
     };
-  }, [open, onClose, id]);
+  }, [open, id]);
 
   if (!open) return null;
-  return (
+  // A portal lifts the dialog out of whatever scroll container or stacking
+  // context it was declared in, so the backdrop always covers the whole
+  // viewport and no ancestor `overflow`/`transform` can clip it. The inline
+  // z-index keeps a nested dialog above the one that opened it.
+  const tree = (
     <div
       className={`oryx-modal-backdrop${size === 'pos' ? ' oryx-modal-backdrop--pos' : ''}`}
       role="dialog"
       aria-modal="true"
       aria-label={title}
+      style={{ zIndex: 60 + depth * 5 }}
       onClick={(e) => {
         e.stopPropagation();
         onClose();
@@ -215,6 +251,8 @@ export function Modal({
       </div>
     </div>
   );
+  if (typeof document === 'undefined') return tree;
+  return createPortal(tree, document.body);
 }
 
 export function EmptyState({

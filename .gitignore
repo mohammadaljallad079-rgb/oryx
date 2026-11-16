@@ -54,6 +54,8 @@ apps/admin/playwright-report/
 .run/*.tok
 # Scratch renders served locally for inspection; committed evidence lives in docs/audit/
 .run/evidence/
+.run/exec25-evidence/
+.run/exec25-inspect/
 
 # The owner-supplied design reference (the printed invoice/quotation and the
 # five-page inspection report) carries a real customer's name, phone and

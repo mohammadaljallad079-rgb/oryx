@@ -1416,8 +1416,8 @@ a {
   flex: none;
   border-radius: 12px;
   font-size: 20px;
-  background: color-mix(in srgb, var(--gold) 16%, transparent);
-  border: 1px solid color-mix(in srgb, var(--gold) 34%, transparent);
+  background: var(--tint-focus);
+  border: 1px solid var(--tint-badge-line);
 }
 
 .oryx-trust-text {

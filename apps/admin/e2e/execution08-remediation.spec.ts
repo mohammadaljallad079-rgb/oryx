@@ -149,6 +149,54 @@ test.describe('Execution 08 remediation — interface', () => {
     }
   });
 
+  test('7. a modal portals to the document body and a nested dialog stacks above its parent', async ({
+    page,
+  }) => {
+    await page.goto('/branches');
+    await page.getByTestId('new-branch').click();
+    await expect(page.getByTestId('branch-name-en')).toBeVisible();
+
+    // The dialog must be lifted out of the shell: a portal on `document.body`
+    // is the only way the fixed backdrop can cover the sticky header, which
+    // otherwise paints over it because the header sits later in the DOM.
+    const root = await page.evaluate(() => {
+      const backdrop = document.querySelector('.oryx-modal-backdrop') as HTMLElement;
+      const header = document.querySelector('.oryx-header') as HTMLElement;
+      const hr = header.getBoundingClientRect();
+      const atHeader = document.elementFromPoint(hr.x + hr.width / 2, hr.y + hr.height / 2);
+      return {
+        parent: backdrop.parentElement?.tagName ?? '',
+        backdropZ: Number(getComputedStyle(backdrop).zIndex),
+        headerCovered: Boolean(atHeader?.closest('.oryx-modal-backdrop')),
+      };
+    });
+    expect(root.parent).toBe('BODY');
+    expect(root.backdropZ).toBeGreaterThanOrEqual(60);
+    expect(root.headerCovered).toBe(true);
+
+    // A dialog opened from inside another must outrank it. The accounting
+    // parent-account picker opens an inline "add new" modal over the account
+    // form; the inner dialog has to paint above the outer one.
+    await page.goto('/accounting');
+    await page.getByTestId('accounting-tab-accounts').click();
+    await page.getByTestId('new-account').click();
+    await expect(page.getByTestId('account-type')).toBeVisible();
+    const outerZ = await page.evaluate(
+      () => Number(getComputedStyle(document.querySelector('.oryx-modal-backdrop') as HTMLElement).zIndex),
+    );
+
+    await page.getByTestId('account-parent').click();
+    await page.getByTestId('account-parent-create').click();
+    await expect(page.locator('.oryx-modal-backdrop')).toHaveCount(2);
+    const zs = await page.evaluate(() =>
+      [...document.querySelectorAll('.oryx-modal-backdrop')].map((el) =>
+        Number(getComputedStyle(el as HTMLElement).zIndex),
+      ),
+    );
+    expect(zs[1]).toBeGreaterThan(zs[0]);
+    expect(zs[0]).toBe(outerZ);
+  });
+
   test('6. a chart-of-accounts entry creates, reclassifies and deletes', async ({ page }) => {
     await page.goto('/accounting');
     await page.getByTestId('accounting-tab-accounts').click();
