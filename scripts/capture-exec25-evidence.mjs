@@ -63,6 +63,28 @@ const run = async () => {
   await page.waitForTimeout(800);
   await shot(page, '04-inspections-light');
 
+  // 5. Reports workspace — catalogue, filters and the detail panel.
+  await page.goto(`${BASE}/reports`);
+  await page.waitForTimeout(1200);
+  await shot(page, '05-reports-workspace-light');
+  await page.getByTestId('report-tile-sales-summary').click().catch(() => {});
+  await page.waitForTimeout(1200);
+  await shot(page, '06-reports-detail-light');
+
+  // 6. HR employee form — the additional phone, the end date and the documents.
+  await page.goto(`${BASE}/hr`);
+  await page.waitForTimeout(800);
+  await page.getByTestId('new-employee').click().catch(() => {});
+  await page.waitForTimeout(700);
+  await shot(page, '07-hr-employee-light');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+
+  // 7. Sales invoices — the Orders and Customers tabs are gone.
+  await page.goto(`${BASE}/sales`);
+  await page.waitForTimeout(1000);
+  await shot(page, '08-sales-tabs-light');
+
   await browser.close();
   console.log(`Evidence written to ${OUT}`);
 };

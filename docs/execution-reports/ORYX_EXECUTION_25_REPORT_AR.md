@@ -143,3 +143,55 @@
 - طلب السحب رقم 28 ما زال **مسودّة (DRAFT)** ولم يُدمج، ولم يُطلب دمجه.
 - لم تُعدَّل الثيم الداكن إطلاقاً (شرط صريح)، وكل التصحيحات اللونية تخصّ الثيم
   الفاتح فقط.
+- يلزم ضبط `DOCUMENT_VERIFY_BASE_URL` على أصل الإنتاج العام
+  (مثل `https://admin.oryxbhr.com`) في بيئة الإنتاج، وإلا رفضت الواجهة البرمجية
+  إصدار أي مستند بدل أن تُصدر رمز QR يشير إلى `localhost`.
+
+---
+
+## 7. دفعة الإكمال (هذه الجلسة)
+
+أُكملت مساحة **التقارير** (فهرس، فلاتر النطاق السريع، فلتر المجموعة، شريط
+المجاميع المحسوبة من الخادم، وزر تنزيل PDF مستقلّ عن المعاينة)، وأُضيفت مفاتيح
+الترجمة العربية/الإنجليزية والأنماط اللازمة. كما أُضيف إلى سكربت الأدلّة التقاط
+مساحة التقارير ونموذج الموظف وشاشة المبيعات.
+
+### 7.1 تحقّق أُعيد تشغيله على الفرع الحالي (2026-11-16)
+
+| الحزمة | الأمر | النتيجة |
+| --- | --- | --- |
+| اختبارات `@oryx/shared` | `pnpm --filter @oryx/shared test` | 244 ناجح |
+| مستندات phase3 + QR + الشعار | `jest execution-phase3-documents` | **35 ناجح** — منها اختبار يفكّ رمز QR من ملف PDF المُصيَّر، واختبار يتحقّق من طباعة العلامة الرسمية |
+| إصلاحات Execution 08 (واجهة برمجية) | `jest execution08-remediation` | **18 ناجح** (الموارد البشرية، المستندات، الإجازة، دليل الحسابات، الفروع، فحوصات السيارات) |
+| إصلاحات Execution 08 (واجهة) | `playwright execution08-remediation` | **7 ناجح** |
+| الثيم والنوافذ | `playwright execution20-theme` | **3 ناجح** |
+| فحوصات السيارات | `playwright execution-phase2-inspection` | **13 ناجح** |
+| التقارير والورشة | `playwright execution-21-reports-workshop` | **9 ناجح** |
+| مستندات/مرفقات/حقول/مواعيد | `playwright execution19-datepicker + execution20-inline-create + execution21-customer-master + execution10-document-actions + execution22-document-* + print-attachments + execution06-hr-attendance` | **42 ناجح** |
+| فحص الأنواع لواجهة الإدارة | `tsc --noEmit` | نظيف |
+| ESLint لواجهة الإدارة | `eslint . --max-warnings=0` | نظيف |
+| بناء الإنتاج `next build` (إدارة + عملاء) + `nest build` | — | نظيف |
+
+### 7.2 دليل الرمز QR (فكّ فعلي بماسح)
+
+- الملف المُصيَّر بإعداد الإنتاج: `.run/exec25-evidence/production-invoice.pdf`
+- الناتج المفكوك: `https://admin.oryxbhr.com/verify/testtokenABC123_xyz-987`
+- الملف: `.run/exec25-evidence/qr-scan-result.txt`، ولقطة الرمز:
+  `.run/exec25-evidence/qr-crop-decoded.png`.
+
+### 7.3 الأدلّة البصرية (محدَّثة)
+
+| الملف | الوصف |
+| --- | --- |
+| `01-branch-create-light.png` | نموذج إنشاء فرع بكامل الحقول |
+| `02-accounting-accounts-light.png` | دليل الحسابات مع قائمتي النوع والحساب الأب |
+| `03-spare-parts-light.png` | قطع الغيار والإنشاء المباشر |
+| `04-inspections-light.png` | مساحة عمل الفحوصات |
+| `05-reports-workspace-light.png` | مساحة التقارير — الفهرس والفلاتر |
+| `06-reports-detail-light.png` | تفاصيل التقرير مع أزرار PDF/CSV |
+| `07-hr-employee-light.png` | نموذج الموظف — الرقم الإضافي وتاريخ الانتهاء والمستندات |
+| `08-sales-tabs-light.png` | المبيعات — تبويبات الفواتير دون Orders وCustomers |
+| `ref-invoice.png` / `production-invoice.png` / `side-by-side.png` | المرجع المعتمد مقابل فاتورتنا |
+| `qr-crop-decoded.png` / `qr-scan-result.txt` | الرمز QR وناتج فكّه |
+
+الرابط المباشر للأدلّة: `https://work-1-vubuorlhlbtzmuys.prod-runtime.all-hands.dev/evidence/exec25/`
