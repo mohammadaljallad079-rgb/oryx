@@ -2212,7 +2212,8 @@ export interface InspectionChassisRegionDto {
 
 export interface InspectionDiagnosticEntryDto {
   id: string;
-  module: string;
+  /** Optional: entries created before the form stopped asking for it. */
+  module: string | null;
   faultCode: string | null;
   description: string;
   observation: string | null;

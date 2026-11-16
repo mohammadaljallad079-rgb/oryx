@@ -330,16 +330,19 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await expect(page.getByTestId('inspection-workspace')).toBeVisible();
 
     await expect(page.getByTestId('diagnostic-list')).toBeVisible();
-    await page.getByTestId('diagnostic-module').fill('ECM');
-    await page.getByTestId('diagnostic-code').fill('P0171');
+    // The form collects a description and an optional note only: the module name
+    // and fault code are no longer asked for.
+    await expect(page.getByTestId('diagnostic-module')).toHaveCount(0);
+    await expect(page.getByTestId('diagnostic-code')).toHaveCount(0);
     await page.getByTestId('diagnostic-description').fill('System too lean (bank 1)');
+    await page.getByTestId('diagnostic-observation').fill('Bank 1 sensor drift');
     await page.getByTestId('diagnostic-add').click();
 
-    const entry = page.locator('[data-testid^="diagnostic-"]').filter({ hasText: 'P0171' }).first();
+    const entry = page.locator('[data-testid^="diagnostic-"]').filter({ hasText: 'System too lean' }).first();
     await expect(entry).toBeVisible();
 
     await entry.locator('[data-testid^="diagnostic-remove-"]').click();
-    await expect(page.locator('[data-testid^="diagnostic-"]').filter({ hasText: 'P0171' })).toHaveCount(0);
+    await expect(page.locator('[data-testid^="diagnostic-"]').filter({ hasText: 'System too lean' })).toHaveCount(0);
   });
 
   test('adds an inspection type after creation but before approval', async ({ page }) => {

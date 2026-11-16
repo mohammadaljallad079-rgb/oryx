@@ -672,7 +672,7 @@ function diagnosticSection(section: InspectionReportSection | undefined): string
     <table class="diag-table">
       <thead>
         <tr>
-          <th>#</th><th>الوحدة / Module</th><th>الرمز / Code</th>
+          <th>#</th>
           <th>الوصف / Description</th><th>الملاحظة / Observation</th><th>الأهمية / Severity</th>
         </tr>
       </thead>
@@ -682,8 +682,6 @@ function diagnosticSection(section: InspectionReportSection | undefined): string
             (d, i) => `
         <tr>
           <td class="num">${i + 1}</td>
-          <td>${esc(d.module)}</td>
-          <td class="num">${esc(orDash(d.faultCode))}</td>
           <td>${esc(d.description)}</td>
           <td>${esc(orDash(d.observation))}</td>
           <td><span class="sev sev-${d.severity.toLowerCase()}">${esc(d.severity)}</span></td>

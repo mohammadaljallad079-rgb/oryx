@@ -79,8 +79,8 @@ test.describe('Execution 21 — customer master data', () => {
   });
 
   test('1. the customers list renders source and department columns', async ({ page }) => {
-    await page.goto('/sales');
-    await page.getByTestId('sales-tab-customers').click();
+    await page.goto('/crm?tab=customers');
+    await expect(page.getByTestId('crm-tab-customers')).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByTestId('customer-row-CUST-001')).toBeVisible({ timeout: 20_000 });
 
     // The seeded customer has a source and a department on the row.
@@ -97,8 +97,8 @@ test.describe('Execution 21 — customer master data', () => {
   });
 
   test('2. creates a customer with an inline-created lead source', async ({ page }) => {
-    await page.goto('/sales');
-    await page.getByTestId('sales-tab-customers').click();
+    await page.goto('/crm?tab=customers');
+    await expect(page.getByTestId('crm-tab-customers')).toHaveAttribute('aria-selected', 'true');
     await page.getByTestId('new-customer').click();
     await expect(page.getByTestId('customer-code')).toBeVisible();
 
@@ -133,8 +133,8 @@ test.describe('Execution 21 — customer master data', () => {
 
   test('3. the detail view shows history, invoices and attachments', async ({ page }) => {
     test.skip(!customerId, 'customer was not created');
-    await page.goto('/sales');
-    await page.getByTestId('sales-tab-customers').click();
+    await page.goto('/crm?tab=customers');
+    await expect(page.getByTestId('crm-tab-customers')).toHaveAttribute('aria-selected', 'true');
     await page.getByTestId('customer-search').fill(customerCode);
     await page.getByTestId(`customer-view-${customerCode}`).click();
     await expect(page.getByTestId('customer-detail')).toBeVisible({ timeout: 20_000 });
@@ -160,8 +160,8 @@ test.describe('Execution 21 — customer master data', () => {
 
   test('4. the list toggle deactivates and reactivates the customer', async ({ page }) => {
     test.skip(!customerId, 'customer was not created');
-    await page.goto('/sales');
-    await page.getByTestId('sales-tab-customers').click();
+    await page.goto('/crm?tab=customers');
+    await expect(page.getByTestId('crm-tab-customers')).toHaveAttribute('aria-selected', 'true');
     await page.getByTestId('customer-search').fill(customerCode);
 
     page.on('dialog', (d) => void d.accept());

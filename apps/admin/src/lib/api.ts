@@ -1121,6 +1121,28 @@ export const api = {
     if (!res.ok) throw new ApiError(res.status, 'report_pdf_failed', 'The report PDF could not be generated.');
     return URL.createObjectURL(await res.blob());
   },
+  /** Download one catalogue report as a print-ready PDF file. */
+  downloadReportPdf: async (kind: string, params: Record<string, unknown> = {}): Promise<void> => {
+    const headers: Record<string, string> = {};
+    const token = tokenStore.access;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const companyId = tokenStore.companyId;
+    const branchId = tokenStore.branchId;
+    if (companyId) headers['x-oryx-company-id'] = companyId;
+    if (branchId) headers['x-oryx-branch-id'] = branchId;
+    const res = await fetch(`${API_BASE}/v1/reports/${kind}/pdf?${toQuery(params)}`, {
+      headers,
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new ApiError(res.status, 'report_pdf_failed', 'The report PDF could not be generated.');
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `oryx-report-${kind}-${new Date().toISOString().slice(0, 10)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
   /** Download one catalogue report as CSV. */
   downloadReportCsv: async (kind: string, params: Record<string, unknown> = {}): Promise<void> => {
     const headers: Record<string, string> = {};

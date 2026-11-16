@@ -31,10 +31,10 @@ import type { JobCardDto, MarketplaceProviderDto, ServiceRequestDto } from '@ory
 /**
  * The workshop (car maintenance) workspace.
  *
- * A landing dashboard shows the live state of the floor, and five tabs drive the
- * work itself: job cards (the workshop's spine), service bays, warranties,
- * marketplace providers and customer service requests. Every figure and row is
- * resolved from the API; the screen never invents a job, a bay or a warranty.
+ * A landing dashboard shows the live state of the floor, and three tabs drive the
+ * work itself: job cards (the workshop's spine), marketplace providers and
+ * customer service requests. Every figure and row is resolved from the API; the
+ * screen never invents a job or a request.
  *
  * The job-card detail dialog is the single place a vehicle moves through the
  * workshop: record the diagnosis, add labour, raise and decide an estimate,
@@ -44,7 +44,7 @@ import type { JobCardDto, MarketplaceProviderDto, ServiceRequestDto } from '@ory
  * holds no matter which control the operator uses.
  */
 
-type Tab = 'job-cards' | 'bay' | 'warranties' | 'providers' | 'requests';
+type Tab = 'job-cards' | 'providers' | 'requests';
 
 const JOB_STATUSES = [
   'DRAFT',
@@ -64,8 +64,6 @@ export default function MaintenancePage() {
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'job-cards', label: t('erp.automotive.jobCards') },
-    { key: 'bay', label: t('erp.automotive.bays') },
-    { key: 'warranties', label: t('erp.automotive.warranties') },
     { key: 'providers', label: t('erp.automotive.providers') },
     { key: 'requests', label: t('erp.automotive.serviceRequests') },
   ];
@@ -105,8 +103,6 @@ export default function MaintenancePage() {
           canIssue={can('erp.parts.issue')}
         />
       ) : null}
-      {tab === 'bay' ? <BaysTab canManage={can('erp.maintenance.booking.manage')} /> : null}
-      {tab === 'warranties' ? <WarrantiesTab canManage={can('erp.maintenance.warranty.manage')} /> : null}
       {tab === 'providers' ? <ProvidersTab canManage={can('erp.marketplace.provider.manage')} /> : null}
       {tab === 'requests' ? <RequestsTab canManage={can('erp.marketplace.request.manage')} /> : null}
     </div>
@@ -123,14 +119,12 @@ function WorkshopDashboard() {
   const dashboard = useAsync(() => api.workshopDashboard(), []);
 
   const tiles: Array<{ key: string; label: string; value: number; icon: string; tone?: 'default' | 'gold' | 'success' | 'danger' }> = [
-    { key: 'bays', label: t('erp.automotive.ws.activeBays'), value: dashboard.data?.activeBays ?? 0, icon: 'warehouse' },
     { key: 'open', label: t('erp.automotive.ws.openJobCards'), value: dashboard.data?.openJobCards ?? 0, icon: 'wrench', tone: 'gold' },
     { key: 'approval', label: t('erp.automotive.ws.awaitingApproval'), value: dashboard.data?.awaitingApproval ?? 0, icon: 'clipboardCheck' },
     { key: 'completed', label: t('erp.automotive.ws.completedJobCards'), value: dashboard.data?.completedJobCards ?? 0, icon: 'check', tone: 'success' },
     { key: 'invoiced', label: t('erp.automotive.ws.invoicedJobCards'), value: dashboard.data?.invoicedJobCards ?? 0, icon: 'wallet' },
     { key: 'bookings', label: t('erp.automotive.ws.scheduledBookings'), value: dashboard.data?.scheduledBookings ?? 0, icon: 'calendar' },
     { key: 'parts', label: t('erp.automotive.ws.outstandingReservations'), value: dashboard.data?.outstandingReservations ?? 0, icon: 'package' },
-    { key: 'warranties', label: t('erp.automotive.ws.activeWarranties'), value: dashboard.data?.activeWarranties ?? 0, icon: 'shield' },
   ];
 
   return (
@@ -1130,7 +1124,6 @@ function CreateJobCardModal({
     complaint: '',
     diagnosis: '',
     odometer: '',
-    bayId: '',
     technicianUserId: '',
     branchId: '',
   });
@@ -1169,7 +1162,6 @@ function CreateJobCardModal({
       complaint: '',
       diagnosis: '',
       odometer: '',
-      bayId: '',
       technicianUserId: '',
       branchId: '',
     });
@@ -1184,7 +1176,6 @@ function CreateJobCardModal({
         complaint: form.complaint || undefined,
         diagnosis: form.diagnosis || undefined,
         odometer: form.odometer ? Number(form.odometer) : undefined,
-        bayId: form.bayId || undefined,
         technicianUserId: form.technicianUserId || undefined,
         branchId: form.branchId || undefined,
       });
@@ -1290,9 +1281,6 @@ function CreateJobCardModal({
             ))}
           </select>
         </Field>
-        <Field label={t('erp.automotive.ws.bay')}>
-          <BaySelect value={form.bayId || null} onChange={(v) => setForm({ ...form, bayId: v ?? '' })} testId="job-bay" />
-        </Field>
         <Field label={t('erp.automotive.branch')}>
           <select
             className="oryx-input"
@@ -1331,330 +1319,6 @@ function CreateJobCardModal({
             value={form.diagnosis}
             onChange={(e) => setForm({ ...form, diagnosis: e.target.value })}
             data-testid="job-diagnosis"
-          />
-        </Field>
-      </div>
-    </Modal>
-  );
-}
-
-/**
- * A bay picker backed by the tenant's own bays.
- *
- * Bays are a small, tenant-scoped list, so this is a plain select rather than
- * the searchable catalogue picker used for larger entities.
- */
-function BaySelect({
-  value,
-  onChange,
-  testId,
-}: {
-  value: string | null;
-  onChange: (value: string | null) => void;
-  testId?: string;
-}) {
-  const { t } = useUi();
-  const bays = useAsync(() => api.workshopBays(), []);
-  const options = useMemo(() => bays.data?.items ?? [], [bays.data]);
-  return (
-    <select
-      className="oryx-input"
-      value={value ?? ''}
-      onChange={(e) => onChange(e.target.value || null)}
-      data-testid={testId}
-    >
-      <option value="">{t('common.select')}</option>
-      {options.map((b) => (
-        <option key={String(b.id)} value={String(b.id)}>
-          {String(b.code)} — {String(b.nameEn)}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-function BaysTab({ canManage }: { canManage: boolean }) {
-  const { t } = useUi();
-  const list = useAsync(() => api.workshopBays(), []);
-  const [open, setOpen] = useState(false);
-
-  return (
-    <Card>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
-        <p className="oryx-panel-title m-0">{t('erp.automotive.bays')}</p>
-        {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-bay">
-            <Icon name="plus" size={16} />
-            {t('erp.automotive.ws.newBay')}
-          </Button>
-        ) : null}
-      </div>
-      <p className="oryx-muted m-0 px-4 pt-3 text-[12px]">{t('erp.automotive.ws.baysHint')}</p>
-      {list.error ? (
-        <div className="p-4">
-          <ErrorBanner message={list.error} onRetry={list.reload} />
-        </div>
-      ) : null}
-      {list.loading ? (
-        <div className="p-4">
-          <Skeleton height={100} />
-        </div>
-      ) : (list.data?.items.length ?? 0) === 0 ? (
-        <EmptyState title={t('common.empty')} hint={t('erp.automotive.ws.emptyBayHint')} />
-      ) : (
-        <TableShell>
-          <thead>
-            <tr>
-              <th>{t('common.code')}</th>
-              <th>{t('common.name')}</th>
-              <th>{t('common.status')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.data!.items.map((b) => (
-              <tr key={String(b.id)} data-testid={`bay-row-${String(b.code)}`}>
-                <td className="font-mono text-[12px]">{String(b.code)}</td>
-                <td className="text-[12.5px]">{String(b.nameEn)}</td>
-                <td>
-                  <Badge tone={b.isActive ? 'success' : 'neutral'}>
-                    {b.isActive ? t('common.active') : t('common.inactive')}
-                  </Badge>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </TableShell>
-      )}
-      <CreateBayModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
-    </Card>
-  );
-}
-
-function CreateBayModal({
-  open,
-  onClose,
-  onCreated,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onCreated: () => Promise<void>;
-}) {
-  const { t } = useUi();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '' });
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await api.createWorkshopBay({ code: form.code.toUpperCase(), nameEn: form.nameEn, nameAr: form.nameAr });
-      await onCreated();
-      setForm({ code: '', nameEn: '', nameAr: '' });
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      title={t('erp.automotive.ws.newBay')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            variant="primary"
-            disabled={busy || !form.code || !form.nameEn || !form.nameAr}
-            onClick={submit}
-            data-testid="save-bay"
-          >
-            {busy ? t('common.loading') : t('erp.automotive.ws.saveBay')}
-          </Button>
-        </>
-      }
-    >
-      {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('erp.automotive.ws.bayCode')} required>
-          <input
-            className="oryx-input"
-            value={form.code}
-            onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
-            data-testid="bay-code"
-          />
-        </Field>
-        <Field label={t('erp.automotive.ws.bayNameEn')} required>
-          <input
-            className="oryx-input"
-            value={form.nameEn}
-            onChange={(e) => setForm({ ...form, nameEn: e.target.value })}
-            data-testid="bay-name-en"
-          />
-        </Field>
-        <Field label={t('erp.automotive.ws.bayNameAr')} required>
-          <input
-            className="oryx-input"
-            value={form.nameAr}
-            onChange={(e) => setForm({ ...form, nameAr: e.target.value })}
-            data-testid="bay-name-ar"
-          />
-        </Field>
-      </div>
-    </Modal>
-  );
-}
-
-function WarrantiesTab({ canManage }: { canManage: boolean }) {
-  const { t } = useUi();
-  const list = useAsync(() => api.warranties(), []);
-  const [open, setOpen] = useState(false);
-
-  return (
-    <Card>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
-        <p className="oryx-panel-title m-0">{t('erp.automotive.warranties')}</p>
-        {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-warranty">
-            <Icon name="plus" size={16} />
-            {t('common.create')}
-          </Button>
-        ) : null}
-      </div>
-      <p className="oryx-muted m-0 px-4 pt-3 text-[12px]">{t('erp.automotive.ws.warrantiesHint')}</p>
-      {list.error ? (
-        <div className="p-4">
-          <ErrorBanner message={list.error} onRetry={list.reload} />
-        </div>
-      ) : null}
-      {list.loading ? (
-        <div className="p-4">
-          <Skeleton height={100} />
-        </div>
-      ) : (list.data?.items.length ?? 0) === 0 ? (
-        <EmptyState title={t('common.empty')} hint={t('erp.automotive.emptyWarranties')} />
-      ) : (
-        <TableShell>
-          <thead>
-            <tr>
-              <th>{t('erp.automotive.vehicle')}</th>
-              <th>{t('erp.accounting.description')}</th>
-              <th>{t('erp.automotive.expiresAt')}</th>
-              <th>{t('common.status')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.data!.items.map((w) => (
-              <tr key={String(w.id)} data-testid={`warranty-row-${String(w.id).slice(-6)}`}>
-                <td className="text-[12.5px]">{String((w.vehicle as { vin?: string } | undefined)?.vin ?? '—')}</td>
-                <td className="text-[12.5px]">{String(w.description)}</td>
-                <td className="text-[12.5px]">{w.expiresAt ? String(w.expiresAt).slice(0, 10) : '—'}</td>
-                <td>
-                  <Badge tone={w.isActive ? 'success' : 'neutral'}>
-                    {w.isActive ? t('common.active') : t('common.inactive')}
-                  </Badge>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </TableShell>
-      )}
-      <CreateWarrantyModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
-    </Card>
-  );
-}
-
-function CreateWarrantyModal({
-  open,
-  onClose,
-  onCreated,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onCreated: () => Promise<void>;
-}) {
-  const { t } = useUi();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ vehicleId: '', description: '', terms: '', expiresAt: '' });
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await api.createWarranty({
-        vehicleId: form.vehicleId,
-        description: form.description,
-        terms: form.terms || undefined,
-        expiresAt: form.expiresAt || undefined,
-      });
-      await onCreated();
-      setForm({ vehicleId: '', description: '', terms: '', expiresAt: '' });
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      title={t('erp.automotive.warranties')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            variant="primary"
-            disabled={busy || !form.vehicleId || !form.description}
-            onClick={submit}
-            data-testid="save-warranty"
-          >
-            {busy ? t('common.loading') : t('common.save')}
-          </Button>
-        </>
-      }
-    >
-      {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('erp.automotive.vehicle')} required>
-          <EntitySelect
-            catalogue="vehicle"
-            value={form.vehicleId || null}
-            onChange={(v) => setForm({ ...form, vehicleId: v ?? '' })}
-            placeholder={t('common.select')}
-            testId="warranty-vehicle"
-          />
-        </Field>
-        <Field label={t('erp.automotive.expiresAt')}>
-          <input
-            type="date"
-            className="oryx-input"
-            value={form.expiresAt}
-            onChange={(e) => setForm({ ...form, expiresAt: e.target.value })}
-            data-testid="warranty-expires"
-          />
-        </Field>
-        <Field label={t('erp.accounting.description')} required>
-          <input
-            className="oryx-input"
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            data-testid="warranty-description"
-          />
-        </Field>
-        <Field label={t('common.notes')}>
-          <input
-            className="oryx-input"
-            value={form.terms}
-            onChange={(e) => setForm({ ...form, terms: e.target.value })}
-            data-testid="warranty-terms"
           />
         </Field>
       </div>

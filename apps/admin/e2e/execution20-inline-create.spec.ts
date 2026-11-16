@@ -249,8 +249,7 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
   });
 
   test('8. the inline create form is the full form, not a reduced copy', async ({ page }) => {
-    await page.goto('/sales');
-    await page.getByTestId('sales-tab-customers').click();
+    await page.goto('/crm?tab=customers');
     await page.getByTestId('new-customer').click();
     // The standalone form offers both customer kinds and the company-only fields.
     await expect(page.getByTestId('customer-kind-individual')).toBeVisible();

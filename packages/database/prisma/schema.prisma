@@ -4582,7 +4582,7 @@ model InspectionDiagnosticEntry {
   companyId   String
   sessionId   String
   sectionId   String
-  module      String
+  module      String?
   faultCode   String?
   description String
   observation String?

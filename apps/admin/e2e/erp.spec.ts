@@ -118,9 +118,14 @@ test.describe('Execution 02 — ERP core interfaces', () => {
     await page.goto('/sales');
     await expect(page.getByTestId('sales-page')).toBeVisible();
     await expect(page.getByTestId('sales-tab-invoices')).toBeVisible();
-    // The tab strip and the invoice list are both real.
-    await page.getByTestId('sales-tab-customers').click();
-    await expect(page.getByTestId('customer-row-CUST-001')).toBeVisible({ timeout: 20_000 });
+    // The invoice list is real. Customer master data now lives in CRM, so the
+    // sales surface no longer offers a customers tab.
+    await expect(page.getByTestId('sales-tab-customers')).toHaveCount(0);
+    const list = await apiCall<{ items: Array<{ invoiceNumber: string }> }>(page, '/sales/invoices');
+    expect(list.status).toBe(200);
+    if (list.body.items.length > 0) {
+      await expect(page.getByTestId(`invoice-row-${list.body.items[0].invoiceNumber}`)).toBeVisible({ timeout: 20_000 });
+    }
   });
 
   test('6. purchasing suppliers and orders load', async ({ page }) => {

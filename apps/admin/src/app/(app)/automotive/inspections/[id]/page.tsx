@@ -577,9 +577,7 @@ function SectionEditor({
           <h2 className="oryx-h2 m-0">{locale === 'ar' ? spec.labelAr : spec.labelEn}</h2>
           <p className="oryx-faint m-0 text-[12px]">{locale === 'ar' ? spec.summaryAr : spec.summaryEn}</p>
         </div>
-        <Badge tone={section.completedAt ? 'success' : 'neutral'}>
-          {section.completedAt ? t('inspection.sectionComplete') : t('inspection.sectionIncomplete')}
-        </Badge>
+        {section.completedAt ? <Badge tone="success">{t('inspection.sectionComplete')}</Badge> : null}
       </div>
 
       {spec.kind === 'ITEMS' ? (
@@ -695,23 +693,21 @@ function DiagnosticList({
 }) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ module: '', faultCode: '', description: '', observation: '', severity: 'INFO' });
+  const [form, setForm] = useState({ description: '', observation: '', severity: 'INFO' });
 
   const add = async () => {
-    if (!form.module.trim() || !form.description.trim()) {
+    if (!form.description.trim()) {
       onError(t('inspection.diagnosticRequired'));
       return;
     }
     setBusy(true);
     try {
       await api.addInspectionDiagnostic(sessionId, {
-        module: form.module.trim(),
-        faultCode: form.faultCode.trim() || undefined,
         description: form.description.trim(),
         observation: form.observation.trim() || undefined,
         severity: form.severity,
       });
-      setForm({ module: '', faultCode: '', description: '', observation: '', severity: 'INFO' });
+      setForm({ description: '', observation: '', severity: 'INFO' });
       onChanged(await api.inspectionSession(sessionId));
     } catch (e) {
       onError(e instanceof Error ? e.message : t('common.error'));
@@ -738,11 +734,7 @@ function DiagnosticList({
       {entries.map((e) => (
         <div key={e.id} className="oryx-diagnostic-row" data-testid={`diagnostic-${e.id}`}>
           <div className="min-w-0">
-            <div className="text-[13px] font-semibold">
-              {e.module}
-              {e.faultCode ? <span className="oryx-faint"> · {e.faultCode}</span> : null}
-            </div>
-            <div className="text-[12.5px]">{e.description}</div>
+            <div className="text-[13px] font-semibold">{e.description}</div>
             {e.observation ? <div className="oryx-faint text-[12px]">{e.observation}</div> : null}
           </div>
           <div className="flex items-center gap-2">
@@ -767,12 +759,6 @@ function DiagnosticList({
 
       {editable ? (
         <div className="grid gap-2 sm:grid-cols-2" data-testid="diagnostic-form">
-          <Field label={t('inspection.module')}>
-            <input className="oryx-input" value={form.module} onChange={(e) => setForm({ ...form, module: e.target.value })} data-testid="diagnostic-module" />
-          </Field>
-          <Field label={t('inspection.faultCode')}>
-            <input className="oryx-input" value={form.faultCode} onChange={(e) => setForm({ ...form, faultCode: e.target.value })} data-testid="diagnostic-code" />
-          </Field>
           <Field label={t('inspection.description')}>
             <input
               className="oryx-input"

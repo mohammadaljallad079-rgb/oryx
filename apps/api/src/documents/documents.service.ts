@@ -1015,8 +1015,6 @@ export class DocumentsService {
         markers: Array<{ condition: string; x: number; y: number; panelKey: string | null; note: string | null }>;
         chassisRegions: Array<{ regionKey: string; condition: string; note: string | null }>;
         diagnostics: Array<{
-          module: string;
-          faultCode: string | null;
           description: string;
           observation: string | null;
           severity: string;
@@ -1091,8 +1089,6 @@ export class DocumentsService {
           };
         }),
         diagnostics: (row?.diagnostics ?? []).map((d) => ({
-          module: d.module,
-          faultCode: d.faultCode,
           description: d.description,
           observation: d.observation,
           severity: d.severity as 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL',

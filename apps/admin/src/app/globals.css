@@ -3159,3 +3159,78 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   padding-inline: 8px;
   font-size: 12px;
 }
+
+/* ---------------------------------------------------------------- Reports */
+/* The report catalogue tile: a card that selects a report and exposes its
+   own export actions without leaving the index. */
+.oryx-report-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+.oryx-report-tile:hover {
+  border-color: var(--tint-line);
+  box-shadow: 0 2px 10px var(--tint-glow);
+}
+.oryx-report-tile:focus-visible {
+  outline: 2px solid var(--tint-ring);
+  outline-offset: 1px;
+}
+.oryx-report-tile--active {
+  border-color: var(--gold);
+  box-shadow: inset 3px 0 0 var(--gold);
+}
+.oryx-report-tile__title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.35;
+}
+.oryx-report-tile__desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  flex: 1 1 auto;
+}
+.oryx-report-tile__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--border);
+}
+.oryx-report-tile__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  padding: 2px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.oryx-report-tile__action:hover {
+  color: var(--gold-deep);
+  background: var(--tint-wash);
+}
+
+/* A single server-resolved total shown above a report table. */
+.oryx-report-total {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 130px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--tint-wash);
+}

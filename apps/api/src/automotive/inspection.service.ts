@@ -542,7 +542,7 @@ export class InspectionService {
         companyId,
         sessionId: id,
         sectionId: section.id,
-        module: dto.module,
+        module: dto.module ?? null,
         faultCode: dto.faultCode ?? null,
         description: dto.description,
         observation: dto.observation ?? null,
@@ -902,7 +902,7 @@ interface SectionShape {
   chassisRegions: Array<{ id: string; regionKey: string; condition: string; note: string | null }>;
   diagnostics: Array<{
     id: string;
-    module: string;
+    module: string | null;
     faultCode: string | null;
     description: string;
     observation: string | null;

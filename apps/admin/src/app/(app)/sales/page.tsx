@@ -20,7 +20,6 @@ import { AttachmentsPanel, DocumentPrintActions } from '@/components/document-pr
 import { ModuleDashboard } from '@/components/module-dashboard';
 import { TabDeepLink } from '@/components/tab-deep-link';
 import { CustomerModal } from '@/components/customer-modal';
-import { CustomersTab } from '@/components/customers-tab';
 import { EntityPicker } from '@/components/inline-create';
 import { ProductModal, WarehouseModal } from '@/components/entity-modals';
 import { TaxPicker } from '@/components/tax-modal';
@@ -49,7 +48,7 @@ import type {
 } from '@oryx/shared';
 import { DocumentActions } from '@/components/document-actions';
 
-type Tab = 'dashboard' | 'invoices' | 'orders' | 'quotations' | 'returns' | 'pos' | 'customers';
+type Tab = 'dashboard' | 'invoices' | 'quotations' | 'returns' | 'pos';
 
 interface LineDraft {
   productId: string;
@@ -165,7 +164,7 @@ function useTaxOptions(companyId: string | null | undefined): {
   };
 }
 
-const TAB_KEYS = ['dashboard', 'invoices', 'orders', 'quotations', 'returns', 'pos', 'customers'] as const;
+const TAB_KEYS = ['dashboard', 'invoices', 'quotations', 'returns', 'pos'] as const;
 
 /** The dictionary key for a return's refund method. */
 function refundLabelKey(method?: string): string {
@@ -197,11 +196,9 @@ function SalesInner() {
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'dashboard', label: t('erp.sales.dashboard') },
     { key: 'invoices', label: t('erp.sales.invoices') },
-    { key: 'orders', label: t('erp.sales.orders') },
     { key: 'quotations', label: t('erp.sales.quotations') },
     { key: 'returns', label: t('erp.sales.returns') },
     { key: 'pos', label: t('erp.sales.pos') },
-    { key: 'customers', label: t('erp.sales.customers') },
   ];
 
   return (
@@ -231,11 +228,9 @@ function SalesInner() {
 
       {tab === 'dashboard' ? <ModuleDashboard moduleKey="sales_pos" /> : null}
       {tab === 'invoices' ? <InvoicesTab canManage={can('erp.sales.invoice.manage')} /> : null}
-      {tab === 'orders' ? <OrdersTab canManage={can('erp.sales.order.manage')} /> : null}
       {tab === 'quotations' ? <QuotationsTab canManage={can('erp.sales.order.manage')} /> : null}
       {tab === 'returns' ? <CreditNotesTab canManage={can('erp.sales.credit_note.manage')} /> : null}
       {tab === 'pos' ? <PosTab canOperate={can('erp.sales.pos.operate')} canManage={can('erp.sales.pos.manage')} /> : null}
-      {tab === 'customers' ? <CustomersTab canManage={can('erp.sales.customer.manage')} /> : null}
     </div>
   );
 }
@@ -463,88 +458,6 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
           </div>
         ) : null}
       </Modal>
-    </Card>
-  );
-}
-
-// -------------------------------------------------------------------- orders
-
-function OrdersTab({ canManage }: { canManage: boolean }) {
-  const { t } = useUi();
-  const { companyId } = useAuth();
-  const [open, setOpen] = useState(false);
-  const list = useAsync(() => api.salesOrders(), []);
-  const customers = useAsync(() => api.salesCustomers(), []);
-  const products = useAsync(() => api.products(), []);
-  const warehouses = useAsync(() => api.warehouses(), []);
-  const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
-
-  return (
-    <Card>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
-        <p className="oryx-panel-title m-0">{t('erp.sales.orders')}</p>
-        {canManage ? (
-          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-order">
-            <Icon name="plus" size={16} />
-            {t('erp.sales.newOrder')}
-          </Button>
-        ) : null}
-      </div>
-      {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
-      {list.loading ? <div className="p-4"><Skeleton height={140} /></div> : (list.data?.items.length ?? 0) === 0 ? (
-        <EmptyState title={t('common.empty')} hint={t('erp.sales.emptyOrders')} />
-      ) : (
-        <TableShell>
-          <thead>
-            <tr>
-              <th>{t('erp.sales.orderNumber')}</th>
-              <th>{t('common.date')}</th>
-              <th>{t('erp.sales.customer')}</th>
-              <th>{t('erp.sales.total')}</th>
-              <th>{t('common.status')}</th>
-              <th>{t('common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.data!.items.map((o: SalesDocumentDto) => (
-              <tr key={o.id} data-testid={`order-row-${o.orderNumber}`}>
-                <td className="font-mono text-[12px]">{o.orderNumber}</td>
-                <td className="text-[12.5px]">{o.orderDate?.slice(0, 10)}</td>
-                <td className="text-[12.5px]">{o.customerNameEn}</td>
-                <td className="tabular-nums text-[12.5px] font-semibold">{money(o.totalMinor, o.currency)}</td>
-                <td><StatusBadge status={o.status} label={o.status} /></td>
-                <td>
-                  <DocumentActions
-                    sourceType="SalesOrder"
-                    sourceId={o.id}
-                    type="SALES_ORDER"
-                    permissions={['erp.sales.read', 'erp.accounting.read']}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </TableShell>
-      )}
-      <DocumentModal
-        open={open}
-        title={t('erp.sales.newOrder')}
-        customers={customers.data?.items ?? []}
-        onCustomerCreated={customers.reload}
-        products={products.data?.items ?? []}
-        warehouses={warehouses.data?.items ?? []}
-        onProductCreated={products.reload}
-        onWarehouseCreated={warehouses.reload}
-        taxOptions={taxOptions}
-        onTaxCreated={reloadTaxOptions}
-        showWarehouse
-        testIdPrefix="order"
-        onClose={() => setOpen(false)}
-        onSubmit={async (payload) => {
-          await api.createSalesOrder({ ...payload, confirm: true });
-          await list.reload();
-        }}
-      />
     </Card>
   );
 }

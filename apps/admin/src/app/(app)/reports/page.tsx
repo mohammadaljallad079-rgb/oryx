@@ -57,7 +57,7 @@ export default function ReportsPage() {
     return definitions.filter((d) => {
       if (group !== 'all' && d.group !== group) return false;
       if (!needle) return true;
-      const hay = `${d.titleEn} ${d.titleAr} ${d.descriptionEn}`;
+      const hay = `${d.titleEn} ${d.titleAr} ${d.descriptionEn} ${d.descriptionAr}`;
       return hay.toLowerCase().includes(needle);
     });
   }, [definitions, group, search]);
@@ -69,13 +69,34 @@ export default function ReportsPage() {
     [activeKind, from, to],
   );
 
-  const groups = [
-    { key: 'all', label: t('erp.reports.group.all') },
-    ...(['SALES', 'PURCHASING', 'INVENTORY', 'ACCOUNTING', 'RECEIVABLES'] as const).map((g) => ({
-      key: g,
-      label: t(`erp.reports.group.${g}`),
-    })),
-  ];
+  const groups = useMemo(
+    () => [
+      { key: 'all', label: t('erp.reports.group.all') },
+      ...(['SALES', 'PURCHASING', 'INVENTORY', 'ACCOUNTING', 'RECEIVABLES'] as const).map((g) => ({
+        key: g,
+        label: t(`erp.reports.group.${g}`),
+      })),
+    ],
+    [t],
+  );
+
+  /** A quick range preset; the two date inputs stay the single source of truth. */
+  const applyRange = (preset: 'month' | 'quarter' | 'year' | 'all') => {
+    if (preset === 'all') {
+      setFrom('');
+      setTo('');
+      return;
+    }
+    const now = new Date();
+    const start = new Date(now);
+    if (preset === 'month') start.setMonth(now.getMonth() - 1);
+    if (preset === 'quarter') start.setMonth(now.getMonth() - 3);
+    if (preset === 'year') start.setFullYear(now.getFullYear() - 1);
+    setFrom(start.toISOString().slice(0, 10));
+    setTo(now.toISOString().slice(0, 10));
+  };
+
+  const groupCount = useMemo(() => new Set(definitions.map((d) => d.group)).size, [definitions]);
 
   const exportCsv = async (kind: string) => {
     setBusy(`csv-${kind}`);
@@ -96,6 +117,15 @@ export default function ReportsPage() {
     }
   };
 
+  const downloadPdf = async (kind: string) => {
+    setBusy(`pdf-${kind}`);
+    try {
+      await api.downloadReportPdf(kind, params);
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4" data-testid="reports-page">
       <SectionHeader
@@ -104,8 +134,34 @@ export default function ReportsPage() {
         actions={<Badge tone="gold">{t('modules.available')}</Badge>}
       />
 
-      <Card className="p-4">
+      {/* The workspace overview: how much the catalogue holds and what is selected. */}
+      <StatGrid>
+        <StatCard icon="list" label={t('erp.reports.reportsAvailable')} value={String(definitions.length)} data-testid="reports-overview-count" />
+        <StatCard icon="grid" label={t('erp.reports.groups')} value={String(groupCount)} />
+        <StatCard icon="sliders" label={t('erp.reports.showing')} value={String(filtered.length)} data-testid="reports-overview-filtered" />
+        <StatCard
+          icon="eye"
+          label={t('erp.reports.selectedReport')}
+          value={activeDefinition ? (locale === 'ar' ? activeDefinition.titleAr : activeDefinition.titleEn) : t('erp.reports.none')}
+        />
+      </StatGrid>
+
+      <Card className="p-4" data-testid="reports-filters">
         <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-wrap gap-2" role="group" aria-label={t('erp.reports.rangeLabel')}>
+            {(
+              [
+                ['month', t('erp.reports.range.month')],
+                ['quarter', t('erp.reports.range.quarter')],
+                ['year', t('erp.reports.range.year')],
+                ['all', t('erp.reports.range.all')],
+              ] as const
+            ).map(([key, label]) => (
+              <Button key={key} size="sm" onClick={() => applyRange(key)} data-testid={`report-range-${key}`}>
+                {label}
+              </Button>
+            ))}
+          </div>
           <label className="min-w-[170px]">
             <span className="oryx-label">{t('erp.reports.from')}</span>
             <input
@@ -125,6 +181,16 @@ export default function ReportsPage() {
               onChange={(e) => setTo(e.target.value)}
               data-testid="report-to"
             />
+          </label>
+          <label className="min-w-[190px]">
+            <span className="oryx-label">{t('erp.reports.group')}</span>
+            <select className="oryx-input" value={group} onChange={(e) => setGroup(e.target.value)} data-testid="report-group-select">
+              {groups.map((g) => (
+                <option key={g.key} value={g.key}>
+                  {g.label}
+                </option>
+              ))}
+            </select>
           </label>
           <Button size="sm" variant="primary" onClick={() => void report.reload()} data-testid="report-refresh">
             <Icon name="refresh" size={14} /> {t('common.refresh')}
@@ -200,7 +266,7 @@ export default function ReportsPage() {
                     className="oryx-report-tile__action"
                     onClick={(e) => {
                       e.stopPropagation();
-                      void openPdf(d.kind);
+                      void downloadPdf(d.kind);
                     }}
                     data-testid={`report-pdf-${d.kind}`}
                   >
@@ -235,6 +301,16 @@ export default function ReportsPage() {
               <p className="oryx-muted m-0 mt-1 text-[12.5px]">
                 {locale === 'ar' ? activeDefinition.descriptionAr : activeDefinition.descriptionEn}
               </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Badge tone="info">{activeDefinition.group}</Badge>
+                <Badge tone="neutral">{activeDefinition.moduleKey}</Badge>
+                <Badge tone={activeDefinition.detail ? 'info' : 'neutral'}>
+                  {activeDefinition.detail ? t('erp.reports.detail') : t('erp.reports.summary')}
+                </Badge>
+                <span className="oryx-faint text-[12px]">
+                  {t('erp.reports.columns')}: {activeDefinition.columns.length}
+                </span>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button size="sm" onClick={() => setPreviewKind(activeKind)} data-testid="report-preview">
@@ -243,8 +319,17 @@ export default function ReportsPage() {
               <Button size="sm" onClick={() => void exportCsv(activeKind)} disabled={busy === `csv-${activeKind}`} data-testid="report-csv">
                 <Icon name="download" size={14} /> {t('erp.reports.exportCsv')}
               </Button>
-              <Button size="sm" variant="primary" onClick={() => void openPdf(activeKind)} disabled={busy === `pdf-${activeKind}`} data-testid="report-pdf">
-                <Icon name="print" size={14} /> {t('erp.reports.exportPdf')}
+              <Button size="sm" onClick={() => void openPdf(activeKind)} data-testid="report-open-pdf">
+                <Icon name="print" size={14} /> {t('erp.reports.openPdf')}
+              </Button>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => void downloadPdf(activeKind)}
+                disabled={busy === `pdf-${activeKind}`}
+                data-testid="report-pdf"
+              >
+                <Icon name="download" size={14} /> {t('erp.reports.downloadPdf')}
               </Button>
             </div>
           </div>
@@ -281,6 +366,26 @@ export default function ReportsPage() {
                   />
                 </StatGrid>
               </div>
+
+              {/* The report's own totals, when the definition carries them. */}
+              {report.data.columns.some((c) => c.total) ? (
+                <div className="flex flex-wrap gap-2 border-b border-[var(--border)] p-4" data-testid="report-total-strip">
+                  {report.data.columns
+                    .filter((c) => c.total)
+                    .map((c) => (
+                      <span key={c.key} className="oryx-report-total">
+                        <span className="oryx-faint text-[11px]">{locale === 'ar' ? c.labelAr : c.labelEn}</span>
+                        <span className="tabular-nums text-[13px] font-semibold">
+                          {c.format === 'money'
+                            ? money(report.data!.totals[c.key] ?? 0, report.data!.currency)
+                            : c.format === 'quantity'
+                              ? qty(report.data!.totals[c.key] ?? 0)
+                              : String(report.data!.totals[c.key] ?? 0)}
+                        </span>
+                      </span>
+                    ))}
+                </div>
+              ) : null}
 
               <div className="p-4">
                 {report.data.rows.length === 0 ? (
