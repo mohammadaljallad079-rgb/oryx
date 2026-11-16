@@ -113,6 +113,16 @@ Security baseline (do not regress):
 - Report incomplete work honestly. Never claim a module works, or that something
   is deployed, without verification.
 
+## Current full-stack preview recovery (dashboard-modules-redesign-unified)
+
+- This is an **ephemeral review preview**, not production. Keep all work on `feature/dashboard-modules-redesign-unified`; do not merge or deploy it to `main` or any `release/*` branch without a separate approval.
+- Recover a recycled sandbox from the repository root with `RUNTIME_ID=gypyysqmmdjouhyu bash .run/start-stack.sh`. The script restores PostgreSQL 17, starts the API (`:3001`), admin (`:3000`), customer (`:3002`), mobile web (`:8081`), and same-origin proxies (`:12000` admin, `:12001` customer). The supplied admin preview is `https://work-1-gypyysqmmdjouhyu.prod-runtime.all-hands.dev`.
+- The seeded preview database is `oryx_e20`; preserve `.run/pgdata` and the existing `.env`. Do **not** run `db:seed`, reset the database, or point this preview at production. The recovery script intentionally reuses the existing data and compiled output.
+- After source changes, rebuild only affected workspaces, then restart the matching app (`bash .run/restart-app.sh admin` or `bash .run/restart-customer.sh`; rebuild API with `pnpm --filter @oryx/api build` before restarting it). Recheck `/api/health`, login, and the relevant feature through the proxy origin.
+- Preview credentials are documented in the task handoff, not repeated here. Rotate development defaults before any real deployment.
+- **Several checkouts of this repo coexist under `/workspace/project`** (`oryx`, `oryx-e20`, `oryx-preview-18`, `oryx-unified`), each on its own branch with its own `.env` and its own seeded database (e.g. `oryx` uses `oryx_dev`; `oryx-unified` uses `oryx_e20`). The recovery and restart scripts (`.run/start-stack.sh`, `.run/restart-app.sh`, `.run/restart-customer.sh`, `.run/preview-proxy.mjs`, `.run/serve-mobile-web.mjs`) are **self-locating** — they resolve the repository root from the script's own path, so run them from the checkout you mean to serve. A hardcoded `/workspace/project/oryx` would have started a different branch and a different database. `ORYX_ROOT` overrides the root when a script must be pointed elsewhere.
+- **Verify the revision before trusting the preview.** `git status`, the checked-out branch and `git rev-parse HEAD` on the checkout that serves the preview. The inline-create work (in-dropdown `EntityPicker` + create modal) is the tip of `feature/dashboard-modules-redesign-unified`; a checkout without `apps/admin/src/components/inline-create.tsx` predates it and is not the preview.
+
 ## Working in this repository
 
 ```bash
@@ -317,6 +327,20 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   admin, 12001 → customer, with a `/mobile` route). It needs no nginx and no
   re-seed — the seeded cluster is preserved. Playwright still needs
   `playwright install chromium` once more after a recycle.
+- **The mobile export is not committed and must be built after a clean checkout.**
+  `serve-mobile-web.mjs` serves `apps/mobile/dist/web`, which a fresh checkout does
+  not have, so port 8081 answers 500. Build it once:
+  `cd apps/mobile && EXPO_BASE_PATH=/mobile EXPO_PUBLIC_API_BASE_URL=/api \
+  node ../../node_modules/.bin/expo export --platform web --output-dir dist/web`.
+  This needs `apps/mobile/node_modules` (the workspace link to `@oryx/shared`), so
+  run `pnpm install --filter @oryx/mobile...` first on a checkout that skipped it.
+- **`CORS_ORIGINS` is the login-CSRF origin allowlist.** The browser suite's
+  documented `ORYX_ADMIN_URL=http://localhost:12000` only signs in when the proxy
+  origins are listed; otherwise login answers `403 auth.csrf_token_invalid`
+  ("Request origin is not allowed") while a `curl` login still passes — curl sends
+  no `Origin` header. `.env.example` lists the localhost and 127.0.0.1 proxy
+  origins; add the public `https://work-1-<id>…` hosts in `.env` for the owner's
+  browser.
 - **`ss`, `netstat` and `lsof` are not installed.** Readiness checks must not use
   them, or a healthy stack reports every port as closed. `start-stack.sh` uses a
   bash `/dev/tcp` probe (`port_open`) instead, which needs no external binary.
@@ -625,6 +649,17 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   surface starts redirecting to `/login` again. After a recycle, recreate
   `apps/customer/.env.local` (and `apps/admin/.env.local`) with
   `NEXT_PUBLIC_API_BASE_URL=/api` *before* rebuilding.
+- **The build guard only catches an unsafe *value*, not an absent one.** The
+  `next.config.ts` check throws when `NEXT_PUBLIC_API_BASE_URL` is set to a
+  loopback or preview host, but an *unset* variable skips it entirely and
+  `src/lib/api.ts` then falls back to `http://localhost:3001/api`. That is the
+  recycle case above: a remote browser resolves the inlined `localhost` against
+  its own machine, so login dies with "تعذّر الوصول إلى الخادم" / "could not
+  reach the server" while the same build passes every Playwright spec on the
+  sandbox. `.run/restart-app.sh` now writes `NEXT_PUBLIC_API_BASE_URL=/api` into
+  the app's `.env.local` before building, so a cold start is deterministic.
+  Confirm a fresh build with
+  `grep -r 'http://localhost:3001' apps/*/.next/static/chunks/` — it must be empty.
 - **The customer app's preference keys are namespaced.** It reads
   `oryx.customer.locale` and `oryx.customer.theme`, while the admin app reads
   `oryx.locale` and `oryx.theme`. Seeding the wrong pair leaves the app on its
@@ -1213,6 +1248,90 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   Save button. Collapsing these into one box silently drops stored findings —
   do not do it. `apps/admin/e2e/execution19-evidence.spec.ts` captures both
   arrangements in both themes.
+
+### Execution 20 gotchas (dashboard, catalog, typography)
+
+- **A unit-test failure in `tokens.test.ts` may be a stale guard, not a code
+  bug.** Commit `aa2395d` deliberately made the light-theme navigation rail an
+  ivory field (the Execution 20 brief forbids a fixed navy background in the
+  light theme) and left `tokens.test.ts`, `branding.spec.ts` and
+  `.run/check-admin-light-palette.mjs` asserting "navy in both themes". When a
+  theme guard fails, read the CSS first: if the CSS matches the brief, update
+  the guard rather than reverting the design.
+- **Name the tint ramp, never an ad-hoc `color-mix`.** The gold tint ramp guard
+  fails on any rule that writes `color-mix(in srgb, var(--gold) …)` directly.
+  Use `var(--tint-fill)` (a wash) or `var(--tint-focus)` so the tint stays in
+  one place.
+- **`CompanySetting` is per company and never seeded.** The seed writes no
+  `CompanySetting` rows, so any row the test suite did not just write is
+  pollution from an earlier run. A stray row on a *second* company makes
+  `execution20-customer-settings.e2e-spec.ts` fail its isolation assertions
+  ("the other company has no tax row of its own") even though the code is
+  correct. Prove it by running that suite against a freshly migrated and seeded
+  scratch database; if it passes there, delete the stray row
+  (`DELETE FROM "CompanySetting" …`) instead of touching the code.
+- **The module catalog is a database table, not a compile-time constant.** The
+  dashboard tiles, the module dashboards' banner copy and the admin catalog
+  screen all read `Module` rows now, falling back to `getModule()` only for a
+  row created before the `tileImage`/`isActive` columns existed. `seedModules()`
+  is create-only so an operator edit survives a reseed. Add a module to
+  `packages/shared/src/modules.ts` *and* seed it, or the dashboard will not show
+  it.
+- **A retired module is hidden, not deleted.** `isActive: false` removes the tile
+  from `GET /dashboard` and the catalog screen shows a "Retired" badge, but the
+  row, its licence and its route stay. Never delete a catalog row to hide a
+  module.
+- **The banner mark is fixed-aspect raster artwork.** The lockup is 1404×320, so
+  at its 64px desktop height it is ~281px wide and cannot sit beside the identity
+  block on a phone. The `@media (max-width: 640px)` rule stacks the hero and caps
+  the logo at 240px; without it a 320px viewport overflows (the responsive-matrix
+  suite fails).
+- **The homepage banner is logo-left, not centred.** The approved design anchors
+  the mark on the reading-start edge with the identity block beside it, and the
+  field is ivory in the light theme (the navy-ink colourway swaps in). The
+  branding spec pins that geometry.
+- **Typography is per-company and applied at the document root.** `branding-context.tsx`
+  writes the tenant's `typography` section to CSS custom properties
+  (`--font-size-*`, `--oryx-heading-weight`, `--oryx-label-tracking`); every
+  component derives from those tokens. Changing the section in the settings
+  centre calls `refreshTypography()` so the shell updates without a reload.
+- **Inline-create pickers must write state functionally.** `EntityPicker`'s
+  inline "add new" opens the *same* modal the standalone screen uses and
+  selects the saved record in the form underneath. Every field handler in
+  `entity-modals.tsx` must use `setForm((prev) => ({ ...prev, X }))`, never
+  `setForm({ ...form, X })`: the mount effect writes the parent's preselected
+  id, and a stale-closure handler that captured the pre-effect `form` clobbers
+  it on the first keystroke (the vehicle modal resetting `customerId` to `''`
+  was the visible symptom). A reduced copy of the form is not acceptable either
+  — the popup runs the same validation, permissions and API call.
+- **A picker without a create path degrades, it does not offer a dead button.**
+  `EntityPicker`'s `renderCreate` is optional: when it is absent (a fixed tax a
+  user may not author, a status filter) the "+ Add new" is not rendered at all.
+  Do not pass an empty `renderCreate` to keep the affordance — that shows a
+  button that opens nothing.
+- **Extract a modal before wiring it inline.** The tax form was extracted from
+  `tax-rates-panel.tsx` into `tax-modal.tsx` so the settings list and the sales/
+  purchasing line pickers share one component; a second copy would drift. The
+  same pattern produced `branch-modal`, `pipeline-modal`, `leave-type-modal` and
+  `CatalogModal` (the two-name code/EN/AR catalogue dialog). `InlineCatalogButton`
+  was removed once both its callers moved their create inside the dropdown. A
+  line's tax option `value` is the rate in basis points and the `label` is the
+  display percentage the line parses back, so `TaxPicker` passes
+  `defaultScope` (`SALES`/`PURCHASES`) to preselect the side.
+- **The topbar branch scope is an `EntityPicker`, not a `<select>`.** Only the
+  company scope remains a native select. Specs that drove the second select in
+  `context-selector` must open `context-branch`'s trigger button instead.
+- **`useTaxOptions` returns `{ options, reload }`.** An inline-created rate must
+  be reloaded into the list before the new id is selected, or the line selects
+  an option the list does not yet contain. Destructure it at every call site.
+- **A searchable picker's options sit inside the `Field` label.** The label
+  re-dispatches a click to its trigger, so `SearchableSelect` calls
+  `preventDefault()` on the option and the create/clear buttons; without it the
+  popover the pick just closed reopens instantly.
+- **Every module now opens on its dashboard tab.** Specs that used to land
+  straight on a list must click the tab that carries the widget first
+  (`accounting-tab-accounts`, `inventory-tab-valuation`, `payments-tab-intents`,
+  …); the module-dashboards work made `dashboard` the default for each.
 
 ### Adding a new ERP module
 

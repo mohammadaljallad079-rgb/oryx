@@ -8,6 +8,10 @@ coverage/
 .env
 .env.local
 .env.*.local
+# Editor/backup copies of the env file (e.g. `.env.bak`) carry the same secrets
+# and must never be committed either.
+.env.*
+!.env.example
 # Production and staging secrets live in a real env file and must never be
 # committed. The templates in deploy/env/ are the committed examples.
 .env.production

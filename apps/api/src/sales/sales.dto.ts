@@ -187,6 +187,46 @@ export class CreateCustomerDto {
   @IsString()
   @MaxLength(400)
   notes?: string;
+
+  /** Individual or company. Absent defaults to INDIVIDUAL on the server. */
+  @IsOptional()
+  @IsIn(['INDIVIDUAL', 'COMPANY'])
+  kind?: 'INDIVIDUAL' | 'COMPANY';
+
+  /** Individual: national id / personal number. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  nationalId?: string;
+
+  /** Company: commercial registration number and expiry. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  crNumber?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  crExpiryDate?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  website?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  contactPersonName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  contactPersonPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  parentCustomerId?: string;
 }
 
 export class UpdateCustomerDto {
@@ -258,6 +298,46 @@ export class UpdateCustomerDto {
   @IsString()
   @MaxLength(400)
   notes?: string;
+
+  /** Individual or company. Absent defaults to INDIVIDUAL on the server. */
+  @IsOptional()
+  @IsIn(['INDIVIDUAL', 'COMPANY'])
+  kind?: 'INDIVIDUAL' | 'COMPANY';
+
+  /** Individual: national id / personal number. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  nationalId?: string;
+
+  /** Company: commercial registration number and expiry. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  crNumber?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  crExpiryDate?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  website?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  contactPersonName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  contactPersonPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  parentCustomerId?: string;
 }
 
 export class CustomerAttachmentDto {
@@ -281,6 +361,114 @@ export class CustomerAttachmentDto {
   @IsString()
   @MaxLength(400)
   storageRef?: string;
+}
+
+/**
+ * A secondary branch of a company customer. Its own code namespace inside the
+ * tenant, so two company customers can each name a branch "MAIN" without a
+ * collision.
+ */
+export class CustomerBranchDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  code!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  nameEn?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  nameAr?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  contactName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  addressLine?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(3)
+  countryCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  notes?: string;
+}
+
+export class UpdateCustomerBranchDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  nameEn?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  nameAr?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  contactName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  addressLine?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(3)
+  countryCode?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  notes?: string;
 }
 
 export class SalesLineDto {

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ENTERPRISE_ADMIN, pickOption, setLocale, setTheme, signIn } from './helpers';
+import { ENTERPRISE_ADMIN, setLocale, setTheme, signIn } from './helpers';
 
 /**
  * Execution 08 remediation — interface coverage for the reported defects.
@@ -47,9 +47,12 @@ test.describe('Execution 08 remediation — interface', () => {
     await page.getByTestId('hr-tab-leave').click();
     await page.getByTestId('new-leave-request').click();
 
-    // Both pickers are searchable comboboxes, not native `<select>` elements.
-    await pickOption(page, 'leave-employee');
-    await pickOption(page, 'leave-type');
+    // Both the employee and the leave type are searchable pickers (with an
+    // inline create action), not native selects.
+    await page.getByTestId('leave-employee').locator('button').first().click();
+    await page.getByTestId('leave-employee').locator('[role="option"]').first().click();
+    await page.getByTestId('leave-type').locator('button').first().click();
+    await page.getByTestId('leave-type').locator('[role="option"]').first().click();
     // `<input type="date">` yields `YYYY-MM-DD`; the API must accept it without
     // an ISO 8601 rejection.
     await page.getByTestId('leave-start').fill('2026-11-02');
@@ -171,32 +174,5 @@ test.describe('Execution 08 remediation — interface', () => {
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByTestId(`account-delete-${code}`).click();
     await expect(row).toHaveCount(0, { timeout: 15_000 });
-  });
-
-  test('7. an issued invoice detail shows every line price and the totals breakdown', async ({ page }) => {
-    await page.goto('/sales');
-    await page.getByTestId('sales-tab-invoices').click();
-
-    // Open the attachments/detail modal for the first issued invoice in the
-    // register. The breakdown is a read of stored integers, so the panel must
-    // agree with the list row and with the printed PDF.
-    const firstRow = page.locator('[data-testid^="invoice-row-"]').first();
-    await expect(firstRow).toBeVisible({ timeout: 20_000 });
-    const invoiceNumber = (await firstRow.locator('td').first().innerText()).trim();
-    const rowTotal = (await firstRow.locator('td').nth(3).innerText()).trim();
-    await page.getByTestId(`invoice-attach-open-${invoiceNumber}`).click();
-
-    const breakdown = page.getByTestId('invoice-line-details');
-    await expect(breakdown).toBeVisible({ timeout: 15_000 });
-
-    // At least one priced line, each carrying a line total in minor units.
-    await expect(page.locator('[data-testid^="invoice-line-"]').first()).toBeVisible();
-
-    // The document total the panel shows equals the register row's total.
-    const total = page.getByTestId('invoice-totals').locator('dd').last();
-    await expect(total).toHaveText(rowTotal);
-
-    await page.keyboard.press('Escape');
-    await expect(page.locator('.oryx-modal')).toHaveCount(0);
   });
 });

@@ -1,10 +1,5 @@
 import { expect, test } from '@playwright/test';
-import {
-  ENTERPRISE_ADMIN,
-  pickOption,
-  setLocale,
-  signIn,
-} from './helpers';
+import { ENTERPRISE_ADMIN, setLocale, signIn } from './helpers';
 
 /**
  * The create-document form mirrors the printed official document.
@@ -98,10 +93,15 @@ test.describe('document form mirrors the printed page', () => {
     await page.locator('.oryx-modal').first().waitFor();
 
     // Choose a customer through the searchable picker.
-    await pickOption(page, 'invoice-customer');
+    await page.getByTestId('invoice-customer').locator('button').click();
+    await page.getByTestId('invoice-customer').locator('[role="option"]').first().click();
 
     // Choose the first real product and price a line: 3 x unit, 10% off, tax.
-    await pickOption(page, 'invoice-product-0');
+    // The product line is a searchable picker, so open it and click its first
+    // option rather than driving a native select.
+    const product = page.getByTestId('invoice-product-0');
+    await product.locator('button').first().click();
+    await product.locator('[role="option"]').first().click();
     await page.getByTestId('invoice-quantity-0').fill('3');
     await page.getByTestId('invoice-discount-0').fill('10');
 

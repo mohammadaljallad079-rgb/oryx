@@ -20,3 +20,4 @@ export * from './reports';
 
 export * from './print';
 export * from './attachments';
+export * from './company-settings';

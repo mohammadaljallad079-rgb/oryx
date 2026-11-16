@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
 import { Icon } from './icons';
 import { useUi } from '@/lib/ui-context';
 
@@ -30,8 +29,8 @@ export function SectionHeader({
   return (
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="m-0 text-[22px] font-extrabold tracking-tight">{title}</h1>
-        {subtitle ? <p className="oryx-muted m-0 mt-1 max-w-[72ch] text-[13px]">{subtitle}</p> : null}
+        <h1 className="oryx-section-title m-0">{title}</h1>
+        {subtitle ? <p className="oryx-muted oryx-section-subtitle m-0 mt-1">{subtitle}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
@@ -143,16 +142,10 @@ export function Modal({
   const { t } = useUi();
   const idRef = useRef<symbol>(Symbol('oryx-modal'));
   const id = idRef.current;
-  // The dialog is mounted at the depth it had when it opened, so a modal opened
-  // from inside another (a preview from a form, a confirm from a list) always
-  // paints above the one that spawned it instead of losing the paint race to a
-  // sibling that happens to sit later in the DOM.
-  const [depth, setDepth] = useState(0);
 
   useEffect(() => {
     if (!open) return;
     openModals.push(id);
-    setDepth(openModals.length);
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       // Only the top-most modal reacts, so a nested preview closes alone.
@@ -169,16 +162,12 @@ export function Modal({
   }, [open, onClose, id]);
 
   if (!open) return null;
-  // A portal lifts the dialog out of whatever scroll container or stacking
-  // context it was declared in, so the backdrop always covers the whole
-  // viewport and no ancestor `overflow`/`transform` can clip it.
-  const tree = (
+  return (
     <div
       className={`oryx-modal-backdrop${size === 'pos' ? ' oryx-modal-backdrop--pos' : ''}`}
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      style={{ zIndex: 60 + depth * 5 }}
       onClick={(e) => {
         e.stopPropagation();
         onClose();
@@ -226,8 +215,6 @@ export function Modal({
       </div>
     </div>
   );
-  if (typeof document === 'undefined') return tree;
-  return createPortal(tree, document.body);
 }
 
 export function EmptyState({
@@ -412,37 +399,12 @@ export interface SearchableOption {
   /** Optional secondary text shown under the label (a code, a phone number). */
   hint?: string;
   disabled?: boolean;
-  /**
-   * The record behind the option, when the caller needs more than the id after
-   * a pick (a product's price and rate, a tax rate's basis points). The picker
-   * passes it to `onSelectData` untouched.
-   */
-  data?: Record<string, unknown>;
-}
-
-/**
- * The fields an inline-create form collects. A picker over a free-text
- * catalogue (customers, suppliers, products, employees) needs code/name/name,
- * while a picker over a keyed lookup (a tax rate, a category) needs one value.
- * The caller supplies `onCreate` and the shape it wants rendered.
- */
-export interface InlineCreateConfig {
-  /** Field labels, in the order they are shown. */
-  fields: Array<{ key: string; label: string; required?: boolean; placeholder?: string }>;
-  /** Resolves the created record so the picker can select it. */
-  onSubmit: (values: Record<string, string>) => Promise<{ value: string } | string | void>;
-  /** Action label; defaults to the translated "Create". */
-  actionLabel?: string;
 }
 
 /**
  * A filterable dropdown. Native `<select>` cannot be searched, and the
  * catalogues it is used against (companies, customers, accounts) are paginated,
  * so the options are supplied by the caller and filtered locally by label.
- *
- * When `create` is supplied the popover grows a "create" action that opens an
- * inline form and selects the record it returns, so an operator who needs a
- * customer that does not exist yet never leaves the invoice they are writing.
  */
 export function SearchableSelect({
   value,
@@ -453,10 +415,8 @@ export function SearchableSelect({
   disabled = false,
   testId,
   ariaLabel,
-  create,
-  onSearch,
-  loading = false,
-  onSelectData,
+  onCreateNew,
+  createLabel,
 }: {
   value: string | null;
   options: SearchableOption[];
@@ -467,23 +427,17 @@ export function SearchableSelect({
   disabled?: boolean;
   testId?: string;
   ariaLabel?: string;
-  create?: InlineCreateConfig;
   /**
-   * Delegates filtering to the server. The catalogues are paginated (the API
-   * returns the first 20 rows), so a client-side filter over `options` would
-   * silently hide every record past the first page; supplying this hands the
-   * typed query to the owner, which re-fetches and passes the matches back
-   * through `options`.
+   * When set, a "+ Add new" action is shown inside the popover. It opens the
+   * record's own create form over the current one; on success the caller
+   * reloads the option list and selects the new id, so the same full form and
+   * the same validation are used as the standalone screen.
    */
-  onSearch?: (query: string) => void;
-  /** Shows a busy state in the popover while a server search is in flight. */
-  loading?: boolean;
-  /** Receives the picked option's `data`, when the caller attached one. */
-  onSelectData?: (data: Record<string, unknown>) => void;
+  onCreateNew?: () => void;
+  createLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [creating, setCreating] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -504,25 +458,17 @@ export function SearchableSelect({
 
   const selected = options.find((o) => o.value === value) ?? null;
   const filtered = useMemo(() => {
-    // When the owner handles the query the list it passes back is already the
-    // match set, so filtering again would only drop rows it deliberately kept.
-    if (onSearch) return options;
     const q = query.trim().toLowerCase();
     if (!q) return options;
     return options.filter(
       (o) => o.label.toLowerCase().includes(q) || (o.hint ? o.hint.toLowerCase().includes(q) : false),
     );
-  }, [options, query, onSearch]);
+  }, [options, query]);
 
   const pick = (next: string | null) => {
     onChange(next);
-    const chosen = options.find((o) => o.value === next);
-    if (chosen?.data) onSelectData?.(chosen.data);
     setOpen(false);
     setQuery('');
-    // Drop any server-side filter so the next open shows the full catalogue and
-    // the chosen record is present in the options the trigger labels itself from.
-    onSearch?.('');
   };
 
   return (
@@ -550,7 +496,7 @@ export function SearchableSelect({
             autoFocus
             className="oryx-input mb-2"
             value={query}
-            onChange={(e) => { setQuery(e.target.value); onSearch?.(e.target.value); }}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder={placeholder}
             data-testid={testId ? `${testId}-search` : undefined}
           />
@@ -559,14 +505,32 @@ export function SearchableSelect({
               <button
                 type="button"
                 className="block w-full rounded-lg px-3 py-2 text-start text-[12.5px] hover:bg-[var(--surface-2)]"
-                onClick={() => pick(null)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  pick(null);
+                }}
               >
                 {emptyLabel}
               </button>
             ) : null}
-            {loading ? (
-              <p className="oryx-faint m-0 px-3 py-2 text-[12px]">…</p>
-            ) : filtered.length === 0 ? (
+            {onCreateNew ? (
+              <button
+                type="button"
+                className="mb-1 flex w-full items-center gap-2 rounded-lg border border-dashed border-[var(--border-strong)] px-3 py-2 text-start text-[12.5px] font-semibold"
+                style={{ color: 'var(--gold)' }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setOpen(false);
+                  setQuery('');
+                  onCreateNew();
+                }}
+                data-testid={testId ? `${testId}-create` : undefined}
+              >
+                <Icon name="plus" size={14} />
+                {createLabel ?? '+ Add new'}
+              </button>
+            ) : null}
+            {filtered.length === 0 ? (
               <p className="oryx-faint m-0 px-3 py-2 text-[12px]">—</p>
             ) : (
               filtered.map((o) => (
@@ -576,9 +540,14 @@ export function SearchableSelect({
                   role="option"
                   aria-selected={o.value === value}
                   disabled={o.disabled}
-                  data-value={o.value}
                   className="block w-full rounded-lg px-3 py-2 text-start hover:bg-[var(--surface-2)] disabled:opacity-50"
-                  onClick={() => pick(o.value)}
+                  onClick={(e) => {
+                    // `preventDefault` stops the wrapping `<label>` (from `Field`)
+                    // from re-dispatching a click to the trigger button, which
+                    // would instantly reopen the popover the pick just closed.
+                    e.preventDefault();
+                    pick(o.value);
+                  }}
                 >
                   <span className="block text-[12.5px] font-semibold">{o.label}</span>
                   {o.hint ? <span className="oryx-faint block text-[11px]">{o.hint}</span> : null}
@@ -586,114 +555,8 @@ export function SearchableSelect({
               ))
             )}
           </div>
-          {create ? (
-            <button
-              type="button"
-              className="mt-2 flex w-full items-center gap-1.5 rounded-lg border border-dashed border-[var(--border)] px-3 py-2 text-start text-[12.5px] font-semibold text-[var(--accent)] hover:bg-[var(--surface-2)]"
-              onClick={() => { setCreating(true); setOpen(false); }}
-              data-testid={testId ? `${testId}-create` : undefined}
-            >
-              <Icon name="plus" size={14} />
-              {create.actionLabel ?? 'Create'}
-            </button>
-          ) : null}
         </div>
       ) : null}
-      {create ? (
-        <InlineCreateForm
-          open={creating}
-          title={placeholder ?? ''}
-          fields={create.fields}
-          actionLabel={create.actionLabel}
-          testId={testId}
-          onSubmit={async (values) => {
-            const created = await create.onSubmit(values);
-            const next = typeof created === 'string' ? created : created?.value;
-            if (next) onChange(next);
-            setCreating(false);
-          }}
-          onClose={() => setCreating(false)}
-        />
-      ) : null}
     </div>
-  );
-}
-
-/**
- * The inline-create dialog a `SearchableSelect` opens. It is deliberately
- * minimal: it renders one text input per field the caller declares and hands
- * the collected values back, so the picker's owner stays the only place that
- * knows which API call creates the record.
- */
-function InlineCreateForm({
-  open,
-  title,
-  fields,
-  actionLabel,
-  testId,
-  onSubmit,
-  onClose,
-}: {
-  open: boolean;
-  title: string;
-  fields: InlineCreateConfig['fields'];
-  actionLabel?: string;
-  testId?: string;
-  onSubmit: (values: Record<string, string>) => Promise<void>;
-  onClose: () => void;
-}) {
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    setValues({});
-    setError(null);
-  }, [open]);
-
-  const missing = fields.some((f) => f.required !== false && !(values[f.key] ?? '').trim());
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await onSubmit(values);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      title={title}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button variant="primary" disabled={busy || missing} onClick={submit} data-testid={testId ? `${testId}-create-save` : undefined}>
-            {busy ? '…' : (actionLabel ?? 'Save')}
-          </Button>
-        </>
-      }
-    >
-      {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3">
-        {fields.map((f) => (
-          <Field key={f.key} label={f.label} required={f.required !== false}>
-            <input
-              className="oryx-input"
-              placeholder={f.placeholder}
-              value={values[f.key] ?? ''}
-              onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-              data-testid={testId ? `${testId}-create-${f.key}` : undefined}
-            />
-          </Field>
-        ))}
-      </div>
-    </Modal>
   );
 }

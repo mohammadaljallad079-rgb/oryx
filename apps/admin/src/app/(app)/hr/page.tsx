@@ -1,13 +1,17 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput } from '@/lib/erp-format';
-import { EntitySelect } from '@/components/entity-select';
 import { Icon } from '@/components/icons';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
+import { EntityPicker } from '@/components/inline-create';
+import { EmployeeModal } from '@/components/entity-modals';
+import { LeaveTypeModal } from '@/components/leave-type-modal';
 import {
   Badge,
   Button,
@@ -16,11 +20,8 @@ import {
   ErrorBanner,
   Field,
   Modal,
-  SearchableSelect,
   SectionHeader,
   Skeleton,
-  StatCard,
-  StatGrid,
   StatusBadge,
   TableShell,
 } from '@/components/ui';
@@ -28,7 +29,17 @@ import type { EmployeeDto, LeaveRequestDto, PayrollRunDto } from '@oryx/shared';
 
 type Tab = 'dashboard' | 'employees' | 'leave' | 'attendance' | 'payroll' | 'advances' | 'policy' | 'reports';
 
+const TAB_KEYS = ['dashboard', 'employees', 'leave', 'attendance', 'policy', 'payroll', 'reports', 'advances'] as const;
+
 export default function HrPage() {
+  return (
+    <Suspense fallback={<Skeleton height={200} />}>
+      <HrInner />
+    </Suspense>
+  );
+}
+
+function HrInner() {
   const { t } = useUi();
   const { can } = useAuth();
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -46,6 +57,7 @@ export default function HrPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="hr-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.human_resources')}
         subtitle={t('erp.hr.subtitle')}
@@ -68,7 +80,7 @@ export default function HrPage() {
         ))}
       </div>
 
-      {tab === 'dashboard' ? <DashboardTab /> : null}
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="human_resources" testId="hr-dashboard" /> : null}
       {tab === 'employees' ? <EmployeesTab canManage={can('erp.hr.employee.manage')} /> : null}
       {tab === 'leave' ? <LeaveTab canRequest={can('erp.hr.leave.request')} canApprove={can('erp.hr.leave.approve')} /> : null}
       {tab === 'attendance' ? <AttendanceTab canManage={can('erp.hr.attendance.manage')} canSelf={can('erp.hr.attendance.self')} /> : null}
@@ -80,32 +92,6 @@ export default function HrPage() {
   );
 }
 
-function DashboardTab() {
-  const { t } = useUi();
-  const data = useAsync(() => api.hrDashboard(), []);
-  if (data.loading) return <div className="p-4"><Skeleton height={160} /></div>;
-  if (data.error) return <ErrorBanner message={data.error} onRetry={data.reload} />;
-  const d = data.data!;
-  return (
-    <Card className="p-4" data-testid="hr-dashboard">
-      <StatGrid>
-        <StatCard icon="users" label={t('erp.hr.totalEmployees')} value={String(d.totalEmployees)} />
-        <StatCard icon="check" label={t('erp.hr.active')} value={String(d.activeEmployees)} />
-        <StatCard icon="calendar" label={t('erp.hr.onLeave')} value={String(d.onLeaveEmployees)} />
-        <StatCard icon="clock" label={t('erp.hr.pendingLeave')} value={String(d.pendingLeaveRequests)} />
-        <StatCard icon="building" label={t('erp.hr.departments')} value={String(d.departmentCount)} />
-      </StatGrid>
-      {d.latestPayroll ? (
-        <div className="mt-4 border-t border-[var(--border)] pt-3 text-[13px]">
-          <span className="oryx-muted">{t('erp.hr.latestPayroll')}: </span>
-          <span className="font-semibold">{d.latestPayroll.runNumber}</span>{' '}
-          <Badge tone="info">{d.latestPayroll.status}</Badge>{' '}
-          <span className="tabular-nums">{money(d.latestPayroll.netMinor)}</span>
-        </div>
-      ) : null}
-    </Card>
-  );
-}
 
 function EmployeesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
@@ -220,161 +206,16 @@ function EmployeesTab({ canManage }: { canManage: boolean }) {
         employee={editing}
         departments={departments.data?.items ?? []}
         canManage={canManage}
+        documentsSlot={editing ? <EmployeeDocumentsSection employeeId={editing.id} canManage={canManage} /> : null}
+        onDepartmentCreated={departments.reload}
         onClose={() => { setOpen(false); setEditing(null); }}
-        onSaved={list.reload}
+        onCreated={list.reload}
       />
       <SalaryModal employee={salaryFor} canManage={canManage} onClose={() => setSalaryFor(null)} />
     </Card>
   );
 }
 
-function EmployeeModal({
-  open,
-  employee,
-  canManage,
-  onClose,
-  onSaved,
-}: {
-  open: boolean;
-  employee: EmployeeDto | null;
-  departments: Array<{ id: string; nameEn: string }>;
-  canManage: boolean;
-  onClose: () => void;
-  onSaved: () => Promise<void>;
-}) {
-  const { t } = useUi();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    code: '',
-    fullNameEn: '',
-    fullNameAr: '',
-    email: '',
-    phone: '',
-    secondaryPhone: '',
-    departmentId: '',
-    hireDate: new Date().toISOString().slice(0, 10),
-    terminationDate: '',
-    addressLine: '',
-    notes: '',
-  });
-
-  useEffect(() => {
-    if (!open) return;
-    setError(null);
-    setForm({
-      code: employee?.code ?? '',
-      fullNameEn: employee?.fullNameEn ?? '',
-      fullNameAr: employee?.fullNameAr ?? '',
-      email: employee?.email ?? '',
-      phone: employee?.phone ?? '',
-      secondaryPhone: employee?.secondaryPhone ?? '',
-      departmentId: employee?.departmentId ?? '',
-      hireDate: employee?.hireDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
-      terminationDate: employee?.terminationDate?.slice(0, 10) ?? '',
-      addressLine: '',
-      notes: '',
-    });
-  }, [open, employee]);
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const body = {
-        fullNameEn: form.fullNameEn,
-        fullNameAr: form.fullNameAr,
-        email: form.email || undefined,
-        phone: form.phone || undefined,
-        secondaryPhone: form.secondaryPhone || undefined,
-        departmentId: form.departmentId || undefined,
-        addressLine: form.addressLine || undefined,
-        notes: form.notes || undefined,
-      };
-      if (employee) {
-        await api.updateEmployee(employee.id, { ...body, terminationDate: form.terminationDate || undefined });
-      } else {
-        await api.createEmployee({ ...body, code: form.code, hireDate: form.hireDate });
-      }
-      await onSaved();
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      title={employee ? t('erp.hr.editEmployee') : t('erp.hr.newEmployee')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            variant="primary"
-            disabled={busy || !form.fullNameEn || !form.fullNameAr || (!employee && !form.code)}
-            onClick={submit}
-            data-testid="save-employee"
-          >
-            {busy ? t('common.loading') : t('common.save')}
-          </Button>
-        </>
-      }
-    >
-      {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} disabled={Boolean(employee)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="employee-code" />
-        </Field>
-        <Field label={t('erp.hr.department')}>
-          <EntitySelect
-            catalogue="department"
-            allowCreate
-            value={form.departmentId || null}
-            onChange={(v) => setForm({ ...form, departmentId: v ?? '' })}
-            placeholder={t('common.select')}
-            emptyLabel={t('common.none')}
-            testId="employee-department"
-          />
-        </Field>
-        <Field label={`${t('common.name')} (EN)`} required>
-          <input className="oryx-input" value={form.fullNameEn} onChange={(e) => setForm({ ...form, fullNameEn: e.target.value })} data-testid="employee-name-en" />
-        </Field>
-        <Field label={`${t('common.name')} (AR)`} required>
-          <input className="oryx-input" value={form.fullNameAr} onChange={(e) => setForm({ ...form, fullNameAr: e.target.value })} data-testid="employee-name-ar" />
-        </Field>
-        <Field label={t('common.email')}>
-          <input className="oryx-input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="employee-email" />
-        </Field>
-        <Field label={t('erp.sales.phone')}>
-          <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} data-testid="employee-phone" />
-        </Field>
-        <Field label={t('erp.hr.secondaryPhone')}>
-          <input className="oryx-input" value={form.secondaryPhone} onChange={(e) => setForm({ ...form, secondaryPhone: e.target.value })} data-testid="employee-secondary-phone" />
-        </Field>
-        {!employee ? (
-          <Field label={t('erp.hr.hireDate')} required>
-            <input type="date" className="oryx-input" value={form.hireDate} onChange={(e) => setForm({ ...form, hireDate: e.target.value })} data-testid="employee-hire-date" />
-          </Field>
-        ) : (
-          <Field label={t('erp.hr.employmentEndDate')}>
-            <input type="date" className="oryx-input" value={form.terminationDate} onChange={(e) => setForm({ ...form, terminationDate: e.target.value })} data-testid="employee-termination-date" />
-          </Field>
-        )}
-        <Field label={t('common.address')}>
-          <input className="oryx-input" value={form.addressLine} onChange={(e) => setForm({ ...form, addressLine: e.target.value })} data-testid="employee-address" />
-        </Field>
-        <Field label={t('common.notes')}>
-          <input className="oryx-input" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} data-testid="employee-notes" />
-        </Field>
-      </div>
-      {employee ? <EmployeeDocumentsSection employeeId={employee.id} canManage={canManage} /> : null}
-    </Modal>
-  );
-}
 
 const DOC_CATEGORIES = ['IDENTITY', 'PASSPORT', 'VISA', 'CONTRACT', 'CERTIFICATE', 'MEDICAL', 'OTHER'] as const;
 
@@ -658,6 +499,7 @@ function LeaveTab({ canRequest, canApprove }: { canRequest: boolean; canApprove:
   const list = useAsync(() => api.leaveRequests(), []);
   const employees = useAsync(() => api.hrEmployees(), []);
   const types = useAsync(() => api.leaveTypes(), []);
+  const departments = useAsync(() => api.hrDepartments(), []);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<LeaveRequestDto | null>(null);
 
@@ -724,6 +566,10 @@ function LeaveTab({ canRequest, canApprove }: { canRequest: boolean; canApprove:
         editing={editing}
         employees={employees.data?.items ?? []}
         types={types.data?.items ?? []}
+        departments={departments.data?.items ?? []}
+        onEmployeeCreated={employees.reload}
+        onDepartmentCreated={departments.reload}
+        onTypesReload={types.reload}
         onClose={() => { setOpen(false); setEditing(null); }}
         onCreated={list.reload}
       />
@@ -734,7 +580,12 @@ function LeaveTab({ canRequest, canApprove }: { canRequest: boolean; canApprove:
 function LeaveRequestModal({
   open,
   editing,
+  employees,
   types,
+  departments,
+  onEmployeeCreated,
+  onDepartmentCreated,
+  onTypesReload,
   onClose,
   onCreated,
 }: {
@@ -742,6 +593,10 @@ function LeaveRequestModal({
   editing: LeaveRequestDto | null;
   employees: Array<{ id: string; code: string; fullNameEn: string }>;
   types: Array<{ id: string; nameEn: string }>;
+  departments: Array<{ id: string; nameEn: string }>;
+  onEmployeeCreated?: () => Promise<void> | void;
+  onDepartmentCreated?: () => Promise<void> | void;
+  onTypesReload?: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
@@ -808,22 +663,44 @@ function LeaveRequestModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.hr.employee')} required>
-          <EntitySelect
-            catalogue="employee"
+          <EntityPicker
             value={form.employeeId || null}
+            options={employees.map((x) => ({ value: x.id, label: `${x.code} — ${x.fullNameEn}` }))}
             onChange={(v) => setForm({ ...form, employeeId: v ?? '' })}
-            disabled={Boolean(editing)}
             placeholder={t('common.select')}
+            disabled={Boolean(editing)}
             testId="leave-employee"
+            createLabel={t('erp.hr.newEmployee')}
+            reloadOptions={onEmployeeCreated}
+            renderCreate={({ onClose, onSaved }) => (
+              <EmployeeModal
+                open
+                departments={departments}
+                onDepartmentCreated={onDepartmentCreated}
+                onClose={onClose}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
           />
         </Field>
         <Field label={t('erp.hr.leaveType')} required>
-          <SearchableSelect
+          <EntityPicker
             value={form.leaveTypeId || null}
             options={types.map((x) => ({ value: x.id, label: x.nameEn }))}
             onChange={(v) => setForm({ ...form, leaveTypeId: v ?? '' })}
             placeholder={t('common.select')}
             testId="leave-type"
+            createLabel={t('erp.hr.newLeaveType')}
+            reloadOptions={onTypesReload}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <LeaveTypeModal
+                open
+                onClose={closeCreate}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
           />
         </Field>
         <Field label={t('erp.reports.from')} required>
@@ -846,6 +723,7 @@ function AttendanceTab({ canManage, canSelf }: { canManage: boolean; canSelf: bo
   const { t } = useUi();
   const list = useAsync(() => api.hrAttendance(), []);
   const employees = useAsync(() => api.hrEmployees(), []);
+  const departments = useAsync(() => api.hrDepartments(), []);
   const [open, setOpen] = useState(false);
 
   const hours = (minutes: number) => `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}`;
@@ -898,6 +776,9 @@ function AttendanceTab({ canManage, canSelf }: { canManage: boolean; canSelf: bo
       <RecordAttendanceModal
         open={open}
         employees={employees.data?.items ?? []}
+        departments={departments.data?.items ?? []}
+        onEmployeeCreated={employees.reload}
+        onDepartmentCreated={departments.reload}
         onClose={() => setOpen(false)}
         onSaved={list.reload}
       />
@@ -980,11 +861,18 @@ function SelfServiceCard({ onRecorded }: { onRecorded: () => Promise<void> }) {
 
 function RecordAttendanceModal({
   open,
+  employees,
+  departments,
+  onEmployeeCreated,
+  onDepartmentCreated,
   onClose,
   onSaved,
 }: {
   open: boolean;
   employees: EmployeeDto[];
+  departments: Array<{ id: string; nameEn: string }>;
+  onEmployeeCreated?: () => Promise<void> | void;
+  onDepartmentCreated?: () => Promise<void> | void;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -1054,12 +942,24 @@ function RecordAttendanceModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.hr.employee')} required>
-          <EntitySelect
-            catalogue="employee"
+          <EntityPicker
             value={form.employeeId || null}
+            options={employees.map((x) => ({ value: x.id, label: `${x.code} — ${x.fullNameEn}` }))}
             onChange={(v) => setForm({ ...form, employeeId: v ?? '' })}
             placeholder={t('common.select')}
             testId="attendance-employee"
+            createLabel={t('erp.hr.newEmployee')}
+            reloadOptions={onEmployeeCreated}
+            renderCreate={({ onClose, onSaved }) => (
+              <EmployeeModal
+                open
+                departments={departments}
+                onDepartmentCreated={onDepartmentCreated}
+                onClose={onClose}
+                onCreated={() => { /* selection is handled by onSaved */ }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
           />
         </Field>
         <Field label={t('common.date')} required>
@@ -1245,13 +1145,10 @@ function RunPayrollModal({
     >
       {error ? <ErrorBanner message={error} /> : null}
       <Field label={t('erp.hr.period')} required>
-        <SearchableSelect
-          value={periodId || null}
-          options={periods.filter((p) => p.status === 'OPEN').map((p) => ({ value: p.id, label: `${p.code} — ${p.nameEn}` }))}
-          onChange={(v) => setPeriodId(v ?? '')}
-          placeholder={t('common.select')}
-          testId="payroll-period"
-        />
+        <select className="oryx-select" value={periodId} onChange={(e) => setPeriodId(e.target.value)} data-testid="payroll-period">
+          <option value="">—</option>
+          {periods.filter((p) => p.status === 'OPEN').map((p) => <option key={p.id} value={p.id}>{p.code} — {p.nameEn}</option>)}
+        </select>
       </Field>
     </Modal>
   );

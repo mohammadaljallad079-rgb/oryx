@@ -25,6 +25,8 @@ import type {
   PosSaleLineDto,
   SalesLineDto,
   UpdateCustomerDto,
+  CustomerBranchDto,
+  UpdateCustomerBranchDto,
   UpdateInvoiceDto,
 } from './sales.dto';
 
@@ -184,6 +186,14 @@ export class SalesService {
         paymentTermsDays: dto.paymentTermsDays ?? 0,
         currency: dto.currency ?? defaultCurrency,
         notes: dto.notes ?? null,
+        kind: dto.kind ?? 'INDIVIDUAL',
+        nationalId: dto.nationalId ?? null,
+        crNumber: dto.crNumber ?? null,
+        crExpiryDate: dto.crExpiryDate ? new Date(dto.crExpiryDate) : null,
+        website: dto.website ?? null,
+        contactPersonName: dto.contactPersonName ?? null,
+        contactPersonPhone: dto.contactPersonPhone ?? null,
+        parentCustomerId: dto.parentCustomerId ?? null,
       },
       include: { source: true, department: true },
     });
@@ -220,6 +230,16 @@ export class SalesService {
         ...(dto.paymentTermsDays !== undefined ? { paymentTermsDays: dto.paymentTermsDays } : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+        ...(dto.kind !== undefined ? { kind: dto.kind } : {}),
+        ...(dto.nationalId !== undefined ? { nationalId: dto.nationalId || null } : {}),
+        ...(dto.crNumber !== undefined ? { crNumber: dto.crNumber || null } : {}),
+        ...(dto.crExpiryDate !== undefined
+          ? { crExpiryDate: dto.crExpiryDate ? new Date(dto.crExpiryDate) : null }
+          : {}),
+        ...(dto.website !== undefined ? { website: dto.website || null } : {}),
+        ...(dto.contactPersonName !== undefined ? { contactPersonName: dto.contactPersonName || null } : {}),
+        ...(dto.contactPersonPhone !== undefined ? { contactPersonPhone: dto.contactPersonPhone || null } : {}),
+        ...(dto.parentCustomerId !== undefined ? { parentCustomerId: dto.parentCustomerId || null } : {}),
       },
       include: { source: true, department: true },
     });
@@ -332,6 +352,133 @@ export class SalesService {
     await this.prisma.entityAttachment.delete({ where: { id: attachmentId } });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'sales.customer_attachment_removed', targetType: 'CUSTOMER', targetId: customerId, summary: `Removed ${attachment.fileName}` });
     return { removed: true };
+  }
+
+  // ------------------------------------------------- secondary customer branches
+
+  /**
+   * The branches of a company customer.
+   *
+   * Scoped to the owning company in the query, so a branch id from another
+   * tenant cannot be read even if it is guessed.
+   */
+  async listCustomerBranches(customerId: string, principal: RequestPrincipal) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: customerId, companyId },
+      select: { id: true },
+    });
+    if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+    return this.prisma.customerBranch.findMany({
+      where: { companyId, customerId },
+      orderBy: { code: 'asc' },
+    });
+  }
+
+  async createCustomerBranch(
+    customerId: string,
+    dto: CustomerBranchDto,
+    principal: RequestPrincipal,
+    actor: ActorContext,
+  ) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const customer = await this.prisma.customer.findFirst({ where: { id: customerId, companyId } });
+    if (!customer) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Customer not found.');
+    const nameEn = (dto.nameEn ?? '').trim();
+    const nameAr = (dto.nameAr ?? '').trim();
+    if (!nameEn && !nameAr) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide the branch name in English, Arabic, or both.');
+    }
+    const dup = await this.prisma.customerBranch.findUnique({
+      where: { companyId_code: { companyId, code: dto.code } },
+    });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Branch code ${dto.code} already exists.`);
+    const branch = await this.prisma.customerBranch.create({
+      data: {
+        companyId,
+        customerId,
+        code: dto.code,
+        nameEn,
+        nameAr,
+        contactName: dto.contactName ?? null,
+        phone: dto.phone ?? null,
+        email: dto.email ?? null,
+        addressLine: dto.addressLine ?? null,
+        city: dto.city ?? null,
+        countryCode: dto.countryCode ?? null,
+        notes: dto.notes ?? null,
+      },
+    });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'sales.customer_branch_created',
+      targetType: 'CUSTOMER',
+      targetId: customerId,
+      summary: `Added branch ${branch.code} to customer ${customer.code}`,
+    });
+    return branch;
+  }
+
+  async updateCustomerBranch(
+    customerId: string,
+    branchId: string,
+    dto: UpdateCustomerBranchDto,
+    principal: RequestPrincipal,
+    actor: ActorContext,
+  ) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const branch = await this.prisma.customerBranch.findFirst({
+      where: { id: branchId, companyId, customerId },
+    });
+    if (!branch) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Branch not found.');
+    const updated = await this.prisma.customerBranch.update({
+      where: { id: branchId },
+      data: {
+        ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
+        ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
+        ...(dto.contactName !== undefined ? { contactName: dto.contactName || null } : {}),
+        ...(dto.phone !== undefined ? { phone: dto.phone || null } : {}),
+        ...(dto.email !== undefined ? { email: dto.email || null } : {}),
+        ...(dto.addressLine !== undefined ? { addressLine: dto.addressLine || null } : {}),
+        ...(dto.city !== undefined ? { city: dto.city || null } : {}),
+        ...(dto.countryCode !== undefined ? { countryCode: dto.countryCode || null } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        ...(dto.notes !== undefined ? { notes: dto.notes || null } : {}),
+      },
+    });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'sales.customer_branch_updated',
+      targetType: 'CUSTOMER',
+      targetId: customerId,
+      summary: `Updated branch ${updated.code}`,
+    });
+    return updated;
+  }
+
+  async deleteCustomerBranch(
+    customerId: string,
+    branchId: string,
+    principal: RequestPrincipal,
+    actor: ActorContext,
+  ) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const branch = await this.prisma.customerBranch.findFirst({
+      where: { id: branchId, companyId, customerId },
+    });
+    if (!branch) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Branch not found.');
+    await this.prisma.customerBranch.delete({ where: { id: branchId } });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'sales.customer_branch_removed',
+      targetType: 'CUSTOMER',
+      targetId: customerId,
+      summary: `Removed branch ${branch.code}`,
+    });
+    return { deleted: true as const };
   }
 
   /**
@@ -1662,6 +1809,14 @@ function toCustomerDto(c: {
   addressLine: string | null;
   city: string | null;
   countryCode: string | null;
+  kind: string;
+  nationalId: string | null;
+  crNumber: string | null;
+  crExpiryDate: Date | null;
+  website: string | null;
+  contactPersonName: string | null;
+  contactPersonPhone: string | null;
+  parentCustomerId: string | null;
   sourceId?: string | null;
   departmentId?: string | null;
   creditLimitMinor: number;
@@ -1675,6 +1830,7 @@ function toCustomerDto(c: {
   const { source, department, ...rest } = c;
   return {
     ...rest,
+    crExpiryDate: c.crExpiryDate ? c.crExpiryDate.toISOString() : null,
     sourceNameEn: source?.nameEn ?? null,
     sourceNameAr: source?.nameAr ?? null,
     departmentNameEn: department?.nameEn ?? null,

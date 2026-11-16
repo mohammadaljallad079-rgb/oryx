@@ -1,15 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput, todayIso } from '@/lib/erp-format';
-import { EntitySelect } from '@/components/entity-select';
 import { Icon } from '@/components/icons';
 import { DocumentActions } from '@/components/document-actions';
 import { AttachmentsPanel, DocumentPrintActions } from '@/components/document-print';
+import { ModuleDashboard } from '@/components/module-dashboard';
+import { TabDeepLink } from '@/components/tab-deep-link';
+import { EntityPicker } from '@/components/inline-create';
+import { AccountModal, SupplierModal } from '@/components/entity-modals';
+import { CustomerModal } from '@/components/customer-modal';
 import {
   Badge,
   Button,
@@ -19,7 +23,6 @@ import {
   Field,
   Modal,
   Pagination,
-  SearchableSelect,
   SectionHeader,
   Skeleton,
   StatusBadge,
@@ -38,12 +41,22 @@ import type {
   TrialBalanceDto,
 } from '@oryx/shared';
 
-type Tab = 'accounts' | 'journals' | 'periods' | 'payments' | 'statements' | 'ledger' | 'receipts';
+type Tab = 'dashboard' | 'accounts' | 'journals' | 'periods' | 'payments' | 'statements' | 'ledger' | 'receipts';
+
+const TAB_KEYS = ['dashboard', 'accounts', 'journals', 'receipts', 'periods', 'payments', 'statements', 'ledger'] as const;
 
 export default function AccountingPage() {
+  return (
+    <Suspense fallback={<Skeleton height={200} />}>
+      <AccountingInner />
+    </Suspense>
+  );
+}
+
+function AccountingInner() {
   const { t } = useUi();
   const { can } = useAuth();
-  const [tab, setTab] = useState<Tab>('accounts');
+  const [tab, setTab] = useState<Tab>('dashboard');
 
   const canManageCoa = can('erp.accounting.coa.manage');
   const canPost = can('erp.accounting.journal.post');
@@ -51,6 +64,7 @@ export default function AccountingPage() {
   const canManagePayments = can('erp.accounting.payment.manage');
 
   const tabs: Array<{ key: Tab; label: string }> = [
+    { key: 'dashboard', label: t('erp.accounting.dashboard') },
     { key: 'accounts', label: t('erp.accounting.accounts') },
     { key: 'journals', label: t('erp.accounting.journals') },
     { key: 'receipts', label: t('erp.accounting.receipts') },
@@ -62,6 +76,7 @@ export default function AccountingPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="accounting-page">
+      <TabDeepLink valid={TAB_KEYS} onSelect={setTab} />
       <SectionHeader
         title={t('nav.financial_accounting')}
         subtitle={t('erp.accounting.subtitle')}
@@ -84,6 +99,7 @@ export default function AccountingPage() {
         ))}
       </div>
 
+      {tab === 'dashboard' ? <ModuleDashboard moduleKey="financial_accounting" /> : null}
       {tab === 'accounts' ? <AccountsTab canManage={canManageCoa} /> : null}
       {tab === 'journals' ? <JournalsTab canPost={canPost} /> : null}
       {tab === 'receipts' ? <ReceiptsTab canManage={canManagePayments} /> : null}
@@ -109,7 +125,7 @@ function ReceiptsTab({ canManage }: { canManage: boolean }) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
         <p className="oryx-panel-title m-0">{t('erp.accounting.receipts')}</p>
         <Button size="sm" onClick={() => void list.reload()} data-testid="receipts-refresh">
-          <Icon name="refresh" size={15} />
+          <Icon name="search" size={15} />
           {t('common.refresh')}
         </Button>
       </div>
@@ -186,6 +202,7 @@ function AccountsTab({ canManage }: { canManage: boolean }) {
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const list = useAsync(() => api.accountingAccounts({ search: search || undefined }), [search]);
+  const allAccounts = useAsync(() => api.accountingAccounts({}), []);
 
   const setStatus = async (row: ErpAccountDto, next: boolean) => {
     await api.updateAccount(row.id, { isActive: next });
@@ -219,7 +236,7 @@ function AccountsTab({ canManage }: { canManage: boolean }) {
           />
         </label>
         <Button size="sm" onClick={() => void list.reload()}>
-          <Icon name="refresh" size={15} />
+          <Icon name="search" size={15} />
           {t('common.refresh')}
         </Button>
         {canManage ? (
@@ -311,194 +328,15 @@ function AccountsTab({ canManage }: { canManage: boolean }) {
       <AccountModal
         open={open}
         account={editing}
+        parentAccounts={allAccounts.data?.items ?? []}
+        onAccountCreated={async () => { await Promise.all([list.reload(), allAccounts.reload()]); }}
         onClose={() => { setOpen(false); setEditing(null); }}
-        onSaved={list.reload}
+        onCreated={list.reload}
       />
     </Card>
   );
 }
 
-function AccountModal({
-  open,
-  account,
-  onClose,
-  onSaved,
-}: {
-  open: boolean;
-  account: ErpAccountDto | null;
-  onClose: () => void;
-  onSaved: () => Promise<void>;
-}) {
-  const { t, locale } = useUi();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    code: '',
-    nameEn: '',
-    nameAr: '',
-    type: 'ASSET',
-    normalBalance: 'DEBIT',
-    parentId: '',
-  });
-
-  const allAccounts = useAsync(() => api.accountingAccounts({}), [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    setError(null);
-    setForm({
-      code: account?.code ?? '',
-      nameEn: account?.nameEn ?? '',
-      nameAr: account?.nameAr ?? '',
-      type: account?.type ?? 'ASSET',
-      normalBalance: account?.normalBalance ?? 'DEBIT',
-      parentId: account?.parentId ?? '',
-    });
-  }, [open, account]);
-
-  // The parent choices exclude the account itself and anything beneath it, so
-  // the dropdown can never offer a move that would create a cycle.
-  const descendants = new Set<string>();
-  if (account && allAccounts.data) {
-    const byParent = new Map<string | null, ErpAccountDto[]>();
-    for (const a of allAccounts.data.items) {
-      const key = a.parentId ?? null;
-      byParent.set(key, [...(byParent.get(key) ?? []), a]);
-    }
-    const walk = (id: string) => {
-      for (const child of byParent.get(id) ?? []) {
-        if (descendants.has(child.id)) continue;
-        descendants.add(child.id);
-        walk(child.id);
-      }
-    };
-    walk(account.id);
-  }
-  const parentOptions = (allAccounts.data?.items ?? []).filter((a) => a.id !== account?.id && !descendants.has(a.id));
-
-  // A new account is numbered automatically: whenever the type changes, ask the
-  // API for the next free code in that type's block. The field stays editable,
-  // so an operator may still type their own code.
-  useEffect(() => {
-    if (!open || account) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { code } = await api.nextAccountCode({ type: form.type });
-        if (!cancelled) setForm((f) => ({ ...f, code }));
-      } catch {
-        /* leave the field for manual entry if the suggestion fails */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [open, account, form.type]);
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      if (account) {
-        await api.updateAccount(account.id, {
-          nameEn: form.nameEn,
-          nameAr: form.nameAr,
-          parentId: form.parentId || null,
-          type: form.type,
-          normalBalance: form.normalBalance,
-        });
-      } else {
-        await api.createAccount({
-          code: form.code,
-          nameEn: form.nameEn,
-          nameAr: form.nameAr,
-          type: form.type,
-          normalBalance: form.normalBalance,
-          parentId: form.parentId || undefined,
-        });
-      }
-      await onSaved();
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      title={account ? t('erp.accounting.editAccount') : t('erp.accounting.newAccount')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            variant="primary"
-            disabled={busy || !form.nameEn || !form.nameAr || (!account && !form.code)}
-            onClick={submit}
-            data-testid="save-account"
-          >
-            {busy ? t('common.loading') : t('common.save')}
-          </Button>
-        </>
-      }
-    >
-      {error ? <ErrorBanner message={error} /> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} disabled={Boolean(account)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="account-code" />
-        </Field>
-        <Field label={t('erp.accounting.type')} required>
-          <select
-            className="oryx-select"
-            value={form.type}
-            onChange={(e) => {
-              const type = e.target.value;
-              // Follow the conventional balance so the operator rarely has to
-              // change it: assets and expenses are debit, the rest credit.
-              const normalBalance = type === 'ASSET' || type === 'EXPENSE' ? 'DEBIT' : 'CREDIT';
-              setForm({ ...form, type, normalBalance });
-            }}
-            data-testid="account-type"
-          >
-            {(['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'] as const).map((x) => (
-              <option key={x} value={x}>
-                {t(`erp.accounting.typeValue.${x}`)}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label={t('erp.accounting.parentAccount')}>
-          <SearchableSelect
-            value={form.parentId || null}
-            options={parentOptions.map((a) => ({
-              value: a.id,
-              label: `${a.code} — ${locale === 'ar' ? a.nameAr : a.nameEn}`,
-            }))}
-            onChange={(v) => setForm({ ...form, parentId: v ?? '' })}
-            placeholder={t('erp.accounting.noParent')}
-            emptyLabel={t('erp.accounting.noParent')}
-            testId="account-parent"
-          />
-        </Field>
-        <Field label={`${t('common.name')} (EN)`} required>
-          <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="account-name-en" />
-        </Field>
-        <Field label={`${t('common.name')} (AR)`} required>
-          <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="account-name-ar" />
-        </Field>
-        <Field label={t('erp.accounting.normalBalance')}>
-          <select className="oryx-select" value={form.normalBalance} onChange={(e) => setForm({ ...form, normalBalance: e.target.value })} data-testid="account-normal-balance">
-            <option value="DEBIT">{t('erp.accounting.debit')}</option>
-            <option value="CREDIT">{t('erp.accounting.credit')}</option>
-          </select>
-        </Field>
-      </div>
-    </Modal>
-  );
-}
 
 // ------------------------------------------------------------------ journals
 
@@ -518,7 +356,7 @@ function JournalsTab({ canPost }: { canPost: boolean }) {
         <p className="oryx-muted m-0 text-[12.5px]">{t('erp.accounting.journalsHint')}</p>
         <div className="flex gap-2">
           <Button size="sm" onClick={() => void list.reload()}>
-            <Icon name="refresh" size={15} />
+            <Icon name="search" size={15} />
             {t('common.refresh')}
           </Button>
           {canPost ? (
@@ -611,6 +449,7 @@ function JournalsTab({ canPost }: { canPost: boolean }) {
       <PostJournalModal
         open={postOpen}
         accounts={accounts.data?.items ?? []}
+        onAccountCreated={accounts.reload}
         onClose={() => setPostOpen(false)}
         onPosted={list.reload}
       />
@@ -694,11 +533,14 @@ function ReverseJournalModal({
 
 function PostJournalModal({
   open,
+  accounts,
+  onAccountCreated,
   onClose,
   onPosted,
 }: {
   open: boolean;
   accounts: ErpAccountDto[];
+  onAccountCreated: () => Promise<void> | void;
   onClose: () => void;
   onPosted: () => Promise<void>;
 }) {
@@ -765,21 +607,31 @@ function PostJournalModal({
       <div className="mt-4 flex flex-col gap-2">
         {lines.map((line, i) => (
           <div key={i} className="grid grid-cols-12 gap-2">
-            <EntitySelect
-              catalogue="account"
-              className="col-span-5"
-              value={line.accountId || null}
-              onChange={(v) => {
-                const next = [...lines];
-                next[i] = { ...next[i], accountId: v ?? '' };
-                setLines(next);
-              }}
-              placeholder={t('erp.accounting.selectAccount')}
-              // Only postable accounts may carry a journal line; a header or a
-              // total row would break the trial balance if it were selectable.
-              filter={(o) => o.data?.isPostable !== false}
-              testId={`journal-line-account-${i}`}
-            />
+            <div className="col-span-5">
+              <EntityPicker
+                value={line.accountId || null}
+                options={accounts.filter((a) => a.isPostable).map((a) => ({ value: a.id, label: `${a.code} — ${a.nameEn}` }))}
+                onChange={(v) => {
+                  const next = [...lines];
+                  next[i] = { ...next[i], accountId: v ?? '' };
+                  setLines(next);
+                }}
+                placeholder={t('erp.accounting.selectAccount')}
+                testId={`journal-line-account-${i}`}
+                createLabel={t('erp.accounting.newAccount')}
+                reloadOptions={onAccountCreated}
+                renderCreate={({ onClose: closeCreate, onSaved }) => (
+                  <AccountModal
+                    open
+                    parentAccounts={accounts}
+                    onAccountCreated={onAccountCreated}
+                    onClose={closeCreate}
+                    onCreated={() => { /* selection is handled by onSaved */ }}
+                    onSaved={(saved) => void onSaved(saved.id)}
+                  />
+                )}
+              />
+            </div>
             <input
               className="oryx-input col-span-3"
               placeholder={t('erp.accounting.debit')}
@@ -993,6 +845,8 @@ function PaymentsTab({ canPay }: { canPay: boolean }) {
         open={open}
         customers={customers.data?.items ?? []}
         suppliers={suppliers.data?.items ?? []}
+        onCustomerCreated={customers.reload}
+        onSupplierCreated={suppliers.reload}
         onClose={() => setOpen(false)}
         onCreated={async () => {
           await list.reload();
@@ -1004,12 +858,18 @@ function PaymentsTab({ canPay }: { canPay: boolean }) {
 
 function PaymentModal({
   open,
+  customers,
+  suppliers,
+  onCustomerCreated,
+  onSupplierCreated,
   onClose,
   onCreated,
 }: {
   open: boolean;
   customers: CustomerDto[];
   suppliers: SupplierDto[];
+  onCustomerCreated?: () => Promise<void> | void;
+  onSupplierCreated?: () => Promise<void> | void;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
@@ -1151,22 +1011,42 @@ function PaymentModal({
         </Field>
         <Field label={direction === 'RECEIPT' ? t('erp.sales.customer') : t('erp.purchasing.supplier')} required>
           {direction === 'RECEIPT' ? (
-            <EntitySelect
-              catalogue="customer"
-              allowCreate
+            <EntityPicker
               value={customerId || null}
+              options={customers.map((c) => ({ value: c.id, label: `${c.code} — ${c.nameEn}`, hint: c.phone ?? undefined }))}
               onChange={(v) => setCustomerId(v ?? '')}
               placeholder={t('common.select')}
               testId="payment-customer"
+              createLabel={t('erp.sales.newCustomer')}
+              reloadOptions={onCustomerCreated}
+              renderCreate={({ onClose: closeCreate, onSaved }) => (
+                <CustomerModal
+                  open
+                  customer={null}
+                  onClose={closeCreate}
+                  onCreated={() => { /* selection is handled by onSaved */ }}
+                  onSaved={(saved) => void onSaved(saved.id)}
+                />
+              )}
             />
           ) : (
-            <EntitySelect
-              catalogue="supplier"
-              allowCreate
+            <EntityPicker
               value={supplierId || null}
+              options={suppliers.map((sp) => ({ value: sp.id, label: `${sp.code} — ${sp.nameEn}`, hint: sp.phone ?? undefined }))}
               onChange={(v) => setSupplierId(v ?? '')}
               placeholder={t('common.select')}
               testId="payment-supplier"
+              createLabel={t('erp.purchasing.newSupplier')}
+              reloadOptions={onSupplierCreated}
+              renderCreate={({ onClose: closeCreate, onSaved }) => (
+                <SupplierModal
+                  open
+                  supplier={null}
+                  onClose={closeCreate}
+                  onCreated={() => { /* selection is handled by onSaved */ }}
+                  onSaved={(saved) => void onSaved(saved.id)}
+                />
+              )}
             />
           )}
         </Field>
@@ -1422,6 +1302,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function LedgerTab() {
   const { t, locale } = useUi();
+  const accounts = useAsync(() => api.accountingAccounts(), []);
   const [accountId, setAccountId] = useState<string>('');
   const ledger = useAsync<{ accounts: LedgerAccountDto[] }>(
     () => api.generalLedger({ accountId: accountId || undefined }),
@@ -1435,13 +1316,30 @@ function LedgerTab() {
       <div className="mb-3 flex flex-wrap items-end gap-3">
         <label className="min-w-[260px] flex-1">
           <span className="oryx-label">{t('erp.accounting.account')}</span>
-          <EntitySelect
-            catalogue="account"
+          <EntityPicker
             value={accountId || null}
+            options={(accounts.data?.items ?? []).map((a) => ({ value: a.id, label: `${a.code} — ${a.nameEn}` }))}
             onChange={(v) => setAccountId(v ?? '')}
             placeholder={t('common.all')}
             emptyLabel={t('common.all')}
             testId="ledger-account"
+            createLabel={t('erp.accounting.newAccount')}
+            reloadOptions={async () => {
+              await accounts.reload();
+              await ledger.reload();
+            }}
+            renderCreate={({ onClose: closeCreate, onSaved }) => (
+              <AccountModal
+                open
+                parentAccounts={accounts.data?.items ?? []}
+                onAccountCreated={accounts.reload}
+                onClose={closeCreate}
+                onCreated={async () => {
+                  await accounts.reload();
+                }}
+                onSaved={(saved) => void onSaved(saved.id)}
+              />
+            )}
           />
         </label>
       </div>

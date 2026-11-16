@@ -31,7 +31,10 @@ const MOBILE_TARGET = { host: '127.0.0.1', port: Number(process.env.MOBILE_PORT 
 // directory is snapshotted at build time. Read-only, and confined to the
 // evidence root: a request cannot climb out with `..`.
 const EVIDENCE_ROOT = path.resolve(
-  process.env.EVIDENCE_ROOT ?? '/workspace/project/oryx/.run/evidence',
+  process.env.EVIDENCE_ROOT ??
+    // Default beside this script, so a checkout recovered from its own root
+    // serves its own evidence rather than another checkout's.
+    new URL('./evidence', import.meta.url).pathname,
 );
 
 const MIME = {
