@@ -307,6 +307,7 @@ export interface UserDto {
   nationalId: string | null;
   nationality: string | null;
   address: string | null;
+  phone: string | null;
   status: UserStatus;
   isSuperAdmin: boolean;
   preferredLocale: 'ar' | 'en';

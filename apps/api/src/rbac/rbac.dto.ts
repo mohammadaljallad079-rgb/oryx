@@ -132,6 +132,11 @@ export class CreateUserDto {
   @MaxLength(300)
   address?: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
+
   @IsString()
   roleId!: string;
 
@@ -169,6 +174,11 @@ export class UpdateUserDto {
   @IsString()
   @MaxLength(300)
   address?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
 }
 
 export class UpdateMembershipDto {

@@ -358,19 +358,19 @@ test.describe('company administrator delegation', () => {
     await expect(page.getByTestId('inspections-page')).toBeVisible();
     await expect(page.getByText('You do not have permission to do that.')).toBeVisible({ timeout: 20_000 });
 
-    // Invite flow only offers roles inside the delegable set. The modal loads
-    // the role list asynchronously, so poll until the options arrive rather than
-    // reading the count the instant the select appears.
+    // The add-user flow only offers roles inside the delegable set. The modal
+    // loads the role list asynchronously, so poll until the options arrive
+    // rather than reading the count the instant the select appears.
     await page.goto('/users');
     await expect(page.getByTestId('users-page')).toBeVisible();
-    await page.getByTestId('invite-user').click();
-    await expect(page.getByTestId('invite-role')).toBeVisible();
+    await page.getByTestId('add-user').click();
+    await expect(page.getByTestId('add-user-role')).toBeVisible();
     // The role picker is a searchable combobox; its options live in the opened
     // listbox, so open it and count what it offers. The list loads
     // asynchronously, so poll until it is populated rather than reading the
     // count the instant the trigger appears.
     await expect
-      .poll(async () => searchableOptionCount(page, 'invite-role'), { timeout: 20_000 })
+      .poll(async () => searchableOptionCount(page, 'add-user-role'), { timeout: 20_000 })
       .toBeGreaterThan(1);
   });
 

@@ -1,5 +1,15 @@
 import { expect, test } from '@playwright/test';
-import { ENTERPRISE_ADMIN, pickOption, setLocale, setTheme, signIn } from './helpers';
+import {
+  apiToken,
+  ENTERPRISE_ADMIN,
+  ensureStock,
+  pickOption,
+  setLocale,
+  setTheme,
+  signIn,
+} from './helpers';
+
+const API = process.env.ORYX_API ?? 'http://localhost:3001/api/v1';
 
 /**
  * Execution 08 remediation — interface coverage for the reported defects.
@@ -174,6 +184,67 @@ test.describe('Execution 08 remediation — interface', () => {
   });
 
   test('7. an issued invoice detail shows every line price and the totals breakdown', async ({ page }) => {
+    // Create the invoice this test inspects rather than depending on another
+    // spec having left one in the register. A clean database would otherwise
+    // leave the register empty and the test would fail on a missing row instead
+    // of the pricing breakdown it means to check.
+    const bearer = await apiToken(page);
+    const ids = await page.evaluate(
+      async ({ api, token }) => {
+        const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+        const stamp = Date.now();
+        const customer = (await (
+          await fetch(`${api}/sales/customers`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              code: `E08INV-${stamp}`,
+              nameEn: 'E08 Invoice Co',
+              creditLimitMinor: 1_000_000_000,
+            }),
+          })
+        ).json()) as { id: string };
+        const products = (await (await fetch(`${api}/inventory/products?pageSize=1`, { headers })).json()) as {
+          items: Array<{ id: string }>;
+        };
+        const warehouses = (await (await fetch(`${api}/inventory/warehouses?pageSize=1`, { headers })).json()) as {
+          items: Array<{ id: string }>;
+        };
+        return {
+          customerId: customer.id,
+          productId: products.items[0].id,
+          warehouseId: warehouses.items[0].id,
+        };
+      },
+      { api: API, token: bearer },
+    );
+    await ensureStock(page, bearer, ids.productId, ids.warehouseId);
+    await page.evaluate(
+      async ({ api, token, ids: idsIn }) => {
+        const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+        const res = await fetch(`${api}/sales/invoices`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            customerId: idsIn.customerId,
+            invoiceDate: new Date().toISOString().slice(0, 10),
+            warehouseId: idsIn.warehouseId,
+            lines: [
+              {
+                productId: idsIn.productId,
+                description: 'E08 invoice breakdown line',
+                quantity: 10000,
+                unitPriceMinor: 10000,
+                taxPercentBp: 1500,
+              },
+            ],
+          }),
+        });
+        if (!res.ok) throw new Error(`invoice create failed: ${res.status} ${await res.text()}`);
+      },
+      { api: API, token: bearer, ids },
+    );
+
     await page.goto('/sales');
     await page.getByTestId('sales-tab-invoices').click();
 

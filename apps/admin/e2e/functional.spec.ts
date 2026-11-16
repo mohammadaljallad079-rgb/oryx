@@ -249,7 +249,7 @@ test.describe('functional audit', () => {
     expect(after.body.items.find((b) => b.code === branchCode)?.isActive).toBe(true);
   });
 
-  test('4. user invitation issues a usable token', async ({ page }) => {
+  test('4. direct user creation yields a usable account', async ({ page }) => {
     await signIn(page);
     await setLocale(page, 'en');
 
@@ -269,27 +269,20 @@ test.describe('functional audit', () => {
 
     await page.goto(`/users?companyId=${companyId}`);
     await expect(page.getByTestId('users-page')).toBeVisible();
-    await page.getByTestId('invite-user').click();
-    await page.getByTestId('invite-email').fill(`audit-${suffix}@oryx.test`);
-    await pickOption(page, 'invite-role');
-    await page.getByTestId('invite-submit').click();
+    await page.getByTestId('add-user').click();
+    await page.getByTestId('add-user-email').fill(`audit-${suffix}@oryx.test`);
+    await page.getByTestId('add-user-password').fill('Audit-Password-2026');
+    await pickOption(page, 'add-user-role');
+    await page.getByTestId('add-user-submit').click();
 
-    // The token is displayed once and is a real 64-character secret.
-    await expect(page.getByTestId('invite-token')).toBeVisible({ timeout: 20_000 });
-    const token = (await page.getByTestId('invite-token').innerText()).trim();
-    expect(token).toHaveLength(64);
-
-    // And it can be redeemed.
-    const accepted = await apiCall(page, '/auth/accept-invitation', {
+    // The account is created directly and can sign in immediately with the
+    // password the administrator set.
+    await expect(page.locator('.oryx-modal')).toHaveCount(0, { timeout: 20_000 });
+    const signedIn = await apiCall(page, '/auth/login', {
       method: 'POST',
-      body: {
-        token,
-        fullNameEn: 'Audit User',
-        fullNameAr: 'مستخدم تدقيق',
-        password: 'Audit-Password-2026',
-      },
+      body: { email: `audit-${suffix}@oryx.test`, password: 'Audit-Password-2026' },
     });
-    expect([200, 201]).toContain(accepted.status);
+    expect([200, 201]).toContain(signedIn.status);
   });
 
   test('5. role creation with permissions persists', async ({ page }) => {
