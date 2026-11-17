@@ -159,23 +159,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loadSession]);
 
   /**
-   * Seed the language and theme from the signed-in account on a fresh browser.
-   *
-   * `localStorage` is the operator's explicit, device-local choice and stays
-   * authoritative once it exists (the header toggle and the settings page both
-   * write it). The account's `preferredLocale`/`preferredTheme` are only a
-   * fallback for a browser that has never chosen, so a first visit opens in the
-   * operator's language instead of the Arabic server default. Applying them
-   * unconditionally would fight an explicit choice, which is why the stored
-   * value wins whenever it is present.
+   * Apply the active company's General → Default language on a fresh browser.
+   * An explicit device choice remains authoritative; otherwise the company
+   * default wins, with the user's saved preference as a fallback.
    */
   useEffect(() => {
     const user = state.user;
     if (!user) return;
+    let cancelled = false;
     const hasStoredLocale = window.localStorage.getItem('oryx.locale');
     const hasStoredTheme = window.localStorage.getItem('oryx.theme');
     const hasStoredFontScale = window.localStorage.getItem('oryx.fontScale');
-    if (!hasStoredLocale && isLocale(user.preferredLocale)) setLocale(user.preferredLocale);
+
+    if (!hasStoredLocale && state.companyId) {
+      void api.companySettings(state.companyId).then((settings) => {
+        if (cancelled || window.localStorage.getItem('oryx.locale')) return;
+        const companyLocale = settings.sections?.general?.defaultLocale;
+        if (isLocale(companyLocale)) setLocale(companyLocale);
+        else if (isLocale(user.preferredLocale)) setLocale(user.preferredLocale);
+      }).catch(() => {
+        if (!cancelled && !window.localStorage.getItem('oryx.locale') && isLocale(user.preferredLocale)) {
+          setLocale(user.preferredLocale);
+        }
+      });
+    } else if (!hasStoredLocale && isLocale(user.preferredLocale)) {
+      setLocale(user.preferredLocale);
+    }
+
     if (!hasStoredTheme && (user.preferredTheme === 'dark' || user.preferredTheme === 'light')) {
       setTheme(user.preferredTheme);
     }
@@ -187,7 +197,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ) {
       setFontScale(user.preferredFontScale);
     }
-  }, [state.user, setLocale, setTheme, setFontScale]);
+    return () => { cancelled = true; };
+  }, [state.user, state.companyId, setLocale, setTheme, setFontScale]);
 
   // When a request proves the session is gone (refresh failed), drop local state
   // so the shell redirects to sign-in rather than showing a broken screen.
