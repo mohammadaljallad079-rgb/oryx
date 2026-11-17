@@ -1918,6 +1918,9 @@ function toQuotationDto(q: {
   totalMinor: number;
   currency: string;
   paymentMethod: string;
+  paymentMethodCode?: string | null;
+  paymentMethodLabelEn?: string | null;
+  paymentMethodLabelAr?: string | null;
   salespersonName: string | null;
   paymentReference: string | null;
   notes: string | null;
@@ -1941,6 +1944,9 @@ function toQuotationDto(q: {
     totalMinor: q.totalMinor,
     currency: q.currency,
     paymentMethod: q.paymentMethod,
+    paymentMethodCode: q.paymentMethodCode ?? null,
+    paymentMethodLabelEn: q.paymentMethodLabelEn ?? null,
+    paymentMethodLabelAr: q.paymentMethodLabelAr ?? null,
     salespersonName: q.salespersonName,
     paymentReference: q.paymentReference,
     notes: q.notes,
@@ -2005,6 +2011,9 @@ function toInvoiceDto(inv: {
   amountPaidMinor: number;
   currency: string;
   paymentMethod: string;
+  paymentMethodCode?: string | null;
+  paymentMethodLabelEn?: string | null;
+  paymentMethodLabelAr?: string | null;
   salespersonName: string | null;
   paymentReference: string | null;
   notes: string | null;
@@ -2032,6 +2041,9 @@ function toInvoiceDto(inv: {
     outstandingMinor: inv.totalMinor - inv.amountPaidMinor,
     currency: inv.currency,
     paymentMethod: inv.paymentMethod,
+    paymentMethodCode: inv.paymentMethodCode ?? null,
+    paymentMethodLabelEn: inv.paymentMethodLabelEn ?? null,
+    paymentMethodLabelAr: inv.paymentMethodLabelAr ?? null,
     salespersonName: inv.salespersonName,
     paymentReference: inv.paymentReference,
     notes: inv.notes,
@@ -2126,6 +2138,9 @@ function toPosSaleDto(s: {
   paidMinor: number;
   changeMinor: number;
   paymentMethod: string;
+  paymentMethodCode?: string | null;
+  paymentMethodLabelEn?: string | null;
+  paymentMethodLabelAr?: string | null;
   currency: string;
   createdAt: Date;
   lines: Array<Record<string, unknown>>;
@@ -2142,6 +2157,9 @@ function toPosSaleDto(s: {
     paidMinor: s.paidMinor,
     changeMinor: s.changeMinor,
     paymentMethod: s.paymentMethod,
+    paymentMethodCode: s.paymentMethodCode ?? null,
+    paymentMethodLabelEn: s.paymentMethodLabelEn ?? null,
+    paymentMethodLabelAr: s.paymentMethodLabelAr ?? null,
     currency: s.currency,
     createdAt: s.createdAt.toISOString(),
     lines: s.lines,
