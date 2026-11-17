@@ -567,6 +567,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
   const [relatedInvoiceId, setRelatedInvoiceId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
   const list = useAsync(() => api.creditNotes(), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
@@ -640,18 +641,41 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{(n as { restockInventory?: boolean }).restockInventory ? '✓' : '—'}</td>
                 <td><StatusBadge status={n.status} label={n.status} /></td>
                 <td>
-                  <DocumentActions
-                    sourceType="CreditNote"
-                    sourceId={n.id}
-                    type="SALES_RETURN"
-                    permissions={['erp.sales.read', 'erp.accounting.read']}
-                  />
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => setDetail(n)}
+                      data-testid={`return-attachments-${n.creditNoteNumber}`}>
+                      <Icon name="list" size={15} />
+                      {t('common.details')}
+                    </Button>
+                    <DocumentActions
+                      sourceType="CreditNote"
+                      sourceId={n.id}
+                      type="SALES_RETURN"
+                      permissions={['erp.sales.read', 'erp.accounting.read']}
+                    />
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+      <Modal
+        open={detail !== null}
+        title={`${t('erp.sales.creditNoteNumber')} ${detail?.creditNoteNumber ?? ''}`}
+        onClose={() => setDetail(null)}
+      >
+        {detail ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[13px] font-semibold">{detail.customerNameEn || detail.customerNameAr}</span>
+              <DocumentPrintActions kind="SALES_RETURN" id={detail.id} />
+            </div>
+            <InvoiceLineBreakdown document={detail} />
+            <AttachmentsPanel entityType="CREDIT_NOTE" entityId={detail.id} canManage={canManage} />
+          </div>
+        ) : null}
+      </Modal>
       <DocumentModal
         open={open}
         title={t('erp.sales.newCreditNote')}
