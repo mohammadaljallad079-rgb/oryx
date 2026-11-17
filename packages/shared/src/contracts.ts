@@ -358,6 +358,12 @@ export interface BranchDto {
   city: string | null;
   addressLine: string | null;
   phone: string | null;
+  phoneNumbers: string[];
+  crNumber: string | null;
+  specialty: string | null;
+  responsibleUserId: string | null;
+  responsibleUserNameEn: string | null;
+  responsibleUserNameAr: string | null;
   countryCode: string | null;
   timezone: string;
   isActive: boolean;
