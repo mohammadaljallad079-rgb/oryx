@@ -209,11 +209,6 @@ export class CreateBranchDto {
 
   @IsOptional()
   @IsString()
-  @Matches(/^[A-Z0-9][A-Z0-9-]{0,20}$/, { message: 'code must be uppercase letters, digits or dashes' })
-  code?: string;
-
-  @IsOptional()
-  @IsString()
   @MaxLength(40)
   crNumber?: string;
 
