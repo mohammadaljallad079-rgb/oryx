@@ -1,6 +1,6 @@
 import type { ReportResultDto } from '@oryx/shared';
 import type { DocumentIssuer } from '../document-payload';
-import { renderReportHtml } from './report-document.template';
+import { renderReportHtml, REPORT_CSS } from './report-document.template';
 
 const issuer = {
   companyId: 'company-1',
@@ -30,6 +30,12 @@ const report = {
 } as unknown as ReportResultDto;
 
 describe('report PDF invoice design parity', () => {
+  it('does not force a page taller than the printable A4 area', () => {
+    // A fixed min-height of 740pt overflowed the usable 730pt report area.
+    expect(REPORT_CSS).toMatch(/\\.rep-page\\s*\\{\\s*position:relative;\\s*\\}/);
+    expect(REPORT_CSS).not.toMatch(/\\.rep-page\\s*\\{[^}]*min-height/);
+  });
+
   it('shares the official identity, bilingual title, tax strip and print fonts', () => {
     const html = renderReportHtml({ issuer, result: report, baseCss: '/* embedded-fonts */' });
     expect(html).toContain('/* embedded-fonts */');
