@@ -1303,6 +1303,7 @@ enum PaymentMethod {
   CHEQUE
   WALLET
   OTHER
+  CREDIT
 }
 
 /**
