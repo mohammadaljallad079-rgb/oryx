@@ -1490,7 +1490,7 @@ function PosSaleModal({
                 {money(changeMinor)}
               </strong>
             </p>
-            <Button variant="primary" className="w-full justify-center"
+            <Button variant="primary" className="oryx-btn oryx-btn--primary w-full justify-center"
               disabled={busy || !saleValid}
               onClick={() => void submit()} data-testid="pos-checkout-panel">
               <Icon name="check" size={17} />
