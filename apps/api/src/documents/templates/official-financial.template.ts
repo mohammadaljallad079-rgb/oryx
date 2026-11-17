@@ -297,9 +297,9 @@ function infoPanel(
           <span class="of-field-value of-date num">${esc(docStamp(payload.documentDate))}</span>
         </div>
         ${
-          isQuotation && payload.dueDate
+          payload.dueDate
             ? `<div class="of-field">
-                 <span class="of-field-label">Expiration Date</span>
+                 <span class="of-field-label">${isQuotation ? 'Expiration Date' : 'Due Date'}</span>
                  <span class="of-field-value of-date num">${esc(docStamp(payload.dueDate))}</span>
                </div>`
             : ''
