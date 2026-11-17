@@ -621,8 +621,8 @@ export class ModuleSummaryService {
         ];
       case 'spare_parts':
         return [
-          S('Parts catalogue', 'كتالوج القطع', '/automotive/spare-parts?tab=catalog', 'package', 'erp.spare_parts.read'),
-          S('Reservations', 'الحجوزات', '/automotive/spare-parts?tab=reservations', 'clipboardCheck', 'erp.spare_parts.read'),
+          S('Parts catalogue', 'كتالوج القطع', '/inventory?tab=parts', 'package', 'erp.spare_parts.read'),
+          S('Reservations', 'الحجوزات', '/inventory?tab=parts', 'clipboardCheck', 'erp.spare_parts.read'),
         ];
       case 'reports_analytics':
         return [

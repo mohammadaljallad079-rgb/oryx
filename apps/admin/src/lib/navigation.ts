@@ -194,7 +194,11 @@ export const ERP_NAV: NavGroup[] = [
     key: 'automotive',
     labelKey: 'nav.group.automotive',
     items: [
-      ...AUTOMOTIVE.map(erpItem),
+      // Spare parts are products with fitment data, so the module is surfaced
+      // inside Warehouses & Inventory (its "Spare parts" tab) instead of as a
+      // second, standalone entry. The catalog entry and its route stay so the
+      // entitlement and any existing deep link keep working.
+      ...AUTOMOTIVE.filter((m) => m.key !== 'spare_parts').map(erpItem),
       // Official documents are issued from an inspection, an invoice or an
       // order, so the entry sits with the automotive group and reuses the
       // inspection read permission rather than inventing a new one.

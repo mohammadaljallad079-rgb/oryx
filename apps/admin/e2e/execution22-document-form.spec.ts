@@ -69,7 +69,7 @@ test.describe('document form mirrors the printed page', () => {
 
   test('the invoice form carries the printed section and column labels', async ({ page }) => {
     await page.goto('/sales');
-    await page.getByTestId('sales-tab-invoices').waitFor();
+    await page.getByTestId('sales-tab-invoices').click();
     await page.getByTestId('new-invoice').click();
     const modal = page.locator('.oryx-modal').first();
     await modal.waitFor();
@@ -115,7 +115,7 @@ test.describe('document form mirrors the printed page', () => {
 
   test('the live totals equal the figures the API computes for the same lines', async ({ page }) => {
     await page.goto('/sales');
-    await page.getByTestId('sales-tab-invoices').waitFor();
+    await page.getByTestId('sales-tab-invoices').click();
     await page.getByTestId('new-invoice').click();
     await page.locator('.oryx-modal').first().waitFor();
 
@@ -144,7 +144,7 @@ test.describe('document form mirrors the printed page', () => {
 
   test('the invoice notes field is multiline and round-trips through the database', async ({ page }) => {
     await page.goto('/sales');
-    await page.getByTestId('sales-tab-invoices').waitFor();
+    await page.getByTestId('sales-tab-invoices').click();
     await page.getByTestId('new-invoice').click();
     await page.locator('.oryx-modal').first().waitFor();
 
@@ -177,7 +177,7 @@ test.describe('document form mirrors the printed page', () => {
     try {
       // Reopen the saved draft from the list: the multiline value is loaded back
       // from the database, not held in component state.
-      await page.getByTestId('sales-tab-invoices').waitFor();
+      await page.getByTestId('sales-tab-invoices').click();
       await page.getByTestId(`edit-invoice-${created.invoiceNumber}`).click();
       await page.locator('.oryx-modal').first().waitFor();
       await expect(page.getByTestId('invoice-notes')).toHaveValue(note);

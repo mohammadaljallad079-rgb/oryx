@@ -881,3 +881,37 @@ export class CreatePosSaleDto {
   @Type(() => PosSaleLineDto)
   lines!: PosSaleLineDto[];
 }
+
+export class PosReturnLineDto {
+  @IsString()
+  posSaleLineId!: string;
+
+  /** Quantity handed back, scaled by 10^4. Bounded server-side to the sold amount. */
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  quantity!: number;
+}
+
+export class CreatePosReturnDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  reason?: string;
+
+  /** Defaults to the receipt's own method (a cash sale refunds cash). */
+  @IsOptional()
+  @IsIn(['CREDIT_ACCOUNT', 'CASH', 'BANK_TRANSFER', 'CARD'])
+  refundMethod?: 'CREDIT_ACCOUNT' | 'CASH' | 'BANK_TRANSFER' | 'CARD';
+
+  /** Put the goods back into stock. Defaults to true for a physical return. */
+  @IsOptional()
+  @IsBoolean()
+  restockInventory?: boolean;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => PosReturnLineDto)
+  lines!: PosReturnLineDto[];
+}

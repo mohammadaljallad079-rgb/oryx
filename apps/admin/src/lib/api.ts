@@ -1053,6 +1053,11 @@ export const api = {
     request<Paginated<PosSaleDto>>(`/sales/pos-sales?${toQuery(params)}`),
   createPosSale: (body: Record<string, unknown>) =>
     request<PosSaleDto>('/sales/pos-sales', { method: 'POST', body }),
+  createPosReturn: (id: string, body: Record<string, unknown>) =>
+    request<{ sale: PosSaleDto; creditNoteId: string; creditNoteNumber: string; totalMinor: number }>(
+      `/sales/pos-sales/${id}/return`,
+      { method: 'POST', body },
+    ),
 
   // ------------------------------------------------------- purchasing (E02)
   suppliers: (params: { companyId?: string; search?: string } = {}) =>

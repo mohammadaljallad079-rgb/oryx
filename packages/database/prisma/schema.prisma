@@ -1366,6 +1366,8 @@ enum StockMovementSource {
   TRANSFER
   ADJUSTMENT
   POS_SALE
+  /// Goods received back from a point-of-sale return to the till.
+  POS_RETURN
   /// A consumer marketplace order placed from the mobile app.
   MARKETPLACE_ORDER
   /// The reversal of a cancelled marketplace order.
@@ -1450,6 +1452,18 @@ enum CashierSessionStatus {
 enum PosSaleStatus {
   COMPLETED
   VOID
+  /**
+   * The whole receipt was returned to the till. The sale keeps its original
+   * amounts so the historical record is intact; the return itself is the credit
+   * note the receipt links to, and its stock is back in the warehouse.
+   */
+  RETURNED
+  /**
+   * Part of the receipt was returned. The remaining lines stay sold; the
+   * returned quantity of each line is recorded on `PosSaleLine.returnedQuantity`
+   * so a second return can never exceed what was sold.
+   */
+  PARTIALLY_RETURNED
 }
 
 // ----------------------------------------------------------- document numbering
@@ -2370,6 +2384,12 @@ model PosSale {
   currency         String        @default("BHD")
   salesInvoiceId   String?
   journalEntryId   String?
+  /**
+   * The credit note a till return produced, when the receipt was (partly)
+   * returned. Null while nothing has been returned.
+   */
+  returnCreditNoteId String?
+  returnedAt       DateTime?
   createdById      String
   createdAt        DateTime      @default(now())
 
@@ -2395,6 +2415,18 @@ model PosSaleLine {
   taxPercentBp   Int     @default(0)
   taxMinor       Int     @default(0)
   lineTotalMinor Int
+  /**
+   * Position of the line on the receipt. An UPDATE (a return increments
+   * `returnedQuantity`) can move a row in the heap, so the read paths order by
+   * this rather than relying on physical order.
+   */
+  sortOrder      Int     @default(0)
+  /**
+   * How much of this line has already been returned to the till. A return can
+   * never take more than `quantity - returnedQuantity`, so the same goods cannot
+   * be refunded twice.
+   */
+  returnedQuantity Int   @default(0)
 
   posSale PosSale @relation(fields: [posSaleId], references: [id], onDelete: Cascade)
 

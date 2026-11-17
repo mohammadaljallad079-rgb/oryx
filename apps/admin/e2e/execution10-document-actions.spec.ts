@@ -108,6 +108,7 @@ test.describe('Sales register — official document actions', () => {
     await page.goto('/sales');
     await expect(page.getByTestId('sales-page')).toBeVisible();
     await expect(page.getByTestId('sales-tab-invoices')).toBeVisible();
+    await page.getByTestId('sales-tab-invoices').click();
 
     // The row for the invoice this test created carries the action cell.
     const row = page.getByTestId(`invoice-row-${created.invoiceNumber}`);
