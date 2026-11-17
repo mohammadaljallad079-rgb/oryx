@@ -4007,6 +4007,8 @@ model WorkOrder {
   requestedById  String?
   assigneeUserId String?
   dueDate        DateTime?
+  scheduledStartAt DateTime?
+  scheduledEndAt   DateTime?
   startedAt      DateTime?
   completedAt    DateTime?
   /**
