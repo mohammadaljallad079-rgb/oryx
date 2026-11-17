@@ -669,7 +669,8 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-[13px] font-semibold">{detail.customerNameEn || detail.customerNameAr}</span>
-              <DocumentPrintActions kind="SALES_RETURN" id={detail.id} />
+              <DocumentActions sourceType="CreditNote" sourceId={detail.id} type="SALES_RETURN"
+                permissions={['erp.sales.read', 'erp.accounting.read']} />
             </div>
             <InvoiceLineBreakdown document={detail} />
             <AttachmentsPanel entityType="CREDIT_NOTE" entityId={detail.id} canManage={canManage} />
