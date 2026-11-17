@@ -398,6 +398,7 @@ model User {
   updatedAt                 DateTime   @updatedAt
 
   memberships        Membership[]
+  responsibleBranches Branch[]      @relation("BranchResponsible")
   refreshTokens      RefreshToken[]
   invitationsSent    Invitation[]      @relation("InvitationInviter")
   auditLogs          AuditLog[]
@@ -736,6 +737,11 @@ model Branch {
   countryCode String?
   addressLine String?
   phone       String?
+  /// Additional contact numbers; the legacy primary phone remains in phone.
+  phoneNumbers String[] @default([])
+  crNumber    String?
+  specialty   String?
+  responsibleUserId String?
   timezone    String   @default("Asia/Bahrain")
   isActive    Boolean  @default(true)
   // Storefront details. Only filled in for branches that are published on the
@@ -755,6 +761,7 @@ model Branch {
   updatedAt   DateTime @updatedAt
 
   company     Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  responsibleUser User?           @relation("BranchResponsible", fields: [responsibleUserId], references: [id], onDelete: SetNull)
   memberships MembershipBranch[]
 
   // Execution 02 — branch-level operational scope.
@@ -797,6 +804,7 @@ model Branch {
 
   @@unique([companyId, code])
   @@index([companyId])
+  @@index([responsibleUserId])
 }
 
 // ---------------------------------------------------------------- RBAC
