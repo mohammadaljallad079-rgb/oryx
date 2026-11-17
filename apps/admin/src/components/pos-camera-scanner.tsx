@@ -37,6 +37,7 @@ export function PosCameraScanner({
     let timer: number | null = null;
     let decoding = false;
     detectedRef.current = false;
+    const videoElement = videoRef.current;
     const start = async () => {
       try {
         const Detector = (window as Window & { BarcodeDetector?: BarcodeDetectorConstructor }).BarcodeDetector;
@@ -58,7 +59,7 @@ export function PosCameraScanner({
           return;
         }
         stream = media;
-        const video = videoRef.current;
+        const video = videoElement;
         if (!video) return;
         video.srcObject = media;
         await video.play();
@@ -87,7 +88,7 @@ export function PosCameraScanner({
       disposed = true;
       if (timer !== null) window.clearInterval(timer);
       stream?.getTracks().forEach(track => track.stop());
-      if (videoRef.current) videoRef.current.srcObject = null;
+      if (videoElement) videoElement.srcObject = null;
     };
   }, [open, ar, onDetected]);
 
