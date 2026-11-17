@@ -95,8 +95,16 @@ test.describe('Point of sale — card terminal', () => {
     const tile = page.getByTestId(`pos-product-${setup.product.sku}`);
     await expect(tile).toBeVisible({ timeout: 30_000 });
 
-    // Tap the tile: it lands in the cart and the total becomes the product price.
+    // Tap the tile and ensure a missing catalogue price can be explicitly
+    // entered before checking out. Never silently charge 1 fils.
     await tile.click();
+    if (setup.product.salesPriceMinor <= 0) {
+      await expect(page.getByTestId('save-pos-sale')).toBeDisabled();
+      const price = page.getByTestId(`pos-price-${setup.product.sku}`);
+      await price.fill('5.000');
+      await price.blur();
+      await expect(price).toHaveValue('5.000');
+    }
     const total = page.getByTestId('pos-total');
     await expect(total).toBeVisible();
     const firstTotal = await total.textContent();
