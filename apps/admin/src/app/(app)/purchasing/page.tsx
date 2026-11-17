@@ -918,13 +918,13 @@ function SupplierInvoiceModal({
         <Field label={t('erp.sales.dueDate')}>
           <input type="date" className="oryx-input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} data-testid="supplier-invoice-due-date" />
         </Field>
-        <Field label={t('common.branch')}>
+        <Field label={t('context.branch')}>
           <EntityPicker value={branchId || null} options={branches.map((b) => ({ value: b.id, label: `${b.code} — ${b.nameEn}` }))} onChange={(v) => setBranchId(v ?? '')} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="supplier-invoice-branch" />
         </Field>
         <Field label={t('erp.purchasing.orders')}>
           <EntityPicker value={purchaseOrderId || null} options={purchaseOrders.map((o) => ({ value: o.id, label: o.orderNumber, hint: o.supplierNameEn ?? o.status }))} onChange={(v) => setPurchaseOrderId(v ?? '')} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="supplier-invoice-purchase-order" />
         </Field>
-        <Field label={t('common.currency')}>
+        <Field label={t('companies.currency')}>
           <select className="oryx-select" value={currency} onChange={(e) => setCurrency(e.target.value)} data-testid="supplier-invoice-currency">
             {['BHD', 'SAR', 'AED', 'KWD', 'QAR', 'OMR', 'USD', 'EUR'].map((code) => <option key={code} value={code}>{code}</option>)}
           </select>
