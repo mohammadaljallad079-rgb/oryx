@@ -562,7 +562,21 @@ export class SalesService {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-    const where = { companyId, ...(query.status ? { status: query.status as never } : {}) };
+    const where = {
+      companyId,
+      ...(query.status ? { status: query.status as never } : {}),
+      ...(query.customerId ? { customerId: query.customerId } : {}),
+      ...(query.dateFrom || query.dateTo ? { issueDate: { ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}), ...(query.dateTo ? { lte: new Date(`${query.dateTo}T23:59:59.999Z`) } : {}) } } : {}),
+      ...(query.minAmountMinor !== undefined || query.maxAmountMinor !== undefined ? { totalMinor: { ...(query.minAmountMinor !== undefined ? { gte: query.minAmountMinor } : {}), ...(query.maxAmountMinor !== undefined ? { lte: query.maxAmountMinor } : {}) } } : {}),
+      ...(query.search?.trim() ? { OR: [
+        { quoteNumber: { contains: query.search.trim(), mode: 'insensitive' as const } },
+        { customer: { is: { OR: [
+          { nameEn: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { nameAr: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { code: { contains: query.search.trim(), mode: 'insensitive' as const } },
+        ] } } },
+      ] } : {}),
+    };
     const [rows, total] = await Promise.all([
       this.prisma.quotation.findMany({
         where,
@@ -757,6 +771,21 @@ export class SalesService {
       ...(query.status ? { status: query.status as never } : {}),
       ...(query.branchId ? { branchId: query.branchId } : {}),
       ...(query.customerId ? { customerId: query.customerId } : {}),
+      ...(query.dateFrom || query.dateTo ? { invoiceDate: { ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}), ...(query.dateTo ? { lte: new Date(`${query.dateTo}T23:59:59.999Z`) } : {}) } } : {}),
+      ...(query.minAmountMinor !== undefined || query.maxAmountMinor !== undefined ? { totalMinor: { ...(query.minAmountMinor !== undefined ? { gte: query.minAmountMinor } : {}), ...(query.maxAmountMinor !== undefined ? { lte: query.maxAmountMinor } : {}) } } : {}),
+      ...(query.search?.trim() ? { OR: [
+        { invoiceNumber: { contains: query.search.trim(), mode: 'insensitive' as const } },
+        { customer: { is: { OR: [
+          { nameEn: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { nameAr: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { code: { contains: query.search.trim(), mode: 'insensitive' as const } },
+        ] } } },
+      ] } : {}),
+      ...(query.paymentState === 'due' ? {
+        amountPaidMinor: { lt: this.prisma.salesInvoice.fields.totalMinor },
+      } : query.paymentState === 'settled' ? {
+        amountPaidMinor: { gte: this.prisma.salesInvoice.fields.totalMinor },
+      } : {}),
     };
     const [rows, total] = await Promise.all([
       this.prisma.salesInvoice.findMany({
@@ -1250,13 +1279,34 @@ export class SalesService {
 
   async listCreditNotes(query: ListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
-    const rows = await this.prisma.creditNote.findMany({
-      where: { companyId },
-      orderBy: { createdAt: 'desc' },
-      take: 200,
-      include: { customer: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
-    });
-    return { items: rows.map(toCreditNoteDto), total: rows.length, page: 1, pageSize: rows.length };
+    const page = query.page ?? 1;
+    const pageSize = Math.min(query.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+    const where = {
+      companyId,
+      ...(query.status ? { status: query.status as never } : {}),
+      ...(query.customerId ? { customerId: query.customerId } : {}),
+      ...(query.dateFrom || query.dateTo ? { issueDate: { ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}), ...(query.dateTo ? { lte: new Date(`${query.dateTo}T23:59:59.999Z`) } : {}) } } : {}),
+      ...(query.minAmountMinor !== undefined || query.maxAmountMinor !== undefined ? { totalMinor: { ...(query.minAmountMinor !== undefined ? { gte: query.minAmountMinor } : {}), ...(query.maxAmountMinor !== undefined ? { lte: query.maxAmountMinor } : {}) } } : {}),
+      ...(query.search?.trim() ? { OR: [
+        { creditNoteNumber: { contains: query.search.trim(), mode: 'insensitive' as const } },
+        { customer: { is: { OR: [
+          { nameEn: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { nameAr: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { code: { contains: query.search.trim(), mode: 'insensitive' as const } },
+        ] } } },
+      ] } : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.creditNote.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: { customer: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
+      }),
+      this.prisma.creditNote.count({ where }),
+    ]);
+    return { items: rows.map(toCreditNoteDto), total, page, pageSize };
   }
 
   /**
@@ -1545,7 +1595,22 @@ export class SalesService {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-    const where = { companyId, ...(query.branchId ? { branchId: query.branchId } : {}) };
+    const where = {
+      companyId,
+      ...(query.branchId ? { branchId: query.branchId } : {}),
+      ...(query.customerId ? { customerId: query.customerId } : {}),
+      ...(query.status ? { status: query.status as never } : {}),
+      ...(query.dateFrom || query.dateTo ? { createdAt: { ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}), ...(query.dateTo ? { lte: new Date(`${query.dateTo}T23:59:59.999Z`) } : {}) } } : {}),
+      ...(query.minAmountMinor !== undefined || query.maxAmountMinor !== undefined ? { totalMinor: { ...(query.minAmountMinor !== undefined ? { gte: query.minAmountMinor } : {}), ...(query.maxAmountMinor !== undefined ? { lte: query.maxAmountMinor } : {}) } } : {}),
+      ...(query.search?.trim() ? { OR: [
+        { receiptNumber: { contains: query.search.trim(), mode: 'insensitive' as const } },
+        { customer: { is: { OR: [
+          { nameEn: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { nameAr: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { code: { contains: query.search.trim(), mode: 'insensitive' as const } },
+        ] } } },
+      ] } : {}),
+    };
     const [rows, total] = await Promise.all([
       this.prisma.posSale.findMany({
         where,
