@@ -1,6 +1,7 @@
 'use client';
 
 import { useUi } from '@/lib/ui-context';
+import { toMinorInput } from '@/lib/erp-format';
 
 export type SalesRegisterKind = 'invoices' | 'quotations' | 'returns' | 'pos';
 export interface SalesRegisterFilterValues {
@@ -99,7 +100,7 @@ export function salesFilterQuery(value: SalesRegisterFilterValues) {
   const minor = (amount: string) => {
     const number = Number(amount);
     return amount.trim() !== '' && Number.isFinite(number) && number >= 0
-      ? Math.round(number * 100) : undefined;
+      ? toMinorInput(amount) : undefined;
   };
   return {
     search: value.search.trim() || undefined,
