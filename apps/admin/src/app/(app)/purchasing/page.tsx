@@ -336,8 +336,6 @@ function RequisitionModal({
   onTaxCreated,
   open,
   suppliers,
-  branches,
-  purchaseOrders,
   products,
   onProductCreated,
   onClose,
@@ -346,8 +344,6 @@ function RequisitionModal({
 }: {
   open: boolean;
   suppliers: SupplierDto[];
-  branches: Array<{ id: string; code: string; nameEn: string }>;
-  purchaseOrders: Array<{ id: string; orderNumber?: string; supplierNameEn?: string; status?: string }>;
   products: Array<{ id: string; sku: string; nameEn: string; costPriceMinor: number }>;
   onProductCreated?: () => Promise<void> | void;
   taxOptions: SearchableOption[];
@@ -832,6 +828,8 @@ function SupplierInvoiceModal({
   onTaxCreated,
   open,
   suppliers,
+  branches,
+  purchaseOrders,
   products,
   onProductCreated,
   onClose,
@@ -840,6 +838,8 @@ function SupplierInvoiceModal({
 }: {
   open: boolean;
   suppliers: SupplierDto[];
+  branches: Array<{ id: string; code: string; nameEn: string }>;
+  purchaseOrders: Array<{ id: string; orderNumber?: string; supplierNameEn?: string; status?: string }>;
   products: Array<{ id: string; sku: string; nameEn: string; costPriceMinor: number }>;
   onProductCreated?: () => Promise<void> | void;
   taxOptions: SearchableOption[];
