@@ -1474,14 +1474,17 @@ function CartRow({
           onChange={(e) => onChange({ quantity: Math.max(1, Math.round(Number(e.target.value) || 1)) })}
           data-testid={`pos-qty-${line.sku}`}
         />
-        <input
-          className="oryx-input text-end text-[12px]"
-          inputMode="decimal"
-          value={minorToInput(line.unitPriceMinor)}
-          aria-label={t('erp.sales.unitPrice')}
-          onChange={(e) => onChange({ unitPriceMinor: toMinorInput(e.target.value) })}
-          data-testid={`pos-price-${line.sku}`}
-        />
+        <label className="flex flex-col gap-1 text-[11px] font-semibold">
+          <span>{t('erp.sales.unitPrice')}</span>
+          <input
+            className="oryx-input text-end text-[12px] font-semibold tabular-nums"
+            inputMode="decimal"
+            value={minorToInput(line.unitPriceMinor)}
+            aria-label={t('erp.sales.unitPrice')}
+            onChange={(e) => onChange({ unitPriceMinor: toMinorInput(e.target.value) })}
+            data-testid={`pos-price-${line.sku}`}
+          />
+        </label>
         <input
           className="oryx-input text-center text-[12px]"
           inputMode="decimal"
