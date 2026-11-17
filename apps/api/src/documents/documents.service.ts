@@ -318,10 +318,9 @@ export class DocumentsService {
     // The faces are spliced in so the footer renders in the same embedded stack
     // as the body, on any machine.
     const footerFaces = `<style>${await this.renderer.baseStyles()}</style>`;
-    // The faint Auto Park seal inside the ORYX authorisation box is part of the
-    // vehicle-inspection cover only, so the financial documents (which share the
-    // same footer band) keep their approved signature boxes untouched.
-    const signatureSeal = args.payload.kind === 'INSPECTION_REPORT';
+    // The ORYX logo watermark belongs inside the authorisation/signature box
+    // on financial documents and inspection reports alike.
+    const signatureSeal = true;
     const footerHtml = footerFaces +
       (layout === 'official'
         ? officialFooterTemplate(args.issuer)
@@ -331,7 +330,7 @@ export class DocumentsService {
     // the renderer splices onto page one. Financial layouts paint one band on
     // every page and need no second pass.
     const coverFooterHtml =
-      layout === 'official' ? undefined : footerFaces + officialFooterTemplate(args.issuer, signatureSeal);
+      layout === 'official' ? footerFaces + officialFooterTemplate(args.issuer, signatureSeal) : footerFaces + officialFooterTemplate(args.issuer, signatureSeal);
     const { pdf, pageCount } = await this.renderer.render(html, {
       footerHtml,
       coverFooterHtml,
@@ -493,7 +492,7 @@ export class DocumentsService {
     const footerHtml = referenceLayout || payload.kind === 'INSPECTION_REPORT'
       ? payload.kind === 'INSPECTION_REPORT'
         ? reportFooterTemplate(issuer, spec.verifiable ? verification.qrDataUri : undefined)
-        : officialFooterTemplate(issuer)
+        : officialFooterTemplate(issuer, true)
       : footerTemplate({
           issuer,
           titleEn: spec.labelEn,
@@ -906,7 +905,9 @@ export class DocumentsService {
     const nameEn = pick(general.nameEn, company.branding?.nameEn, company.nameEn) ?? company.nameEn;
     const nameAr = pick(general.nameAr, company.branding?.nameAr, company.nameAr) ?? company.nameAr;
     const legalNameEn = pick(general.tradeNameEn, company.legalNameEn);
-    const taxNumber = pick(general.taxNumber, company.taxNumber);
+    // TRN is optional on issued documents: print it only when explicitly
+    // configured in Settings → General, never from a stale company-row fallback.
+    const taxNumber = pick(general.taxNumber);
     const crNumber = pick(general.crNumber, company.crNumber);
     return {
       companyId,
