@@ -41,6 +41,12 @@ export class CreateDepartmentDto {
   @IsOptional() @IsString() branchId?: string;
 }
 
+export class UpdateDepartmentDto {
+  @IsOptional() @IsString() @MinLength(1) @MaxLength(40) code?: string;
+  @IsOptional() @IsString() @MinLength(2) @MaxLength(160) nameEn?: string;
+  @IsOptional() @IsString() @MinLength(2) @MaxLength(160) nameAr?: string;
+}
+
 export class CreateJobTitleDto {
   @IsString() @MinLength(1) @MaxLength(40) code!: string;
   @IsString() @MinLength(2) @MaxLength(160) nameEn!: string;
