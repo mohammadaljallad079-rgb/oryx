@@ -319,8 +319,6 @@ function RequisitionsTab({ canManage }: { canManage: boolean }) {
       <RequisitionModal
         open={open}
         suppliers={suppliers.data?.items ?? []}
-        branches={branches.data?.items ?? []}
-        purchaseOrders={purchaseOrders.data?.items ?? []}
         onSupplierCreated={suppliers.reload}
         products={products.data?.items ?? []}
         onProductCreated={products.reload}
@@ -815,6 +813,8 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
       <SupplierInvoiceModal
         open={open}
         suppliers={suppliers.data?.items ?? []}
+        branches={branches.data?.items ?? []}
+        purchaseOrders={purchaseOrders.data?.items ?? []}
         onSupplierCreated={suppliers.reload}
         products={products.data?.items ?? []}
         onProductCreated={products.reload}
