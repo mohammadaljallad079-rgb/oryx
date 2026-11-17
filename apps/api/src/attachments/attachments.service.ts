@@ -78,6 +78,11 @@ export class AttachmentsService {
       if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Sales invoice not found.');
       return;
     }
+    if (entityType === 'CREDIT_NOTE') {
+      const found = await this.prisma.creditNote.findFirst({ where: { id: entityId, companyId } });
+      if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Credit note not found.');
+      return;
+    }
     if (entityType === 'PAYMENT') {
       const found = await this.prisma.payment.findFirst({ where: { id: entityId, companyId } });
       if (!found) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Receipt not found.');
