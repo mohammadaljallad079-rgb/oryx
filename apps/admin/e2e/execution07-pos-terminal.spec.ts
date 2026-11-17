@@ -71,8 +71,9 @@ test.describe('Point of sale — card terminal', () => {
     await expect(page.getByTestId('sales-page')).toBeVisible();
     await page.getByTestId('sales-tab-pos').click();
 
-    const newSale = page.getByTestId('new-pos-sale');
-    await expect(newSale).toBeVisible({ timeout: 30_000 });
+    // When an active session is present, the cashier opens the workstation
+    // directly; the legacy "new sale" button is no longer required.
+    await expect(page.getByTestId('pos-search')).toBeVisible({ timeout: 30_000 });
 
     // Record the receipt count so the sale this test creates can be identified.
     const receiptsBefore = await page.evaluate(
@@ -86,7 +87,7 @@ test.describe('Point of sale — card terminal', () => {
       { api: API, bearer },
     );
 
-    await newSale.click();
+    // Terminal is already open on the current cashier session.
 
     // The grid loads from the catalogue endpoint.
     const grid = page.getByTestId('pos-grid');
@@ -175,7 +176,7 @@ test.describe('Point of sale — card terminal', () => {
     await page.goto('/sales');
     await expect(page.getByTestId('sales-page')).toBeVisible();
     await page.getByTestId('sales-tab-pos').click();
-    await page.getByTestId('new-pos-sale').click();
+    await expect(page.getByTestId('pos-search')).toBeVisible({ timeout: 30_000 });
 
     await expect(page.getByTestId('pos-grid')).toBeVisible({ timeout: 30_000 });
 
