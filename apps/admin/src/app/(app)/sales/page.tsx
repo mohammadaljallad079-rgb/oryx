@@ -1967,6 +1967,10 @@ function DocumentModal({
   }));
 
   const submit = async (post = true) => {
+    if (dueDateField === 'dueDate' && paymentMethod === 'CREDIT' && !dueDate) {
+      setError(locale === 'ar' ? 'تاريخ الاستحقاق مطلوب للبيع الآجل.' : 'A due date is required for credit sales.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -2064,8 +2068,8 @@ function DocumentModal({
                 data-testid={`${testIdPrefix}-document-date`}
               />
             </Field>
-            {dueDateField ? (
-              <Field label={t('erp.sales.form.expirationDate')}>
+            {dueDateField && (dueDateField === 'validUntil' || paymentMethod === 'CREDIT' || Boolean(dueDate)) ? (
+              <Field label={dueDateField === 'dueDate' ? (locale === 'ar' ? 'تاريخ الاستحقاق' : 'Due date') : t('erp.sales.form.expirationDate')}>
                 <input
                   type="date"
                   className="oryx-input"
@@ -2083,9 +2087,9 @@ function DocumentModal({
                   onChange={(e) => setPaymentMethod(e.target.value)}
                   data-testid={`${testIdPrefix}-payment-method`}
                 >
-                  {(['CASH', 'CARD', 'BANK_TRANSFER', 'WALLET', 'CHEQUE', 'OTHER'] as const).map((m) => (
+                  {(['CASH', 'CARD', 'BANK_TRANSFER', 'WALLET', 'CHEQUE', 'OTHER', ...(dueDateField === 'dueDate' ? ['CREDIT'] as const : [])] as const).map((m) => (
                     <option key={m} value={m}>
-                      {t(`erp.sales.payment.${m}`)}
+                      {m === 'CREDIT' ? (locale === 'ar' ? 'آجل / كريدت' : 'Credit / Pay later') : t(`erp.sales.payment.${m}`)}
                     </option>
                   ))}
                 </select>
