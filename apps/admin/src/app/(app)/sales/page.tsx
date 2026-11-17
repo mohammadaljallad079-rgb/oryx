@@ -47,6 +47,7 @@ import type {
   WarehouseDto,
 } from '@oryx/shared';
 import { DocumentActions } from '@/components/document-actions';
+import { PosCameraScanner } from '@/components/pos-camera-scanner';
 
 type Tab = 'dashboard' | 'invoices' | 'quotations' | 'returns' | 'pos';
 
@@ -718,6 +719,11 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
 
   const openSession = sessions.data?.items.find((s) => s.status === 'OPEN');
 
+  // Open the workstation directly when an active cashier session is restored.
+  useEffect(() => {
+    if (canOperate && openSession?.id) setSaleOpen(true);
+  }, [canOperate, openSession?.id]);
+
   /**
    * Opens the branch's cashier session.
    *
@@ -946,6 +952,7 @@ function PosSaleModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
 
   const catalog = useAsync(
@@ -967,6 +974,7 @@ function PosSaleModal({
     setCart([]);
     setPaid('');
     setPaymentMethod('CASH');
+    setCameraOpen(false);
     setCustomerId('');
     setWarehouseId(session?.warehouseId ?? warehouses[0]?.id ?? '');
     // Focus the scan field so a USB scanner's keystrokes land in it without a
@@ -1006,8 +1014,8 @@ function PosSaleModal({
   // code and the Enter in one burst — waiting for a 250 ms debounce would miss
   // it. An exact barcode match wins; otherwise a lone search result is taken;
   // otherwise the term stays in the field as an ordinary search.
-  const onScanSubmit = async () => {
-    const term = search.trim();
+  const onScanSubmit = async (scannedCode?: string) => {
+    const term = (scannedCode ?? search).trim();
     if (!term) return;
     try {
       const { items } = await api.posCatalog({
@@ -1146,11 +1154,18 @@ function PosSaleModal({
                 data-testid="pos-search"
               />
             </div>
+            <Button size="sm" variant="ghost" onClick={() => setCameraOpen((value) => !value)}
+              data-testid="pos-camera-toggle" aria-label={locale === 'ar' ? 'مسح بالكاميرا' : 'Scan with camera'}>
+              <Icon name="camera" size={18} />
+              {locale === 'ar' ? 'مسح بالكاميرا' : 'Camera scan'}
+            </Button>
             <Button variant="ghost" onClick={() => void catalog.reload()} aria-label={t('common.refresh')}>
               <Icon name="refresh" size={18} />
             </Button>
           </div>
 
+          <PosCameraScanner open={cameraOpen} onClose={() => setCameraOpen(false)}
+            onDetected={(code) => { setCameraOpen(false); void onScanSubmit(code); }} />
           {catalog.error ? <ErrorBanner message={catalog.error} onRetry={catalog.reload} /> : null}
 
           {(categories.data?.items.length ?? 0) > 0 ? (
