@@ -1129,12 +1129,12 @@ function PosSaleModal({
   }, [paid, totals.totalMinor]);
   const changeMinor = paidMinor - totals.totalMinor;
   const saleValid = Boolean(session) && cart.length > 0 &&
-    cart.every(line => Number.isSafeInteger(line.unitPriceMinor) && line.unitPriceMinor > 0) &&
+    cart.every(line => Number.isSafeInteger(line.unitPriceMinor) && line.unitPriceMinor > (currencyScale === 3 ? 1 : 0)) &&
     paidMinor >= totals.totalMinor && totals.totalMinor > 0;
 
   const submit = async () => {
     if (!session || cart.length === 0) return;
-    if (cart.some(line => !Number.isInteger(line.unitPriceMinor) || line.unitPriceMinor <= 0)) {
+    if (cart.some(line => !Number.isInteger(line.unitPriceMinor) || line.unitPriceMinor <= (currencyScale === 3 ? 1 : 0))) {
       setError(locale === 'ar' ? 'يرجى إدخال سعر صحيح أكبر من صفر لكل منتج قبل إتمام البيع.' : 'Set a valid price greater than zero for every item before checkout.');
       return;
     }
@@ -1586,7 +1586,8 @@ function CartRow({
     'NONE', currencyScale,
   ).totalMinor;
   const imageUrl = api.resolveImage(line.imageUrl);
-  const needsPrice = line.unitPriceMinor <= 0;
+  // One fils is a common unconfigured placeholder in BHD catalogue imports.
+  const needsPrice = line.unitPriceMinor <= (currencyScale === 3 ? 1 : 0);
   const ar = locale === 'ar';
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3"
