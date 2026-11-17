@@ -141,6 +141,31 @@ export interface InventorySettings {
   barcodeRequired: boolean;
 }
 
+/**
+ * Company-scoped payment method catalogue. The method code is a stable business
+ * identifier, while accountingMethod keeps financial posting on an approved
+ * cash/bank/credit path. Labels can change without rewriting past documents.
+ */
+export interface CompanyPaymentMethodSetting {
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  accountingMethod: 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'WALLET' | 'CHEQUE' | 'OTHER' | 'CREDIT';
+  isActive: boolean;
+  useInInvoices: boolean;
+  useInPos: boolean;
+}
+
+export const DEFAULT_COMPANY_PAYMENT_METHODS: CompanyPaymentMethodSetting[] = [
+  { code: 'CASH', nameEn: 'Cash', nameAr: 'نقداً', accountingMethod: 'CASH', isActive: true, useInInvoices: true, useInPos: true },
+  { code: 'CARD', nameEn: 'Card', nameAr: 'بطاقة', accountingMethod: 'CARD', isActive: true, useInInvoices: true, useInPos: true },
+  { code: 'BANK_TRANSFER', nameEn: 'Bank transfer', nameAr: 'تحويل بنكي', accountingMethod: 'BANK_TRANSFER', isActive: true, useInInvoices: true, useInPos: true },
+  { code: 'WALLET', nameEn: 'Wallet', nameAr: 'محفظة إلكترونية', accountingMethod: 'WALLET', isActive: true, useInInvoices: true, useInPos: true },
+  { code: 'CHEQUE', nameEn: 'Cheque', nameAr: 'شيك', accountingMethod: 'CHEQUE', isActive: true, useInInvoices: true, useInPos: false },
+  { code: 'OTHER', nameEn: 'Other', nameAr: 'أخرى', accountingMethod: 'OTHER', isActive: true, useInInvoices: true, useInPos: false },
+  { code: 'CREDIT', nameEn: 'Credit / Pay later', nameAr: 'كريدت / آجل', accountingMethod: 'CREDIT', isActive: true, useInInvoices: true, useInPos: false },
+];
+
 export interface SalesSettings {
   quotationPrefix: string;
   orderPrefix: string;
@@ -150,6 +175,7 @@ export interface SalesSettings {
   allowDiscounts: boolean;
   maxDiscountBp: number;
   requireCustomerDocuments: boolean;
+  paymentMethods: CompanyPaymentMethodSetting[];
 }
 
 export interface MaintenanceSettings {
@@ -324,6 +350,7 @@ export const COMPANY_SETTING_DEFAULTS: CompanySettingsMap = {
     allowDiscounts: true,
     maxDiscountBp: 10000,
     requireCustomerDocuments: false,
+    paymentMethods: DEFAULT_COMPANY_PAYMENT_METHODS.map(method => ({ ...method })),
   },
   maintenance: {
     orderPrefix: 'WO-',
