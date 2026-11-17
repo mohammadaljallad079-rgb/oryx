@@ -1602,7 +1602,14 @@ export class SalesService {
       ...(query.status ? { status: query.status as never } : {}),
       ...(query.dateFrom || query.dateTo ? { createdAt: { ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}), ...(query.dateTo ? { lte: new Date(`${query.dateTo}T23:59:59.999Z`) } : {}) } } : {}),
       ...(query.minAmountMinor !== undefined || query.maxAmountMinor !== undefined ? { totalMinor: { ...(query.minAmountMinor !== undefined ? { gte: query.minAmountMinor } : {}), ...(query.maxAmountMinor !== undefined ? { lte: query.maxAmountMinor } : {}) } } : {}),
-      ...(query.search?.trim() ? { receiptNumber: { contains: query.search.trim(), mode: 'insensitive' as const } } : {}),
+      ...(query.search?.trim() ? { OR: [
+        { receiptNumber: { contains: query.search.trim(), mode: 'insensitive' as const } },
+        { customer: { is: { OR: [
+          { nameEn: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { nameAr: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { code: { contains: query.search.trim(), mode: 'insensitive' as const } },
+        ] } } },
+      ] } : {}),
     };
     const [rows, total] = await Promise.all([
       this.prisma.posSale.findMany({
