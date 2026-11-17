@@ -838,6 +838,10 @@ export class SalesService {
       const totals = computeDocumentTotals(lineInputs, rounding.mode, rounding.scale);
       const invoiceDate = new Date(resolveDocumentDate(dto)!);
       const dueDate = dto.dueDate ? new Date(dto.dueDate) : current.dueDate;
+      const paymentMethod = (dto.paymentMethod as PaymentMethod | undefined) ?? current.paymentMethod;
+      if (paymentMethod === 'CREDIT' && !dueDate) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'A due date is required for credit invoices.');
+      }
       const willPost = dto.post === true;
       if (willPost) await this.assertCreditLimit(tx, companyId, dto.customerId, totals.totalMinor);
       const updated = await tx.salesInvoice.update({
@@ -852,7 +856,7 @@ export class SalesService {
           taxMinor: totals.taxMinor,
           roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
-          paymentMethod: (dto.paymentMethod as PaymentMethod | undefined) ?? current.paymentMethod,
+          paymentMethod,
           salespersonName,
           paymentReference: dto.paymentReference ?? null,
           notes: dto.notes ?? null,
@@ -1017,6 +1021,9 @@ export class SalesService {
 
       const invoiceNumber = await this.sequences.next(tx, companyId, 'salesInvoice');
       const invoiceDate = new Date(resolveDocumentDate(dto)!);
+      if (dto.paymentMethod === 'CREDIT' && !dto.dueDate) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Select the due date for a credit invoice.');
+      }
       const dueDate = dto.dueDate
         ? new Date(dto.dueDate)
         : await computeDueDate(tx, companyId, customerId!, invoiceDate);
