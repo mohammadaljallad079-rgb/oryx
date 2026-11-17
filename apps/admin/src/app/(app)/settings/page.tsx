@@ -192,7 +192,7 @@ export default function SettingsPage() {
               setSettingsSection('sales');
               document.querySelector('[data-testid="settings-centre-card"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }}>
-              <Icon name="credit-card" size={16} />
+              <Icon name="wallet" size={16} />
               {locale === 'ar' ? 'إدارة طرق الدفع' : 'Manage payment methods'}
             </Button>
           </div>
