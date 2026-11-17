@@ -602,6 +602,7 @@ export function SearchableSelect({
                   type="button"
                   role="option"
                   aria-selected={o.value === value}
+                  data-value={o.value}
                   disabled={o.disabled}
                   className="block w-full rounded-lg px-3 py-2 text-start hover:bg-[var(--surface-2)] disabled:opacity-50"
                   onClick={(e) => {
@@ -659,6 +660,7 @@ export function SearchableSelect({
                   className="oryx-input"
                   value={createValues[field.key] ?? ''}
                   placeholder={field.placeholder}
+                  data-testid={testId ? `${testId}-create-${field.key}` : undefined}
                   onChange={(e) => setCreateValues((v) => ({ ...v, [field.key]: e.target.value }))}
                 />
               </Field>
