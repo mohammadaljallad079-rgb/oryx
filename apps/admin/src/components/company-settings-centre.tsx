@@ -379,6 +379,18 @@ export function CompanySettingsCentre({ canEdit }: { canEdit: boolean }) {
 
   return (
     <div className="flex flex-col gap-4" data-testid="settings-centre">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border)] p-3" data-testid="payment-methods-shortcut">
+        <div>
+          <p className="m-0 text-sm font-semibold">{locale === 'ar' ? 'إدارة طرق الدفع' : 'Manage payment methods'}</p>
+          <p className="oryx-muted m-0 text-xs">{locale === 'ar' ? 'الإضافة والتعديل والتفعيل لطرق دفع الفواتير ونقاط البيع' : 'Add, edit and enable payment methods for invoices and POS.'}</p>
+        </div>
+        <Button type="button" variant="primary" onClick={() => {
+          setActive('sales');
+          setSaved(false);
+        }} data-testid="open-payment-methods-settings">
+          {locale === 'ar' ? 'فتح طرق الدفع' : 'Open payment methods'}
+        </Button>
+      </div>
       <div className="flex flex-wrap gap-2" role="tablist" aria-label={t('settings.centre')}>
         {COMPANY_SETTING_SECTIONS.map((section) => {
           const m = SECTION_META[section];
