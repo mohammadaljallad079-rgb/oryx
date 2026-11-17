@@ -101,24 +101,64 @@ function HrInner() {
 function DepartmentsTab({ companyId, canManage }: { companyId: string | null; canManage: boolean }) {
   const { t, locale } = useUi();
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<DepartmentDto | null>(null);
   const [busy, setBusy] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [rowError, setRowError] = useState<string | null>(null);
   const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '' });
   const list = useAsync(() => companyId ? api.hrDepartments({ companyId }) : Promise.resolve(null), [companyId]);
 
-  async function create() {
+  function openCreate() {
+    setEditing(null);
+    setForm({ code: '', nameEn: '', nameAr: '' });
+    setError(null);
+    setOpen(true);
+  }
+
+  function openEdit(department: DepartmentDto) {
+    setEditing(department);
+    setForm({ code: department.code, nameEn: department.nameEn, nameAr: department.nameAr });
+    setError(null);
+    setOpen(true);
+  }
+
+  async function save() {
     if (!companyId) return;
     setBusy(true);
     setError(null);
     try {
-      await api.createDepartment({ companyId, code: form.code.trim().toUpperCase(), nameEn: form.nameEn.trim(), nameAr: form.nameAr.trim() });
-      setForm({ code: '', nameEn: '', nameAr: '' });
+      const payload = { code: form.code.trim().toUpperCase(), nameEn: form.nameEn.trim(), nameAr: form.nameAr.trim() };
+      if (editing) {
+        await api.updateDepartment(editing.id, payload);
+      } else {
+        await api.createDepartment({ companyId, ...payload });
+      }
       setOpen(false);
+      setEditing(null);
       await list.reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : t('common.error'));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function remove(department: DepartmentDto) {
+    const name = locale === 'ar' ? department.nameAr : department.nameEn;
+    const message = locale === 'ar'
+      ? `هل تريد حذف القسم "${name}" نهائياً؟ لا يمكن التراجع عن الحذف. يجب نقل جميع السجلات المرتبطة به أولاً.`
+      : `Permanently delete department "${name}"? This cannot be undone. All linked records must be reassigned first.`;
+    if (!window.confirm(message)) return;
+    setDeletingId(department.id);
+    setRowError(null);
+    try {
+      await api.deleteDepartment(department.id);
+      await list.reload();
+    } catch (err) {
+      setRowError(err instanceof Error ? err.message : t('common.error'));
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -133,27 +173,35 @@ function DepartmentsTab({ companyId, canManage }: { companyId: string | null; ca
           <h3 className="m-0 text-sm font-bold">{t('erp.hr.departments')}</h3>
           <p className="oryx-muted m-0 mt-1 text-xs">{locale === 'ar' ? 'الأقسام مرتبطة بملفات الموظفين والمسميات الوظيفية.' : 'Departments are shared with employee records and job titles.'}</p>
         </div>
-        {canManage ? <Button size="sm" variant="primary" onClick={() => { setError(null); setOpen(true); }} data-testid="department-create"><Icon name="plus" size={14} />{locale === 'ar' ? 'إضافة قسم' : 'Add department'}</Button> : null}
+        {canManage ? <Button size="sm" variant="primary" onClick={openCreate} data-testid="department-create"><Icon name="plus" size={14} />{locale === 'ar' ? 'إضافة قسم' : 'Add department'}</Button> : null}
       </div>
+      {rowError ? <div className="p-4"><ErrorBanner message={rowError} /></div> : null}
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
       {list.loading ? <div className="p-4"><Skeleton height={100} /></div> : !list.data?.items.length ? <EmptyState title={t('common.empty')} hint={locale === 'ar' ? 'أضف أول قسم للشركة.' : 'Add the first department for this company.'} /> : (
         <TableShell>
-          <thead><tr><th>{t('common.code')}</th><th>{t('common.name')}</th><th>{locale === 'ar' ? 'عدد الموظفين' : 'Employees'}</th></tr></thead>
-          <tbody>{list.data.items.map((department: DepartmentDto) => <tr key={department.id}><td className="font-mono">{department.code}</td><td><span className="font-semibold">{locale === 'ar' ? department.nameAr : department.nameEn}</span><span className="oryx-faint block text-xs">{locale === 'ar' ? department.nameEn : department.nameAr}</span></td><td className="tabular-nums">{department.employeeCount ?? 0}</td></tr>)}</tbody>
+          <thead><tr><th>{t('common.code')}</th><th>{t('common.name')}</th><th>{locale === 'ar' ? 'عدد الموظفين' : 'Employees'}</th>{canManage ? <th>{locale === 'ar' ? 'الإجراءات' : 'Actions'}</th> : null}</tr></thead>
+          <tbody>{list.data.items.map((department: DepartmentDto) => <tr key={department.id} data-testid={`department-row-${department.code}`}>
+            <td className="font-mono">{department.code}</td>
+            <td><span className="font-semibold">{locale === 'ar' ? department.nameAr : department.nameEn}</span><span className="oryx-faint block text-xs">{locale === 'ar' ? department.nameEn : department.nameAr}</span></td>
+            <td className="tabular-nums">{department.employeeCount ?? 0}</td>
+            {canManage ? <td><div className="flex flex-wrap gap-2">
+              <Button size="sm" disabled={deletingId !== null} onClick={() => openEdit(department)} data-testid={`department-edit-${department.code}`}>{locale === 'ar' ? 'تعديل' : 'Edit'}</Button>
+              <Button size="sm" variant="danger" disabled={deletingId !== null} onClick={() => void remove(department)} data-testid={`department-delete-${department.code}`}><Icon name="trash" size={14} />{locale === 'ar' ? 'حذف فعلي' : 'Permanently delete'}</Button>
+            </div></td> : null}
+          </tr>)}</tbody>
         </TableShell>
       )}
-      <Modal open={open} title={locale === 'ar' ? 'إضافة قسم جديد' : 'Add department'} onClose={() => setOpen(false)} footer={<><Button onClick={() => setOpen(false)}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || !form.code.trim() || !form.nameEn.trim() || !form.nameAr.trim()} onClick={() => void create()}>{busy ? t('common.loading') : t('common.create')}</Button></>}>
+      <Modal open={open} title={editing ? (locale === 'ar' ? 'تعديل القسم' : 'Edit department') : (locale === 'ar' ? 'إضافة قسم جديد' : 'Add department')} onClose={() => { if (!busy) setOpen(false); }} footer={<><Button disabled={busy} onClick={() => setOpen(false)}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || !form.code.trim() || !form.nameEn.trim() || !form.nameAr.trim()} onClick={() => void save()} data-testid="department-save">{busy ? t('common.loading') : editing ? t('common.save') : t('common.create')}</Button></>}>
         {error ? <ErrorBanner message={error} /> : null}
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t('common.code')} required><input className="oryx-input uppercase" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} /></Field>
-          <Field label={locale === 'ar' ? 'الاسم بالعربية' : 'Name (Arabic)'} required><input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} /></Field>
-          <Field label={locale === 'ar' ? 'الاسم بالإنجليزية' : 'Name (English)'} required><input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} /></Field>
+          <Field label={t('common.code')} required><input data-testid="department-code" className="oryx-input uppercase" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} /></Field>
+          <Field label={locale === 'ar' ? 'الاسم بالعربية' : 'Name (Arabic)'} required><input data-testid="department-name-ar" className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} /></Field>
+          <Field label={locale === 'ar' ? 'الاسم بالإنجليزية' : 'Name (English)'} required><input data-testid="department-name-en" className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} /></Field>
         </div>
       </Modal>
     </Card>
   );
 }
-
 
 function EmployeesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
