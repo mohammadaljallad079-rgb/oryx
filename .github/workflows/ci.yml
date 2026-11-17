@@ -6,9 +6,9 @@ name: CI
 # workflow is safe for fork pull requests.
 on:
   pull_request:
-    branches: [main]
+    branches: [main, release/oryx-latest]
   push:
-    branches: [main, feature/execution-01-super-admin-foundation, feature/execution-02-erp-core, feature/execution-03-hr-crm-automotive, feature/execution-04-customer-marketplace-mobile, feature/execution-05-platform-completion, feature/execution-07-premium-web]
+    branches: [main, release/oryx-latest, fix/settings-propagation-audit, feature/execution-01-super-admin-foundation, feature/execution-02-erp-core, feature/execution-03-hr-crm-automotive, feature/execution-04-customer-marketplace-mobile, feature/execution-05-platform-completion, feature/execution-07-premium-web]
   workflow_dispatch:
 
 # Cancel superseded runs on the same ref to conserve CI minutes.
