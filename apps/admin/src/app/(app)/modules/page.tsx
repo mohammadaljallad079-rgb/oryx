@@ -80,7 +80,7 @@ function ModulesPageInner() {
                     <span className="oryx-module-badge" aria-hidden>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={`/tiles/${m.tileImage ?? 'tile-modules'}.svg`}
+                        src={`/tiles/${m.tileImage?.trim() || 'tile-modules'}.svg`}
                         alt=""
                         className="h-full w-full object-cover"
                       />
@@ -183,7 +183,7 @@ function ModuleEditModal({
         descriptionAr: form.descriptionAr.trim(),
         group: form.group.trim(),
         icon: form.icon.trim(),
-        tileImage: form.tileImage.trim(),
+        tileImage: form.tileImage.trim() || m.tileImage || 'tile-modules',
         route: form.route.trim(),
         status: form.status,
         sortOrder: Number(form.sortOrder) || 0,
@@ -360,7 +360,7 @@ function ModuleEditModal({
           <span className="oryx-module-badge oryx-module-badge--lg" aria-hidden>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={`/tiles/${form.tileImage || 'tile-modules'}.svg`}
+              src={`/tiles/${form.tileImage.trim() || m.tileImage?.trim() || 'tile-modules'}.svg`}
               alt=""
               className="h-full w-full object-cover"
             />
