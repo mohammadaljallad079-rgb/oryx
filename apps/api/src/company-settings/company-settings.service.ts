@@ -7,10 +7,12 @@ import {
   type CompanySettingSection,
   type CompanySettingsMap,
   type CompanySettingsResponse,
+  type CompanyPaymentMethodSetting,
 } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
 import { ErpContextService } from '../common/erp-context.service';
 import type { RequestPrincipal } from '../auth/auth.decorators';
+import { badRequest, ERROR_CODES } from '../common/errors';
 
 /**
  * Per-company settings.
@@ -74,7 +76,8 @@ export class CompanySettingsService {
     const existing = await this.prisma.companySetting.findUnique({
       where: { companyId_section: { companyId, section } },
     });
-    const incoming = section === 'numbering' ? sanitiseNumbering(patch) : patch;
+    const incoming = section === 'numbering' ? sanitiseNumbering(patch)
+      : section === 'sales' ? sanitiseSalesSettings(patch) : patch;
     const merged = { ...withDefaults(section, existing?.value), ...incoming };
     await this.prisma.companySetting.upsert({
       where: { companyId_section: { companyId, section } },
@@ -141,3 +144,49 @@ function clampInt(value: unknown, min: number, max: number): number {
 }
 
 const KNOWN_NUMBERING_KEYS = new Set(DOCUMENT_NUMBERING_TYPES.map((t) => t.key));
+
+const PAYMENT_ACCOUNTING_METHODS = new Set([
+  'CASH', 'CARD', 'BANK_TRANSFER', 'WALLET', 'CHEQUE', 'OTHER', 'CREDIT',
+]);
+
+/** Store payment methods as a validated, company-scoped catalogue, never raw JSON. */
+function sanitiseSalesSettings(patch: Record<string, unknown>): Record<string, unknown> {
+  if (!Object.prototype.hasOwnProperty.call(patch, 'paymentMethods')) return patch;
+  const input = patch.paymentMethods;
+  if (!Array.isArray(input) || input.length > 40) {
+    throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Payment methods must be a list of up to 40 entries.');
+  }
+  const seen = new Set<string>();
+  const paymentMethods: CompanyPaymentMethodSetting[] = input.map((raw: unknown) => {
+    if (!raw || typeof raw !== 'object') {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Invalid payment method.');
+    }
+    const item = raw as Record<string, unknown>;
+    const code = String(item.code ?? '').trim().toUpperCase();
+    const nameEn = String(item.nameEn ?? '').trim();
+    const nameAr = String(item.nameAr ?? '').trim();
+    const accountingMethod = String(item.accountingMethod ?? '').trim();
+    if (!/^[A-Z][A-Z0-9_]{1,31}$/.test(code) || seen.has(code)
+      || !nameEn || nameEn.length > 80 || !nameAr || nameAr.length > 80
+      || !PAYMENT_ACCOUNTING_METHODS.has(accountingMethod)
+      || typeof item.isActive !== 'boolean'
+      || typeof item.useInInvoices !== 'boolean'
+      || typeof item.useInPos !== 'boolean'
+      || (accountingMethod === 'CREDIT' && item.useInPos)) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Invalid or duplicate payment method configuration.');
+    }
+    seen.add(code);
+    return {
+      code, nameEn, nameAr,
+      accountingMethod: accountingMethod as CompanyPaymentMethodSetting['accountingMethod'],
+      isActive: item.isActive,
+      useInInvoices: item.useInInvoices,
+      useInPos: item.useInPos,
+    };
+  });
+  if (!paymentMethods.some(method => method.isActive && method.useInInvoices)
+    || !paymentMethods.some(method => method.isActive && method.useInPos)) {
+    throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'At least one active payment method is required for invoices and POS.');
+  }
+  return { ...patch, paymentMethods };
+}
