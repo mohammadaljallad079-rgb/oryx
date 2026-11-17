@@ -1251,6 +1251,7 @@ export class DocumentsService {
             currency: invoice.currency || (await currencyOf()),
             notes: invoice.notes,
             paymentMethod: invoice.paymentMethod,
+            paymentMethodDisplay: invoice.paymentMethodLabelEn || invoice.paymentMethodLabelAr || null,
             salespersonName,
             paymentReference: invoice.paymentReference,
             taxRateBp,
@@ -1289,6 +1290,7 @@ export class DocumentsService {
             currency: quotation.currency || (await currencyOf()),
             notes: quotation.notes,
             paymentMethod: quotation.paymentMethod,
+            paymentMethodDisplay: quotation.paymentMethodLabelEn || quotation.paymentMethodLabelAr || null,
             salespersonName:
               quotation.salespersonName ?? (await this.userDisplayName(quotation.createdById)),
             paymentReference: quotation.paymentReference,
