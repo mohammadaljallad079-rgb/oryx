@@ -98,7 +98,7 @@ test.describe('Point of sale — card terminal', () => {
     // Tap the tile and ensure a missing catalogue price can be explicitly
     // entered before checking out. Never silently charge 1 fils.
     await tile.click();
-    if (setup.product.salesPriceMinor <= 0) {
+    if (setup.product.salesPriceMinor <= 1) {
       await expect(page.getByTestId('save-pos-sale')).toBeDisabled();
       const price = page.getByTestId(`pos-price-${setup.product.sku}`);
       await price.fill('5.000');
