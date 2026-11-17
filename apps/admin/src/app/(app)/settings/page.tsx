@@ -15,6 +15,7 @@ import { CompanySettingsCentre } from '@/components/company-settings-centre';
 export default function SettingsPage() {
   const { t, locale, theme, fontScale, setLocale, setTheme, setFontScale } = useUi();
   const { user, companyId, isPlatform, can, updatePreferences, refreshSession } = useAuth();
+  const [settingsSection, setSettingsSection] = useState<'general' | 'sales'>('general');
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState({ fullNameEn: '', fullNameAr: '' });
@@ -179,10 +180,30 @@ export default function SettingsPage() {
       ) : null}
 
       {companyId ? (
+        <Card className="p-4" data-testid="settings-payment-shortcut">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="oryx-panel-title m-0">{locale === 'ar' ? 'طرق الدفع' : 'Payment methods'}</p>
+              <p className="oryx-muted m-0 text-xs">
+                {locale === 'ar' ? 'إضافة وتعديل وتفعيل طرق دفع الفواتير ونقاط البيع' : 'Manage invoice and POS tender methods'}
+              </p>
+            </div>
+            <Button variant="primary" data-testid="open-payment-method-settings" onClick={() => {
+              setSettingsSection('sales');
+              document.querySelector('[data-testid="settings-centre-card"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}>
+              <Icon name="credit-card" size={16} />
+              {locale === 'ar' ? 'إدارة طرق الدفع' : 'Manage payment methods'}
+            </Button>
+          </div>
+        </Card>
+      ) : null}
+
+      {companyId ? (
         <Card className="p-4" data-testid="settings-centre-card">
           <p className="oryx-panel-title m-0 mb-1">{t('settings.centre')}</p>
           <p className="oryx-muted m-0 mb-4 text-[12px]">{t('settings.centreHint')}</p>
-          <CompanySettingsCentre canEdit={canEditBranding} />
+          <CompanySettingsCentre canEdit={canEditBranding} initialSection={settingsSection} />
         </Card>
       ) : null}
 
