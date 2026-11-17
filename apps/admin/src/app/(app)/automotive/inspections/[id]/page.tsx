@@ -543,15 +543,20 @@ function GroupedSectionsEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
+  const emptyAreaState = (): AreaState => ({ remarks: '', noFindings: false, results: {} });
+
   const patch = (area: InspectionSectionKey, next: Partial<AreaState>) =>
-    setState((prev) => ({ ...prev, [area]: { ...prev[area], ...next } }));
+    setState((prev) => ({ ...prev, [area]: { ...(prev[area] ?? emptyAreaState()), ...next } }));
 
   const setResult = (area: InspectionSectionKey, itemKey: string, result: InspectionResultValue) =>
     setState((prev) => ({
       ...prev,
       [area]: {
-        ...prev[area],
-        results: { ...prev[area].results, [itemKey]: { itemKey, result, note: prev[area].results[itemKey]?.note ?? null } },
+        ...(prev[area] ?? emptyAreaState()),
+        results: {
+          ...(prev[area] ?? emptyAreaState()).results,
+          [itemKey]: { itemKey, result, note: (prev[area] ?? emptyAreaState()).results[itemKey]?.note ?? null },
+        },
       },
     }));
 
@@ -589,7 +594,10 @@ function GroupedSectionsEditor({
         {areas.map((area) => {
           const spec = inspectionSectionSpec(area);
           const section = session.sections.find((s) => s.area === area);
-          const areaState = state[area];
+          // The selected-area set can grow while this editor is mounted. React
+          // renders once before the session-sync effect runs, so supply an empty
+          // state for newly added sections instead of dereferencing undefined.
+          const areaState = state[area] ?? emptyAreaState();
           return (
             <div key={area} className="oryx-group-section" data-testid={`group-section-${area}`}>
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
