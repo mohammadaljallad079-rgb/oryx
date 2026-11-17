@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
-import { ENTERPRISE_ADMIN, setLocale, setTheme, signIn } from './helpers';
+import { ENTERPRISE_ADMIN, apiToken, setLocale, setTheme, signIn } from './helpers';
 
 /**
  * Screenshot capture for the vehicle-inspection entry forms and the printed
@@ -12,6 +12,28 @@ import { ENTERPRISE_ADMIN, setLocale, setTheme, signIn } from './helpers';
  * Output: docs/execution-reports/exec20-inspection/
  */
 const OUT = '../../docs/execution-reports/exec20-inspection';
+
+const API = process.env.ORYX_API ?? 'http://localhost:3001/api/v1';
+
+/** Seed a real inspection so the workspace capture never depends on unrelated fixtures. */
+async function seedInspectionJob(page: Page): Promise<string> {
+  const token = await apiToken(page, ENTERPRISE_ADMIN);
+  return page.evaluate(async ({ api, token }) => {
+    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const customers = (await (await fetch(`${api}/sales/customers?pageSize=50`, { headers })).json()) as { items: Array<{ id: string }> };
+    for (const customer of customers.items) {
+      const vehicles = (await (await fetch(`${api}/automotive/vehicles?customerId=${customer.id}`, { headers })).json()) as { items: Array<{ id: string }> };
+      if (!vehicles.items.length) continue;
+      const created = await fetch(`${api}/automotive/inspections`, {
+        method: 'POST', headers,
+        body: JSON.stringify({ customerId: customer.id, vehicleId: vehicles.items[0].id, selectedAreas: ['EXTERIOR'] }),
+      });
+      if (!created.ok) throw new Error(`Inspection fixture creation failed: ${created.status} ${await created.text()}`);
+      return ((await created.json()) as { id: string }).id;
+    }
+    throw new Error('No seeded customer with a vehicle is available for the inspection capture.');
+  }, { api: API, token });
+}
 
 async function shot(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
@@ -41,6 +63,7 @@ test.describe('Execution 20 — inspection form and print capture', () => {
         await setTheme(page, theme);
         await setLocale(page, locale);
         const tag = `${locale}-${theme}`;
+        const seededJobId = await seedInspectionJob(page);
 
         await page.goto('/automotive/inspections', { waitUntil: 'domcontentloaded' });
         await expect(page.getByTestId('inspections-page')).toBeVisible();
@@ -62,7 +85,7 @@ test.describe('Execution 20 — inspection form and print capture', () => {
         await closeModal(page);
         await expect(page.locator('.oryx-modal')).toHaveCount(0);
 
-        await page.locator('[data-testid^="open-job-"]').first().click();
+        await page.getByTestId(`open-job-${seededJobId}`).click();
         await page.waitForURL(/\/automotive\/inspections\/.+/);
         await page.waitForLoadState('networkidle');
         await shot(page, `04-inspection-workspace-${tag}`);
