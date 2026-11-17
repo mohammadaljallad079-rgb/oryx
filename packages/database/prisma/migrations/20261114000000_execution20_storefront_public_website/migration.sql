@@ -1,201 +1,96 @@
--- Execution 20 — public storefront (premium customer website) integration.
--- Purely additive: new enums, new tables and nullable/defaulted columns only.
--- No column, table, index or constraint is dropped or narrowed, so every
--- existing ERP, HR, automotive and marketplace record is preserved.
+-- Execution 20 — supplemental storefront schema.
+-- The base storefront migration (20261113174116_storefront_public_website)
+-- already creates the shared enums, ContactMessage, WebOrder, WebOrderLine,
+-- CustomerWishlistItem and their common indexes/relations. This migration
+-- adds only the remaining storefront fields and SiteContent.
+-- All additions are guarded so an environment that already has an additive
+-- field does not fail or lose existing data.
 
--- CreateEnum
-CREATE TYPE "PartCondition" AS ENUM ('NEW', 'REFURBISHED');
+-- Add guest contact fields to booking slots.
+ALTER TABLE "BookingSlot"
+  ADD COLUMN IF NOT EXISTS "guestEmail" TEXT,
+  ADD COLUMN IF NOT EXISTS "guestName" TEXT,
+  ADD COLUMN IF NOT EXISTS "guestPhone" TEXT;
 
--- CreateEnum
-CREATE TYPE "FulfilmentMethod" AS ENUM ('COLLECTION', 'DELIVERY');
+-- Add public branch profile fields.
+ALTER TABLE "Branch"
+  ADD COLUMN IF NOT EXISTS "descriptionAr" TEXT,
+  ADD COLUMN IF NOT EXISTS "descriptionEn" TEXT,
+  ADD COLUMN IF NOT EXISTS "email" TEXT,
+  ADD COLUMN IF NOT EXISTS "imageUrl" TEXT,
+  ADD COLUMN IF NOT EXISTS "isPublished" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "latitude" DECIMAL(10,7),
+  ADD COLUMN IF NOT EXISTS "longitude" DECIMAL(10,7),
+  ADD COLUMN IF NOT EXISTS "servicesOffered" TEXT[] DEFAULT ARRAY[]::TEXT[],
+  ADD COLUMN IF NOT EXISTS "whatsapp" TEXT;
 
--- CreateEnum
-CREATE TYPE "WebOrderStatus" AS ENUM ('PENDING', 'CONFIRMED', 'PAID', 'CANCELLED');
+-- Add the product image field; the remaining product storefront fields are
+-- already supplied by the base storefront migration.
+ALTER TABLE "Product"
+  ADD COLUMN IF NOT EXISTS "imageUrl" TEXT;
 
--- CreateEnum
-CREATE TYPE "ContactMessageStatus" AS ENUM ('NEW', 'READ', 'HANDLED');
-
--- AlterTable
-ALTER TABLE "BookingSlot" ADD COLUMN     "guestEmail" TEXT,
-ADD COLUMN     "guestName" TEXT,
-ADD COLUMN     "guestPhone" TEXT;
-
--- AlterTable
-ALTER TABLE "Branch" ADD COLUMN     "descriptionAr" TEXT,
-ADD COLUMN     "descriptionEn" TEXT,
-ADD COLUMN     "email" TEXT,
-ADD COLUMN     "imageUrl" TEXT,
-ADD COLUMN     "isPublished" BOOLEAN NOT NULL DEFAULT false,
-ADD COLUMN     "latitude" DECIMAL(10,7),
-ADD COLUMN     "longitude" DECIMAL(10,7),
-ADD COLUMN     "servicesOffered" TEXT[] DEFAULT ARRAY[]::TEXT[],
-ADD COLUMN     "whatsapp" TEXT;
-
--- AlterTable
-ALTER TABLE "Product" ADD COLUMN     "brand" TEXT,
-ADD COLUMN     "compareAtPriceMinor" INTEGER,
-ADD COLUMN     "descriptionAr" TEXT,
-ADD COLUMN     "descriptionEn" TEXT,
-ADD COLUMN     "engineType" TEXT,
-ADD COLUMN     "imageUrl" TEXT,
-ADD COLUMN     "isFeatured" BOOLEAN NOT NULL DEFAULT false,
-ADD COLUMN     "isPublished" BOOLEAN NOT NULL DEFAULT false,
-ADD COLUMN     "partCategoryKey" TEXT,
-ADD COLUMN     "partCondition" "PartCondition" NOT NULL DEFAULT 'NEW',
-ADD COLUMN     "warrantyAr" TEXT,
-ADD COLUMN     "warrantyEn" TEXT;
-
--- CreateTable
-CREATE TABLE "SiteContent" (
+-- Public website content, localized by locale.
+CREATE TABLE IF NOT EXISTS "SiteContent" (
     "id" TEXT NOT NULL,
     "key" TEXT NOT NULL DEFAULT 'website',
     "locale" "Locale" NOT NULL,
     "data" JSONB NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-
     CONSTRAINT "SiteContent_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "ContactMessage" (
-    "id" TEXT NOT NULL,
-    "companyId" TEXT NOT NULL,
-    "fullName" TEXT NOT NULL,
-    "email" TEXT NOT NULL,
-    "phone" TEXT,
-    "subject" TEXT,
-    "message" TEXT NOT NULL,
-    "branchId" TEXT,
-    "locale" TEXT NOT NULL DEFAULT 'ar',
-    "status" "ContactMessageStatus" NOT NULL DEFAULT 'NEW',
-    "handledById" TEXT,
-    "handledAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+CREATE UNIQUE INDEX IF NOT EXISTS "SiteContent_key_locale_key"
+  ON "SiteContent"("key", "locale");
 
-    CONSTRAINT "ContactMessage_pkey" PRIMARY KEY ("id")
-);
+-- The base migration creates ContactMessage before companyId was introduced.
+-- Preserve existing messages by deriving their company from the selected
+-- branch. If a legacy message has no branch, only use a fallback when the
+-- database contains exactly one company; never guess across tenants.
+ALTER TABLE "ContactMessage"
+  ADD COLUMN IF NOT EXISTS "companyId" TEXT;
 
--- CreateTable
-CREATE TABLE "WebOrder" (
-    "id" TEXT NOT NULL,
-    "companyId" TEXT NOT NULL,
-    "branchId" TEXT,
-    "orderNumber" TEXT NOT NULL,
-    "customerAccountId" TEXT NOT NULL,
-    "customerId" TEXT,
-    "salesInvoiceId" TEXT,
-    "paymentIntentId" TEXT,
-    "fulfilment" "FulfilmentMethod" NOT NULL DEFAULT 'COLLECTION',
-    "deliveryAddress" JSONB,
-    "contactName" TEXT NOT NULL,
-    "contactPhone" TEXT NOT NULL,
-    "contactEmail" TEXT,
-    "notes" TEXT,
-    "subtotalMinor" INTEGER NOT NULL DEFAULT 0,
-    "discountMinor" INTEGER NOT NULL DEFAULT 0,
-    "taxMinor" INTEGER NOT NULL DEFAULT 0,
-    "shippingMinor" INTEGER NOT NULL DEFAULT 0,
-    "totalMinor" INTEGER NOT NULL DEFAULT 0,
-    "currency" TEXT NOT NULL DEFAULT 'BHD',
-    "currencyScale" INTEGER NOT NULL DEFAULT 3,
-    "status" "WebOrderStatus" NOT NULL DEFAULT 'PENDING',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+UPDATE "ContactMessage" AS cm
+SET "companyId" = b."companyId"
+FROM "Branch" AS b
+WHERE cm."branchId" = b."id"
+  AND cm."companyId" IS NULL;
 
-    CONSTRAINT "WebOrder_pkey" PRIMARY KEY ("id")
-);
+DO $$
+DECLARE
+  sole_company_id TEXT;
+BEGIN
+  SELECT MIN("id") INTO sole_company_id
+  FROM "Company"
+  HAVING COUNT(*) = 1;
 
--- CreateTable
-CREATE TABLE "WebOrderLine" (
-    "id" TEXT NOT NULL,
-    "orderId" TEXT NOT NULL,
-    "productId" TEXT NOT NULL,
-    "sku" TEXT NOT NULL,
-    "nameEn" TEXT NOT NULL,
-    "nameAr" TEXT NOT NULL,
-    "quantity" INTEGER NOT NULL,
-    "unitPriceMinor" INTEGER NOT NULL,
-    "taxPercentBp" INTEGER NOT NULL DEFAULT 0,
-    "lineTotalMinor" INTEGER NOT NULL,
-    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+  IF sole_company_id IS NOT NULL THEN
+    UPDATE "ContactMessage"
+    SET "companyId" = sole_company_id
+    WHERE "companyId" IS NULL;
+  END IF;
 
-    CONSTRAINT "WebOrderLine_pkey" PRIMARY KEY ("id")
-);
+  IF EXISTS (SELECT 1 FROM "ContactMessage" WHERE "companyId" IS NULL) THEN
+    RAISE EXCEPTION 'Cannot safely assign companyId to legacy ContactMessage rows. Assign each row to its correct company, then rerun this migration.';
+  END IF;
+END $$;
 
--- CreateTable
-CREATE TABLE "CustomerWishlistItem" (
-    "id" TEXT NOT NULL,
-    "accountId" TEXT NOT NULL,
-    "productId" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ALTER TABLE "ContactMessage"
+  ALTER COLUMN "companyId" SET NOT NULL;
 
-    CONSTRAINT "CustomerWishlistItem_pkey" PRIMARY KEY ("id")
-);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'ContactMessage_companyId_fkey'
+      AND conrelid = '"ContactMessage"'::regclass
+  ) THEN
+    ALTER TABLE "ContactMessage"
+      ADD CONSTRAINT "ContactMessage_companyId_fkey"
+      FOREIGN KEY ("companyId") REFERENCES "Company"("id")
+      ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
 
--- CreateIndex
-CREATE UNIQUE INDEX "SiteContent_key_locale_key" ON "SiteContent"("key", "locale");
-
--- CreateIndex
-CREATE INDEX "ContactMessage_companyId_status_createdAt_idx" ON "ContactMessage"("companyId", "status", "createdAt");
-
--- CreateIndex
-CREATE INDEX "WebOrder_customerAccountId_createdAt_idx" ON "WebOrder"("customerAccountId", "createdAt");
-
--- CreateIndex
-CREATE INDEX "WebOrder_companyId_status_idx" ON "WebOrder"("companyId", "status");
-
--- CreateIndex
-CREATE UNIQUE INDEX "WebOrder_companyId_orderNumber_key" ON "WebOrder"("companyId", "orderNumber");
-
--- CreateIndex
-CREATE INDEX "WebOrderLine_orderId_idx" ON "WebOrderLine"("orderId");
-
--- CreateIndex
-CREATE INDEX "WebOrderLine_productId_idx" ON "WebOrderLine"("productId");
-
--- CreateIndex
-CREATE INDEX "CustomerWishlistItem_accountId_idx" ON "CustomerWishlistItem"("accountId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "CustomerWishlistItem_accountId_productId_key" ON "CustomerWishlistItem"("accountId", "productId");
-
--- AddForeignKey
-ALTER TABLE "ContactMessage" ADD CONSTRAINT "ContactMessage_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ContactMessage" ADD CONSTRAINT "ContactMessage_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES "Branch"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ContactMessage" ADD CONSTRAINT "ContactMessage_handledById_fkey" FOREIGN KEY ("handledById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "WebOrder" ADD CONSTRAINT "WebOrder_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "WebOrder" ADD CONSTRAINT "WebOrder_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES "Branch"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "WebOrder" ADD CONSTRAINT "WebOrder_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "WebOrder" ADD CONSTRAINT "WebOrder_customerAccountId_fkey" FOREIGN KEY ("customerAccountId") REFERENCES "CustomerAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "WebOrder" ADD CONSTRAINT "WebOrder_salesInvoiceId_fkey" FOREIGN KEY ("salesInvoiceId") REFERENCES "SalesInvoice"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "WebOrder" ADD CONSTRAINT "WebOrder_paymentIntentId_fkey" FOREIGN KEY ("paymentIntentId") REFERENCES "PaymentIntent"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "WebOrderLine" ADD CONSTRAINT "WebOrderLine_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "WebOrder"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "WebOrderLine" ADD CONSTRAINT "WebOrderLine_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "CustomerWishlistItem" ADD CONSTRAINT "CustomerWishlistItem_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "CustomerAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "CustomerWishlistItem" ADD CONSTRAINT "CustomerWishlistItem_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
+CREATE INDEX IF NOT EXISTS "ContactMessage_companyId_status_createdAt_idx"
+  ON "ContactMessage"("companyId", "status", "createdAt");
