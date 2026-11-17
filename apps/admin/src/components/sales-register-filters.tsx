@@ -99,8 +99,13 @@ export function SalesRegisterFilters({
 export function salesFilterQuery(value: SalesRegisterFilterValues) {
   const minor = (amount: string) => {
     const number = Number(amount);
-    return amount.trim() !== '' && Number.isFinite(number) && number >= 0
-      ? toMinorInput(amount) : undefined;
+    if (amount.trim() === '' || !Number.isFinite(number) || number < 0) return undefined;
+    try {
+      return toMinorInput(amount);
+    } catch {
+      // Partial or over-precision input must never crash the sales register.
+      return undefined;
+    }
   };
   return {
     search: value.search.trim() || undefined,
