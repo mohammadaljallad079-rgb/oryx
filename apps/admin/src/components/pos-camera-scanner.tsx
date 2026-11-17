@@ -28,6 +28,8 @@ export function PosCameraScanner({
   const ar = locale === 'ar';
   const videoRef = useRef<HTMLVideoElement>(null);
   const detectedRef = useRef(false);
+  const callbackRef = useRef(onDetected);
+  useEffect(() => { callbackRef.current = onDetected; }, [onDetected]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,7 +74,7 @@ export function PosCameraScanner({
             const value = results.find(x => x.rawValue?.trim())?.rawValue.trim();
             if (value) {
               detectedRef.current = true;
-              onDetected(value);
+              callbackRef.current(value);
             }
           }).catch(() => {
             // Decoder may reject individual frames. Keep scanning the stream.
@@ -90,7 +92,7 @@ export function PosCameraScanner({
       stream?.getTracks().forEach(track => track.stop());
       if (videoElement) videoElement.srcObject = null;
     };
-  }, [open, ar, onDetected]);
+  }, [open, ar]);
 
   if (!open) return null;
   return (
