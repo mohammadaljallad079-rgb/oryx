@@ -160,7 +160,7 @@ export function watermark(issuer: DocumentIssuer): string {
   if (issuer.documentWatermarkEnabled === false) return '';
   const size = Math.max(80, Math.min(500, issuer.documentWatermarkSizePt ?? 310));
   const mark = issuer.logoDataUri
-    ? `<img src="${esc(issuer.logoDataUri)}" alt="" aria-hidden="true">`
+    ? `<img src="${esc(issuer.logoDataUri)}" alt="" aria-hidden="true" style="width:${size}pt;max-height:${size}pt;object-fit:contain">`
     : oryxLogoMark(`${size}pt`, 'of-watermark-vector');
   return `<div class="of-watermark" aria-hidden="true" style="opacity:${Math.max(0.02, Math.min(0.3, issuer.documentWatermarkOpacity ?? 0.10))}">${mark}</div>`;
 }
