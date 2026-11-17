@@ -99,6 +99,7 @@ interface CartLine {
   productId: string;
   description: string;
   sku: string;
+  imageUrl?: string | null;
   quantity: number;
   unitPriceMinor: number;
   taxPercentBp: number;
@@ -1056,6 +1057,7 @@ function PosSaleModal({
           productId: product.id,
           description: locale === 'ar' && product.nameAr ? product.nameAr : product.nameEn,
           sku: product.sku,
+          imageUrl: product.imageUrl,
           quantity: 1,
           unitPriceMinor: product.salesPriceMinor,
           taxPercentBp: product.taxRateBp,
@@ -1122,6 +1124,10 @@ function PosSaleModal({
 
   const submit = async () => {
     if (!session || cart.length === 0) return;
+    if (cart.some((line) => !Number.isSafeInteger(line.unitPriceMinor) || line.unitPriceMinor <= 0)) {
+      setError(locale === 'ar' ? 'يوجد منتج بلا سعر صالح. أدخل سعر البيع قبل إتمام العملية.' : 'A product has no valid price. Set its selling price before completing the sale.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -1167,7 +1173,7 @@ function PosSaleModal({
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
-            disabled={busy || cart.length === 0 || !session}
+            disabled={busy || cart.length === 0 || !session || cart.some((line) => !Number.isSafeInteger(line.unitPriceMinor) || line.unitPriceMinor <= 0)}
             onClick={submit}
             data-testid="save-pos-sale"
           >
@@ -1301,6 +1307,7 @@ function PosSaleModal({
                 <CartRow
                   key={l.key}
                   line={l}
+                  currencyScale={currencyScale}
                   onChange={(patch) => updateLine(l.key, patch)}
                   onRemove={() => removeLine(l.key)}
                 />
@@ -1492,14 +1499,17 @@ function PosProductTile({ product, onAdd }: { product: PosProductDto; onAdd: () 
 /** One editable cart line. */
 function CartRow({
   line,
+  currencyScale,
   onChange,
   onRemove,
 }: {
   line: CartLine;
+  currencyScale: number;
   onChange: (patch: Partial<CartLine>) => void;
   onRemove: () => void;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
+  const imageUrl = api.resolveImage(line.imageUrl ?? null);
   const lineTotal = computePosTotals(
     [
       {
@@ -1510,12 +1520,20 @@ function CartRow({
       },
     ],
     'NONE',
-    2,
+    currencyScale,
   ).totalMinor;
   return (
     <div className="flex flex-col gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2">
       <div className="flex items-start justify-between gap-2">
-        <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold">{line.description}</span>
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--background)]" aria-hidden="true">
+            {imageUrl ? <img src={imageUrl} alt="" className="h-full w-full object-cover" /> : <Icon name="package" size={20} />}
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-[12.5px] font-semibold">{line.description}</span>
+            <span className="oryx-muted block text-[10px]">{line.sku}</span>
+          </span>
+        </span>
         <Button
           size="sm"
           variant="ghost"
@@ -1547,20 +1565,28 @@ function CartRow({
             data-testid={`pos-price-${line.sku}`}
           />
         </label>
-        <input
+        <label className="flex flex-col gap-1 text-[11px] font-semibold">
+          <span>{t('erp.sales.discount')} (%)</span>
+          <input
           className="oryx-input text-center text-[12px]"
           inputMode="decimal"
           value={line.discountPercentBp / 100}
           aria-label={t('erp.sales.discount')}
           onChange={(e) =>
-            onChange({ discountPercentBp: Math.round((Number(e.target.value) || 0) * 100) })
+            onChange({ discountPercentBp: Math.min(10000, Math.max(0, Math.round((Number(e.target.value) || 0) * 100))) })
           }
           data-testid={`pos-discount-${line.sku}`}
         />
+        </label>
         <span className="grid place-items-center text-[12px] font-semibold tabular-nums">
           {money(lineTotal)}
         </span>
       </div>
+      {line.unitPriceMinor <= 0 ? (
+        <p className="m-0 text-xs text-[var(--danger)]" role="alert" data-testid={`pos-price-required-${line.sku}`}>
+          {locale === 'ar' ? 'السعر غير محدد. أدخل سعر البيع قبل إتمام العملية.' : 'Price missing. Enter a selling price to complete this sale.'}
+        </p>
+      ) : null}
     </div>
   );
 }
