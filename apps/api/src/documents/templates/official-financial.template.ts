@@ -156,8 +156,11 @@ function documentTaxRate(payload: FinancialDocumentPayload): number {
  * absolutely positioned mark would paint on page one only and leave continuation
  * pages blank.
  */
-export function watermark(): string {
-  return '<div class="of-watermark" aria-hidden="true">AUTO SERVICES</div>';
+export function watermark(issuer: DocumentIssuer): string {
+  const mark = issuer.logoDataUri
+    ? `<img src="${esc(issuer.logoDataUri)}" alt="" aria-hidden="true">`
+    : oryxLogoMark('190pt', 'of-watermark-vector');
+  return `<div class="of-watermark" aria-hidden="true">${mark}</div>`;
 }
 
 /**
@@ -451,7 +454,7 @@ ${OFFICIAL_FINANCIAL_CSS}
 </head>
 <body>
 <section class="of-page">
-  ${watermark()}
+  ${watermark(input.issuer)}
   ${identityBand(input.issuer)}
   <div class="of-body">
   ${titleBlock(payload)}
@@ -511,11 +514,12 @@ export const OFFICIAL_FINANCIAL_CSS = `
      A position:fixed mark makes Chromium repaint it on every printed page; an
      absolutely positioned mark would paint on page one only and leave
      continuation pages blank. */
-  .of-watermark{ position:fixed; left:0; right:0; top:349.8pt;
-    text-align:center; pointer-events:none; z-index:0;
-    font-family:'ORYX Display',Verdana,Arial,Helvetica,sans-serif;
-    font-size:51.747pt; font-weight:700; letter-spacing:6.72pt; white-space:pre;
-    color:#0a1f44; opacity:0.101; }
+  .of-watermark{ position:fixed; inset-inline:0; top:285pt;
+    display:flex; align-items:center; justify-content:center;
+    pointer-events:none; z-index:0; opacity:0.14; }
+  .of-watermark img{ display:block; width:245pt; max-height:245pt; object-fit:contain; }
+  .of-watermark-vector{ display:block; width:245pt; height:auto; }
+  .of-band,.of-body{ position:relative; z-index:1; }
   /* The approved invoice prints the identity band wider than the priced table:
      the logotype starts ~10pt left of the content box and the quality badge ends
      ~8pt right of it (measured logo x16.5, badge x579.5 against a content box of
@@ -651,10 +655,9 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-totals td{ font-size:8.8pt; font-weight:700; color:#0f2b48; text-align:end;
     padding:3.5pt 2pt; }
   .of-total-grand th,.of-total-grand td{ border-top:0.75px solid #0f2b48; }
-  /* The approved reference prints the note as a bordered box with no heading,
-     so the box height is exactly the note text and its padding. */
-  .of-notes{ margin-top:27.7pt; border:1px solid #c2c9d5; padding:7pt 12.3pt; }
-  .of-notes-body{ font-size:8.8pt; color:#334155; }
+  /* Notes remain readable below the invoice without an unnecessary framed box. */
+  .of-notes{ margin-top:12pt; padding:0; border:0; background:transparent; }
+  .of-notes-body{ font-size:8.8pt; color:#334155; white-space:normal; }
   /* The written amount is a plain line, not a box: it sits directly beneath the
      totals block and states the total in words so a reader can verify it. */
   .of-words{ width:59.6%; margin-inline-start:auto; margin-top:6pt;

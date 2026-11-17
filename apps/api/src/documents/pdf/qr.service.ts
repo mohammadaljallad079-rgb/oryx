@@ -31,7 +31,10 @@ export class QrService {
    * issuance rather than emit a dead code.
    */
   verificationUrl(token: string): string {
-    const configured = process.env.DOCUMENT_VERIFY_BASE_URL ?? process.env.NEXT_PUBLIC_SITE_URL;
+    const configured =
+      process.env.DOCUMENT_VERIFY_BASE_URL ??
+      process.env.CUSTOMER_APP_URL ??
+      process.env.NEXT_PUBLIC_SITE_URL;
     if (!configured && process.env.NODE_ENV === 'production') {
       this.logger.error(
         'DOCUMENT_VERIFY_BASE_URL is not set: refusing to issue a document whose QR code would resolve to a developer machine.',
