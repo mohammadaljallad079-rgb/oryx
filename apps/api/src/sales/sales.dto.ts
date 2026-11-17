@@ -498,6 +498,13 @@ export class SalesLineDto {
   @Min(0)
   discountPercentBp?: number;
 
+  /** A flat discount on the line, in minor units, applied after the percentage. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  discountAmountMinor?: number;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -828,6 +835,13 @@ export class PosSaleLineDto {
   @Min(0)
   @Max(10_000)
   discountPercentBp?: number;
+
+  /** A flat discount on the line, in minor units, applied after the percentage. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  discountAmountMinor?: number;
 
   @IsOptional()
   @Type(() => Number)

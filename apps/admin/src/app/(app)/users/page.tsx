@@ -1064,25 +1064,25 @@ function EffectivePermissionsModal({
 
           <div>
             <p className="oryx-label">{t('users.effective')}</p>
-            <div className="flex flex-wrap gap-1">
+            <ul className="oryx-perm-list m-0">
               {data.effective.map((p) => (
-                <span key={p} className="oryx-badge oryx-badge--success font-mono text-[10.5px]">
+                <li key={p} className="oryx-perm-list__item" title={p}>
                   {p}
-                </span>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
 
           {data.suppressedByEntitlement.length > 0 ? (
             <div>
               <p className="oryx-label">{t('users.suppressed')}</p>
-              <div className="flex flex-wrap gap-1">
+              <ul className="oryx-perm-list m-0">
                 {data.suppressedByEntitlement.map((s) => (
-                  <span key={s.code} className="oryx-badge oryx-badge--warning font-mono text-[10.5px]">
+                  <li key={s.code} className="oryx-perm-list__item is-blocked" title={s.code}>
                     {s.code}
-                  </span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           ) : null}
         </div>

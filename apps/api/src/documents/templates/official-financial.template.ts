@@ -146,15 +146,16 @@ function documentTaxRate(payload: FinancialDocumentPayload): number {
 }
 
 /**
- * The faint "AUTO SERVICES" wordmark the approved sheet lays behind the priced
- * body, exactly as the reference prints it.
+ * The faint ORYX Auto Park mark the owner asked to lay behind the priced body.
  *
- * The reference sets the identity wordmark in the brand display face (Codec Pro
- * Bold) at 51.75pt with a 6.72pt tracking, centred on the sheet (measured
- * x 57.5-533.6, y 374.4-426.1 of a 595x842pt page) at ~9.7% opacity, in the
- * identity navy. It repeats on every sheet, so the layer is position:fixed — an
- * absolutely positioned mark would paint on page one only and leave continuation
- * pages blank.
+ * The owner's instruction is explicit: the watermark must be the official ORYX
+ * *logo*, not a typed wordmark. This paints the issuer's own logo image (the
+ * approved ORYX Auto Park lockup, or a tenant's uploaded mark), centred and kept
+ * at low opacity so the navy table headings and the figures stay fully legible on
+ * top of it, with the vector ORYX mark as the fallback when no logo is
+ * configured. The layer is position:fixed so Chromium repaints it on every
+ * printed page; an absolutely positioned mark would paint on page one only and
+ * leave continuation pages blank.
  */
 export function watermark(issuer: DocumentIssuer): string {
   if (issuer.documentWatermarkEnabled === false) return '';
@@ -512,10 +513,11 @@ export const OFFICIAL_FINANCIAL_CSS = `
      on the band cannot be used: Chromium clips a child that overhangs the page
      content box and the band loses its outer edge. */
   .of-body{ padding-inline:10pt 8pt; flex:1 1 auto; }
-  /* The reference watermark is the "AUTO SERVICES" wordmark set in the brand
-     display face (Codec Pro Bold) at 51.75pt with a 6.72pt tracking, so the run
-     measures the reference's 476pt ink width, in the identity navy at ~9.7%
-     opacity (measured from the approved PDF), centred on the sheet.
+  /* The owner asked for the official ORYX Auto Park *logo* behind the priced
+     body rather than a typed wordmark, so the mark is the issuer's own logo
+     image (or the vector ORYX lockup when none is configured), centred and kept
+     at the measured ~10% opacity so the priced table stays fully legible. It is
+     deliberately not boxed and repeats on every printed page.
 
      A position:fixed mark makes Chromium repaint it on every printed page; an
      absolutely positioned mark would paint on page one only and leave

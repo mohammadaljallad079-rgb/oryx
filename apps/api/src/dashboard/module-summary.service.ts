@@ -562,10 +562,10 @@ export class ModuleSummaryService {
         ];
       case 'sales_pos':
         return [
-          S('New sales order', 'أمر بيع جديد', '/sales?tab=orders', 'cart', 'erp.sales.order.manage'),
+          S('New sales order', 'أمر بيع جديد', '/sales?tab=quotations', 'cart', 'erp.sales.order.manage'),
           S('Issue invoice', 'إصدار فاتورة', '/sales?tab=invoices', 'scroll', 'erp.sales.invoice.manage'),
           S('Open POS', 'نقطة البيع', '/sales?tab=pos', 'cash', 'erp.sales.pos.operate'),
-          S('Customers', 'العملاء', '/sales?tab=customers', 'users', 'erp.sales.read'),
+          S('Customers', 'العملاء', '/crm?tab=customers', 'users', 'erp.sales.read'),
         ];
       case 'purchasing_procurement':
         return [
@@ -609,15 +609,15 @@ export class ModuleSummaryService {
         ];
       case 'automotive_maintenance':
         return [
-          S('New maintenance order', 'أمر صيانة جديد', '/automotive/maintenance?tab=orders', 'wrench', 'erp.maintenance.write'),
+          S('New maintenance order', 'أمر صيانة جديد', '/automotive/maintenance?tab=job-cards', 'wrench', 'erp.maintenance.write'),
           S('Bookings', 'الحجوزات', '/automotive/maintenance?tab=bookings', 'calendar', 'erp.maintenance.read'),
           S('Job cards', 'بطاقات العمل', '/automotive/maintenance?tab=job-cards', 'clipboardCheck', 'erp.maintenance.read'),
         ];
       case 'automotive_inspections':
         return [
-          S('New inspection', 'فحص جديد', '/automotive/inspections?tab=sessions', 'clipboardCheck', 'erp.inspection.write'),
+          S('New inspection', 'فحص جديد', '/automotive/inspections?tab=jobs', 'clipboardCheck', 'erp.inspection.write'),
           S('Bookings', 'الحجوزات', '/automotive/inspections?tab=bookings', 'calendar', 'erp.inspection.read'),
-          S('Reports', 'التقارير', '/automotive/inspections?tab=reports', 'file', 'erp.inspection.read'),
+          S('Vehicles', 'المركبات', '/automotive/inspections?tab=vehicles', 'car', 'erp.vehicle.read'),
         ];
       case 'spare_parts':
         return [
@@ -661,17 +661,17 @@ export class ModuleSummaryService {
           F('Journal entries', 'قيود اليومية', '/accounting?tab=journals', 'edit', 'erp.accounting.read', 'Draft, post, reverse and lock double-entry journals.', 'إنشاء وترحيل وعكس وقفل القيود المزدوجة.'),
           F('Receipts & payments', 'المقبوضات والمدفوعات', '/accounting?tab=receipts', 'cash', 'erp.accounting.read', 'Record customer receipts and supplier payments.', 'تسجيل مقبوضات العملاء ومدفوعات الموردين.'),
           F('Financial periods', 'الفترات المالية', '/accounting?tab=periods', 'calendar', 'erp.accounting.read', 'Fiscal years and period open/close control.', 'السنوات المالية والتحكم في إغلاق الفترات.'),
-          F('Trial balance', 'ميزان المراجعة', '/accounting?tab=trial', 'scale', 'erp.accounting.read', 'Posted debit and credit balances by account.', 'الأرصدة المدينة والدائنة المرحّلة حسب الحساب.'),
+          F('Trial balance', 'ميزان المراجعة', '/accounting?tab=statements', 'scale', 'erp.accounting.read', 'Posted debit and credit balances by account.', 'الأرصدة المدينة والدائنة المرحّلة حسب الحساب.'),
           F('Statements', 'القوائم المالية', '/accounting?tab=statements', 'barChart', 'erp.accounting.read', 'Income statement and balance sheet from the ledger.', 'قائمة الدخل والميزانية من دفتر الأستاذ.'),
         ];
       case 'sales_pos':
         return [
           F('Quotations', 'عروض الأسعار', '/sales?tab=quotations', 'file', 'erp.sales.read', 'Price a deal and convert it to an order.', 'تسعير الصفقة وتحويلها إلى أمر بيع.'),
-          F('Sales orders', 'أوامر البيع', '/sales?tab=orders', 'cart', 'erp.sales.read', 'Confirm orders and issue their invoices.', 'تأكيد الأوامر وإصدار فواتيرها.'),
+          F('Sales orders', 'أوامر البيع', '/sales?tab=quotations', 'cart', 'erp.sales.read', 'Confirm orders and issue their invoices.', 'تأكيد الأوامر وإصدار فواتيرها.'),
           F('Invoices', 'الفواتير', '/sales?tab=invoices', 'scroll', 'erp.sales.read', 'Issue invoices, record payment and post to the ledger.', 'إصدار الفواتير وتسجيل السداد والترحيل للدفتر.'),
-          F('Credit notes', 'إشعارات الدائن', '/sales?tab=credit-notes', 'refresh', 'erp.sales.read', 'Return goods and reverse an invoice.', 'إرجاع البضاعة وعكس الفاتورة.'),
+          F('Credit notes', 'إشعارات الدائن', '/sales?tab=returns', 'refresh', 'erp.sales.read', 'Return goods and reverse an invoice.', 'إرجاع البضاعة وعكس الفاتورة.'),
           F('Point of sale', 'نقاط البيع', '/sales?tab=pos', 'cash', 'erp.sales.pos.operate', 'Cashier sessions, cart checkout and receipts.', 'جلسات الكاشير وإتمام البيع والإيصالات.'),
-          F('Customers', 'العملاء', '/sales?tab=customers', 'users', 'erp.sales.read', 'The customer directory shared with CRM and maintenance.', 'دليل العملاء المشترك مع إدارة العلاقات والصيانة.'),
+          F('Customers', 'العملاء', '/crm?tab=customers', 'users', 'erp.sales.read', 'The customer directory shared with CRM and maintenance.', 'دليل العملاء المشترك مع إدارة العلاقات والصيانة.'),
         ];
       case 'purchasing_procurement':
         return [

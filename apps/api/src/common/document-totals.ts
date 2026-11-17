@@ -10,6 +10,8 @@ export interface PricedLineInput {
   quantity: number;
   unitPriceMinor: number;
   discountPercentBp?: number;
+  /** A flat discount on the line, in minor units, applied after the percentage. */
+  discountAmountMinor?: number;
   taxPercentBp?: number;
 }
 
@@ -53,13 +55,21 @@ export function computeDocumentTotals(
     const discountPercentBp = line.discountPercentBp ?? 0;
     const taxPercentBp = line.taxPercentBp ?? 0;
     const lineSubtotalMinor = lineAmountMinor(line.quantity, line.unitPriceMinor);
-    const discountMinor = basisPointsOfMinor(lineSubtotalMinor, discountPercentBp);
+    // The percentage is taken first, then the flat amount, so the two compose:
+    // a 10% discount followed by a 1.000 BD credit reduces the line by both.
+    // The flat amount is clamped to what is left, so the discount can never
+    // exceed the line and push the net (and the tax base) below zero.
+    const percentMinor = basisPointsOfMinor(lineSubtotalMinor, discountPercentBp);
+    const requestedAmountMinor = Math.max(0, line.discountAmountMinor ?? 0);
+    const amountMinor = Math.min(requestedAmountMinor, lineSubtotalMinor - percentMinor);
+    const discountMinor = percentMinor + amountMinor;
     const net = lineSubtotalMinor - discountMinor;
     const taxMinor = basisPointsOfMinor(net, taxPercentBp);
     return {
       quantity: line.quantity,
       unitPriceMinor: line.unitPriceMinor,
       discountPercentBp,
+      discountAmountMinor: amountMinor,
       taxPercentBp,
       lineSubtotalMinor,
       discountMinor,

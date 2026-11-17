@@ -57,6 +57,8 @@ interface LineDraft {
   unitPrice: string;
   /** A per-line discount in whole percent, converted to basis points on submit. */
   discountPercent: string;
+  /** A flat per-line discount in major units, converted to minor units on submit. */
+  discountAmount: string;
   /** The chosen tax row, or a synthetic id when the product carries a rate that
    * is not in the tenant's saved list. */
   taxId: string;
@@ -69,6 +71,7 @@ const emptyLine = (taxPercent = '10'): LineDraft => ({
   quantity: '1',
   unitPrice: '0.00',
   discountPercent: '0',
+  discountAmount: '0.00',
   taxId: '',
   taxPercent,
 });
@@ -120,6 +123,7 @@ function computePosTotals(
     quantity: number;
     unitPriceMinor: number;
     discountPercentBp: number;
+    discountAmountMinor?: number;
     taxPercentBp: number;
   }>,
   roundingMode: RoundingMode,
@@ -127,7 +131,11 @@ function computePosTotals(
 ) {
   const priced = lines.map((l) => {
     const lineSubtotalMinor = lineAmountMinor(l.quantity, l.unitPriceMinor);
-    const discountMinor = basisPointsOfMinor(lineSubtotalMinor, l.discountPercentBp);
+    const percentMinor = basisPointsOfMinor(lineSubtotalMinor, l.discountPercentBp);
+    // The flat discount is applied after the percentage and clamped to what is
+    // left, matching `computeDocumentTotals` so the till shows the posted total.
+    const amountMinor = Math.min(Math.max(0, l.discountAmountMinor ?? 0), lineSubtotalMinor - percentMinor);
+    const discountMinor = percentMinor + amountMinor;
     const net = lineSubtotalMinor - discountMinor;
     const taxMinor = basisPointsOfMinor(net, l.taxPercentBp);
     return { lineSubtotalMinor, discountMinor, taxMinor, lineTotalMinor: net + taxMinor };
@@ -191,7 +199,9 @@ export default function SalesPage() {
 function SalesInner() {
   const { t } = useUi();
   const { can } = useAuth();
-  const [tab, setTab] = useState<Tab>('invoices');
+  // Every module opens on its dashboard, whose first block is the Quick actions
+  // row, so an operator lands on what they can do rather than on a data table.
+  const [tab, setTab] = useState<Tab>('dashboard');
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'dashboard', label: t('erp.sales.dashboard') },
@@ -241,6 +251,8 @@ type SalesLine = {
   quantity?: number;
   unitPriceMinor?: number;
   discountPercentBp?: number;
+  discountAmountMinor?: number;
+  discountMinor?: number;
   taxPercentBp?: number;
   lineTotalMinor?: number;
 };
@@ -276,7 +288,11 @@ function InvoiceLineBreakdown({ document: doc }: { document: SalesDocumentDto })
                 <td className="py-1.5 text-start">{line.description || '—'}</td>
                 <td className="py-1.5 text-end tabular-nums">{qty(line.quantity)}</td>
                 <td className="py-1.5 text-end tabular-nums">{money(line.unitPriceMinor, currency)}</td>
-                <td className="py-1.5 text-end tabular-nums">{((line.discountPercentBp ?? 0) / 100).toFixed(2)}%</td>
+                <td className="py-1.5 text-end tabular-nums">
+                  {line.discountMinor != null
+                    ? money(line.discountMinor, currency)
+                    : `${((line.discountPercentBp ?? 0) / 100).toFixed(2)}%`}
+                </td>
                 <td className="py-1.5 text-end tabular-nums">{((line.taxPercentBp ?? 0) / 100).toFixed(2)}%</td>
                 <td className="py-1.5 text-end tabular-nums font-semibold">{money(line.lineTotalMinor, currency)}</td>
               </tr>
@@ -1569,9 +1585,14 @@ function priceDraftLine(line: LineDraft, currency?: string) {
   const quantity = toQuantityInput(line.quantity);
   const unitPriceMinor = toMinorInput(line.unitPrice, currency);
   const discountPercentBp = Math.round((Number(line.discountPercent) || 0) * 100);
+  const requestedAmountMinor = Math.max(0, toMinorInput(line.discountAmount || '0', currency));
   const taxPercentBp = Math.round((Number(line.taxPercent) || 0) * 100);
   const lineSubtotalMinor = lineAmountMinor(quantity, unitPriceMinor);
-  const discountMinor = basisPointsOfMinor(lineSubtotalMinor, discountPercentBp);
+  // Mirror the API exactly: percentage first, then the flat amount clamped to
+  // what is left, so the form's figure equals the posted figure.
+  const percentMinor = basisPointsOfMinor(lineSubtotalMinor, discountPercentBp);
+  const discountAmountMinor = Math.min(requestedAmountMinor, lineSubtotalMinor - percentMinor);
+  const discountMinor = percentMinor + discountAmountMinor;
   const net = lineSubtotalMinor - discountMinor;
   const taxMinor = basisPointsOfMinor(net, taxPercentBp);
   return { lineSubtotalMinor, discountMinor, taxMinor, lineTotalMinor: net + taxMinor };
@@ -1670,6 +1691,7 @@ function LineEditor({
         <span className="text-center">{t('erp.sales.form.quantity')}</span>
         <span className="text-end">{t('erp.sales.form.unitPrice')}</span>
         <span className="text-center">{t('erp.sales.discount')}</span>
+        <span className="text-center">{t('erp.sales.discountAmount')}</span>
         <span className="text-center">{t('erp.sales.form.taxes')}</span>
         <span className="text-end">{t('erp.sales.form.amount')}</span>
         <span />
@@ -1723,6 +1745,13 @@ function LineEditor({
             value={line.discountPercent}
             onChange={(e) => update(i, { discountPercent: e.target.value })}
             data-testid={`${testIdPrefix}-discount-${i}`}
+          />
+          <input
+            className="oryx-input text-center"
+            placeholder="0.000"
+            value={line.discountAmount}
+            onChange={(e) => update(i, { discountAmount: e.target.value })}
+            data-testid={`${testIdPrefix}-discount-amount-${i}`}
           />
           <TaxPicker
             value={line.taxId || null}
@@ -1918,6 +1947,7 @@ function DocumentModal({
             quantity: qty(Number(line.quantity ?? 0)),
             unitPrice: minorToInput(Number(line.unitPriceMinor ?? 0), initialDocument.currency),
             discountPercent: String(Number(line.discountPercentBp ?? 0) / 100),
+            discountAmount: minorToInput(Number(line.discountAmountMinor ?? 0), initialDocument.currency),
             taxId: '',
             taxPercent: String(Number(line.taxPercentBp ?? 0) / 100),
           }))
@@ -1997,6 +2027,7 @@ function DocumentModal({
           quantity: toQuantityInput(l.quantity),
           unitPriceMinor: toMinorInput(l.unitPrice, currency),
           discountPercentBp: Math.round((Number(l.discountPercent) || 0) * 100),
+          discountAmountMinor: Math.max(0, toMinorInput(l.discountAmount || '0', currency)),
           taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
         })),
       };

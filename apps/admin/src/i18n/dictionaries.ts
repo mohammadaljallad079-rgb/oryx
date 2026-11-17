@@ -1371,6 +1371,7 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     'erp.sales.total': 'Total',
     'erp.sales.rounding': 'Rounding',
     'erp.sales.discount': 'Discount %',
+    'erp.sales.discountAmount': 'Discount amount',
     'erp.sales.lineDetails': 'Line details',
     'erp.sales.lineNumber': 'Line',
     // The document form mirrors the printed official document, so its sections
@@ -2061,6 +2062,7 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     // Localization completion (execution-22 pass): strings that previously
     // rendered as literals in one language only.
     'roles.catalogTitle': 'Permission catalog',
+    'roles.morePermissions': '+{n} more permissions',
     'roles.description.company_admin': 'Full administration of the company within plan entitlements.',
     'roles.description.branch_manager': 'Manages a single branch and its staff.',
     'roles.description.staff_viewer': 'Read-only access to company and branch information.',
@@ -3463,6 +3465,7 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     'erp.sales.total': 'الإجمالي',
     'erp.sales.rounding': 'التقريب',
     'erp.sales.discount': 'الخصم %',
+    'erp.sales.discountAmount': 'مبلغ الخصم',
     'erp.sales.lineDetails': 'تفاصيل البنود',
     'erp.sales.lineNumber': 'البند',
     // The document form mirrors the printed official document, so its sections
@@ -4151,6 +4154,7 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     'erp.payments.matched': 'مطابق',
     'erp.payments.unmatched': 'فرق',
     'roles.catalogTitle': 'دليل الصلاحيات',
+    'roles.morePermissions': '+{n} صلاحيات أخرى',
     'roles.description.company_admin': 'إدارة كاملة للشركة ضمن صلاحيات الخطة.',
     'roles.description.branch_manager': 'يدير فرعاً واحداً وموظفيه.',
     'roles.description.staff_viewer': 'اطلاع للقراءة فقط على بيانات الشركة والفروع.',

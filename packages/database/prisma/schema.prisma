@@ -2116,6 +2116,8 @@ model QuotationLine {
   quantity          Int
   unitPriceMinor    Int
   discountPercentBp Int     @default(0)
+  /// A flat discount on the line, in minor units, applied after the percentage.
+  discountAmountMinor Int   @default(0)
   taxPercentBp      Int     @default(0)
   lineTotalMinor    Int
   sortOrder         Int     @default(0)
@@ -2168,6 +2170,8 @@ model SalesOrderLine {
   quantityInvoiced  Int     @default(0)
   unitPriceMinor    Int
   discountPercentBp Int     @default(0)
+  /// A flat discount on the line, in minor units, applied after the percentage.
+  discountAmountMinor Int   @default(0)
   taxPercentBp      Int     @default(0)
   lineTotalMinor    Int
   sortOrder         Int     @default(0)
@@ -2237,6 +2241,8 @@ model SalesInvoiceLine {
   quantity          Int
   unitPriceMinor    Int
   discountPercentBp Int     @default(0)
+  /// A flat discount on the line, in minor units, applied after the percentage.
+  discountAmountMinor Int   @default(0)
   taxPercentBp      Int     @default(0)
   lineSubtotalMinor Int
   discountMinor     Int     @default(0)

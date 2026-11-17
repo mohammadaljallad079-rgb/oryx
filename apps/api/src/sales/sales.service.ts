@@ -657,6 +657,7 @@ export class SalesService {
               quantity: l.quantity,
               unitPriceMinor: l.unitPriceMinor,
               discountPercentBp: l.discountPercentBp,
+              discountAmountMinor: l.discountAmountMinor,
               taxPercentBp: l.taxPercentBp,
               lineTotalMinor: l.lineTotalMinor,
               sortOrder: l.sortOrder,
@@ -832,6 +833,7 @@ export class SalesService {
         quantity: line.quantity,
         unitPriceMinor: line.unitPriceMinor,
         discountPercentBp: line.discountPercentBp,
+        discountAmountMinor: line.discountAmountMinor,
         taxPercentBp: line.taxPercentBp,
       }));
       const rounding = await this.context.companyRoundingMode(companyId, tx);
@@ -988,6 +990,7 @@ export class SalesService {
           quantity: l.quantity,
           unitPriceMinor: l.unitPriceMinor,
           discountPercentBp: l.discountPercentBp,
+          discountAmountMinor: l.discountAmountMinor,
           taxPercentBp: l.taxPercentBp,
         }));
       } else {
@@ -1001,6 +1004,7 @@ export class SalesService {
           quantity: l.quantity,
           unitPriceMinor: l.unitPriceMinor,
           discountPercentBp: l.discountPercentBp,
+          discountAmountMinor: l.discountAmountMinor,
           taxPercentBp: l.taxPercentBp,
         }));
       }
@@ -1587,6 +1591,7 @@ export class SalesService {
         quantity: l.quantity,
         unitPriceMinor: l.unitPriceMinor,
         discountPercentBp: l.discountPercentBp ?? 0,
+        discountAmountMinor: l.discountAmountMinor ?? 0,
         taxPercentBp: l.taxPercentBp ?? 0,
       }));
       const rounding = await this.context.companyRoundingMode(companyId, tx);
@@ -1783,6 +1788,7 @@ function buildSimpleLineRows(
     quantity: l.quantity,
     unitPriceMinor: l.unitPriceMinor,
     discountPercentBp: l.discountPercentBp,
+    discountAmountMinor: l.discountAmountMinor,
     taxPercentBp: l.taxPercentBp,
     lineTotalMinor: l.lineTotalMinor,
     sortOrder: i,
@@ -1800,6 +1806,7 @@ function buildLineRows(
     quantity: l.quantity,
     unitPriceMinor: l.unitPriceMinor,
     discountPercentBp: l.discountPercentBp,
+    discountAmountMinor: l.discountAmountMinor,
     taxPercentBp: l.taxPercentBp,
     lineSubtotalMinor: l.lineSubtotalMinor,
     discountMinor: l.discountMinor,
