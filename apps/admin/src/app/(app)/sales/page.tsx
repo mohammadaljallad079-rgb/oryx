@@ -1490,7 +1490,7 @@ function PosSaleModal({
                 {money(changeMinor)}
               </strong>
             </p>
-            <Button variant="primary" block
+            <Button variant="primary" className="w-full justify-center"
               disabled={busy || !saleValid}
               onClick={() => void submit()} data-testid="pos-checkout-panel">
               <Icon name="check" size={17} />
