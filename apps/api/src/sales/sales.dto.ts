@@ -532,6 +532,12 @@ export class CreateQuotationDto extends SalesDocumentDateDto {
   @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER'])
   paymentMethod?: string;
 
+  /** Stable company-configured method code (validated server-side). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  paymentMethodCode?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(160)
@@ -643,8 +649,14 @@ export class CreateInvoiceDto extends SalesDocumentDateDto {
    * so the method is captured with the document.
    */
   @IsOptional()
-  @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER'])
+  @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER', 'CREDIT'])
   paymentMethod?: string;
+
+  /** Stable company-configured method code (validated server-side). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  paymentMethodCode?: string;
 
   /** The salesperson credited on the printed invoice ("Staf Name"). */
   @IsOptional()
@@ -691,8 +703,14 @@ export class UpdateInvoiceDto extends SalesDocumentDateDto {
   dueDate?: string;
 
   @IsOptional()
-  @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER'])
+  @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER', 'CREDIT'])
   paymentMethod?: string;
+
+  /** Stable company-configured method code (validated server-side). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  paymentMethodCode?: string;
 
   @IsOptional()
   @IsString()
@@ -854,6 +872,12 @@ export class CreatePosSaleDto {
   @IsOptional()
   @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER'])
   paymentMethod?: 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'CHEQUE' | 'WALLET' | 'OTHER';
+
+  /** Stable company-configured method code (validated server-side). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  paymentMethodCode?: string;
 
   @IsOptional()
   @Type(() => Number)

@@ -86,6 +86,7 @@ function paymentLabel(payload: FinancialDocumentPayload): string | null {
   // beneath it, rather than naming the method. Reproduce that wording whenever a
   // reference is stored, so the document reads exactly as the approved one does.
   if (paymentReference(payload)) return 'Payment at Account';
+  if (payload.paymentMethodDisplay) return payload.paymentMethodDisplay;
   const raw = payload.paymentMethod ?? payload.payment?.method ?? null;
   if (!raw) return null;
   const map: Record<string, string> = {
@@ -95,6 +96,7 @@ function paymentLabel(payload: FinancialDocumentPayload): string | null {
     CHEQUE: 'Cheque',
     WALLET: 'Benefit Pay',
     OTHER: 'Other',
+    CREDIT: 'Credit / Pay later',
   };
   return map[raw] ?? raw;
 }
@@ -295,9 +297,9 @@ function infoPanel(
           <span class="of-field-value of-date num">${esc(docStamp(payload.documentDate))}</span>
         </div>
         ${
-          isQuotation && payload.dueDate
+          payload.dueDate
             ? `<div class="of-field">
-                 <span class="of-field-label">Expiration Date</span>
+                 <span class="of-field-label">${isQuotation ? 'Expiration Date' : 'Due Date'}</span>
                  <span class="of-field-value of-date num">${esc(docStamp(payload.dueDate))}</span>
                </div>`
             : ''

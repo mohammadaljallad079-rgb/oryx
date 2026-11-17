@@ -252,7 +252,7 @@ export class PrintService {
     // The reference invoice always prints a "Payment" line naming how the sale
     // was settled. That value lives on the invoice itself; a linked allocation
     // is only a fallback for records issued before the column existed.
-    const settlement = paymentMethodLabel(invoice.paymentMethod ?? payment?.method ?? null);
+    const settlement = paymentMethodLabel(invoice.paymentMethodLabelEn ?? invoice.paymentMethod ?? payment?.method ?? null);
     return {
       kind: 'SALES_INVOICE',
       documentNumber: invoice.invoiceNumber,

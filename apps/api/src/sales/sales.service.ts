@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { fromQuantity, sumMinor, type RoundingMode } from '@oryx/shared';
+import { fromQuantity, sumMinor, withDefaults, type RoundingMode } from '@oryx/shared';
 import type { PaymentMethod } from '@oryx/database';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
@@ -82,6 +82,45 @@ export class SalesService {
     private readonly context: ErpContextService,
     private readonly inventory: InventoryService,
   ) {}
+
+  /**
+   * Resolve the company's selected payment code to a recognised accounting
+   * method. Store both the stable code and a label snapshot on the document so
+   * deleting or renaming configuration never rewrites historical receipts.
+   */
+  private async resolveCompanyPayment(
+    tx: Tx,
+    companyId: string,
+    code: string | undefined,
+    fallback: PaymentMethod,
+    channel: 'invoices' | 'pos',
+  ) {
+    // Preserve compatibility for existing clients and internal posting flows.
+    // New UI requests always send a configured payment-method code.
+    if (!code) return {
+      paymentMethod: fallback,
+      paymentMethodCode: null,
+      paymentMethodLabelEn: null,
+      paymentMethodLabelAr: null,
+    };
+    const row = await tx.companySetting.findUnique({
+      where: { companyId_section: { companyId, section: 'sales' } },
+    });
+    const settings = withDefaults('sales', row?.value);
+    const selectedCode = (code?.trim().toUpperCase() || fallback);
+    const method = settings.paymentMethods.find(item => item.code === selectedCode);
+    if (!method || !method.isActive
+      || (channel === 'invoices' && !method.useInInvoices)
+      || (channel === 'pos' && (!method.useInPos || method.accountingMethod === 'CREDIT'))) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Selected payment method is unavailable for this company.');
+    }
+    return {
+      paymentMethod: method.accountingMethod as PaymentMethod,
+      paymentMethodCode: method.code,
+      paymentMethodLabelEn: method.nameEn,
+      paymentMethodLabelAr: method.nameAr,
+    };
+  }
 
   // --------------------------------------------------------------- customers
 
@@ -587,6 +626,8 @@ export class SalesService {
     const salespersonName = await this.resolveSalespersonName(dto.salespersonName, actor.userId);
     const quotation = await this.posting.withTransaction(async (tx) => {
       const quoteNumber = await this.sequences.next(tx, companyId, 'quotation');
+      const selectedPayment = await this.resolveCompanyPayment(tx, companyId, dto.paymentMethodCode,
+        (dto.paymentMethod ?? 'CASH') as PaymentMethod, 'invoices');
       return tx.quotation.create({
         data: {
           companyId,
@@ -602,7 +643,7 @@ export class SalesService {
           roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
           currency,
-          paymentMethod: (dto.paymentMethod as PaymentMethod | undefined) ?? 'CASH',
+          ...selectedPayment,
           salespersonName,
           paymentReference: dto.paymentReference ?? null,
           notes: dto.notes ?? null,
@@ -838,6 +879,12 @@ export class SalesService {
       const totals = computeDocumentTotals(lineInputs, rounding.mode, rounding.scale);
       const invoiceDate = new Date(resolveDocumentDate(dto)!);
       const dueDate = dto.dueDate ? new Date(dto.dueDate) : current.dueDate;
+      const selectedPayment = await this.resolveCompanyPayment(tx, companyId,
+        dto.paymentMethodCode ?? current.paymentMethodCode ?? undefined,
+        (dto.paymentMethod as PaymentMethod | undefined) ?? current.paymentMethod, 'invoices');
+      if (selectedPayment.paymentMethod === 'CREDIT' && !dueDate) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'A due date is required for credit invoices.');
+      }
       const willPost = dto.post === true;
       if (willPost) await this.assertCreditLimit(tx, companyId, dto.customerId, totals.totalMinor);
       const updated = await tx.salesInvoice.update({
@@ -852,7 +899,7 @@ export class SalesService {
           taxMinor: totals.taxMinor,
           roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
-          paymentMethod: (dto.paymentMethod as PaymentMethod | undefined) ?? current.paymentMethod,
+          ...selectedPayment,
           salespersonName,
           paymentReference: dto.paymentReference ?? null,
           notes: dto.notes ?? null,
@@ -1016,7 +1063,12 @@ export class SalesService {
       }
 
       const invoiceNumber = await this.sequences.next(tx, companyId, 'salesInvoice');
+      const selectedPayment = await this.resolveCompanyPayment(tx, companyId, dto.paymentMethodCode,
+        (dto.paymentMethod ?? 'CASH') as PaymentMethod, 'invoices');
       const invoiceDate = new Date(resolveDocumentDate(dto)!);
+      if (selectedPayment.paymentMethod === 'CREDIT' && !dto.dueDate) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Select the due date for a credit invoice.');
+      }
       const dueDate = dto.dueDate
         ? new Date(dto.dueDate)
         : await computeDueDate(tx, companyId, customerId!, invoiceDate);
@@ -1038,7 +1090,7 @@ export class SalesService {
           roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
           currency,
-          paymentMethod: (dto.paymentMethod as PaymentMethod | undefined) ?? 'CASH',
+          ...selectedPayment,
           salespersonName,
           paymentReference: dto.paymentReference ?? null,
           notes: dto.notes ?? null,
@@ -1580,6 +1632,8 @@ export class SalesService {
         throw badRequest(ERROR_CODES.CASHIER_SESSION_CLOSED, 'The cashier session is closed.');
       }
       const warehouseId = dto.warehouseId ?? session.warehouseId ?? null;
+      const selectedPayment = await this.resolveCompanyPayment(tx, companyId, dto.paymentMethodCode,
+        (dto.paymentMethod ?? 'CASH') as PaymentMethod, 'pos');
 
       const lineInputs = dto.lines.map((l: PosSaleLineDto) => ({
         productId: l.productId ?? null,
@@ -1616,6 +1670,7 @@ export class SalesService {
           roundingMinor: totals.roundingMinor,
           totalMinor: totals.totalMinor,
           currency: companyCurrency,
+          ...selectedPayment,
           notes: `POS sale in session ${session.sessionNumber}`,
           createdById: actor.userId,
           lines: { create: buildLineRows(totals, lineInputs) },
@@ -1662,7 +1717,7 @@ export class SalesService {
           totalMinor: totals.totalMinor,
           paidMinor,
           changeMinor,
-          paymentMethod: dto.paymentMethod,
+          ...selectedPayment,
           currency: companyCurrency,
           salesInvoiceId: invoice.id,
           journalEntryId: posted.journalEntryId ?? null,
@@ -1686,7 +1741,7 @@ export class SalesService {
       const cashAccount = await this.posting.systemAccount(
         tx,
         companyId,
-        dto.paymentMethod === 'CASH' ? SYSTEM_ROLES.CASH : SYSTEM_ROLES.BANK,
+        selectedPayment.paymentMethod === 'CASH' ? SYSTEM_ROLES.CASH : SYSTEM_ROLES.BANK,
       );
       const arAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.AR_CONTROL);
       await this.posting.postJournal(tx, {
@@ -1863,6 +1918,9 @@ function toQuotationDto(q: {
   totalMinor: number;
   currency: string;
   paymentMethod: string;
+  paymentMethodCode?: string | null;
+  paymentMethodLabelEn?: string | null;
+  paymentMethodLabelAr?: string | null;
   salespersonName: string | null;
   paymentReference: string | null;
   notes: string | null;
@@ -1886,6 +1944,9 @@ function toQuotationDto(q: {
     totalMinor: q.totalMinor,
     currency: q.currency,
     paymentMethod: q.paymentMethod,
+    paymentMethodCode: q.paymentMethodCode ?? null,
+    paymentMethodLabelEn: q.paymentMethodLabelEn ?? null,
+    paymentMethodLabelAr: q.paymentMethodLabelAr ?? null,
     salespersonName: q.salespersonName,
     paymentReference: q.paymentReference,
     notes: q.notes,
@@ -1950,6 +2011,9 @@ function toInvoiceDto(inv: {
   amountPaidMinor: number;
   currency: string;
   paymentMethod: string;
+  paymentMethodCode?: string | null;
+  paymentMethodLabelEn?: string | null;
+  paymentMethodLabelAr?: string | null;
   salespersonName: string | null;
   paymentReference: string | null;
   notes: string | null;
@@ -1977,6 +2041,9 @@ function toInvoiceDto(inv: {
     outstandingMinor: inv.totalMinor - inv.amountPaidMinor,
     currency: inv.currency,
     paymentMethod: inv.paymentMethod,
+    paymentMethodCode: inv.paymentMethodCode ?? null,
+    paymentMethodLabelEn: inv.paymentMethodLabelEn ?? null,
+    paymentMethodLabelAr: inv.paymentMethodLabelAr ?? null,
     salespersonName: inv.salespersonName,
     paymentReference: inv.paymentReference,
     notes: inv.notes,
@@ -2071,6 +2138,9 @@ function toPosSaleDto(s: {
   paidMinor: number;
   changeMinor: number;
   paymentMethod: string;
+  paymentMethodCode?: string | null;
+  paymentMethodLabelEn?: string | null;
+  paymentMethodLabelAr?: string | null;
   currency: string;
   createdAt: Date;
   lines: Array<Record<string, unknown>>;
@@ -2087,6 +2157,9 @@ function toPosSaleDto(s: {
     paidMinor: s.paidMinor,
     changeMinor: s.changeMinor,
     paymentMethod: s.paymentMethod,
+    paymentMethodCode: s.paymentMethodCode ?? null,
+    paymentMethodLabelEn: s.paymentMethodLabelEn ?? null,
+    paymentMethodLabelAr: s.paymentMethodLabelAr ?? null,
     currency: s.currency,
     createdAt: s.createdAt.toISOString(),
     lines: s.lines,

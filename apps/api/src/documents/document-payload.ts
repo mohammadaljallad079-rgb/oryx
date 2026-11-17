@@ -201,6 +201,8 @@ export interface FinancialDocumentPayload {
    * creation, so a reprint always shows the same figures.
    */
   paymentMethod?: string | null;
+  /** Label captured when the payment method was selected (never re-resolved). */
+  paymentMethodDisplay?: string | null;
   salespersonName?: string | null;
   /**
    * The bank/reference printed beneath "Payment at Account" on the quotation.

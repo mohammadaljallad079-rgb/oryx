@@ -1303,6 +1303,7 @@ enum PaymentMethod {
   CHEQUE
   WALLET
   OTHER
+  CREDIT
 }
 
 /**
@@ -2098,6 +2099,10 @@ model Quotation {
    * "Payment" line, so the method is captured with the document.
    */
   paymentMethod    PaymentMethod   @default(CASH)
+  /** Original company payment method, saved so later renames do not rewrite history. */
+  paymentMethodCode String?
+  paymentMethodLabelEn String?
+  paymentMethodLabelAr String?
   /** The salesperson credited on the printed quotation ("Staf Name"). */
   salespersonName  String?
   /** The bank/reference printed beneath "Payment at Account" on the quotation. */
@@ -2210,6 +2215,10 @@ model SalesInvoice {
    * itself rather than only on the cash receipt that later settles it.
    */
   paymentMethod   PaymentMethod      @default(CASH)
+  /** Original company payment method, saved so later renames do not rewrite history. */
+  paymentMethodCode String?
+  paymentMethodLabelEn String?
+  paymentMethodLabelAr String?
   /** The salesperson credited on the printed invoice. */
   salespersonName String?
   /** The bank/reference printed beneath "Payment at Account" on the invoice. */
@@ -2369,6 +2378,10 @@ model PosSale {
   paidMinor        Int           @default(0)
   changeMinor      Int           @default(0)
   paymentMethod    PaymentMethod @default(CASH)
+  /** Original company payment method, saved so later renames do not rewrite history. */
+  paymentMethodCode String?
+  paymentMethodLabelEn String?
+  paymentMethodLabelAr String?
   currency         String        @default("BHD")
   salesInvoiceId   String?
   journalEntryId   String?

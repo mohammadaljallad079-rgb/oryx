@@ -14,6 +14,8 @@ import {
   roundMinor,
   sumMinor,
   type RoundingMode,
+  DEFAULT_COMPANY_PAYMENT_METHODS,
+  type CompanyPaymentMethodSetting,
 } from '@oryx/shared';
 import { Icon } from '@/components/icons';
 import { AttachmentsPanel, DocumentPrintActions } from '@/components/document-print';
@@ -74,10 +76,7 @@ const emptyLine = (taxPercent = '10'): LineDraft => ({
 });
 
 /** The payment methods a POS sale may be settled with. */
-type PosPaymentMethod = 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'WALLET';
-
-/** The tender buttons the till offers, in the order a cashier expects them. */
-const POS_PAYMENT_METHODS: PosPaymentMethod[] = ['CASH', 'CARD', 'BANK_TRANSFER', 'WALLET'];
+type PosPaymentMethod = 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'WALLET' | 'CHEQUE' | 'OTHER';
 
 /**
  * Round a cash tender up to the next convenience denomination.
@@ -967,6 +966,8 @@ function PosSaleModal({
   const [customerId, setCustomerId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PosPaymentMethod>('CASH');
+  const [paymentMethodCode, setPaymentMethodCode] = useState('CASH');
+  const [paymentOptions, setPaymentOptions] = useState<CompanyPaymentMethodSetting[]>(DEFAULT_COMPANY_PAYMENT_METHODS);
   const [paid, setPaid] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -985,6 +986,28 @@ function PosSaleModal({
   const categories = useAsync(() => api.posCategories(companyId ?? undefined), [companyId]);
 
   useEffect(() => {
+    if (!open || !companyId) return;
+    let cancelled = false;
+    void api.companySettings(companyId).then((response) => {
+      if (cancelled) return;
+      const enabled = (response.sections.sales.paymentMethods ?? DEFAULT_COMPANY_PAYMENT_METHODS)
+        .filter((method) => method.isActive && method.useInPos && method.accountingMethod !== 'CREDIT');
+      setPaymentOptions(enabled);
+      const preferred = enabled.find((method) => method.code === 'CASH') ?? enabled[0];
+      if (preferred) {
+        setPaymentMethodCode(preferred.code);
+        setPaymentMethod(preferred.accountingMethod as PosPaymentMethod);
+      }
+    }).catch(() => {
+      if (!cancelled) setPaymentOptions(DEFAULT_COMPANY_PAYMENT_METHODS.filter(
+        (method) => method.useInPos && method.isActive,
+      ));
+    });
+    return () => { cancelled = true; };
+  }, [open, companyId]);
+
+
+  useEffect(() => {
     if (!open) return;
     setError(null);
     setNotice(null);
@@ -992,6 +1015,7 @@ function PosSaleModal({
     setCart([]);
     setPaid('');
     setPaymentMethod('CASH');
+    setPaymentMethodCode('CASH');
     setCustomerId('');
     setWarehouseId(session?.warehouseId ?? warehouses[0]?.id ?? '');
     // Focus the scan field so a USB scanner's keystrokes land in it without a
@@ -1090,6 +1114,7 @@ function PosSaleModal({
         warehouseId: warehouseId || undefined,
         customerId: customerId || undefined,
         paymentMethod,
+        paymentMethodCode,
         paidMinor,
         lines: cart.map((l) => ({
           productId: l.productId,
@@ -1327,16 +1352,19 @@ function PosSaleModal({
 
             <span className="oryx-label">{t('erp.sales.pos.payment')}</span>
             <div className="oryx-pos__pay" role="group" aria-label={t('erp.sales.pos.payment')}>
-              {POS_PAYMENT_METHODS.map((m) => (
+              {paymentOptions.filter((m) => m.isActive && m.useInPos && m.accountingMethod !== 'CREDIT').map((m) => (
                 <button
-                  key={m}
+                  key={m.code}
                   type="button"
-                  onClick={() => setPaymentMethod(m)}
-                  aria-pressed={paymentMethod === m}
-                  className={`oryx-pay-method ${paymentMethod === m ? 'oryx-pay-method--active' : ''}`}
-                  data-testid={`pos-pay-${m}`}
+                  onClick={() => {
+                    setPaymentMethodCode(m.code);
+                    setPaymentMethod(m.accountingMethod as PosPaymentMethod);
+                  }}
+                  aria-pressed={paymentMethodCode === m.code}
+                  className={`oryx-pay-method ${paymentMethodCode === m.code ? 'oryx-pay-method--active' : ''}`}
+                  data-testid={`pos-pay-${m.code}`}
                 >
-                  {t(`erp.sales.payment.${m}`)}
+                  {locale === 'ar' ? m.nameAr : m.nameEn}
                 </button>
               ))}
             </div>
@@ -1919,6 +1947,8 @@ function DocumentModal({
   const [reason, setReason] = useState('');
   const [refundMethod, setRefundMethod] = useState('CREDIT_ACCOUNT');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
+  const [paymentMethodCode, setPaymentMethodCode] = useState('CASH');
+  const [paymentOptions, setPaymentOptions] = useState<CompanyPaymentMethodSetting[]>(DEFAULT_COMPANY_PAYMENT_METHODS);
   const [salespersonName, setSalespersonName] = useState('');
   const [paymentReference, setPaymentReference] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
@@ -1932,6 +1962,11 @@ function DocumentModal({
     setDueDate(initialDocument?.dueDate?.slice(0, 10) ?? '');
     setNotes(reasonField ? '' : initialDocument?.notes ?? '');
     setPaymentMethod(initialDocument?.paymentMethod ?? 'CASH');
+    setPaymentMethodCode(
+      (initialDocument as (SalesDocumentDto & { paymentMethodCode?: string | null }) | null)?.paymentMethodCode
+        ?? initialDocument?.paymentMethod ?? 'CASH',
+    );
+    setPaymentOptions(DEFAULT_COMPANY_PAYMENT_METHODS);
     setRestock(!(initialDocument && reasonField));
     setSalespersonName(initialDocument?.salespersonName ?? user?.fullNameEn ?? user?.fullNameAr ?? user?.email ?? '');
     setPaymentReference(initialDocument?.paymentReference ?? '');
@@ -1954,6 +1989,13 @@ function DocumentModal({
     setSalespersonName((prev) => prev || user?.fullNameEn || user?.fullNameAr || user?.email || '');
     if (!companyId) return;
     let cancelled = false;
+    void api.companySettings(companyId).then((res) => {
+      if (cancelled) return;
+      const methods = res.sections.sales.paymentMethods ?? DEFAULT_COMPANY_PAYMENT_METHODS;
+      setPaymentOptions(methods);
+    }).catch(() => {
+      // The catalogue defaults preserve the form if settings cannot be loaded.
+    });
     void (async () => {
       try {
         const c = await api.getCompany(companyId);
@@ -1992,6 +2034,10 @@ function DocumentModal({
   }));
 
   const submit = async (post = true) => {
+    if (dueDateField === 'dueDate' && paymentMethod === 'CREDIT' && !dueDate) {
+      setError(locale === 'ar' ? 'تاريخ الاستحقاق مطلوب للبيع الآجل.' : 'A due date is required for credit sales.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -2011,7 +2057,7 @@ function DocumentModal({
         ...(dueDateField && dueDate ? { [dueDateField]: new Date(dueDate).toISOString() } : {}),
         ...(reasonField && reason.trim() ? { reason: reason.trim() } : {}),
         ...(reasonField ? { refundMethod } : {}),
-        ...(settlement ? { paymentMethod } : {}),
+        ...(settlement ? { paymentMethod, paymentMethodCode } : {}),
         ...(settlement && salespersonName.trim() ? { salespersonName: salespersonName.trim() } : {}),
         ...(settlement && paymentReference.trim() ? { paymentReference: paymentReference.trim() } : {}),
         ...(!reasonField && notes.trim() ? { notes: notes.trim() } : {}),
@@ -2036,6 +2082,7 @@ function DocumentModal({
       setSalespersonName('');
       setPaymentReference('');
       setPaymentMethod('CASH');
+      setPaymentMethodCode('CASH');
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
@@ -2089,8 +2136,8 @@ function DocumentModal({
                 data-testid={`${testIdPrefix}-document-date`}
               />
             </Field>
-            {dueDateField ? (
-              <Field label={t('erp.sales.form.expirationDate')}>
+            {dueDateField && (dueDateField === 'validUntil' || paymentMethod === 'CREDIT' || Boolean(dueDate)) ? (
+              <Field label={dueDateField === 'dueDate' ? (locale === 'ar' ? 'تاريخ الاستحقاق' : 'Due date') : t('erp.sales.form.expirationDate')}>
                 <input
                   type="date"
                   className="oryx-input"
@@ -2104,13 +2151,18 @@ function DocumentModal({
               <Field label={t('erp.sales.form.payment')}>
                 <select
                   className="oryx-select"
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  value={paymentMethodCode}
+                  onChange={(e) => {
+                    const method = paymentOptions.find((item) => item.code === e.target.value);
+                    setPaymentMethodCode(e.target.value);
+                    setPaymentMethod(method?.accountingMethod ?? 'CASH');
+                  }}
                   data-testid={`${testIdPrefix}-payment-method`}
                 >
-                  {(['CASH', 'CARD', 'BANK_TRANSFER', 'WALLET', 'CHEQUE', 'OTHER'] as const).map((m) => (
-                    <option key={m} value={m}>
-                      {t(`erp.sales.payment.${m}`)}
+                  {paymentOptions.filter((m) => m.isActive && m.useInInvoices &&
+                    (dueDateField === 'dueDate' || m.accountingMethod !== 'CREDIT')).map((m) => (
+                    <option key={m.code} value={m.code}>
+                      {locale === 'ar' ? m.nameAr : m.nameEn}
                     </option>
                   ))}
                 </select>
