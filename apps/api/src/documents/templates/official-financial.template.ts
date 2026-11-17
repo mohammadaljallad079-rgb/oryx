@@ -95,6 +95,7 @@ function paymentLabel(payload: FinancialDocumentPayload): string | null {
     CHEQUE: 'Cheque',
     WALLET: 'Benefit Pay',
     OTHER: 'Other',
+    CREDIT: 'Credit / Pay later',
   };
   return map[raw] ?? raw;
 }
