@@ -17,6 +17,15 @@ test.describe('POS, company payment settings and banner image upload', () => {
     await expect(page.getByTestId('payment-method-add')).toBeVisible();
   });
 
+  test('actual homepage slider offers image file uploads with previews', async ({ page }) => {
+    await page.goto('/website');
+    await page.getByTestId('cms-tab-content').click();
+    await expect(page.getByTestId('site-content-editor')).toBeVisible();
+    await expect(page.getByTestId('site-slide-image-editor-0')).toBeVisible();
+    await expect(page.getByTestId('site-slide-file-0')).toHaveAttribute('accept', /image\\/jpeg/);
+    await expect(page.getByTestId('site-slide-image-url-0')).toBeVisible();
+  });
+
   test('banner editor offers direct file upload and image URL fallback', async ({ page }) => {
     await page.goto('/website');
     await page.getByTestId('cms-tab-banners').click();
