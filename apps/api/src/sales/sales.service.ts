@@ -95,6 +95,14 @@ export class SalesService {
     fallback: PaymentMethod,
     channel: 'invoices' | 'pos',
   ) {
+    // Preserve compatibility for existing clients and internal posting flows.
+    // New UI requests always send a configured payment-method code.
+    if (!code) return {
+      paymentMethod: fallback,
+      paymentMethodCode: null,
+      paymentMethodLabelEn: null,
+      paymentMethodLabelAr: null,
+    };
     const row = await tx.companySetting.findUnique({
       where: { companyId_section: { companyId, section: 'sales' } },
     });
