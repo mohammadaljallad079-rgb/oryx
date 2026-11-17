@@ -521,52 +521,70 @@ function GroupedSectionsEditor({
   const { t, locale } = useUi();
   const [busy, setBusy] = useState(false);
   type AreaState = { remarks: string; noFindings: boolean; results: Record<string, InspectionItemResultDto> };
-  const initial = (): Record<string, AreaState> =>
-    Object.fromEntries(
-      areas.map((area) => {
-        const section = session.sections.find((s) => s.area === area);
-        return [
-          area,
-          {
-            remarks: section?.remarks ?? '',
-            noFindings: section?.noFindings ?? false,
-            results: Object.fromEntries((section?.items ?? []).map((i) => [i.itemKey, i])),
-          },
-        ];
-      }),
-    );
+
+  // The empty state for one area, read from the session. Used both to seed the
+  // editor and as the fallback for an area the state has not caught up with yet:
+  // adding a type grows `areas` immediately, but `state` is only rebuilt by the
+  // effect below, which runs after the render that first sees the new area.
+  const areaStateFor = useCallback(
+    (area: InspectionSectionKey): AreaState => {
+      const section = session.sections.find((s) => s.area === area);
+      return {
+        remarks: section?.remarks ?? '',
+        noFindings: section?.noFindings ?? false,
+        results: Object.fromEntries((section?.items ?? []).map((i) => [i.itemKey, i])),
+      };
+    },
+    [session],
+  );
+
+  const initial = useCallback(
+    (): Record<string, AreaState> => Object.fromEntries(areas.map((area) => [area, areaStateFor(area)])),
+    [areas, areaStateFor],
+  );
   const [state, setState] = useState<Record<string, AreaState>>(initial);
 
   useEffect(() => {
     setState(initial());
-    // Re-sync when the server returns a fresh session (a save, or a reload).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+    // Re-sync when the server returns a fresh session (a save, or a reload) or
+    // when a type was added/removed, which changes the rendered area set.
+  }, [initial]);
+
+  // Never read `state[area]` directly: a render that first sees a newly added
+  // area must fall back to the session's empty state rather than crash.
+  const readArea = (area: InspectionSectionKey): AreaState => state[area] ?? areaStateFor(area);
 
   const patch = (area: InspectionSectionKey, next: Partial<AreaState>) =>
-    setState((prev) => ({ ...prev, [area]: { ...prev[area], ...next } }));
+    setState((prev) => ({ ...prev, [area]: { ...(prev[area] ?? areaStateFor(area)), ...next } }));
 
   const setResult = (area: InspectionSectionKey, itemKey: string, result: InspectionResultValue) =>
-    setState((prev) => ({
-      ...prev,
-      [area]: {
-        ...prev[area],
-        results: { ...prev[area].results, [itemKey]: { itemKey, result, note: prev[area].results[itemKey]?.note ?? null } },
-      },
-    }));
+    setState((prev) => {
+      const current = prev[area] ?? areaStateFor(area);
+      return {
+        ...prev,
+        [area]: {
+          ...current,
+          results: {
+            ...current.results,
+            [itemKey]: { itemKey, result, note: current.results[itemKey]?.note ?? null },
+          },
+        },
+      };
+    });
 
   const saveAll = async () => {
     setBusy(true);
     try {
       const payload = areas.map((area) => {
         const spec = inspectionSectionSpec(area);
+        const areaState = readArea(area);
         return {
           area,
-          remarks: state[area].remarks,
-          noFindings: state[area].noFindings,
+          remarks: areaState.remarks,
+          noFindings: areaState.noFindings,
           items: spec.items.map(
             (item) =>
-              state[area].results[item.key] ?? { itemKey: item.key, result: 'UNSET' as InspectionResultValue, note: null },
+              areaState.results[item.key] ?? { itemKey: item.key, result: 'UNSET' as InspectionResultValue, note: null },
           ),
         };
       });
@@ -589,7 +607,7 @@ function GroupedSectionsEditor({
         {areas.map((area) => {
           const spec = inspectionSectionSpec(area);
           const section = session.sections.find((s) => s.area === area);
-          const areaState = state[area];
+          const areaState = readArea(area);
           return (
             <div key={area} className="oryx-group-section" data-testid={`group-section-${area}`}>
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">

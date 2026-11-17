@@ -563,6 +563,23 @@ const COMPANIES: CompanySpec[] = [
   },
 ];
 
+/**
+ * The companies the current seed run actually creates.
+ *
+ * The default profile seeds the whole demonstration set (the internal group and
+ * the two synthetic tenants) because the development and CI suites assert
+ * against it. A production initialisation must not: the live platform has one
+ * operating company, so `SEED_PROFILE=production` narrows the set to it and
+ * leaves the demo tenants, the group holding company and the unrelated internal
+ * companies out of the database entirely.
+ */
+const KEEP_COMPANY_CODE = process.env.SEED_SINGLE_COMPANY_CODE ?? 'ORYX-AUTO';
+const SINGLE_COMPANY_PROFILE = (process.env.SEED_PROFILE ?? '').toLowerCase() === 'production';
+
+const ACTIVE_COMPANIES: CompanySpec[] = SINGLE_COMPANY_PROFILE
+  ? COMPANIES.filter((c) => c.code === KEEP_COMPANY_CODE)
+  : COMPANIES;
+
 /** Print metadata for a company, defaulting the contact bar from the code. */
 function printMeta(spec: CompanySpec) {
   return {
@@ -580,7 +597,7 @@ function printMeta(spec: CompanySpec) {
 
 async function seedCompanies(superAdminId: string) {
   const idByCode = new Map<string, string>();
-  for (const spec of COMPANIES) {
+  for (const spec of ACTIVE_COMPANIES) {
     const notes = spec.demo ? `${DEMO_MARKER}: synthetic tenant for dashboard demonstration` : null;
     const company = await prisma.company.upsert({
       where: { code: spec.code },
@@ -691,7 +708,7 @@ async function seedCompanies(superAdminId: string) {
   }
 
   // Parent/subsidiary relationships.
-  for (const spec of COMPANIES) {
+  for (const spec of ACTIVE_COMPANIES) {
     if (!spec.parentCode) continue;
     await prisma.company.update({
       where: { code: spec.code },
@@ -699,7 +716,7 @@ async function seedCompanies(superAdminId: string) {
     });
   }
 
-  console.log(`  companies: ${COMPANIES.length} upserted (2 marked ${DEMO_MARKER})`);
+  console.log(`  companies: ${ACTIVE_COMPANIES.length} upserted (demo tenants only in the default profile)`);
   return idByCode;
 }
 
@@ -781,7 +798,8 @@ async function seedSubscriptions(idByCode: Map<string, string>) {
     repaired += removed.count;
   }
 
-  console.log(`  subscriptions: ${assignments.length} upserted, ${repaired} internal-company rows removed`);
+  const applied = assignments.filter((a) => idByCode.has(a.companyCode));
+  console.log(`  subscriptions: ${applied.length} upserted, ${repaired} internal-company rows removed`);
 }
 
 async function seedCompanyAdmin(
