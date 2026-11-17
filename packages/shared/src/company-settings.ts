@@ -171,6 +171,9 @@ export interface DocumentsSettings {
   contactLine: string;
   showStamp: boolean;
   showSignature: boolean;
+  showWatermark: boolean;
+  watermarkOpacity: number;
+  watermarkSizePt: number;
   stampUrl: string;
   signatureUrl: string;
   paperSize: 'A4' | 'A5' | 'THERMAL';
@@ -340,6 +343,9 @@ export const COMPANY_SETTING_DEFAULTS: CompanySettingsMap = {
     contactLine: '',
     showStamp: true,
     showSignature: true,
+    showWatermark: true,
+    watermarkOpacity: 0.10,
+    watermarkSizePt: 310,
     stampUrl: '',
     signatureUrl: '',
     paperSize: 'A4',

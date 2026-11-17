@@ -890,6 +890,10 @@ export class DocumentsService {
       where: { companyId_section: { companyId, section: 'general' } },
     });
     const general = withDefaults('general', generalRow?.value);
+    const documentsRow = await this.prisma.companySetting.findUnique({
+      where: { companyId_section: { companyId, section: 'documents' } },
+    });
+    const documentSettings = withDefaults('documents', documentsRow?.value);
     const pick = (...values: Array<string | null | undefined>): string | null =>
       values.find((v) => typeof v === 'string' && v.trim().length > 0)?.trim() ?? null;
 
@@ -928,6 +932,9 @@ export class DocumentsService {
       primaryColor: company.branding?.primaryColor ?? null,
       accentColor: company.branding?.accentColor ?? null,
       documentLocale: company.documentLocale,
+      documentWatermarkEnabled: documentSettings.showWatermark ?? true,
+      documentWatermarkOpacity: documentSettings.watermarkOpacity ?? 0.10,
+      documentWatermarkSizePt: documentSettings.watermarkSizePt ?? 310,
     };
   }
 

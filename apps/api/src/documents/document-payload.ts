@@ -34,6 +34,9 @@ export interface DocumentIssuer {
    * left-to-right; both languages' labels are always printed either way.
    */
   documentLocale?: 'ar' | 'en' | null;
+  documentWatermarkEnabled?: boolean;
+  documentWatermarkOpacity?: number;
+  documentWatermarkSizePt?: number;
 }
 
 /** The QR block printed on a verifiable document. */

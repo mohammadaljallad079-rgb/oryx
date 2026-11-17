@@ -157,10 +157,12 @@ function documentTaxRate(payload: FinancialDocumentPayload): number {
  * pages blank.
  */
 export function watermark(issuer: DocumentIssuer): string {
+  if (issuer.documentWatermarkEnabled === false) return '';
+  const size = Math.max(80, Math.min(500, issuer.documentWatermarkSizePt ?? 310));
   const mark = issuer.logoDataUri
-    ? `<img src="${esc(issuer.logoDataUri)}" alt="" aria-hidden="true">`
-    : oryxLogoMark('190pt', 'of-watermark-vector');
-  return `<div class="of-watermark" aria-hidden="true">${mark}</div>`;
+    ? `<img src="${esc(issuer.logoDataUri)}" alt="" aria-hidden="true" style="width:${size}pt;max-height:${size}pt;object-fit:contain">`
+    : oryxLogoMark(`${size}pt`, 'of-watermark-vector');
+  return `<div class="of-watermark" aria-hidden="true" style="opacity:${Math.max(0.02, Math.min(0.3, issuer.documentWatermarkOpacity ?? 0.10))}">${mark}</div>`;
 }
 
 /**
@@ -208,9 +210,13 @@ export function identityBand(issuer: DocumentIssuer): string {
  * document/customer panel.
  */
 export function trnStrip(issuer: DocumentIssuer): string {
-  if (!issuer.taxNumber) return '';
+  // Keep the navy identity strip on every official financial document.
+  // The TRN value itself is optional and is supplied only by Settings → General.
+  const trn = issuer.taxNumber
+    ? `TRN: <span class="num">${esc(issuer.taxNumber)}</span>`
+    : '';
   return `
-  <div class="of-trn">TRN: <span class="num">${esc(issuer.taxNumber)}</span></div>`;
+  <div class="of-trn">${trn}</div>`;
 }
 
 /**
@@ -516,9 +522,9 @@ export const OFFICIAL_FINANCIAL_CSS = `
      continuation pages blank. */
   .of-watermark{ position:fixed; inset-inline:0; top:285pt;
     display:flex; align-items:center; justify-content:center;
-    pointer-events:none; z-index:0; opacity:0.14; }
-  .of-watermark img{ display:block; width:245pt; max-height:245pt; object-fit:contain; }
-  .of-watermark-vector{ display:block; width:245pt; height:auto; }
+    pointer-events:none; z-index:0; }
+  .of-watermark img{ display:block; width:310pt; max-height:310pt; object-fit:contain; }
+  .of-watermark-vector{ display:block; width:310pt; height:auto; }
   .of-band,.of-body{ position:relative; z-index:1; }
   /* The approved invoice prints the identity band wider than the priced table:
      the logotype starts ~10pt left of the content box and the quality badge ends
