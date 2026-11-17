@@ -58,7 +58,7 @@ export function CreateBranchModal({
         countryCode: form.countryCode || undefined,
         addressLine: form.addressLine || undefined,
         phone: form.phone || undefined,
-        phoneNumbers: form.phoneNumbers.split(/[\\n,;]+/).map((value) => value.trim()).filter(Boolean),
+        phoneNumbers: form.phoneNumbers.split(/[\n,;]+/).map((value) => value.trim()).filter(Boolean),
         crNumber: form.crNumber.trim() || undefined,
         specialty: form.specialty.trim() || undefined,
         responsibleUserId: form.responsibleUserId || undefined,
