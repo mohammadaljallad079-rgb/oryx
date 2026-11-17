@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import {
   CHASSIS_REGIONS,
   INSPECTION_SECTION_SPECS,
@@ -31,6 +32,7 @@ import type {
   InspectionListQueryDto,
   ReviewInspectionDto,
   SaveInspectionSectionDto,
+  SaveInspectionSectionsDto,
   UpdateInspectionSessionDto,
 } from './inspection.dto';
 
@@ -381,6 +383,59 @@ export class InspectionService {
     if (!isInspectionSectionKey(area)) {
       throw badRequest(ERROR_CODES.VALIDATION_FAILED, `Unknown inspection section ${area}.`);
     }
+    await this.prisma.$transaction(async (tx) => {
+      await this.writeSection(tx, { id, companyId, session, area }, dto);
+    });
+
+    await this.touchProgress(id, companyId);
+    return this.get(id, principal);
+  }
+
+  /**
+   * Save several sections in one call.
+   *
+   * The approved report draws the interior, exterior, engine-compartment and road
+   * checks on one form, so the operator expects one Save. Every section is
+   * validated before any is written, and all writes share one transaction, so a
+   * bad row cannot leave the form half-saved.
+   */
+  async saveSections(
+    id: string,
+    dto: SaveInspectionSectionsDto,
+    principal: RequestPrincipal,
+    actor: ActorContext,
+  ) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const session = await this.requireSession(id, companyId);
+    this.assertEditable(session.status);
+    for (const entry of dto.sections) {
+      if (!isInspectionSectionKey(entry.area)) {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, `Unknown inspection section ${entry.area}.`);
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const entry of dto.sections) {
+        await this.writeSection(tx, { id, companyId, session, area: entry.area }, entry);
+      }
+    });
+
+    await this.touchProgress(id, companyId);
+    return this.get(id, principal);
+  }
+
+  /**
+   * Validate and write one section's remarks, no-findings flag and item results.
+   *
+   * Shared by the single-section and the batch save so the validation rules live
+   * in one place. It runs inside the caller's transaction.
+   */
+  private async writeSection(
+    tx: Prisma.TransactionClient,
+    target: { id: string; companyId: string; session: { id: string; companyId: string; selectedAreas: string[] }; area: InspectionSectionKey },
+    dto: SaveInspectionSectionDto,
+  ) {
+    const { id, companyId, session, area } = target;
     const section = await this.sectionRow(session, area);
     const spec = inspectionSectionSpec(area);
     const allowed = new Set(spec.items.map((i) => i.key));
@@ -392,7 +447,10 @@ export class InspectionService {
           `Item ${item.itemKey} does not belong to section ${area}.`,
         );
       }
-      const permitted = inspectionResultsFor(spec);
+      // `UNSET` is always accepted: an untouched item is saved as "not
+      // assessed" rather than forcing the inspector to answer every row before
+      // the section can be persisted.
+      const permitted = [...inspectionResultsFor(spec), 'UNSET'];
       if (!permitted.includes(item.result as never)) {
         throw badRequest(
           ERROR_CODES.VALIDATION_FAILED,
@@ -401,32 +459,27 @@ export class InspectionService {
       }
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.inspectionSectionResult.update({
-        where: { id: section.id },
-        data: {
-          ...(dto.remarks !== undefined ? { remarks: dto.remarks } : {}),
-          ...(dto.noFindings !== undefined ? { noFindings: dto.noFindings } : {}),
-        },
-      });
-      for (const item of dto.items ?? []) {
-        await tx.inspectionItemResult.upsert({
-          where: { sessionId_itemKey: { sessionId: id, itemKey: item.itemKey } },
-          create: {
-            companyId,
-            sessionId: id,
-            sectionId: section.id,
-            itemKey: item.itemKey,
-            result: item.result as never,
-            note: item.note ?? null,
-          },
-          update: { result: item.result as never, note: item.note ?? null },
-        });
-      }
+    await tx.inspectionSectionResult.update({
+      where: { id: section.id },
+      data: {
+        ...(dto.remarks !== undefined ? { remarks: dto.remarks } : {}),
+        ...(dto.noFindings !== undefined ? { noFindings: dto.noFindings } : {}),
+      },
     });
-
-    await this.touchProgress(id, companyId);
-    return this.get(id, principal);
+    for (const item of dto.items ?? []) {
+      await tx.inspectionItemResult.upsert({
+        where: { sessionId_itemKey: { sessionId: id, itemKey: item.itemKey } },
+        create: {
+          companyId,
+          sessionId: id,
+          sectionId: section.id,
+          itemKey: item.itemKey,
+          result: item.result as never,
+          note: item.note ?? null,
+        },
+        update: { result: item.result as never, note: item.note ?? null },
+      });
+    }
   }
 
   /**
@@ -542,8 +595,6 @@ export class InspectionService {
         companyId,
         sessionId: id,
         sectionId: section.id,
-        module: dto.module ?? null,
-        faultCode: dto.faultCode ?? null,
         description: dto.description,
         observation: dto.observation ?? null,
         severity: (dto.severity ?? 'INFO') as never,
@@ -902,8 +953,6 @@ interface SectionShape {
   chassisRegions: Array<{ id: string; regionKey: string; condition: string; note: string | null }>;
   diagnostics: Array<{
     id: string;
-    module: string | null;
-    faultCode: string | null;
     description: string;
     observation: string | null;
     severity: string;
@@ -1105,8 +1154,6 @@ function toSessionDto(
         })),
         diagnostics: section.diagnostics.map((d) => ({
           id: d.id,
-          module: d.module,
-          faultCode: d.faultCode,
           description: d.description,
           observation: d.observation,
           severity: d.severity,

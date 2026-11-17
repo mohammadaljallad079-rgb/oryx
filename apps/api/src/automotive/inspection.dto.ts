@@ -129,6 +129,24 @@ export class SaveInspectionSectionDto {
   items?: InspectionItemResultInputDto[];
 }
 
+/**
+ * Save several sections in one call.
+ *
+ * The approved report draws the interior, exterior, engine-compartment and road
+ * checks on a single form, so the operator fills them in as one unit and expects
+ * one Save. Each entry carries its own `area`, and the API validates every one
+ * against its catalogue before writing any of them, so a bad row fails the whole
+ * save rather than leaving the form half-written.
+ */
+export class SaveInspectionSectionsDto {
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(20) @ValidateNested({ each: true }) @Type(() => SaveInspectionSectionItemDto)
+  sections!: SaveInspectionSectionItemDto[];
+}
+
+export class SaveInspectionSectionItemDto extends SaveInspectionSectionDto {
+  @IsIn(INSPECTION_SECTION_KEYS) area!: InspectionSectionKey;
+}
+
 export class InspectionItemResultInputDto {
   @IsString() @MaxLength(120) itemKey!: string;
   @IsIn(['UNSET', 'PASS', 'FAIL', 'NA']) result!: 'UNSET' | 'PASS' | 'FAIL' | 'NA';
@@ -173,13 +191,11 @@ export class ChassisRegionInputDto {
 /**
  * Add one computer-unit diagnostic entry.
  *
- * The module name and fault code are accepted but optional: the inspection form
- * no longer collects them, while a stored entry or an external caller may still
- * carry them.
+ * The approved form records a fault's description, an optional observation and
+ * its severity only; the module name and fault code fields were removed from
+ * every layer, so they are no longer accepted here.
  */
 export class CreateDiagnosticEntryDto {
-  @IsOptional() @IsString() @MaxLength(120) module?: string;
-  @IsOptional() @IsString() @MaxLength(40) faultCode?: string;
   @IsString() @MinLength(1) @MaxLength(2000) description!: string;
   @IsOptional() @IsString() @MaxLength(2000) observation?: string;
   @IsOptional() @IsIn(['INFO', 'MINOR', 'MAJOR', 'CRITICAL']) severity?: 'INFO' | 'MINOR' | 'MAJOR' | 'CRITICAL';

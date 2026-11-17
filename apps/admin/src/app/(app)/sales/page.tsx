@@ -386,15 +386,15 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                     ) : null}
                     {inv.status !== 'DRAFT' ? (
                       <>
-                        <DocumentPrintActions kind="SALES_INVOICE" id={inv.id} compact />
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => setDetail(inv)}
-                          title={t('attachments.title')}
+                          title={t('common.details')}
+                          aria-label={t('common.details')}
                           data-testid={`invoice-attach-open-${inv.invoiceNumber}`}
                         >
-                          <Icon name="paperclip" size={15} />
+                          <Icon name="list" size={15} />
                         </Button>
                         <DocumentActions
                           sourceType="SalesInvoice"
@@ -402,6 +402,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                           type="SALES_INVOICE"
                           permissions={['erp.sales.read', 'erp.accounting.read']}
                           autoOpenOnMount={autoPreviewId === inv.id}
+                          iconsOnly
                         />
                       </>
                     ) : null}
@@ -726,17 +727,29 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
    * no-op here reads as a broken button.
    */
   const startSession = async () => {
-    const branchId = branches.data?.branches[0]?.id;
+    // `context().branches` can carry branches from every company the principal
+    // can see (a platform or multi-company operator). Opening a session against
+    // the first entry regardless of the selected company is what produced
+    // "Branch belongs to another company", so the branch is matched to the
+    // active company first.
+    const branchId = (branches.data?.branches ?? []).find(
+      (b) => !companyId || b.companyId === companyId,
+    )?.id;
     if (!branchId) {
       setOpenError(t('erp.sales.pos.noBranch'));
       return;
     }
+    // The session's warehouse must belong to the same branch; a warehouse from
+    // another branch is silently dropped rather than sent and rejected.
+    const warehouseId = (warehouses.data?.items ?? []).find(
+      (w) => !w.branchId || w.branchId === branchId,
+    )?.id;
     setOpening(true);
     setOpenError(null);
     try {
       await api.openCashierSession({
         branchId,
-        warehouseId: warehouses.data?.items[0]?.id,
+        warehouseId,
         openingFloatMinor: 0,
       });
       await sessions.reload();
@@ -1716,9 +1729,13 @@ function LineEditor({
             options={taxOptions}
             onChange={(v) => {
               const chosen = taxOptions.find((o) => o.value === v);
+              // Choosing "None" must zero the line's rate, not leave the
+              // previous one in place: the picker's empty option means "without
+              // tax", and keeping the old percentage silently charged VAT on a
+              // line the operator had just exempted.
               update(i, {
                 taxId: v ?? '',
-                taxPercent: chosen ? chosen.label.replace(/[^\d.]/g, '') : line.taxPercent,
+                taxPercent: v == null ? '0' : chosen ? chosen.label.replace(/[^\d.]/g, '') : line.taxPercent,
               });
             }}
             scope="SALES"

@@ -189,7 +189,7 @@ describe('inspection report template — font independence', () => {
     expect(html).toContain('للتأكد من صحة التقرير');
   });
 
-  it('prints the approved cover illustration when no photograph was attached', () => {
+  it('prints an empty band when no photograph was attached', () => {
     const html = renderInspectionReportHtml({
       issuer,
       payload,
@@ -199,12 +199,11 @@ describe('inspection report template — font independence', () => {
       verification: null,
       baseCss: '',
     });
-    // With no attached photograph the approved sheet prints its own faint
-    // vehicle illustration in the band, not a text placeholder. The illustration
-    // is painted as a CSS background so it bleeds past the side margins without
-    // widening the document.
+    // With no attached photograph the cover must not invent a vehicle: the band
+    // stays empty (no illustration, no placeholder text, no stock image), so the
+    // report shows exactly what was attached.
     expect(html).toContain('class="vphoto-art"');
-    expect(html).toMatch(/class="vphoto-art" style="background-image:url\('data:image\/png;base64,/);
+    expect(html).not.toContain('background-image');
     expect(html).not.toContain('class="vphoto-img"');
     expect(html).not.toContain('No vehicle photograph attached');
   });
@@ -492,6 +491,42 @@ describe('inspection report template — reference page parity (Execution 19)', 
     expect(html).toContain('terms-banner-ar');
     expect(html).toMatch(/\.terms-banner\{ display:flex; direction:ltr;[^}]*background:#0f2b48; color:#fff;/);
     expect(html).toContain('Terms, Conditions &amp; Liability Disclaimer');
+  });
+
+  it('prints the "nothing to report" statement when a section opted in', () => {
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload: {
+        ...payload,
+        sections: payload.sections.map((s) =>
+          s.area === 'INTERIOR' ? { ...s, noFindings: true } : s,
+        ),
+      },
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    // The checkbox the inspector ticks in the form must survive to the printed
+    // sheet, in both languages, on the section it belongs to.
+    expect(html).toContain('لا يوجد ما يستدعي الملاحظة');
+    expect(html).toContain('Nothing to report');
+    expect(html).toContain('class="no-findings"');
+  });
+
+  it('omits the "nothing to report" statement when no section opted in', () => {
+    const html = renderInspectionReportHtml({
+      issuer,
+      payload,
+      documentNumber: 'VR-1',
+      issuedAt: new Date(),
+      version: 1,
+      verification: null,
+      baseCss: '',
+    });
+    expect(html).not.toContain('لا يوجد ما يستدعي الملاحظة');
+    expect(html).not.toContain('Nothing to report');
   });
 
   it('does not print a verification QR inside the report body', () => {

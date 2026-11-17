@@ -136,16 +136,30 @@ export default function InspectionWorkspacePage() {
       <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-4">
           {spec && section ? (
-            <SectionEditor
-              key={spec.key}
-              sessionId={id}
-              area={spec.key}
-              spec={spec}
-              section={section}
-              editable={editable && canWrite}
-              onSaved={applySession}
-              onError={setError}
-            />
+            GROUP_PAGE_AREAS.includes(spec.key) ? (
+              // The four grouped checks share one form and one Save; the rail
+              // selection opens the group rather than a single section.
+              <GroupedSectionsEditor
+                key="group"
+                sessionId={id}
+                areas={GROUP_PAGE_AREAS.filter((a) => session.selectedAreas.includes(a))}
+                session={session}
+                editable={editable && canWrite}
+                onSaved={applySession}
+                onError={setError}
+              />
+            ) : (
+              <SectionEditor
+                key={spec.key}
+                sessionId={id}
+                area={spec.key}
+                spec={spec}
+                section={section}
+                editable={editable && canWrite}
+                onSaved={applySession}
+                onError={setError}
+              />
+            )
           ) : (
             <Card>{t('inspection.noSections')}</Card>
           )}
@@ -481,6 +495,177 @@ function ProgressRail({
 }
 
 /**
+ * The combined form for the report's shared interior/exterior/engine/road page.
+ *
+ * The approved report prints those four checks on one sheet, so the operator
+ * fills them in as one form and expects one Save. Each area keeps its own
+ * checklist, "nothing to report" checkbox and remarks box, but the four are
+ * written by a single request (`saveInspectionSections`), which the API applies
+ * in one transaction — a partially answered form can never be left half-saved.
+ */
+function GroupedSectionsEditor({
+  sessionId,
+  areas,
+  session,
+  editable,
+  onSaved,
+  onError,
+}: {
+  sessionId: string;
+  areas: InspectionSectionKey[];
+  session: InspectionSessionDto;
+  editable: boolean;
+  onSaved: (s: InspectionSessionDto) => void;
+  onError: (message: string) => void;
+}) {
+  const { t, locale } = useUi();
+  const [busy, setBusy] = useState(false);
+  type AreaState = { remarks: string; noFindings: boolean; results: Record<string, InspectionItemResultDto> };
+  const initial = (): Record<string, AreaState> =>
+    Object.fromEntries(
+      areas.map((area) => {
+        const section = session.sections.find((s) => s.area === area);
+        return [
+          area,
+          {
+            remarks: section?.remarks ?? '',
+            noFindings: section?.noFindings ?? false,
+            results: Object.fromEntries((section?.items ?? []).map((i) => [i.itemKey, i])),
+          },
+        ];
+      }),
+    );
+  const [state, setState] = useState<Record<string, AreaState>>(initial);
+
+  useEffect(() => {
+    setState(initial());
+    // Re-sync when the server returns a fresh session (a save, or a reload).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
+
+  const patch = (area: InspectionSectionKey, next: Partial<AreaState>) =>
+    setState((prev) => ({ ...prev, [area]: { ...prev[area], ...next } }));
+
+  const setResult = (area: InspectionSectionKey, itemKey: string, result: InspectionResultValue) =>
+    setState((prev) => ({
+      ...prev,
+      [area]: {
+        ...prev[area],
+        results: { ...prev[area].results, [itemKey]: { itemKey, result, note: prev[area].results[itemKey]?.note ?? null } },
+      },
+    }));
+
+  const saveAll = async () => {
+    setBusy(true);
+    try {
+      const payload = areas.map((area) => {
+        const spec = inspectionSectionSpec(area);
+        return {
+          area,
+          remarks: state[area].remarks,
+          noFindings: state[area].noFindings,
+          items: spec.items.map(
+            (item) =>
+              state[area].results[item.key] ?? { itemKey: item.key, result: 'UNSET' as InspectionResultValue, note: null },
+          ),
+        };
+      });
+      onSaved(await api.saveInspectionSections(sessionId, payload));
+    } catch (e) {
+      onError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card data-testid="inspection-group-form">
+      <div className="mb-3">
+        <h2 className="oryx-h2 m-0">{t('inspection.groupTitle')}</h2>
+        <p className="oryx-faint m-0 text-[12px]">{t('inspection.groupHint')}</p>
+      </div>
+
+      <div className="flex flex-col gap-5">
+        {areas.map((area) => {
+          const spec = inspectionSectionSpec(area);
+          const section = session.sections.find((s) => s.area === area);
+          const areaState = state[area];
+          return (
+            <div key={area} className="oryx-group-section" data-testid={`group-section-${area}`}>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="m-0 text-[14px] font-semibold">{locale === 'ar' ? spec.labelAr : spec.labelEn}</h3>
+                  <p className="oryx-faint m-0 text-[11.5px]">{locale === 'ar' ? spec.summaryAr : spec.summaryEn}</p>
+                </div>
+                {section?.completedAt ? <Badge tone="success">{t('inspection.sectionComplete')}</Badge> : null}
+              </div>
+
+              <div className="oryx-checklist" data-testid={`checklist-${area}`}>
+                {spec.items.map((item) => {
+                  const current = areaState.results[item.key]?.result ?? 'UNSET';
+                  const options: InspectionResultValue[] =
+                    spec.resultSet === 'PASS_FAIL' ? ['PASS', 'FAIL'] : ['PASS', 'FAIL', 'NA'];
+                  return (
+                    <div key={item.key} className="oryx-checklist__row" data-testid={`item-${item.key}`} data-result={current}>
+                      <span className="oryx-checklist__label">{locale === 'ar' ? item.labelAr : item.labelEn}</span>
+                      <div className="flex gap-1" role="group" aria-label={item.labelEn}>
+                        {options.map((opt) => (
+                          <button
+                            key={opt}
+                            type="button"
+                            className={`oryx-result-btn oryx-result-btn--${opt.toLowerCase()}${current === opt ? ' is-active' : ''}`}
+                            aria-pressed={current === opt}
+                            disabled={!editable || busy}
+                            onClick={() => setResult(area, item.key, opt)}
+                            data-testid={`item-${item.key}-${opt}`}
+                          >
+                            {t(`inspection.result.${opt}`)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <label className="mt-3 flex items-center gap-2 text-[13px]">
+                <input
+                  type="checkbox"
+                  checked={areaState.noFindings}
+                  disabled={!editable || busy}
+                  onChange={(e) => patch(area, { noFindings: e.target.checked })}
+                  data-testid={`no-findings-${area}`}
+                />
+                {t('inspection.nothingToReport')}
+              </label>
+
+              <Field label={locale === 'ar' ? spec.remarksLabelAr : spec.remarksLabelEn}>
+                <textarea
+                  className="oryx-input oryx-textarea"
+                  rows={2}
+                  value={areaState.remarks}
+                  disabled={!editable || busy}
+                  onChange={(e) => patch(area, { remarks: e.target.value })}
+                  data-testid={`remarks-${area}`}
+                />
+              </Field>
+            </div>
+          );
+        })}
+      </div>
+
+      {editable ? (
+        <div className="mt-4 flex justify-end">
+          <Button variant="primary" disabled={busy} onClick={saveAll} data-testid="save-sections-group">
+            {busy ? t('common.loading') : t('common.save')}
+          </Button>
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+/**
  * One section's editor.
  *
  * The section kind decides the interface: a checklist for the item sections, the
@@ -642,18 +827,16 @@ function SectionEditor({
         <DiagnosticList sessionId={sessionId} entries={section.diagnostics} editable={editable && !busy} onChanged={onSaved} onError={onError} />
       ) : null}
 
-      {spec.kind !== 'ITEMS' ? (
-        <label className="mt-3 flex items-center gap-2 text-[13px]">
-          <input
-            type="checkbox"
-            checked={noFindings}
-            disabled={!editable || busy}
-            onChange={(e) => setNoFindings(e.target.checked)}
-            data-testid={`no-findings-${area}`}
-          />
-          {t('inspection.nothingToReport')}
-        </label>
-      ) : null}
+      <label className="mt-3 flex items-center gap-2 text-[13px]">
+        <input
+          type="checkbox"
+          checked={noFindings}
+          disabled={!editable || busy}
+          onChange={(e) => setNoFindings(e.target.checked)}
+          data-testid={`no-findings-${area}`}
+        />
+        {t('inspection.nothingToReport')}
+      </label>
 
       <Field label={locale === 'ar' ? spec.remarksLabelAr : spec.remarksLabelEn}>
         <textarea

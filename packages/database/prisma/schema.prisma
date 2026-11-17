@@ -4576,14 +4576,13 @@ model InspectionChassisRegion {
 
 /// A computer-unit diagnostic fault record. The report prints a titled
 /// "Computer Module Faults" area with no fixed rows, so these are entered by the
-/// inspector; nothing is fabricated on their behalf.
+/// inspector; nothing is fabricated on their behalf. The approved form records a
+/// description, an optional observation and a severity only.
 model InspectionDiagnosticEntry {
   id          String          @id @default(cuid())
   companyId   String
   sessionId   String
   sectionId   String
-  module      String?
-  faultCode   String?
   description String
   observation String?
   severity    FindingSeverity @default(INFO)

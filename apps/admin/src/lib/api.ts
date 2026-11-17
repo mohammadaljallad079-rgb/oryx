@@ -1535,6 +1535,8 @@ export const api = {
   inspectionProgress: (id: string) => request<InspectionProgressDto>(`/automotive/inspections/${id}/progress`),
   saveInspectionSection: (id: string, area: InspectionAreaKey, body: Record<string, unknown>) =>
     request<InspectionSessionDto>(`/automotive/inspections/${id}/sections/${area}`, { method: 'PUT', body }),
+  saveInspectionSections: (id: string, sections: Array<{ area: InspectionAreaKey } & Record<string, unknown>>) =>
+    request<InspectionSessionDto>(`/automotive/inspections/${id}/sections`, { method: 'PUT', body: { sections } }),
   saveInspectionMarkers: (id: string, markers: Array<Partial<InspectionBodyMarkerDto>>) =>
     request<InspectionSessionDto>(`/automotive/inspections/${id}/paint-markers`, { method: 'PUT', body: { markers } }),
   saveInspectionChassis: (id: string, regions: Array<Partial<InspectionChassisRegionDto>>) =>

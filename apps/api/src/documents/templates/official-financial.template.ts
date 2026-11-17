@@ -2,6 +2,7 @@ import { docStamp, esc, escMultiline, money, moneyPlain, quantity, countryName }
 import { oryxLogoMark } from './oryx-logo.asset';
 import { CHROME_CSS } from './chrome';
 import { DOCUMENT_LATIN_STACK } from '../pdf/document-fonts.service';
+import { amountInWords } from '../../print/print-format';
 import type {
   DocumentIssuer,
   DocumentVerification,
@@ -377,6 +378,24 @@ function lineTable(
   </table>`;
 }
 
+/**
+ * The written amount, printed as a plain line under the totals.
+ *
+ * The approved sheet states the total in words beneath the figures, so a reader
+ * can verify the amount without reading the numerals. It is deliberately not
+ * boxed: it is part of the sheet, not a form field. The words come from the same
+ * `amountInWords` the browser print view uses, so the two can never disagree.
+ */
+function amountInWordsLine(payload: FinancialDocumentPayload, locale: 'ar' | 'en'): string {
+  const words = amountInWords(payload.totalMinor, payload.currency);
+  const label = locale === 'ar' ? 'المبلغ كتابةً' : 'Amount in words';
+  return `
+  <div class="of-words">
+    <span class="of-words-label">${esc(label)}</span>
+    <span class="of-words-value">${esc(words)}</span>
+  </div>`;
+}
+
 /** The right-aligned totals block: untaxed amount, tax, discount, total. */
 function totalsBlock(payload: FinancialDocumentPayload, locale: 'ar' | 'en'): string {
   const rate = documentTaxRate(payload);
@@ -440,6 +459,7 @@ ${OFFICIAL_FINANCIAL_CSS}
   ${infoPanel(numbered, counterpartyName, dateLabel)}
   ${lineTable(payload, docLocale, /quotation/i.test(payload.titleEn))}
   ${totalsBlock(payload, docLocale)}
+  ${amountInWordsLine(payload, docLocale)}
   ${
     payload.notes
       ? `<div class="of-notes avoid-break">
@@ -635,6 +655,12 @@ export const OFFICIAL_FINANCIAL_CSS = `
      so the box height is exactly the note text and its padding. */
   .of-notes{ margin-top:27.7pt; border:1px solid #c2c9d5; padding:7pt 12.3pt; }
   .of-notes-body{ font-size:8.8pt; color:#334155; }
+  /* The written amount is a plain line, not a box: it sits directly beneath the
+     totals block and states the total in words so a reader can verify it. */
+  .of-words{ width:59.6%; margin-inline-start:auto; margin-top:6pt;
+    font-size:8.8pt; color:#0f2b48; }
+  .of-words-label{ font-weight:700; margin-inline-end:6pt; }
+  .of-words-value{ font-weight:700; }
   /* The verification strip: a compact ruled box above the signature strip. It is
      deliberately restrained so it reads as a security footnote and never
      competes with the priced table or the approved identity band. */

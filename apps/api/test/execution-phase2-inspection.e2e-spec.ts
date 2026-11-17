@@ -326,6 +326,85 @@ describe('Execution Phase 2 — inspection engine (e2e)', () => {
     });
   });
 
+  /**
+   * The four checks the report prints on one page are edited as one form and
+   * written by one request, so a partially answered form can never be left
+   * half-saved.
+   */
+  describe('grouped section save (single form, single save)', () => {
+    const GROUP = ['INTERIOR', 'EXTERIOR', 'ENGINE_COMPARTMENT', 'ROAD_TEST'] as const;
+
+    it('saves every grouped section in one call and returns the fresh session', async () => {
+      const created = await createSession([...GROUP]);
+      const res = await companyCall<{ sections: Array<{ area: string; remarks: string | null; items: unknown[] }> }>(
+        ctx.base,
+        companyId,
+        `/automotive/inspections/${created.id}/sections`,
+        {
+          method: 'PUT',
+          token: writerToken,
+          body: {
+            sections: [
+              { area: 'INTERIOR', remarks: 'Cabin clean.', items: [{ itemKey: 'interior.doors', result: 'PASS' }] },
+              { area: 'EXTERIOR', noFindings: true },
+              { area: 'ENGINE_COMPARTMENT', items: [{ itemKey: 'engine.fluids', result: 'PASS' }] },
+              { area: 'ROAD_TEST', items: [{ itemKey: 'road.vibrations', result: 'FAIL' }] },
+            ],
+          },
+        },
+      );
+      expect(res.status).toBe(200);
+      const interior = res.body.sections.find((s) => s.area === 'INTERIOR')!;
+      expect(interior.remarks).toBe('Cabin clean.');
+      expect(interior.items).toHaveLength(1);
+      const exterior = res.body.sections.find((s) => s.area === 'EXTERIOR')! as unknown as { noFindings: boolean };
+      expect(exterior.noFindings).toBe(true);
+      expect(res.body.sections.find((s) => s.area === 'ROAD_TEST')!.items).toHaveLength(1);
+    });
+
+    it('writes nothing when one entry in the batch is invalid', async () => {
+      const created = await createSession(['INTERIOR', 'EXTERIOR']);
+      const res = await companyCall(
+        ctx.base,
+        companyId,
+        `/automotive/inspections/${created.id}/sections`,
+        {
+          method: 'PUT',
+          token: writerToken,
+          body: {
+            sections: [
+              { area: 'INTERIOR', remarks: 'Should not persist.', items: [{ itemKey: 'interior.doors', result: 'PASS' }] },
+              // `engine.fluids` does not belong to EXTERIOR, so the whole save
+              // must fail before any row is written.
+              { area: 'EXTERIOR', items: [{ itemKey: 'engine.fluids', result: 'PASS' }] },
+            ],
+          },
+        },
+      );
+      expect(res.status).toBe(400);
+
+      const detail = await companyCall<{ sections: Array<{ area: string; remarks: string | null; items: unknown[] }> }>(
+        ctx.base,
+        companyId,
+        `/automotive/inspections/${created.id}`,
+        auth(writerToken),
+      );
+      const interior = detail.body.sections.find((s) => s.area === 'INTERIOR')!;
+      expect(interior.remarks).toBeNull();
+      expect(interior.items).toHaveLength(0);
+    });
+
+    it('refuses an unknown area in the batch', async () => {
+      const created = await createSession(['INTERIOR']);
+      const res = await companyCall(ctx.base, companyId, `/automotive/inspections/${created.id}/sections`, {
+        method: 'PUT',
+        token: writerToken,
+        body: { sections: [{ area: 'NOT_A_SECTION' }] },
+      });
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe('progress and submission gating', () => {
     it('reports every selected item as outstanding before it is answered', async () => {
       const created = await createSession(['ROAD_TEST']);
@@ -565,14 +644,14 @@ describe('Execution Phase 2 — inspection engine (e2e)', () => {
   describe('computer-unit diagnostics', () => {
     it('records and removes a diagnostic entry', async () => {
       const created = await createSession(['COMPUTER_UNIT']);
-      const added = await companyCall<{ id: string; module: string }>(
+      const added = await companyCall<{ id: string; description: string }>(
         ctx.base,
         companyId,
         `/automotive/inspections/${created.id}/diagnostics`,
         {
           method: 'POST',
           token: writerToken,
-          body: { module: 'ECM', faultCode: 'P0171', description: 'System too lean', severity: 'MAJOR' },
+          body: { description: 'System too lean', observation: 'Bank 1 sensor drift', severity: 'MAJOR' },
         },
       );
       expect(added.status).toBe(201);
@@ -607,7 +686,19 @@ describe('Execution Phase 2 — inspection engine (e2e)', () => {
       const res = await companyCall(ctx.base, companyId, `/automotive/inspections/${created.id}/diagnostics`, {
         method: 'POST',
         token: writerToken,
-        body: { module: 'ECM' },
+        body: { observation: 'Bank 1 sensor drift' },
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('refuses a diagnostic that still carries a removed module or fault code', async () => {
+      const created = await createSession(['COMPUTER_UNIT']);
+      // `forbidNonWhitelisted` is on globally, so the removed fields are refused
+      // rather than silently dropped.
+      const res = await companyCall(ctx.base, companyId, `/automotive/inspections/${created.id}/diagnostics`, {
+        method: 'POST',
+        token: writerToken,
+        body: { description: 'System too lean', module: 'ECM' },
       });
       expect(res.status).toBe(400);
     });

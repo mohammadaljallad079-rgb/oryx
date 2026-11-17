@@ -384,13 +384,16 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
   .tvalue { color:var(--ink); text-align:right; }
   .totals-rule { position:absolute; left:251.0pt; top:${(433.24 + tableShift).toFixed(2)}pt; width:320.13pt; border-top:0.75pt solid var(--navy); }
 
-  /* notes / warranty box below the totals */
-  .notes { position:absolute; left:29.02pt; top:481.17pt; width:544.99pt; height:27.9pt;
-           border:1.5pt solid var(--border); }
-  /* Relative to .notes, not to the page: the box is itself positioned, so an
+  /* Amount in words - printed as a plain line, not inside a box, so it reads as
+     part of the sheet rather than a form field. Notes, when present, sit above
+     it in the same unboxed block. */
+  .notes { position:absolute; left:29.02pt; top:481.17pt; width:544.99pt; min-height:27.9pt; }
+  /* Relative to .notes, not to the page: the block is itself positioned, so an
      absolute child would otherwise be placed from the page top and fall off it. */
-  .notes-text { position:absolute; left:8.95pt; top:5.83pt; right:10.0pt; font-size:8.79pt;
+  .notes-text { position:absolute; left:0; top:5.83pt; right:0; font-size:8.79pt;
                 font-weight:700; color:var(--ink); line-height:1.25; white-space:normal; }
+  .notes-label { position:absolute; left:0; top:0; font-size:7.4pt; font-weight:700;
+                 letter-spacing:0.02em; color:var(--muted); }
 
   /* verification strip - the QR a reader scans to confirm the document. It sits
      in the whitespace the reference leaves between the notes box and the
@@ -458,8 +461,11 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
     <div class="tvalue" style="${rightAt(569.83, totalTop, 8.79)}">${esc(doc.totals.total)}</div>
 
     <div class="notes">
-      <div class="notes-text">${dash(doc.notes ?? doc.amountInWords)}</div>
+      <div class="notes-label">المبلغ كتابة · Amount in words</div>
+      <div class="notes-text">${dash(doc.amountInWords)}</div>
     </div>
+
+    ${doc.notes ? `<div class="doc-notes" style="${at(29.02, 512.0, 8.4)}">${esc(doc.notes)}</div>` : ''}
 
     ${verificationHtml}
 

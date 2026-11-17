@@ -84,6 +84,14 @@ export interface DocumentActionsProps {
   permissions: string[];
   /** Automatically issue (when needed) and open the stored PDF after a new invoice is saved. */
   autoOpenOnMount?: boolean;
+  /**
+   * Render the actions as icon-only buttons. The register uses this so a row
+   * carries one compact action cluster instead of repeating the document
+   * actions beside a second preview/print pair. Every icon keeps its `title`
+   * and an `aria-label`, so the control stays described without a visible text
+   * label.
+   */
+  iconsOnly?: boolean;
 }
 
 /**
@@ -98,7 +106,7 @@ function attachmentEntityFor(sourceType: DocumentSourceType): AttachmentEntityTy
   return null;
 }
 
-export function DocumentActions({ sourceType, sourceId, type, permissions, autoOpenOnMount = false }: DocumentActionsProps) {
+export function DocumentActions({ sourceType, sourceId, type, permissions, autoOpenOnMount = false, iconsOnly = false }: DocumentActionsProps) {
   const { t, locale } = useUi();
   const { canAny } = useAuth();
 
@@ -313,6 +321,11 @@ export function DocumentActions({ sourceType, sourceId, type, permissions, autoO
 
   if (!canRead) return null;
 
+  // Icon-only mode keeps the same controls and the same test ids; only the
+  // visible text label is dropped, replaced by `title` and `aria-label`.
+  const label = (key: string) => (iconsOnly ? undefined : t(key));
+  const aria = (key: string) => (iconsOnly ? t(key) : undefined);
+
   return (
     <div className="flex flex-wrap justify-end gap-2" data-testid={`doc-actions-${sourceId}`}>
       {loading ? (
@@ -326,9 +339,10 @@ export function DocumentActions({ sourceType, sourceId, type, permissions, autoO
             onClick={() => void openPreview()}
             data-testid={`doc-preview-${sourceId}`}
             title={!document.downloadable ? t('documents.notPrintable') : t('documents.preview')}
+            aria-label={aria('documents.preview')}
           >
             <Icon name="scroll" size={14} />
-            {t('documents.preview')}
+            {label('documents.preview')}
           </Button>
           <Button
             size="sm"
@@ -336,9 +350,11 @@ export function DocumentActions({ sourceType, sourceId, type, permissions, autoO
             disabled={!document.downloadable}
             onClick={() => void print()}
             data-testid={`doc-row-print-${sourceId}`}
+            title={t('documents.print')}
+            aria-label={aria('documents.print')}
           >
             <Icon name="print" size={14} />
-            {t('documents.print')}
+            {label('documents.print')}
           </Button>
           <Button
             size="sm"
@@ -346,9 +362,11 @@ export function DocumentActions({ sourceType, sourceId, type, permissions, autoO
             disabled={!document.downloadable}
             onClick={() => void download()}
             data-testid={`doc-row-download-${sourceId}`}
+            title={t('documents.download')}
+            aria-label={aria('documents.download')}
           >
             <Icon name="download" size={14} />
-            {t('documents.download')}
+            {label('documents.download')}
           </Button>
           <Button
             size="sm"
@@ -357,9 +375,10 @@ export function DocumentActions({ sourceType, sourceId, type, permissions, autoO
             disabled={busy}
             data-testid={`doc-reissue-${sourceId}`}
             title={t('documents.reissueHint')}
+            aria-label={aria('documents.reissue')}
           >
             <Icon name="refresh" size={14} />
-            {t('documents.reissue')}
+            {label('documents.reissue')}
           </Button>
         </>
       ) : (
@@ -380,9 +399,10 @@ export function DocumentActions({ sourceType, sourceId, type, permissions, autoO
           onClick={() => setAttachOpen(true)}
           data-testid={`doc-attach-${sourceId}`}
           title={t('documents.attach')}
+          aria-label={aria('documents.attach')}
         >
           <Icon name="paperclip" size={14} />
-          {attachments.length > 0 ? `${t('documents.attach')} (${attachments.length})` : t('documents.attach')}
+          {iconsOnly ? null : attachments.length > 0 ? `${t('documents.attach')} (${attachments.length})` : t('documents.attach')}
         </Button>
       ) : null}
       {error ? <span className="oryx-danger text-[12px]">{error}</span> : null}

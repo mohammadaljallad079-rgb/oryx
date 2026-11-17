@@ -337,8 +337,6 @@ describe('Execution Phase 3 — official documents and QR verification (e2e)', (
           method: 'POST',
           token: issuerToken,
           body: {
-            module: 'Engine control unit',
-            faultCode: 'P0301',
             description: 'Cylinder 1 misfire detected during the road test',
             observation: 'Intermittent; clears when the engine is warm',
             severity: 'MINOR',

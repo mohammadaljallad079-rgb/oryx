@@ -5,7 +5,6 @@ import {
 import {
   BODY_SCHEME_DATA_URI,
   CHASSIS_DIAGRAM_DATA_URI,
-  COVER_ILLUSTRATION_DATA_URI,
   INTERIOR_DIAGRAM_DATA_URI,
 } from './inspection-artwork.assets';
 import { signatureBlock, type DocumentChrome } from './chrome';
@@ -280,9 +279,10 @@ function liabilityBlock(): string {
  * The approved report prints the vehicle photograph as a wide band across the
  * middle of the cover, bleeding past the side margins. The frame keeps that
  * proportion (a wide band, not a thumbnail) so the printed sheet reads the same
- * as the reference. A session with no attached photograph prints the neutral
- * placeholder rather than an empty frame, so the cover never shows a broken
- * image.
+ * as the reference. A session with no attached photograph prints an empty band
+ * (carrying only the verification QR when the report is verifiable) — never a
+ * default vehicle illustration, so the cover shows exactly the photo that was
+ * actually attached, or none.
  */
 function vehiclePhoto(
   p: InspectionReportPayload,
@@ -312,14 +312,14 @@ function vehiclePhoto(
       ${qr}
     </figure>`;
   }
-  // No photograph attached: the approved sheet prints its own vehicle
-  // illustration across the cover, reserving the reference's blank band
+  // No photograph attached: the cover keeps the reference's blank band
   // (y184-549 of the 842pt sheet) between the vehicle information and the terms
-  // block. The illustration is painted as a CSS background so it bleeds past the
-  // side margins without contributing to layout (an overflowing <img> makes
-  // Chromium shrink the whole sheet), and the verification QR floats over it.
+  // block, with no illustration and no placeholder text. The band is painted as
+  // a plain block so it bleeds past the side margins without contributing to
+  // layout (an overflowing <img> makes Chromium shrink the whole sheet), and the
+  // verification QR floats over it when the report is verifiable.
   return `
-    <div class="vphoto-art" style="background-image:url('${COVER_ILLUSTRATION_DATA_URI}')">
+    <div class="vphoto-art">
       ${qr}
     </div>`;
 }
@@ -533,7 +533,22 @@ function itemsTable(
           .join('')}
       </tbody>
     </table>
+    ${noFindingsNote(section.noFindings)}
   </div>`;
+}
+
+/**
+ * The "nothing to report" marker a section prints when the inspector ticked the
+ * matching checkbox.
+ *
+ * The approved form offers the option on every check, so the printed report
+ * carries the same statement on the section it belongs to instead of leaving the
+ * reader to infer "no remarks" from an empty remarks box. It prints on the
+ * item checklists, both diagrams and the computer-unit fault list.
+ */
+function noFindingsNote(noFindings: boolean): string {
+  if (!noFindings) return '';
+  return `<div class="no-findings">لا يوجد ما يستدعي الملاحظة<span class="ltr">Nothing to report</span></div>`;
 }
 
 /**
@@ -576,6 +591,7 @@ function paintDiagram(section: InspectionReportSection): string {
       ${markers}
     </div>
     <div class="legend legend--row">${legend}</div>
+    ${noFindingsNote(section.noFindings)}
     ${
       section.remarks
         ? `<div class="sec-remarks"><b>${esc(section.remarksLabelAr)}</b><span class="ltr">${esc(section.remarksLabelEn)}</span>${escMultiline(section.remarks)}</div>`
@@ -634,6 +650,7 @@ function chassisDiagram(section: InspectionReportSection): string {
       <span class="lg-chip">${markGlyph('check', 10)}سليم / OK</span>
       <span class="lg-chip">${markGlyph('cross', 10)}متضرر / Damage</span>
     </div>
+    ${noFindingsNote(section.noFindings)}
     ${section.remarks ? `<div class="sec-remarks"><b>${esc(section.remarksLabelAr)}:</b> ${escMultiline(section.remarks)}</div>` : ''}
   </div>`;
 }
@@ -659,11 +676,16 @@ function chassisMarkers(section: InspectionReportSection): string {
 
 /** The free-form computer-unit fault table. */
 function diagnosticSection(section: InspectionReportSection | undefined): string {
+  // The section prints the "nothing to report" statement when the inspector
+  // ticked the matching checkbox, and the "no faults recorded" line when the
+  // fault list is empty. The checkbox wins when both apply, so the sheet never
+  // prints two different statements about the same check.
+  const nothingToReport = section?.noFindings ? noFindingsNote(true) : '';
   if (!section || section.diagnostics.length === 0) {
     return `
     <div class="diag-block avoid-break">
       <div class="diagram-title">أعطال وحدة الكمبيوتر<span class="ltr">Computer Module Faults</span></div>
-      <div class="no-findings">لم يتم تسجيل أي أعطال · No computer module faults recorded</div>
+      ${nothingToReport || '<div class="no-findings">لم يتم تسجيل أي أعطال · No computer module faults recorded</div>'}
     </div>`;
   }
   return `
@@ -690,6 +712,7 @@ function diagnosticSection(section: InspectionReportSection | undefined): string
           .join('')}
       </tbody>
     </table>
+    ${nothingToReport}
     ${section.remarks ? `<div class="sec-remarks"><b>${esc(section.remarksLabelAr)}:</b> ${escMultiline(section.remarks)}</div>` : ''}
   </div>`;
 }
@@ -825,16 +848,13 @@ export const INSPECTION_REPORT_CSS = `
   .vphoto--bleed .vphoto-img{ position:absolute; top:0; inset-inline:-12mm;
     width:calc(100% + 24mm); height:var(--vphoto-h); object-fit:cover; }
   .vphoto-img{ width:100%; height:var(--vphoto-h); object-fit:cover; display:block; }
-  /* With no attached photograph the approved sheet prints its own vehicle
-   * illustration across the cover. It is drawn at the reference's car size
-   * (about 485pt wide, inside the printable content box) so it never exceeds the
-   * page and never makes Chromium shrink the sheet to fit; the band's height
-   * reserves the reference's blank strip (y184-549) so the vehicle information
-   * and the terms block land where the approved sheet puts them. The verification
-   * QR floats over it, anchored bottom-right. */
+  /* With no attached photograph the cover keeps the reference's blank band
+   * (y184-549) empty: no illustration, no placeholder text. The band is drawn at
+   * the reference's height so the vehicle information and the terms block land
+   * where the approved sheet puts them, and the verification QR floats over it,
+   * anchored bottom-right. */
   .vphoto-art{ position:relative; width:595.5pt; margin-left:-15.87pt;
-    height:330pt; margin-top:-29pt; background-repeat:no-repeat;
-    background-size:94% auto; background-position:calc(50% + 7pt) 5pt; }
+    height:330pt; margin-top:-29pt; }
   .vphoto-empty .vphoto-ph{ position:absolute; top:0; inset-inline:-12mm;
     width:calc(100% + 24mm); height:var(--vphoto-h);
     display:flex; flex-direction:column; align-items:center; justify-content:center;

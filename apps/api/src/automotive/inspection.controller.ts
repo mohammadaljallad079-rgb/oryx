@@ -33,6 +33,7 @@ import {
   SaveBodyMarkersDto,
   SaveChassisRegionsDto,
   SaveInspectionSectionDto,
+  SaveInspectionSectionsDto,
   UpdateInspectionSessionDto,
 } from './inspection.dto';
 
@@ -113,6 +114,19 @@ export class InspectionController {
     @Req() req: RequestLike,
   ) {
     return this.inspections.saveSection(id, area, dto, p, actorFrom(p, req));
+  }
+
+  @Put(':id/sections')
+  @RequireModule('automotive_inspections')
+  @RequirePermissions('erp.inspection.write')
+  @ApiOperation({ summary: 'Save several sections in one call (single form, single save)' })
+  saveSections(
+    @Param('id') id: string,
+    @Body() dto: SaveInspectionSectionsDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.inspections.saveSections(id, dto, p, actorFrom(p, req));
   }
 
   @Put(':id/paint-markers')

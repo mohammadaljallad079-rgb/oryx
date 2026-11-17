@@ -2459,6 +2459,18 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   flex-shrink: 0;
 }
 
+/* The four grouped checks that print on one report page are edited as one form;
+   a hairline separates them without reading as four separate documents. */
+.oryx-group-section {
+  padding-top: 16px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.oryx-group-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
 /* --------------------------------------------- searchable vehicle picker */
 .oryx-combo {
   position: absolute;
