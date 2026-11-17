@@ -225,7 +225,9 @@ export class HrService {
     if (!employee) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Employee not found.');
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     if (dto.departmentId) await this.assertDepartment(companyId, dto.departmentId);
-    if (dto.jobTitleId) await this.assertJobTitle(companyId, dto.jobTitleId, dto.departmentId ?? employee.departmentId);
+    const effectiveJobTitleId = dto.jobTitleId ?? employee.jobTitleId;
+    const effectiveDepartmentId = dto.departmentId !== undefined ? dto.departmentId : employee.departmentId;
+    if (effectiveJobTitleId) await this.assertJobTitle(companyId, effectiveJobTitleId, effectiveDepartmentId);
     if (dto.managerId) {
       if (dto.managerId === id) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'An employee cannot report to itself.');
       await this.assertEmployee(companyId, dto.managerId);
