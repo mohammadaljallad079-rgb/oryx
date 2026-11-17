@@ -209,27 +209,6 @@ export class CreateBranchDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(40)
-  crNumber?: string;
-
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(5)
-  @IsString({ each: true })
-  @MaxLength(40, { each: true })
-  phoneNumbers?: string[];
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(120)
-  specialty?: string;
-
-  @IsOptional()
-  @IsString()
-  responsibleUserId?: string;
-
-  @IsOptional()
-  @IsString()
   @MaxLength(80)
   city?: string;
 
@@ -249,11 +228,6 @@ export class CreateBranchDto {
   phone?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  crNumber?: string;
-
-  @IsOptional()
   @IsArray()
   @ArrayMaxSize(5)
   @IsString({ each: true })
@@ -262,12 +236,17 @@ export class CreateBranchDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(40)
+  crNumber?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(120)
   specialty?: string;
 
   @IsOptional()
   @IsString()
-  responsibleUserId?: string | null;
+  responsibleUserId?: string;
 
   @IsOptional()
   @IsString()
@@ -312,6 +291,27 @@ export class UpdateBranchDto {
   @IsString()
   @MaxLength(40)
   phone?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  phoneNumbers?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  crNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  specialty?: string;
+
+  @IsOptional()
+  @IsString()
+  responsibleUserId?: string | null;
 
   @IsOptional()
   @IsString()
