@@ -49,6 +49,8 @@ import type {
   WarehouseDto,
 } from '@oryx/shared';
 import { DocumentActions } from '@/components/document-actions';
+import { SalesRegisterFilters, EMPTY_SALES_REGISTER_FILTERS, salesFilterQuery, type SalesRegisterFilterValues } from '@/components/sales-register-filters';
+import { PosCameraScanner } from '@/components/pos-camera-scanner';
 
 type Tab = 'dashboard' | 'invoices' | 'quotations' | 'returns' | 'pos';
 
@@ -313,7 +315,8 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
   const [autoPreviewId, setAutoPreviewId] = useState<string | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<SalesDocumentDto | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const list = useAsync(() => api.salesInvoices({ page: 1 }), []);
+  const [filters, setFilters] = useState<SalesRegisterFilterValues>({ ...EMPTY_SALES_REGISTER_FILTERS });
+  const list = useAsync(() => api.salesInvoices({ page: 1, ...salesFilterQuery(filters) }), [filters]);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
@@ -330,6 +333,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
           </Button>
         ) : null}
       </div>
+      <SalesRegisterFilters kind="invoices" value={filters} onChange={setFilters} />
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
       {actionError ? <div className="p-4"><ErrorBanner message={actionError} /></div> : null}
       {list.loading ? (
@@ -468,7 +472,8 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
-  const list = useAsync(() => api.quotations(), []);
+  const [filters, setFilters] = useState<SalesRegisterFilterValues>({ ...EMPTY_SALES_REGISTER_FILTERS });
+  const list = useAsync(() => api.quotations({ page: 1, ...salesFilterQuery(filters) }), [filters]);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
@@ -485,6 +490,7 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
           </Button>
         ) : null}
       </div>
+      <SalesRegisterFilters kind="quotations" value={filters} onChange={setFilters} />
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
       {list.loading ? <div className="p-4"><Skeleton height={140} /></div> : (list.data?.items.length ?? 0) === 0 ? (
         <EmptyState title={t('common.empty')} hint={t('erp.sales.emptyQuotations')} />
@@ -567,7 +573,8 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
   const [open, setOpen] = useState(false);
   const [relatedInvoiceId, setRelatedInvoiceId] = useState<string | null>(null);
   const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
-  const list = useAsync(() => api.creditNotes(), []);
+  const [filters, setFilters] = useState<SalesRegisterFilterValues>({ ...EMPTY_SALES_REGISTER_FILTERS });
+  const list = useAsync(() => api.creditNotes({ page: 1, ...salesFilterQuery(filters) }), [filters]);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
@@ -612,6 +619,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
           </Button>
         ) : null}
       </div>
+      <SalesRegisterFilters kind="returns" value={filters} onChange={setFilters} />
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
       {list.loading ? <div className="p-4"><Skeleton height={140} /></div> : (list.data?.items.length ?? 0) === 0 ? (
         <EmptyState title={t('common.empty')} hint={t('erp.sales.emptyCreditNotes')} />
@@ -731,7 +739,8 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
     };
   }, [companyId]);
   const sessions = useAsync(() => api.cashierSessions(), []);
-  const sales = useAsync(() => api.posSales({ page: 1 }), []);
+  const [filters, setFilters] = useState<SalesRegisterFilterValues>({ ...EMPTY_SALES_REGISTER_FILTERS });
+  const sales = useAsync(() => api.posSales({ page: 1, ...salesFilterQuery(filters) }), [filters]);
   const branches = useAsync(() => api.context(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
   const customers = useAsync(() => api.salesCustomers(), []);
@@ -741,6 +750,11 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
   const [openError, setOpenError] = useState<string | null>(null);
 
   const openSession = sessions.data?.items.find((s) => s.status === 'OPEN');
+
+  // Keep the desktop POS workstation ready as soon as a cashier session is open.
+  useEffect(() => {
+    if (canOperate && openSession?.id) setSaleOpen(true);
+  }, [canOperate, openSession?.id]);
 
   /**
    * Opens the branch's cashier session.
@@ -856,6 +870,7 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
         <div className="border-b border-[var(--border)] p-4">
           <p className="oryx-panel-title m-0">{t('erp.sales.posSales')}</p>
         </div>
+        <SalesRegisterFilters kind="pos" value={filters} onChange={setFilters} />
         {sales.loading ? <div className="p-4"><Skeleton height={100} /></div> : (sales.data?.items.length ?? 0) === 0 ? (
           <EmptyState title={t('common.empty')} hint={t('erp.sales.emptyPosSales')} />
         ) : (
@@ -972,6 +987,7 @@ function PosSaleModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
 
   const catalog = useAsync(
@@ -1014,6 +1030,7 @@ function PosSaleModal({
     setSearch('');
     setCart([]);
     setPaid('');
+    setCameraOpen(false);
     setPaymentMethod('CASH');
     setPaymentMethodCode('CASH');
     setCustomerId('');
@@ -1055,8 +1072,8 @@ function PosSaleModal({
   // code and the Enter in one burst — waiting for a 250 ms debounce would miss
   // it. An exact barcode match wins; otherwise a lone search result is taken;
   // otherwise the term stays in the field as an ordinary search.
-  const onScanSubmit = async () => {
-    const term = search.trim();
+  const onScanSubmit = async (scannedCode?: string) => {
+    const term = (scannedCode ?? search).trim();
     if (!term) return;
     try {
       const { items } = await api.posCatalog({
@@ -1196,11 +1213,18 @@ function PosSaleModal({
                 data-testid="pos-search"
               />
             </div>
+            <Button size="sm" variant="ghost" onClick={() => setCameraOpen(value => !value)}
+              data-testid="pos-camera-toggle" aria-label={locale === 'ar' ? 'مسح بالكاميرا' : 'Scan with camera'}>
+              <Icon name="camera" size={18} />
+              {locale === 'ar' ? 'مسح بالكاميرا' : 'Camera scan'}
+            </Button>
             <Button variant="ghost" onClick={() => void catalog.reload()} aria-label={t('common.refresh')}>
               <Icon name="refresh" size={18} />
             </Button>
           </div>
 
+          <PosCameraScanner open={cameraOpen} onClose={() => setCameraOpen(false)}
+            onDetected={(code) => { setCameraOpen(false); void onScanSubmit(code); }} />
           {catalog.error ? <ErrorBanner message={catalog.error} onRetry={catalog.reload} /> : null}
 
           {(categories.data?.items.length ?? 0) > 0 ? (
@@ -1512,14 +1536,17 @@ function CartRow({
           onChange={(e) => onChange({ quantity: Math.max(1, Math.round(Number(e.target.value) || 1)) })}
           data-testid={`pos-qty-${line.sku}`}
         />
-        <input
-          className="oryx-input text-end text-[12px]"
-          inputMode="decimal"
-          value={minorToInput(line.unitPriceMinor)}
-          aria-label={t('erp.sales.unitPrice')}
-          onChange={(e) => onChange({ unitPriceMinor: toMinorInput(e.target.value) })}
-          data-testid={`pos-price-${line.sku}`}
-        />
+        <label className="flex flex-col gap-1 text-[11px] font-semibold">
+          <span>{t('erp.sales.unitPrice')}</span>
+          <input
+            className="oryx-input text-end text-[12px] font-semibold tabular-nums"
+            inputMode="decimal"
+            value={minorToInput(line.unitPriceMinor)}
+            aria-label={t('erp.sales.unitPrice')}
+            onChange={(e) => onChange({ unitPriceMinor: toMinorInput(e.target.value) })}
+            data-testid={`pos-price-${line.sku}`}
+          />
+        </label>
         <input
           className="oryx-input text-center text-[12px]"
           inputMode="decimal"
