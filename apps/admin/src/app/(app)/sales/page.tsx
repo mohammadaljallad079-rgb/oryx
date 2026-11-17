@@ -99,6 +99,7 @@ interface CartLine {
   productId: string;
   description: string;
   sku: string;
+  imageUrl: string | null;
   quantity: number;
   unitPriceMinor: number;
   taxPercentBp: number;
@@ -717,7 +718,7 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
   const { t } = useUi();
   const { companyId } = useAuth();
   const [roundingMode, setRoundingMode] = useState<RoundingMode>('NONE');
-  const [currencyScale, setCurrencyScale] = useState(2);
+  const [currencyScale, setCurrencyScale] = useState(currencyScaleOf('BHD'));
   useEffect(() => {
     if (!companyId) {
       setRoundingMode('NONE');
@@ -1056,6 +1057,7 @@ function PosSaleModal({
           productId: product.id,
           description: locale === 'ar' && product.nameAr ? product.nameAr : product.nameEn,
           sku: product.sku,
+          imageUrl: product.imageUrl,
           quantity: 1,
           unitPriceMinor: product.salesPriceMinor,
           taxPercentBp: product.taxRateBp,
@@ -1122,6 +1124,14 @@ function PosSaleModal({
 
   const submit = async () => {
     if (!session || cart.length === 0) return;
+    if (cart.some(line => !Number.isInteger(line.unitPriceMinor) || line.unitPriceMinor <= 0)) {
+      setError(locale === 'ar' ? 'يرجى إدخال سعر صحيح أكبر من صفر لكل منتج قبل إتمام البيع.' : 'Set a valid price greater than zero for every item before checkout.');
+      return;
+    }
+    if (paidMinor < totals.totalMinor) {
+      setError(locale === 'ar' ? 'المبلغ المدفوع أقل من إجمالي الفاتورة.' : 'Paid amount is less than the sale total.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -1167,7 +1177,7 @@ function PosSaleModal({
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
-            disabled={busy || cart.length === 0 || !session}
+            disabled={busy || cart.length === 0 || !session || cart.some(line => line.unitPriceMinor <= 0) || paidMinor < totals.totalMinor}
             onClick={submit}
             data-testid="save-pos-sale"
           >
@@ -1301,6 +1311,7 @@ function PosSaleModal({
                 <CartRow
                   key={l.key}
                   line={l}
+                  currencyScale={currencyScale}
                   onChange={(patch) => updateLine(l.key, patch)}
                   onRemove={() => removeLine(l.key)}
                 />
@@ -1492,74 +1503,107 @@ function PosProductTile({ product, onAdd }: { product: PosProductDto; onAdd: () 
 /** One editable cart line. */
 function CartRow({
   line,
+  currencyScale,
   onChange,
   onRemove,
 }: {
   line: CartLine;
+  currencyScale: number;
   onChange: (patch: Partial<CartLine>) => void;
   onRemove: () => void;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
+  const [priceDraft, setPriceDraft] = useState(() => minorToInput(line.unitPriceMinor));
+  const [priceError, setPriceError] = useState(false);
+  useEffect(() => { setPriceDraft(minorToInput(line.unitPriceMinor)); }, [line.unitPriceMinor]);
+  const onPriceCommit = () => {
+    try {
+      const price = toMinorInput(priceDraft);
+      if (!Number.isSafeInteger(price) || price < 0) throw new Error('Invalid price');
+      onChange({ unitPriceMinor: price });
+      setPriceDraft(minorToInput(price));
+      setPriceError(false);
+    } catch {
+      setPriceError(true);
+    }
+  };
   const lineTotal = computePosTotals(
-    [
-      {
-        quantity: line.quantity,
-        unitPriceMinor: line.unitPriceMinor,
-        discountPercentBp: line.discountPercentBp,
-        taxPercentBp: line.taxPercentBp,
-      },
-    ],
-    'NONE',
-    2,
+    [{ quantity: line.quantity, unitPriceMinor: line.unitPriceMinor,
+       discountPercentBp: line.discountPercentBp, taxPercentBp: line.taxPercentBp }],
+    'NONE', currencyScale,
   ).totalMinor;
+  const imageUrl = api.resolveImage(line.imageUrl);
+  const needsPrice = line.unitPriceMinor <= 0;
+  const ar = locale === 'ar';
   return (
-    <div className="flex flex-col gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2">
-      <div className="flex items-start justify-between gap-2">
-        <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold">{line.description}</span>
-        <Button
-          size="sm"
-          variant="ghost"
-          aria-label={`${t('common.delete')} ${line.description}`}
-          onClick={onRemove}
-          data-testid={`pos-remove-${line.sku}`}
-        >
-          <Icon name="close" size={13} />
+    <div className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3"
+      data-testid={`pos-cart-line-${line.sku}`}>
+      <div className="flex items-start gap-3">
+        <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--background)]">
+          {imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={imageUrl} alt={line.description} className="h-full w-full object-cover" loading="lazy" />
+          ) : <Icon name="package" size={24} />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold">{line.description}</div>
+          <div className="font-mono text-xs text-[var(--muted)]">{line.sku}</div>
+          <div className="mt-1 text-xs font-medium">{money(line.unitPriceMinor)}</div>
+        </div>
+        <Button size="sm" variant="ghost" aria-label={`${t('common.delete')} ${line.description}`}
+          onClick={onRemove} data-testid={`pos-remove-${line.sku}`}>
+          <Icon name="close" size={14} />
         </Button>
       </div>
-      <div className="grid grid-cols-4 gap-1">
-        <input
-          className="oryx-input text-center text-[12px]"
-          type="number"
-          min={1}
-          value={line.quantity}
-          aria-label={t('erp.inventory.quantity')}
-          onChange={(e) => onChange({ quantity: Math.max(1, Math.round(Number(e.target.value) || 1)) })}
-          data-testid={`pos-qty-${line.sku}`}
-        />
-        <label className="flex flex-col gap-1 text-[11px] font-semibold">
-          <span>{t('erp.sales.unitPrice')}</span>
-          <input
-            className="oryx-input text-end text-[12px] font-semibold tabular-nums"
-            inputMode="decimal"
-            value={minorToInput(line.unitPriceMinor)}
-            aria-label={t('erp.sales.unitPrice')}
-            onChange={(e) => onChange({ unitPriceMinor: toMinorInput(e.target.value) })}
-            data-testid={`pos-price-${line.sku}`}
-          />
+      {needsPrice ? (
+        <p className="m-0 rounded-lg border border-[var(--warning)] p-2 text-xs" role="alert">
+          {ar ? 'المنتج بدون سعر بيع. أدخل السعر قبل إتمام العملية.' : 'Product has no sales price. Enter a price to check out.'}
+        </p>
+      ) : null}
+      <div className="grid grid-cols-3 gap-2">
+        <label className="flex flex-col gap-1 text-xs">
+          <span>{t('erp.inventory.quantity')}</span>
+          <input className="oryx-input text-center tabular-nums" type="number" min={1} step={1}
+            value={line.quantity}
+            onChange={e => onChange({ quantity: Math.max(1, Math.round(Number(e.target.value) || 1)) })}
+            data-testid={`pos-qty-${line.sku}`} />
         </label>
-        <input
-          className="oryx-input text-center text-[12px]"
-          inputMode="decimal"
-          value={line.discountPercentBp / 100}
-          aria-label={t('erp.sales.discount')}
-          onChange={(e) =>
-            onChange({ discountPercentBp: Math.round((Number(e.target.value) || 0) * 100) })
-          }
-          data-testid={`pos-discount-${line.sku}`}
-        />
-        <span className="grid place-items-center text-[12px] font-semibold tabular-nums">
-          {money(lineTotal)}
+        <label className="flex flex-col gap-1 text-xs">
+          <span>{t('erp.sales.unitPrice')}</span>
+          <input className="oryx-input text-end tabular-nums" inputMode="decimal" type="text"
+            value={priceDraft} aria-invalid={priceError || needsPrice}
+            onChange={e => { setPriceDraft(e.target.value); setPriceError(false); }}
+            onBlur={onPriceCommit}
+            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+            data-testid={`pos-price-${line.sku}`} />
+        </label>
+        <label className="flex flex-col gap-1 text-xs">
+          <span>{t('erp.sales.discount')} %</span>
+          <input className="oryx-input text-center tabular-nums" inputMode="decimal" type="number"
+            min={0} max={100} step="0.01" value={line.discountPercentBp / 100}
+            onChange={e => {
+              const next = Number(e.target.value);
+              onChange({ discountPercentBp: Math.max(0, Math.min(10000, Math.round((Number.isFinite(next) ? next : 0) * 100))) });
+            }}
+            data-testid={`pos-discount-${line.sku}`} />
+        </label>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-1" aria-label={ar ? 'خصم سريع' : 'Quick discount'}>
+          {[0, 5, 10, 15].map(percent => (
+            <button key={percent} type="button"
+              className={`oryx-btn oryx-btn--sm ${line.discountPercentBp === percent * 100 ? 'oryx-btn--primary' : ''}`}
+              onClick={() => onChange({ discountPercentBp: percent * 100 })}
+              data-testid={`pos-discount-preset-${percent}-${line.sku}`}>{percent}%</button>
+          ))}
+        </div>
+        <span className="text-xs text-[var(--muted)]">
+          {ar ? 'ضريبة تلقائية' : 'Auto tax'}: {(line.taxPercentBp / 100).toFixed(2)}%
         </span>
+      </div>
+      <div className="flex items-center justify-between border-t border-[var(--border)] pt-2 text-sm font-bold">
+        <span>{t('erp.sales.total')}</span>
+        <span className="tabular-nums" data-testid={`pos-line-total-${line.sku}`}>{money(lineTotal)}</span>
       </div>
     </div>
   );
