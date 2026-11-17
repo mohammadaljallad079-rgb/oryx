@@ -166,7 +166,7 @@ function ValuationTab() {
 }
 
 function ProductsTab({ canManage, sparePartsOnly = false }: { canManage: boolean; sparePartsOnly?: boolean }) {
-  const { t, locale } = useUi();
+  const { t } = useUi();
   const [search, setSearch] = useState('');
   const [barcode, setBarcode] = useState('');
   // The committed scan target. Kept apart from the input so a scanner that emits
