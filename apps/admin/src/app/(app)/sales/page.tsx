@@ -974,7 +974,7 @@ function PosSaleModal({
   onDone: () => Promise<void>;
 }) {
   const { t, locale } = useUi();
-  const { companyId } = useAuth();
+  const { companyId, can } = useAuth();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
   const debouncedSearch = useDebounced(search, 250);
@@ -989,6 +989,7 @@ function PosSaleModal({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [uploadingImageId, setUploadingImageId] = useState<string | null>(null);
   const scanRef = useRef<HTMLInputElement>(null);
 
   const catalog = useAsync(
@@ -1164,6 +1165,24 @@ function PosSaleModal({
     }
   };
 
+  async function uploadPosImage(product: PosProductDto, file: File | null) {
+    if (!file) return;
+    setError(null);
+    setUploadingImageId(product.id);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('altEn', product.nameEn);
+      if (product.nameAr) form.append('altAr', product.nameAr);
+      await api.uploadProductImage(product.id, form);
+      await catalog.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setUploadingImageId(null);
+    }
+  }
+
   const items = catalog.data?.items ?? [];
 
   return (
@@ -1272,7 +1291,21 @@ function PosSaleModal({
           ) : (
             <div className="oryx-pos__grid" data-testid="pos-grid">
               {items.map((p) => (
-                <PosProductTile key={p.id} product={p} onAdd={() => addProduct(p)} />
+                <div key={p.id} className="flex min-w-0 flex-col gap-1">
+                  <PosProductTile product={p} onAdd={() => addProduct(p)} />
+                  {!p.imageUrl && can('erp.inventory.item.manage') ? (
+                    <label className="oryx-btn oryx-btn--sm flex cursor-pointer items-center justify-center gap-1"
+                      data-testid={`pos-add-image-${p.sku}`}>
+                      <Icon name="plus" size={13} />
+                      {uploadingImageId === p.id
+                        ? (locale === 'ar' ? 'جارٍ رفع الصورة...' : 'Uploading image...')
+                        : (locale === 'ar' ? 'إضافة صورة المنتج' : 'Add product photo')}
+                      <input type="file" className="sr-only" accept="image/png,image/jpeg,image/webp,image/avif"
+                        disabled={uploadingImageId !== null}
+                        onChange={e => { void uploadPosImage(p, e.target.files?.[0] ?? null); e.target.value = ''; }} />
+                    </label>
+                  ) : null}
+                </div>
               ))}
             </div>
           )}
