@@ -312,7 +312,7 @@ export function SiteContentEditor() {
                 <Button
                   size="sm"
                   variant="danger"
-                  disabled={doc.hero.slides.length <= 1}
+                  disabled={doc.hero.slides.length <= 1 || uploadingSlide !== null}
                   onClick={() => patch((d) => void d.hero.slides.splice(i, 1))}
                 >
                   {t('cms.removeSlide')}
@@ -704,7 +704,7 @@ export function SiteContentEditor() {
         >
           {t('cms.restoreDefaults')}
         </Button>
-        <Button variant="primary" disabled={busy} onClick={() => void save()} data-testid="site-content-save-bottom">
+        <Button variant="primary" disabled={busy || uploadingSlide !== null} onClick={() => void save()} data-testid="site-content-save-bottom">
           {busy ? t('common.loading') : t('common.save')}
         </Button>
       </div>
