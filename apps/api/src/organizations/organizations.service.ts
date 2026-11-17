@@ -226,6 +226,7 @@ export class OrganizationsService {
     const updated = await this.prisma.company.update({
       where: { id },
       data: {
+        ...(dto.code !== undefined ? { code: dto.code } : {}),
         ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
         ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
         ...(dto.legalNameEn !== undefined ? { legalNameEn: dto.legalNameEn } : {}),
@@ -347,7 +348,7 @@ export class OrganizationsService {
         orderBy: { nameEn: 'asc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
-        include: { company: { select: { nameEn: true } }, _count: { select: { memberships: true } } },
+        include: { company: { select: { nameEn: true } }, responsibleUser: { select: { fullNameEn: true, fullNameAr: true } }, _count: { select: { memberships: true } } },
       }),
       this.prisma.branch.count({ where }),
     ]);
@@ -357,6 +358,7 @@ export class OrganizationsService {
 
   async createBranch(companyId: string, dto: CreateBranchDto, actor: ActorContext) {
     this.assertCompanyAccess(companyId, actor);
+    if (dto.responsibleUserId) await this.assertBranchResponsibleUser(companyId, dto.responsibleUserId);
 
     const duplicate = await this.prisma.branch.findUnique({
       where: { companyId_code: { companyId, code: dto.code } },
@@ -392,9 +394,13 @@ export class OrganizationsService {
         countryCode: dto.countryCode ?? DEFAULT_COUNTRY_CODE,
         addressLine: dto.addressLine ?? null,
         phone: dto.phone ?? null,
+        phoneNumbers: dto.phoneNumbers ?? [],
+        crNumber: dto.crNumber ?? null,
+        specialty: dto.specialty ?? null,
+        responsibleUserId: dto.responsibleUserId ?? null,
         timezone: dto.timezone ?? DEFAULT_TIMEZONE,
       },
-      include: { company: { select: { nameEn: true } }, _count: { select: { memberships: true } } },
+      include: { company: { select: { nameEn: true } }, responsibleUser: { select: { fullNameEn: true, fullNameAr: true } }, _count: { select: { memberships: true } } },
     });
 
     await this.audit.record({
@@ -413,6 +419,15 @@ export class OrganizationsService {
     const branch = await this.prisma.branch.findUnique({ where: { id: branchId } });
     if (!branch) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Branch not found.');
     this.assertCompanyAccess(branch.companyId, actor);
+    if (dto.code && dto.code !== branch.code) {
+      const duplicate = await this.prisma.branch.findUnique({
+        where: { companyId_code: { companyId: branch.companyId, code: dto.code } },
+      });
+      if (duplicate && duplicate.id !== branchId) {
+        throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Branch code "${dto.code}" already exists in this company.`);
+      }
+    }
+    if (dto.responsibleUserId) await this.assertBranchResponsibleUser(branch.companyId, dto.responsibleUserId);
 
     const updated = await this.prisma.branch.update({
       where: { id: branchId },
@@ -423,10 +438,14 @@ export class OrganizationsService {
         ...(dto.countryCode !== undefined ? { countryCode: dto.countryCode } : {}),
         ...(dto.addressLine !== undefined ? { addressLine: dto.addressLine } : {}),
         ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
+        ...(dto.phoneNumbers !== undefined ? { phoneNumbers: dto.phoneNumbers } : {}),
+        ...(dto.crNumber !== undefined ? { crNumber: dto.crNumber } : {}),
+        ...(dto.specialty !== undefined ? { specialty: dto.specialty } : {}),
+        ...(dto.responsibleUserId !== undefined ? { responsibleUserId: dto.responsibleUserId } : {}),
         ...(dto.timezone !== undefined ? { timezone: dto.timezone } : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
       },
-      include: { company: { select: { nameEn: true } }, _count: { select: { memberships: true } } },
+      include: { company: { select: { nameEn: true } }, responsibleUser: { select: { fullNameEn: true, fullNameAr: true } }, _count: { select: { memberships: true } } },
     });
 
     await this.audit.record({
@@ -463,6 +482,16 @@ export class OrganizationsService {
   }
 
   // -------------------------------------------------------------------- helpers
+
+  private async assertBranchResponsibleUser(companyId: string, userId: string): Promise<void> {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, status: 'ACTIVE', memberships: { some: { companyId, isActive: true } } },
+      select: { id: true },
+    });
+    if (!user) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'The responsible user must be an active member of this company.');
+    }
+  }
 
   private assertCompanyAccess(companyId: string, actor: ActorContext): void {
     if (actor.kind === 'PLATFORM') return;
@@ -596,6 +625,11 @@ export class OrganizationsService {
     city: string | null;
     addressLine: string | null;
     phone: string | null;
+    phoneNumbers: string[];
+    crNumber: string | null;
+    specialty: string | null;
+    responsibleUserId: string | null;
+    responsibleUser?: { fullNameEn: string; fullNameAr: string } | null;
     countryCode: string | null;
     timezone: string;
     isActive: boolean;
@@ -613,6 +647,12 @@ export class OrganizationsService {
       city: b.city,
       addressLine: b.addressLine,
       phone: b.phone,
+      phoneNumbers: b.phoneNumbers ?? [],
+      crNumber: b.crNumber,
+      specialty: b.specialty,
+      responsibleUserId: b.responsibleUserId,
+      responsibleUserNameEn: b.responsibleUser?.fullNameEn ?? null,
+      responsibleUserNameAr: b.responsibleUser?.fullNameAr ?? null,
       countryCode: b.countryCode,
       timezone: b.timezone,
       isActive: b.isActive,
