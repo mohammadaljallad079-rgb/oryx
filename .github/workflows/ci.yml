@@ -116,6 +116,7 @@ jobs:
     # PDF renderer uses, and Playwright 1.56.1 refuses to install it on
     # ubuntu26.04-x64, which `ubuntu-latest` now resolves to.
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     needs: quality
 
     services:
@@ -211,6 +212,7 @@ jobs:
     # chromium on ubuntu26.04-x64"). 24.04 is the newest image this Playwright
     # release supports. Lift the pin when Playwright gains 26.04 support.
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     needs: quality
 
     services:
