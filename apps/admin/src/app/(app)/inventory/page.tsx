@@ -35,9 +35,9 @@ import type {
   WarehouseDto,
 } from '@oryx/shared';
 
-type Tab = 'dashboard' | 'valuation' | 'products' | 'warehouses' | 'movements' | 'transfers' | 'adjustments' | 'reorder';
+type Tab = 'dashboard' | 'valuation' | 'products' | 'spare-parts' | 'warehouses' | 'movements' | 'transfers' | 'adjustments' | 'reorder';
 
-const TAB_KEYS = ['dashboard', 'valuation', 'products', 'warehouses', 'movements', 'transfers', 'adjustments', 'reorder'] as const;
+const TAB_KEYS = ['dashboard', 'valuation', 'products', 'spare-parts', 'warehouses', 'movements', 'transfers', 'adjustments', 'reorder'] as const;
 
 export default function InventoryPage() {
   return (
@@ -48,7 +48,7 @@ export default function InventoryPage() {
 }
 
 function InventoryInner() {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const { can } = useAuth();
   const [tab, setTab] = useState<Tab>('dashboard');
 
@@ -62,6 +62,7 @@ function InventoryInner() {
     { key: 'dashboard', label: t('erp.inventory.dashboard') },
     { key: 'valuation', label: t('erp.inventory.valuation') },
     { key: 'products', label: t('erp.inventory.products') },
+    { key: 'spare-parts', label: locale === 'ar' ? 'قطع الغيار' : 'Spare parts' },
     { key: 'warehouses', label: t('erp.inventory.warehouses') },
     { key: 'movements', label: t('erp.inventory.movements') },
     { key: 'transfers', label: t('erp.inventory.transfers') },
@@ -97,6 +98,7 @@ function InventoryInner() {
       {tab === 'dashboard' ? <ModuleDashboard moduleKey="warehouses_inventory" /> : null}
       {tab === 'valuation' ? <ValuationTab /> : null}
       {tab === 'products' ? <ProductsTab canManage={canItem} /> : null}
+      {tab === 'spare-parts' ? <ProductsTab canManage={canItem} sparePartsOnly /> : null}
       {tab === 'warehouses' ? <WarehousesTab canManage={canWarehouse} /> : null}
       {tab === 'movements' ? <MovementsTab canManage={canMove} /> : null}
       {tab === 'transfers' ? <TransfersTab canManage={canTransfer} /> : null}
@@ -163,7 +165,7 @@ function ValuationTab() {
   );
 }
 
-function ProductsTab({ canManage }: { canManage: boolean }) {
+function ProductsTab({ canManage, sparePartsOnly = false }: { canManage: boolean; sparePartsOnly?: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
   const [barcode, setBarcode] = useState('');
@@ -171,7 +173,7 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
   // the code and a trailing Enter runs an exact-barcode lookup through the API's
   // dedicated path instead of a fuzzy text search.
   const [barcodeQuery, setBarcodeQuery] = useState('');
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState(sparePartsOnly ? 'Spare Parts' : '');
   const [type, setType] = useState<'' | 'PRODUCT' | 'SERVICE'>('');
   const [stockStatus, setStockStatus] = useState<'' | 'in' | 'low' | 'out'>('');
   const [status, setStatus] = useState<'' | 'active' | 'inactive'>('');
@@ -220,7 +222,7 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
     (maxPrice.trim() ? 1 : 0);
 
   function clearFilters() {
-    setCategory('');
+    setCategory(sparePartsOnly ? 'Spare Parts' : '');
     setType('');
     setStockStatus('');
     setStatus('');
@@ -317,7 +319,7 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
         </div>
 
         <div className="flex flex-wrap items-end gap-3" data-testid="product-filters">
-          <label className="min-w-[150px]">
+          {!sparePartsOnly ? <label className="min-w-[150px]">
             <span className="oryx-label">{t('erp.inventory.category')}</span>
             <select
               className="oryx-select"
@@ -332,7 +334,7 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
                 </option>
               ))}
             </select>
-          </label>
+          </label> : null}
           <label className="min-w-[130px]">
             <span className="oryx-label">{t('erp.inventory.type')}</span>
             <select className="oryx-select" value={type} onChange={(e) => setType(e.target.value as typeof type)} data-testid="filter-type">
@@ -524,7 +526,7 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
           </tbody>
         </TableShell>
       )}
-      <ProductModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
+      <ProductModal open={open} defaultCategory={sparePartsOnly ? 'Spare Parts' : undefined} onClose={() => setOpen(false)} onCreated={list.reload} />
       <EditProductModal
         product={editing}
         onClose={() => setEditing(null)}

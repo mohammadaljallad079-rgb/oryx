@@ -155,18 +155,20 @@ export function ProductModal({
   onClose,
   onCreated,
   onSaved,
+  defaultCategory,
 }: {
   open: boolean;
   onClose: () => void;
   onCreated: () => Promise<void> | void;
   onSaved?: (saved: ProductDto) => void;
+  defaultCategory?: string;
 }) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
-    barcode: '', category: '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
+    barcode: '', category: defaultCategory ?? '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
   });
 
   useEffect(() => {
@@ -174,9 +176,9 @@ export function ProductModal({
     setError(null);
     setForm({
       sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
-      barcode: '', category: '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
+      barcode: '', category: defaultCategory ?? '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
     });
-  }, [open]);
+  }, [open, defaultCategory]);
 
   const submit = async () => {
     setBusy(true);
