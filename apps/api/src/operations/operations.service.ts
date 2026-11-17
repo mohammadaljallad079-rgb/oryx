@@ -169,10 +169,32 @@ export class OperationsService {
       ...(query.search ? { OR: [{ code: { contains: query.search, mode: 'insensitive' as const } }, { nameEn: { contains: query.search, mode: 'insensitive' as const } }] } : {}),
     };
     const [rows, total] = await Promise.all([
-      this.prisma.project.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * pageSize, take: pageSize, include: { _count: { select: { tasks: true } } } }),
+      this.prisma.project.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          _count: { select: { tasks: true } },
+          branch: { select: { nameEn: true, nameAr: true } },
+          department: { select: { nameEn: true, nameAr: true } },
+        },
+      }),
       this.prisma.project.count({ where }),
     ]);
-    return { items: rows.map((p) => ({ ...p, taskCount: p._count.tasks })), total, page, pageSize };
+    return {
+      items: rows.map((p) => ({
+        ...p,
+        taskCount: p._count.tasks,
+        branchNameEn: p.branch?.nameEn ?? null,
+        branchNameAr: p.branch?.nameAr ?? null,
+        departmentNameEn: p.department?.nameEn ?? null,
+        departmentNameAr: p.department?.nameAr ?? null,
+      })),
+      total,
+      page,
+      pageSize,
+    };
   }
 
   async createProject(dto: CreateProjectDto, principal: RequestPrincipal, actor: ActorContext) {
