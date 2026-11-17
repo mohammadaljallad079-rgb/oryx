@@ -1352,6 +1352,29 @@ pnpm --filter @oryx/admin test:ui   # Playwright (needs both services running)
   (`accounting-tab-accounts`, `inventory-tab-valuation`, `payments-tab-intents`,
   …); the module-dashboards work made `dashboard` the default for each.
 
+### Spare parts and POS returns (Execution 26)
+
+- **Spare parts are products, not a second inventory.** The module is the
+  "Spare parts" tab of Warehouses & Inventory; the legacy
+  `/automotive/spare-parts` route renders the same panel and the standalone
+  automotive nav entry is gone. Do not reintroduce a separate spare-parts
+  stock ledger or catalogue.
+- **A child line list must be read with an explicit order.** `include: { lines:
+  true }` returns rows in physical order, and an `UPDATE` (a POS return bumps
+  `returnedQuantity`) moves the row in the heap, which silently reshuffles a
+  receipt. `PosSaleLine` carries `sortOrder` and every POS read orders by it.
+  Any new line table needs the same treatment.
+- **A POS return never rewrites the sale.** It posts its own credit note, moves
+  the goods back through `InventoryService.recordMovement`
+  (`StockMovementSource.POS_RETURN`) unless the operator declines to restock,
+  and increments `PosSaleLine.returnedQuantity` so a unit cannot be refunded
+  twice.
+- **Editing a migration that has already been applied locally needs its
+  checksum refreshed.** `prisma migrate deploy` compares checksums, so after
+  changing an applied migration's SQL run the statement by hand and
+  `UPDATE _prisma_migrations SET checksum=…`, or `migrate deploy` reports the
+  edited migration as failed on the next run.
+
 ### Adding a new ERP module
 
 1. Add a `ModuleDefinition` to `packages/shared/src/modules.ts`.
