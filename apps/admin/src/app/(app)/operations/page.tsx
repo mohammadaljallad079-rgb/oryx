@@ -256,10 +256,10 @@ function ProjectModal({
         <Field label={`${t('common.name')} (EN)`} required><input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="project-name-en" /></Field>
         <Field label={`${t('common.name')} (AR)`} required><input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="project-name-ar" /></Field>
         <Field label={t('erp.operations.endDate')}><input type="date" className="oryx-input" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} data-testid="project-end-date" /></Field>
-        <Field label={t('common.branch')}>
+        <Field label={t('context.branch')}>
           <EntityPicker value={form.branchId || null} options={(branches.data?.items ?? []).map((b) => ({ value: b.id, label: `${b.code} — ${b.nameEn}` }))} onChange={(v) => setForm({ ...form, branchId: v ?? '' })} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="project-branch" />
         </Field>
-        <Field label={t('common.employee')}>
+        <Field label={t('erp.hr.employee')}>
           <EntityPicker value={form.ownerUserId || null} options={(users.data?.items ?? []).map((u) => ({ value: u.id, label: u.fullNameEn || u.email }))} onChange={(v) => setForm({ ...form, ownerUserId: v ?? '' })} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="project-owner" />
         </Field>
         <Field label={t('erp.operations.description')}><input className="oryx-input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} data-testid="project-description" /></Field>
@@ -451,10 +451,10 @@ function CreateWorkOrderModal({
             )}
           />
         </Field>
-        <Field label={t('common.branch')}>
+        <Field label={t('context.branch')}>
           <EntityPicker value={form.branchId || null} options={(branches.data?.items ?? []).map((b) => ({ value: b.id, label: `${b.code} — ${b.nameEn}` }))} onChange={(v) => setForm({ ...form, branchId: v ?? '' })} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="work-order-branch" />
         </Field>
-        <Field label={t('common.employee')}>
+        <Field label={t('erp.hr.employee')}>
           <EntityPicker value={form.assigneeUserId || null} options={(users.data?.items ?? []).map((u) => ({ value: u.id, label: u.fullNameEn || u.email }))} onChange={(v) => setForm({ ...form, assigneeUserId: v ?? '' })} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="work-order-assignee" />
         </Field>
         <Field label={t('common.date')}>
