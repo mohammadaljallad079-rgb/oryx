@@ -47,6 +47,7 @@ import type {
   WarehouseDto,
 } from '@oryx/shared';
 import { DocumentActions } from '@/components/document-actions';
+import { SalesRegisterFilters, EMPTY_SALES_REGISTER_FILTERS, salesFilterQuery, type SalesRegisterFilterValues } from '@/components/sales-register-filters';
 
 type Tab = 'dashboard' | 'invoices' | 'quotations' | 'returns' | 'pos';
 
@@ -314,7 +315,8 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
   const [autoPreviewId, setAutoPreviewId] = useState<string | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<SalesDocumentDto | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const list = useAsync(() => api.salesInvoices({ page: 1 }), []);
+  const [filters, setFilters] = useState<SalesRegisterFilterValues>({ ...EMPTY_SALES_REGISTER_FILTERS });
+  const list = useAsync(() => api.salesInvoices({ page: 1, ...salesFilterQuery(filters) }), [filters]);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
@@ -331,6 +333,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
           </Button>
         ) : null}
       </div>
+      <SalesRegisterFilters kind="invoices" value={filters} onChange={setFilters} />
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
       {actionError ? <div className="p-4"><ErrorBanner message={actionError} /></div> : null}
       {list.loading ? (
@@ -469,7 +472,8 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
-  const list = useAsync(() => api.quotations(), []);
+  const [filters, setFilters] = useState<SalesRegisterFilterValues>({ ...EMPTY_SALES_REGISTER_FILTERS });
+  const list = useAsync(() => api.quotations({ page: 1, ...salesFilterQuery(filters) }), [filters]);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
@@ -486,6 +490,7 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
           </Button>
         ) : null}
       </div>
+      <SalesRegisterFilters kind="quotations" value={filters} onChange={setFilters} />
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
       {list.loading ? <div className="p-4"><Skeleton height={140} /></div> : (list.data?.items.length ?? 0) === 0 ? (
         <EmptyState title={t('common.empty')} hint={t('erp.sales.emptyQuotations')} />
@@ -567,7 +572,8 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
   const [relatedInvoiceId, setRelatedInvoiceId] = useState<string | null>(null);
-  const list = useAsync(() => api.creditNotes(), []);
+  const [filters, setFilters] = useState<SalesRegisterFilterValues>({ ...EMPTY_SALES_REGISTER_FILTERS });
+  const list = useAsync(() => api.creditNotes({ page: 1, ...salesFilterQuery(filters) }), [filters]);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
@@ -612,6 +618,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
           </Button>
         ) : null}
       </div>
+      <SalesRegisterFilters kind="returns" value={filters} onChange={setFilters} />
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
       {list.loading ? <div className="p-4"><Skeleton height={140} /></div> : (list.data?.items.length ?? 0) === 0 ? (
         <EmptyState title={t('common.empty')} hint={t('erp.sales.emptyCreditNotes')} />
@@ -707,7 +714,8 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
     };
   }, [companyId]);
   const sessions = useAsync(() => api.cashierSessions(), []);
-  const sales = useAsync(() => api.posSales({ page: 1 }), []);
+  const [filters, setFilters] = useState<SalesRegisterFilterValues>({ ...EMPTY_SALES_REGISTER_FILTERS });
+  const sales = useAsync(() => api.posSales({ page: 1, ...salesFilterQuery(filters) }), [filters]);
   const branches = useAsync(() => api.context(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
   const customers = useAsync(() => api.salesCustomers(), []);
@@ -832,6 +840,7 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
         <div className="border-b border-[var(--border)] p-4">
           <p className="oryx-panel-title m-0">{t('erp.sales.posSales')}</p>
         </div>
+        <SalesRegisterFilters kind="pos" value={filters} onChange={setFilters} />
         {sales.loading ? <div className="p-4"><Skeleton height={100} /></div> : (sales.data?.items.length ?? 0) === 0 ? (
           <EmptyState title={t('common.empty')} hint={t('erp.sales.emptyPosSales')} />
         ) : (
