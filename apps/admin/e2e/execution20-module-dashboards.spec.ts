@@ -72,17 +72,20 @@ test.describe('Execution 20 — module dashboards', () => {
 });
 
 test.describe('Execution 20 — module dashboards (Enterprise tenant)', () => {
-  test('the automotive tenant sees the maintenance and spare-parts dashboards', async ({ page }) => {
+  test('the automotive tenant sees its maintenance and spare-parts workspaces', async ({ page }) => {
     await signIn(page, ENTERPRISE_ADMIN);
     await setLocale(page, 'en');
     await setTheme(page, 'dark');
 
-    await page.goto('/automotive/maintenance?tab=dashboard');
-    await expect(page.getByTestId('module-dashboard-automotive_maintenance')).toBeVisible({ timeout: 25_000 });
-    await expect(page.getByTestId('module-stats-automotive_maintenance')).toBeVisible();
+    // These automotive pages deliberately use domain-specific workspaces,
+    // not the generic ModuleDashboard used by core ERP modules.
+    await page.goto('/automotive/maintenance');
+    await expect(page.getByTestId('maintenance-page')).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByTestId('workshop-dashboard')).toBeVisible();
+    await expect(page.getByTestId('ws-kpi-open')).toBeVisible();
 
-    await page.goto('/automotive/spare-parts?tab=dashboard');
-    await expect(page.getByTestId('module-dashboard-spare_parts')).toBeVisible({ timeout: 25_000 });
-    await expect(page.getByTestId('module-stats-spare_parts')).toBeVisible();
+    await page.goto('/automotive/spare-parts');
+    await expect(page.getByTestId('spare-parts-page')).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByTestId('parts-tab-catalog')).toBeVisible();
   });
 });
