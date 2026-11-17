@@ -349,7 +349,7 @@ function RequisitionModal({
   open: boolean;
   suppliers: SupplierDto[];
   branches: Array<{ id: string; code: string; nameEn: string }>;
-  purchaseOrders: Array<{ id: string; orderNumber: string; supplierNameEn?: string; status?: string }>;
+  purchaseOrders: Array<{ id: string; orderNumber?: string; supplierNameEn?: string; status?: string }>;
   products: Array<{ id: string; sku: string; nameEn: string; costPriceMinor: number }>;
   onProductCreated?: () => Promise<void> | void;
   taxOptions: SearchableOption[];
@@ -922,7 +922,7 @@ function SupplierInvoiceModal({
           <EntityPicker value={branchId || null} options={branches.map((b) => ({ value: b.id, label: `${b.code} — ${b.nameEn}` }))} onChange={(v) => setBranchId(v ?? '')} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="supplier-invoice-branch" />
         </Field>
         <Field label={t('erp.purchasing.orders')}>
-          <EntityPicker value={purchaseOrderId || null} options={purchaseOrders.map((o) => ({ value: o.id, label: o.orderNumber, hint: o.supplierNameEn ?? o.status }))} onChange={(v) => setPurchaseOrderId(v ?? '')} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="supplier-invoice-purchase-order" />
+          <EntityPicker value={purchaseOrderId || null} options={purchaseOrders.map((o) => ({ value: o.id, label: o.orderNumber ?? o.id, hint: o.supplierNameEn ?? o.status }))} onChange={(v) => setPurchaseOrderId(v ?? '')} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="supplier-invoice-purchase-order" />
         </Field>
         <Field label={t('companies.currency')}>
           <select className="oryx-select" value={currency} onChange={(e) => setCurrency(e.target.value)} data-testid="supplier-invoice-currency">
