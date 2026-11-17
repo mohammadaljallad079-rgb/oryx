@@ -53,7 +53,6 @@ const PRINTED_LABELS = [
   'Discount',
   'Total',
   'Order Date',
-  'Expiration Date',
   'Taxes',
   'Amount',
   'Quantity',
@@ -89,6 +88,11 @@ test.describe('document form mirrors the printed page', () => {
     for (const label of PRINTED_LABELS) {
       expect(text, `form is missing the printed label "${label}"`).toContain(label);
     }
+
+    // Credit is a distinct payment method; its due date appears when selected.
+    await page.getByTestId('invoice-payment-method').selectOption('CREDIT');
+    await expect(page.getByTestId('invoice-due-date')).toBeVisible();
+    await expect(modal).toContainText('Due date');
 
     // The customer picker is the searchable control, not a native select.
     await expect(page.getByTestId('invoice-customer').locator('button')).toBeVisible();
