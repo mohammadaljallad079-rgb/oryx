@@ -283,6 +283,9 @@ const SECTION_META: Record<CompanySettingSection, { labelEn: string; labelAr: st
       { key: 'contactLine', labelEn: 'Contact line', labelAr: 'سطر التواصل', type: 'text' },
       { key: 'showStamp', labelEn: 'Show stamp', labelAr: 'إظهار الختم', type: 'toggle' },
       { key: 'showSignature', labelEn: 'Show signature', labelAr: 'إظهار التوقيع', type: 'toggle' },
+      { key: 'showWatermark', labelEn: 'Show logo watermark', labelAr: 'إظهار العلامة المائية للشعار', type: 'toggle' },
+      { key: 'watermarkOpacity', labelEn: 'Watermark opacity (0.02–0.30)', labelAr: 'شفافية العلامة المائية (0.02–0.30)', type: 'number' },
+      { key: 'watermarkSizePt', labelEn: 'Watermark size (pt)', labelAr: 'حجم العلامة المائية (نقطة)', type: 'number' },
       { key: 'stampUrl', labelEn: 'Stamp image URL', labelAr: 'رابط صورة الختم', type: 'text' },
       { key: 'signatureUrl', labelEn: 'Signature image URL', labelAr: 'رابط صورة التوقيع', type: 'text' },
       {
