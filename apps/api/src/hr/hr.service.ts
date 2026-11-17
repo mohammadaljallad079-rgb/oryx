@@ -18,6 +18,7 @@ import type {
   CreateAdvanceDto,
   CreateContractDto,
   CreateDepartmentDto,
+  UpdateDepartmentDto,
   CreateDocumentDto,
   CreateEmployeeDto,
   CreateJobTitleDto,
@@ -95,6 +96,54 @@ export class HrService {
     });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.department_created', targetType: 'DEPARTMENT', targetId: dept.id, summary: `Created department ${dept.code}` });
     return dept;
+  }
+
+  async updateDepartment(id: string, dto: UpdateDepartmentDto, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const department = await this.prisma.department.findFirst({ where: { id, companyId } });
+    if (!department) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Department not found.');
+    if (dto.code && dto.code !== department.code) {
+      const duplicate = await this.prisma.department.findUnique({
+        where: { companyId_code: { companyId, code: dto.code } },
+      });
+      if (duplicate) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Department code ${dto.code} already exists.`);
+    }
+    const updated = await this.prisma.department.update({
+      where: { id },
+      data: {
+        ...(dto.code !== undefined ? { code: dto.code } : {}),
+        ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
+        ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
+      },
+    });
+    await this.audit.record({
+      actorUserId: actor.userId, companyId, action: 'hr.department_updated',
+      targetType: 'DEPARTMENT', targetId: id, summary: `Updated department ${updated.code}`,
+    });
+    return updated;
+  }
+
+  async deleteDepartment(id: string, principal: RequestPrincipal, actor: ActorContext) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const department = await this.prisma.department.findFirst({
+      where: { id, companyId },
+      include: { _count: { select: {
+        employees: true, jobTitles: true, children: true, projects: true,
+        workOrders: true, customers: true,
+      } } },
+    });
+    if (!department) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Department not found.');
+    if (Object.values(department._count).some((count) => count > 0)) {
+      throw conflict(ERROR_CODES.RESOURCE_CONFLICT,
+        'This department has linked records. Reassign employees, job titles, child departments, projects, work orders and customers before permanent deletion.');
+    }
+    await this.prisma.department.delete({ where: { id } });
+    await this.audit.record({
+      actorUserId: actor.userId, companyId, action: 'hr.department_deleted',
+      targetType: 'DEPARTMENT', targetId: id,
+      summary: `Permanently deleted department ${department.code}`,
+    });
+    return { id, deleted: true };
   }
 
   async listJobTitles(query: ListQueryDto, principal: RequestPrincipal) {
