@@ -178,6 +178,11 @@ export class OperationsService {
   async createProject(dto: CreateProjectDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
+    if (dto.departmentId) await this.assertDepartment(companyId, dto.departmentId);
+    if (dto.ownerUserId) await this.assertCompanyUser(companyId, dto.ownerUserId);
+    if (dto.startDate && dto.endDate && new Date(dto.endDate) < new Date(dto.startDate)) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Project end date cannot be earlier than its start date.');
+    }
     const dup = await this.prisma.project.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Project ${dto.code} already exists.`);
     const project = await this.prisma.project.create({
@@ -200,15 +205,25 @@ export class OperationsService {
   }
 
   async updateProject(id: string, dto: UpdateProjectDto, principal: RequestPrincipal, actor: ActorContext) {
-    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     const project = await this.prisma.project.findFirst({ where: { id, companyId } });
     if (!project) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Project not found.');
+    if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
+    if (dto.departmentId) await this.assertDepartment(companyId, dto.departmentId);
+    if (dto.ownerUserId) await this.assertCompanyUser(companyId, dto.ownerUserId);
+    const startDate = dto.startDate !== undefined ? new Date(dto.startDate) : project.startDate;
+    const endDate = dto.endDate !== undefined ? new Date(dto.endDate) : project.endDate;
+    if (startDate && endDate && endDate < startDate) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Project end date cannot be earlier than its start date.');
+    }
     const updated = await this.prisma.project.update({
       where: { id },
       data: {
         ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
         ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
         ...(dto.status !== undefined ? { status: dto.status as never } : {}),
+        ...(dto.branchId !== undefined ? { branchId: dto.branchId } : {}),
+        ...(dto.departmentId !== undefined ? { departmentId: dto.departmentId } : {}),
         ...(dto.ownerUserId !== undefined ? { ownerUserId: dto.ownerUserId } : {}),
         ...(dto.startDate !== undefined ? { startDate: new Date(dto.startDate) } : {}),
         ...(dto.endDate !== undefined ? { endDate: new Date(dto.endDate) } : {}),
@@ -317,6 +332,12 @@ export class OperationsService {
   async createWorkOrder(dto: CreateWorkOrderDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
+    if (dto.departmentId) await this.assertDepartment(companyId, dto.departmentId);
+    if (dto.projectId) await this.assertProject(companyId, dto.projectId);
+    if (dto.assigneeUserId) await this.assertCompanyUser(companyId, dto.assigneeUserId);
+    if (dto.scheduledStartAt && dto.scheduledEndAt && new Date(dto.scheduledEndAt) < new Date(dto.scheduledStartAt)) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Work-order end date cannot be earlier than its start date.');
+    }
     const order = await this.posting.withTransaction(async (tx) => {
       const orderNumber = await this.sequences.next(tx, companyId, 'workOrder');
       return tx.workOrder.create({
@@ -331,7 +352,10 @@ export class OperationsService {
           projectId: dto.projectId ?? null,
           status: dto.assigneeUserId ? 'ASSIGNED' : 'OPEN',
           priority: (dto.priority as never) ?? 'NORMAL',
+          requestedById: actor.userId,
           assigneeUserId: dto.assigneeUserId ?? null,
+          scheduledStartAt: dto.scheduledStartAt ? new Date(dto.scheduledStartAt) : null,
+          scheduledEndAt: dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null,
           dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
           sourceType: dto.sourceType ?? null,
           sourceId: dto.sourceId ?? null,
@@ -367,9 +391,18 @@ export class OperationsService {
 
   /** Change a work order's status, enforcing the transition graph. */
   async updateWorkOrder(id: string, dto: UpdateWorkOrderDto, principal: RequestPrincipal, actor: ActorContext) {
-    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     const order = await this.prisma.workOrder.findFirst({ where: { id, companyId } });
     if (!order) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Work order not found.');
+    if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
+    if (dto.departmentId) await this.assertDepartment(companyId, dto.departmentId);
+    if (dto.projectId) await this.assertProject(companyId, dto.projectId);
+    if (dto.assigneeUserId) await this.assertCompanyUser(companyId, dto.assigneeUserId);
+    const scheduledStartAt = dto.scheduledStartAt !== undefined ? new Date(dto.scheduledStartAt) : order.scheduledStartAt;
+    const scheduledEndAt = dto.scheduledEndAt !== undefined ? new Date(dto.scheduledEndAt) : order.scheduledEndAt;
+    if (scheduledStartAt && scheduledEndAt && scheduledEndAt < scheduledStartAt) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Work-order end date cannot be earlier than its start date.');
+    }
 
     if (dto.status && dto.status !== order.status) {
       const allowed = WORK_ORDER_TRANSITIONS[order.status] ?? [];
@@ -385,6 +418,13 @@ export class OperationsService {
         ...(dto.description !== undefined ? { description: dto.description } : {}),
         ...(dto.status !== undefined ? { status: dto.status as never } : {}),
         ...(dto.priority !== undefined ? { priority: dto.priority as never } : {}),
+        ...(dto.type !== undefined ? { type: dto.type } : {}),
+        ...(dto.branchId !== undefined ? { branchId: dto.branchId } : {}),
+        ...(dto.departmentId !== undefined ? { departmentId: dto.departmentId } : {}),
+        ...(dto.projectId !== undefined ? { projectId: dto.projectId } : {}),
+        ...(dto.assigneeUserId !== undefined ? { assigneeUserId: dto.assigneeUserId } : {}),
+        ...(dto.scheduledStartAt !== undefined ? { scheduledStartAt: new Date(dto.scheduledStartAt) } : {}),
+        ...(dto.scheduledEndAt !== undefined ? { scheduledEndAt: new Date(dto.scheduledEndAt) } : {}),
         ...(dto.dueDate !== undefined ? { dueDate: new Date(dto.dueDate) } : {}),
         ...(dto.status === 'IN_PROGRESS' && !order.startedAt ? { startedAt: new Date() } : {}),
         ...(dto.status === 'COMPLETED' ? { completedAt: new Date() } : {}),
@@ -549,6 +589,19 @@ export class OperationsService {
   private async assertProject(companyId: string, projectId: string) {
     const project = await this.prisma.project.findFirst({ where: { id: projectId, companyId } });
     if (!project) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Project not found in this company.');
+  }
+
+  private async assertDepartment(companyId: string, departmentId: string) {
+    const department = await this.prisma.department.findFirst({ where: { id: departmentId, companyId, isActive: true } });
+    if (!department) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Department not found in this company.');
+  }
+
+  private async assertCompanyUser(companyId: string, userId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, status: 'ACTIVE', memberships: { some: { companyId, isActive: true } } },
+      select: { id: true },
+    });
+    if (!user) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'The selected employee must be an active user in this company.');
   }
 
   /** Persist an internal notification. No external provider is claimed. */
