@@ -314,10 +314,11 @@ describe('official financial template — identity', () => {
     expect(render()).toContain('200001111222111');
   });
 
-  it('omits the TRN strip when no tax number is configured', () => {
+  it('keeps the navy strip when no tax number is configured', () => {
     const html = render({}, { ...issuer, taxNumber: null });
     // The class name is always in the stylesheet; assert on the rendered strip.
-    expect(html).not.toContain('class="of-trn"');
+    expect(html).toContain('class="of-trn"');
+    expect(html).not.toContain('TRN:');
   });
 
   it('sizes the navy TRN strip to the reference band height', () => {
