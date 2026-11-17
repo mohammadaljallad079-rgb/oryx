@@ -8,6 +8,11 @@ test('evidence: invoice print preview (en, dark)', async ({ page }) => {
   await setLocale(page, 'en');
   await page.goto('/sales');
   await expect(page.getByTestId('sales-page')).toBeVisible();
+  const invoiceRow = page.locator('[data-testid^="invoice-row-"]').first();
+  await expect(invoiceRow).toBeVisible({ timeout: 20_000 });
+  const invoiceNumber = (await invoiceRow.getAttribute('data-testid'))!.replace('invoice-row-', '');
+  // The invoice print controls are inside the details dialog in the current UI.
+  await page.getByTestId(`invoice-attach-open-${invoiceNumber}`).click();
   const previewBtn = page.locator('[data-testid^="preview-sales_invoice-"]').first();
   await previewBtn.waitFor({ timeout: 20_000 });
   const [popup] = await Promise.all([page.waitForEvent('popup'), previewBtn.click()]);
