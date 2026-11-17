@@ -1,10 +1,5 @@
 import { type ReportColumn, type ReportResultDto } from '@oryx/shared';
-import {
-  CHROME_CSS,
-  documentHeader,
-  documentWatermark,
-  type DocumentChrome,
-} from './chrome';
+import { identityBand, trnStrip, watermark, OFFICIAL_FINANCIAL_CSS } from './official-financial.template';
 import { esc, money, quantity, docDate, docDateTime, orDash } from './html.util';
 import type { DocumentIssuer } from '../document-payload';
 
@@ -81,14 +76,6 @@ function metaStrip(input: ReportRenderInput, locale: 'ar' | 'en'): string {
 export function renderReportHtml(input: ReportRenderInput): string {
   const { result, issuer } = input;
   const locale: 'ar' | 'en' = issuer.documentLocale === 'en' ? 'en' : 'ar';
-  const chrome: DocumentChrome = {
-    issuer,
-    titleEn: result.titleEn,
-    titleAr: result.titleAr,
-    documentNumber: result.kind,
-    issuedAt: new Date(result.generatedAt),
-  };
-
   const columns = result.columns;
   const totalRow = columns.some((c) => c.total)
     ? `
@@ -120,18 +107,21 @@ export function renderReportHtml(input: ReportRenderInput): string {
 <head>
 <meta charset="utf-8">
 <title>${esc(result.titleEn)}</title>
-<style>${CHROME_CSS}
+<style>${input.baseCss}
+${OFFICIAL_FINANCIAL_CSS}
 ${REPORT_CSS}
 </style>
 </head>
 <body>
-<div class="doc-page">
-  ${documentWatermark(issuer)}
-  ${documentHeader(chrome)}
+<section class="rep-page">
+  ${watermark(issuer)}
+  ${identityBand(issuer)}
+  <div class="rep-content">
   <div class="rep-title-band">
     <div class="rep-title-ar">${esc(result.titleAr)}</div>
     <div class="rep-title-en">${esc(result.titleEn)}</div>
   </div>
+  ${trnStrip(issuer)}
   ${metaStrip(input, locale)}
   ${
     result.rows.length === 0
@@ -170,28 +160,45 @@ ${REPORT_CSS}
         )}</p>`
       : ''
   }`}
-</div>
+  </div>
+</section>
 </body>
 </html>`;
 }
 
 /** The report body styles, layered on top of the shared chrome. */
 export const REPORT_CSS = `
-  .rep-title-band{ margin-top:8px; border-inline-start:5px solid var(--gold); padding-inline-start:10px; }
-  .rep-title-ar{ font-size:15pt; font-weight:700; color:var(--navy); }
-  .rep-title-en{ font-size:9.5pt; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; }
-  .rep-meta{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-  .rep-meta-item{ flex:1 1 22%; border:1px solid var(--line); border-radius:5px; padding:4px 8px; background:#f7f9fc; }
-  .rep-meta-label{ display:block; font-size:7pt; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
-  .rep-meta-value{ display:block; font-size:9.5pt; font-weight:700; color:var(--navy); }
-  .rep-table{ margin-top:10px; font-size:8.5pt; }
-  .rep-table th{ background:var(--navy); color:#fff; text-align:start; padding:5px 6px; font-size:8pt;
-    font-weight:700; border:1px solid var(--navy); }
-  .rep-table td{ padding:4px 6px; border:1px solid var(--line); vertical-align:top; }
-  .rep-table tbody tr:nth-child(even){ background:#f4f7fb; }
-  .rep-idx{ width:22pt; text-align:center; color:var(--muted); }
-  .rep-num{ text-align:end; }
-  .rep-total td{ background:#eef3f9; font-weight:700; color:var(--navy); border-top:2px solid var(--navy); }
-  .rep-empty{ margin-top:14px; color:var(--muted); font-size:10pt; }
-  .rep-note{ margin-top:8px; color:var(--muted); font-size:8pt; }
+  /* Reports share the printed invoice identity; tables remain report-specific. */
+  .rep-page{ position:relative; min-height:740pt; }
+  .rep-content{ position:relative; z-index:1; padding-inline:10pt 8pt; }
+  .rep-title-band{ text-align:center; margin:14pt 0 10pt; padding:0 0 9pt;
+    border-bottom:1pt solid #cbd5e1; }
+  .rep-title-ar{ font-size:15pt; line-height:1.3; font-weight:700; color:#0f2b48; }
+  .rep-title-en{ font-size:10pt; font-weight:700; color:#0f2b48;
+    text-transform:uppercase; letter-spacing:.8px; margin-top:3pt; }
+  .rep-meta{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7pt;
+    margin-top:10pt; margin-bottom:12pt; }
+  .rep-meta-item{ border:1px solid #cbd5e1; border-radius:3pt; padding:6pt 9pt;
+    background:#f7f9fc; min-width:0; }
+  .rep-meta-label{ display:block; font-size:7.4pt; color:#5b6472; }
+  .rep-meta-value{ display:block; font-size:9pt; font-weight:700; color:#0f2b48;
+    overflow-wrap:anywhere; }
+  .rep-table{ margin-top:12pt; font-size:8.4pt; table-layout:auto; width:100%;
+    border-collapse:collapse; }
+  .rep-table thead{ display:table-header-group; }
+  .rep-table th{ background:#0f2b48; color:#fff; text-align:start; padding:7pt 6pt;
+    font-size:8pt; font-weight:700; border:1px solid #0f2b48;
+    overflow-wrap:anywhere; }
+  .rep-table td{ padding:6pt; border-bottom:1px solid #d7dce3; vertical-align:top;
+    overflow-wrap:anywhere; }
+  .rep-table tbody tr:nth-child(even){ background:#f3f6fa; }
+  .rep-table tbody tr{ break-inside:avoid; }
+  .rep-idx{ width:25pt; text-align:center; color:#5b6472; }
+  .rep-num{ text-align:end; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .rep-total{ break-inside:avoid; }
+  .rep-total td{ background:#eaf0f7; font-weight:700; color:#0f2b48;
+    border-top:2px solid #0f2b48; border-bottom:1px solid #94a3b8; }
+  .rep-empty{ margin-top:18pt; padding:14pt; background:#f7f9fc;
+    border:1px solid #d7dce3; color:#5b6472; font-size:10pt; text-align:center; }
+  .rep-note{ margin-top:10pt; color:#5b6472; font-size:8pt; }
 `;
