@@ -893,7 +893,11 @@ export class DocumentsService {
     const documentsRow = await this.prisma.companySetting.findUnique({
       where: { companyId_section: { companyId, section: 'documents' } },
     });
+    const taxRow = await this.prisma.companySetting.findUnique({
+      where: { companyId_section: { companyId, section: 'tax' } },
+    });
     const documentSettings = withDefaults('documents', documentsRow?.value);
+    const taxSettings = withDefaults('tax', taxRow?.value);
     const pick = (...values: Array<string | null | undefined>): string | null =>
       values.find((v) => typeof v === 'string' && v.trim().length > 0)?.trim() ?? null;
 
@@ -909,9 +913,12 @@ export class DocumentsService {
     const nameEn = pick(general.nameEn, company.branding?.nameEn, company.nameEn) ?? company.nameEn;
     const nameAr = pick(general.nameAr, company.branding?.nameAr, company.nameAr) ?? company.nameAr;
     const legalNameEn = pick(general.tradeNameEn, company.legalNameEn);
-    // TRN is optional on issued documents: print it only when explicitly
-    // configured in Settings → General, never from a stale company-row fallback.
-    const taxNumber = pick(general.taxNumber);
+    // General is the primary TRN field. Tax is the legacy/finance section
+    // fallback so a number entered there is not silently ignored. Never print
+    // the repository's seeded test fixture as a real company tax registration.
+    const configuredTaxNumber = pick(general.taxNumber, taxSettings.companyTaxNumber);
+    const taxNumber =
+      configuredTaxNumber?.toUpperCase() === 'TEST-TRN-001' ? null : configuredTaxNumber;
     const crNumber = pick(general.crNumber, company.crNumber);
     return {
       companyId,
