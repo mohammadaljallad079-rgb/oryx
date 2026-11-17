@@ -178,7 +178,9 @@ export function ProductModal({
       sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
       barcode: '', category: defaultCategory ?? '', reorderLevel: '0', reorderQuantity: '0', trackStock: true,
     });
-  }, [open, defaultCategory]); = async () => {
+  }, [open, defaultCategory]);
+
+  const submit = async () => {
     setBusy(true);
     setError(null);
     try {
