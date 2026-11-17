@@ -80,6 +80,30 @@ export class ListQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  dateFrom?: string;
+
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  dateTo?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minAmountMinor?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  maxAmountMinor?: number;
+
+  @IsOptional()
+  @IsIn(['due', 'settled'])
+  paymentState?: 'due' | 'settled';
+
 
   @IsOptional()
   @IsString()
