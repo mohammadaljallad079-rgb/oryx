@@ -319,6 +319,8 @@ function RequisitionsTab({ canManage }: { canManage: boolean }) {
       <RequisitionModal
         open={open}
         suppliers={suppliers.data?.items ?? []}
+        branches={branches.data?.items ?? []}
+        purchaseOrders={purchaseOrders.data?.items ?? []}
         onSupplierCreated={suppliers.reload}
         products={products.data?.items ?? []}
         onProductCreated={products.reload}
@@ -336,6 +338,8 @@ function RequisitionModal({
   onTaxCreated,
   open,
   suppliers,
+  branches,
+  purchaseOrders,
   products,
   onProductCreated,
   onClose,
@@ -344,6 +348,8 @@ function RequisitionModal({
 }: {
   open: boolean;
   suppliers: SupplierDto[];
+  branches: Array<{ id: string; code: string; nameEn: string }>;
+  purchaseOrders: Array<{ id: string; orderNumber: string; supplierNameEn?: string; status?: string }>;
   products: Array<{ id: string; sku: string; nameEn: string; costPriceMinor: number }>;
   onProductCreated?: () => Promise<void> | void;
   taxOptions: SearchableOption[];
@@ -728,6 +734,8 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
   const list = useAsync(() => api.supplierInvoices(), []);
   const suppliers = useAsync(() => api.suppliers(), []);
   const products = useAsync(() => api.products(), []);
+  const branches = useAsync(() => (companyId ? api.listBranches(companyId, { pageSize: 100 }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 })), [companyId]);
+  const purchaseOrders = useAsync(() => api.purchaseOrders(), []);
 
   return (
     <Card>
@@ -821,7 +829,11 @@ function SupplierInvoiceModal({
   const [error, setError] = useState<string | null>(null);
   const [supplierId, setSupplierId] = useState('');
   const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState('');
+  const [invoiceDate, setInvoiceDate] = useState(todayIso());
   const [dueDate, setDueDate] = useState('');
+  const [branchId, setBranchId] = useState('');
+  const [purchaseOrderId, setPurchaseOrderId] = useState('');
+  const [currency, setCurrency] = useState('BHD');
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
 
@@ -832,8 +844,11 @@ function SupplierInvoiceModal({
       await api.createSupplierInvoice({
         supplierId,
         supplierInvoiceNumber,
-        invoiceDate: new Date().toISOString(),
+        invoiceDate: new Date(invoiceDate).toISOString(),
         ...(dueDate ? { dueDate: new Date(dueDate).toISOString() } : {}),
+        ...(branchId ? { branchId } : {}),
+        ...(purchaseOrderId ? { purchaseOrderId } : {}),
+        currency,
         ...(notes.trim() ? { notes: notes.trim() } : {}),
         lines: lines.map((l) => ({
           productId: l.productId || undefined,
@@ -855,6 +870,7 @@ function SupplierInvoiceModal({
   return (
     <Modal
       open={open}
+      size="document"
       title={t('erp.purchasing.newInvoice')}
       onClose={onClose}
       footer={
@@ -896,14 +912,22 @@ function SupplierInvoiceModal({
             data-testid="supplier-invoice-number"
           />
         </Field>
+        <Field label={t('common.date')} required>
+          <input type="date" className="oryx-input" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} data-testid="supplier-invoice-date" />
+        </Field>
         <Field label={t('erp.sales.dueDate')}>
-          <input
-            type="date"
-            className="oryx-input"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            data-testid="supplier-invoice-due-date"
-          />
+          <input type="date" className="oryx-input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} data-testid="supplier-invoice-due-date" />
+        </Field>
+        <Field label={t('common.branch')}>
+          <EntityPicker value={branchId || null} options={branches.map((b) => ({ value: b.id, label: `${b.code} — ${b.nameEn}` }))} onChange={(v) => setBranchId(v ?? '')} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="supplier-invoice-branch" />
+        </Field>
+        <Field label={t('erp.purchasing.orders')}>
+          <EntityPicker value={purchaseOrderId || null} options={purchaseOrders.map((o) => ({ value: o.id, label: o.orderNumber, hint: o.supplierNameEn ?? o.status }))} onChange={(v) => setPurchaseOrderId(v ?? '')} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="supplier-invoice-purchase-order" />
+        </Field>
+        <Field label={t('common.currency')}>
+          <select className="oryx-select" value={currency} onChange={(e) => setCurrency(e.target.value)} data-testid="supplier-invoice-currency">
+            {['BHD', 'SAR', 'AED', 'KWD', 'QAR', 'OMR', 'USD', 'EUR'].map((code) => <option key={code} value={code}>{code}</option>)}
+          </select>
         </Field>
         <Field label={t('common.notes')}>
           <input
