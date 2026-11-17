@@ -22,7 +22,7 @@ test.describe('POS, company payment settings and banner image upload', () => {
     await page.getByTestId('cms-tab-content').click();
     await expect(page.getByTestId('site-content-editor')).toBeVisible();
     await expect(page.getByTestId('site-slide-image-editor-0')).toBeVisible();
-    await expect(page.getByTestId('site-slide-file-0')).toHaveAttribute('accept', /image\\/jpeg/);
+    await expect(page.getByTestId('site-slide-file-0')).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp,image/avif');
     await expect(page.getByTestId('site-slide-image-url-0')).toBeVisible();
   });
 
