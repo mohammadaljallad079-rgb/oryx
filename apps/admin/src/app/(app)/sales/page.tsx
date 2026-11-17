@@ -1120,8 +1120,17 @@ function PosSaleModal({
     [cart, roundingMode, currencyScale],
   );
 
-  const paidMinor = paid.trim() === '' ? totals.totalMinor : toMinorInput(paid);
+  const paidMinor = useMemo(() => {
+    try {
+      return paid.trim() === '' ? totals.totalMinor : toMinorInput(paid);
+    } catch {
+      return -1;
+    }
+  }, [paid, totals.totalMinor]);
   const changeMinor = paidMinor - totals.totalMinor;
+  const saleValid = Boolean(session) && cart.length > 0 &&
+    cart.every(line => Number.isSafeInteger(line.unitPriceMinor) && line.unitPriceMinor > 0) &&
+    paidMinor >= totals.totalMinor && totals.totalMinor > 0;
 
   const submit = async () => {
     if (!session || cart.length === 0) return;
@@ -1196,7 +1205,7 @@ function PosSaleModal({
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
-            disabled={busy || cart.length === 0 || !session || cart.some(line => line.unitPriceMinor <= 0) || paidMinor < totals.totalMinor}
+            disabled={busy || !saleValid}
             onClick={submit}
             data-testid="save-pos-sale"
           >
@@ -1470,12 +1479,23 @@ function PosSaleModal({
               </div>
             </div>
 
+            {paidMinor < 0 ? (
+              <p className="m-0 text-xs text-[var(--danger)]" role="alert">
+                {locale === 'ar' ? 'تحقق من صيغة المبلغ المدفوع.' : 'Enter a valid paid amount.'}
+              </p>
+            ) : null}
             <p className="oryx-pos__change m-0" data-testid="pos-change">
               <span>{t('erp.sales.pos.change')}</span>
               <strong className={`tabular-nums ${changeMinor < 0 ? 'text-[var(--danger)]' : ''}`}>
                 {money(changeMinor)}
               </strong>
             </p>
+            <Button variant="primary" block
+              disabled={busy || !saleValid}
+              onClick={() => void submit()} data-testid="pos-checkout-panel">
+              <Icon name="check" size={17} />
+              {busy ? t('common.loading') : `${t('erp.sales.pos.complete')} · ${money(totals.totalMinor)}`}
+            </Button>
           </div>
         </div>
       </div>
