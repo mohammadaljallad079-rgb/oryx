@@ -84,6 +84,11 @@ export class CreateCompanyDto {
 export class UpdateCompanyDto {
   @IsOptional()
   @IsString()
+  @Matches(/^[A-Z0-9][A-Z0-9-]{1,30}$/, { message: 'code must be uppercase letters, digits or dashes' })
+  code?: string;
+
+  @IsOptional()
+  @IsString()
   @MinLength(2)
   @MaxLength(160)
   nameEn?: string;
