@@ -71,6 +71,7 @@ test.describe('Execution 19 evidence', () => {
       await setLocale(page, 'en');
       await setTheme(page, theme);
       await page.goto('/accounting');
+      await page.getByTestId('accounting-tab-accounts').click();
       await page.getByTestId('new-account').click();
       await expect(page.getByTestId('account-type')).toBeVisible();
       // Open the parent dropdown so the popup surface is captured too.
