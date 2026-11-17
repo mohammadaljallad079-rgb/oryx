@@ -110,6 +110,6 @@ export function salesFilterQuery(value: SalesRegisterFilterValues) {
     minAmountMinor: minor(value.minAmount),
     maxAmountMinor: minor(value.maxAmount),
     paymentState: value.paymentState === 'due' || value.paymentState === 'settled'
-      ? value.paymentState : undefined,
+      ? (value.paymentState as 'due' | 'settled') : undefined,
   };
 }
