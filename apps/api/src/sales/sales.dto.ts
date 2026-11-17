@@ -80,6 +80,33 @@ export class ListQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
+  /** Inclusive document dates in YYYY-MM-DD format. */
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  dateFrom?: string;
+
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  dateTo?: string;
+
+  /** Inclusive total amount filters, always in minor units. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minAmountMinor?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  maxAmountMinor?: number;
+
+  /** Receivable balance filter, only meaningful for sales invoices. */
+  @IsOptional()
+  @IsIn(['due', 'settled'])
+  paymentState?: 'due' | 'settled';
+
 
   @IsOptional()
   @IsString()
