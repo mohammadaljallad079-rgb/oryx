@@ -135,17 +135,20 @@ test.describe('Execution 19 evidence', () => {
       await page.goto(`/automotive/inspections/${id}`);
       await expect(page.getByTestId('inspection-workspace')).toBeVisible({ timeout: 20_000 });
 
-      // Paint section: its own page-2 remarks box, no page-4 blocks.
-      await expect(page.getByTestId('remarks-PAINT_BODY')).toBeVisible();
-      await expect(page.getByTestId('general-remarks')).toHaveCount(0);
+      // The current report editor consolidates the former section/page-level
+      // remarks fields into one optional inspection-notes field.
+      await expect(page.getByTestId('inspection-notes')).toBeVisible();
+      await expect(page.getByTestId('inspection-notes-input')).toBeVisible();
       await page.screenshot({ path: `${OUT}/inspection-remarks-paint-${theme}-en.png` });
 
-      // Exterior (page 4): the three page-level blocks, no section box.
+      // The same single notes field remains available when the grouped exterior
+      // page is selected; legacy split fields must not reappear.
       await page.getByTestId('inspection-rail-EXTERIOR').click();
-      await expect(page.getByTestId('general-remarks')).toBeVisible();
-      await expect(page.getByTestId('exterior-remarks')).toBeVisible();
-      await expect(page.getByTestId('final-assessment')).toBeVisible();
-      await expect(page.getByTestId('remarks-EXTERIOR')).toHaveCount(0);
+      await expect(page.getByTestId('inspection-notes')).toBeVisible();
+      await expect(page.getByTestId('inspection-notes-input')).toBeVisible();
+      await expect(page.getByTestId('general-remarks')).toHaveCount(0);
+      await expect(page.getByTestId('exterior-remarks')).toHaveCount(0);
+      await expect(page.getByTestId('final-assessment')).toHaveCount(0);
       await page.screenshot({ path: `${OUT}/inspection-remarks-page4-${theme}-en.png` });
     });
   }
