@@ -244,8 +244,8 @@ const SECTION_META: Record<CompanySettingSection, { labelEn: string; labelAr: st
     ],
   },
   sales: {
-    labelEn: 'Sales & customers',
-    labelAr: 'المبيعات والعملاء',
+    labelEn: 'Sales, customers & payment methods',
+    labelAr: 'المبيعات والعملاء وطرق الدفع',
     icon: 'cart',
     fields: [
       { key: 'quotationPrefix', labelEn: 'Quotation prefix', labelAr: 'بادئة عرض السعر', type: 'text' },
@@ -313,11 +313,12 @@ const SECTION_META: Record<CompanySettingSection, { labelEn: string; labelAr: st
   },
 };
 
-export function CompanySettingsCentre({ canEdit }: { canEdit: boolean }) {
+export function CompanySettingsCentre({ canEdit, initialSection = 'general' }: { canEdit: boolean; initialSection?: CompanySettingSection }) {
   const { t, locale } = useUi();
   const { companyId } = useAuth();
   const { refresh, refreshTypography } = useBranding();
-  const [active, setActive] = useState<CompanySettingSection>('general');
+  const [active, setActive] = useState<CompanySettingSection>(initialSection);
+  useEffect(() => { setActive(initialSection); }, [initialSection]);
   const [values, setValues] = useState<Record<string, SectionData>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
