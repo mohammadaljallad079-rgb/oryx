@@ -279,7 +279,7 @@ export default function CompaniesPage() {
                             data-testid={`company-delete-${c.code}`}
                           >
                             <Icon name="trash" size={14} />
-                            {t('common.delete')}
+                            {locale === 'ar' ? 'حذف فعلي' : 'Permanently delete'}
                           </Button>
                         ) : null}
                         {isPlatform && canSuspend && c.status !== 'ARCHIVED' ? (

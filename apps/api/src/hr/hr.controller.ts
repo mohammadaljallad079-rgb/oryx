@@ -21,6 +21,7 @@ import {
   CreateAdvanceDto,
   CreateContractDto,
   CreateDepartmentDto,
+  UpdateDepartmentDto,
   CreateDocumentDto,
   CreateEmployeeDto,
   CreateJobTitleDto,
@@ -79,6 +80,20 @@ export class HrController {
   @ApiOperation({ summary: 'Create a department' })
   createDepartment(@Body() dto: CreateDepartmentDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.hr.createDepartment(dto, p, actorFrom(p, req));
+  }
+
+  @Patch('departments/:id')
+  @RequirePermissions('erp.hr.department.manage')
+  @ApiOperation({ summary: 'Update a department within the current company' })
+  updateDepartment(@Param('id') id: string, @Body() dto: UpdateDepartmentDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.updateDepartment(id, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('departments/:id')
+  @RequirePermissions('erp.hr.department.manage')
+  @ApiOperation({ summary: 'Permanently delete an unused department' })
+  deleteDepartment(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.hr.deleteDepartment(id, p, actorFrom(p, req));
   }
 
   @Get('job-titles')

@@ -164,7 +164,7 @@ function BranchesInner() {
                           data-testid={`delete-branch-${b.code}`}
                         >
                           <Icon name="trash" size={14} />
-                          {t('common.delete')}
+                          {locale === 'ar' ? 'حذف فعلي' : 'Permanently delete'}
                         </Button>
                       ) : null}
                       {canEdit ? (
