@@ -1049,7 +1049,7 @@ export const api = {
       method: 'POST',
       body: { countedCashMinor, notes },
     }),
-  posSales: (params: { companyId?: string; page?: number } = {}) =>
+  posSales: (params: { companyId?: string; status?: string; customerId?: string; search?: string; dateFrom?: string; dateTo?: string; minAmountMinor?: number; maxAmountMinor?: number; page?: number; pageSize?: number } = {}) =>
     request<Paginated<PosSaleDto>>(`/sales/pos-sales?${toQuery(params)}`),
   createPosSale: (body: Record<string, unknown>) =>
     request<PosSaleDto>('/sales/pos-sales', { method: 'POST', body }),
