@@ -14,6 +14,8 @@ import {
   roundMinor,
   sumMinor,
   type RoundingMode,
+  DEFAULT_COMPANY_PAYMENT_METHODS,
+  type CompanyPaymentMethodSetting,
 } from '@oryx/shared';
 import { Icon } from '@/components/icons';
 import { AttachmentsPanel, DocumentPrintActions } from '@/components/document-print';
@@ -1894,6 +1896,8 @@ function DocumentModal({
   const [reason, setReason] = useState('');
   const [refundMethod, setRefundMethod] = useState('CREDIT_ACCOUNT');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
+  const [paymentMethodCode, setPaymentMethodCode] = useState('CASH');
+  const [paymentOptions, setPaymentOptions] = useState<CompanyPaymentMethodSetting[]>(DEFAULT_COMPANY_PAYMENT_METHODS);
   const [salespersonName, setSalespersonName] = useState('');
   const [paymentReference, setPaymentReference] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
@@ -1907,6 +1911,11 @@ function DocumentModal({
     setDueDate(initialDocument?.dueDate?.slice(0, 10) ?? '');
     setNotes(reasonField ? '' : initialDocument?.notes ?? '');
     setPaymentMethod(initialDocument?.paymentMethod ?? 'CASH');
+    setPaymentMethodCode(
+      (initialDocument as (SalesDocumentDto & { paymentMethodCode?: string | null }) | null)?.paymentMethodCode
+        ?? initialDocument?.paymentMethod ?? 'CASH',
+    );
+    setPaymentOptions(DEFAULT_COMPANY_PAYMENT_METHODS);
     setRestock(!(initialDocument && reasonField));
     setSalespersonName(initialDocument?.salespersonName ?? user?.fullNameEn ?? user?.fullNameAr ?? user?.email ?? '');
     setPaymentReference(initialDocument?.paymentReference ?? '');
@@ -1929,6 +1938,13 @@ function DocumentModal({
     setSalespersonName((prev) => prev || user?.fullNameEn || user?.fullNameAr || user?.email || '');
     if (!companyId) return;
     let cancelled = false;
+    void api.companySettings(companyId).then((res) => {
+      if (cancelled) return;
+      const methods = res.sections.sales.paymentMethods ?? DEFAULT_COMPANY_PAYMENT_METHODS;
+      setPaymentOptions(methods);
+    }).catch(() => {
+      // The catalogue defaults preserve the form if settings cannot be loaded.
+    });
     void (async () => {
       try {
         const c = await api.getCompany(companyId);
@@ -1990,7 +2006,7 @@ function DocumentModal({
         ...(dueDateField && dueDate ? { [dueDateField]: new Date(dueDate).toISOString() } : {}),
         ...(reasonField && reason.trim() ? { reason: reason.trim() } : {}),
         ...(reasonField ? { refundMethod } : {}),
-        ...(settlement ? { paymentMethod } : {}),
+        ...(settlement ? { paymentMethod, paymentMethodCode } : {}),
         ...(settlement && salespersonName.trim() ? { salespersonName: salespersonName.trim() } : {}),
         ...(settlement && paymentReference.trim() ? { paymentReference: paymentReference.trim() } : {}),
         ...(!reasonField && notes.trim() ? { notes: notes.trim() } : {}),
@@ -2015,6 +2031,7 @@ function DocumentModal({
       setSalespersonName('');
       setPaymentReference('');
       setPaymentMethod('CASH');
+      setPaymentMethodCode('CASH');
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
@@ -2083,13 +2100,18 @@ function DocumentModal({
               <Field label={t('erp.sales.form.payment')}>
                 <select
                   className="oryx-select"
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  value={paymentMethodCode}
+                  onChange={(e) => {
+                    const method = paymentOptions.find((item) => item.code === e.target.value);
+                    setPaymentMethodCode(e.target.value);
+                    setPaymentMethod(method?.accountingMethod ?? 'CASH');
+                  }}
                   data-testid={`${testIdPrefix}-payment-method`}
                 >
-                  {(['CASH', 'CARD', 'BANK_TRANSFER', 'WALLET', 'CHEQUE', 'OTHER', ...(dueDateField === 'dueDate' ? ['CREDIT'] as const : [])] as const).map((m) => (
-                    <option key={m} value={m}>
-                      {m === 'CREDIT' ? (locale === 'ar' ? 'آجل / كريدت' : 'Credit / Pay later') : t(`erp.sales.payment.${m}`)}
+                  {paymentOptions.filter((m) => m.isActive && m.useInInvoices &&
+                    (dueDateField === 'dueDate' || m.accountingMethod !== 'CREDIT')).map((m) => (
+                    <option key={m.code} value={m.code}>
+                      {locale === 'ar' ? m.nameAr : m.nameEn}
                     </option>
                   ))}
                 </select>
