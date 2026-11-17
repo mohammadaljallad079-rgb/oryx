@@ -125,6 +125,9 @@ test.describe('print preview and document attachments', () => {
     await expect(page.getByTestId('sales-page')).toBeVisible();
     await expect(page.getByTestId(`invoice-row-${invoiceNumber}`)).toBeVisible({ timeout: 20_000 });
 
+    // Invoice print actions are available from the details dialog.
+    await page.getByTestId(`invoice-attach-open-${invoiceNumber}`).click();
+    await expect(page.getByTestId(`attachments-${invoiceId}`)).toBeVisible();
     const [popup] = await Promise.all([
       page.waitForEvent('popup'),
       page.getByTestId(`preview-sales_invoice-${invoiceId}`).click(),
