@@ -315,7 +315,7 @@ const SECTION_META: Record<CompanySettingSection, { labelEn: string; labelAr: st
 export function CompanySettingsCentre({ canEdit }: { canEdit: boolean }) {
   const { t, locale } = useUi();
   const { companyId } = useAuth();
-  const { refreshTypography } = useBranding();
+  const { refresh, refreshTypography } = useBranding();
   const [active, setActive] = useState<CompanySettingSection>('general');
   const [values, setValues] = useState<Record<string, SectionData>>({});
   const [loading, setLoading] = useState(true);
@@ -363,6 +363,9 @@ export function CompanySettingsCentre({ canEdit }: { canEdit: boolean }) {
       const updated = await api.updateCompanySettingSection(active, values[active] ?? {}, companyId);
       setValues((prev) => ({ ...prev, [active]: updated }));
       setSaved(true);
+      // Company identity is consumed by the shell (name, logo, favicon and
+      // brand variables), so refresh it immediately after General is saved.
+      if (active === 'general') await refresh();
       // Typography is applied to the document root, so the shell must re-read it
       // the moment it is saved or the change would only appear after a reload.
       if (active === 'typography') await refreshTypography();
