@@ -974,7 +974,7 @@ export const api = {
       `/company-settings/${section}${companyId ? `?companyId=${companyId}` : ''}`,
       { method: 'PUT', body },
     ),
-  quotations: (params: { companyId?: string; status?: string } = {}) =>
+  quotations: (params: { companyId?: string; status?: string; customerId?: string; search?: string; dateFrom?: string; dateTo?: string; minAmountMinor?: number; maxAmountMinor?: number; page?: number; pageSize?: number } = {}) =>
     request<Paginated<SalesDocumentDto>>(`/sales/quotations?${toQuery(params)}`),
   createQuotation: (body: Record<string, unknown>) =>
     request<SalesDocumentDto>('/sales/quotations', { method: 'POST', body }),
@@ -984,7 +984,7 @@ export const api = {
     request<Paginated<SalesDocumentDto>>(`/sales/orders?${toQuery(params)}`),
   createSalesOrder: (body: Record<string, unknown>) =>
     request<SalesDocumentDto>('/sales/orders', { method: 'POST', body }),
-  salesInvoices: (params: { companyId?: string; status?: string; customerId?: string; page?: number; pageSize?: number } = {}) =>
+  salesInvoices: (params: { companyId?: string; status?: string; customerId?: string; search?: string; dateFrom?: string; dateTo?: string; minAmountMinor?: number; maxAmountMinor?: number; page?: number; pageSize?: number; paymentState?: 'due' | 'settled' } = {}) =>
     request<Paginated<SalesDocumentDto>>(`/sales/invoices?${toQuery(params)}`),
   getSalesInvoice: (id: string) => request<SalesDocumentDto>(`/sales/invoices/${id}`),
   createSalesInvoice: (body: Record<string, unknown>) =>
@@ -993,7 +993,7 @@ export const api = {
     request<SalesDocumentDto>(`/sales/invoices/${id}`, { method: 'POST', body }),
   deleteSalesInvoice: (id: string) =>
     request<{ id: string; deleted: boolean }>(`/sales/invoices/${id}`, { method: 'DELETE' }),
-  creditNotes: (params: { companyId?: string } = {}) =>
+  creditNotes: (params: { companyId?: string; status?: string; customerId?: string; search?: string; dateFrom?: string; dateTo?: string; minAmountMinor?: number; maxAmountMinor?: number; page?: number; pageSize?: number } = {}) =>
     request<Paginated<SalesDocumentDto>>(`/sales/credit-notes?${toQuery(params)}`),
   createCreditNote: (body: Record<string, unknown>) =>
     request<SalesDocumentDto>('/sales/credit-notes', { method: 'POST', body }),
