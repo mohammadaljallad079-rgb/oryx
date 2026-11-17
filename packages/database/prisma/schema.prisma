@@ -2988,6 +2988,7 @@ model Department {
 
   jobTitles  JobTitle[]
   employees  Employee[]
+  projects   Project[]
   workOrders WorkOrder[]
   branch     Branch?     @relation(fields: [branchId], references: [id], onDelete: SetNull)
   customers  Customer[]
@@ -3958,11 +3959,13 @@ model Project {
 
   company    Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   branch     Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  department Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   tasks      ProjectTask[]
   workOrders WorkOrder[]
 
   @@unique([companyId, code])
   @@index([companyId, status])
+  @@index([companyId, departmentId])
 }
 
 model ProjectTask {
