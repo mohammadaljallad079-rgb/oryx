@@ -643,7 +643,7 @@ export class CreateInvoiceDto extends SalesDocumentDateDto {
    * so the method is captured with the document.
    */
   @IsOptional()
-  @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER'])
+  @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER', 'CREDIT'])
   paymentMethod?: string;
 
   /** The salesperson credited on the printed invoice ("Staf Name"). */
@@ -691,7 +691,7 @@ export class UpdateInvoiceDto extends SalesDocumentDateDto {
   dueDate?: string;
 
   @IsOptional()
-  @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER'])
+  @IsIn(['CASH', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'WALLET', 'OTHER', 'CREDIT'])
   paymentMethod?: string;
 
   @IsOptional()
