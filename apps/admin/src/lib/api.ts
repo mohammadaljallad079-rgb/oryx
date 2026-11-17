@@ -1169,6 +1169,9 @@ export const api = {
   hrDepartments: (params: { companyId?: string } = {}) =>
     request<Paginated<DepartmentDto>>(`/hr/departments?${toQuery(params)}`),
   createDepartment: (body: Record<string, unknown>) => request<DepartmentDto>('/hr/departments', { method: 'POST', body }),
+  updateDepartment: (id: string, body: { code?: string; nameEn?: string; nameAr?: string }) =>
+    request<DepartmentDto>(`/hr/departments/${id}`, { method: 'PATCH', body }),
+  deleteDepartment: (id: string) => request<{ id: string; deleted: boolean }>(`/hr/departments/${id}`, { method: 'DELETE' }),
   hrJobTitles: (params: { companyId?: string } = {}) =>
     request<Paginated<JobTitleDto>>(`/hr/job-titles?${toQuery(params)}`),
   createJobTitle: (body: Record<string, unknown>) => request<JobTitleDto>('/hr/job-titles', { method: 'POST', body }),
