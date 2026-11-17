@@ -88,6 +88,25 @@ describe('Execution 20 — editable module catalog (e2e)', () => {
     expect(stored.isActive).toBe(false);
   });
 
+  it('persists and applies the edited catalog sort order across groups', async () => {
+    const res = await call(ctx.base, `/modules/${moduleId}`, {
+      method: 'PATCH',
+      token: superToken,
+      body: { sortOrder: -999 },
+    });
+    expect(res.status).toBe(200);
+
+    const stored = await prisma.module.findUniqueOrThrow({ where: { id: moduleId } });
+    expect(stored.sortOrder).toBe(-999);
+
+    const catalog = await call<{ items: Array<{ key: string; sortOrder: number }> }>(ctx.base, '/modules', {
+      token: superToken,
+    });
+    expect(catalog.status).toBe(200);
+    expect(catalog.body.items[0]?.key).toBe(targetKey);
+    expect(catalog.body.items[0]?.sortOrder).toBe(-999);
+  });
+
   it('reflects the edited name in the dashboard tiles', async () => {
     const res = await call<{ tiles: Array<{ moduleKey: string; nameEn: string }> }>(ctx.base, '/dashboard', {
       token: superToken,
