@@ -65,15 +65,14 @@ export function UiProvider({
   // over the stored values. From the second pass on they reflect real changes.
   const mounted = useRef(false);
 
-  // Hydrate from persisted preference (localStorage), falling back to the
-  // server-provided initial values. When nothing is stored yet, the server
-  // default is written back so the bootstrap script and the next reload agree.
+  // Hydrate explicit device preferences. Do not persist the server locale
+  // when no device choice exists: the authenticated company default must get
+  // the opportunity to seed the locale before it becomes a stored preference.
   useEffect(() => {
     const storedLocale = window.localStorage.getItem(LOCALE_KEY);
     const storedTheme = window.localStorage.getItem(THEME_KEY);
     const storedFontScale = window.localStorage.getItem(FONT_SCALE_KEY);
     if (storedLocale && isLocale(storedLocale)) setLocaleState(storedLocale);
-    else window.localStorage.setItem(LOCALE_KEY, initialLocale);
     if (storedTheme === 'dark' || storedTheme === 'light') setThemeState(storedTheme);
     else window.localStorage.setItem(THEME_KEY, initialTheme);
     if (storedFontScale && isFontScale(storedFontScale)) setFontScaleState(storedFontScale);
