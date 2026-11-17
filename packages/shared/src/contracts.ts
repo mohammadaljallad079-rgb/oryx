@@ -358,6 +358,12 @@ export interface BranchDto {
   city: string | null;
   addressLine: string | null;
   phone: string | null;
+  phoneNumbers: string[];
+  crNumber: string | null;
+  specialty: string | null;
+  responsibleUserId: string | null;
+  responsibleUserNameEn: string | null;
+  responsibleUserNameAr: string | null;
   countryCode: string | null;
   timezone: string;
   isActive: boolean;
@@ -1544,9 +1550,16 @@ export interface ProjectDto {
   nameEn: string;
   nameAr: string;
   status: string;
+  branchId?: string | null;
+  branchNameEn?: string | null;
+  branchNameAr?: string | null;
+  departmentId?: string | null;
+  departmentNameEn?: string | null;
+  departmentNameAr?: string | null;
   ownerUserId: string | null;
   startDate: string | null;
   endDate: string | null;
+  description?: string | null;
   taskCount?: number;
 }
 
@@ -1572,10 +1585,17 @@ export interface WorkOrderDto {
   id: string;
   orderNumber: string;
   title: string;
+  description?: string | null;
   status: string;
   priority: string;
   type: string;
+  branchId?: string | null;
+  departmentId?: string | null;
+  projectId?: string | null;
+  requestedById?: string | null;
   assigneeUserId: string | null;
+  scheduledStartAt?: string | null;
+  scheduledEndAt?: string | null;
   dueDate: string | null;
   checklist: WorkOrderChecklistItemDto[];
   comments?: Array<Record<string, unknown>>;

@@ -35,9 +35,7 @@ const TOOLBAR = `
  * and direction apply. Returns false when the popup was blocked so the caller
  * can tell the user.
  */
-function openDocumentWindow(html: string, autoPrint: boolean): boolean {
-  const win = window.open('', '_blank', 'width=920,height=1040');
-  if (!win) return false;
+function writeDocumentWindow(win: Window, html: string, autoPrint: boolean): void {
   win.document.open();
   win.document.write(html);
   win.document.close();
@@ -45,7 +43,6 @@ function openDocumentWindow(html: string, autoPrint: boolean): boolean {
     win.focus();
     win.setTimeout(() => win.print(), 350);
   }
-  return true;
 }
 
 export function DocumentPrintActions({
@@ -65,12 +62,21 @@ export function DocumentPrintActions({
     async (mode: 'preview' | 'print') => {
       setBusy(mode);
       setError(null);
+      // Reserve the browser window synchronously in the click gesture. Opening
+      // it only after the API request resolves loses transient user activation
+      // and browsers block the popup, leaving the print action apparently inert.
+      const printWindow = window.open('', '_blank', 'width=920,height=1040');
+      if (!printWindow) {
+        setError(t('print.popupBlocked'));
+        setBusy(null);
+        return;
+      }
       try {
         const doc = await api.printDocument(kind, id);
         const html = renderPrintDocument(doc, locale).replace('</body>', `${TOOLBAR}</body>`);
-        const opened = openDocumentWindow(html, mode === 'print');
-        if (!opened) setError(t('print.popupBlocked'));
+        writeDocumentWindow(printWindow, html, mode === 'print');
       } catch (e) {
+        printWindow.close();
         setError(e instanceof Error ? e.message : t('common.error'));
       } finally {
         setBusy(null);

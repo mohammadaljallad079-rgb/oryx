@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -25,11 +26,11 @@ import {
   StatusBadge,
   TableShell,
 } from '@/components/ui';
-import type { EmployeeDto, LeaveRequestDto, PayrollRunDto } from '@oryx/shared';
+import type { DepartmentDto, EmployeeDto, LeaveRequestDto, PayrollRunDto } from '@oryx/shared';
 
-type Tab = 'dashboard' | 'employees' | 'leave' | 'attendance' | 'payroll' | 'advances' | 'policy' | 'reports';
+type Tab = 'dashboard' | 'employees' | 'departments' | 'leave' | 'attendance' | 'payroll' | 'advances' | 'policy' | 'reports';
 
-const TAB_KEYS = ['dashboard', 'employees', 'leave', 'attendance', 'policy', 'payroll', 'reports', 'advances'] as const;
+const TAB_KEYS = ['dashboard', 'employees', 'departments', 'leave', 'attendance', 'policy', 'payroll', 'reports', 'advances'] as const;
 
 export default function HrPage() {
   return (
@@ -41,12 +42,15 @@ export default function HrPage() {
 
 function HrInner() {
   const { t } = useUi();
-  const { can } = useAuth();
+  const { can, companyId } = useAuth();
+  const params = useSearchParams();
+  const scopedCompanyId = params.get('companyId') ?? companyId;
   const [tab, setTab] = useState<Tab>('dashboard');
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'dashboard', label: t('erp.hr.dashboard') },
     { key: 'employees', label: t('erp.hr.employees') },
+    { key: 'departments', label: t('erp.hr.departments') },
     { key: 'leave', label: t('erp.hr.leave') },
     { key: 'attendance', label: t('erp.hr.attendance') },
     { key: 'policy', label: t('erp.hr.policyTab') },
@@ -82,6 +86,7 @@ function HrInner() {
 
       {tab === 'dashboard' ? <ModuleDashboard moduleKey="human_resources" testId="hr-dashboard" /> : null}
       {tab === 'employees' ? <EmployeesTab canManage={can('erp.hr.employee.manage')} /> : null}
+      {tab === 'departments' ? <DepartmentsTab companyId={scopedCompanyId} canManage={can('erp.hr.department.manage')} /> : null}
       {tab === 'leave' ? <LeaveTab canRequest={can('erp.hr.leave.request')} canApprove={can('erp.hr.leave.approve')} /> : null}
       {tab === 'attendance' ? <AttendanceTab canManage={can('erp.hr.attendance.manage')} canSelf={can('erp.hr.attendance.self')} /> : null}
       {tab === 'policy' ? <PolicyTab canManagePolicy={can('erp.hr.attendance.policy')} canViewWorkSites={can('erp.hr.read') || can('erp.hr.worksite.manage') || can('erp.hr.attendance.manage')} canManageWorkSites={can('erp.hr.worksite.manage')} /> : null}
@@ -89,6 +94,63 @@ function HrInner() {
       {tab === 'reports' ? <ReportsTab /> : null}
       {tab === 'advances' ? <AdvancesTab canManage={can('erp.hr.advance.manage')} /> : null}
     </div>
+  );
+}
+
+
+function DepartmentsTab({ companyId, canManage }: { companyId: string | null; canManage: boolean }) {
+  const { t, locale } = useUi();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '' });
+  const list = useAsync(() => companyId ? api.hrDepartments({ companyId }) : Promise.resolve(null), [companyId]);
+
+  async function create() {
+    if (!companyId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.createDepartment({ companyId, code: form.code.trim().toUpperCase(), nameEn: form.nameEn.trim(), nameAr: form.nameAr.trim() });
+      setForm({ code: '', nameEn: '', nameAr: '' });
+      setOpen(false);
+      await list.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!companyId) {
+    return <Card><EmptyState title={t('common.selectCompany')} hint={locale === 'ar' ? 'اختر الشركة لعرض وإدارة أقسامها.' : 'Select a company to manage its departments.'} /></Card>;
+  }
+
+  return (
+    <Card data-testid="hr-departments">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
+        <div>
+          <h3 className="m-0 text-sm font-bold">{t('erp.hr.departments')}</h3>
+          <p className="oryx-muted m-0 mt-1 text-xs">{locale === 'ar' ? 'الأقسام مرتبطة بملفات الموظفين والمسميات الوظيفية.' : 'Departments are shared with employee records and job titles.'}</p>
+        </div>
+        {canManage ? <Button size="sm" variant="primary" onClick={() => { setError(null); setOpen(true); }} data-testid="department-create"><Icon name="plus" size={14} />{locale === 'ar' ? 'إضافة قسم' : 'Add department'}</Button> : null}
+      </div>
+      {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
+      {list.loading ? <div className="p-4"><Skeleton height={100} /></div> : !list.data?.items.length ? <EmptyState title={t('common.empty')} hint={locale === 'ar' ? 'أضف أول قسم للشركة.' : 'Add the first department for this company.'} /> : (
+        <TableShell>
+          <thead><tr><th>{t('common.code')}</th><th>{t('common.name')}</th><th>{locale === 'ar' ? 'عدد الموظفين' : 'Employees'}</th></tr></thead>
+          <tbody>{list.data.items.map((department: DepartmentDto) => <tr key={department.id}><td className="font-mono">{department.code}</td><td><span className="font-semibold">{locale === 'ar' ? department.nameAr : department.nameEn}</span><span className="oryx-faint block text-xs">{locale === 'ar' ? department.nameEn : department.nameAr}</span></td><td className="tabular-nums">{department.employeeCount ?? 0}</td></tr>)}</tbody>
+        </TableShell>
+      )}
+      <Modal open={open} title={locale === 'ar' ? 'إضافة قسم جديد' : 'Add department'} onClose={() => setOpen(false)} footer={<><Button onClick={() => setOpen(false)}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || !form.code.trim() || !form.nameEn.trim() || !form.nameAr.trim()} onClick={() => void create()}>{busy ? t('common.loading') : t('common.create')}</Button></>}>
+        {error ? <ErrorBanner message={error} /> : null}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={t('common.code')} required><input className="oryx-input uppercase" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} /></Field>
+          <Field label={locale === 'ar' ? 'الاسم بالعربية' : 'Name (Arabic)'} required><input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} /></Field>
+          <Field label={locale === 'ar' ? 'الاسم بالإنجليزية' : 'Name (English)'} required><input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} /></Field>
+        </div>
+      </Modal>
+    </Card>
   );
 }
 

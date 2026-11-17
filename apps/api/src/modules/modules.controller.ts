@@ -99,7 +99,7 @@ export class ModulesController {
   @Get()
   @ApiOperation({ summary: 'ERP module catalog with the caller\'s entitlement state' })
   async list(@CurrentPrincipal() principal: RequestPrincipal) {
-    const modules = await this.prisma.module.findMany({ orderBy: [{ group: 'asc' }, { sortOrder: 'asc' }] });
+    const modules = await this.prisma.module.findMany({ orderBy: [{ sortOrder: 'asc' }, { group: 'asc' }, { key: 'asc' }] });
     const licensed = principal.company ? await this.entitlements.licensedModulesFor(principal.company.companyId) : [];
     const licensedSet = new Set(licensed);
     return {

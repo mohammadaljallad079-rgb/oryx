@@ -116,6 +116,7 @@ jobs:
     # PDF renderer uses, and Playwright 1.56.1 refuses to install it on
     # ubuntu26.04-x64, which `ubuntu-latest` now resolves to.
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     needs: quality
 
     services:
@@ -189,8 +190,11 @@ jobs:
       - name: Run authorization unit tests
         run: pnpm --filter @oryx/shared test
 
+      # All suites can finish while Nest/Prisma/Chromium handles keep Jest alive.
+      # Force process exit only after Jest has finished and reported its test result;
+      # Jest still returns a failure code if any test fails.
       - name: Run API integration tests
-        run: pnpm --filter @oryx/api test:e2e
+        run: pnpm --filter @oryx/api exec jest --config jest-e2e.config.js --runInBand --forceExit
 
       - name: Upload API test report
         if: always()
@@ -211,6 +215,7 @@ jobs:
     # chromium on ubuntu26.04-x64"). 24.04 is the newest image this Playwright
     # release supports. Lift the pin when Playwright gains 26.04 support.
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     needs: quality
 
     services:

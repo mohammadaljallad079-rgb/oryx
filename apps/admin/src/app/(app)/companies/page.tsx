@@ -240,6 +240,9 @@ export default function CompaniesPage() {
                         <Link href={`/branches?companyId=${c.id}`} className="oryx-btn oryx-btn--sm">
                           {t('companies.branches')}
                         </Link>
+                        <Link href={`/hr?tab=departments&companyId=${c.id}`} className="oryx-btn oryx-btn--sm" data-testid={`company-departments-${c.code}`}>
+                          {locale === 'ar' ? 'الأقسام' : 'Departments'}
+                        </Link>
                         <Link href={`/users?companyId=${c.id}`} className="oryx-btn oryx-btn--sm">
                           {t('companies.users')}
                         </Link>

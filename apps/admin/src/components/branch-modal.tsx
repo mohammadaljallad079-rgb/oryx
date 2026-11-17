@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import type { BranchDto } from '@oryx/shared';
+import { useEffect, useState } from 'react';
+import type { BranchDto, UserDto } from '@oryx/shared';
 import { api } from '@/lib/api';
 import { errorMessageKey } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
@@ -32,11 +32,19 @@ export function CreateBranchModal({
   onSaved?: (created: BranchDto) => void;
   hasModule: boolean;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const emptyForm = { code: '', nameEn: '', nameAr: '', city: '', countryCode: 'BH', addressLine: '', phone: '', timezone: 'Asia/Bahrain' };
+  const [users, setUsers] = useState<UserDto[]>([]);
+  const emptyForm = { code: '', nameEn: '', nameAr: '', city: '', countryCode: 'BH', addressLine: '', phone: '', phoneNumbers: '', crNumber: '', specialty: '', responsibleUserId: '', timezone: 'Asia/Bahrain' };
   const [form, setForm] = useState(emptyForm);
+
+  useEffect(() => {
+    if (!open || !companyId) return;
+    void api.listUsers(companyId, { pageSize: 100, status: 'ACTIVE' })
+      .then((result) => setUsers(result.items))
+      .catch(() => setUsers([]));
+  }, [open, companyId]);
 
   async function submit() {
     setBusy(true);
@@ -50,6 +58,10 @@ export function CreateBranchModal({
         countryCode: form.countryCode || undefined,
         addressLine: form.addressLine || undefined,
         phone: form.phone || undefined,
+        phoneNumbers: form.phoneNumbers.split(/[\n,;]+/).map((value) => value.trim()).filter(Boolean),
+        crNumber: form.crNumber.trim() || undefined,
+        specialty: form.specialty.trim() || undefined,
+        responsibleUserId: form.responsibleUserId || undefined,
         timezone: form.timezone || undefined,
       });
       await onCreated(created);
@@ -147,6 +159,21 @@ export function CreateBranchModal({
             onChange={(e) => setForm({ ...form, phone: e.target.value })}
             data-testid="branch-phone"
           />
+        </Field>
+        <Field label={locale === 'ar' ? 'أرقام هواتف إضافية (افصل بينها بفاصلة أو سطر)' : 'Additional phone numbers (comma or newline separated)'}>
+          <textarea className="oryx-input min-h-20" value={form.phoneNumbers} onChange={(e) => setForm({ ...form, phoneNumbers: e.target.value })} data-testid="branch-phone-numbers" />
+        </Field>
+        <Field label={locale === 'ar' ? 'رقم السجل التجاري للفرع' : 'Branch commercial registration number'}>
+          <input className="oryx-input" value={form.crNumber} onChange={(e) => setForm({ ...form, crNumber: e.target.value })} data-testid="branch-cr-number" />
+        </Field>
+        <Field label={locale === 'ar' ? 'تخصص ومجال الفرع' : 'Branch specialty / field'}>
+          <input className="oryx-input" value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} data-testid="branch-specialty" />
+        </Field>
+        <Field label={locale === 'ar' ? 'الموظف المسؤول' : 'Responsible employee'}>
+          <select className="oryx-select" value={form.responsibleUserId} onChange={(e) => setForm({ ...form, responsibleUserId: e.target.value })} data-testid="branch-responsible-user">
+            <option value="">{locale === 'ar' ? 'غير محدد' : 'Not assigned'}</option>
+            {users.map((user) => <option key={user.id} value={user.id}>{locale === 'ar' ? user.fullNameAr : user.fullNameEn} · {user.email}</option>)}
+          </select>
         </Field>
         <Field label={t('branches.addressLine')}>
           <input

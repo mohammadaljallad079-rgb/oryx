@@ -85,8 +85,9 @@ export class HrService {
   }
 
   async createDepartment(dto: CreateDepartmentDto, principal: RequestPrincipal, actor: ActorContext) {
-    const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
+    const { companyId, branchIds } = await this.context.resolveCompanyScope(principal, dto.companyId);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
+    if (dto.parentId) await this.assertDepartment(companyId, dto.parentId);
     const dup = await this.prisma.department.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Department code ${dto.code} already exists.`);
     const dept = await this.prisma.department.create({
@@ -104,6 +105,7 @@ export class HrService {
 
   async createJobTitle(dto: CreateJobTitleDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    if (dto.departmentId) await this.assertDepartment(companyId, dto.departmentId);
     const dup = await this.prisma.jobTitle.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Job title code ${dto.code} already exists.`);
     const title = await this.prisma.jobTitle.create({ data: { companyId, code: dto.code, nameEn: dto.nameEn, nameAr: dto.nameAr, departmentId: dto.departmentId ?? null } });
@@ -172,6 +174,8 @@ export class HrService {
   async createEmployee(dto: CreateEmployeeDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
+    if (dto.departmentId) await this.assertDepartment(companyId, dto.departmentId);
+    if (dto.jobTitleId) await this.assertJobTitle(companyId, dto.jobTitleId, dto.departmentId);
     const dup = await this.prisma.employee.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Employee code ${dto.code} already exists.`);
     if (dto.managerId) await this.assertEmployee(companyId, dto.managerId);
@@ -216,9 +220,14 @@ export class HrService {
   }
 
   async updateEmployee(id: string, dto: UpdateEmployeeDto, principal: RequestPrincipal, actor: ActorContext) {
-    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     const employee = await this.prisma.employee.findFirst({ where: { id, companyId } });
     if (!employee) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Employee not found.');
+    if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
+    if (dto.departmentId) await this.assertDepartment(companyId, dto.departmentId);
+    const effectiveJobTitleId = dto.jobTitleId ?? employee.jobTitleId;
+    const effectiveDepartmentId = dto.departmentId !== undefined ? dto.departmentId : employee.departmentId;
+    if (effectiveJobTitleId) await this.assertJobTitle(companyId, effectiveJobTitleId, effectiveDepartmentId);
     if (dto.managerId) {
       if (dto.managerId === id) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'An employee cannot report to itself.');
       await this.assertEmployee(companyId, dto.managerId);
@@ -1958,6 +1967,19 @@ export class HrService {
         return this.reportPayrollCost(query, principal);
       default:
         throw badRequest(ERROR_CODES.VALIDATION_FAILED, `Unknown report "${kind}".`);
+    }
+  }
+
+  private async assertDepartment(companyId: string, departmentId: string) {
+    const department = await this.prisma.department.findFirst({ where: { id: departmentId, companyId }, select: { id: true } });
+    if (!department) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Department must belong to the current company.');
+  }
+
+  private async assertJobTitle(companyId: string, jobTitleId: string, departmentId?: string | null) {
+    const jobTitle = await this.prisma.jobTitle.findFirst({ where: { id: jobTitleId, companyId }, select: { id: true, departmentId: true } });
+    if (!jobTitle) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Job title must belong to the current company.');
+    if (departmentId && jobTitle.departmentId && jobTitle.departmentId !== departmentId) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Job title must belong to the selected department.');
     }
   }
 

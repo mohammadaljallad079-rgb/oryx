@@ -92,35 +92,27 @@ test.describe('Sales invoice — document attachments', () => {
       timeout: 30_000,
     });
 
-    // The attach control is offered beside the document actions.
-    const attachButton = page.getByTestId(`doc-attach-${invoice.id}`);
-    await expect(attachButton).toBeVisible({ timeout: 30_000 });
-    await attachButton.click();
+    // Attachments are managed from the invoice details dialog; the row action
+    // opens that dialog, which displays the stored list and upload control.
+    await page.getByTestId(`invoice-attach-open-${invoice.invoiceNumber}`).click();
+    await expect(page.getByTestId(`attachments-${invoice.id}`)).toBeVisible();
 
-    // Upload the scan through the real file input.
-    await page.getByTestId(`doc-attach-input-${invoice.id}`).setInputFiles({
+    await page.getByTestId(`attach-input-${invoice.id}`).setInputFiles({
       name: 'receipt.png',
       mimeType: 'image/png',
       buffer: SCAN_PNG,
     });
 
-    // The upload closes the modal; reopen it to read the stored list back.
-    await expect(attachButton).toContainText('(1)', { timeout: 30_000 });
-    await attachButton.click();
-    await expect(page.getByText('receipt.png')).toBeVisible({ timeout: 30_000 });
+    const attachment = page.locator('[data-testid^="attachment-"]').filter({ hasText: 'receipt.png' }).first();
+    await expect(attachment).toBeVisible({ timeout: 30_000 });
+    const attachmentTestId = await attachment.getAttribute('data-testid');
+    const attachmentId = attachmentTestId!.replace('attachment-', '');
 
-    // The attachment row opens over a blob URL served by the download route.
-    page.on('dialog', (d) => void d.accept());
-    const openButton = page.locator('button[data-testid^="doc-attachment-open-"]').first();
-    const [popup] = await Promise.all([
-      page.context().waitForEvent('page').catch(() => null),
-      openButton.click(),
-    ]);
-    if (popup) await popup.close();
+    await page.getByTestId(`attachment-preview-${attachmentId}`).click();
+    await expect(page.getByTestId('attachment-preview-content')).toBeVisible();
+    await page.keyboard.press('Escape');
 
-    // Removing it clears the row again.
-    const removeButton = page.locator('button[data-testid^="doc-attachment-remove-"]').first();
-    await removeButton.click();
-    await expect(page.getByText('receipt.png')).toHaveCount(0, { timeout: 30_000 });
+    await page.getByTestId(`attachment-delete-${attachmentId}`).click();
+    await expect(page.getByTestId(`attachment-${attachmentId}`)).toHaveCount(0, { timeout: 30_000 });
   });
 });

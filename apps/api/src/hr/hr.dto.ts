@@ -33,6 +33,7 @@ export class ListQueryDto {
 // ------------------------------------------------------------- departments
 
 export class CreateDepartmentDto {
+  @IsOptional() @IsString() @MaxLength(64) companyId?: string;
   @IsString() @MinLength(1) @MaxLength(40) code!: string;
   @IsString() @MinLength(2) @MaxLength(160) nameEn!: string;
   @IsString() @MinLength(2) @MaxLength(160) nameAr!: string;

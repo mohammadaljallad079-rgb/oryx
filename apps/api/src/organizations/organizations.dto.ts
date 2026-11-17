@@ -1,4 +1,6 @@
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -80,6 +82,11 @@ export class CreateCompanyDto {
 }
 
 export class UpdateCompanyDto {
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Z0-9][A-Z0-9-]{1,30}$/, { message: 'code must be uppercase letters, digits or dashes' })
+  code?: string;
+
   @IsOptional()
   @IsString()
   @MinLength(2)
@@ -226,12 +233,38 @@ export class CreateBranchDto {
   phone?: string;
 
   @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  phoneNumbers?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  crNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  specialty?: string;
+
+  @IsOptional()
+  @IsString()
+  responsibleUserId?: string;
+
+  @IsOptional()
   @IsString()
   @MaxLength(60)
   timezone?: string;
 }
 
 export class UpdateBranchDto {
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Z0-9][A-Z0-9-]{0,20}$/, { message: 'code must be uppercase letters, digits or dashes' })
+  code?: string;
+
   @IsOptional()
   @IsString()
   @MinLength(2)
@@ -263,6 +296,27 @@ export class UpdateBranchDto {
   @IsString()
   @MaxLength(40)
   phone?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  phoneNumbers?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  crNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  specialty?: string;
+
+  @IsOptional()
+  @IsString()
+  responsibleUserId?: string | null;
 
   @IsOptional()
   @IsString()

@@ -42,7 +42,9 @@ export class UpdateProjectDto {
   @IsOptional() @IsString() @MaxLength(200) nameEn?: string;
   @IsOptional() @IsString() @MaxLength(200) nameAr?: string;
   @IsOptional() @IsIn(['PLANNED', 'ACTIVE', 'ON_HOLD', 'COMPLETED', 'CANCELLED']) status?: string;
-  @IsOptional() @IsString() ownerUserId?: string;
+  @IsOptional() @IsString() branchId?: string | null;
+  @IsOptional() @IsString() departmentId?: string | null;
+  @IsOptional() @IsString() ownerUserId?: string | null;
   @IsOptional() @IsISO8601() startDate?: string;
   @IsOptional() @IsISO8601() endDate?: string;
   @IsOptional() @IsString() @MaxLength(2000) description?: string;
@@ -85,6 +87,8 @@ export class CreateWorkOrderDto {
   @IsOptional() @IsString() projectId?: string;
   @IsOptional() @IsIn(['LOW', 'NORMAL', 'HIGH', 'URGENT']) priority?: string;
   @IsOptional() @IsString() assigneeUserId?: string;
+  @IsOptional() @IsISO8601() scheduledStartAt?: string;
+  @IsOptional() @IsISO8601() scheduledEndAt?: string;
   @IsOptional() @IsISO8601() dueDate?: string;
   @IsOptional() @IsString() @MaxLength(40) sourceType?: string;
   @IsOptional() @IsString() sourceId?: string;
@@ -102,6 +106,13 @@ export class UpdateWorkOrderDto {
   @IsOptional() @IsString() @MaxLength(2000) description?: string;
   @IsOptional() @IsIn(['DRAFT', 'OPEN', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CANCELLED']) status?: string;
   @IsOptional() @IsIn(['LOW', 'NORMAL', 'HIGH', 'URGENT']) priority?: string;
+  @IsOptional() @IsString() @MaxLength(60) type?: string;
+  @IsOptional() @IsString() branchId?: string | null;
+  @IsOptional() @IsString() departmentId?: string | null;
+  @IsOptional() @IsString() projectId?: string | null;
+  @IsOptional() @IsString() assigneeUserId?: string | null;
+  @IsOptional() @IsISO8601() scheduledStartAt?: string;
+  @IsOptional() @IsISO8601() scheduledEndAt?: string;
   @IsOptional() @IsISO8601() dueDate?: string;
 }
 
