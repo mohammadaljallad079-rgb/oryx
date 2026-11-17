@@ -323,14 +323,14 @@ export class DocumentsService {
     const signatureSeal = true;
     const footerHtml = footerFaces +
       (layout === 'official'
-        ? officialFooterTemplate(args.issuer)
+        ? officialFooterTemplate(args.issuer, signatureSeal)
         : reportFooterTemplate(args.issuer, spec.verifiable ? verification.qrDataUri : undefined));
     // The report's cover prints the signature-box band while its section pages
     // print only the compact lockup, so the cover footer is a second template
     // the renderer splices onto page one. Financial layouts paint one band on
     // every page and need no second pass.
     const coverFooterHtml =
-      layout === 'official' ? footerFaces + officialFooterTemplate(args.issuer, signatureSeal) : footerFaces + officialFooterTemplate(args.issuer, signatureSeal);
+      layout === 'official' ? undefined : footerFaces + officialFooterTemplate(args.issuer, signatureSeal);
     const { pdf, pageCount } = await this.renderer.render(html, {
       footerHtml,
       coverFooterHtml,
