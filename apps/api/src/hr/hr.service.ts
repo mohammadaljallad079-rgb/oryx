@@ -85,7 +85,7 @@ export class HrService {
   }
 
   async createDepartment(dto: CreateDepartmentDto, principal: RequestPrincipal, actor: ActorContext) {
-    const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
+    const { companyId, branchIds } = await this.context.resolveCompanyScope(principal, dto.companyId);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     const dup = await this.prisma.department.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Department code ${dto.code} already exists.`);
