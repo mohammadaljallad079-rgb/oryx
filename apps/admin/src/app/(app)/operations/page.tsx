@@ -202,10 +202,11 @@ function ProjectModal({
   const { t } = useUi();
   const { companyId } = useAuth();
   const branches = useAsync(() => companyId ? api.listBranches(companyId, { pageSize: 100 }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 }), [companyId]);
-  const users = useAsync(() => companyId ? api.listUsers(companyId, { pageSize: 100 }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 }), [companyId]);
+  const users = useAsync(() => companyId ? api.listUsers(companyId, { pageSize: 100, status: 'ACTIVE' }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 }), [companyId]);
+  const departments = useAsync(() => companyId ? api.hrDepartments({ companyId }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 }), [companyId]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', startDate: '', endDate: '', description: '', branchId: '', ownerUserId: '' });
+  const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', startDate: '', endDate: '', description: '', branchId: '', departmentId: '', ownerUserId: '' });
 
   useEffect(() => {
     if (!open) return;
@@ -218,6 +219,7 @@ function ProjectModal({
       endDate: project?.endDate?.slice(0, 10) ?? '',
       description: project?.description ?? '',
       branchId: project?.branchId ?? '',
+      departmentId: project?.departmentId ?? '',
       ownerUserId: project?.ownerUserId ?? '',
     });
   }, [open, project]);
@@ -232,6 +234,7 @@ function ProjectModal({
         endDate: form.endDate || undefined,
         description: form.description || undefined,
         branchId: form.branchId || undefined,
+        departmentId: form.departmentId || undefined,
         ownerUserId: form.ownerUserId || undefined,
       };
       let saved: ProjectDto;
@@ -247,7 +250,7 @@ function ProjectModal({
   };
 
   return (
-    <Modal open={open} title={project ? t('erp.operations.editProject') : t('erp.operations.newProject')} onClose={onClose}
+    <Modal open={open} size="document" title={project ? t('erp.operations.editProject') : t('erp.operations.newProject')} onClose={onClose}
       footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || !form.nameEn || !form.nameAr || (!project && !form.code)} onClick={submit} data-testid="save-project">{busy ? t('common.loading') : t('common.save')}</Button></>}>
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
@@ -259,10 +262,13 @@ function ProjectModal({
         <Field label={t('context.branch')}>
           <EntityPicker value={form.branchId || null} options={(branches.data?.items ?? []).map((b) => ({ value: b.id, label: `${b.code} — ${b.nameEn}` }))} onChange={(v) => setForm({ ...form, branchId: v ?? '' })} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="project-branch" />
         </Field>
+        <Field label={t('erp.hr.departments')}>
+          <EntityPicker value={form.departmentId || null} options={(departments.data?.items ?? []).map((d) => ({ value: d.id, label: `${d.code} — ${d.nameEn}` }))} onChange={(v) => setForm({ ...form, departmentId: v ?? '' })} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="project-department" />
+        </Field>
         <Field label={t('erp.hr.employee')}>
           <EntityPicker value={form.ownerUserId || null} options={(users.data?.items ?? []).map((u) => ({ value: u.id, label: u.fullNameEn || u.email }))} onChange={(v) => setForm({ ...form, ownerUserId: v ?? '' })} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="project-owner" />
         </Field>
-        <Field label={t('erp.operations.description')}><input className="oryx-input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} data-testid="project-description" /></Field>
+        <Field label={t('erp.operations.description')}><textarea className="oryx-input min-h-28" rows={4} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} data-testid="project-description" /></Field>
       </div>
     </Modal>
   );
@@ -397,9 +403,10 @@ function CreateWorkOrderModal({
   const { companyId } = useAuth();
   const branches = useAsync(() => companyId ? api.listBranches(companyId, { pageSize: 100 }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 }), [companyId]);
   const users = useAsync(() => companyId ? api.listUsers(companyId, { pageSize: 100 }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 }), [companyId]);
+  const departments = useAsync(() => companyId ? api.hrDepartments({ companyId }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 }), [companyId]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ title: '', description: '', projectId: '', priority: 'NORMAL', checklist: '', branchId: '', assigneeUserId: '', dueDate: '' });
+  const [form, setForm] = useState({ title: '', description: '', projectId: '', type: 'GENERAL', priority: 'NORMAL', checklist: '', branchId: '', departmentId: '', assigneeUserId: '', scheduledStartAt: '', scheduledEndAt: '', dueDate: '' });
   const submit = async () => {
     setBusy(true); setError(null);
     try {
@@ -411,9 +418,13 @@ function CreateWorkOrderModal({
       await api.createWorkOrder({
         title: form.title,
         description: form.description || undefined,
+        type: form.type || 'GENERAL',
         projectId: form.projectId || undefined,
         branchId: form.branchId || undefined,
+        departmentId: form.departmentId || undefined,
         assigneeUserId: form.assigneeUserId || undefined,
+        scheduledStartAt: form.scheduledStartAt ? new Date(form.scheduledStartAt).toISOString() : undefined,
+        scheduledEndAt: form.scheduledEndAt ? new Date(form.scheduledEndAt).toISOString() : undefined,
         dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : undefined,
         priority: form.priority,
         checklist: checklist.length > 0 ? checklist : undefined,
@@ -423,7 +434,7 @@ function CreateWorkOrderModal({
     } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); } finally { setBusy(false); }
   };
   return (
-    <Modal open={open} title={t('erp.operations.newWorkOrder')} onClose={onClose}
+    <Modal open={open} size="document" title={t('erp.operations.newWorkOrder')} onClose={onClose}
       footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy} onClick={submit} data-testid="save-work-order">{busy ? t('common.loading') : t('common.save')}</Button></>}>
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
@@ -454,11 +465,23 @@ function CreateWorkOrderModal({
         <Field label={t('context.branch')}>
           <EntityPicker value={form.branchId || null} options={(branches.data?.items ?? []).map((b) => ({ value: b.id, label: `${b.code} — ${b.nameEn}` }))} onChange={(v) => setForm({ ...form, branchId: v ?? '' })} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="work-order-branch" />
         </Field>
+        <Field label={t('erp.hr.departments')}>
+          <EntityPicker value={form.departmentId || null} options={(departments.data?.items ?? []).map((d) => ({ value: d.id, label: `${d.code} — ${d.nameEn}` }))} onChange={(v) => setForm({ ...form, departmentId: v ?? '' })} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="work-order-department" />
+        </Field>
         <Field label={t('erp.hr.employee')}>
           <EntityPicker value={form.assigneeUserId || null} options={(users.data?.items ?? []).map((u) => ({ value: u.id, label: u.fullNameEn || u.email }))} onChange={(v) => setForm({ ...form, assigneeUserId: v ?? '' })} placeholder={t('common.select')} emptyLabel={t('common.none')} testId="work-order-assignee" />
         </Field>
+        <Field label={t('erp.operations.startDate')}>
+          <input type="date" className="oryx-input" value={form.scheduledStartAt} onChange={(e) => setForm({ ...form, scheduledStartAt: e.target.value })} data-testid="work-order-start-date" />
+        </Field>
+        <Field label={t('erp.operations.endDate')}>
+          <input type="date" className="oryx-input" value={form.scheduledEndAt} onChange={(e) => setForm({ ...form, scheduledEndAt: e.target.value })} data-testid="work-order-end-date" />
+        </Field>
         <Field label={t('common.date')}>
           <input type="date" className="oryx-input" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} data-testid="work-order-due-date" />
+        </Field>
+        <Field label={t('erp.operations.type')}>
+          <input className="oryx-input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} data-testid="work-order-type" />
         </Field>
         <Field label={t('erp.crm.priority')}>
           <select className="oryx-select" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
