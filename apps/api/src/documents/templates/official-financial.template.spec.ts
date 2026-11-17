@@ -370,7 +370,7 @@ describe('official financial template — reference watermark parity (Execution 
     // must not depend on a configured logo image.
     expect(html).not.toContain('class="of-watermark-img"');
     expect(html).not.toContain('class="of-watermark-mark"');
-    expect(html).toMatch(/opacity:0\.10/);
+    expect(html).toContain('style="opacity:0.1"');
     // Measured off the reference: brand display face, 51.747pt, 6.72pt tracking.
     expect(html).toContain('font-size:51.747pt');
     expect(html).toContain('letter-spacing:6.72pt');
