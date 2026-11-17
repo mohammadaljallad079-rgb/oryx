@@ -1551,7 +1551,11 @@ export interface ProjectDto {
   nameAr: string;
   status: string;
   branchId?: string | null;
+  branchNameEn?: string | null;
+  branchNameAr?: string | null;
   departmentId?: string | null;
+  departmentNameEn?: string | null;
+  departmentNameAr?: string | null;
   ownerUserId: string | null;
   startDate: string | null;
   endDate: string | null;
