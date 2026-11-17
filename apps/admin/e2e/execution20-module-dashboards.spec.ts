@@ -72,14 +72,17 @@ test.describe('Execution 20 — module dashboards', () => {
 });
 
 test.describe('Execution 20 — module dashboards (Enterprise tenant)', () => {
-  test('the automotive tenant sees the maintenance and spare-parts dashboards', async ({ page }) => {
+  test('the automotive tenant sees the spare-parts dashboard', async ({ page }) => {
     await signIn(page, ENTERPRISE_ADMIN);
     await setLocale(page, 'en');
     await setTheme(page, 'dark');
 
-    await page.goto('/automotive/maintenance?tab=dashboard');
-    await expect(page.getByTestId('module-dashboard-automotive_maintenance')).toBeVisible({ timeout: 25_000 });
-    await expect(page.getByTestId('module-stats-automotive_maintenance')).toBeVisible();
+    // The workshop surface dropped its dashboard tab (the bay and warranty
+    // surfaces were removed and the module opens on its job cards), so only the
+    // spare-parts dashboard — reached through Warehouses & Inventory — is
+    // asserted here.
+    await page.goto('/inventory?tab=parts');
+    await expect(page.getByTestId('parts-tab-catalog')).toBeVisible({ timeout: 25_000 });
 
     await page.goto('/automotive/spare-parts?tab=dashboard');
     await expect(page.getByTestId('module-dashboard-spare_parts')).toBeVisible({ timeout: 25_000 });

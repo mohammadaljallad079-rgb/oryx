@@ -363,24 +363,21 @@ describe('official financial template — identity', () => {
 });
 
 describe('official financial template — reference watermark parity (Execution 19)', () => {
-  it('prints the "AUTO SERVICES" wordmark exactly as the reference, not a logo', () => {
+  it('lays the official ORYX logo behind the priced body, not a typed wordmark', () => {
     const html = render({}, { ...issuer, logoDataUri: 'data:image/png;base64,LOGO' });
-    expect(html).toContain('class="of-watermark" aria-hidden="true">AUTO SERVICES</div>');
-    // The reference prints a typed wordmark, not the issuer logo, so the mark
-    // must not depend on a configured logo image.
-    expect(html).not.toContain('class="of-watermark-img"');
-    expect(html).not.toContain('class="of-watermark-mark"');
-    expect(html).toContain('style="opacity:0.1"');
-    // Measured off the reference: brand display face, 51.747pt, 6.72pt tracking.
-    expect(html).toContain('font-size:51.747pt');
-    expect(html).toContain('letter-spacing:6.72pt');
+    // The owner asked for the real mark, so a configured logo is painted as an
+    // image rather than the "AUTO SERVICES" wordmark text. The layer carries the
+    // configured opacity inline, so the mark follows the style attribute.
+    expect(html).toContain('class="of-watermark" aria-hidden="true"');
+    expect(html).toContain('<img src="data:image/png;base64,LOGO"');
+    expect(html).not.toContain('>AUTO SERVICES</div>');
+    expect(html).toMatch(/\.of-watermark img\{[^}]*object-fit:contain/);
   });
 
-  it('prints the same wordmark regardless of a configured tenant logo', () => {
-    const withLogo = render({}, { ...issuer, logoDataUri: 'data:image/png;base64,LOGO' });
-    const noLogo = render({}, { ...issuer, logoDataUri: null });
-    const extract = (h: string) => h.match(/<div class="of-watermark"[^>]*>[^<]*<\/div>/)![0];
-    expect(extract(withLogo)).toBe(extract(noLogo));
+  it('falls back to the vector ORYX mark when no logo is configured', () => {
+    const html = render({}, { ...issuer, logoDataUri: null });
+    expect(html).toContain('<svg class="of-watermark-vector"');
+    expect(html).not.toMatch(/of-watermark"[^>]*>\s*<img/);
   });
 
   it('fixes the watermark so it repeats on every printed page', () => {
@@ -389,6 +386,9 @@ describe('official financial template — reference watermark parity (Execution 
     // `position:absolute` mark paints only on page one.
     expect(html).toContain('.of-watermark{ position:fixed');
     expect(html).not.toContain('.of-watermark{ position:absolute');
+    // A positioned z-index:0 mark paints above in-flow content, so the identity
+    // band and the priced body are lifted to keep them on top of the watermark.
+    expect(html).toContain('.of-band,.of-body{ position:relative; z-index:1; }');
   });
 
   it('keeps the header badge inside the printable box so the sheet is not scaled', () => {

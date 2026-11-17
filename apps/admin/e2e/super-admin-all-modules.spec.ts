@@ -42,6 +42,15 @@ const PLATFORM_GROUPS = [
 /** Company-scoped section headings that appear once a company is selected. */
 const COMPANY_SCOPED_GROUPS = ['Ecosystem Operations'];
 
+/**
+ * Modules that are surfaced inside another module's surface rather than as a
+ * sidebar entry of their own. Spare parts are products with fitment data, so the
+ * module is reached through Warehouses & Inventory → Spare parts (its catalogue
+ * and its route are unchanged); the catalogue test above still asserts it is
+ * present, so the module is not hidden, only merged.
+ */
+const NAV_MERGED = new Set(['spare_parts']);
+
 test.describe('Super Admin sees every module and section', () => {
   test('the platform surface and the full module catalogue are visible', async ({ page }) => {
     await signIn(page);
@@ -97,11 +106,18 @@ test.describe('Super Admin sees every module and section', () => {
     }
 
     for (const mod of MODULES) {
+      if (NAV_MERGED.has(mod.key)) continue;
       await expect(
         nav.locator(`a[href="${mod.route}"]`).first(),
         `module "${mod.key}" (${mod.route}) must be visible to the Super Admin`,
       ).toHaveCount(1);
     }
+
+    // The merged module is still reachable: it is the "Spare parts" tab of
+    // Warehouses & Inventory, which is the entry the plan licenses it through.
+    await page.goto('/inventory?tab=parts');
+    await expect(page.getByTestId('inventory-page')).toBeVisible();
+    await expect(page.getByTestId('parts-tab-catalog')).toBeVisible();
   });
 
   test('every module route opens without an application error', async ({ page }) => {

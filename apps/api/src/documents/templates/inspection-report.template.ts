@@ -674,44 +674,33 @@ function chassisMarkers(section: InspectionReportSection): string {
   }).join('');
 }
 
-/** The free-form computer-unit fault table. */
+/**
+ * The computer-unit check's notes.
+ *
+ * The approved form carries one notes field for this check (plus the shared
+ * "nothing to note" checkbox and the attached documents), so the report prints
+ * the notes as a simple numbered list rather than a fault table with separate
+ * description, observation and severity columns.
+ */
 function diagnosticSection(section: InspectionReportSection | undefined): string {
   // The section prints the "nothing to report" statement when the inspector
-  // ticked the matching checkbox, and the "no faults recorded" line when the
-  // fault list is empty. The checkbox wins when both apply, so the sheet never
+  // ticked the matching checkbox, and the "no notes recorded" line when the
+  // note list is empty. The checkbox wins when both apply, so the sheet never
   // prints two different statements about the same check.
   const nothingToReport = section?.noFindings ? noFindingsNote(true) : '';
   if (!section || section.diagnostics.length === 0) {
     return `
     <div class="diag-block avoid-break">
-      <div class="diagram-title">أعطال وحدة الكمبيوتر<span class="ltr">Computer Module Faults</span></div>
-      ${nothingToReport || '<div class="no-findings">لم يتم تسجيل أي أعطال · No computer module faults recorded</div>'}
+      <div class="diagram-title">ملاحظات وحدة الكمبيوتر<span class="ltr">Computer Unit Notes</span></div>
+      ${nothingToReport || '<div class="no-findings">لا توجد ملاحظات مسجلة · No computer unit notes recorded</div>'}
     </div>`;
   }
   return `
   <div class="diag-block">
-    <div class="diagram-title">أعطال وحدة الكمبيوتر<span class="ltr">Computer Module Faults</span></div>
-    <table class="diag-table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>الوصف / Description</th><th>الملاحظة / Observation</th><th>الأهمية / Severity</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${section.diagnostics
-          .map(
-            (d, i) => `
-        <tr>
-          <td class="num">${i + 1}</td>
-          <td>${esc(d.description)}</td>
-          <td>${esc(orDash(d.observation))}</td>
-          <td><span class="sev sev-${d.severity.toLowerCase()}">${esc(d.severity)}</span></td>
-        </tr>`,
-          )
-          .join('')}
-      </tbody>
-    </table>
+    <div class="diagram-title">ملاحظات وحدة الكمبيوتر<span class="ltr">Computer Unit Notes</span></div>
+    <ol class="diag-notes">
+      ${section.diagnostics.map((d) => `<li>${escMultiline(d.description)}</li>`).join('')}
+    </ol>
     ${nothingToReport}
     ${section.remarks ? `<div class="sec-remarks"><b>${esc(section.remarksLabelAr)}:</b> ${escMultiline(section.remarks)}</div>` : ''}
   </div>`;
@@ -1018,9 +1007,8 @@ export const INSPECTION_REPORT_CSS = `
   .ch-ok{ background:#f0fdf4; border-color:#86efac; } .ch-ok .ch-card-state{ color:var(--ok); }
   .ch-bad{ background:#fef2f2; border-color:#fca5a5; } .ch-bad .ch-card-state{ color:var(--bad); }
   .ch-unset .ch-card-state{ color:#9aa4b2; }
-  .diag-table{ border:1px solid var(--line); }
-  .diag-table th,.diag-table td{ border-bottom:1px solid var(--line); padding:4px 7px; font-size:8pt; text-align:start; }
-  .diag-table thead th{ background:#eef2f8; color:var(--navy); }
+  .diag-notes{ margin:6px 0 0; padding-inline-start:18px; font-size:8.5pt; line-height:1.35; color:var(--ink); }
+  .diag-notes li{ margin-bottom:3px; }
   .sev{ padding:1px 6px; border-radius:3px; font-size:7.5pt; font-weight:700; }
   .sev-info{ background:#eef2f8; color:var(--muted); }
   .sev-low{ background:#ecfdf5; color:var(--ok); }

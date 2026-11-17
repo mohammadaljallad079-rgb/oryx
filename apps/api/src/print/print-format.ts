@@ -99,6 +99,7 @@ export interface PrintLineSource {
   quantity: number;
   unitPriceMinor: number;
   discountPercentBp: number;
+  discountAmountMinor?: number;
   taxPercentBp: number;
 }
 
@@ -135,6 +136,7 @@ export function toPrintLines(lines: PrintLineSource[], currency: string) {
     quantity: l.quantity,
     unitPriceMinor: l.unitPriceMinor,
     discountPercentBp: l.discountPercentBp,
+    discountAmountMinor: l.discountAmountMinor,
     taxPercentBp: l.taxPercentBp,
   }));
   const totals = computeDocumentTotals(priced);

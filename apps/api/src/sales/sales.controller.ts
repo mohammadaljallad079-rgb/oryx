@@ -17,6 +17,7 @@ import {
   CreateCustomerDto,
   CreateInvoiceDto,
   CreatePosSaleDto,
+  CreatePosReturnDto,
   CreateQuotationDto,
   CreateSalesOrderDto,
   CustomerAttachmentDto,
@@ -300,5 +301,17 @@ export class SalesController {
   @ApiOperation({ summary: 'Record a POS sale inside an open cashier session' })
   createPosSale(@Body() dto: CreatePosSaleDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.sales.createPosSale(dto, p, actorFrom(p, req));
+  }
+
+  @Post('pos-sales/:id/return')
+  @RequireAnyPermission('erp.sales.pos.operate', 'erp.sales.credit_note.manage')
+  @ApiOperation({ summary: 'Return (part of) a POS receipt and restock the goods' })
+  createPosReturn(
+    @Param('id') id: string,
+    @Body() dto: CreatePosReturnDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.sales.createPosReturn(id, dto, p, actorFrom(p, req));
   }
 }

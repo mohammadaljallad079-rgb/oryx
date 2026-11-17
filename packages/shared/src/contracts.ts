@@ -1082,6 +1082,21 @@ export interface CashierSessionDto {
   saleCount?: number;
 }
 
+export interface PosSaleLineDto {
+  id: string;
+  productId: string | null;
+  description: string;
+  /** Quantity sold, scaled by 10^4. */
+  quantity: number;
+  unitPriceMinor: number;
+  discountMinor: number;
+  taxPercentBp: number;
+  taxMinor: number;
+  lineTotalMinor: number;
+  /** Quantity already returned, scaled by 10^4. */
+  returnedQuantity: number;
+}
+
 export interface PosSaleDto {
   id: string;
   receiptNumber: string;
@@ -1096,8 +1111,30 @@ export interface PosSaleDto {
   changeMinor: number;
   paymentMethod: string;
   currency: string;
+  /** The credit note a till return produced, when the receipt was returned. */
+  returnCreditNoteId: string | null;
+  returnedAt: string | null;
   createdAt: string;
-  lines: Array<Record<string, unknown>>;
+  lines: PosSaleLineDto[];
+}
+
+/**
+ * One line of a till return. `quantity` is what the customer hands back, scaled
+ * by 10^4, and may not exceed the line's sold quantity minus what was already
+ * returned.
+ */
+export interface CreatePosReturnLineDto {
+  posSaleLineId: string;
+  quantity: number;
+}
+
+export interface CreatePosReturnDto {
+  reason?: string;
+  /** Defaults to the receipt's own method (cash out for a cash sale). */
+  refundMethod?: 'CREDIT_ACCOUNT' | 'CASH' | 'BANK_TRANSFER' | 'CARD';
+  /** Put the goods back into stock at the receipt's warehouse. Defaults to true. */
+  restockInventory?: boolean;
+  lines: CreatePosReturnLineDto[];
 }
 
 export interface RequisitionDto {

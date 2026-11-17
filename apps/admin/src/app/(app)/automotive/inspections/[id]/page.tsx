@@ -521,52 +521,70 @@ function GroupedSectionsEditor({
   const { t, locale } = useUi();
   const [busy, setBusy] = useState(false);
   type AreaState = { remarks: string; noFindings: boolean; results: Record<string, InspectionItemResultDto> };
-  const initial = (): Record<string, AreaState> =>
-    Object.fromEntries(
-      areas.map((area) => {
-        const section = session.sections.find((s) => s.area === area);
-        return [
-          area,
-          {
-            remarks: section?.remarks ?? '',
-            noFindings: section?.noFindings ?? false,
-            results: Object.fromEntries((section?.items ?? []).map((i) => [i.itemKey, i])),
-          },
-        ];
-      }),
-    );
+
+  // The empty state for one area, read from the session. Used both to seed the
+  // editor and as the fallback for an area the state has not caught up with yet:
+  // adding a type grows `areas` immediately, but `state` is only rebuilt by the
+  // effect below, which runs after the render that first sees the new area.
+  const areaStateFor = useCallback(
+    (area: InspectionSectionKey): AreaState => {
+      const section = session.sections.find((s) => s.area === area);
+      return {
+        remarks: section?.remarks ?? '',
+        noFindings: section?.noFindings ?? false,
+        results: Object.fromEntries((section?.items ?? []).map((i) => [i.itemKey, i])),
+      };
+    },
+    [session],
+  );
+
+  const initial = useCallback(
+    (): Record<string, AreaState> => Object.fromEntries(areas.map((area) => [area, areaStateFor(area)])),
+    [areas, areaStateFor],
+  );
   const [state, setState] = useState<Record<string, AreaState>>(initial);
 
   useEffect(() => {
     setState(initial());
-    // Re-sync when the server returns a fresh session (a save, or a reload).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+    // Re-sync when the server returns a fresh session (a save, or a reload) or
+    // when a type was added/removed, which changes the rendered area set.
+  }, [initial]);
+
+  // Never read `state[area]` directly: a render that first sees a newly added
+  // area must fall back to the session's empty state rather than crash.
+  const readArea = (area: InspectionSectionKey): AreaState => state[area] ?? areaStateFor(area);
 
   const patch = (area: InspectionSectionKey, next: Partial<AreaState>) =>
-    setState((prev) => ({ ...prev, [area]: { ...prev[area], ...next } }));
+    setState((prev) => ({ ...prev, [area]: { ...(prev[area] ?? areaStateFor(area)), ...next } }));
 
   const setResult = (area: InspectionSectionKey, itemKey: string, result: InspectionResultValue) =>
-    setState((prev) => ({
-      ...prev,
-      [area]: {
-        ...prev[area],
-        results: { ...prev[area].results, [itemKey]: { itemKey, result, note: prev[area].results[itemKey]?.note ?? null } },
-      },
-    }));
+    setState((prev) => {
+      const current = prev[area] ?? areaStateFor(area);
+      return {
+        ...prev,
+        [area]: {
+          ...current,
+          results: {
+            ...current.results,
+            [itemKey]: { itemKey, result, note: current.results[itemKey]?.note ?? null },
+          },
+        },
+      };
+    });
 
   const saveAll = async () => {
     setBusy(true);
     try {
       const payload = areas.map((area) => {
         const spec = inspectionSectionSpec(area);
+        const areaState = readArea(area);
         return {
           area,
-          remarks: state[area].remarks,
-          noFindings: state[area].noFindings,
+          remarks: areaState.remarks,
+          noFindings: areaState.noFindings,
           items: spec.items.map(
             (item) =>
-              state[area].results[item.key] ?? { itemKey: item.key, result: 'UNSET' as InspectionResultValue, note: null },
+              areaState.results[item.key] ?? { itemKey: item.key, result: 'UNSET' as InspectionResultValue, note: null },
           ),
         };
       });
@@ -589,7 +607,7 @@ function GroupedSectionsEditor({
         {areas.map((area) => {
           const spec = inspectionSectionSpec(area);
           const section = session.sections.find((s) => s.area === area);
-          const areaState = state[area];
+          const areaState = readArea(area);
           return (
             <div key={area} className="oryx-group-section" data-testid={`group-section-${area}`}>
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -860,7 +878,15 @@ function SectionEditor({
   );
 }
 
-/** The computer-unit fault records: added one at a time, removed one at a time. */
+/**
+ * The computer-unit check's records.
+ *
+ * The approved form offers exactly three things on this section: a notes field,
+ * the shared "nothing to note" checkbox (rendered by the section editor above),
+ * and the document attachments (a separate panel). The former heading field —
+ * a per-entry title above the note — is not part of the approved form, so it is
+ * gone; each record is a single note.
+ */
 function DiagnosticList({
   sessionId,
   entries,
@@ -874,23 +900,19 @@ function DiagnosticList({
   onChanged: (s: InspectionSessionDto) => void;
   onError: (m: string) => void;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ description: '', observation: '', severity: 'INFO' });
+  const [note, setNote] = useState('');
 
   const add = async () => {
-    if (!form.description.trim()) {
+    if (!note.trim()) {
       onError(t('inspection.diagnosticRequired'));
       return;
     }
     setBusy(true);
     try {
-      await api.addInspectionDiagnostic(sessionId, {
-        description: form.description.trim(),
-        observation: form.observation.trim() || undefined,
-        severity: form.severity,
-      });
-      setForm({ description: '', observation: '', severity: 'INFO' });
+      await api.addInspectionDiagnostic(sessionId, { description: note.trim() });
+      setNote('');
       onChanged(await api.inspectionSession(sessionId));
     } catch (e) {
       onError(e instanceof Error ? e.message : t('common.error'));
@@ -920,45 +942,33 @@ function DiagnosticList({
             <div className="text-[13px] font-semibold">{e.description}</div>
             {e.observation ? <div className="oryx-faint text-[12px]">{e.observation}</div> : null}
           </div>
-          <div className="flex items-center gap-2">
-            <Badge tone={e.severity === 'CRITICAL' || e.severity === 'MAJOR' ? 'danger' : e.severity === 'MINOR' ? 'warning' : 'neutral'}>
-              {t(`inspection.severity.${e.severity}`)}
-            </Badge>
-            {editable ? (
-              <button
-                type="button"
-                className="oryx-btn oryx-btn--sm oryx-btn--ghost"
-                onClick={() => remove(e.id)}
-                disabled={busy}
-                aria-label={t('common.delete')}
-                data-testid={`diagnostic-remove-${e.id}`}
-              >
-                <Icon name="close" size={14} />
-              </button>
-            ) : null}
-          </div>
+          {editable ? (
+            <button
+              type="button"
+              className="oryx-btn oryx-btn--sm oryx-btn--ghost"
+              onClick={() => remove(e.id)}
+              disabled={busy}
+              aria-label={t('common.delete')}
+              data-testid={`diagnostic-remove-${e.id}`}
+            >
+              <Icon name="close" size={14} />
+            </button>
+          ) : null}
         </div>
       ))}
 
       {editable ? (
-        <div className="grid gap-2 sm:grid-cols-2" data-testid="diagnostic-form">
-          <Field label={t('inspection.description')}>
-            <input
-              className="oryx-input"
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              data-testid="diagnostic-description"
+        <div className="flex flex-col gap-2" data-testid="diagnostic-form">
+          <Field label={locale === 'ar' ? 'ملاحظات وحدة الكمبيوتر' : 'Computer Unit Notes'} hint={t('common.optional')}>
+            <textarea
+              className="oryx-input oryx-textarea"
+              rows={2}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              data-testid="diagnostic-notes"
             />
           </Field>
-          <Field label={t('inspection.observation')}>
-            <input
-              className="oryx-input"
-              value={form.observation}
-              onChange={(e) => setForm({ ...form, observation: e.target.value })}
-              data-testid="diagnostic-observation"
-            />
-          </Field>
-          <div className="flex justify-end sm:col-span-2">
+          <div className="flex justify-end">
             <Button onClick={add} disabled={busy} data-testid="diagnostic-add">
               <Icon name="plus" size={14} />
               {t('common.create')}

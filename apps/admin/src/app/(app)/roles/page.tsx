@@ -74,6 +74,15 @@ function RolesInner() {
     return map;
   }, [catalog.data]);
 
+  // Permissions are listed by their human name, not their machine code, so the
+  // list reads as a sentence rather than a wall of identifiers. The code stays
+  // available in the row's tooltip for an operator who needs to quote it.
+  const permissionLabel = (code: string): string => {
+    const def = catalogByCode.get(code);
+    if (!def) return code;
+    return locale === 'ar' ? def.labelAr : def.labelEn;
+  };
+
   if (!scopeCompanyId) {
     return (
       <div className="flex flex-col gap-4" data-testid="roles-page">
@@ -132,31 +141,32 @@ function RolesInner() {
 
                 <p className="oryx-muted m-0 mb-3 text-[12px]">{roleDescription(r)}</p>
 
-                <div className="mb-3 flex flex-wrap gap-1">
-                  {r.permissions.slice(0, 10).map((p) => {
-                    const def = catalogByCode.get(p);
-                    const blocked = !r.isSystem && !delegableSet.has(p);
-                    return (
-                      <span
-                        key={p}
-                        className={`oryx-badge ${blocked ? 'oryx-badge--danger' : 'oryx-badge--neutral'} font-mono text-[10px]`}
-                        title={def ? def.labelEn : p}
-                      >
-                        {p}
-                      </span>
-                    );
-                  })}
-                  {r.permissions.length > 10 ? (
-                    <span className="oryx-badge oryx-badge--neutral text-[10px]">
-                      +{r.permissions.length - 10}
-                    </span>
+                <div className="mb-3" data-testid={`role-permissions-${r.code}`}>
+                  <ul className="oryx-perm-list m-0">
+                    {r.permissions.slice(0, 12).map((p) => {
+                      const blocked = !r.isSystem && !delegableSet.has(p);
+                      return (
+                        <li
+                          key={p}
+                          className={blocked ? 'oryx-perm-list__item is-blocked' : 'oryx-perm-list__item'}
+                          title={p}
+                        >
+                          {permissionLabel(p)}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {r.permissions.length > 12 ? (
+                    <p className="oryx-faint m-0 mt-1 text-[11.5px]">
+                      {t('roles.morePermissions').replace('{n}', String(r.permissions.length - 12))}
+                    </p>
                   ) : null}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone="neutral">
+                  <span className="oryx-muted text-[12px]">
                     {r.permissions.length} {t('roles.permissionCount')}
-                  </Badge>
+                  </span>
                   {!r.isSystem && can('company.role.update') ? (
                     <Button size="sm" onClick={() => setEditing(r)} data-testid={`edit-role-${r.code}`}>
                       {t('common.edit')}
@@ -179,22 +189,22 @@ function RolesInner() {
         {(catalog.data?.groups ?? []).map((group) => (
           <div key={group} className="mb-4">
             <p className="oryx-nav-group-label">{group}</p>
-            <div className="flex flex-wrap gap-1">
+            <ul className="oryx-perm-list m-0">
               {(catalog.data?.permissions ?? [])
                 .filter((p) => p.group === group)
                 .map((p) => {
                   const allowed = delegableSet.has(p.code);
                   return (
-                    <span
+                    <li
                       key={p.code}
-                      className={`oryx-badge ${allowed ? 'oryx-badge--success' : 'oryx-badge--neutral'} font-mono text-[10px]`}
-                      title={locale === 'ar' ? p.labelAr : p.labelEn}
+                      className={allowed ? 'oryx-perm-list__item' : 'oryx-perm-list__item is-blocked'}
+                      title={p.code}
                     >
-                      {p.code}
-                    </span>
+                      {locale === 'ar' ? p.labelAr : p.labelEn}
+                    </li>
                   );
                 })}
-            </div>
+            </ul>
           </div>
         ))}
       </Card>

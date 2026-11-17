@@ -1943,11 +1943,16 @@ function percentLine(l: {
   quantity: number;
   unitPriceMinor: number;
   discountPercentBp: number;
+  discountAmountMinor?: number;
   taxPercentBp: number;
   lineTotalMinor: number;
 }, skus: Map<string, string> = new Map()) {
   const gross = lineAmountMinor(l.quantity, l.unitPriceMinor);
-  const discount = basisPointsOfMinor(gross, l.discountPercentBp);
+  const percentMinor = basisPointsOfMinor(gross, l.discountPercentBp);
+  // The flat amount is applied after the percentage and clamped to what remains,
+  // matching `computeDocumentTotals` so the printed figure equals the posted one.
+  const amountMinor = Math.min(Math.max(0, l.discountAmountMinor ?? 0), gross - percentMinor);
+  const discount = percentMinor + amountMinor;
   const tax = basisPointsOfMinor(gross - discount, l.taxPercentBp);
   return {
     ...splitLineDescription(l.description),

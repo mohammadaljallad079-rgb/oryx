@@ -324,18 +324,20 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await expect(page.getByTestId('inspection-submit')).toBeEnabled();
   });
 
-  test('records a computer-unit fault and can remove it again', async ({ page }) => {
+  test('records a computer-unit note and can remove it again', async ({ page }) => {
     const id = await seedJob(page, ['COMPUTER_UNIT']);
     await page.goto(`/automotive/inspections/${id}`);
     await expect(page.getByTestId('inspection-workspace')).toBeVisible();
 
     await expect(page.getByTestId('diagnostic-list')).toBeVisible();
-    // The form collects a description and an optional note only: the module name
-    // and fault code are no longer asked for.
+    // The check keeps the notes, the "nothing to note" checkbox and the
+    // attachments only. The module name, the fault code and the separate
+    // observation field are gone; a record is a single note.
     await expect(page.getByTestId('diagnostic-module')).toHaveCount(0);
     await expect(page.getByTestId('diagnostic-code')).toHaveCount(0);
-    await page.getByTestId('diagnostic-description').fill('System too lean (bank 1)');
-    await page.getByTestId('diagnostic-observation').fill('Bank 1 sensor drift');
+    await expect(page.getByTestId('diagnostic-observation')).toHaveCount(0);
+    await expect(page.getByTestId('no-findings-COMPUTER_UNIT')).toBeVisible();
+    await page.getByTestId('diagnostic-notes').fill('System too lean (bank 1)');
     await page.getByTestId('diagnostic-add').click();
 
     const entry = page.locator('[data-testid^="diagnostic-"]').filter({ hasText: 'System too lean' }).first();

@@ -659,7 +659,7 @@ body::before {
    the numeric columns stay close to equal, exactly as the document lays them out. */
 .oryx-doc-form__grid {
   display: grid;
-  grid-template-columns: 3.2fr 0.7fr 1fr 0.9fr 0.8fr 1fr 32px;
+  grid-template-columns: 3.2fr 0.7fr 1fr 0.8fr 0.9fr 0.8fr 1fr 32px;
   gap: 8px;
   align-items: center;
 }
@@ -1299,6 +1299,49 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   color: var(--text-muted);
   background: var(--surface-raised);
   border-color: var(--border);
+}
+
+/* ------------------------------------------------------------------ permissions */
+
+/* The textual permission list. A role or a principal carries many permissions,
+ * so they are printed one per line as readable names rather than as a wall of
+ * machine codes or a row of unlabelled chips. A suppressed (not delegable, or
+ * not licensed) permission is struck through and muted so the list still reads
+ * top to bottom without a second legend. */
+.oryx-perm-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 1px 18px;
+}
+
+.oryx-perm-list__item {
+  position: relative;
+  padding-inline-start: 15px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text);
+}
+
+.oryx-perm-list__item::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 2px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+
+.oryx-perm-list__item.is-blocked {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.oryx-perm-list__item.is-blocked::before {
+  background: var(--border-strong, var(--border));
 }
 
 /* ------------------------------------------------------------------ tables */

@@ -10,6 +10,7 @@ import { Icon } from '@/components/icons';
 import { ModuleDashboard } from '@/components/module-dashboard';
 import { TabDeepLink } from '@/components/tab-deep-link';
 import { EntityPicker } from '@/components/inline-create';
+import { PartsWorkspace } from '@/components/parts-tabs';
 import { ProductModal, WarehouseModal } from '@/components/entity-modals';
 import {
   Badge,
@@ -35,9 +36,9 @@ import type {
   WarehouseDto,
 } from '@oryx/shared';
 
-type Tab = 'dashboard' | 'valuation' | 'products' | 'warehouses' | 'movements' | 'transfers' | 'adjustments' | 'reorder';
+type Tab = 'dashboard' | 'valuation' | 'products' | 'warehouses' | 'movements' | 'transfers' | 'adjustments' | 'reorder' | 'parts';
 
-const TAB_KEYS = ['dashboard', 'valuation', 'products', 'warehouses', 'movements', 'transfers', 'adjustments', 'reorder'] as const;
+const TAB_KEYS = ['dashboard', 'valuation', 'products', 'warehouses', 'movements', 'transfers', 'adjustments', 'reorder', 'parts'] as const;
 
 export default function InventoryPage() {
   return (
@@ -49,7 +50,7 @@ export default function InventoryPage() {
 
 function InventoryInner() {
   const { t } = useUi();
-  const { can } = useAuth();
+  const { can, hasModule } = useAuth();
   const [tab, setTab] = useState<Tab>('dashboard');
 
   const canItem = can('erp.inventory.item.manage');
@@ -57,6 +58,7 @@ function InventoryInner() {
   const canMove = can('erp.inventory.movement.manage');
   const canTransfer = can('erp.inventory.transfer.manage');
   const canAdjust = can('erp.inventory.adjustment.manage');
+  const showParts = hasModule('spare_parts');
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'dashboard', label: t('erp.inventory.dashboard') },
@@ -67,6 +69,9 @@ function InventoryInner() {
     { key: 'transfers', label: t('erp.inventory.transfers') },
     { key: 'adjustments', label: t('erp.inventory.adjustments') },
     { key: 'reorder', label: t('erp.inventory.reorder') },
+    // Spare parts are licensed with the Enterprise plan, so the tab is hidden
+    // when the module is not entitled rather than shown and rejected by the API.
+    ...(showParts ? [{ key: 'parts' as Tab, label: t('nav.spare_parts') }] : []),
   ];
 
   return (
@@ -102,6 +107,7 @@ function InventoryInner() {
       {tab === 'transfers' ? <TransfersTab canManage={canTransfer} /> : null}
       {tab === 'adjustments' ? <AdjustmentsTab canManage={canAdjust} /> : null}
       {tab === 'reorder' ? <ReorderTab /> : null}
+      {tab === 'parts' && showParts ? <PartsWorkspace /> : null}
     </div>
   );
 }

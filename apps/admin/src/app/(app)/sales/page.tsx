@@ -57,6 +57,8 @@ interface LineDraft {
   unitPrice: string;
   /** A per-line discount in whole percent, converted to basis points on submit. */
   discountPercent: string;
+  /** A flat per-line discount in major units, converted to minor units on submit. */
+  discountAmount: string;
   /** The chosen tax row, or a synthetic id when the product carries a rate that
    * is not in the tenant's saved list. */
   taxId: string;
@@ -69,6 +71,7 @@ const emptyLine = (taxPercent = '10'): LineDraft => ({
   quantity: '1',
   unitPrice: '0.00',
   discountPercent: '0',
+  discountAmount: '0.00',
   taxId: '',
   taxPercent,
 });
@@ -120,6 +123,7 @@ function computePosTotals(
     quantity: number;
     unitPriceMinor: number;
     discountPercentBp: number;
+    discountAmountMinor?: number;
     taxPercentBp: number;
   }>,
   roundingMode: RoundingMode,
@@ -127,7 +131,11 @@ function computePosTotals(
 ) {
   const priced = lines.map((l) => {
     const lineSubtotalMinor = lineAmountMinor(l.quantity, l.unitPriceMinor);
-    const discountMinor = basisPointsOfMinor(lineSubtotalMinor, l.discountPercentBp);
+    const percentMinor = basisPointsOfMinor(lineSubtotalMinor, l.discountPercentBp);
+    // The flat discount is applied after the percentage and clamped to what is
+    // left, matching `computeDocumentTotals` so the till shows the posted total.
+    const amountMinor = Math.min(Math.max(0, l.discountAmountMinor ?? 0), lineSubtotalMinor - percentMinor);
+    const discountMinor = percentMinor + amountMinor;
     const net = lineSubtotalMinor - discountMinor;
     const taxMinor = basisPointsOfMinor(net, l.taxPercentBp);
     return { lineSubtotalMinor, discountMinor, taxMinor, lineTotalMinor: net + taxMinor };
@@ -191,7 +199,9 @@ export default function SalesPage() {
 function SalesInner() {
   const { t } = useUi();
   const { can } = useAuth();
-  const [tab, setTab] = useState<Tab>('invoices');
+  // Every module opens on its dashboard, whose first block is the Quick actions
+  // row, so an operator lands on what they can do rather than on a data table.
+  const [tab, setTab] = useState<Tab>('dashboard');
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'dashboard', label: t('erp.sales.dashboard') },
@@ -241,6 +251,8 @@ type SalesLine = {
   quantity?: number;
   unitPriceMinor?: number;
   discountPercentBp?: number;
+  discountAmountMinor?: number;
+  discountMinor?: number;
   taxPercentBp?: number;
   lineTotalMinor?: number;
 };
@@ -276,7 +288,11 @@ function InvoiceLineBreakdown({ document: doc }: { document: SalesDocumentDto })
                 <td className="py-1.5 text-start">{line.description || '—'}</td>
                 <td className="py-1.5 text-end tabular-nums">{qty(line.quantity)}</td>
                 <td className="py-1.5 text-end tabular-nums">{money(line.unitPriceMinor, currency)}</td>
-                <td className="py-1.5 text-end tabular-nums">{((line.discountPercentBp ?? 0) / 100).toFixed(2)}%</td>
+                <td className="py-1.5 text-end tabular-nums">
+                  {line.discountMinor != null
+                    ? money(line.discountMinor, currency)
+                    : `${((line.discountPercentBp ?? 0) / 100).toFixed(2)}%`}
+                </td>
                 <td className="py-1.5 text-end tabular-nums">{((line.taxPercentBp ?? 0) / 100).toFixed(2)}%</td>
                 <td className="py-1.5 text-end tabular-nums font-semibold">{money(line.lineTotalMinor, currency)}</td>
               </tr>
@@ -712,6 +728,7 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
   const warehouses = useAsync(() => api.warehouses(), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const [saleOpen, setSaleOpen] = useState(false);
+  const [returnTarget, setReturnTarget] = useState<PosSaleDto | null>(null);
   const [closeTarget, setCloseTarget] = useState<CashierSessionDto | null>(null);
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
@@ -844,28 +861,57 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
                 <th>{t('erp.sales.paid')}</th>
                 <th>{t('erp.sales.change')}</th>
                 <th>{t('erp.sales.method')}</th>
+                <th>{t('erp.sales.pos.status')}</th>
                 <th>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
-              {sales.data!.items.map((p: PosSaleDto) => (
-                <tr key={p.id} data-testid={`pos-row-${p.receiptNumber}`}>
-                  <td className="font-mono text-[12px]">{p.receiptNumber}</td>
-                  <td className="text-[12.5px]">{p.createdAt.slice(0, 10)}</td>
-                  <td className="tabular-nums text-[12.5px] font-semibold">{money(p.totalMinor)}</td>
-                  <td className="tabular-nums text-[12.5px]">{money(p.paidMinor)}</td>
-                  <td className="tabular-nums text-[12.5px]">{money(p.changeMinor)}</td>
-                  <td><Badge tone="info">{p.paymentMethod}</Badge></td>
-                  <td>
-                    <DocumentActions
-                      sourceType="PosSale"
-                      sourceId={p.id}
-                      type="POS_RECEIPT"
-                      permissions={['erp.sales.read']}
-                    />
-                  </td>
-                </tr>
-              ))}
+              {sales.data!.items.map((p: PosSaleDto) => {
+                const fullyReturned = p.status === 'RETURNED';
+                return (
+                  <tr key={p.id} data-testid={`pos-row-${p.receiptNumber}`}>
+                    <td className="font-mono text-[12px]">{p.receiptNumber}</td>
+                    <td className="text-[12.5px]">{p.createdAt.slice(0, 10)}</td>
+                    <td className="tabular-nums text-[12.5px] font-semibold">{money(p.totalMinor)}</td>
+                    <td className="tabular-nums text-[12.5px]">{money(p.paidMinor)}</td>
+                    <td className="tabular-nums text-[12.5px]">{money(p.changeMinor)}</td>
+                    <td><Badge tone="info">{p.paymentMethod}</Badge></td>
+                    <td>
+                      <StatusBadge
+                        status={p.status}
+                        label={
+                          fullyReturned
+                            ? t('erp.sales.pos.returned')
+                            : p.status === 'PARTIALLY_RETURNED'
+                              ? t('erp.sales.pos.partiallyReturned')
+                              : p.status
+                        }
+                      />
+                    </td>
+                    <td>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <DocumentActions
+                          sourceType="PosSale"
+                          sourceId={p.id}
+                          type="POS_RECEIPT"
+                          permissions={['erp.sales.read']}
+                        />
+                        {canOperate && !fullyReturned && p.status !== 'VOID' ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setReturnTarget(p)}
+                            data-testid={`return-pos-${p.receiptNumber}`}
+                          >
+                            <Icon name="refresh" size={14} />
+                            {t('erp.sales.pos.return')}
+                          </Button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </TableShell>
         )}
@@ -895,7 +941,211 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
           await sales.reload();
         }}
       />
+
+      <PosReturnModal
+        sale={returnTarget}
+        onClose={() => setReturnTarget(null)}
+        onDone={async () => {
+          await sales.reload();
+        }}
+      />
     </div>
+  );
+}
+
+/**
+ * The till return.
+ *
+ * A receipt can be returned in full or line by line. The operator picks the
+ * quantities coming back, chooses how the refund is settled, and — unless the
+ * goods are damaged — they go back into the receipt's warehouse. The server
+ * prices the return from the original lines, so the refund can never exceed what
+ * was charged, and it refuses to return more than a line still has outstanding.
+ */
+function PosReturnModal({
+  sale,
+  onClose,
+  onDone,
+}: {
+  sale: PosSaleDto | null;
+  onClose: () => void;
+  onDone: () => Promise<void>;
+}) {
+  const { t } = useUi();
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [refundMethod, setRefundMethod] = useState<'CREDIT_ACCOUNT' | 'CASH' | 'BANK_TRANSFER' | 'CARD'>('CASH');
+  const [restock, setRestock] = useState(true);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!sale) return;
+    setQuantities({});
+    setReason('');
+    setError(null);
+    setNotice(null);
+    setRestock(true);
+    setRefundMethod(sale.paymentMethod === 'CASH' ? 'CASH' : 'CREDIT_ACCOUNT');
+  }, [sale]);
+
+  const lines = sale?.lines ?? [];
+  const returnable = lines.filter((l) => l.quantity - l.returnedQuantity > 0);
+
+  // The inputs are typed in whole units; the API works in 10^4-scaled units, so
+  // the conversion happens once, on submit.
+  const requested = returnable
+    .map((l) => ({ line: l, units: Math.min(quantities[l.id] ?? 0, (l.quantity - l.returnedQuantity) / 10_000) }))
+    .filter((r) => r.units > 0);
+  const estimate = computePosTotals(
+    requested.map((r) => ({
+      quantity: Math.round(r.units * 10_000),
+      unitPriceMinor: r.line.unitPriceMinor,
+      discountPercentBp: 0,
+      discountAmountMinor:
+        r.line.quantity > 0 ? Math.round((r.line.discountMinor * Math.round(r.units * 10_000)) / r.line.quantity) : 0,
+      taxPercentBp: r.line.taxPercentBp,
+    })),
+    'NONE',
+    3,
+  );
+
+  const submit = async () => {
+    if (!sale || requested.length === 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.createPosReturn(sale.id, {
+        refundMethod,
+        restockInventory: restock,
+        reason: reason || undefined,
+        lines: requested.map((r) => ({ posSaleLineId: r.line.id, quantity: Math.round(r.units * 10_000) })),
+      });
+      setNotice(t('erp.sales.pos.returnDone'));
+      await onDone();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={Boolean(sale)}
+      title={sale ? `${t('erp.sales.pos.returnTitle')} — ${sale.receiptNumber}` : t('erp.sales.pos.returnTitle')}
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            variant="primary"
+            disabled={busy || requested.length === 0}
+            onClick={submit}
+            data-testid="pos-return-confirm"
+          >
+            {busy ? t('common.loading') : `${t('erp.sales.pos.returnConfirm')} · ${money(estimate.totalMinor)}`}
+          </Button>
+        </>
+      }
+    >
+      {error ? <ErrorBanner message={error} /> : null}
+      {notice ? (
+        <p className="oryx-muted m-0 mb-3 text-[12.5px]" role="status" data-testid="pos-return-notice">
+          {notice}
+        </p>
+      ) : null}
+      <p className="oryx-faint m-0 mb-3 text-[12px]">{t('erp.sales.pos.returnIntro')}</p>
+
+      {returnable.length === 0 ? (
+        <ErrorBanner message={t('erp.sales.pos.returnNone')} />
+      ) : (
+        <div className="flex flex-col gap-2" data-testid="pos-return-lines">
+          {returnable.map((l) => {
+            const remainingUnits = (l.quantity - l.returnedQuantity) / 10_000;
+            return (
+              <div
+                key={l.id}
+                className="grid grid-cols-[minmax(0,1fr)_90px] items-center gap-2 rounded-xl border border-[var(--border)] p-2"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-[12.5px] font-semibold">{l.description}</span>
+                  <span className="oryx-faint block text-[11px]">
+                    {t('erp.sales.pos.returnSold')} {qty(l.quantity)} ·{' '}
+                    {t('erp.sales.pos.returnAlready')} {qty(l.returnedQuantity)}
+                  </span>
+                </span>
+                <input
+                  className="oryx-input text-center text-[12px]"
+                  type="number"
+                  min={0}
+                  max={remainingUnits}
+                  step={1}
+                  value={quantities[l.id] ?? 0}
+                  aria-label={`${t('erp.sales.pos.returnQty')} ${l.description}`}
+                  onChange={(e) =>
+                    setQuantities((prev) => ({
+                      ...prev,
+                      [l.id]: Math.max(0, Math.min(remainingUnits, Number(e.target.value) || 0)),
+                    }))
+                  }
+                  data-testid={`pos-return-qty-${l.id}`}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <Field label={t('erp.sales.pos.returnRefund')}>
+          <SearchableSelect
+            value={refundMethod}
+            options={[
+              { value: 'CASH', label: t('erp.sales.refundCash') },
+              { value: 'CARD', label: t('erp.sales.refundCard') },
+              { value: 'BANK_TRANSFER', label: t('erp.sales.refundBankTransfer') },
+              { value: 'CREDIT_ACCOUNT', label: t('erp.sales.refundCreditAccount') },
+            ]}
+            onChange={(v) => setRefundMethod((v ?? 'CASH') as typeof refundMethod)}
+            testId="pos-return-refund"
+          />
+        </Field>
+        <Field label={t('erp.sales.pos.returnReason')}>
+          <input
+            className="oryx-input"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            data-testid="pos-return-reason"
+          />
+        </Field>
+      </div>
+
+      <label className="mt-3 flex items-center gap-2 text-[12.5px]">
+        <input
+          type="checkbox"
+          className="oryx-checkbox"
+          checked={restock}
+          onChange={(e) => setRestock(e.target.checked)}
+          data-testid="pos-return-restock"
+        />
+        {t('erp.sales.pos.returnRestock')}
+      </label>
+
+      <dl className="oryx-pos__totals mt-4">
+        <Row label={t('erp.sales.pos.subtotal')} value={money(estimate.subtotalMinor)} />
+        {estimate.discountMinor !== 0 ? (
+          <Row label={t('erp.sales.pos.discountTotal')} value={`− ${money(estimate.discountMinor)}`} />
+        ) : null}
+        <Row label={t('erp.sales.pos.tax')} value={money(estimate.taxMinor)} />
+      </dl>
+      <div className="oryx-pos__grand" data-testid="pos-return-total">
+        <span>{t('erp.sales.pos.returnConfirm')}</span>
+        <span className="tabular-nums">{money(estimate.totalMinor)}</span>
+      </div>
+    </Modal>
   );
 }
 
@@ -1569,9 +1819,14 @@ function priceDraftLine(line: LineDraft, currency?: string) {
   const quantity = toQuantityInput(line.quantity);
   const unitPriceMinor = toMinorInput(line.unitPrice, currency);
   const discountPercentBp = Math.round((Number(line.discountPercent) || 0) * 100);
+  const requestedAmountMinor = Math.max(0, toMinorInput(line.discountAmount || '0', currency));
   const taxPercentBp = Math.round((Number(line.taxPercent) || 0) * 100);
   const lineSubtotalMinor = lineAmountMinor(quantity, unitPriceMinor);
-  const discountMinor = basisPointsOfMinor(lineSubtotalMinor, discountPercentBp);
+  // Mirror the API exactly: percentage first, then the flat amount clamped to
+  // what is left, so the form's figure equals the posted figure.
+  const percentMinor = basisPointsOfMinor(lineSubtotalMinor, discountPercentBp);
+  const discountAmountMinor = Math.min(requestedAmountMinor, lineSubtotalMinor - percentMinor);
+  const discountMinor = percentMinor + discountAmountMinor;
   const net = lineSubtotalMinor - discountMinor;
   const taxMinor = basisPointsOfMinor(net, taxPercentBp);
   return { lineSubtotalMinor, discountMinor, taxMinor, lineTotalMinor: net + taxMinor };
@@ -1670,6 +1925,7 @@ function LineEditor({
         <span className="text-center">{t('erp.sales.form.quantity')}</span>
         <span className="text-end">{t('erp.sales.form.unitPrice')}</span>
         <span className="text-center">{t('erp.sales.discount')}</span>
+        <span className="text-center">{t('erp.sales.discountAmount')}</span>
         <span className="text-center">{t('erp.sales.form.taxes')}</span>
         <span className="text-end">{t('erp.sales.form.amount')}</span>
         <span />
@@ -1723,6 +1979,13 @@ function LineEditor({
             value={line.discountPercent}
             onChange={(e) => update(i, { discountPercent: e.target.value })}
             data-testid={`${testIdPrefix}-discount-${i}`}
+          />
+          <input
+            className="oryx-input text-center"
+            placeholder="0.000"
+            value={line.discountAmount}
+            onChange={(e) => update(i, { discountAmount: e.target.value })}
+            data-testid={`${testIdPrefix}-discount-amount-${i}`}
           />
           <TaxPicker
             value={line.taxId || null}
@@ -1918,6 +2181,7 @@ function DocumentModal({
             quantity: qty(Number(line.quantity ?? 0)),
             unitPrice: minorToInput(Number(line.unitPriceMinor ?? 0), initialDocument.currency),
             discountPercent: String(Number(line.discountPercentBp ?? 0) / 100),
+            discountAmount: minorToInput(Number(line.discountAmountMinor ?? 0), initialDocument.currency),
             taxId: '',
             taxPercent: String(Number(line.taxPercentBp ?? 0) / 100),
           }))
@@ -1997,6 +2261,7 @@ function DocumentModal({
           quantity: toQuantityInput(l.quantity),
           unitPriceMinor: toMinorInput(l.unitPrice, currency),
           discountPercentBp: Math.round((Number(l.discountPercent) || 0) * 100),
+          discountAmountMinor: Math.max(0, toMinorInput(l.discountAmount || '0', currency)),
           taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
         })),
       };

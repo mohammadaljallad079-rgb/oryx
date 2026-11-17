@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { fromQuantity, sumMinor, type RoundingMode } from '@oryx/shared';
+import { fromQuantity, basisPointsOfMinor, lineAmountMinor, sumMinor, type RoundingMode } from '@oryx/shared';
 import type { PaymentMethod } from '@oryx/database';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
@@ -19,6 +19,7 @@ import type {
   CreateCustomerDto,
   CreateInvoiceDto,
   CreatePosSaleDto,
+  CreatePosReturnDto,
   CreateQuotationDto,
   CreateSalesOrderDto,
   ListQueryDto,
@@ -657,6 +658,7 @@ export class SalesService {
               quantity: l.quantity,
               unitPriceMinor: l.unitPriceMinor,
               discountPercentBp: l.discountPercentBp,
+              discountAmountMinor: l.discountAmountMinor,
               taxPercentBp: l.taxPercentBp,
               lineTotalMinor: l.lineTotalMinor,
               sortOrder: l.sortOrder,
@@ -832,6 +834,7 @@ export class SalesService {
         quantity: line.quantity,
         unitPriceMinor: line.unitPriceMinor,
         discountPercentBp: line.discountPercentBp,
+        discountAmountMinor: line.discountAmountMinor,
         taxPercentBp: line.taxPercentBp,
       }));
       const rounding = await this.context.companyRoundingMode(companyId, tx);
@@ -988,6 +991,7 @@ export class SalesService {
           quantity: l.quantity,
           unitPriceMinor: l.unitPriceMinor,
           discountPercentBp: l.discountPercentBp,
+          discountAmountMinor: l.discountAmountMinor,
           taxPercentBp: l.taxPercentBp,
         }));
       } else {
@@ -1001,6 +1005,7 @@ export class SalesService {
           quantity: l.quantity,
           unitPriceMinor: l.unitPriceMinor,
           discountPercentBp: l.discountPercentBp,
+          discountAmountMinor: l.discountAmountMinor,
           taxPercentBp: l.taxPercentBp,
         }));
       }
@@ -1552,7 +1557,7 @@ export class SalesService {
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
-        include: { lines: true },
+        include: { lines: { orderBy: { sortOrder: 'asc' } } },
       }),
       this.prisma.posSale.count({ where }),
     ]);
@@ -1587,6 +1592,7 @@ export class SalesService {
         quantity: l.quantity,
         unitPriceMinor: l.unitPriceMinor,
         discountPercentBp: l.discountPercentBp ?? 0,
+        discountAmountMinor: l.discountAmountMinor ?? 0,
         taxPercentBp: l.taxPercentBp ?? 0,
       }));
       const rounding = await this.context.companyRoundingMode(companyId, tx);
@@ -1676,10 +1682,11 @@ export class SalesService {
               taxPercentBp: l.taxPercentBp,
               taxMinor: l.taxMinor,
               lineTotalMinor: l.lineTotalMinor,
+              sortOrder: i,
             })),
           },
         },
-        include: { lines: true },
+        include: { lines: { orderBy: { sortOrder: 'asc' } } },
       });
 
       // Settle the AR control against cash for this receipt.
@@ -1713,6 +1720,225 @@ export class SalesService {
       targetType: 'POS_SALE',
       targetId: result.id,
       summary: `Recorded POS sale ${result.receiptNumber}`,
+    });
+    return result;
+  }
+
+  /**
+   * Return (part of) a till receipt.
+   *
+   * The sale is never rewritten: the return is its own posted credit note, which
+   * carries the ledger entry and, when restocking, the stock receipt through the
+   * shared inventory ledger. Each line records how much has already come back,
+   * so the same goods cannot be refunded twice and a partial return leaves the
+   * rest of the receipt sold. The refund settles the same way the sale was
+   * taken: a cash receipt refunds cash, everything else credits the customer's
+   * account unless the operator chooses otherwise.
+   */
+  async createPosReturn(
+    id: string,
+    dto: CreatePosReturnDto,
+    principal: RequestPrincipal,
+    actor: ActorContext,
+  ) {
+    const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
+    const companyCurrency = await this.context.companyCurrency(companyId);
+
+    const result = await this.posting.withTransaction(async (tx) => {
+      const sale = await tx.posSale.findFirst({
+        where: { id, companyId },
+        include: { lines: { orderBy: { sortOrder: 'asc' } } },
+      });
+      if (!sale) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'POS sale not found.');
+      await this.context.assertBranchScope(companyId, sale.branchId, branchIds);
+      if (sale.status === 'VOID' || sale.status === 'RETURNED') {
+        throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'This receipt has already been returned in full.');
+      }
+
+      const lineById = new Map(sale.lines.map((l) => [l.id, l]));
+      const rounding = await this.context.companyRoundingMode(companyId, tx);
+
+      // Validate every requested quantity against what is still returnable and
+      // price the return exactly as the receipt priced the line, so a refund
+      // cannot exceed what was charged (including the cashier's line discount).
+      const pricedInputs: PricedLineInput[] = [];
+      const returnLines: Array<{ line: (typeof sale.lines)[number]; quantity: number }> = [];
+      for (const rl of dto.lines) {
+        const line = lineById.get(rl.posSaleLineId);
+        if (!line) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'A return line does not belong to this receipt.');
+        }
+        const remaining = line.quantity - line.returnedQuantity;
+        if (rl.quantity > remaining) {
+          throw badRequest(
+            ERROR_CODES.VALIDATION_FAILED,
+            `Cannot return ${fromQuantity(rl.quantity)} of ${line.description}; only ${fromQuantity(remaining)} remain.`,
+          );
+        }
+        const perUnitDiscount = line.quantity > 0 ? Math.round((line.discountMinor * rl.quantity) / line.quantity) : 0;
+        pricedInputs.push({
+          quantity: rl.quantity,
+          unitPriceMinor: line.unitPriceMinor,
+          discountAmountMinor: perUnitDiscount,
+          taxPercentBp: line.taxPercentBp,
+        });
+        returnLines.push({ line, quantity: rl.quantity });
+      }
+
+      const totals = computeDocumentTotals(pricedInputs, rounding.mode, rounding.scale);
+      const issueDate = new Date();
+      const creditNoteNumber = await this.sequences.next(tx, companyId, 'creditNote');
+
+      // A cash sale refunds cash by default; every other method credits the
+      // customer's account unless the operator explicitly refunds to cash/bank.
+      const refundMethod: 'CREDIT_ACCOUNT' | 'CASH' | 'BANK_TRANSFER' | 'CARD' =
+        dto.refundMethod ?? (sale.paymentMethod === 'CASH' ? 'CASH' : 'CREDIT_ACCOUNT');
+      const restockInventory = dto.restockInventory ?? true;
+
+      const note = await tx.creditNote.create({
+        data: {
+          companyId,
+          branchId: sale.branchId,
+          creditNoteNumber,
+          customerId: sale.customerId ?? (await this.ensureWalkInCustomer(tx, companyId)),
+          invoiceId: sale.salesInvoiceId ?? null,
+          warehouseId: restockInventory ? sale.warehouseId : null,
+          status: 'POSTED',
+          issueDate,
+          subtotalMinor: totals.subtotalMinor,
+          taxMinor: totals.taxMinor,
+          roundingMinor: totals.roundingMinor,
+          totalMinor: totals.totalMinor,
+          reason: dto.reason ?? `POS return for receipt ${sale.receiptNumber}`,
+          refundMethod,
+          currency: sale.currency || companyCurrency,
+          restockInventory,
+          createdById: actor.userId,
+          postedAt: issueDate,
+          lines: {
+            create: totals.lines.map((l, i) => ({
+              productId: returnLines[i].line.productId,
+              description: returnLines[i].line.description,
+              quantity: l.quantity,
+              unitPriceMinor: l.unitPriceMinor,
+              taxPercentBp: l.taxPercentBp,
+              lineTotalMinor: l.lineTotalMinor,
+              sortOrder: i,
+            })),
+          },
+        },
+        include: { customer: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
+      });
+
+      // Reverse the sale's revenue/VAT and settle the refund the way it is paid.
+      const revenueAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.SALES_REVENUE);
+      const arAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.AR_CONTROL);
+      const creditAccount =
+        refundMethod === 'CASH'
+          ? await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.CASH)
+          : refundMethod === 'BANK_TRANSFER' || refundMethod === 'CARD'
+            ? await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.BANK)
+            : arAccount;
+      const roundingAccount =
+        totals.roundingMinor !== 0
+          ? await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.ROUNDING_GAIN_LOSS)
+          : null;
+      const journal = await this.posting.postJournal(tx, {
+        companyId,
+        branchId: sale.branchId,
+        entryDate: issueDate,
+        memo: `POS return ${creditNoteNumber} for receipt ${sale.receiptNumber}`,
+        sourceType: 'CREDIT_NOTE',
+        sourceId: note.id,
+        actorUserId: actor.userId,
+        lines: [
+          { accountId: revenueAccount, debit: totals.subtotalMinor },
+          ...(totals.taxMinor > 0
+            ? [{ accountId: await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.VAT_OUTPUT), debit: totals.taxMinor }]
+            : []),
+          ...(roundingAccount && totals.roundingMinor > 0
+            ? [{ accountId: roundingAccount, debit: totals.roundingMinor }]
+            : []),
+          ...(roundingAccount && totals.roundingMinor < 0
+            ? [{ accountId: roundingAccount, credit: -totals.roundingMinor }]
+            : []),
+          { accountId: creditAccount, credit: totals.totalMinor },
+        ],
+      });
+
+      // Restock returned goods at their original (moving-average) cost.
+      if (restockInventory && sale.warehouseId) {
+        let restockValue = 0;
+        for (const [i, rl] of returnLines.entries()) {
+          if (!rl.line.productId) continue;
+          const product = await tx.product.findFirst({ where: { id: rl.line.productId, companyId } });
+          if (!product || !product.trackStock) continue;
+          const movement = await this.inventory.recordMovement(tx, {
+            companyId,
+            branchId: sale.branchId,
+            warehouseId: sale.warehouseId,
+            productId: rl.line.productId,
+            movementType: 'RECEIPT',
+            quantity: totals.lines[i].quantity,
+            source: 'POS_RETURN',
+            sourceId: note.id,
+            occurredAt: issueDate,
+            actorUserId: actor.userId,
+          });
+          restockValue += movement.totalCostMinor;
+        }
+        if (restockValue !== 0) {
+          const cogsAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.COGS);
+          const inventoryAccount = await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.INVENTORY);
+          await this.posting.postJournal(tx, {
+            companyId,
+            branchId: sale.branchId,
+            entryDate: issueDate,
+            memo: `POS return restock ${creditNoteNumber}`,
+            sourceType: 'CREDIT_NOTE',
+            sourceId: `${note.id}:restock`,
+            actorUserId: actor.userId,
+            lines: [
+              { accountId: inventoryAccount, debit: restockValue },
+              { accountId: cogsAccount, credit: restockValue },
+            ],
+          });
+        }
+      }
+
+      await tx.creditNote.update({ where: { id: note.id }, data: { journalEntryId: journal.id } });
+
+      // Record how much of each line has come back, and the receipt's new status.
+      for (const rl of returnLines) {
+        await tx.posSaleLine.update({
+          where: { id: rl.line.id },
+          data: { returnedQuantity: { increment: rl.quantity } },
+        });
+      }
+      const fullyReturned = sale.lines.every((l) => {
+        const returned = returnLines.find((r) => r.line.id === l.id)?.quantity ?? 0;
+        return l.returnedQuantity + returned >= l.quantity;
+      });
+      const updated = await tx.posSale.update({
+        where: { id: sale.id },
+        data: {
+          status: fullyReturned ? 'RETURNED' : 'PARTIALLY_RETURNED',
+          returnCreditNoteId: note.id,
+          returnedAt: issueDate,
+        },
+        include: { lines: { orderBy: { sortOrder: 'asc' } } },
+      });
+
+      return { sale: toPosSaleDto(updated), creditNoteId: note.id, creditNoteNumber, totalMinor: totals.totalMinor };
+    });
+
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'pos.sale_returned',
+      targetType: 'POS_SALE',
+      targetId: result.sale.id,
+      summary: `Returned ${result.totalMinor} against POS receipt ${result.sale.receiptNumber} (credit note ${result.creditNoteNumber})`,
     });
     return result;
   }
@@ -1783,6 +2009,7 @@ function buildSimpleLineRows(
     quantity: l.quantity,
     unitPriceMinor: l.unitPriceMinor,
     discountPercentBp: l.discountPercentBp,
+    discountAmountMinor: l.discountAmountMinor,
     taxPercentBp: l.taxPercentBp,
     lineTotalMinor: l.lineTotalMinor,
     sortOrder: i,
@@ -1800,6 +2027,7 @@ function buildLineRows(
     quantity: l.quantity,
     unitPriceMinor: l.unitPriceMinor,
     discountPercentBp: l.discountPercentBp,
+    discountAmountMinor: l.discountAmountMinor,
     taxPercentBp: l.taxPercentBp,
     lineSubtotalMinor: l.lineSubtotalMinor,
     discountMinor: l.discountMinor,
@@ -2072,6 +2300,8 @@ function toPosSaleDto(s: {
   changeMinor: number;
   paymentMethod: string;
   currency: string;
+  returnCreditNoteId?: string | null;
+  returnedAt?: Date | null;
   createdAt: Date;
   lines: Array<Record<string, unknown>>;
 }) {
@@ -2088,6 +2318,8 @@ function toPosSaleDto(s: {
     changeMinor: s.changeMinor,
     paymentMethod: s.paymentMethod,
     currency: s.currency,
+    returnCreditNoteId: s.returnCreditNoteId ?? null,
+    returnedAt: s.returnedAt ? s.returnedAt.toISOString() : null,
     createdAt: s.createdAt.toISOString(),
     lines: s.lines,
   };

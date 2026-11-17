@@ -123,7 +123,10 @@ test.describe('print preview and document attachments', () => {
   test('1. sales invoice opens a print preview with the approved form', async ({ page }) => {
     await page.goto('/sales');
     await expect(page.getByTestId('sales-page')).toBeVisible();
+    await page.getByTestId('sales-tab-invoices').click();
     await expect(page.getByTestId(`invoice-row-${invoiceNumber}`)).toBeVisible({ timeout: 20_000 });
+
+    await page.getByTestId(`invoice-row-${invoiceNumber}`).getByTestId(`invoice-attach-open-${invoiceNumber}`).click();
 
     const [popup] = await Promise.all([
       page.waitForEvent('popup'),
@@ -154,6 +157,7 @@ test.describe('print preview and document attachments', () => {
 
   test('3. attach, preview, download and remove a document on an invoice', async ({ page }) => {
     await page.goto('/sales');
+    await page.getByTestId('sales-tab-invoices').click();
     await expect(page.getByTestId(`invoice-row-${invoiceNumber}`)).toBeVisible({ timeout: 20_000 });
 
     // Open the attachments modal for the fixture invoice.
