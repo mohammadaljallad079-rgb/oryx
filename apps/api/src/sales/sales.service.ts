@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { fromQuantity, sumMinor, type RoundingMode } from '@oryx/shared';
+import { fromQuantity, sumMinor, withDefaults, type RoundingMode } from '@oryx/shared';
 import type { PaymentMethod } from '@oryx/database';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
@@ -82,6 +82,37 @@ export class SalesService {
     private readonly context: ErpContextService,
     private readonly inventory: InventoryService,
   ) {}
+
+  /**
+   * Resolve the company's selected payment code to a recognised accounting
+   * method. Store both the stable code and a label snapshot on the document so
+   * deleting or renaming configuration never rewrites historical receipts.
+   */
+  private async resolveCompanyPayment(
+    tx: Tx,
+    companyId: string,
+    code: string | undefined,
+    fallback: PaymentMethod,
+    channel: 'invoices' | 'pos',
+  ) {
+    const row = await tx.companySetting.findUnique({
+      where: { companyId_section: { companyId, section: 'sales' } },
+    });
+    const settings = withDefaults('sales', row?.value);
+    const selectedCode = (code?.trim().toUpperCase() || fallback);
+    const method = settings.paymentMethods.find(item => item.code === selectedCode);
+    if (!method || !method.isActive
+      || (channel === 'invoices' && !method.useInInvoices)
+      || (channel === 'pos' && (!method.useInPos || method.accountingMethod === 'CREDIT'))) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Selected payment method is unavailable for this company.');
+    }
+    return {
+      paymentMethod: method.accountingMethod as PaymentMethod,
+      paymentMethodCode: method.code,
+      paymentMethodLabelEn: method.nameEn,
+      paymentMethodLabelAr: method.nameAr,
+    };
+  }
 
   // --------------------------------------------------------------- customers
 
