@@ -169,7 +169,10 @@ ${REPORT_CSS}
 /** The report body styles, layered on top of the shared chrome. */
 export const REPORT_CSS = `
   /* Reports share the printed invoice identity; tables remain report-specific. */
-  .rep-page{ position:relative; min-height:740pt; }
+  /* No forced A4 page height: the printable area is A4 minus the renderer's
+     top/bottom margins (~730pt with REPORT_PDF_MARGINS). A 740pt minimum
+     overflows that area and creates a blank second page for short reports. */
+  .rep-page{ position:relative; }
   .rep-content{ position:relative; z-index:1; padding-inline:10pt 8pt; }
   .rep-title-band{ text-align:center; margin:14pt 0 10pt; padding:0 0 9pt;
     border-bottom:1pt solid #cbd5e1; }
