@@ -1542,7 +1542,11 @@ function PosProductTile({ product, onAdd }: { product: PosProductDto; onAdd: () 
           {locale === 'ar' && product.nameAr ? product.nameAr : product.nameEn}
         </span>
         <span className="oryx-faint font-mono text-[10.5px]">{product.sku}</span>
-        <span className="oryx-pos-tile__price tabular-nums">{money(product.salesPriceMinor)}</span>
+        <span className="oryx-pos-tile__price tabular-nums">
+          {product.salesPriceMinor <= 1
+            ? (locale === 'ar' ? 'السعر بحاجة لتحديد' : 'Price needs review')
+            : money(product.salesPriceMinor)}
+        </span>
         <span className="oryx-pos-tile__stock" data-testid={`pos-stock-${product.sku}`}>
           {product.trackStock
             ? `${t('erp.sales.pos.available')}: ${qty(product.onHand)}`
