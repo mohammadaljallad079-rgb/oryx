@@ -1544,6 +1544,7 @@ export interface ProjectDto {
   nameEn: string;
   nameAr: string;
   status: string;
+  branchId?: string | null;
   ownerUserId: string | null;
   startDate: string | null;
   endDate: string | null;
