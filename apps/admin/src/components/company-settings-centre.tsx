@@ -16,6 +16,7 @@ import { useBranding } from '@/lib/branding-context';
 import { useUi } from '@/lib/ui-context';
 import { Icon } from '@/components/icons';
 import { Button, Card, ErrorBanner, Field, Skeleton } from '@/components/ui';
+import { PaymentMethodsEditor } from '@/components/payment-methods-editor';
 
 type SectionData = Record<string, unknown>;
 
@@ -476,6 +477,15 @@ export function CompanySettingsCentre({ canEdit }: { canEdit: boolean }) {
                 )}
               </Field>
             ))}
+            {active === 'sales' ? (
+              <div className="sm:col-span-2">
+                <PaymentMethodsEditor
+                  value={current.paymentMethods as import('@oryx/shared').CompanyPaymentMethodSetting[] | undefined}
+                  canEdit={canEdit}
+                  onChange={(methods) => setField('paymentMethods', methods)}
+                />
+              </div>
+            ) : null}
           </div>
         )}
         {canEdit ? (
