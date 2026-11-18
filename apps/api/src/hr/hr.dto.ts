@@ -35,8 +35,8 @@ export class ListQueryDto {
 export class CreateDepartmentDto {
   @IsOptional() @IsString() @MaxLength(64) companyId?: string;
   @IsString() @MinLength(1) @MaxLength(40) code!: string;
-  @IsString() @MinLength(2) @MaxLength(160) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(160) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(160) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(160) nameAr?: string;
   @IsOptional() @IsString() parentId?: string;
   @IsOptional() @IsString() branchId?: string;
 }
@@ -49,8 +49,8 @@ export class UpdateDepartmentDto {
 
 export class CreateJobTitleDto {
   @IsString() @MinLength(1) @MaxLength(40) code!: string;
-  @IsString() @MinLength(2) @MaxLength(160) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(160) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(160) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(160) nameAr?: string;
   @IsOptional() @IsString() departmentId?: string;
 }
 
@@ -58,8 +58,8 @@ export class CreateJobTitleDto {
 
 export class CreateEmployeeDto {
   @IsString() @MinLength(1) @MaxLength(40) code!: string;
-  @IsString() @MinLength(2) @MaxLength(200) fullNameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(200) fullNameAr!: string;
+  @IsOptional() @IsString() @MaxLength(200) fullNameEn?: string;
+  @IsOptional() @IsString() @MaxLength(200) fullNameAr?: string;
   @IsOptional() @IsString() @MaxLength(160) email?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
   @IsOptional() @IsString() @MaxLength(40) secondaryPhone?: string;
