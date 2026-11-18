@@ -146,6 +146,8 @@ export class RbacService {
     if (actor.kind === 'COMPANY' && actor.companyId !== companyId) {
       throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'Cross-tenant access is not permitted.');
     }
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a role name in Arabic or English.');
     const code = (dto.code?.trim() || await nextMasterCode(this.prisma, 'RL')).toLowerCase().replace(/\s+/g, '_');
     const existing = await this.prisma.role.findFirst({ where: { companyId, code } });
     if (existing) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Role code "${code}" already exists.`);
@@ -157,8 +159,7 @@ export class RbacService {
       data: {
         companyId,
         code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        ...names,
         descriptionEn: dto.descriptionEn ?? null,
         isSystem: false,
         permissions: { create: permissions.map((permissionCode) => ({ permissionCode })) },
