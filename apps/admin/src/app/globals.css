@@ -3426,3 +3426,353 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
     scrollbar-width: thin;
   }
 }
+
+
+/* --------------------------------------------------------------------------
+ * ORYX POS / approved cashier workstation (light lavender, RTL first).
+ * This is intentionally scoped to the POS dialog, never to ERP forms/pages.
+ * All colours are POS-only; the accounting/theme configuration is unchanged.
+ * -------------------------------------------------------------------------- */
+.oryx-modal--pos:has(.oryx-pos--premium) {
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --background: #f8f9fd;
+  --border: #e7e5f1;
+  --text: #20203a;
+  --muted: #75758d;
+  --accent: #6738bd;
+  --accent-strong: #5228a7;
+  color: #20203a;
+  background: #f7f8fc;
+  color-scheme: light;
+}
+.oryx-modal--pos:has(.oryx-pos--premium) > div:first-child {
+  background: #fff;
+  color: #22203c;
+  border-bottom: 1px solid #e9e7f3;
+}
+.oryx-modal--pos:has(.oryx-pos--premium) > div:last-child {
+  background: #fff;
+  color: #221d39;
+  border-top: 1px solid #e5e3f0;
+}
+.oryx-modal--pos:has(.oryx-pos--premium) .oryx-btn--primary {
+  background: #6636b9;
+  border-color: #6636b9;
+  color: #fff;
+}
+.oryx-modal--pos .oryx-pos--premium {
+  --pos-ink: #201d39;
+  --pos-soft: #6a6983;
+  --pos-line: #e7e4f0;
+  --pos-raised: #fff;
+  --pos-panel: #fff;
+  display: grid;
+  direction: rtl;
+  grid-template-columns: 172px minmax(0, 1fr) minmax(320px, 33%);
+  grid-template-areas: "categories catalog cart";
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  padding: 14px;
+  min-height: 0;
+  color: #23203e;
+  background: #f8f9fd;
+}
+.oryx-modal--pos .oryx-pos--premium .oryx-pos__catalog {
+  grid-area: catalog;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.oryx-pos--premium .oryx-pos__section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+  gap: 12px;
+  padding: 3px 5px 0;
+}
+.oryx-pos--premium .oryx-pos__section-heading > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.oryx-pos--premium .oryx-pos__section-heading strong {
+  color: #24213e;
+  font-size: 17px;
+  font-weight: 800;
+}
+.oryx-pos--premium .oryx-pos__section-heading span {
+  color: #858397;
+  font-size: 11px;
+}
+.oryx-pos--premium .oryx-pos__catalog-count {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #eeebf8;
+  color: #5d36a7 !important;
+  font-weight: 700;
+}
+.oryx-modal--pos .oryx-pos--premium .oryx-pos__toolbar {
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #e7e5f0;
+  border-radius: 14px;
+  box-shadow: 0 3px 16px rgba(39, 29, 86, .04);
+}
+.oryx-pos--premium .oryx-pos__search .oryx-input {
+  height: 44px;
+  background: #fafafe;
+  border: 1px solid #e4e2f0;
+  border-radius: 10px;
+  color: #24213d;
+}
+.oryx-pos--premium .oryx-pos__search-icon { color: #88829d; }
+.oryx-pos--premium .oryx-pos__toolbar .oryx-btn {
+  background: #f4f0fd;
+  border: 1px solid #ece6f7;
+  color: #5d36af;
+  border-radius: 10px;
+}
+.oryx-pos--premium .oryx-pos__categories {
+  grid-area: categories;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 8px;
+  border: 1px solid #e8e5f1;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 4px 20px rgba(44, 33, 91, .035);
+  scrollbar-width: thin;
+}
+.oryx-pos--premium .oryx-pos__categories-title {
+  margin: 0 0 6px;
+  padding: 6px 11px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #33304b;
+}
+.oryx-pos--premium .oryx-pos__category {
+  width: 100%;
+  min-height: 45px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: start;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: #393550;
+  padding: 10px;
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.oryx-pos--premium .oryx-pos__category svg { flex: 0 0 auto; color: #605a78; }
+.oryx-pos--premium .oryx-pos__category:hover {
+  background: #f8f5ff;
+}
+.oryx-pos--premium .oryx-pos__category--active {
+  color: #6338b8;
+  border-color: #eee5ff;
+  background: #f1eafd;
+}
+.oryx-pos--premium .oryx-pos__category--active svg { color: #6338b8; }
+.oryx-modal--pos .oryx-pos--premium .oryx-pos__grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  grid-template-columns: repeat(auto-fill, minmax(146px, 1fr));
+  gap: 12px;
+  padding: 2px 3px 12px;
+  align-content: start;
+  overflow-y: auto;
+}
+.oryx-pos--premium .oryx-pos__grid > div { min-width: 0; }
+.oryx-pos--premium .oryx-pos-tile {
+  position: relative;
+  background: #fff;
+  border: 1px solid #e7e5f0;
+  border-radius: 14px;
+  box-shadow: 0 3px 14px rgba(39, 29, 86, .06);
+  color: #22203e;
+  min-height: 194px;
+}
+.oryx-pos--premium .oryx-pos-tile:hover:not(:disabled) {
+  border-color: #ad94e4;
+  box-shadow: 0 6px 20px rgba(81, 50, 154, .12);
+}
+.oryx-pos--premium .oryx-pos-tile--selected {
+  border-color: #956cdd;
+  box-shadow: 0 0 0 1px #bda7ec;
+}
+.oryx-pos--premium .oryx-pos-tile__media {
+  aspect-ratio: 16 / 10;
+  background: #f8f8fc;
+}
+.oryx-pos--premium .oryx-pos-tile__media img { object-fit: contain; padding: 5px; }
+.oryx-pos--premium .oryx-pos-tile__body { padding: 9px 11px 42px; gap: 4px; }
+.oryx-pos--premium .oryx-pos-tile__name { color: #26223c; font-size: 12.5px; min-height: 30px; }
+.oryx-pos--premium .oryx-pos-tile__price { color: #6539b7; font-size: 14px; }
+.oryx-pos--premium .oryx-pos-tile__stock { color: #76748b; }
+.oryx-pos--premium .oryx-pos-tile__add {
+  position: absolute;
+  bottom: 9px;
+  left: 10px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  color: #fff;
+  background: #6639bb;
+}
+.oryx-pos--premium .oryx-pos-tile__selected {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 2;
+  border-radius: 999px;
+  background: #6439bb;
+  color: #fff;
+  min-width: 24px;
+  padding: 3px 7px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+}
+.oryx-modal--pos .oryx-pos--premium .oryx-pos__rail {
+  grid-area: cart;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  border: 1px solid #e8e5f0;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 4px 20px rgba(44, 33, 91, .055);
+  overflow: hidden;
+}
+.oryx-pos--premium .oryx-pos__rail-head {
+  min-height: 57px;
+  padding: 10px 13px !important;
+  background: #fff;
+  border-bottom: 1px solid #e8e5f0;
+}
+.oryx-pos--premium .oryx-pos__rail-title { color: #27223f; font-size: 15px; }
+.oryx-pos--premium .oryx-pos__lines {
+  min-height: 105px;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 9px 10px;
+  gap: 8px;
+  background: #fff;
+}
+.oryx-pos--premium .oryx-pos__lines > [data-testid^="pos-cart-line-"] {
+  background: #fbfafe;
+  border: 1px solid #e9e6f1;
+  color: #22203c;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+.oryx-pos--premium .oryx-pos__empty { flex: 1; }
+.oryx-modal--pos .oryx-pos--premium .oryx-pos__customer-warehouse {
+  background: #fff;
+  border-color: #e9e6f1;
+  padding: 8px;
+  gap: 8px;
+}
+.oryx-modal--pos .oryx-pos--premium .oryx-pos__tender {
+  background: #fff;
+  border-top: 1px solid #e7e5ee;
+  padding: 10px 12px;
+  gap: 7px;
+  max-height: 43%;
+  min-height: 0;
+  overflow-y: auto;
+  flex: 0 1 auto;
+}
+.oryx-pos--premium .oryx-pos__totals { font-size: 12px; gap: 2px; }
+.oryx-pos--premium .oryx-pos__grand {
+  margin-top: 2px;
+  padding: 11px;
+  border: 0;
+  border-radius: 11px;
+  background: #efe8fd;
+  color: #4e269e;
+  font-size: 18px;
+}
+.oryx-pos--premium .oryx-pay-method {
+  background: #f7f5fd;
+  color: #51466e;
+  border-color: #e7e2f1;
+  border-radius: 9px;
+  min-height: 35px;
+}
+.oryx-pos--premium .oryx-pay-method--active {
+  color: #fff;
+  background: #6636b9;
+  border-color: #6636b9;
+}
+.oryx-pos--premium .oryx-pos__tender .oryx-btn--primary {
+  min-height: 45px;
+  border-radius: 11px;
+  background: #6636b9;
+  color: #fff;
+}
+.oryx-pos--premium input,
+.oryx-pos--premium button { font-family: inherit; }
+@media (min-width: 901px) {
+  .oryx-modal--pos .oryx-pos--premium { grid-template-columns: 170px minmax(0,1fr) minmax(310px,32%); }
+}
+@media (max-width: 1100px) and (min-width: 901px) {
+  .oryx-modal--pos .oryx-pos--premium { grid-template-columns: 140px minmax(0,1fr) minmax(305px,34%); gap: 8px; padding: 9px; }
+  .oryx-modal--pos .oryx-pos--premium .oryx-pos__grid { grid-template-columns: repeat(auto-fill, minmax(126px,1fr)); gap: 8px; }
+}
+@media (max-width: 900px) {
+  .oryx-modal--pos .oryx-pos--premium {
+    display: grid;
+    height: auto;
+    min-height: 100%;
+    grid-template-columns: minmax(0,1fr) minmax(300px,42%);
+    grid-template-areas: "categories categories" "catalog cart";
+    gap: 9px;
+  }
+  .oryx-pos--premium .oryx-pos__categories {
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    min-height: 55px;
+    padding: 6px;
+  }
+  .oryx-pos--premium .oryx-pos__categories-title { display: none; }
+  .oryx-pos--premium .oryx-pos__category { width: auto; white-space: nowrap; min-height: 40px; flex-shrink: 0; }
+  .oryx-modal--pos .oryx-pos--premium .oryx-pos__catalog { min-height: 460px; }
+  .oryx-modal--pos .oryx-pos--premium .oryx-pos__rail { min-height: 460px; }
+}
+@media (max-width: 650px) {
+  .oryx-modal--pos .oryx-pos--premium {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    padding: 8px;
+    gap: 10px;
+  }
+  .oryx-pos--premium .oryx-pos__categories { order: 0; width: 100%; flex: 0 0 auto; }
+  .oryx-modal--pos .oryx-pos--premium .oryx-pos__catalog { order: 1; min-height: 380px; overflow: visible; }
+  .oryx-modal--pos .oryx-pos--premium .oryx-pos__grid { max-height: 45dvh; grid-template-columns: repeat(auto-fill, minmax(128px,1fr)); }
+  .oryx-modal--pos .oryx-pos--premium .oryx-pos__rail { order: 2; height: auto; min-height: 440px; overflow: visible; }
+  .oryx-pos--premium .oryx-pos__lines { max-height: 36dvh; }
+  .oryx-modal--pos .oryx-pos--premium .oryx-pos__tender { max-height: none; overflow: visible; }
+  .oryx-pos--premium .oryx-pos__section-heading { padding: 4px 2px; }
+}
