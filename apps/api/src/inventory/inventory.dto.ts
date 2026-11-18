@@ -102,10 +102,7 @@ export class ListQueryDto {
 }
 
 export class CreateWarehouseDto {
-  @IsString()
-  @MinLength(1)
-  @MaxLength(40)
-  code!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
 
   @IsOptional()
   @IsString()
@@ -153,10 +150,7 @@ export class UpdateWarehouseDto {
 }
 
 export class CreateProductDto {
-  @IsString()
-  @MinLength(1)
-  @MaxLength(60)
-  sku!: string;
+  @IsOptional() @IsString() @MaxLength(60) sku?: string;
 
   @IsOptional()
   @IsString()
