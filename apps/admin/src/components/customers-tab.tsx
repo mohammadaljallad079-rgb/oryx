@@ -34,10 +34,20 @@ export function CustomersTab({ canManage }: { canManage: boolean }) {
   const { t, locale } = useUi();
   const { companyId } = useAuth();
   const [search, setSearch] = useState('');
+  const [kindFilter, setKindFilter] = useState<'' | 'COMPANY' | 'INDIVIDUAL'>('');
+  const [activeFilter, setActiveFilter] = useState<'' | 'true' | 'false'>('');
+  const [sourceFilter, setSourceFilter] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('');
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<CustomerDto | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const list = useAsync(() => api.salesCustomers({ search: search || undefined }), [search]);
+  const list = useAsync(() => api.salesCustomers({
+    search: search || undefined,
+    kind: kindFilter || undefined,
+    active: activeFilter || undefined,
+    sourceId: sourceFilter || undefined,
+    departmentId: departmentFilter || undefined,
+  }), [search, kindFilter, activeFilter, sourceFilter, departmentFilter]);
   const sources = useAsync(() => api.crmLeadSources({ companyId: companyId ?? undefined }), [companyId]);
   const departments = useAsync(() => api.hrDepartments({ companyId: companyId ?? undefined }), [companyId]);
 
@@ -78,6 +88,39 @@ export function CustomersTab({ canManage }: { canManage: boolean }) {
           <span className="oryx-label">{t('common.search')}</span>
           <input className="oryx-input" value={search} onChange={(e) => setSearch(e.target.value)} data-testid="customer-search" />
         </label>
+        <label className="min-w-[140px]">
+          <span className="oryx-label">{t('erp.sales.customerType')}</span>
+          <select className="oryx-select" value={kindFilter} onChange={e => setKindFilter(e.target.value as typeof kindFilter)} data-testid="customer-filter-kind">
+            <option value="">{locale === 'ar' ? 'كل الأنواع' : 'All types'}</option>
+            <option value="COMPANY">{t('erp.sales.customerKindCompany')}</option>
+            <option value="INDIVIDUAL">{t('erp.sales.customerKindIndividual')}</option>
+          </select>
+        </label>
+        <label className="min-w-[130px]">
+          <span className="oryx-label">{t('common.status')}</span>
+          <select className="oryx-select" value={activeFilter} onChange={e => setActiveFilter(e.target.value as typeof activeFilter)} data-testid="customer-filter-active">
+            <option value="">{locale === 'ar' ? 'كل الحالات' : 'All statuses'}</option>
+            <option value="true">{t('common.active')}</option>
+            <option value="false">{t('common.inactive')}</option>
+          </select>
+        </label>
+        <label className="min-w-[150px]">
+          <span className="oryx-label">{t('erp.sales.customerSource')}</span>
+          <select className="oryx-select" value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} data-testid="customer-filter-source">
+            <option value="">{locale === 'ar' ? 'كل المصادر' : 'All sources'}</option>
+            {sourceOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+        <label className="min-w-[150px]">
+          <span className="oryx-label">{t('erp.sales.customerDepartment')}</span>
+          <select className="oryx-select" value={departmentFilter} onChange={e => setDepartmentFilter(e.target.value)} data-testid="customer-filter-department">
+            <option value="">{locale === 'ar' ? 'كل الأقسام' : 'All departments'}</option>
+            {departmentOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+        <Button size="sm" variant="ghost" onClick={() => {
+          setSearch(''); setKindFilter(''); setActiveFilter(''); setSourceFilter(''); setDepartmentFilter('');
+        }} data-testid="customer-filter-reset">{locale === 'ar' ? 'مسح الفلاتر' : 'Reset filters'}</Button>
         {canManage ? (
           <Button variant="primary" size="sm" onClick={() => { setEditing(null); setOpen(true); }} data-testid="new-customer">
             <Icon name="plus" size={16} />
