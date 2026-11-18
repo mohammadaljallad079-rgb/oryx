@@ -111,8 +111,8 @@ export class PurchasingService {
     const updated = await this.prisma.supplier.update({
       where: { id },
       data: {
-        ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
-        ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
+        ...(dto.nameEn !== undefined ? { nameEn: nextNameEn } : {}),
+        ...(dto.nameAr !== undefined ? { nameAr: nextNameAr } : {}),
         ...(dto.email !== undefined ? { email: dto.email } : {}),
         ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
         ...(dto.taxNumber !== undefined ? { taxNumber: dto.taxNumber } : {}),
