@@ -105,7 +105,7 @@ function CouponsPageInner() {
         await api.updateCoupon(editing.id, base);
         setNotice(t('coupon.updated'));
       } else {
-        await api.createCoupon({ ...base, code: form.code.trim().toUpperCase() });
+        await api.createCoupon({ ...base, code: '' });
         setNotice(t('coupon.created'));
       }
       setFormOpen(false);
@@ -293,7 +293,7 @@ function CouponsPageInner() {
         footer={
           <>
             <Button onClick={() => setFormOpen(false)}>{t('common.cancel')}</Button>
-            <Button variant="primary" onClick={() => void save()} disabled={busy || !form.code} data-testid="coupon-save">
+            <Button variant="primary" onClick={() => void save()} disabled={busy} data-testid="coupon-save">
               {busy ? t('common.saving') : t('common.save')}
             </Button>
           </>
@@ -304,10 +304,9 @@ function CouponsPageInner() {
           <Field label={t('coupon.code')} required>
             <input
               className="oryx-input"
-              value={form.code}
-              disabled={!!editing}
-              onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
-              placeholder="WELCOME15"
+              value={editing ? form.code : ''}
+              readOnly
+              placeholder="Automatic / تلقائي"
               data-testid="coupon-form-code"
             />
           </Field>
