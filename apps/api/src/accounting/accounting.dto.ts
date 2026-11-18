@@ -21,15 +21,15 @@ export class CreateAccountDto {
   @MaxLength(24)
   code!: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(160)
-  nameEn!: string;
+  nameEn?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(160)
-  nameAr!: string;
+  nameAr?: string;
 
   @IsIn(ACCOUNT_TYPES)
   type!: (typeof ACCOUNT_TYPES)[number];
