@@ -154,8 +154,7 @@ export class CrmService {
       data: {
         companyId,
         code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        ...bilingualName(dto.nameEn, dto.nameAr),
         isDefault: dto.isDefault ?? false,
         // Seed a conventional set of stages so the pipeline is usable at once.
         stages: {
