@@ -89,6 +89,21 @@ export function RecoveryTrackingPanel({ compact = false }: { compact?: boolean }
         </div>
       </div>
       {lastChecked ? <p className="oryx-faint mb-2 text-[11px]">{en ? 'Last checked' : 'آخر فحص'}: {lastChecked.toLocaleTimeString(en ? 'en-GB' : 'ar-BH')}</p> : null}
+      {!loading && !compact ? (
+        <div className="mb-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4" data-testid="tracking-status-cards">
+          {([
+            ['REQUESTED', en ? 'New requests' : 'طلبات جديدة'],
+            ['ASSIGNED', en ? 'Assigned' : 'تم الإسناد'],
+            ['EN_ROUTE', en ? 'On the way' : 'في الطريق'],
+            ['ON_SITE', en ? 'At pickup' : 'في الموقع'],
+          ] as const).map(([status, label]) => (
+            <div key={status} className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-3">
+              <p className="oryx-muted m-0 text-xs">{label}</p>
+              <strong className="mt-1 block text-2xl">{active.filter((item) => item.status === status).length}</strong>
+            </div>
+          ))}
+        </div>
+      ) : null}
       {error ? <ErrorBanner message={error} onRetry={() => void refresh()} /> : null}
       {loading ? <Skeleton height={compact ? 240 : 390} /> : !active.length ? (
         <div className="grid min-h-[210px] place-items-center rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-raised)] p-6 text-center">
