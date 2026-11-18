@@ -158,7 +158,7 @@ export function CustomerModal({
       };
       const saved = customer
         ? await api.updateCustomer(customer.id, body)
-        : await api.createCustomer({ ...body, code: form.code });
+        : await api.createCustomer({ ...body, ...(form.code.trim() ? { code: form.code.trim() } : {}) });
       await onCreated();
       onSaved?.(saved);
       onClose();
@@ -203,11 +203,12 @@ export function CustomerModal({
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('common.code')} required>
+        <Field label={t('common.code')} hint={locale === 'ar' ? 'اختياري: اتركه فارغًا لتوليد رقم تلقائي حسب نوع العميل من الإعدادات' : 'Optional: leave blank to auto-generate a code using the customer type and settings'}>
           <input
             className="oryx-input"
             value={form.code}
             disabled={Boolean(customer)}
+            placeholder={customer ? undefined : (form.kind === 'COMPANY' ? 'CO000001' : 'CU000001')}
             onChange={(e) => setForm({ ...form, code: e.target.value })}
             data-testid="customer-code"
           />
