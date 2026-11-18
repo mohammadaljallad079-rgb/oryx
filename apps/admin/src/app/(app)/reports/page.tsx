@@ -20,6 +20,7 @@ import {
   TableShell,
 } from '@/components/ui';
 import { Icon } from '@/components/icons';
+import { PdfShareActions } from '@/components/pdf-share-actions';
 
 /**
  * The Reports workspace.
@@ -513,6 +514,7 @@ function ReportPreviewModal({
           <Button size="sm" onClick={onClose}>
             {t('common.close')}
           </Button>
+          {url.data ? <PdfShareActions url={url.data} filename={`oryx-report-${kind ?? 'report'}.pdf`} /> : null}
           {url.data ? (
             <Button size="sm" variant="primary" onClick={() => window.open(url.data!, '_blank', 'noopener')}>
               <Icon name="print" size={14} /> {t('erp.reports.print')}
