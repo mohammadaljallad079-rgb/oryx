@@ -17,9 +17,10 @@ import {
 const ACCOUNT_TYPES = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'] as const;
 
 export class CreateAccountDto {
+  @IsOptional()
   @IsString()
   @MaxLength(24)
-  code!: string;
+  code?: string;
 
   @IsOptional()
   @IsString()
