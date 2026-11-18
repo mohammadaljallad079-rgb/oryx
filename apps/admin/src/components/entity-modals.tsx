@@ -660,8 +660,8 @@ export function LeadModal({
     setError(null);
     try {
       const body = {
-        nameEn: form.nameEn,
-        nameAr: form.nameAr,
+        nameEn: form.nameEn.trim() || form.nameAr.trim(),
+        nameAr: form.nameAr.trim() || form.nameEn.trim(),
         contactName: form.contactName || undefined,
         email: form.email || undefined,
         phone: form.phone || undefined,
@@ -687,7 +687,7 @@ export function LeadModal({
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy || !form.nameEn || !form.nameAr || (!lead && !form.code)} onClick={submit} data-testid="save-lead">
+          <Button variant="primary" disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim()) || (!lead && !form.code)} onClick={submit} data-testid="save-lead">
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </>
@@ -701,10 +701,10 @@ export function LeadModal({
         <Field label={t('erp.crm.contact')}>
           <input className="oryx-input" value={form.contactName} onChange={(e) => setForm((prev) => ({ ...prev, contactName: e.target.value }))} data-testid="lead-contact" />
         </Field>
-        <Field label={`${t('common.name')} (EN)`} required>
+        <Field label={`${t('common.name')} (EN)`}>
           <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm((prev) => ({ ...prev, nameEn: e.target.value }))} data-testid="lead-name-en" />
         </Field>
-        <Field label={`${t('common.name')} (AR)`} required>
+        <Field label={`${t('common.name')} (AR)`}>
           <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm((prev) => ({ ...prev, nameAr: e.target.value }))} data-testid="lead-name-ar" />
         </Field>
         <Field label={t('erp.crm.estimatedValue')}>
