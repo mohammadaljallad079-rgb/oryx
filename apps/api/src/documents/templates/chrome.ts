@@ -244,7 +244,7 @@ function brandBand(issuer: DocumentIssuer, signatureWatermark = false): string {
  */
 export function officialFooterTemplate(issuer: DocumentIssuer, signatureWatermark = false): string {
   const base = [
-    "font-family:'ORYX Latin','ORYX Arabic','ORYX Sans',Verdana,Arial,sans-serif",
+    "font-family:'ORYX Arabic','ORYX Sans',Arial,sans-serif",
     'color:#64748b',
     '-webkit-print-color-adjust:exact',
   ].join(';');
