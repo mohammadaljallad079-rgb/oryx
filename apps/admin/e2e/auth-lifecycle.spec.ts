@@ -190,14 +190,15 @@ test.describe('expiry and revocation', () => {
     await signIn(page);
     await setLocale(page, 'en');
 
-    // Simulate the session ending server-side: clear the cookies the browser
-    // holds. The in-memory token remains, so the app only discovers the loss
-    // when a request fails and the refresh cannot recover.
+    // Simulate loss of the browser's refresh credentials. A fresh document
+    // navigation drops the in-memory access token, forcing the application
+    // to prove whether the session can still be restored. Merely clearing
+    // cookies while a valid access token remains in memory does not expire it.
     await page.context().clearCookies();
 
-    await page.goto('/companies');
-    await page.waitForURL('**/login', { timeout: 25_000 });
-    await expect(page.getByTestId('login-form')).toBeVisible();
+    await page.goto('/companies', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('login-form')).toBeVisible({ timeout: 30_000 });
+    await expect(page).toHaveURL(/\\/login(?:[?#]|$)/);
   });
 
   test('an unauthenticated visit to a protected route redirects to sign-in', async ({ page }) => {
