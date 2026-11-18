@@ -3776,3 +3776,46 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   .oryx-modal--pos .oryx-pos--premium .oryx-pos__tender { max-height: none; overflow: visible; }
   .oryx-pos--premium .oryx-pos__section-heading { padding: 4px 2px; }
 }
+
+
+/* Visible quantity +/- controls in the approved three-product cart layout. */
+.oryx-pos--premium .oryx-pos__line-quick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+.oryx-pos--premium .oryx-pos__line-quick > strong {
+  color: #37264f;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.oryx-pos--premium .oryx-pos__quantity-stepper {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #e3def2;
+  border-radius: 9px;
+  background: #fff;
+}
+.oryx-pos--premium .oryx-pos__quantity-stepper button {
+  width: 27px;
+  min-height: 28px;
+  border: 0;
+  background: #f6f2fc;
+  color: #6136ac;
+  font-weight: 800;
+  cursor: pointer;
+}
+.oryx-pos--premium .oryx-pos__quantity-stepper button:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+.oryx-pos--premium .oryx-pos__quantity-stepper span {
+  min-width: 26px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #33294a;
+}
