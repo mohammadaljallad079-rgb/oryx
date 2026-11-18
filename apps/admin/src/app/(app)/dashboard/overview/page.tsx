@@ -8,6 +8,7 @@ import { useUi } from '@/lib/ui-context';
 import { Icon } from '@/components/icons';
 import { Badge, Card, EmptyState, ErrorBanner, Skeleton, StatCard, StatGrid } from '@/components/ui';
 import { MiniBarChart, MiniDonut } from '@/components/charts';
+import { RecoveryTrackingPanel } from '@/components/recovery-tracking-panel';
 
 /**
  * لوحة المعلومات — the statistics and analytics surface.
@@ -243,6 +244,7 @@ export default function DashboardOverviewPage() {
           )}
         </Card>
       </section>
+      <RecoveryTrackingPanel compact />
     </div>
   );
 }
