@@ -95,6 +95,7 @@ export function DocumentPrintActions({
           disabled={busy !== null}
           data-testid={`preview-${kind.toLowerCase()}-${id}`}
           title={t('print.preview')}
+          aria-label={t('print.preview')}
         >
           <Icon name="eye" size={15} />
           {compact ? null : t('print.preview')}
@@ -105,6 +106,7 @@ export function DocumentPrintActions({
           disabled={busy !== null}
           data-testid={`print-${kind.toLowerCase()}-${id}`}
           title={t('print.print')}
+          aria-label={t('print.print')}
         >
           <Icon name="print" size={15} />
           {compact ? null : t('print.print')}
