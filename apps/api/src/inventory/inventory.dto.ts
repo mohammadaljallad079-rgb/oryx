@@ -107,15 +107,15 @@ export class CreateWarehouseDto {
   @MaxLength(40)
   code!: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(160)
-  nameEn!: string;
+  nameEn?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(160)
-  nameAr!: string;
+  nameAr?: string;
 
   @IsOptional()
   @IsString()
@@ -158,15 +158,15 @@ export class CreateProductDto {
   @MaxLength(60)
   sku!: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(200)
-  nameEn!: string;
+  nameEn?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(200)
-  nameAr!: string;
+  nameAr?: string;
 
   @IsOptional()
   @IsIn(['PRODUCT', 'SERVICE'])
