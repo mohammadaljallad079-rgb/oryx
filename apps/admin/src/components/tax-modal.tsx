@@ -72,7 +72,7 @@ export function TaxModal({
     try {
       const body = {
         nameEn: form.nameEn.trim() || form.nameAr.trim(),
-        nameAr: form.nameAr.trim() || form.nameEn.trim()
+        nameAr: form.nameAr.trim() || form.nameEn.trim(),
         rateBp,
         scope: form.scope,
         applicationLevel: form.applicationLevel,
