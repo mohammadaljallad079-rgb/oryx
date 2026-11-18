@@ -1213,12 +1213,30 @@ function PosSaleModal({
         </p>
       ) : null}
 
-      <div className="oryx-pos oryx-pos--premium grid min-h-0 flex-1 gap-3" data-testid="pos-premium-workstation">
+      <div className="oryx-pos oryx-pos--premium oryx-pos--command grid min-h-0 flex-1 gap-3" data-testid="pos-premium-workstation">
+        <header className="oryx-pos__command-bar" data-testid="pos-command-bar">
+          <div className="oryx-pos__command-identity">
+            <span className="oryx-pos__command-monogram">O</span>
+            <div>
+              <strong>{locale === 'ar' ? 'نقطة البيع' : 'Sales terminal'}</strong>
+              <span>{locale === 'ar' ? 'ORYX لخدمات السيارات' : 'ORYX AUTO SERVICES'}</span>
+            </div>
+          </div>
+          <div className="oryx-pos__command-status">
+            <span className="oryx-pos__command-indicator" aria-hidden="true" />
+            <span>{locale === 'ar' ? 'جلسة الكاشير نشطة' : 'Cashier session active'}</span>
+            <b dir="ltr">{session.sessionNumber}</b>
+          </div>
+          <div className="oryx-pos__command-stats">
+            <span>{locale === 'ar' ? 'الأصناف في السلة' : 'Cart items'} <strong>{cart.reduce((n, l) => n + l.quantity, 0)}</strong></span>
+            <span>{locale === 'ar' ? 'المجموع' : 'Total'} <strong dir="ltr">{money(totals.totalMinor)}</strong></span>
+          </div>
+        </header>
         {/* ---------------------------------------------------- product grid */}
         <div className="oryx-pos__catalog flex min-h-0 min-w-0 flex-col gap-3">
           <div className="oryx-pos__section-heading">
             <div>
-              <strong>{locale === 'ar' ? 'المنتجات' : 'Products'}</strong>
+              <strong>{locale === 'ar' ? 'كتالوج المنتجات والخدمات' : 'Products & services'}</strong>
               <span>{locale === 'ar' ? 'اختر من المنتجات أو امسح الباركود' : 'Select a product or scan a barcode'}</span>
             </div>
             <span className="oryx-pos__catalog-count">{items.length} {locale === 'ar' ? 'منتج' : 'products'}</span>
@@ -1290,7 +1308,7 @@ function PosSaleModal({
         </div>
 
         <aside className="oryx-pos__categories" data-testid="pos-categories" aria-label={locale === 'ar' ? 'تصنيفات المنتجات' : 'Product categories'}>
-          <p className="oryx-pos__categories-title">{locale === 'ar' ? 'التصنيفات' : 'Categories'}</p>
+          <p className="oryx-pos__categories-title"><Icon name="grid" size={17} /> {locale === 'ar' ? 'التصنيفات' : 'Categories'}</p>
           <button type="button" onClick={() => setCategory('')}
             className={`oryx-pos__category ${category === '' ? 'oryx-pos__category--active' : ''}`}
             data-testid="pos-category-all" aria-pressed={category === ''}>
@@ -1311,7 +1329,7 @@ function PosSaleModal({
         <div className="oryx-pos__rail" data-testid="pos-checkout-cart">
           <div className="oryx-pos__rail-head">
             <p className="oryx-pos__rail-title">
-              <Icon name="cart" size={17} />
+              <span className="oryx-pos__rail-icon"><Icon name="cart" size={19} /></span>
               {t('erp.sales.pos.cart')}
               <Badge tone="neutral">
                 {cart.reduce((n, l) => n + l.quantity, 0)} {t('erp.sales.pos.itemCount')}
