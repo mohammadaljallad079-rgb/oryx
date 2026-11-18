@@ -151,6 +151,17 @@ const PAYMENT_ACCOUNTING_METHODS = new Set([
 
 /** Store payment methods as a validated, company-scoped catalogue, never raw JSON. */
 function sanitiseSalesSettings(patch: Record<string, unknown>): Record<string, unknown> {
+  // Prefixes become part of generated customer identifiers: allow only safe
+  // non-empty alphanumeric prefixes and disallow overlap between both types.
+  const defaults = { customerCompanyPrefix: 'CO', customerIndividualPrefix: 'CU' };
+  for (const key of Object.keys(defaults) as Array<keyof typeof defaults>) {
+    if (!Object.prototype.hasOwnProperty.call(patch, key)) continue;
+    const prefix = String(patch[key] ?? '').trim().toUpperCase();
+    if (!/^[A-Z][A-Z0-9_-]{0,11}$/.test(prefix)) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Customer code prefixes must be 1–12 letters, digits, underscore or dash.');
+    }
+    patch[key] = prefix;
+  }
   if (!Object.prototype.hasOwnProperty.call(patch, 'paymentMethods')) return patch;
   const input = patch.paymentMethods;
   if (!Array.isArray(input) || input.length > 40) {
