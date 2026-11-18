@@ -121,6 +121,14 @@ test.describe('Point of sale — card terminal', () => {
     // Selecting a product must immediately display a real line in the
     // independently scrolling order rail, without opening another panel.
     await expect(page.getByTestId(`pos-cart-line-${setup.product.sku}`)).toBeVisible();
+    await expect(page.getByTestId('pos-premium-workstation')).toBeVisible();
+    await expect(page.getByTestId('pos-checkout-cart')).toBeVisible();
+    await expect(tile.locator('.oryx-pos-tile__selected')).toHaveText('1');
+    // The approved cart design adjusts quantity without opening the detail editor.
+    await page.getByTestId(`pos-increment-${setup.product.sku}`).click();
+    await expect(page.getByTestId(`pos-quantity-label-${setup.product.sku}`)).toHaveText('2');
+    await page.getByTestId(`pos-decrement-${setup.product.sku}`).click();
+    await expect(page.getByTestId(`pos-quantity-label-${setup.product.sku}`)).toHaveText('1');
     // Compact cart rows display all selected products; editing expands a row.
     const priceEditor = page.getByTestId(`pos-price-${setup.product.sku}`);
     if (!(await priceEditor.isVisible())) {
@@ -232,7 +240,7 @@ test.describe('Point of sale — card terminal', () => {
     const chip = page.getByTestId(`pos-category-${firstCategory}`);
     await expect(chip).toBeVisible();
     await chip.click();
-    await expect(chip).toHaveClass(/oryx-chip--active/);
+    await expect(chip).toHaveClass(/oryx-pos__category--active/);
 
     // Every tile now belongs to the chosen category. The tile name is not the
     // category, so assert through the API: filter the grid to a category whose
