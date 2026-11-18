@@ -121,6 +121,9 @@ test.describe('Point of sale — card terminal', () => {
     // Selecting a product must immediately display a real line in the
     // independently scrolling order rail, without opening another panel.
     await expect(page.getByTestId(`pos-cart-line-${setup.product.sku}`)).toBeVisible();
+    // Compact cart rows display all selected products; editing expands a row.
+    await page.getByTestId(`pos-edit-line-${setup.product.sku}`).click();
+    await expect(page.getByTestId(`pos-price-${setup.product.sku}`)).toBeVisible();
     if (setup.product.salesPriceMinor <= 1) {
       await expect(page.getByTestId('save-pos-sale')).toBeDisabled();
       const price = page.getByTestId(`pos-price-${setup.product.sku}`);
