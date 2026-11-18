@@ -1,14 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { ENTERPRISE_ADMIN, setLocale, signIn } from './helpers';
+import { ENTERPRISE_ADMIN, SUPER_ADMIN, setLocale, signIn } from './helpers';
 
 /** The three owner-facing workflows are discoverable in their real pages. */
 test.describe('POS, company payment settings and banner image upload', () => {
-  test.beforeEach(async ({ page }) => {
+  test('payment methods are directly reachable from main Settings', async ({ page }) => {
     await signIn(page, ENTERPRISE_ADMIN);
     await setLocale(page, 'en');
-  });
-
-  test('payment methods are directly reachable from main Settings', async ({ page }) => {
     await page.goto('/settings');
     await expect(page.getByTestId('settings-payment-shortcut')).toBeVisible();
     await page.getByTestId('open-payment-method-settings').click();
@@ -18,7 +15,10 @@ test.describe('POS, company payment settings and banner image upload', () => {
   });
 
   test('actual homepage slider offers image file uploads with previews', async ({ page }) => {
+    await signIn(page, SUPER_ADMIN);
+    await setLocale(page, 'en');
     await page.goto('/website');
+    await expect(page.getByTestId('website-page')).toBeVisible();
     await page.getByTestId('cms-tab-content').click();
     await expect(page.getByTestId('site-content-editor')).toBeVisible();
     await expect(page.getByTestId('site-slide-image-editor-0')).toBeVisible();
@@ -27,7 +27,10 @@ test.describe('POS, company payment settings and banner image upload', () => {
   });
 
   test('banner editor offers direct file upload and image URL fallback', async ({ page }) => {
+    await signIn(page, SUPER_ADMIN);
+    await setLocale(page, 'en');
     await page.goto('/website');
+    await expect(page.getByTestId('website-page')).toBeVisible();
     await page.getByTestId('cms-tab-banners').click();
     await page.getByTestId('new-cms-banner').click();
     await expect(page.getByTestId('banner-image-upload')).toBeVisible();
