@@ -21,6 +21,7 @@ import {
   SectionHeader,
   Skeleton,
   TableShell,
+  SearchableSelect,
 } from '@/components/ui';
 
 export default function BranchesPage() {
@@ -244,6 +245,7 @@ function EditBranchModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<UserDto[]>([]);
+  const [userSearch, setUserSearch] = useState('');
   const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', city: '', countryCode: 'BH', addressLine: '', phone: '', phoneNumbers: '', crNumber: '', specialty: '', responsibleUserId: '', timezone: 'Asia/Bahrain' });
 
   // Re-seed the form whenever a different branch is opened.
@@ -264,10 +266,19 @@ function EditBranchModal({
       timezone: branch.timezone ?? 'Asia/Bahrain',
     });
     setError(null);
-    void api.listUsers(branch.companyId, { pageSize: 100, status: 'ACTIVE' })
-      .then((result) => setUsers(result.items))
-      .catch(() => setUsers([]));
+
   }, [branch]);
+
+  useEffect(() => {
+    if (!branch) return;
+    let alive = true;
+    const load = () => void api.listUsers(branch.companyId, { pageSize: 100, status: 'ACTIVE', search: userSearch || undefined })
+      .then((result) => { if (alive) setUsers(result.items); })
+      .catch(() => { if (alive) setUsers([]); });
+    const timer = setTimeout(load, userSearch ? 250 : 0);
+    window.addEventListener('focus', load);
+    return () => { alive = false; clearTimeout(timer); window.removeEventListener('focus', load); };
+  }, [branch, userSearch]);
 
   async function submit() {
     if (!branch) return;
@@ -365,17 +376,28 @@ function EditBranchModal({
         <Field label={locale === 'ar' ? 'أرقام هواتف إضافية (افصل بينها بفاصلة أو سطر)' : 'Additional phone numbers (comma or newline separated)'}>
           <textarea className="oryx-input min-h-20" value={form.phoneNumbers} onChange={(e) => setForm({ ...form, phoneNumbers: e.target.value })} data-testid="edit-branch-phone-numbers" />
         </Field>
-        <Field label={locale === 'ar' ? 'رقم السجل التجاري للفرع' : 'Branch commercial registration number'}>
+        <Field label={locale === 'ar' ? 'رقم السجل التجاري' : 'Commercial registration number'}>
           <input className="oryx-input" value={form.crNumber} onChange={(e) => setForm({ ...form, crNumber: e.target.value })} data-testid="edit-branch-cr-number" />
         </Field>
-        <Field label={locale === 'ar' ? 'تخصص ومجال الفرع' : 'Branch specialty / field'}>
+        <Field label={locale === 'ar' ? 'مجال العمل' : 'Business field'}>
           <input className="oryx-input" value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} data-testid="edit-branch-specialty" />
         </Field>
         <Field label={locale === 'ar' ? 'الموظف المسؤول' : 'Responsible employee'}>
-          <select className="oryx-select" value={form.responsibleUserId} onChange={(e) => setForm({ ...form, responsibleUserId: e.target.value })} data-testid="edit-branch-responsible-user">
-            <option value="">{locale === 'ar' ? 'غير محدد' : 'Not assigned'}</option>
-            {users.map((user) => <option key={user.id} value={user.id}>{locale === 'ar' ? user.fullNameAr : user.fullNameEn} · {user.email}</option>)}
-          </select>
+          <SearchableSelect
+            value={form.responsibleUserId || null}
+            options={users.map((user) => ({
+              value: user.id,
+              label: (locale === 'ar' ? user.fullNameAr : user.fullNameEn) || user.email,
+              hint: user.email,
+            }))}
+            onChange={(value) => setForm((prev) => ({ ...prev, responsibleUserId: value ?? '' }))}
+            onSearch={setUserSearch}
+            placeholder={locale === 'ar' ? 'ابحث عن مستخدم بالاسم أو البريد' : 'Search users by name or email'}
+            emptyLabel={locale === 'ar' ? 'غير محدد' : 'Not assigned'}
+            createLabel={locale === 'ar' ? 'إضافة مستخدم جديد' : 'Add new user'}
+            onCreateNew={() => branch && window.open(`/users?companyId=${encodeURIComponent(branch.companyId)}&add=1`, '_blank', 'noopener,noreferrer')}
+            testId="edit-branch-responsible-user"
+          />
         </Field>
         <Field label={t('branches.addressLine')}>
           <input
