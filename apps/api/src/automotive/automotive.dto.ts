@@ -103,8 +103,8 @@ export class OcrExtractDto {
 
 export class CreateInspectionServiceDto {
   @IsOptional() @IsString() @MaxLength(40) code?: string;
-  @IsString() @MinLength(2) @MaxLength(160) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(160) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(160) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(160) nameAr?: string;
   @IsOptional() @IsString() @MaxLength(600) description?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) priceMinor?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) taxPercentBp?: number;
