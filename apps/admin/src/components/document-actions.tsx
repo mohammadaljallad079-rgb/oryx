@@ -420,10 +420,6 @@ export function DocumentActions({ sourceType, sourceId, type, permissions, autoO
             {preview && document ? (
               <PdfShareActions url={preview} filename={`${document.documentNumber}.pdf`} />
             ) : null}
-            <Button variant="ghost" onClick={download} disabled={!preview} data-testid={`doc-download-${sourceId}`}>
-              <Icon name="download" size={14} />
-              {t('documents.download')}
-            </Button>
             <Button variant="primary" onClick={print} disabled={!preview} data-testid={`doc-print-${sourceId}`}>
               <Icon name="print" size={14} />
               {t('documents.print')}
