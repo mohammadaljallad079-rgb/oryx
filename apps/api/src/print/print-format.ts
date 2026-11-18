@@ -154,7 +154,8 @@ export function toPrintLines(lines: PrintLineSource[], currency: string) {
     unitPrice: fromMinor(line.unitPriceMinor, scale),
     taxLabel: rateLabel(line.taxPercentBp),
     discountPercent: line.discountPercentBp > 0 ? `${line.discountPercentBp / 100}%` : '—',
-    amount: `${fromMinor(totals.lines[index].lineTotalMinor, scale)} ${symbol}`,
+    // Print the net line amount excluding VAT. Tax is displayed in totals only.
+    amount: `${fromMinor(totals.lines[index].lineSubtotalMinor - totals.lines[index].discountMinor, scale)} ${symbol}`,
     };
   });
 }
