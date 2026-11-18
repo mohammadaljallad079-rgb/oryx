@@ -286,9 +286,9 @@ function RoleEditor({
         });
       } else {
         await api.createRole(companyId, {
-          code: form.code,
-          nameEn: form.nameEn,
-          nameAr: form.nameAr,
+          code: '',
+          nameEn: form.nameEn.trim() || form.nameAr.trim(),
+          nameAr: form.nameAr.trim() || form.nameEn.trim(),
           descriptionEn: form.descriptionEn || undefined,
           permissions,
         });
@@ -311,7 +311,7 @@ function RoleEditor({
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
-            disabled={busy || !form.nameEn || !form.nameAr || (!role && !form.code)}
+            disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim())}
             onClick={submit}
             data-testid="save-role"
           >
@@ -335,8 +335,9 @@ function RoleEditor({
           <Field label={t('common.code')} required>
             <input
               className="oryx-input"
-              value={form.code}
-              onChange={(e) => setForm({ ...form, code: e.target.value })}
+              value=""
+              readOnly
+              placeholder="Automatic / تلقائي"
               data-testid="role-code"
             />
           </Field>
