@@ -55,9 +55,15 @@ function logoBlock(issuer: DocumentIssuer): string {
  * and the navy table headings stay fully legible on top of it — a watermark that
  * competes with the data is worse than none.
  */
+/** Shared watermark dimensions for all official print templates. */
+export function watermarkSizePt(issuer: DocumentIssuer): number {
+  return Math.max(80, Math.min(500, issuer.documentWatermarkSizePt ?? 310));
+}
+
 export function documentWatermark(issuer: DocumentIssuer): string {
-  if (!issuer.logoDataUri) return '';
-  return `<div class="doc-watermark" aria-hidden="true"><img src="${esc(issuer.logoDataUri)}" alt=""></div>`;
+  if (!issuer.logoDataUri || issuer.documentWatermarkEnabled === false) return '';
+  const size = watermarkSizePt(issuer);
+  return `<div class="doc-watermark" aria-hidden="true"><img src="${esc(issuer.logoDataUri)}" alt="" style="width:${size}pt;max-width:${size}pt;max-height:${size}pt;object-fit:contain"></div>`;
 }
 
 /** The running header on the first page of a document. */
@@ -400,7 +406,7 @@ export function footerTemplate(chrome: DocumentFooterInput): string {
 export const CHROME_CSS = `
   .doc-watermark{ position:absolute; inset:0; display:flex; align-items:center;
     justify-content:center; pointer-events:none; z-index:-1; }
-  .doc-watermark img{ width:78%; height:auto; opacity:0.05; }
+  .doc-watermark img{ height:auto; opacity:0.05; }
   .doc-head{ position:relative; z-index:1; display:flex; justify-content:space-between; align-items:flex-start;
     border-bottom:3px solid var(--navy); padding-bottom:6px; }
   .doc-head-left{ flex:1 1 auto; }
