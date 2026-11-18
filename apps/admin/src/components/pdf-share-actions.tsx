@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui';
 import { useUi } from '@/lib/ui-context';
 
@@ -14,12 +14,26 @@ export function PdfShareActions({ url, filename }: { url: string; filename: stri
   const ar = locale === 'ar';
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
+  const [file, setFile] = useState<File | null>(null);
 
-  async function getFile(): Promise<File> {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(ar ? 'تعذر تحميل ملف PDF' : 'Could not load PDF');
-    return new File([await response.blob()], filename, { type: 'application/pdf' });
-  }
+  // Load in advance. Native Web Share requires a live user gesture and fails
+  // in several browsers if the click first waits on an asynchronous fetch.
+  useEffect(() => {
+    let active = true;
+    setFile(null);
+    setNotice('');
+    void (async () => {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(ar ? 'تعذر تحميل ملف PDF' : 'Could not load PDF');
+        const loaded = new File([await response.blob()], filename, { type: 'application/pdf' });
+        if (active) setFile(loaded);
+      } catch (error) {
+        if (active) setNotice(error instanceof Error ? error.message : (ar ? 'تعذر تحميل PDF' : 'Could not load PDF'));
+      }
+    })();
+    return () => { active = false; };
+  }, [url, filename, ar]);
 
   function download(file: File) {
     const href = URL.createObjectURL(file);
@@ -33,10 +47,10 @@ export function PdfShareActions({ url, filename }: { url: string; filename: stri
   }
 
   async function handleAction(action: 'share' | 'download') {
+    if (!file) return;
     setBusy(true);
     setNotice('');
     try {
-      const file = await getFile();
       if (action === 'share') {
         // If the browser supports only text links, do not call navigator.share:
         // doing so silently sends the title but not the actual PDF attachment.
@@ -62,10 +76,10 @@ export function PdfShareActions({ url, filename }: { url: string; filename: stri
 
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="pdf-share-actions">
-      <Button size="sm" disabled={busy} onClick={() => void handleAction('share')} data-testid="pdf-share-native">
+      <Button size="sm" disabled={busy || !file} onClick={() => void handleAction('share')} data-testid="pdf-share-native">
         {ar ? 'مشاركة PDF' : 'Share PDF'}
       </Button>
-      <Button size="sm" disabled={busy} onClick={() => void handleAction('download')} data-testid="pdf-share-download">
+      <Button size="sm" disabled={busy || !file} onClick={() => void handleAction('download')} data-testid="pdf-share-download">
         {ar ? 'تنزيل PDF' : 'Download PDF'}
       </Button>
       {notice ? <p className="m-0 w-full text-xs text-[var(--muted)]" role="status">{notice}</p> : null}
