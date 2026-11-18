@@ -3392,3 +3392,37 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
     overflow-y: auto;
   }
 }
+
+/* POS cart visibility: compact line summaries leave room for several selected
+ * products on shorter desktop screens; item details open on demand. */
+@media (min-width: 768px) {
+  .oryx-modal--pos .oryx-pos__rail {
+    min-height: 0;
+    overflow: hidden;
+  }
+  .oryx-modal--pos .oryx-pos__rail-head { flex: 0 0 auto; padding: 8px 10px; }
+  .oryx-modal--pos .oryx-pos__lines {
+    flex: 1 1 auto;
+    min-height: 135px;
+    padding: 7px;
+    gap: 5px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .oryx-modal--pos .oryx-pos__lines > [data-testid^="pos-cart-line-"] {
+    flex-shrink: 0;
+  }
+  .oryx-modal--pos .oryx-pos__customer-warehouse {
+    flex: 0 0 auto;
+    padding: 7px 9px;
+    gap: 6px;
+  }
+  .oryx-modal--pos .oryx-pos__tender {
+    flex: 0 1 auto;
+    max-height: 32%;
+    min-height: 100px;
+    padding: 8px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+}
