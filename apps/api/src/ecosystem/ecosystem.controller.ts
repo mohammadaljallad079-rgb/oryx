@@ -1,11 +1,12 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { RequirePermissions } from '../auth/auth.decorators';
 import { PrincipalGuard } from '../auth/principal.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { CurrentPrincipal, type RequestPrincipal } from '../auth/auth.decorators';
 import { EcosystemService } from './ecosystem.service';
-import { AdvanceRecoveryDto, DecideReturnDto, ReviewAiSuggestionDto, SubmitRfqQuoteDto } from './ecosystem.dto';
+import { AdvanceRecoveryDto, RecoveryLocationDto, DecideReturnDto, ReviewAiSuggestionDto, SubmitRfqQuoteDto } from './ecosystem.dto';
 
 /**
  * Provider-side ecosystem surface (P4–P7).
@@ -62,6 +63,19 @@ export class ProviderEcosystemController {
   }
 
   // ------------------------------------------------------------- P5 recovery
+
+  @Post('recovery/:id/location')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 12, ttl: 60_000 } })
+  @RequirePermissions('erp.provider_portal.read')
+  @ApiOperation({ summary: 'Report the assigned recovery truck GPS position; does not change job status' })
+  async reportLocation(
+    @CurrentPrincipal() principal: RequestPrincipal,
+    @Param('id') id: string,
+    @Body() dto: RecoveryLocationDto,
+  ) {
+    return this.ecosystem.reportRecoveryLocation(principal.userId, id, dto.latitude, dto.longitude);
+  }
 
   @Get('recovery')
   @RequirePermissions('erp.provider_portal.read')
