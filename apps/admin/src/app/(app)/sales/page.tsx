@@ -310,7 +310,7 @@ function InvoiceLineBreakdown({ document: doc }: { document: SalesDocumentDto })
 // ------------------------------------------------------------------ invoices
 
 function InvoicesTab({ canManage, onOpenReturns }: { canManage: boolean; onOpenReturns: () => void }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
@@ -392,7 +392,9 @@ function InvoicesTab({ canManage, onOpenReturns }: { canManage: boolean; onOpenR
                     {canManage && inv.status !== 'DRAFT' ? (
                       <>
                         <Button size="sm" variant="ghost" disabled
-                          title="Posted invoices cannot be permanently deleted because doing so would corrupt journal entries, payments, tax and stock. Issue a credit note instead."
+                          title={locale === 'ar'
+                            ? 'الفاتورة المُرحّلة لا يمكن حذفها دون التأثير على القيود والمدفوعات والضريبة والمخزون. استخدم سند إرجاع.'
+                            : 'Posted invoices cannot be deleted without affecting journals, payments, tax and stock. Issue a credit note instead.'}
                           aria-label={t('common.delete')}
                           data-testid={`delete-invoice-blocked-${inv.invoiceNumber}`}>
                           <Icon name="trash" size={14} />
