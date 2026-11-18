@@ -440,7 +440,7 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
     <div class="trn-band"></div>
     <div class="trn-text" style="top:${topFor(110.63)}pt">TRN: ${dash(trn)}</div>
     <div class="info-rule"></div>
-    <div class="docno" style="${at(37.17, 131.31, 13.28)}">${esc(doc.titleEn)} # ${esc(doc.documentNumber)}</div>
+    <div class="docno" style="${at(37.17, 131.31, 13.28)}">${esc(rtl ? (doc.titleAr || doc.titleEn) : (doc.titleEn || doc.titleAr))} # ${esc(doc.documentNumber)}</div>
     ${leftFieldHtml}${secondaryHtml}
     ${rightFieldHtml}
 
