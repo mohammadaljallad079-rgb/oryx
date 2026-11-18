@@ -1595,7 +1595,19 @@ function CartRow({
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold">{line.description}</div>
           <div className="font-mono text-xs text-[var(--muted)]">{line.sku}</div>
-          <div className="mt-1 text-xs font-medium tabular-nums">{line.quantity} × {money(line.unitPriceMinor)} · {money(lineTotal)}</div>
+          <div className="mt-1 text-xs font-medium tabular-nums">{money(line.unitPriceMinor)}</div>
+          <div className="oryx-pos__line-quick">
+            <div className="oryx-pos__quantity-stepper" role="group" aria-label={ar ? 'تعديل الكمية' : 'Change quantity'}>
+              <button type="button" aria-label={ar ? 'تقليل الكمية' : 'Decrease quantity'}
+                data-testid={`pos-decrement-${line.sku}`} disabled={line.quantity <= 1}
+                onClick={() => onChange({ quantity: Math.max(1, line.quantity - 1) })}>−</button>
+              <span className="tabular-nums" data-testid={`pos-quantity-label-${line.sku}`}>{line.quantity}</span>
+              <button type="button" aria-label={ar ? 'زيادة الكمية' : 'Increase quantity'}
+                data-testid={`pos-increment-${line.sku}`}
+                onClick={() => onChange({ quantity: line.quantity + 1 })}>+</button>
+            </div>
+            <strong className="tabular-nums">{money(lineTotal)}</strong>
+          </div>
         </div>
         <Button size="sm" variant="ghost" onClick={() => setExpanded(value => !value)}
           aria-expanded={expanded} aria-label={ar ? 'تفاصيل المنتج' : 'Edit item details'}
