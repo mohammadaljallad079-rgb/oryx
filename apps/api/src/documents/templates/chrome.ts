@@ -325,7 +325,7 @@ function contactRow(issuer: DocumentIssuer): string {
  */
 export function reportFooterTemplate(issuer: DocumentIssuer, qrDataUri?: string): string {
   const base = [
-    "font-family:'ORYX Latin','ORYX Arabic','ORYX Sans',Verdana,Arial,sans-serif",
+    "font-family:'ORYX Arabic','ORYX Sans',Arial,sans-serif",
     'color:#64748b',
     '-webkit-print-color-adjust:exact',
   ].join(';');
@@ -383,7 +383,7 @@ export function footerTemplate(chrome: DocumentFooterInput): string {
     .join(' · ');
   const meta = [address, registration, contact].filter(Boolean).join('  ·  ');
   const style = [
-    "font-family:'ORYX Latin','ORYX Arabic','ORYX Sans',Verdana,Arial,sans-serif",
+    "font-family:'ORYX Arabic','ORYX Sans',Arial,sans-serif",
     'font-size:8px',
     'color:#5b6472',
     'width:100%',
