@@ -919,6 +919,50 @@ describe('Execution Phase 2 — inspection engine (e2e)', () => {
     });
   });
 
+  describe('deletion and accounting protection', () => {
+    it('deletes an unapproved draft inspection without touching financial documents', async () => {
+      const created = await createSession(['INTERIOR']);
+      const deleted = await companyCall<{ deleted: boolean }>(
+        ctx.base, companyId, `/automotive/inspections/${created.id}`,
+        { method: 'DELETE', token: writerToken },
+      );
+      expect(deleted.status).toBe(200);
+      expect(deleted.body.deleted).toBe(true);
+      expect(await prisma.inspectionSession.count({ where: { id: created.id } })).toBe(0);
+    });
+
+    it('refuses to delete an inspection referenced by a billed booking', async () => {
+      const created = await createSession(['INTERIOR']);
+      const writer = await prisma.user.findUniqueOrThrow({ where: { email: writerEmail } });
+      const service = await prisma.inspectionService.create({
+        data: {
+          companyId, code: `${PREFIX}-SERVICE-${Date.now()}`,
+          nameEn: 'Billed fixture', nameAr: 'فحص مفوتر',
+        },
+      });
+      const booking = await prisma.inspectionBooking.create({
+        data: {
+          companyId, bookingNumber: `${PREFIX}-BOOK-${Date.now()}`,
+          vehicleId, customerId, serviceId: service.id,
+          scheduledAt: new Date(), createdById: writer.id,
+        },
+      });
+      const report = await prisma.inspectionReport.create({
+        data: { companyId, bookingId: booking.id, invoiceId: 'accounting-invoice-reference', status: 'APPROVED' },
+      });
+      await prisma.inspectionSession.update({
+        where: { id: created.id }, data: { bookingId: booking.id },
+      });
+      const response = await companyCall(
+        ctx.base, companyId, `/automotive/inspections/${created.id}`,
+        { method: 'DELETE', token: writerToken },
+      );
+      expect(response.status).toBe(409);
+      expect(await prisma.inspectionSession.count({ where: { id: created.id } })).toBe(1);
+      expect(await prisma.inspectionReport.count({ where: { id: report.id, invoiceId: 'accounting-invoice-reference' } })).toBe(1);
+    });
+  });
+
   describe('optional inspection notes', () => {
     it('submits a fully passing inspection with no notes recorded', async () => {
       const created = await createSession(['EXTERIOR']);
