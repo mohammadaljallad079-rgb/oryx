@@ -50,11 +50,26 @@ export default function DashboardOverviewPage() {
   }
 
   const k = data?.kpis;
+  // Tenant currency data may be missing or invalid. Currency formatters throw
+  // during React render for invalid ISO codes, blanking the entire overview.
+  const currencyCode = (() => {
+    const value = k?.currency;
+    if (!value || !/^[A-Z]{3}$/.test(value)) return DEFAULT_CURRENCY;
+    try {
+      new Intl.NumberFormat('en-US', { style: 'currency', currency: value });
+      return value;
+    } catch {
+      return DEFAULT_CURRENCY;
+    }
+  })();
   const currency = new Intl.NumberFormat(locale === 'ar' ? 'ar-SA' : 'en-US', {
     style: 'currency',
-    currency: k?.currency ?? DEFAULT_CURRENCY,
+    currency: currencyCode,
     maximumFractionDigits: 0,
   });
+  const branches = Array.isArray(data?.branchPerformance) ? data.branchPerformance : [];
+  const adoption = Array.isArray(data?.moduleAdoption) ? data.moduleAdoption : [];
+  const activity = Array.isArray(data?.recentActivity) ? data.recentActivity : [];
 
   return (
     <div className="flex flex-col gap-4" data-testid="dashboard">
@@ -114,7 +129,7 @@ export default function DashboardOverviewPage() {
             <StatCard
               icon="scroll"
               label={t('dash.kpi.mrr')}
-              value={currency.format(k.monthlyRecurringRevenue)}
+              value={currency.format(Number(k.monthlyRecurringRevenue) || 0)}
               sub={k.currency}
             />
             <StatCard icon="package" label={t('dash.kpi.modulesLicensed')} value={String(k.modulesLicensed)} />
@@ -140,15 +155,15 @@ export default function DashboardOverviewPage() {
               <p className="oryx-panel-title m-0">{t('dash.branchPerformance')}</p>
               <p className="oryx-faint m-0 text-[11.5px]">{t('dash.branchPerformanceHint')}</p>
             </div>
-            <Badge tone="gold">{data?.branchPerformance.length ?? 0}</Badge>
+            <Badge tone="gold">{branches.length}</Badge>
           </div>
           {loading ? (
             <Skeleton height={190} />
-          ) : (data?.branchPerformance.length ?? 0) === 0 ? (
+          ) : (branches.length) === 0 ? (
             <EmptyState title={t('common.empty')} hint={t('common.emptyHint')} />
           ) : (
             <MiniBarChart
-              data={data!.branchPerformance}
+              data={branches}
               height={190}
               valueFormatter={(v) => String(v)}
             />
@@ -184,13 +199,13 @@ export default function DashboardOverviewPage() {
           </div>
           {loading ? (
             <Skeleton height={160} />
-          ) : (data?.moduleAdoption.length ?? 0) === 0 ? (
+          ) : (adoption.length) === 0 ? (
             <EmptyState title={t('common.empty')} />
           ) : (
             // Each row is a module with a licensed/not-licensed indicator; the
             // API reports these as 0/1 flags, so a chart would be misleading.
             <ul className="m-0 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2">
-              {data!.moduleAdoption.map((m) => {
+              {adoption.map((m) => {
                 const licensed = m.value === 1;
                 return (
                   <li key={m.label} className="flex items-center gap-2 text-[12.5px]">
@@ -221,11 +236,11 @@ export default function DashboardOverviewPage() {
           <p className="oryx-panel-title m-0 mb-3">{t('dash.recentActivity')}</p>
           {loading ? (
             <Skeleton height={160} />
-          ) : (data?.recentActivity.length ?? 0) === 0 ? (
+          ) : (activity.length) === 0 ? (
             <EmptyState title={t('common.empty')} />
           ) : (
             <ul className="m-0 flex list-none flex-col gap-2 p-0">
-              {data!.recentActivity.map((a) => (
+              {activity.map((a) => (
                 <li key={a.id} className="flex items-start gap-2 text-[12.5px]">
                   <span className="oryx-gold mt-1">
                     <Icon name="check" size={13} />
