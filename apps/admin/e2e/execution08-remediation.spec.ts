@@ -90,8 +90,7 @@ test.describe('Execution 08 remediation — interface', () => {
     await page.getByTestId('inspections-tab-services').click();
     await page.getByTestId('new-inspection-service').click();
 
-    const code = `E08UI${Date.now().toString().slice(-6)}`;
-    await page.getByTestId('service-code').fill(code);
+    await expect(page.getByTestId('service-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('service-name-en').fill('E08 UI inspection');
     await page.getByTestId('service-name-ar').fill('فحص واجهة');
     await page.getByTestId('service-price').fill('5.000');
@@ -101,7 +100,11 @@ test.describe('Execution 08 remediation — interface', () => {
     await expect(page.getByTestId('preview-total')).toContainText('5.500');
     await page.getByTestId('save-service').click();
 
-    const row = page.getByTestId(`service-row-${code}`);
+    const row = page.locator('[data-testid^="service-row-"]').filter({ hasText: 'E08 UI inspection' });
+    await expect(row).toBeVisible({ timeout: 15_000 });
+    const rowId = await row.getAttribute('data-testid');
+    expect(rowId).toBeTruthy();
+    const code = rowId!.replace('service-row-', '');
     await expect(row).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId(`service-vat-${code}`)).toContainText('0.500');
     await expect(page.getByTestId(`service-total-${code}`)).toContainText('5.500');
@@ -202,14 +205,17 @@ test.describe('Execution 08 remediation — interface', () => {
     await page.getByTestId('accounting-tab-accounts').click();
     await page.getByTestId('new-account').click();
 
-    const code = `E08UI${Date.now().toString().slice(-6)}`;
-    await page.getByTestId('account-code').fill(code);
+    await expect(page.getByTestId('account-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('account-type').selectOption('ASSET');
     await page.getByTestId('account-name-en').fill('E08 UI account');
     await page.getByTestId('account-name-ar').fill('حساب واجهة');
     await page.getByTestId('save-account').click();
 
-    const row = page.getByTestId(`account-row-${code}`);
+    const row = page.locator('[data-testid^="account-row-"]').filter({ hasText: 'E08 UI account' });
+    await expect(row).toBeVisible({ timeout: 15_000 });
+    const rowId = await row.getAttribute('data-testid');
+    expect(rowId).toBeTruthy();
+    const code = rowId!.replace('account-row-', '');
     await expect(row).toBeVisible({ timeout: 15_000 });
 
     // Reclassify through the type dropdown and rename; both must persist.
