@@ -109,7 +109,7 @@ export function SupplierModal({
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
-            disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim()) || (!supplier && !form.code)}
+            disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim())}
             onClick={submit}
             data-testid="save-supplier"
           >
@@ -121,7 +121,7 @@ export function SupplierModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} disabled={Boolean(supplier)} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))} data-testid="supplier-code" />
+          <input className="oryx-input" value={(supplier?.code ?? '')} readOnly placeholder="Automatic / تلقائي" aria-label="Auto-generated code" data-testid="supplier-code" />
         </Field>
         <Field label={t('erp.sales.phone')}>
           <input className="oryx-input" value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))} data-testid="supplier-phone" />
@@ -222,7 +222,7 @@ export function ProductModal({
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy || !form.sku || (!form.nameEn.trim() && !form.nameAr.trim())} onClick={submit} data-testid="save-product">
+          <Button variant="primary" disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim())} onClick={submit} data-testid="save-product">
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </>
@@ -231,7 +231,7 @@ export function ProductModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('erp.inventory.sku')} required>
-          <input className="oryx-input" value={form.sku} onChange={(e) => setForm((prev) => ({ ...prev, sku: e.target.value }))} data-testid="product-sku" />
+          <input className="oryx-input" value={form.sku} readOnly placeholder="Automatic / تلقائي" aria-label="Auto-generated code" data-testid="product-sku" />
         </Field>
         <Field label={t('erp.inventory.unit')}>
           <input className="oryx-input" value={form.unit} onChange={(e) => setForm((prev) => ({ ...prev, unit: e.target.value }))} />
@@ -323,7 +323,7 @@ export function WarehouseModal({
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy || !form.code || (!form.nameEn.trim() && !form.nameAr.trim())} onClick={submit} data-testid="save-warehouse">
+          <Button variant="primary" disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim())} onClick={submit} data-testid="save-warehouse">
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </>
@@ -332,7 +332,7 @@ export function WarehouseModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))} data-testid="warehouse-code" />
+          <input className="oryx-input" value={form.code} readOnly placeholder="Automatic / تلقائي" aria-label="Auto-generated code" data-testid="warehouse-code" />
         </Field>
         <Field label={`${t('common.name')} (EN)`}>
           <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm((prev) => ({ ...prev, nameEn: e.target.value }))} data-testid="warehouse-name-en" />
@@ -687,7 +687,7 @@ export function LeadModal({
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim()) || (!lead && !form.code)} onClick={submit} data-testid="save-lead">
+          <Button variant="primary" disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim())} onClick={submit} data-testid="save-lead">
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </>
@@ -696,7 +696,7 @@ export function LeadModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} disabled={Boolean(lead)} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))} data-testid="lead-code" />
+          <input className="oryx-input" value={(lead?.code ?? '')} readOnly placeholder="Automatic / تلقائي" aria-label="Auto-generated code" data-testid="lead-code" />
         </Field>
         <Field label={t('erp.crm.contact')}>
           <input className="oryx-input" value={form.contactName} onChange={(e) => setForm((prev) => ({ ...prev, contactName: e.target.value }))} data-testid="lead-contact" />
@@ -821,7 +821,7 @@ export function AccountModal({
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
-            disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim()) || (!account && !form.code)}
+            disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim())}
             onClick={submit}
             data-testid="save-account"
           >
@@ -833,7 +833,7 @@ export function AccountModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} disabled={Boolean(account)} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))} data-testid="account-code" />
+          <input className="oryx-input" value={(account?.code ?? form.code)} readOnly placeholder="Automatic / تلقائي" aria-label="Auto-generated code" data-testid="account-code" />
         </Field>
         <Field label={t('erp.accounting.type')} required>
           <select
@@ -926,10 +926,10 @@ export function InlineDepartmentModal({
 
   return (
     <Modal open title={t('erp.hr.newDepartment')} onClose={onClose}
-      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || !form.code || (!form.nameEn.trim() && !form.nameAr.trim())} onClick={submit} data-testid="inline-create-department-save">{busy ? t('common.loading') : t('common.save')}</Button></>}>
+      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim())} onClick={submit} data-testid="inline-create-department-save">{busy ? t('common.loading') : t('common.save')}</Button></>}>
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3">
-        <Field label={t('common.code')} required><input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="inline-create-department-code" /></Field>
+        <Field label={t('common.code')} required><input className="oryx-input" value={form.code} readOnly placeholder="Automatic / تلقائي" aria-label="Auto-generated code" data-testid="inline-create-department-code" /></Field>
         <Field label={`${t('common.name')} (EN)`}><input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="inline-create-department-name-en" /></Field>
         <Field label={`${t('common.name')} (AR)`}><input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="inline-create-department-name-ar" /></Field>
       </div>
@@ -1016,7 +1016,7 @@ export function MarketplaceProviderModal({
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
-            disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim()) || !form.code}
+            disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim())}
             onClick={submit}
             data-testid="save-provider"
           >
@@ -1028,7 +1028,7 @@ export function MarketplaceProviderModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))} data-testid="provider-code" />
+          <input className="oryx-input" value={form.code} readOnly placeholder="Automatic / تلقائي" aria-label="Auto-generated code" data-testid="provider-code" />
         </Field>
         <Field label={t('erp.providers.category')}>
           <input className="oryx-input" value={form.categoryKey} onChange={(e) => setForm((prev) => ({ ...prev, categoryKey: e.target.value }))} data-testid="provider-category" />
