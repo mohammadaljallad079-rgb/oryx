@@ -230,7 +230,7 @@ function SalesInner() {
       </div>
 
       {tab === 'dashboard' ? <ModuleDashboard moduleKey="sales_pos" /> : null}
-      {tab === 'invoices' ? <InvoicesTab canManage={can('erp.sales.invoice.manage')} onOpenReturns={() => setTab('returns')} /> : null}
+      {tab === 'invoices' ? <InvoicesTab canManage={can('erp.sales.invoice.manage')} /> : null}
       {tab === 'quotations' ? <QuotationsTab canManage={can('erp.sales.order.manage')} /> : null}
       {tab === 'returns' ? <CreditNotesTab canManage={can('erp.sales.credit_note.manage')} /> : null}
       {tab === 'pos' ? <PosTab canOperate={can('erp.sales.pos.operate')} canManage={can('erp.sales.pos.manage')} /> : null}
@@ -309,14 +309,13 @@ function InvoiceLineBreakdown({ document: doc }: { document: SalesDocumentDto })
 
 // ------------------------------------------------------------------ invoices
 
-function InvoicesTab({ canManage, onOpenReturns }: { canManage: boolean; onOpenReturns: () => void }) {
-  const { t, locale } = useUi();
+function InvoicesTab({ canManage }: { canManage: boolean }) {
+  const { t } = useUi();
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
   const [autoPreviewId, setAutoPreviewId] = useState<string | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<SalesDocumentDto | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
   const [filters, setFilters] = useState<SalesRegisterFilterValues>({ ...EMPTY_SALES_REGISTER_FILTERS });
   const list = useAsync(() => api.salesInvoices({ page: 1, ...salesFilterQuery(filters) }), [filters]);
   const customers = useAsync(() => api.salesCustomers(), []);
@@ -337,7 +336,6 @@ function InvoicesTab({ canManage, onOpenReturns }: { canManage: boolean; onOpenR
       </div>
       <SalesRegisterFilters kind="invoices" value={filters} onChange={setFilters} />
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
-      {actionError ? <div className="p-4"><ErrorBanner message={actionError} /></div> : null}
       {list.loading ? (
         <div className="flex flex-col gap-3 p-4">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} height={34} />)}</div>
       ) : (list.data?.items.length ?? 0) === 0 ? (
@@ -371,38 +369,6 @@ function InvoicesTab({ canManage, onOpenReturns }: { canManage: boolean; onOpenR
                         <Button size="sm" variant="ghost" onClick={() => { setEditingInvoice(inv); setOpen(true); }} data-testid={`edit-invoice-${inv.invoiceNumber}`}>
                           <Icon name="edit" size={14} />
                           {t('common.edit')}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            if (!window.confirm(t('common.confirm'))) return;
-                            setActionError(null);
-                            void api.deleteSalesInvoice(inv.id)
-                              .then(() => list.reload())
-                              .catch((e) => setActionError(e instanceof Error ? e.message : t('common.error')));
-                          }}
-                          data-testid={`delete-invoice-${inv.invoiceNumber}`}
-                        >
-                          <Icon name="trash" size={14} />
-                          {t('common.delete')}
-                        </Button>
-                      </>
-                    ) : null}
-                    {canManage && inv.status !== 'DRAFT' ? (
-                      <>
-                        <Button size="sm" variant="ghost" disabled
-                          title={locale === 'ar'
-                            ? 'الفاتورة المُرحّلة لا يمكن حذفها دون التأثير على القيود والمدفوعات والضريبة والمخزون. استخدم سند إرجاع.'
-                            : 'Posted invoices cannot be deleted without affecting journals, payments, tax and stock. Issue a credit note instead.'}
-                          aria-label={t('common.delete')}
-                          data-testid={`delete-invoice-blocked-${inv.invoiceNumber}`}>
-                          <Icon name="trash" size={14} />
-                          {t('common.delete')}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={onOpenReturns}
-                          data-testid={`reverse-invoice-${inv.invoiceNumber}`}>
-                          {t('erp.sales.returns')}
                         </Button>
                       </>
                     ) : null}
