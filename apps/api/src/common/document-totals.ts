@@ -10,10 +10,13 @@ export interface PricedLineInput {
   quantity: number;
   unitPriceMinor: number;
   discountPercentBp?: number;
+  /** Fixed discount in minor units; when set, takes precedence over legacy percent. */
+  discountAmountMinor?: number;
   taxPercentBp?: number;
 }
 
-export interface PricedLine extends Required<Omit<PricedLineInput, never>> {
+export interface PricedLine extends Required<Omit<PricedLineInput, 'discountAmountMinor'>> {
+  discountAmountMinor?: number;
   lineSubtotalMinor: number;
   discountMinor: number;
   taxMinor: number;
@@ -53,13 +56,16 @@ export function computeDocumentTotals(
     const discountPercentBp = line.discountPercentBp ?? 0;
     const taxPercentBp = line.taxPercentBp ?? 0;
     const lineSubtotalMinor = lineAmountMinor(line.quantity, line.unitPriceMinor);
-    const discountMinor = basisPointsOfMinor(lineSubtotalMinor, discountPercentBp);
+    const discountMinor = line.discountAmountMinor === undefined
+      ? basisPointsOfMinor(lineSubtotalMinor, discountPercentBp)
+      : Math.min(lineSubtotalMinor, Math.max(0, line.discountAmountMinor));
     const net = lineSubtotalMinor - discountMinor;
     const taxMinor = basisPointsOfMinor(net, taxPercentBp);
     return {
       quantity: line.quantity,
       unitPriceMinor: line.unitPriceMinor,
       discountPercentBp,
+      discountAmountMinor: line.discountAmountMinor,
       taxPercentBp,
       lineSubtotalMinor,
       discountMinor,
