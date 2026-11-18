@@ -556,13 +556,14 @@ export class HrService {
   }
 
   async createLeaveType(dto: CreateLeaveTypeDto, principal: RequestPrincipal, actor: ActorContext) {
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'LVT');
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.leaveType.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Leave type ${dto.code} already exists.`);
+    const dup = await this.prisma.leaveType.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Leave type ${code} already exists.`);
     const type = await this.prisma.leaveType.create({
       data: {
         companyId,
-        code: dto.code,
+        code: code,
         nameEn: dto.nameEn,
         nameAr: dto.nameAr,
         annualEntitlementDays: dto.annualEntitlementDays ?? 0,
@@ -801,10 +802,11 @@ export class HrService {
   }
 
   async createShift(dto: CreateShiftDto, principal: RequestPrincipal, actor: ActorContext) {
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'SHF');
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.shift.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Shift ${dto.code} already exists.`);
-    const shift = await this.prisma.shift.create({ data: { companyId, code: dto.code, nameEn: dto.nameEn, nameAr: dto.nameAr, startTime: dto.startTime, endTime: dto.endTime, breakMinutes: dto.breakMinutes ?? 0 } });
+    const dup = await this.prisma.shift.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Shift ${code} already exists.`);
+    const shift = await this.prisma.shift.create({ data: { companyId, code: code, nameEn: dto.nameEn, nameAr: dto.nameAr, startTime: dto.startTime, endTime: dto.endTime, breakMinutes: dto.breakMinutes ?? 0 } });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.shift_created', targetType: 'SHIFT', targetId: shift.id, summary: `Created shift ${shift.code}` });
     return shift;
   }
@@ -960,15 +962,16 @@ export class HrService {
   }
 
   async createWorkSite(dto: CreateWorkSiteDto, principal: RequestPrincipal, actor: ActorContext) {
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'WST');
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
-    const dup = await this.prisma.workSite.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Work site ${dto.code} already exists.`);
+    const dup = await this.prisma.workSite.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Work site ${code} already exists.`);
     const site = await this.prisma.workSite.create({
       data: {
         companyId,
         branchId: dto.branchId ?? null,
-        code: dto.code,
+        code: code,
         nameEn: dto.nameEn,
         nameAr: dto.nameAr,
         latitude: dto.latitude,
@@ -1374,11 +1377,12 @@ export class HrService {
   }
 
   async createPayrollPeriod(dto: CreatePayrollPeriodDto, principal: RequestPrincipal, actor: ActorContext) {
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'PAY');
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.payrollPeriod.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Payroll period ${dto.code} already exists.`);
+    const dup = await this.prisma.payrollPeriod.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Payroll period ${code} already exists.`);
     const period = await this.prisma.payrollPeriod.create({
-      data: { companyId, code: dto.code, nameEn: dto.nameEn, nameAr: dto.nameAr, startDate: new Date(dto.startDate), endDate: new Date(dto.endDate) },
+      data: { companyId, code: code, nameEn: dto.nameEn, nameAr: dto.nameAr, startDate: new Date(dto.startDate), endDate: new Date(dto.endDate) },
     });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.payroll_period_created', targetType: 'PAYROLL_PERIOD', targetId: period.id, summary: `Created payroll period ${period.code}` });
     return period;
