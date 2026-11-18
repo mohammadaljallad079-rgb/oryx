@@ -1,3 +1,4 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
 import { fromMinor, sumMinor } from '@oryx/shared';
 import type { Prisma } from '@oryx/database';
@@ -86,6 +87,8 @@ export class HrService {
   }
 
   async createDepartment(dto: CreateDepartmentDto, principal: RequestPrincipal, actor: ActorContext) {
+    // Server allocates the code when a form omits it; legacy imports may supply their own.
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'DEP');
 
     const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
     if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Enter a name in Arabic or English.');
@@ -93,10 +96,10 @@ export class HrService {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal, dto.companyId);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     if (dto.parentId) await this.assertDepartment(companyId, dto.parentId);
-    const dup = await this.prisma.department.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Department code ${dto.code} already exists.`);
+    const dup = await this.prisma.department.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Department code ${code} already exists.`);
     const dept = await this.prisma.department.create({
-      data: { companyId, code: dto.code, ...names, parentId: dto.parentId ?? null, branchId: dto.branchId ?? null },
+      data: { companyId, code: code, ...names, parentId: dto.parentId ?? null, branchId: dto.branchId ?? null },
     });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.department_created', targetType: 'DEPARTMENT', targetId: dept.id, summary: `Created department ${dept.code}` });
     return dept;
@@ -157,15 +160,17 @@ export class HrService {
   }
 
   async createJobTitle(dto: CreateJobTitleDto, principal: RequestPrincipal, actor: ActorContext) {
+    // Server allocates the code when a form omits it; legacy imports may supply their own.
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'JOB');
 
     const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
     if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Enter a name in Arabic or English.');
 
     const { companyId } = await this.context.resolveCompanyScope(principal);
     if (dto.departmentId) await this.assertDepartment(companyId, dto.departmentId);
-    const dup = await this.prisma.jobTitle.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Job title code ${dto.code} already exists.`);
-    const title = await this.prisma.jobTitle.create({ data: { companyId, code: dto.code, ...names, departmentId: dto.departmentId ?? null } });
+    const dup = await this.prisma.jobTitle.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Job title code ${code} already exists.`);
+    const title = await this.prisma.jobTitle.create({ data: { companyId, code: code, ...names, departmentId: dto.departmentId ?? null } });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.job_title_created', targetType: 'JOB_TITLE', targetId: title.id, summary: `Created job title ${title.code}` });
     return title;
   }
@@ -229,6 +234,8 @@ export class HrService {
   }
 
   async createEmployee(dto: CreateEmployeeDto, principal: RequestPrincipal, actor: ActorContext) {
+    // Server allocates the code when a form omits it; legacy imports may supply their own.
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'EMP');
 
     const names = { nameEn: dto.fullNameEn?.trim() || dto.fullNameAr?.trim() || '', nameAr: dto.fullNameAr?.trim() || dto.fullNameEn?.trim() || '' };
     if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Employee name is required in Arabic or English.');
@@ -237,15 +244,15 @@ export class HrService {
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     if (dto.departmentId) await this.assertDepartment(companyId, dto.departmentId);
     if (dto.jobTitleId) await this.assertJobTitle(companyId, dto.jobTitleId, dto.departmentId);
-    const dup = await this.prisma.employee.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Employee code ${dto.code} already exists.`);
+    const dup = await this.prisma.employee.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Employee code ${code} already exists.`);
     if (dto.managerId) await this.assertEmployee(companyId, dto.managerId);
 
     const employee = await this.posting.withTransaction(async (tx) => {
       const created = await tx.employee.create({
         data: {
           companyId,
-          code: dto.code,
+          code: code,
           fullNameEn: names.nameEn,
           fullNameAr: names.nameAr,
           email: dto.email ?? null,
