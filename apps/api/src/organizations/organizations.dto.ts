@@ -20,15 +20,15 @@ export class CreateCompanyDto {
   @Matches(/^[A-Z0-9][A-Z0-9-]{1,30}$/, { message: 'code must be uppercase letters, digits or dashes' })
   code?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(160)
-  nameEn!: string;
+  nameEn?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(160)
-  nameAr!: string;
+  nameAr?: string;
 
   @IsOptional()
   @IsString()
@@ -204,15 +204,15 @@ export class CreateBranchDto {
   @Matches(/^[A-Z0-9][A-Z0-9-]{0,20}$/, { message: 'code must be uppercase letters, digits or dashes' })
   code?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(160)
-  nameEn!: string;
+  nameEn?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(160)
-  nameAr!: string;
+  nameAr?: string;
 
   @IsOptional()
   @IsString()
