@@ -124,6 +124,11 @@ test.describe('Point of sale — card terminal', () => {
     await expect(page.getByTestId('pos-premium-workstation')).toBeVisible();
     await expect(page.getByTestId('pos-checkout-cart')).toBeVisible();
     await expect(tile.locator('.oryx-pos-tile__selected')).toHaveText('1');
+    // The approved cart design adjusts quantity without opening the detail editor.
+    await page.getByTestId(`pos-increment-${setup.product.sku}`).click();
+    await expect(page.getByTestId(`pos-quantity-label-${setup.product.sku}`)).toHaveText('2');
+    await page.getByTestId(`pos-decrement-${setup.product.sku}`).click();
+    await expect(page.getByTestId(`pos-quantity-label-${setup.product.sku}`)).toHaveText('1');
     // Compact cart rows display all selected products; editing expands a row.
     const priceEditor = page.getByTestId(`pos-price-${setup.product.sku}`);
     if (!(await priceEditor.isVisible())) {
