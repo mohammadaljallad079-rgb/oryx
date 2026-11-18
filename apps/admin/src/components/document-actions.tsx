@@ -7,6 +7,7 @@ import { useUi } from '@/lib/ui-context';
 import { useAuth } from '@/lib/auth-context';
 import { Icon } from '@/components/icons';
 import { Button, Modal } from '@/components/ui';
+import { PdfShareActions } from '@/components/pdf-share-actions';
 
 /**
  * Issue, preview, print and download the official document for one record.
@@ -416,6 +417,9 @@ export function DocumentActions({ sourceType, sourceId, type, permissions, autoO
             <Button variant="ghost" onClick={closePreview}>
               {t('common.close')}
             </Button>
+            {preview && document ? (
+              <PdfShareActions url={preview} filename={`${document.documentNumber}.pdf`} />
+            ) : null}
             <Button variant="ghost" onClick={download} disabled={!preview} data-testid={`doc-download-${sourceId}`}>
               <Icon name="download" size={14} />
               {t('documents.download')}

@@ -124,11 +124,31 @@ export class ListQueryDto {
   customerId?: string;
 }
 
-export class CreateCustomerDto {
+/** Customer-master filters are validated independently from document register filters. */
+export class CustomerListQueryDto extends ListQueryDto {
+  @IsOptional()
+  @IsIn(['COMPANY', 'INDIVIDUAL'])
+  kind?: 'COMPANY' | 'INDIVIDUAL';
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  active?: 'true' | 'false';
+
+  @IsOptional()
   @IsString()
-  @MinLength(1)
+  sourceId?: string;
+
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
+}
+
+export class CreateCustomerDto {
+  /** Optional when the server assigns the next company-scoped CO/CU identifier. */
+  @IsOptional()
+  @IsString()
   @MaxLength(40)
-  code!: string;
+  code?: string;
 
   /**
    * The two name fields are optional independently: an administrator may know

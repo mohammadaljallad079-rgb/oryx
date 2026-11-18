@@ -47,8 +47,8 @@ export function PaymentMethodsEditor({
             {ar ? 'طرق الدفع' : 'Payment methods'}
           </h3>
           <p className="text-xs text-[var(--muted)]">
-            {ar ? 'اختر طريقة التسوية المحاسبية لكل طريقة دفع. التعديلات تُحفظ مع إعدادات المبيعات.' :
-              'Choose the accounting settlement for each payment method. Save using the Sales settings button.'}
+            {ar ? 'يمكن تعديل اسم طريقة الدفع بالعربية والإنجليزية مباشرة، ثم الضغط على حفظ إعدادات المبيعات. الكود ثابت لحماية الربط بالفواتير.' :
+              'Edit payment names in Arabic and English, then save Sales settings. Codes stay fixed to preserve invoice references.'}
           </p>
         </div>
         {canEdit ? <Button size="sm" onClick={() => setAdding(true)}
@@ -65,12 +65,12 @@ export function PaymentMethodsEditor({
             <label className="flex flex-col gap-1 md:col-span-2">
               <span className="oryx-label">{ar ? 'الاسم بالعربية' : 'Arabic name'}</span>
               <input className="oryx-input" value={method.nameAr} disabled={!canEdit}
-                onChange={e => patch(i, { nameAr: e.target.value })} />
+                onChange={e => patch(i, { nameAr: e.target.value })} data-testid={`payment-method-name-ar-${method.code}`} />
             </label>
             <label className="flex flex-col gap-1 md:col-span-2">
               <span className="oryx-label">{ar ? 'الاسم بالإنجليزية' : 'English name'}</span>
               <input className="oryx-input" value={method.nameEn} disabled={!canEdit}
-                onChange={e => patch(i, { nameEn: e.target.value })} />
+                onChange={e => patch(i, { nameEn: e.target.value })} data-testid={`payment-method-name-en-${method.code}`} />
             </label>
             <label className="flex flex-col gap-1 md:col-span-2">
               <span className="oryx-label">{ar ? 'التسوية' : 'Settlement'}</span>

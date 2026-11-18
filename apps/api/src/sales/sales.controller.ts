@@ -15,6 +15,7 @@ import {
   CreateCashierSessionDto,
   CreateCreditNoteDto,
   CreateCustomerDto,
+  CustomerListQueryDto,
   CreateInvoiceDto,
   CreatePosSaleDto,
   CreateQuotationDto,
@@ -43,7 +44,7 @@ export class SalesController {
   @Get('customers')
   @RequireAnyPermission('erp.sales.read', 'erp.sales.customer.manage')
   @ApiOperation({ summary: 'List customers' })
-  customers(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+  customers(@Query() query: CustomerListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
     return this.sales.listCustomers(query, p);
   }
 

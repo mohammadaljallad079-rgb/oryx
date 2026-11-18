@@ -128,7 +128,8 @@ function computePosTotals(
   scale: number,
 ) {
   const priced = lines.map((l) => {
-    const lineSubtotalMinor = lineAmountMinor(l.quantity, l.unitPriceMinor);
+    // Cart quantities are human units; the shared money helper expects 10^4-scaled units.
+    const lineSubtotalMinor = lineAmountMinor(l.quantity * 10000, l.unitPriceMinor);
     const discountMinor = basisPointsOfMinor(lineSubtotalMinor, l.discountPercentBp);
     const net = lineSubtotalMinor - discountMinor;
     const taxMinor = basisPointsOfMinor(net, l.taxPercentBp);
@@ -715,7 +716,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
 // ------------------------------------------------------------------- POS
 
 function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boolean }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const { companyId } = useAuth();
   const [roundingMode, setRoundingMode] = useState<RoundingMode>('NONE');
   const [currencyScale, setCurrencyScale] = useState(currencyScaleOf('BHD'));
@@ -813,7 +814,7 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
               onClick={() => void startSession()}
             >
               <Icon name="plus" size={16} />
-              {opening ? t('common.loading') : t('erp.sales.openSession')}
+              {opening ? t('common.loading') : (locale === 'ar' ? 'فتح جلسة جديدة' : 'Open new session')}
             </Button>
           ) : null}
           {canOperate && openSession ? (
@@ -1156,7 +1157,8 @@ function PosSaleModal({
         lines: cart.map((l) => ({
           productId: l.productId,
           description: l.description || 'Item',
-          quantity: l.quantity,
+          // The API's invoice/stock engine also uses 10^4-scaled quantities.
+          quantity: l.quantity * 10000,
           unitPriceMinor: l.unitPriceMinor,
           discountPercentBp: l.discountPercentBp,
           taxPercentBp: l.taxPercentBp,
@@ -1227,7 +1229,7 @@ function PosSaleModal({
         </p>
       ) : null}
 
-      <div className="oryx-pos grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="oryx-pos grid min-h-0 flex-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(305px,38%)] xl:grid-cols-[minmax(0,1fr)_minmax(360px,34%)]">
         {/* ---------------------------------------------------- product grid */}
         <div className="flex min-h-0 min-w-0 flex-col gap-3">
           <div className="oryx-pos__toolbar">
@@ -1594,10 +1596,10 @@ function CartRow({
   const needsPrice = line.unitPriceMinor <= (currencyScale === 3 ? 1 : 0);
   const ar = locale === 'ar';
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3"
+    <div className="flex flex-col gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2"
       data-testid={`pos-cart-line-${line.sku}`}>
       <div className="flex items-start gap-3">
-        <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--background)]">
+        <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--background)]">
           {imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={imageUrl} alt={line.description} className="h-full w-full object-cover" loading="lazy" />

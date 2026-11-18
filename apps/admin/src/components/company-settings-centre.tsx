@@ -248,6 +248,8 @@ const SECTION_META: Record<CompanySettingSection, { labelEn: string; labelAr: st
     labelAr: 'المبيعات والعملاء وطرق الدفع',
     icon: 'cart',
     fields: [
+      { key: 'customerCompanyPrefix', labelEn: 'Company customer prefix', labelAr: 'بادئة العميل الشركة', type: 'text' },
+      { key: 'customerIndividualPrefix', labelEn: 'Individual customer prefix', labelAr: 'بادئة العميل الفرد', type: 'text' },
       { key: 'quotationPrefix', labelEn: 'Quotation prefix', labelAr: 'بادئة عرض السعر', type: 'text' },
       { key: 'orderPrefix', labelEn: 'Order prefix', labelAr: 'بادئة أمر البيع', type: 'text' },
       { key: 'invoicePrefix', labelEn: 'Invoice prefix', labelAr: 'بادئة الفاتورة', type: 'text' },

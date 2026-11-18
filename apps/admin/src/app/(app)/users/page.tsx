@@ -39,6 +39,9 @@ function UsersInner() {
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  useEffect(() => {
+    if (params.get('add') === '1') setAddOpen(true);
+  }, [params]);
   const [editProfile, setEditProfile] = useState<UserDto | null>(null);
   const [selectedUser, setSelectedUser] = useState<UserDto | null>(null);
   const [manageUser, setManageUser] = useState<UserDto | null>(null);
@@ -713,6 +716,7 @@ function AddUserModal({
     password: '',
     nationalId: '',
     nationality: '',
+    phone: '',
     address: '',
     roleId: '',
   });
@@ -730,6 +734,7 @@ function AddUserModal({
       password: '',
       nationalId: '',
       nationality: '',
+      phone: '',
       address: '',
       roleId: '',
     });
@@ -769,6 +774,7 @@ function AddUserModal({
         password: form.password,
         nationalId: form.nationalId || undefined,
         nationality: form.nationality || undefined,
+        phone: form.phone.trim() || undefined,
         address: form.address || undefined,
         roleId: form.roleId,
         branchIds,
@@ -863,6 +869,10 @@ function AddUserModal({
             data-testid="add-user-nationality"
           />
         </Field>
+        <Field label={locale === 'ar' ? 'رقم الهاتف' : 'Phone number'}>
+          <input className="oryx-input" type="tel" autoComplete="tel" value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })} data-testid="add-user-phone" />
+        </Field>
         <Field label={t('users.address')}>
           <input
             className="oryx-input"
@@ -913,12 +923,13 @@ function EditProfileModal({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const [form, setForm] = useState({
     fullNameEn: '',
     fullNameAr: '',
     nationalId: '',
     nationality: '',
+    phone: '',
     address: '',
   });
   const [busy, setBusy] = useState(false);
@@ -932,6 +943,7 @@ function EditProfileModal({
       fullNameAr: user.fullNameAr,
       nationalId: user.nationalId ?? '',
       nationality: user.nationality ?? '',
+      phone: user.phone ?? '',
       address: user.address ?? '',
     });
   }, [user]);
@@ -946,6 +958,7 @@ function EditProfileModal({
         fullNameAr: form.fullNameAr,
         nationalId: form.nationalId,
         nationality: form.nationality,
+        phone: form.phone.trim(),
         address: form.address,
       });
       await onSaved();
@@ -1003,6 +1016,10 @@ function EditProfileModal({
             onChange={(e) => setForm({ ...form, nationality: e.target.value })}
             data-testid="edit-profile-nationality"
           />
+        </Field>
+        <Field label={locale === 'ar' ? 'رقم الهاتف' : 'Phone number'}>
+          <input className="oryx-input" type="tel" autoComplete="tel" value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })} data-testid="edit-profile-phone" />
         </Field>
         <Field label={t('users.address')}>
           <input

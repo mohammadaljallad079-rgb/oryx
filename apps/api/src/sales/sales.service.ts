@@ -17,6 +17,7 @@ import type {
   CreateCashierSessionDto,
   CreateCreditNoteDto,
   CreateCustomerDto,
+  CustomerListQueryDto,
   CreateInvoiceDto,
   CreatePosSaleDto,
   CreateQuotationDto,
@@ -124,12 +125,16 @@ export class SalesService {
 
   // --------------------------------------------------------------- customers
 
-  async listCustomers(query: ListQueryDto, principal: RequestPrincipal) {
+  async listCustomers(query: CustomerListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? 200, 500);
     const where = {
       companyId,
+      ...(query.kind ? { kind: query.kind } : {}),
+      ...(query.active !== undefined ? { isActive: query.active === 'true' } : {}),
+      ...(query.sourceId ? { sourceId: query.sourceId } : {}),
+      ...(query.departmentId ? { departmentId: query.departmentId } : {}),
       ...(query.search
         ? {
             OR: [
@@ -197,8 +202,16 @@ export class SalesService {
       this.context.companyCurrency(companyId),
       this.context.companyCountryCode(companyId),
     ]);
-    const dup = await this.prisma.customer.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Customer code ${dto.code} already exists.`);
+    const explicitCode = dto.code?.trim();
+    if (explicitCode) {
+      const dup = await this.prisma.customer.findUnique({ where: { companyId_code: { companyId, code: explicitCode } } });
+      if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Customer code ${explicitCode} already exists.`);
+    }
+    const settings = explicitCode ? null : await this.prisma.companySetting.findUnique({
+      where: { companyId_section: { companyId, section: 'sales' } },
+    });
+    const customerPrefixes = withDefaults('sales', settings?.value);
+    const prefix = (dto.kind === 'COMPANY' ? customerPrefixes.customerCompanyPrefix : customerPrefixes.customerIndividualPrefix).toUpperCase();
     // The two names are independent, but a customer with no name at all would be
     // unidentifiable in a list, so at least one is required.
     const nameEn = (dto.nameEn ?? '').trim();
@@ -207,10 +220,10 @@ export class SalesService {
       throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide the customer name in English, Arabic, or both.');
     }
     await this.resolveAttribution(companyId, dto.sourceId, dto.departmentId);
-    const customer = await this.prisma.customer.create({
+    const createRecord = (code: string) => this.prisma.customer.create({
       data: {
         companyId,
-        code: dto.code,
+        code,
         nameEn,
         nameAr,
         email: dto.email ?? null,
@@ -236,6 +249,26 @@ export class SalesService {
       },
       include: { source: true, department: true },
     });
+    let customer: Awaited<ReturnType<typeof createRecord>> | undefined;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      // Existing manual codes are left untouched. Only numeric suffixes count.
+      const recent = explicitCode ? [] : await this.prisma.customer.findMany({
+        where: { companyId, code: { startsWith: prefix } },
+        orderBy: { code: 'desc' }, take: 100, select: { code: true },
+      });
+      const last = recent.map(row => row.code.slice(prefix.length))
+        .filter(suffix => /^\\d+$/.test(suffix))
+        .reduce((max, suffix) => Math.max(max, Number(suffix)), 0);
+      const code = explicitCode || `${prefix}${String(last + 1 + attempt).padStart(6, '0')}`;
+      try {
+        customer = await createRecord(code);
+        break;
+      } catch (error) {
+        if (!explicitCode && (error as { code?: string }).code === 'P2002') continue;
+        throw error;
+      }
+    }
+    if (!customer) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, 'Unable to allocate a unique customer code.');
     await this.audit.record({
       actorUserId: actor.userId,
       companyId,

@@ -167,6 +167,9 @@ export const DEFAULT_COMPANY_PAYMENT_METHODS: CompanyPaymentMethodSetting[] = [
 ];
 
 export interface SalesSettings {
+  /** Automatically allocated customer identifiers, scoped per company and type. */
+  customerCompanyPrefix: string;
+  customerIndividualPrefix: string;
   quotationPrefix: string;
   orderPrefix: string;
   invoicePrefix: string;
@@ -342,6 +345,8 @@ export const COMPANY_SETTING_DEFAULTS: CompanySettingsMap = {
     barcodeRequired: false,
   },
   sales: {
+    customerCompanyPrefix: 'CO',
+    customerIndividualPrefix: 'CU',
     quotationPrefix: 'QT-',
     orderPrefix: 'SO-',
     invoicePrefix: 'INV-',

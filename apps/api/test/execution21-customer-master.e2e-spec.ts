@@ -126,6 +126,46 @@ describe('Customer master data — attribution, profile and attachments (e2e)', 
     expect(res.body.departmentNameAr).toBe('مبيعات الأسطول');
   });
 
+  it('auto-numbers company and individual customers with configurable prefixes and filters', async () => {
+    const original = await erp<{ customerCompanyPrefix: string; customerIndividualPrefix: string }>('/company-settings/sales');
+    expect(original.status).toBe(200);
+    try {
+      const saved = await erp('/company-settings/sales', {
+        method: 'PUT',
+        body: { customerCompanyPrefix: 'CO', customerIndividualPrefix: 'CU' },
+      });
+      expect(saved.status).toBe(200);
+      const company = await erp<{ id: string; code: string; kind: string }>('/sales/customers', {
+        method: 'POST', body: { kind: 'COMPANY', nameEn: 'Execution Company Customer' },
+      });
+      expect(company.status).toBe(201);
+      expect(company.body.code).toMatch(/^CO\d+$/);
+      createdCustomerIds.push(company.body.id);
+
+      const individual = await erp<{ id: string; code: string; kind: string }>('/sales/customers', {
+        method: 'POST', body: { kind: 'INDIVIDUAL', nameEn: 'Execution Individual Customer' },
+      });
+      expect(individual.status).toBe(201);
+      expect(individual.body.code).toMatch(/^CU\d+$/);
+      createdCustomerIds.push(individual.body.id);
+
+      const filtered = await erp<{ items: Array<{ id: string; kind: string }> }>(
+        '/sales/customers?kind=COMPANY&active=true',
+      );
+      expect(filtered.status).toBe(200);
+      expect(filtered.body.items.some(row => row.id === company.body.id)).toBe(true);
+      expect(filtered.body.items.some(row => row.id === individual.body.id)).toBe(false);
+    } finally {
+      await erp('/company-settings/sales', {
+        method: 'PUT',
+        body: {
+          customerCompanyPrefix: original.body.customerCompanyPrefix,
+          customerIndividualPrefix: original.body.customerIndividualPrefix,
+        },
+      });
+    }
+  });
+
   it('refuses a source id that belongs to another company', async () => {
     const foreign = await otherErp<{ id: string }>('/crm/lead-sources', {
       method: 'POST',

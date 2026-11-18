@@ -749,8 +749,8 @@ body::before {
 /* The product grid: as many columns as the width allows, each tile square-ish. */
 .oryx-pos__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 8px;
   overflow-y: auto;
   flex: 1 1 auto;
   min-height: 0;
@@ -845,6 +845,7 @@ body::before {
 
 /* The order rail that holds the live cart and the tender controls. */
 .oryx-pos__rail {
+  position: relative;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--pos-line);
@@ -1785,6 +1786,30 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* On tablet keep the cart visible next to the catalogue. On phones the same
+ * screen scrolls as one document rather than clipping the order rail below the
+ * grid. Both colour schemes inherit the existing ORYX surface/text tokens. */
+@media (max-width: 767px) {
+  .oryx-pos {
+    overflow-y: auto;
+    align-content: start;
+  }
+  .oryx-pos__grid {
+    grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+    max-height: 42vh;
+    overflow-y: auto;
+  }
+  .oryx-pos__rail { overflow: visible; min-height: 0; }
+  .oryx-pos__lines { max-height: 24vh; overflow-y: auto; }
+  .oryx-pos__toolbar { flex-wrap: wrap; }
+}
+@media (min-width: 768px) and (max-width: 1100px) {
+  .oryx-pos { padding: 8px; }
+  .oryx-pos__grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 7px; }
+  .oryx-pos__rail-head { padding: 8px; }
+  .oryx-pos__tender { padding: 8px; gap: 6px; }
 }
 
 /*
