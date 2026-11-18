@@ -26,7 +26,7 @@ export class ListQueryDto {
 // ------------------------------------------------------------- lead sources
 
 export class CreateLeadSourceDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
   @IsOptional() @IsString() @MaxLength(120) nameEn?: string;
   @IsOptional() @IsString() @MaxLength(120) nameAr?: string;
 }
@@ -34,7 +34,7 @@ export class CreateLeadSourceDto {
 // -------------------------------------------------------------------- leads
 
 export class CreateLeadDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
   @IsOptional() @IsString() @MaxLength(200) nameEn?: string;
   @IsOptional() @IsString() @MaxLength(200) nameAr?: string;
   @IsOptional() @IsString() @MaxLength(200) contactName?: string;
@@ -60,7 +60,7 @@ export class UpdateLeadDto {
 // --------------------------------------------------------------- pipelines
 
 export class CreatePipelineDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
   @IsOptional() @IsString() @MaxLength(120) nameEn?: string;
   @IsOptional() @IsString() @MaxLength(120) nameAr?: string;
   @IsOptional() @IsBoolean() isDefault?: boolean;
