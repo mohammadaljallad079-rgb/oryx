@@ -1520,9 +1520,9 @@ function CreateWorkSiteModal({ open, site, onClose, onSaved }: { open: boolean; 
         });
       } else {
         await api.createWorkSite({
-          code: form.code,
-          nameEn: form.nameEn,
-          nameAr: form.nameAr || form.nameEn,
+          code: '',
+          nameEn: form.nameEn.trim() || form.nameAr.trim(),
+          nameAr: form.nameAr.trim() || form.nameEn.trim(),
           latitude: form.latitude ? Number(form.latitude) : undefined,
           longitude: form.longitude ? Number(form.longitude) : undefined,
           radiusMeters: form.radiusMeters ? Number(form.radiusMeters) : undefined,
@@ -1542,12 +1542,12 @@ function CreateWorkSiteModal({ open, site, onClose, onSaved }: { open: boolean; 
     <Modal open={open} title={isEdit ? t('erp.hr.editWorkSite') : t('erp.hr.newWorkSite')} onClose={onClose} footer={
       <>
         <Button size="sm" variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
-        <Button size="sm" variant="primary" disabled={busy || !form.code || !form.nameEn} onClick={submit} data-testid="submit-work-site">{t('common.save')}</Button>
+        <Button size="sm" variant="primary" disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim())} onClick={submit} data-testid="submit-work-site">{t('common.save')}</Button>
       </>
     }>
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('erp.hr.code')}><input className="oryx-input" value={form.code} disabled={isEdit} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="work-site-code" /></Field>
+        <Field label={t('erp.hr.code')}><input className="oryx-input" value={isEdit ? form.code : ''} readOnly placeholder="Automatic / تلقائي" data-testid="work-site-code" /></Field>
         <Field label={t('erp.hr.radius')}><input type="number" className="oryx-input" value={form.radiusMeters} onChange={(e) => setForm({ ...form, radiusMeters: e.target.value })} data-testid="work-site-radius" /></Field>
         <Field label={`${t('common.name')} (EN)`}><input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="work-site-name-en" /></Field>
         <Field label={`${t('common.name')} (AR)`}><input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="work-site-name-ar" /></Field>
