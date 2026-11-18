@@ -144,10 +144,11 @@ export class CustomerListQueryDto extends ListQueryDto {
 }
 
 export class CreateCustomerDto {
+  /** Optional when the server assigns the next company-scoped CO/CU identifier. */
+  @IsOptional()
   @IsString()
-  @MinLength(1)
   @MaxLength(40)
-  code!: string;
+  code?: string;
 
   /**
    * The two name fields are optional independently: an administrator may know
