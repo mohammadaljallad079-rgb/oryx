@@ -129,8 +129,12 @@ test.describe('Sales register — official document actions', () => {
     const source = await frame.getAttribute('src');
     expect(source).toMatch(/^blob:/);
 
-    // The download and print controls are present and enabled once loaded.
-    await expect(page.getByTestId(`doc-download-${created.id}`)).toBeEnabled();
+    // The preview offers the two approved PDF actions, not duplicate
+    // download or misleading text-only WhatsApp/email share controls.
+    await expect(page.getByTestId('pdf-share-native')).toBeEnabled();
+    await expect(page.getByTestId('pdf-share-download')).toBeEnabled();
+    await expect(page.getByTestId('pdf-share-whatsapp')).toHaveCount(0);
+    await expect(page.getByTestId('pdf-share-email')).toHaveCount(0);
     await expect(page.getByTestId(`doc-print-${created.id}`)).toBeEnabled();
 
     // Assert the stored document really is a PDF by fetching it directly. The
