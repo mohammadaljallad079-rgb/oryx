@@ -3434,12 +3434,12 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
  * cashier layout and all its responsive dimensions remain unchanged.
  * -------------------------------------------------------------------------- */
 :root .oryx-modal--pos:has(.oryx-pos--premium) {
-  --pos-bg: var(--bg);
   --pos-panel: var(--surface);
   --pos-raised: var(--surface-raised);
   --pos-ink: var(--text);
   --pos-soft: var(--text-muted);
   --pos-line: var(--border);
+  --pos-bg: var(--bg);
   --pos-tint: var(--tint-fill);
   --pos-accent: var(--gold);
   --pos-action: var(--primary);
@@ -3451,14 +3451,6 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   --pos-action-ink: var(--on-gold);
 }
 .oryx-modal--pos:has(.oryx-pos--premium) {
-  --surface: var(--pos-panel);
-  --surface-raised: var(--pos-panel);
-  --background: var(--pos-bg);
-  --border: var(--pos-line);
-  --text: var(--pos-ink);
-  --muted: var(--pos-soft);
-  --accent: var(--pos-accent);
-  --accent-strong: var(--pos-accent);
   color: var(--pos-ink);
   background: var(--pos-bg);
   color-scheme: inherit;
@@ -3479,11 +3471,6 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   color: var(--pos-action-ink);
 }
 .oryx-modal--pos .oryx-pos--premium {
-  --pos-ink: var(--text);
-  --pos-soft: var(--text-muted);
-  --pos-line: var(--border);
-  --pos-raised: var(--surface-raised);
-  --pos-panel: var(--surface);
   display: grid;
   direction: rtl;
   grid-template-columns: 172px minmax(0, 1fr) minmax(320px, 33%);
