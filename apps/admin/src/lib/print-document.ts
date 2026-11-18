@@ -324,7 +324,7 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
   * { box-sizing: border-box; }
   html, body { margin:0; padding:0; }
   body {
-    font-family: Tahoma, Arial, sans-serif;
+    font-family: Arial, Tahoma, sans-serif;
     color: var(--ink);
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
