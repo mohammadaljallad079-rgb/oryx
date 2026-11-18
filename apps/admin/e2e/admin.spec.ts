@@ -303,7 +303,7 @@ test.describe('subscription packages', () => {
     await page.getByTestId('new-plan').click();
 
     const suffix = Date.now().toString().slice(-6);
-    await page.getByTestId('plan-code').fill(`e2e${suffix}`);
+    await expect(page.getByTestId('plan-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('plan-name-en').fill(`E2E Plan ${suffix}`);
     await page.getByTestId('plan-name-ar').fill(`باقة اختبار ${suffix}`);
     await page.getByTestId('plan-desc-en').fill('E2E plan for automated verification');
@@ -315,7 +315,7 @@ test.describe('subscription packages', () => {
     await page.getByTestId('plan-module-branch_management').check();
 
     await page.getByTestId('save-plan').click();
-    await expect(page.getByTestId(`plan-card-e2e${suffix}`)).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('[data-testid^="plan-card-"]').filter({ hasText: `E2E Plan ${suffix}` })).toBeVisible({ timeout: 20_000 });
   });
 });
 
