@@ -104,12 +104,23 @@ test.describe('Point of sale — card terminal', () => {
     expect(railRect!.x + railRect!.width).toBeLessThanOrEqual(viewport!.width + 1);
     expect(railRect!.y).toBeGreaterThanOrEqual(0);
     expect(railRect!.y).toBeLessThan(viewport!.height);
+    // On a normal desktop the grid must show several products across the
+    // viewport, not a narrow strip of three oversized cards.
+    if (viewport!.width >= 1024) {
+      const columns = await grid.evaluate((element) =>
+        window.getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length,
+      );
+      expect(columns).toBeGreaterThanOrEqual(4);
+    }
     const tile = page.getByTestId(`pos-product-${setup.product.sku}`);
     await expect(tile).toBeVisible({ timeout: 30_000 });
 
     // Tap the tile and ensure a missing catalogue price can be explicitly
     // entered before checking out. Never silently charge 1 fils.
     await tile.click();
+    // Selecting a product must immediately display a real line in the
+    // independently scrolling order rail, without opening another panel.
+    await expect(page.getByTestId(`pos-cart-line-${setup.product.sku}`)).toBeVisible();
     if (setup.product.salesPriceMinor <= 1) {
       await expect(page.getByTestId('save-pos-sale')).toBeDisabled();
       const price = page.getByTestId(`pos-price-${setup.product.sku}`);

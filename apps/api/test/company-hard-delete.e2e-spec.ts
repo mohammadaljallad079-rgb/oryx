@@ -23,6 +23,12 @@ describe('Company hard deletion (e2e)', () => {
     await ctx.app.close();
   });
 
+  it('exposes permanent-company deletion to the true super admin even when the seeded role is stale', async () => {
+    const me = await call<{ permissions: string[] }>(ctx.base, '/auth/me', { token: platformToken });
+    expect(me.status).toBe(200);
+    expect(me.body.permissions).toContain('platform.company.delete');
+  });
+
   it('requires explicit confirmation and a platform deletion permission, then actually removes the tenant', async () => {
     const created = await ctx.prisma.company.create({
       data: {
