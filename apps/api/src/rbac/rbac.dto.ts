@@ -18,15 +18,15 @@ export class CreateRoleDto {
   @MaxLength(60)
   code?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(120)
-  nameEn!: string;
+  nameEn?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(120)
-  nameAr!: string;
+  nameAr?: string;
 
   @IsOptional()
   @IsString()
