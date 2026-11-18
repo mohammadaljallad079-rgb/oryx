@@ -38,7 +38,7 @@ function mapUrl(point: Location) {
 
 export function RecoveryTrackingPanel({ compact = false }: { compact?: boolean }) {
   const { t, locale } = useUi();
-  const { can, isPlatform, companyId } = useAuth();
+  const { can, isPlatform } = useAuth();
   const authorized = isPlatform || can('erp.marketplace.request.manage');
   const [requests, setRequests] = useState<RecoveryRequestDto[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -58,7 +58,7 @@ export function RecoveryTrackingPanel({ compact = false }: { compact?: boolean }
     } finally {
       setLoading(false);
     }
-  }, [authorized, companyId, t]);
+  }, [authorized, t]);
 
   useEffect(() => {
     if (!authorized) return;
