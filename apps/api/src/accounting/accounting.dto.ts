@@ -142,9 +142,10 @@ export class ListQueryDto {
 }
 
 export class CreateFiscalYearDto {
+  @IsOptional()
   @IsString()
   @MaxLength(20)
-  code!: string;
+  code?: string;
 
   @IsISO8601()
   startDate!: string;
