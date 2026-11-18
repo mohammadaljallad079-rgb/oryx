@@ -83,7 +83,7 @@ export class CreateStagesDto {
 // ------------------------------------------------------------- opportunities
 
 export class CreateOpportunityDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
   @IsString() @MinLength(2) @MaxLength(200) title!: string;
   @IsString() pipelineId!: string;
   @IsOptional() @IsString() stageId?: string;
