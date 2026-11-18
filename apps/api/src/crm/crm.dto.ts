@@ -169,7 +169,7 @@ export class UpdateTicketDto {
 // ------------------------------------------------------------------ segments
 
 export class CreateSegmentDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
   @IsOptional() @IsString() @MaxLength(160) nameEn?: string;
   @IsOptional() @IsString() @MaxLength(160) nameAr?: string;
   @IsOptional() @IsString() @MaxLength(600) description?: string;
