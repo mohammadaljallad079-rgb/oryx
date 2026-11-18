@@ -6,7 +6,6 @@ import {
   PRINT_LOGO_MARK,
   PRINT_MASTHEAD_LOCKUP,
   PRINT_TAGLINE,
-  PRINT_WATERMARK,
 } from './print-assets';
 
 /**
@@ -377,7 +376,7 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
 
   /* watermark - the reference's oversized lockup, behind the items and totals */
   .watermark { position:absolute; left:calc(50% - 165pt); top:260pt; width:330pt; height:185pt; opacity:0.08; line-height:0; pointer-events:none; overflow:hidden; }
-  .watermark svg { display:block; width:100%; height:100%; max-width:100%; max-height:100%; object-fit:contain; }
+  .watermark img { display:block; width:100%; height:100%; object-fit:contain; }
 
   /* totals - right aligned, a rule above the grand total */
   .tlabel { color:var(--ink); }
@@ -453,7 +452,7 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
     <div class="th" style="${rightAt(HEAD.amountRight, 242.40 + tableShift, 8.79)}">${rtl ? 'المبلغ' : 'Amount'}</div>
     ${rowParts.join('')}
 
-    <div class="watermark">${PRINT_WATERMARK}</div>
+    <div class="watermark"><img src="${PRINT_LOGO_MARK}" alt="" /></div>
 
     ${totalsRows}
     <div class="totals-rule"></div>
