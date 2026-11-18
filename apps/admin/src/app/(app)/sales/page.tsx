@@ -1346,7 +1346,7 @@ function PosSaleModal({
             </div>
           )}
 
-          <div className="grid gap-2 border-t border-[var(--border)] p-3 sm:grid-cols-2">
+          <div className="oryx-pos__customer-warehouse grid gap-2 border-t border-[var(--border)] p-3 sm:grid-cols-2">
             <Field label={t('erp.sales.pos.customer')}>
               <EntityPicker
                 value={customerId || null}
@@ -1557,6 +1557,7 @@ function CartRow({
   const { t, locale } = useUi();
   const [priceDraft, setPriceDraft] = useState(() => minorToInput(line.unitPriceMinor));
   const [priceError, setPriceError] = useState(false);
+  const [expanded, setExpanded] = useState(() => line.unitPriceMinor <= (currencyScale === 3 ? 1 : 0));
   useEffect(() => { setPriceDraft(minorToInput(line.unitPriceMinor)); }, [line.unitPriceMinor]);
   const onPriceCommit = () => {
     try {
@@ -1591,8 +1592,13 @@ function CartRow({
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold">{line.description}</div>
           <div className="font-mono text-xs text-[var(--muted)]">{line.sku}</div>
-          <div className="mt-1 text-xs font-medium">{money(line.unitPriceMinor)}</div>
+          <div className="mt-1 text-xs font-medium tabular-nums">{line.quantity} × {money(line.unitPriceMinor)} · {money(lineTotal)}</div>
         </div>
+        <Button size="sm" variant="ghost" onClick={() => setExpanded(value => !value)}
+          aria-expanded={expanded} aria-label={ar ? 'تفاصيل المنتج' : 'Edit item details'}
+          data-testid={`pos-edit-line-${line.sku}`}>
+          <Icon name="edit" size={14} />
+        </Button>
         <Button size="sm" variant="ghost" aria-label={`${t('common.delete')} ${line.description}`}
           onClick={onRemove} data-testid={`pos-remove-${line.sku}`}>
           <Icon name="close" size={14} />
@@ -1603,6 +1609,7 @@ function CartRow({
           {ar ? 'المنتج بدون سعر بيع. أدخل السعر قبل إتمام العملية.' : 'Product has no sales price. Enter a price to check out.'}
         </p>
       ) : null}
+      {expanded ? <>
       <div className="grid grid-cols-3 gap-2">
         <label className="flex flex-col gap-1 text-xs">
           <span>{t('erp.inventory.quantity')}</span>
@@ -1648,6 +1655,7 @@ function CartRow({
         <span>{t('erp.sales.total')}</span>
         <span className="tabular-nums" data-testid={`pos-line-total-${line.sku}`}>{money(lineTotal)}</span>
       </div>
+      </> : null}
     </div>
   );
 }
