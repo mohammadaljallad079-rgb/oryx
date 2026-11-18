@@ -121,9 +121,9 @@ test.describe('company and branch management', () => {
     await page.getByTestId('new-company').click();
 
     const suffix = Date.now().toString().slice(-6);
-    const code = `E2E-${suffix}`;
-    await page.getByTestId('company-code').fill(code);
-    await page.getByTestId('company-name-en').fill(`E2E Tenant ${suffix}`);
+    const name = `E2E Tenant ${suffix}`;
+    await expect(page.getByTestId('company-code')).toHaveAttribute('readonly', '');
+    await page.getByTestId('company-name-en').fill(name);
     await page.getByTestId('company-name-ar').fill(`شركة اختبار ${suffix}`);
     await page.getByTestId('company-admin-email').fill(`admin-${suffix}@e2e.local`);
 
@@ -137,8 +137,10 @@ test.describe('company and branch management', () => {
 
     // The list is paginated, so search for the newly provisioned tenant rather
     // than assuming it lands on the first page.
-    await page.getByTestId('company-search').fill(code);
-    await expect(page.getByTestId(`company-row-${code}`)).toBeVisible({ timeout: 20_000 });
+    await page.getByTestId('company-search').fill(name);
+    const createdRow = page.locator('[data-testid^="company-row-"]').filter({ hasText: name });
+    await expect(createdRow).toBeVisible({ timeout: 20_000 });
+    expect((await createdRow.getAttribute('data-testid'))?.replace('company-row-', '')).toMatch(/^CO\d+$/);
   });
 
   test('super admin can edit, archive and restore a company', async ({ page }) => {
@@ -148,17 +150,21 @@ test.describe('company and branch management', () => {
     // Provision a dedicated tenant so the assertions are independent of other
     // data and safe to re-run.
     const suffix = Date.now().toString().slice(-6);
-    const code = `E2EE-${suffix}`;
+    const name = `E2E Edit ${suffix}`;
+    let code = '';
     await page.goto('/companies');
     await page.getByTestId('new-company').click();
-    await page.getByTestId('company-code').fill(code);
-    await page.getByTestId('company-name-en').fill(`E2E Edit ${suffix}`);
+    await expect(page.getByTestId('company-code')).toHaveAttribute('readonly', '');
+    await page.getByTestId('company-name-en').fill(name);
     await page.getByTestId('company-name-ar').fill(`شركة تعديل ${suffix}`);
     await page.getByTestId('create-company-submit').click();
     await expect(page.getByTestId('new-company')).toBeVisible({ timeout: 20_000 });
 
-    await page.getByTestId('company-search').fill(code);
-    await expect(page.getByTestId(`company-row-${code}`)).toBeVisible({ timeout: 20_000 });
+    await page.getByTestId('company-search').fill(name);
+    const row = page.locator('[data-testid^="company-row-"]').filter({ hasText: name });
+    await expect(row).toBeVisible({ timeout: 20_000 });
+    code = (await row.getAttribute('data-testid'))?.replace('company-row-', '') ?? '';
+    expect(code).toMatch(/^CO\d+$/);
 
     // --- Edit: change the Arabic name and the default tax, then re-open and
     // confirm the values were persisted and reloaded from the API.
@@ -253,25 +259,25 @@ test.describe('company and branch management', () => {
 
     const code = `B${suffix}`;
     await page.getByTestId('new-branch').click();
-    await page.getByTestId('branch-code').fill(code);
+    await expect(page.getByTestId('branch-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('branch-name-en').fill(`E2E Branch ${code}`);
     await page.getByTestId('branch-name-ar').fill(`فرع اختبار ${code}`);
     await page.getByTestId('create-branch-submit').click();
-    await expect(page.getByTestId(`branch-row-${code}`)).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('[data-testid^="branch-row-"]').filter({ hasText: `E2E Branch ${code}` })).toBeVisible({ timeout: 20_000 });
 
     // The second branch fills the Starter plan limit.
     const code2 = `C${suffix}`;
     await page.getByTestId('new-branch').click();
-    await page.getByTestId('branch-code').fill(code2);
+    await expect(page.getByTestId('branch-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('branch-name-en').fill(`E2E Branch ${code2}`);
     await page.getByTestId('branch-name-ar').fill(`فرع اختبار ${code2}`);
     await page.getByTestId('create-branch-submit').click();
-    await expect(page.getByTestId(`branch-row-${code2}`)).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('[data-testid^="branch-row-"]').filter({ hasText: `E2E Branch ${code2}` })).toBeVisible({ timeout: 20_000 });
 
     // The third must be rejected by the backend plan limit, and the UI must
     // surface the localized error rather than pretending success.
     await page.getByTestId('new-branch').click();
-    await page.getByTestId('branch-code').fill(`D${suffix}`);
+    await expect(page.getByTestId('branch-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('branch-name-en').fill('Over the limit');
     await page.getByTestId('branch-name-ar').fill('تجاوز الحد');
     await page.getByTestId('create-branch-submit').click();
@@ -327,7 +333,7 @@ test.describe('roles and permissions', () => {
     // System roles cannot be edited; the UI says so instead of offering edit.
     await page.getByTestId('new-role').click();
     const suffix = Date.now().toString().slice(-5);
-    await page.getByTestId('role-code').fill(`e2e_role_${suffix}`);
+    await expect(page.getByTestId('role-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('role-name-en').fill(`E2E Role ${suffix}`);
     await page.getByTestId('role-name-ar').fill(`دور اختبار ${suffix}`);
 
@@ -340,7 +346,7 @@ test.describe('roles and permissions', () => {
     await expect(page.getByTestId('perm-platform.plan.manage')).toHaveCount(0);
 
     await page.getByTestId('save-role').click();
-    await expect(page.getByTestId(`role-card-e2e_role_${suffix}`)).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('[data-testid^="role-card-"]').filter({ hasText: `E2E Role ${suffix}` })).toBeVisible({ timeout: 20_000 });
   });
 });
 
