@@ -108,7 +108,7 @@ test.describe('Vehicle tracking module', () => {
     const tile = page.getByTestId('tile-vehicle-tracking');
     await expect(tile).toHaveAttribute('href', '/vehicle-tracking');
     await tile.click();
-    await expect(page).toHaveURL(/\\/vehicle-tracking$/);
+    await expect(page).toHaveURL(/\/vehicle-tracking$/);
     await expect(page.getByTestId('vehicle-tracking-page')).toBeVisible();
     await expect(page.getByTestId('recovery-tracking-panel')).toBeVisible();
     await page.goto('/dashboard/overview');
