@@ -34,7 +34,7 @@ export class ListQueryDto {
 
 export class CreateDepartmentDto {
   @IsOptional() @IsString() @MaxLength(64) companyId?: string;
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
   @IsOptional() @IsString() @MaxLength(160) nameEn?: string;
   @IsOptional() @IsString() @MaxLength(160) nameAr?: string;
   @IsOptional() @IsString() parentId?: string;
@@ -48,7 +48,7 @@ export class UpdateDepartmentDto {
 }
 
 export class CreateJobTitleDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
   @IsOptional() @IsString() @MaxLength(160) nameEn?: string;
   @IsOptional() @IsString() @MaxLength(160) nameAr?: string;
   @IsOptional() @IsString() departmentId?: string;
@@ -57,7 +57,7 @@ export class CreateJobTitleDto {
 // --------------------------------------------------------------- employees
 
 export class CreateEmployeeDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
   @IsOptional() @IsString() @MaxLength(200) fullNameEn?: string;
   @IsOptional() @IsString() @MaxLength(200) fullNameAr?: string;
   @IsOptional() @IsString() @MaxLength(160) email?: string;
