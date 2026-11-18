@@ -116,9 +116,8 @@ test.describe('functional audit', () => {
     await page.goto('/companies');
 
     const suffix = Date.now().toString().slice(-6);
-    const code = `${FIXTURE}-${suffix}`;
     await page.getByTestId('new-company').click();
-    await page.getByTestId('company-code').fill(code);
+    await expect(page.getByTestId('company-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('company-name-en').fill(`Audit Co ${suffix}`);
     await page.getByTestId('company-name-ar').fill(`شركة تدقيق ${suffix}`);
     await page.getByTestId('create-company-submit').click();
@@ -130,9 +129,9 @@ test.describe('functional audit', () => {
     // Verify persistence through the API, not the toast.
     const list = await apiCall<{ items: Array<{ id: string; code: string; nameEn: string }> }>(
       page,
-      `/companies?pageSize=50&search=${code}`,
+      `/companies?pageSize=50&search=${encodeURIComponent('Audit Co ' + suffix)}`, 
     );
-    const created = list.body.items.find((c) => c.code === code);
+    const created = list.body.items.find((c) => c.nameEn === `Audit Co ${suffix}`);
     expect(created, 'company must exist in the database').toBeTruthy();
 
     // Edit it and confirm the change is stored.
