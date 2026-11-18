@@ -27,16 +27,16 @@ export class ListQueryDto {
 
 export class CreateLeadSourceDto {
   @IsString() @MinLength(1) @MaxLength(40) code!: string;
-  @IsString() @MinLength(2) @MaxLength(120) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(120) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(120) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(120) nameAr?: string;
 }
 
 // -------------------------------------------------------------------- leads
 
 export class CreateLeadDto {
   @IsString() @MinLength(1) @MaxLength(40) code!: string;
-  @IsString() @MinLength(2) @MaxLength(200) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(200) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(200) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(200) nameAr?: string;
   @IsOptional() @IsString() @MaxLength(200) contactName?: string;
   @IsOptional() @IsString() @MaxLength(160) email?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
@@ -61,15 +61,15 @@ export class UpdateLeadDto {
 
 export class CreatePipelineDto {
   @IsString() @MinLength(1) @MaxLength(40) code!: string;
-  @IsString() @MinLength(2) @MaxLength(120) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(120) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(120) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(120) nameAr?: string;
   @IsOptional() @IsBoolean() isDefault?: boolean;
 }
 
 export class PipelineStageDto {
   @IsString() @MinLength(1) @MaxLength(40) code!: string;
-  @IsString() @MinLength(1) @MaxLength(120) nameEn!: string;
-  @IsString() @MinLength(1) @MaxLength(120) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(120) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(120) nameAr?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) probabilityBp?: number;
   @IsOptional() @IsBoolean() isWon?: boolean;
   @IsOptional() @IsBoolean() isLost?: boolean;
@@ -109,8 +109,8 @@ export class ConvertOpportunityDto {
 // ------------------------------------------------------------------ contacts
 
 export class CreateContactDto {
-  @IsString() @MinLength(2) @MaxLength(200) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(200) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(200) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(200) nameAr?: string;
   @IsOptional() @IsString() @MaxLength(160) email?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
   @IsOptional() @IsString() @MaxLength(120) role?: string;
