@@ -280,7 +280,7 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
     await expect
       .poll(async () => {
         const res = await apiCall<{ items: Array<{ id: string; code: string; nameEn: string }> }>(page, '/operations/projects');
-        const found = res.body.items.find((p) => p.nameEn === name && /^PRJ\\d+$/.test(p.code));
+        const found = res.body.items.find((p) => p.nameEn === name && /^PRJ\d+$/.test(p.code));
         if (found) projectId = found.id;
         return found?.id ?? null;
       }, { timeout: 20_000 })
@@ -310,7 +310,7 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
     await expect
       .poll(async () => {
         const res = await apiCall<{ items: Array<{ id: string; code: string; nameEn: string }> }>(page, '/crm/pipelines');
-        const found = res.body.items.find((p) => p.nameEn === name && /^PL\\d+$/.test(p.code));
+        const found = res.body.items.find((p) => p.nameEn === name && /^PL\d+$/.test(p.code));
         if (found) pipelineId = found.id;
         return found?.id ?? null;
       }, { timeout: 20_000 })
@@ -354,7 +354,7 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
     await expect
       .poll(async () => {
         const res = await apiCall<{ items: Array<{ id: string; code: string; nameEn: string }> }>(page, '/inventory/warehouses');
-        const found = res.body.items.find((w) => w.nameEn === name && /^WH\\d+$/.test(w.code));
+        const found = res.body.items.find((w) => w.nameEn === name && /^WH\d+$/.test(w.code));
         if (found) warehouseId = found.id;
         return found?.id ?? null;
       }, { timeout: 20_000 })
