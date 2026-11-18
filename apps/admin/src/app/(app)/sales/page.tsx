@@ -1225,7 +1225,7 @@ function PosSaleModal({
           <div className="oryx-pos__command-status">
             <span className="oryx-pos__command-indicator" aria-hidden="true" />
             <span>{locale === 'ar' ? 'جلسة الكاشير نشطة' : 'Cashier session active'}</span>
-            <b dir="ltr">{session.sessionNumber}</b>
+            <b dir="ltr">{session?.sessionNumber ?? '—'}</b>
           </div>
           <div className="oryx-pos__command-stats">
             <span>{locale === 'ar' ? 'الأصناف في السلة' : 'Cart items'} <strong>{cart.reduce((n, l) => n + l.quantity, 0)}</strong></span>
