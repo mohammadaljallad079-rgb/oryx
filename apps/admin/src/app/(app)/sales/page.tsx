@@ -1212,9 +1212,16 @@ function PosSaleModal({
         </p>
       ) : null}
 
-      <div className="oryx-pos grid min-h-0 flex-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(305px,38%)] xl:grid-cols-[minmax(0,1fr)_minmax(360px,34%)]">
+      <div className="oryx-pos oryx-pos--premium grid min-h-0 flex-1 gap-3" data-testid="pos-premium-workstation">
         {/* ---------------------------------------------------- product grid */}
-        <div className="flex min-h-0 min-w-0 flex-col gap-3">
+        <div className="oryx-pos__catalog flex min-h-0 min-w-0 flex-col gap-3">
+          <div className="oryx-pos__section-heading">
+            <div>
+              <strong>{locale === 'ar' ? 'المنتجات' : 'Products'}</strong>
+              <span>{locale === 'ar' ? 'اختر من المنتجات أو امسح الباركود' : 'Select a product or scan a barcode'}</span>
+            </div>
+            <span className="oryx-pos__catalog-count">{items.length} {locale === 'ar' ? 'منتج' : 'products'}</span>
+          </div>
           <div className="oryx-pos__toolbar">
             <div className="oryx-pos__search">
               <span className="oryx-pos__search-icon">
@@ -1250,30 +1257,6 @@ function PosSaleModal({
             onDetected={(code) => { setCameraOpen(false); void onScanSubmit(code); }} />
           {catalog.error ? <ErrorBanner message={catalog.error} onRetry={catalog.reload} /> : null}
 
-          {(categories.data?.items.length ?? 0) > 0 ? (
-            <div className="oryx-pos__chips" data-testid="pos-categories">
-              <button
-                type="button"
-                onClick={() => setCategory('')}
-                className={`oryx-chip ${category === '' ? 'oryx-chip--active' : ''}`}
-                data-testid="pos-category-all"
-              >
-                {t('erp.sales.pos.allCategories')}
-              </button>
-              {categories.data!.items.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setCategory(c)}
-                  className={`oryx-chip ${category === c ? 'oryx-chip--active' : ''}`}
-                  data-testid={`pos-category-${c}`}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-          ) : null}
-
           {catalog.loading ? (
             <div className="oryx-pos__grid">
               {Array.from({ length: 8 }).map((_, i) => (
@@ -1286,7 +1269,7 @@ function PosSaleModal({
             <div className="oryx-pos__grid" data-testid="pos-grid">
               {items.map((p) => (
                 <div key={p.id} className="flex min-w-0 flex-col gap-1">
-                  <PosProductTile product={p} onAdd={() => addProduct(p)} />
+                  <PosProductTile product={p} onAdd={() => addProduct(p)} selectedQuantity={cart.find((line) => line.productId === p.id)?.quantity ?? 0} />
                   {!p.imageUrl && can('erp.inventory.item.manage') ? (
                     <label className="oryx-btn oryx-btn--sm flex cursor-pointer items-center justify-center gap-1"
                       data-testid={`pos-add-image-${p.sku}`}>
@@ -1305,8 +1288,26 @@ function PosSaleModal({
           )}
         </div>
 
+        <aside className="oryx-pos__categories" data-testid="pos-categories" aria-label={locale === 'ar' ? 'تصنيفات المنتجات' : 'Product categories'}>
+          <p className="oryx-pos__categories-title">{locale === 'ar' ? 'التصنيفات' : 'Categories'}</p>
+          <button type="button" onClick={() => setCategory('')}
+            className={`oryx-pos__category ${category === '' ? 'oryx-pos__category--active' : ''}`}
+            data-testid="pos-category-all" aria-pressed={category === ''}>
+            <Icon name="grid" size={17} />
+            <span>{t('erp.sales.pos.allCategories')}</span>
+          </button>
+          {(categories.data?.items ?? []).map((c) => (
+            <button type="button" key={c} onClick={() => setCategory(c)}
+              className={`oryx-pos__category ${category === c ? 'oryx-pos__category--active' : ''}`}
+              data-testid={`pos-category-${c}`} aria-pressed={category === c}>
+              <Icon name="package" size={17} />
+              <span>{c}</span>
+            </button>
+          ))}
+        </aside>
+
         {/* ---------------------------------------------------- order rail */}
-        <div className="oryx-pos__rail">
+        <div className="oryx-pos__rail" data-testid="pos-checkout-cart">
           <div className="oryx-pos__rail-head">
             <p className="oryx-pos__rail-title">
               <Icon name="cart" size={17} />
@@ -1489,7 +1490,7 @@ function PosSaleModal({
 }
 
 /** One product tile in the POS grid. */
-function PosProductTile({ product, onAdd }: { product: PosProductDto; onAdd: () => void }) {
+function PosProductTile({ product, onAdd, selectedQuantity = 0 }: { product: PosProductDto; onAdd: () => void; selectedQuantity?: number }) {
   const { t, locale } = useUi();
   const imageUrl = api.resolveImage(product.imageUrl);
   const soldOut = product.trackStock && product.stockStatus === 'OUT';
@@ -1498,10 +1499,11 @@ function PosProductTile({ product, onAdd }: { product: PosProductDto; onAdd: () 
       type="button"
       onClick={onAdd}
       disabled={soldOut}
-      className="oryx-pos-tile"
+      className={`oryx-pos-tile ${selectedQuantity > 0 ? 'oryx-pos-tile--selected' : ''}`}
       data-testid={`pos-product-${product.sku}`}
     >
       <span className="oryx-pos-tile__media">
+        {selectedQuantity > 0 ? <span className="oryx-pos-tile__selected" aria-label={`${selectedQuantity} in cart`}>{selectedQuantity}</span> : null}
         {imageUrl ? (
           // The catalogue serves a card-sized variant; a plain img keeps the
           // grid cheap for hundreds of tiles.
@@ -1532,6 +1534,7 @@ function PosProductTile({ product, onAdd }: { product: PosProductDto; onAdd: () 
             ? (locale === 'ar' ? 'السعر بحاجة لتحديد' : 'Price needs review')
             : money(product.salesPriceMinor)}
         </span>
+        <span className="oryx-pos-tile__add" aria-hidden="true"><Icon name="plus" size={15} /></span>
         <span className="oryx-pos-tile__stock" data-testid={`pos-stock-${product.sku}`}>
           {product.trackStock
             ? `${t('erp.sales.pos.available')}: ${qty(product.onHand)}`
