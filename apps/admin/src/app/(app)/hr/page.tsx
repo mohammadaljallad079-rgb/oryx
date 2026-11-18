@@ -128,7 +128,7 @@ function DepartmentsTab({ companyId, canManage }: { companyId: string | null; ca
     setBusy(true);
     setError(null);
     try {
-      const payload = { code: form.code.trim().toUpperCase(), nameEn: form.nameEn.trim(), nameAr: form.nameAr.trim() };
+      const payload = { code: form.code.trim().toUpperCase(), nameEn: form.nameEn.trim() || form.nameAr.trim(), nameAr: form.nameAr.trim() || form.nameEn.trim() };
       if (editing) {
         await api.updateDepartment(editing.id, payload);
       } else {
@@ -191,7 +191,7 @@ function DepartmentsTab({ companyId, canManage }: { companyId: string | null; ca
           </tr>)}</tbody>
         </TableShell>
       )}
-      <Modal open={open} title={editing ? (locale === 'ar' ? 'تعديل القسم' : 'Edit department') : (locale === 'ar' ? 'إضافة قسم جديد' : 'Add department')} onClose={() => { if (!busy) setOpen(false); }} footer={<><Button disabled={busy} onClick={() => setOpen(false)}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || !form.code.trim() || !form.nameEn.trim() || !form.nameAr.trim()} onClick={() => void save()} data-testid="department-save">{busy ? t('common.loading') : editing ? t('common.save') : t('common.create')}</Button></>}>
+      <Modal open={open} title={editing ? (locale === 'ar' ? 'تعديل القسم' : 'Edit department') : (locale === 'ar' ? 'إضافة قسم جديد' : 'Add department')} onClose={() => { if (!busy) setOpen(false); }} footer={<><Button disabled={busy} onClick={() => setOpen(false)}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || !form.code.trim() || (!form.nameEn.trim() && !form.nameAr.trim())} onClick={() => void save()} data-testid="department-save">{busy ? t('common.loading') : editing ? t('common.save') : t('common.create')}</Button></>}>
         {error ? <ErrorBanner message={error} /> : null}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t('common.code')} required><input data-testid="department-code" className="oryx-input uppercase" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} /></Field>
