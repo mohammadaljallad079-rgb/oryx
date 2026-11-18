@@ -681,7 +681,10 @@ export class AuthService {
     if (!user) return [];
     if (user.isSuperAdmin) {
       const role = await findPlatformSuperAdminRole(this.prisma);
-      return role?.permissions.map((p) => p.permissionCode) ?? [];
+      // A genuine platform Super Admin must never lose the platform-company
+      // hard-delete action because an older seeded role lacks its permission row.
+      // Delegated staff still need the explicit role permission.
+      return [...new Set([...(role?.permissions.map((p) => p.permissionCode) ?? []), 'platform.company.delete'])];
     }
     if (!membershipId) return [];
     const membership = await this.prisma.membership.findUnique({
