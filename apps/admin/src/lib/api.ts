@@ -932,7 +932,7 @@ export const api = {
     request<{ items: string[] }>(`/inventory/pos-categories${companyId ? `?companyId=${companyId}` : ''}`),
 
   // ------------------------------------------------------------ sales (E02)
-  salesCustomers: (params: { companyId?: string; search?: string } = {}) =>
+  salesCustomers: (params: { companyId?: string; search?: string; kind?: 'COMPANY' | 'INDIVIDUAL'; active?: 'true' | 'false'; sourceId?: string; departmentId?: string; page?: number; pageSize?: number } = {}) =>
     request<Paginated<CustomerDto>>(`/sales/customers?${toQuery(params)}`),
   customer: (id: string) => request<CustomerDetailDto>(`/sales/customers/${id}`),
   createCustomer: (body: Record<string, unknown>) =>
