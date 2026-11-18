@@ -402,7 +402,7 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
     await expect(page.getByTestId('tax-code')).toBeVisible();
     // The line opens the create form with the sales scope preselected.
     await expect(page.getByTestId('tax-scope')).toHaveValue('SALES');
-    await page.getByTestId('tax-code').fill(`E20T${suffix}`);
+    await expect(page.getByTestId('tax-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('tax-rate').fill('5');
     await page.getByTestId('tax-name-en').fill(nameEn);
     await page.getByTestId('tax-name-ar').fill('ضريبة مبيعات');
@@ -438,7 +438,7 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
     await expect(page.getByTestId('tax-code')).toBeVisible();
     // The purchase line opens the create form with the purchases scope preselected.
     await expect(page.getByTestId('tax-scope')).toHaveValue('PURCHASES');
-    await page.getByTestId('tax-code').fill(`E20PT${suffix}`);
+    await expect(page.getByTestId('tax-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('tax-rate').fill('12.5');
     await page.getByTestId('tax-name-en').fill(nameEn);
     await page.getByTestId('tax-name-ar').fill('ضريبة مشتريات');
