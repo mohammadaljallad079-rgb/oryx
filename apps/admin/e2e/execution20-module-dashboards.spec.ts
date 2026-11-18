@@ -45,6 +45,16 @@ test.describe('Execution 20 — module dashboards', () => {
     });
   }
 
+  test('Dashboard module tile opens analytics rather than returning to module home', async ({ page }) => {
+    await page.goto('/dashboard');
+    const dashboardTile = page.getByTestId('tile-dashboard');
+    await expect(dashboardTile).toBeVisible({ timeout: 25_000 });
+    await expect(dashboardTile).toHaveAttribute('href', '/dashboard/overview');
+    await dashboardTile.click();
+    await expect(page).toHaveURL(/\\/dashboard\\/overview$/);
+    await expect(page.getByTestId('kpi-row')).toBeVisible();
+  });
+
   test('a deep link selects the named tab', async ({ page }) => {
     await page.goto('/accounting?tab=journals');
     await expect(page.getByTestId('accounting-tab-journals')).toHaveAttribute('aria-selected', 'true');
