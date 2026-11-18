@@ -191,8 +191,8 @@ export function ProductModal({
     try {
       const saved = await api.createProduct({
         sku: form.sku,
-        nameEn: form.nameEn,
-        nameAr: form.nameAr,
+        nameEn: form.nameEn.trim() || form.nameAr.trim(),
+        nameAr: form.nameAr.trim() || form.nameEn.trim(),
         unit: form.unit,
         salesPriceMinor: toMinorInput(form.salesPrice),
         costPriceMinor: toMinorInput(form.costPrice),
@@ -222,7 +222,7 @@ export function ProductModal({
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy || !form.sku || !form.nameEn || !form.nameAr} onClick={submit} data-testid="save-product">
+          <Button variant="primary" disabled={busy || !form.sku || (!form.nameEn.trim() && !form.nameAr.trim())} onClick={submit} data-testid="save-product">
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </>
@@ -236,10 +236,10 @@ export function ProductModal({
         <Field label={t('erp.inventory.unit')}>
           <input className="oryx-input" value={form.unit} onChange={(e) => setForm((prev) => ({ ...prev, unit: e.target.value }))} />
         </Field>
-        <Field label={`${t('common.name')} (EN)`} required>
+        <Field label={`${t('common.name')} (EN)`}>
           <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm((prev) => ({ ...prev, nameEn: e.target.value }))} data-testid="product-name-en" />
         </Field>
-        <Field label={`${t('common.name')} (AR)`} required>
+        <Field label={`${t('common.name')} (AR)`}>
           <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm((prev) => ({ ...prev, nameAr: e.target.value }))} data-testid="product-name-ar" />
         </Field>
         <Field label={t('erp.inventory.salesPrice')}>
@@ -323,7 +323,7 @@ export function WarehouseModal({
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy || !form.code || !form.nameEn || !form.nameAr} onClick={submit} data-testid="save-warehouse">
+          <Button variant="primary" disabled={busy || !form.code || (!form.nameEn.trim() && !form.nameAr.trim())} onClick={submit} data-testid="save-warehouse">
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </>
@@ -334,10 +334,10 @@ export function WarehouseModal({
         <Field label={t('common.code')} required>
           <input className="oryx-input" value={form.code} onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))} data-testid="warehouse-code" />
         </Field>
-        <Field label={`${t('common.name')} (EN)`} required>
+        <Field label={`${t('common.name')} (EN)`}>
           <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm((prev) => ({ ...prev, nameEn: e.target.value }))} data-testid="warehouse-name-en" />
         </Field>
-        <Field label={`${t('common.name')} (AR)`} required>
+        <Field label={`${t('common.name')} (AR)`}>
           <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm((prev) => ({ ...prev, nameAr: e.target.value }))} data-testid="warehouse-name-ar" />
         </Field>
       </div>
@@ -787,16 +787,16 @@ export function AccountModal({
     try {
       const saved = account
         ? await api.updateAccount(account.id, {
-            nameEn: form.nameEn,
-            nameAr: form.nameAr,
+            nameEn: form.nameEn.trim() || form.nameAr.trim(),
+            nameAr: form.nameAr.trim() || form.nameEn.trim(),
             parentId: form.parentId || null,
             type: form.type,
             normalBalance: form.normalBalance,
           })
         : await api.createAccount({
             code: form.code,
-            nameEn: form.nameEn,
-            nameAr: form.nameAr,
+            nameEn: form.nameEn.trim() || form.nameAr.trim(),
+            nameAr: form.nameAr.trim() || form.nameEn.trim(),
             type: form.type,
             normalBalance: form.normalBalance,
             parentId: form.parentId || undefined,
@@ -821,7 +821,7 @@ export function AccountModal({
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
-            disabled={busy || !form.nameEn || !form.nameAr || (!account && !form.code)}
+            disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim()) || (!account && !form.code)}
             onClick={submit}
             data-testid="save-account"
           >
@@ -876,10 +876,10 @@ export function AccountModal({
             )}
           />
         </Field>
-        <Field label={`${t('common.name')} (EN)`} required>
+        <Field label={`${t('common.name')} (EN)`}>
           <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm((prev) => ({ ...prev, nameEn: e.target.value }))} data-testid="account-name-en" />
         </Field>
-        <Field label={`${t('common.name')} (AR)`} required>
+        <Field label={`${t('common.name')} (AR)`}>
           <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm((prev) => ({ ...prev, nameAr: e.target.value }))} data-testid="account-name-ar" />
         </Field>
         <Field label={t('erp.accounting.normalBalance')}>
