@@ -128,7 +128,8 @@ function computePosTotals(
   scale: number,
 ) {
   const priced = lines.map((l) => {
-    const lineSubtotalMinor = lineAmountMinor(l.quantity, l.unitPriceMinor);
+    // Cart quantities are human units; the shared money helper expects 10^4-scaled units.
+    const lineSubtotalMinor = lineAmountMinor(l.quantity * 10000, l.unitPriceMinor);
     const discountMinor = basisPointsOfMinor(lineSubtotalMinor, l.discountPercentBp);
     const net = lineSubtotalMinor - discountMinor;
     const taxMinor = basisPointsOfMinor(net, l.taxPercentBp);
@@ -1156,7 +1157,8 @@ function PosSaleModal({
         lines: cart.map((l) => ({
           productId: l.productId,
           description: l.description || 'Item',
-          quantity: l.quantity,
+          // The API's invoice/stock engine also uses 10^4-scaled quantities.
+          quantity: l.quantity * 10000,
           unitPriceMinor: l.unitPriceMinor,
           discountPercentBp: l.discountPercentBp,
           taxPercentBp: l.taxPercentBp,
