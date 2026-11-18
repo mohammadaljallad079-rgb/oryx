@@ -151,9 +151,11 @@ export class AccountingService {
     const normalizedNames = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
     if (!normalizedNames.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a name in Arabic or English.');
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    // Preserve chart-of-accounts type blocks and parent hierarchy on allocation.
+    const code = dto.code?.trim() || (await this.nextAccountCode(dto.type, dto.parentId, principal)).code;
     const companyCurrency = await this.context.companyCurrency(companyId);
-    const dup = await this.prisma.account.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Account code ${dto.code} already exists.`);
+    const dup = await this.prisma.account.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Account code ${code} already exists.`);
 
     let level = 1;
     if (dto.parentId) {
@@ -165,7 +167,7 @@ export class AccountingService {
     const account = await this.prisma.account.create({
       data: {
         companyId,
-        code: dto.code,
+        code: code,
         ...normalizedNames,
         type: dto.type,
         normalBalance,
