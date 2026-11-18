@@ -133,7 +133,9 @@ export default function DashboardHomePage() {
               .map((tile) => (
               <Link
                 key={tile.moduleKey}
-                href={tile.route}
+                // Home is /dashboard; the Dashboard module must open the analytics overview.
+                // Resolve independently of a stale DB module route.
+                href={tile.moduleKey === 'dashboard' ? '/dashboard/overview' : tile.route}
                 className={`oryx-tile ${tile.available ? '' : 'oryx-tile--planned'}`}
                 data-testid={`tile-${tile.moduleKey}`}
               >
