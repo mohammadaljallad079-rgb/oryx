@@ -51,7 +51,7 @@ test.describe('Execution 20 — module dashboards', () => {
     await expect(dashboardTile).toBeVisible({ timeout: 25_000 });
     await expect(dashboardTile).toHaveAttribute('href', '/dashboard/overview');
     await dashboardTile.click();
-    await expect(page).toHaveURL(/\\/dashboard\\/overview$/);
+    await expect(page).toHaveURL(/\/dashboard\/overview$/);
     await expect(page.getByTestId('kpi-row')).toBeVisible();
   });
 
