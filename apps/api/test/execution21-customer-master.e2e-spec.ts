@@ -139,14 +139,14 @@ describe('Customer master data — attribution, profile and attachments (e2e)', 
         method: 'POST', body: { kind: 'COMPANY', nameEn: 'Execution Company Customer' },
       });
       expect(company.status).toBe(201);
-      expect(company.body.code).toMatch(/^CO\\d+$/);
+      expect(company.body.code).toMatch(/^CO\d+$/);
       createdCustomerIds.push(company.body.id);
 
       const individual = await erp<{ id: string; code: string; kind: string }>('/sales/customers', {
         method: 'POST', body: { kind: 'INDIVIDUAL', nameEn: 'Execution Individual Customer' },
       });
       expect(individual.status).toBe(201);
-      expect(individual.body.code).toMatch(/^CU\\d+$/);
+      expect(individual.body.code).toMatch(/^CU\d+$/);
       createdCustomerIds.push(individual.body.id);
 
       const filtered = await erp<{ items: Array<{ id: string; kind: string }> }>(
