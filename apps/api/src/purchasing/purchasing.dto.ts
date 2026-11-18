@@ -55,15 +55,15 @@ export class CreateSupplierDto {
   @MaxLength(40)
   code!: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(200)
-  nameEn!: string;
+  nameEn?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(200)
-  nameAr!: string;
+  nameAr?: string;
 
   @IsOptional()
   @IsString()
