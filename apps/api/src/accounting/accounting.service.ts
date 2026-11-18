@@ -148,6 +148,8 @@ export class AccountingService {
   }
 
   async createAccount(dto: CreateAccountDto, principal: RequestPrincipal, actor: ActorContext) {
+    const normalizedNames = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!normalizedNames.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a name in Arabic or English.');
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const companyCurrency = await this.context.companyCurrency(companyId);
     const dup = await this.prisma.account.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
@@ -164,8 +166,7 @@ export class AccountingService {
       data: {
         companyId,
         code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        ...normalizedNames,
         type: dto.type,
         normalBalance,
         parentId: dto.parentId ?? null,
