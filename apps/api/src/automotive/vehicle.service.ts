@@ -1,3 +1,4 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
 import { sumMinor } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
@@ -354,14 +355,15 @@ export class VehicleService {
   }
 
   async createInspectionService(dto: CreateInspectionServiceDto, principal: RequestPrincipal, actor: ActorContext) {
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'INS');
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.inspectionService.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Inspection service ${dto.code} already exists.`);
+    const dup = await this.prisma.inspectionService.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Inspection service ${code} already exists.`);
     if (dto.imageAssetId) await this.assertMediaAsset(companyId, dto.imageAssetId);
     const service = await this.prisma.inspectionService.create({
       data: {
         companyId,
-        code: dto.code,
+        code: code,
         nameEn: dto.nameEn,
         nameAr: dto.nameAr,
         description: dto.description ?? null,
