@@ -86,13 +86,15 @@ test.describe('Execution 06 — attendance, policy, work sites and HR reporting'
     await page.getByTestId('hr-tab-policy').click();
     await expect(page.getByTestId('new-work-site')).toBeVisible({ timeout: 20_000 });
     await page.getByTestId('new-work-site').click();
-    const code = `E2E${Date.now().toString().slice(-6)}`;
-    await page.getByTestId('work-site-code').fill(code);
+    await expect(page.getByTestId('work-site-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('work-site-name-en').fill('E2E Site');
     await page.getByTestId('work-site-lat').fill('26.2285');
     await page.getByTestId('work-site-lng').fill('50.5860');
     await page.getByTestId('submit-work-site').click();
     await expect(page.locator('.oryx-modal')).toHaveCount(0, { timeout: 20_000 });
+    const editId = await page.getByRole('row').filter({ hasText: 'E2E Site' }).locator('[data-testid^="edit-work-site-"]').getAttribute('data-testid');
+    expect(editId).toBeTruthy();
+    const code = editId!.replace('edit-work-site-', '');
     await expect(page.getByText(code)).toBeVisible({ timeout: 20_000 });
 
     // Edit renames the site and persists the change through the API.
