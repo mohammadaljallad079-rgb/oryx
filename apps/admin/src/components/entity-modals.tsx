@@ -70,9 +70,14 @@ export function SupplierModal({
     setBusy(true);
     setError(null);
     try {
+      const primaryName = form.nameEn.trim() || form.nameAr.trim();
+      if (!primaryName) {
+        setError('Enter a supplier name in Arabic or English / أدخل اسم المورد بالعربية أو الإنجليزية');
+        return;
+      }
       const body = {
-        nameEn: form.nameEn,
-        nameAr: form.nameAr,
+        nameEn: form.nameEn.trim() || primaryName,
+        nameAr: form.nameAr.trim() || primaryName,
         phone: form.phone || undefined,
         email: form.email || undefined,
         taxNumber: form.taxNumber || undefined,
@@ -104,7 +109,7 @@ export function SupplierModal({
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
-            disabled={busy || !form.nameEn || !form.nameAr || (!supplier && !form.code)}
+            disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim()) || (!supplier && !form.code)}
             onClick={submit}
             data-testid="save-supplier"
           >
