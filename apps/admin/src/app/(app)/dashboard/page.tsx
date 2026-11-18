@@ -19,7 +19,7 @@ import { ErrorBanner, Skeleton, StatCard, StatGrid } from '@/components/ui';
  */
 export default function DashboardHomePage() {
   const { t, locale } = useUi();
-  const { companyId, branchId } = useAuth();
+  const { companyId, branchId, can, isPlatform } = useAuth();
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -133,7 +133,9 @@ export default function DashboardHomePage() {
               .map((tile) => (
               <Link
                 key={tile.moduleKey}
-                href={tile.route}
+                // Home is /dashboard; the Dashboard module must open the analytics overview.
+                // Resolve independently of a stale DB module route.
+                href={tile.moduleKey === 'dashboard' ? '/dashboard/overview' : tile.route}
                 className={`oryx-tile ${tile.available ? '' : 'oryx-tile--planned'}`}
                 data-testid={`tile-${tile.moduleKey}`}
               >
@@ -161,6 +163,18 @@ export default function DashboardHomePage() {
                 </span>
               </Link>
             ))}
+            {(isPlatform || can('erp.marketplace.request.manage')) ? (
+              <Link href="/vehicle-tracking" className="oryx-tile" data-testid="tile-vehicle-tracking">
+                <span className="oryx-tile__media" style={{ backgroundImage: `url(${tileImageUrl('tile-maintenance')})` }}>
+                  <span className="oryx-tile__icon"><Icon name="mapPin" size={24} /></span>
+                </span>
+                <span className="oryx-tile__band">
+                  <span className="oryx-tile__title">{locale === 'ar' ? 'تتبع السيارات' : 'Vehicle Tracking'}</span>
+                  <span className="oryx-tile__desc">{locale === 'ar' ? 'خريطة عمليات السحب وتتبع آخر المواقع المرسلة' : 'Recovery dispatch map and latest reported locations'}</span>
+                  <span className="oryx-tile__meta"><span className="oryx-tile__state">{t('modules.available')}</span><Icon name="arrowForward" size={13} /></span>
+                </span>
+              </Link>
+            ) : null}
           </div>
         )}
       </section>

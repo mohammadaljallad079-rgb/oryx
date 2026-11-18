@@ -181,6 +181,17 @@ export class AdvanceRecoveryDto {
   longitude?: number | null;
 }
 
+/** A GPS ping from the provider assigned to an active recovery operation. */
+export class RecoveryLocationDto {
+  @Type(() => Number)
+  @IsLatitude()
+  latitude!: number;
+
+  @Type(() => Number)
+  @IsLongitude()
+  longitude!: number;
+}
+
 export class CancelRecoveryDto {
   @TrimString()
   @IsString()

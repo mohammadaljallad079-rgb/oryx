@@ -1043,6 +1043,46 @@ export class EcosystemService {
     return this.recoveryDetail(row.id);
   }
 
+  /**
+   * Receive a location ping for an assigned, active recovery job.
+   * The provider is inferred from the authenticated staff account. A caller
+   * cannot report coordinates for a competitor's request or a closed job.
+   *
+   * Append-only GPS events are polled by the staff dashboard. We deliberately
+   * avoid sending a notification or audit email for every location ping.
+   */
+  async reportRecoveryLocation(
+    userId: string,
+    requestId: string,
+    latitude: number,
+    longitude: number,
+  ) {
+    const provider = await this.resolveProvider(userId);
+    const row = await this.prisma.recoveryRequest.findUnique({
+      where: { id: requestId },
+      select: { id: true, providerId: true, status: true },
+    });
+    if (!row) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Recovery request not found.');
+    if (row.providerId !== provider.id) {
+      throw forbidden(ERROR_CODES.RECOVERY_NOT_ASSIGNED, 'This recovery request is not assigned to your provider.');
+    }
+    if (!['ASSIGNED', 'EN_ROUTE', 'ON_SITE'].includes(row.status)) {
+      throw conflict(ERROR_CODES.RECOVERY_STATE, 'Location updates are only accepted while recovery is active.');
+    }
+    const event = await this.prisma.recoveryTrackingEvent.create({
+      data: {
+        requestId: row.id,
+        status: row.status,
+        actor: 'PROVIDER',
+        actorUserId: userId,
+        latitude,
+        longitude,
+      },
+      select: { id: true, createdAt: true },
+    });
+    return { accepted: true, eventId: event.id, recordedAt: event.createdAt.toISOString() };
+  }
+
   private async recoveryDetail(requestId: string) {
     const row = await this.prisma.recoveryRequest.findUnique({
       where: { id: requestId },

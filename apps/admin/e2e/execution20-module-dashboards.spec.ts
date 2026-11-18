@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { COMPANY_ADMIN, ENTERPRISE_ADMIN, setLocale, setTheme, signIn } from './helpers';
+import { COMPANY_ADMIN, ENTERPRISE_ADMIN, SUPER_ADMIN, setLocale, setTheme, signIn } from './helpers';
 
 /**
  * Execution 20 — module dashboards.
@@ -45,6 +45,16 @@ test.describe('Execution 20 — module dashboards', () => {
     });
   }
 
+  test('Dashboard module tile opens analytics rather than returning to module home', async ({ page }) => {
+    await page.goto('/dashboard');
+    const dashboardTile = page.getByTestId('tile-dashboard');
+    await expect(dashboardTile).toBeVisible({ timeout: 25_000 });
+    await expect(dashboardTile).toHaveAttribute('href', '/dashboard/overview');
+    await dashboardTile.click();
+    await expect(page).toHaveURL(/\/dashboard\/overview$/);
+    await expect(page.getByTestId('kpi-row')).toBeVisible();
+  });
+
   test('a deep link selects the named tab', async ({ page }) => {
     await page.goto('/accounting?tab=journals');
     await expect(page.getByTestId('accounting-tab-journals')).toHaveAttribute('aria-selected', 'true');
@@ -87,5 +97,21 @@ test.describe('Execution 20 — module dashboards (Enterprise tenant)', () => {
     await page.goto('/automotive/spare-parts');
     await expect(page.getByTestId('spare-parts-page')).toBeVisible({ timeout: 25_000 });
     await expect(page.getByTestId('parts-tab-catalog')).toBeVisible();
+  });
+});
+
+test.describe('Vehicle tracking module', () => {
+  test('Super Admin opens the tracking module and the dashboard map panel', async ({ page }) => {
+    await signIn(page, SUPER_ADMIN);
+    await setLocale(page, 'en');
+    await page.goto('/dashboard');
+    const tile = page.getByTestId('tile-vehicle-tracking');
+    await expect(tile).toHaveAttribute('href', '/vehicle-tracking');
+    await tile.click();
+    await expect(page).toHaveURL(/\/vehicle-tracking$/);
+    await expect(page.getByTestId('vehicle-tracking-page')).toBeVisible();
+    await expect(page.getByTestId('recovery-tracking-panel')).toBeVisible();
+    await page.goto('/dashboard/overview');
+    await expect(page.getByTestId('recovery-tracking-panel')).toBeVisible();
   });
 });
