@@ -32,8 +32,20 @@ describe('print-format', () => {
       [{ description: 'Oil', quantity: 10000, unitPriceMinor: 750, discountPercentBp: 0, taxPercentBp: 1000 }],
       'BHD',
     );
-    // 0.750 net + 10% tax = 0.825, printed with the symbol the form uses.
-    expect(line.amount).toBe('0.825 BD');
+    // VAT appears in the totals only; each line displays its tax-exclusive amount.
+    expect(line.amount).toBe('0.750 BD');
+  });
+
+  it('prints an exact fixed BHD discount without adding line VAT', () => {
+    const [line] = toPrintLines(
+      [{ description: 'Battery', quantity: 20000, unitPriceMinor: 10000,
+         discountPercentBp: 0, discountAmountMinor: 1500, taxPercentBp: 1000 }],
+      'BHD',
+    );
+    // 2 x 10.000 = 20.000, minus a fixed 1.500, before 10% VAT.
+    expect(line.amount).toBe('18.500 BD');
+    expect(line.discountPercent).toBe('1.500 BD');
+    expect(line.unitPrice).toBe('10.000');
   });
 
   it('prints the totals block with the currency symbol and a plain tax label', () => {
