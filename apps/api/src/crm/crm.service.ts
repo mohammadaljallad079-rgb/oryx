@@ -573,9 +573,10 @@ export class CrmService {
     const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
     if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a name in Arabic or English.');
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.customerSegment.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Segment ${dto.code} already exists.`);
-    const segment = await this.prisma.customerSegment.create({ data: { companyId, code: dto.code, ...names, description: dto.description ?? null } });
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'SEG');
+    const dup = await this.prisma.customerSegment.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Segment ${code} already exists.`);
+    const segment = await this.prisma.customerSegment.create({ data: { companyId, code: code, ...names, description: dto.description ?? null } });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'crm.segment_created', targetType: 'CUSTOMER_SEGMENT', targetId: segment.id, summary: `Created segment ${segment.code}` });
     return segment;
   }
