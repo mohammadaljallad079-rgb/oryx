@@ -127,7 +127,7 @@ export class LifecycleItemDto {
 // -------------------------------------------------------------------- leave
 
 export class CreateLeaveTypeDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
   @IsString() @MinLength(2) @MaxLength(160) nameEn!: string;
   @IsString() @MinLength(2) @MaxLength(160) nameAr!: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) annualEntitlementDays?: number;
@@ -166,7 +166,7 @@ export class AdjustBalanceDto {
 // --------------------------------------------------------------- attendance
 
 export class CreateShiftDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
   @IsString() @MinLength(2) @MaxLength(120) nameEn!: string;
   @IsString() @MinLength(2) @MaxLength(120) nameAr!: string;
   @IsString() @MaxLength(8) startTime!: string;
@@ -188,7 +188,7 @@ export class RecordAttendanceDto {
 // ------------------------------------------------------------ worksites
 
 export class CreateWorkSiteDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
   @IsString() @MinLength(2) @MaxLength(160) nameEn!: string;
   @IsString() @MinLength(2) @MaxLength(160) nameAr!: string;
   @IsOptional() @IsString() branchId?: string;
@@ -295,7 +295,7 @@ export class CreateSalaryStructureDto {
 }
 
 export class CreatePayrollPeriodDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
   @IsString() @MinLength(2) @MaxLength(120) nameEn!: string;
   @IsString() @MinLength(2) @MaxLength(120) nameAr!: string;
   @NormaliseIsoDate() @IsISO8601() startDate!: string;
