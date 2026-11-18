@@ -794,7 +794,8 @@ export function AccountModal({
             normalBalance: form.normalBalance,
           })
         : await api.createAccount({
-            code: form.code,
+            // Preview is informational: the server assigns the authoritative code.
+            code: '',
             nameEn: form.nameEn.trim() || form.nameAr.trim(),
             nameAr: form.nameAr.trim() || form.nameEn.trim(),
             type: form.type,
