@@ -124,6 +124,7 @@ export const ECOSYSTEM_OPS_NAV: NavGroup = {
   items: [
     { key: 'ecoReturns', labelKey: 'nav.ecoReturns', href: '/ecosystem/returns', icon: 'scroll', permission: 'erp.customer_portal.read' },
     { key: 'ecoRecovery', labelKey: 'nav.ecoRecovery', href: '/ecosystem/recovery', icon: 'lifeBuoy', permission: 'erp.marketplace.request.manage' },
+    { key: 'vehicleTracking', labelKey: 'nav.vehicleTracking', href: '/vehicle-tracking', icon: 'mapPin', anyPermission: ['erp.marketplace.request.manage', 'platform.company.read'] },
     { key: 'ecoSensage', labelKey: 'nav.ecoSensage', href: '/ecosystem/sensage', icon: 'wrench', permission: 'erp.customer_portal.read' },
   ],
 };
