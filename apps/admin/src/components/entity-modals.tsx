@@ -988,8 +988,8 @@ export function MarketplaceProviderModal({
     try {
       const saved = await api.createProvider({
         code: form.code,
-        nameEn: form.nameEn,
-        nameAr: form.nameAr,
+        nameEn: form.nameEn.trim() || form.nameAr.trim(),
+        nameAr: form.nameAr.trim() || form.nameEn.trim(),
         categoryKey: form.categoryKey || undefined,
         email: form.email || undefined,
         phone: form.phone || undefined,
@@ -1016,7 +1016,7 @@ export function MarketplaceProviderModal({
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
-            disabled={busy || !form.nameEn || !form.nameAr || !form.code}
+            disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim()) || !form.code}
             onClick={submit}
             data-testid="save-provider"
           >
@@ -1033,10 +1033,10 @@ export function MarketplaceProviderModal({
         <Field label={t('erp.providers.category')}>
           <input className="oryx-input" value={form.categoryKey} onChange={(e) => setForm((prev) => ({ ...prev, categoryKey: e.target.value }))} data-testid="provider-category" />
         </Field>
-        <Field label={`${t('common.name')} (EN)`} required>
+        <Field label={`${t('common.name')} (EN)`}>
           <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm((prev) => ({ ...prev, nameEn: e.target.value }))} data-testid="provider-name-en" />
         </Field>
-        <Field label={t('erp.providers.nameAr')} required>
+        <Field label={t('erp.providers.nameAr')}>
           <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm((prev) => ({ ...prev, nameAr: e.target.value }))} data-testid="provider-name-ar" />
         </Field>
         <Field label={t('common.email')}>
