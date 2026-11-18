@@ -355,6 +355,8 @@ export class VehicleService {
   }
 
   async createInspectionService(dto: CreateInspectionServiceDto, principal: RequestPrincipal, actor: ActorContext) {
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a name in Arabic or English.');
     const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'INS');
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const dup = await this.prisma.inspectionService.findUnique({ where: { companyId_code: { companyId, code: code } } });
@@ -364,8 +366,7 @@ export class VehicleService {
       data: {
         companyId,
         code: code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        ...names,
         description: dto.description ?? null,
         priceMinor: dto.priceMinor ?? 0,
         taxPercentBp: dto.taxPercentBp ?? 0,
