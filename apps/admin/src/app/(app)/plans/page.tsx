@@ -306,7 +306,7 @@ function PlanEditor({
       if (plan) {
         await api.updatePlan(plan.id, payload);
       } else {
-        await api.createPlan({ ...payload, code: '' });
+        await api.createPlan(payload);
       }
       await onSaved();
     } catch (err) {
