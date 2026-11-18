@@ -778,7 +778,34 @@ function BannerEditor({
     status: 'DRAFT',
   });
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function uploadBannerImage(file: File | null) {
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(file.type)) {
+      setError('Only JPEG, PNG, WebP and AVIF images are supported.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError('The image must be smaller than 10 MB.');
+      return;
+    }
+    setUploading(true);
+    setError(null);
+    try {
+      const data = new FormData();
+      data.append('file', file);
+      data.append('altEn', form.title || file.name);
+      data.append('altAr', form.title || file.name);
+      const asset = await api.uploadMedia(data);
+      setForm(prev => ({ ...prev, imageUrl: `/api/v1/cms/media/${asset.id}/file?variant=original` }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('common.error'));
+    } finally {
+      setUploading(false);
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -831,7 +858,7 @@ function BannerEditor({
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy || !form.title} onClick={submit} data-testid="save-cms-banner">
+          <Button variant="primary" disabled={busy || uploading || !form.title} onClick={submit} data-testid="save-cms-banner">
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </>
@@ -874,13 +901,32 @@ function BannerEditor({
             onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
           />
         </Field>
-        <Field label={t('cms.imageUrl')}>
-          <input
-            className="oryx-input"
-            value={form.imageUrl}
-            onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-          />
-        </Field>
+        <div className="flex flex-col gap-2 sm:col-span-2" data-testid="banner-image-upload">
+          <Field label={t('cms.imageUrl')}>
+            <input type="file" accept="image/jpeg,image/png,image/webp,image/avif"
+              className="oryx-input" disabled={uploading || busy}
+              onChange={(e) => { void uploadBannerImage(e.target.files?.[0] ?? null); e.target.value = ''; }}
+              data-testid="banner-image-file" />
+          </Field>
+          <span className="text-xs text-[var(--muted)]">
+            {uploading ? 'Uploading image… / جارٍ رفع الصورة…' : 'Upload a banner image directly (maximum 10 MB) / ارفع صورة السلايدر مباشرة'}
+          </span>
+          {form.imageUrl ? (
+            <div className="relative overflow-hidden rounded-lg border border-[var(--border)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={api.resolveImage(form.imageUrl) ?? form.imageUrl} alt={form.title || 'Banner preview'}
+                className="max-h-56 w-full object-contain" data-testid="banner-image-preview" />
+              <Button size="sm" onClick={() => setForm(prev => ({ ...prev, imageUrl: '' }))}>
+                {t('common.delete')}
+              </Button>
+            </div>
+          ) : null}
+          <Field label="Optional image URL / رابط صورة اختياري">
+            <input className="oryx-input" value={form.imageUrl}
+              onChange={(e) => setForm(prev => ({ ...prev, imageUrl: e.target.value }))}
+              data-testid="banner-image-url" />
+          </Field>
+        </div>
         <Field label={t('cms.actionUrl')}>
           <input
             className="oryx-input"

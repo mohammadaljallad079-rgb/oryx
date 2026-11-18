@@ -8,6 +8,7 @@ import {
   blockValue,
   categoryImage,
   mediaAlt,
+  resolveImage,
   SERVICE_CATEGORIES,
   type WebsiteCategory,
 } from '@/lib/api';
@@ -36,7 +37,7 @@ export default function HomePage() {
   // Hero slider slides: every slide carries its own photograph, headline,
   // description and calls to action from the editable site document.
   const slides: HeroSlide[] = site.hero.slides.map((slide) => ({
-    image: slide.image,
+    image: resolveImage(slide.image) ?? slide.image,
     alt: pick(slide.altEn, slide.altAr),
     headline: pick(slide.headlineEn, slide.headlineAr),
     description: pick(slide.descriptionEn, slide.descriptionAr),

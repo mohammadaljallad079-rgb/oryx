@@ -82,6 +82,7 @@ export function SiteContentEditor() {
   const [doc, setDoc] = useState<SiteContent>(() => clone(DEFAULT_SITE_CONTENT.ar));
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [uploadingSlide, setUploadingSlide] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -118,7 +119,31 @@ export function SiteContentEditor() {
     setSaved(false);
   };
 
+  async function uploadSlideImage(index: number, file: File | null) {
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(file.type) ||
+        file.size > 10 * 1024 * 1024) {
+      setError('Choose a JPEG, PNG, WebP or AVIF image smaller than 10 MB. / اختر صورة لا تتجاوز 10 ميغابايت.');
+      return;
+    }
+    setError(null);
+    setUploadingSlide(index);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('altEn', doc.hero.slides[index]?.altEn || 'Homepage slide');
+      form.append('altAr', doc.hero.slides[index]?.altAr || 'سلايدر الصفحة الرئيسية');
+      const asset = await api.uploadMedia(form);
+      patch(d => { if (d.hero.slides[index]) d.hero.slides[index].image = `/api/v1/cms/media/${asset.id}/file?variant=hero`; });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('common.error'));
+    } finally {
+      setUploadingSlide(null);
+    }
+  }
+
   const save = async () => {
+    if (uploadingSlide !== null) return;
     setBusy(true);
     setError(null);
     try {
@@ -169,7 +194,7 @@ export function SiteContentEditor() {
             </div>
             <Button
               variant="primary"
-              disabled={busy}
+              disabled={busy || uploadingSlide !== null}
               onClick={() => void save()}
               data-testid="site-content-save"
             >
@@ -287,21 +312,38 @@ export function SiteContentEditor() {
                 <Button
                   size="sm"
                   variant="danger"
-                  disabled={doc.hero.slides.length <= 1}
+                  disabled={doc.hero.slides.length <= 1 || uploadingSlide !== null}
                   onClick={() => patch((d) => void d.hero.slides.splice(i, 1))}
                 >
                   {t('cms.removeSlide')}
                 </Button>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label={t('cms.imageUrl')}>
-                  <input
-                    className="oryx-input"
-                    dir="ltr"
-                    value={slide.image}
-                    onChange={(e) => patch((d) => void (d.hero.slides[i].image = e.target.value))}
-                  />
-                </Field>
+                <div className="flex flex-col gap-2 sm:col-span-2" data-testid={`site-slide-image-editor-${i}`}>
+                  <Field label={`${t('cms.slide')} ${i + 1} · ${t('cms.upload')}`}>
+                    <input type="file" accept="image/jpeg,image/png,image/webp,image/avif"
+                      className="oryx-input" disabled={uploadingSlide !== null || busy}
+                      data-testid={`site-slide-file-${i}`}
+                      onChange={e => { void uploadSlideImage(i, e.target.files?.[0] ?? null); e.target.value = ''; }} />
+                  </Field>
+                  {uploadingSlide === i ? (
+                    <p className="m-0 text-xs">{t('cms.uploading')}...</p>
+                  ) : null}
+                  {slide.image ? (
+                    <div className="overflow-hidden rounded-xl border border-[var(--border)]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={api.resolveImage(slide.image) ?? slide.image} alt={slide.altEn || slide.altAr || 'Slide'}
+                        className="max-h-52 w-full object-cover" data-testid={`site-slide-preview-${i}`} />
+                      <Button size="sm" onClick={() => patch(d => { d.hero.slides[i].image = ''; })}
+                        data-testid={`site-slide-clear-image-${i}`}>{t('common.delete')}</Button>
+                    </div>
+                  ) : null}
+                  <Field label={`${t('cms.imageUrl')} (optional / اختياري)`}>
+                    <input className="oryx-input" dir="ltr" value={slide.image}
+                      data-testid={`site-slide-image-url-${i}`}
+                      onChange={e => patch(d => { d.hero.slides[i].image = e.target.value; })} />
+                  </Field>
+                </div>
                 <Field label={t('cms.link')}>
                   <input
                     className="oryx-input"
@@ -662,7 +704,7 @@ export function SiteContentEditor() {
         >
           {t('cms.restoreDefaults')}
         </Button>
-        <Button variant="primary" disabled={busy} onClick={() => void save()} data-testid="site-content-save-bottom">
+        <Button variant="primary" disabled={busy || uploadingSlide !== null} onClick={() => void save()} data-testid="site-content-save-bottom">
           {busy ? t('common.loading') : t('common.save')}
         </Button>
       </div>
