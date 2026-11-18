@@ -232,6 +232,8 @@ export class InventoryService {
   }
 
   async createWarehouse(dto: CreateWarehouseDto, principal: RequestPrincipal, actor: ActorContext) {
+    const normalizedNames = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!normalizedNames.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a name in Arabic or English.');
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     const dup = await this.prisma.warehouse.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
@@ -241,8 +243,7 @@ export class InventoryService {
         companyId,
         branchId: dto.branchId ?? null,
         code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        ...normalizedNames,
         addressLine: dto.addressLine ?? null,
         inventoryAccountId: dto.inventoryAccountId ?? null,
       },
@@ -514,6 +515,8 @@ export class InventoryService {
   }
 
   async createProduct(dto: CreateProductDto, principal: RequestPrincipal, actor: ActorContext) {
+    const normalizedNames = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!normalizedNames.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a name in Arabic or English.');
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const dup = await this.prisma.product.findUnique({ where: { companyId_sku: { companyId, sku: dto.sku } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `SKU ${dto.sku} already exists.`);
@@ -527,8 +530,7 @@ export class InventoryService {
       data: {
         companyId,
         sku: dto.sku,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        ...normalizedNames,
         type: dto.type ?? 'PRODUCT',
         unit: dto.unit ?? 'unit',
         barcode: dto.barcode ?? null,
