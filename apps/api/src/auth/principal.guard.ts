@@ -146,7 +146,10 @@ export class PrincipalGuard implements CanActivate {
     // ------------------------------------------------------------ platform
     if (user.isSuperAdmin) {
       const role = await findPlatformSuperAdminRole(this.prisma);
-      const granted = role?.permissions.map((p) => p.permissionCode) ?? [];
+      // Keep enforcement aligned with AuthService /auth/me: the one real
+      // platform super admin always retains company hard-delete capability
+      // even if an older seeded platform role omitted that permission row.
+      const granted = [...new Set([...(role?.permissions.map((p) => p.permissionCode) ?? []), 'platform.company.delete'])];
       const base: Principal = { kind: 'PLATFORM', userId: user.id, grantedPermissions: granted };
 
       let supportSessionCompanyId: string | undefined;
