@@ -71,7 +71,7 @@ export class DashboardService {
       // The tile band and the adoption chart read the catalog from the database,
       // so a module renamed or re-iconed in the platform UI is reflected here
       // without a code change.
-      this.prisma.module.findMany({ orderBy: [{ group: 'asc' }, { sortOrder: 'asc' }] }),
+      this.prisma.module.findMany({ orderBy: [{ sortOrder: 'asc' }, { group: 'asc' }, { key: 'asc' }] }),
     ]);
 
     const licensedModules = companyId ? await this.entitlements.licensedModulesFor(companyId) : [];

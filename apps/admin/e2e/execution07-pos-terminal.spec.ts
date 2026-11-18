@@ -92,6 +92,18 @@ test.describe('Point of sale — card terminal', () => {
     // The grid loads from the catalogue endpoint.
     const grid = page.getByTestId('pos-grid');
     await expect(grid).toBeVisible({ timeout: 30_000 });
+    // The full-height workstation must not push the order rail outside the
+    // visible screen when the catalogue is tall.
+    const rail = page.locator('.oryx-pos__rail');
+    await expect(rail).toBeVisible();
+    const railRect = await rail.boundingBox();
+    const viewport = page.viewportSize();
+    expect(railRect).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    expect(railRect!.x).toBeGreaterThanOrEqual(0);
+    expect(railRect!.x + railRect!.width).toBeLessThanOrEqual(viewport!.width + 1);
+    expect(railRect!.y).toBeGreaterThanOrEqual(0);
+    expect(railRect!.y).toBeLessThan(viewport!.height);
     const tile = page.getByTestId(`pos-product-${setup.product.sku}`);
     await expect(tile).toBeVisible({ timeout: 30_000 });
 

@@ -107,11 +107,14 @@ describe('Execution 20 — editable module catalog (e2e)', () => {
     expect(catalog.body.items[0]?.sortOrder).toBe(-999);
   });
 
-  it('reflects the edited name in the dashboard tiles', async () => {
+  it('reflects edited names and global sort order in the dashboard tiles', async () => {
     const res = await call<{ tiles: Array<{ moduleKey: string; nameEn: string }> }>(ctx.base, '/dashboard', {
       token: superToken,
     });
     expect(res.status).toBe(200);
+    // The platform catalogue and the home dashboard must use the same order,
+    // even when the edited module belongs to a different group.
+    expect(res.body.tiles[0]?.moduleKey).toBe(targetKey);
     const tile = res.body.tiles.find((t) => t.moduleKey === targetKey);
     expect(tile?.nameEn).toBe('Reports & Analytics');
   });
