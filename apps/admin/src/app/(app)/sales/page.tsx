@@ -59,8 +59,8 @@ interface LineDraft {
   description: string;
   quantity: string;
   unitPrice: string;
-  /** A per-line discount in whole percent, converted to basis points on submit. */
-  discountPercent: string;
+  /** A fixed per-line discount in document currency (excluding VAT). */
+  discountAmount: string;
   /** The chosen tax row, or a synthetic id when the product carries a rate that
    * is not in the tenant's saved list. */
   taxId: string;
@@ -72,7 +72,7 @@ const emptyLine = (taxPercent = '10'): LineDraft => ({
   description: '',
   quantity: '1',
   unitPrice: '0.00',
-  discountPercent: '0',
+  discountAmount: '0',
   taxId: '',
   taxPercent,
 });
@@ -1758,10 +1758,10 @@ function CloseSessionModal({
 function priceDraftLine(line: LineDraft, currency?: string) {
   const quantity = toQuantityInput(line.quantity);
   const unitPriceMinor = toMinorInput(line.unitPrice, currency);
-  const discountPercentBp = Math.round((Number(line.discountPercent) || 0) * 100);
+  const discountAmountMinor = toMinorInput(line.discountAmount, currency);
   const taxPercentBp = Math.round((Number(line.taxPercent) || 0) * 100);
   const lineSubtotalMinor = lineAmountMinor(quantity, unitPriceMinor);
-  const discountMinor = basisPointsOfMinor(lineSubtotalMinor, discountPercentBp);
+  const discountMinor = Math.min(lineSubtotalMinor, Math.max(0, discountAmountMinor));
   const net = lineSubtotalMinor - discountMinor;
   const taxMinor = basisPointsOfMinor(net, taxPercentBp);
   return { lineSubtotalMinor, discountMinor, taxMinor, lineTotalMinor: net + taxMinor };
@@ -1909,9 +1909,9 @@ function LineEditor({
           />
           <input
             className="oryx-input text-center"
-            placeholder="%"
-            value={line.discountPercent}
-            onChange={(e) => update(i, { discountPercent: e.target.value })}
+            placeholder="0.000"
+            value={line.discountAmount}
+            onChange={(e) => update(i, { discountAmount: e.target.value })}
             data-testid={`${testIdPrefix}-discount-${i}`}
           />
           <TaxPicker
@@ -2114,7 +2114,7 @@ function DocumentModal({
             description: typeof line.description === 'string' ? line.description : '',
             quantity: qty(Number(line.quantity ?? 0)),
             unitPrice: minorToInput(Number(line.unitPriceMinor ?? 0), initialDocument.currency),
-            discountPercent: String(Number(line.discountPercentBp ?? 0) / 100),
+            discountAmount: minorToInput(Number(line.discountMinor ?? 0), initialDocument.currency),
             taxId: '',
             taxPercent: String(Number(line.taxPercentBp ?? 0) / 100),
           }))
@@ -2204,7 +2204,7 @@ function DocumentModal({
           description: l.description || 'Item',
           quantity: toQuantityInput(l.quantity),
           unitPriceMinor: toMinorInput(l.unitPrice, currency),
-          discountPercentBp: Math.round((Number(l.discountPercent) || 0) * 100),
+          discountAmountMinor: toMinorInput(l.discountAmount, currency),
           taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
         })),
       };
