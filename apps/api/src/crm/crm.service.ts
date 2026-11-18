@@ -221,8 +221,9 @@ export class CrmService {
 
   async createOpportunity(dto: CreateOpportunityDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.opportunity.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Opportunity code ${dto.code} already exists.`);
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'OPP');
+    const dup = await this.prisma.opportunity.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Opportunity code ${code} already exists.`);
     const pipeline = await this.prisma.pipeline.findFirst({ where: { id: dto.pipelineId, companyId }, include: { stages: { orderBy: { sortOrder: 'asc' } } } });
     if (!pipeline) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Pipeline not found.');
     const stageId = dto.stageId ?? pipeline.stages[0]?.id;
@@ -232,7 +233,7 @@ export class CrmService {
     const opportunity = await this.prisma.opportunity.create({
       data: {
         companyId,
-        code: dto.code,
+        code: code,
         title: dto.title,
         pipelineId: dto.pipelineId,
         stageId,
