@@ -3429,44 +3429,61 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
 
 
 /* --------------------------------------------------------------------------
- * ORYX POS / approved cashier workstation (light lavender, RTL first).
- * This is intentionally scoped to the POS dialog, never to ERP forms/pages.
- * All colours are POS-only; the accounting/theme configuration is unchanged.
+ * ORYX POS: respect the approved navy/gold identity in both UI themes.
+ * CSS variables intentionally inherit from the existing root tokens. The
+ * cashier layout and all its responsive dimensions remain unchanged.
  * -------------------------------------------------------------------------- */
+:root .oryx-modal--pos:has(.oryx-pos--premium) {
+  --pos-bg: var(--bg);
+  --pos-panel: var(--surface);
+  --pos-raised: var(--surface-raised);
+  --pos-ink: var(--text);
+  --pos-soft: var(--text-muted);
+  --pos-line: var(--border);
+  --pos-tint: var(--tint-fill);
+  --pos-accent: var(--gold);
+  --pos-action: var(--primary);
+  --pos-action-ink: var(--on-primary);
+  color-scheme: inherit;
+}
+:root[data-theme='dark'] .oryx-modal--pos:has(.oryx-pos--premium) {
+  --pos-action: var(--gold-fill-to);
+  --pos-action-ink: var(--on-gold);
+}
 .oryx-modal--pos:has(.oryx-pos--premium) {
-  --surface: #ffffff;
-  --surface-raised: #ffffff;
-  --background: #f8f9fd;
-  --border: #e7e5f1;
-  --text: #20203a;
-  --muted: #75758d;
-  --accent: #6738bd;
-  --accent-strong: #5228a7;
-  color: #20203a;
-  background: #f7f8fc;
-  color-scheme: light;
+  --surface: var(--pos-panel);
+  --surface-raised: var(--pos-panel);
+  --background: var(--pos-bg);
+  --border: var(--pos-line);
+  --text: var(--pos-ink);
+  --muted: var(--pos-soft);
+  --accent: var(--pos-accent);
+  --accent-strong: var(--pos-accent);
+  color: var(--pos-ink);
+  background: var(--pos-bg);
+  color-scheme: inherit;
 }
 .oryx-modal--pos:has(.oryx-pos--premium) > div:first-child {
-  background: #fff;
-  color: #22203c;
-  border-bottom: 1px solid #e9e7f3;
+  background: var(--pos-panel);
+  color: var(--pos-ink);
+  border-bottom: 1px solid var(--pos-line);
 }
 .oryx-modal--pos:has(.oryx-pos--premium) > div:last-child {
-  background: #fff;
-  color: #221d39;
-  border-top: 1px solid #e5e3f0;
+  background: var(--pos-panel);
+  color: var(--pos-ink);
+  border-top: 1px solid var(--pos-line);
 }
 .oryx-modal--pos:has(.oryx-pos--premium) .oryx-btn--primary {
-  background: #6636b9;
-  border-color: #6636b9;
-  color: #fff;
+  background: var(--pos-action);
+  border-color: var(--pos-action);
+  color: var(--pos-action-ink);
 }
 .oryx-modal--pos .oryx-pos--premium {
-  --pos-ink: #201d39;
-  --pos-soft: #6a6983;
-  --pos-line: #e7e4f0;
-  --pos-raised: #fff;
-  --pos-panel: #fff;
+  --pos-ink: var(--text);
+  --pos-soft: var(--text-muted);
+  --pos-line: var(--border);
+  --pos-raised: var(--surface-raised);
+  --pos-panel: var(--surface);
   display: grid;
   direction: rtl;
   grid-template-columns: 172px minmax(0, 1fr) minmax(320px, 33%);
@@ -3477,8 +3494,8 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   height: 100%;
   padding: 14px;
   min-height: 0;
-  color: #23203e;
-  background: #f8f9fd;
+  color: var(--pos-ink);
+  background: var(--pos-bg);
 }
 .oryx-modal--pos .oryx-pos--premium .oryx-pos__catalog {
   grid-area: catalog;
@@ -3500,41 +3517,41 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   gap: 2px;
 }
 .oryx-pos--premium .oryx-pos__section-heading strong {
-  color: #24213e;
+  color: var(--pos-ink);
   font-size: 17px;
   font-weight: 800;
 }
 .oryx-pos--premium .oryx-pos__section-heading span {
-  color: #858397;
+  color: var(--pos-soft);
   font-size: 11px;
 }
 .oryx-pos--premium .oryx-pos__catalog-count {
   flex-shrink: 0;
   border-radius: 999px;
   padding: 5px 9px;
-  background: #eeebf8;
-  color: #5d36a7 !important;
+  background: var(--pos-tint);
+  color: var(--pos-accent) !important;
   font-weight: 700;
 }
 .oryx-modal--pos .oryx-pos--premium .oryx-pos__toolbar {
   padding: 8px;
-  background: #fff;
-  border: 1px solid #e7e5f0;
+  background: var(--pos-panel);
+  border: 1px solid var(--pos-line);
   border-radius: 14px;
-  box-shadow: 0 3px 16px rgba(39, 29, 86, .04);
+  box-shadow: 0 3px 16px color-mix(in srgb, var(--pos-accent) 10%, transparent);
 }
 .oryx-pos--premium .oryx-pos__search .oryx-input {
   height: 44px;
-  background: #fafafe;
-  border: 1px solid #e4e2f0;
+  background: var(--pos-raised);
+  border: 1px solid var(--pos-line);
   border-radius: 10px;
-  color: #24213d;
+  color: var(--pos-ink);
 }
-.oryx-pos--premium .oryx-pos__search-icon { color: #88829d; }
+.oryx-pos--premium .oryx-pos__search-icon { color: var(--pos-soft); }
 .oryx-pos--premium .oryx-pos__toolbar .oryx-btn {
-  background: #f4f0fd;
-  border: 1px solid #ece6f7;
-  color: #5d36af;
+  background: var(--pos-tint);
+  border: 1px solid var(--pos-line);
+  color: var(--pos-accent);
   border-radius: 10px;
 }
 .oryx-pos--premium .oryx-pos__categories {
@@ -3546,10 +3563,10 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   min-height: 0;
   overflow-y: auto;
   padding: 12px 8px;
-  border: 1px solid #e8e5f1;
+  border: 1px solid var(--pos-line);
   border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 4px 20px rgba(44, 33, 91, .035);
+  background: var(--pos-panel);
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--pos-accent) 10%, transparent);
   scrollbar-width: thin;
 }
 .oryx-pos--premium .oryx-pos__categories-title {
@@ -3557,7 +3574,7 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   padding: 6px 11px;
   font-size: 13px;
   font-weight: 800;
-  color: #33304b;
+  color: var(--pos-ink);
 }
 .oryx-pos--premium .oryx-pos__category {
   width: 100%;
@@ -3569,23 +3586,23 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   border: 1px solid transparent;
   border-radius: 12px;
   background: transparent;
-  color: #393550;
+  color: var(--pos-ink);
   padding: 10px;
   font-size: 12.5px;
   font-weight: 650;
   cursor: pointer;
   overflow-wrap: anywhere;
 }
-.oryx-pos--premium .oryx-pos__category svg { flex: 0 0 auto; color: #605a78; }
+.oryx-pos--premium .oryx-pos__category svg { flex: 0 0 auto; color: var(--pos-soft); }
 .oryx-pos--premium .oryx-pos__category:hover {
-  background: #f8f5ff;
+  background: var(--pos-tint);
 }
 .oryx-pos--premium .oryx-pos__category--active {
-  color: #6338b8;
-  border-color: #eee5ff;
-  background: #f1eafd;
+  color: var(--pos-accent);
+  border-color: var(--pos-line);
+  background: var(--pos-tint);
 }
-.oryx-pos--premium .oryx-pos__category--active svg { color: #6338b8; }
+.oryx-pos--premium .oryx-pos__category--active svg { color: var(--pos-accent); }
 .oryx-modal--pos .oryx-pos--premium .oryx-pos__grid {
   flex: 1 1 auto;
   min-height: 0;
@@ -3599,30 +3616,30 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
 .oryx-pos--premium .oryx-pos__grid > div { min-width: 0; }
 .oryx-pos--premium .oryx-pos-tile {
   position: relative;
-  background: #fff;
-  border: 1px solid #e7e5f0;
+  background: var(--pos-panel);
+  border: 1px solid var(--pos-line);
   border-radius: 14px;
-  box-shadow: 0 3px 14px rgba(39, 29, 86, .06);
-  color: #22203e;
+  box-shadow: 0 3px 14px color-mix(in srgb, var(--pos-accent) 10%, transparent);
+  color: var(--pos-ink);
   min-height: 194px;
 }
 .oryx-pos--premium .oryx-pos-tile:hover:not(:disabled) {
-  border-color: #ad94e4;
-  box-shadow: 0 6px 20px rgba(81, 50, 154, .12);
+  border-color: var(--pos-accent);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--pos-accent) 10%, transparent);
 }
 .oryx-pos--premium .oryx-pos-tile--selected {
-  border-color: #956cdd;
-  box-shadow: 0 0 0 1px #bda7ec;
+  border-color: var(--pos-accent);
+  box-shadow: 0 0 0 1px var(--pos-line);
 }
 .oryx-pos--premium .oryx-pos-tile__media {
   aspect-ratio: 16 / 10;
-  background: #f8f8fc;
+  background: var(--pos-raised);
 }
 .oryx-pos--premium .oryx-pos-tile__media img { object-fit: contain; padding: 5px; }
 .oryx-pos--premium .oryx-pos-tile__body { padding: 9px 11px 42px; gap: 4px; }
-.oryx-pos--premium .oryx-pos-tile__name { color: #26223c; font-size: 12.5px; min-height: 30px; }
-.oryx-pos--premium .oryx-pos-tile__price { color: #6539b7; font-size: 14px; }
-.oryx-pos--premium .oryx-pos-tile__stock { color: #76748b; }
+.oryx-pos--premium .oryx-pos-tile__name { color: var(--pos-ink); font-size: 12.5px; min-height: 30px; }
+.oryx-pos--premium .oryx-pos-tile__price { color: var(--pos-accent); font-size: 14px; }
+.oryx-pos--premium .oryx-pos-tile__stock { color: var(--pos-soft); }
 .oryx-pos--premium .oryx-pos-tile__add {
   position: absolute;
   bottom: 9px;
@@ -3632,8 +3649,8 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  color: #fff;
-  background: #6639bb;
+  color: var(--pos-action-ink);
+  background: var(--pos-action);
 }
 .oryx-pos--premium .oryx-pos-tile__selected {
   position: absolute;
@@ -3641,8 +3658,8 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   right: 7px;
   z-index: 2;
   border-radius: 999px;
-  background: #6439bb;
-  color: #fff;
+  background: var(--pos-action);
+  color: var(--pos-action-ink);
   min-width: 24px;
   padding: 3px 7px;
   text-align: center;
@@ -3656,44 +3673,44 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   min-width: 0;
   min-height: 0;
   height: 100%;
-  border: 1px solid #e8e5f0;
+  border: 1px solid var(--pos-line);
   border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 4px 20px rgba(44, 33, 91, .055);
+  background: var(--pos-panel);
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--pos-accent) 10%, transparent);
   overflow: hidden;
 }
 .oryx-pos--premium .oryx-pos__rail-head {
   min-height: 57px;
   padding: 10px 13px !important;
-  background: #fff;
-  border-bottom: 1px solid #e8e5f0;
+  background: var(--pos-panel);
+  border-bottom: 1px solid var(--pos-line);
 }
-.oryx-pos--premium .oryx-pos__rail-title { color: #27223f; font-size: 15px; }
+.oryx-pos--premium .oryx-pos__rail-title { color: var(--pos-ink); font-size: 15px; }
 .oryx-pos--premium .oryx-pos__lines {
   min-height: 105px;
   flex: 1 1 auto;
   overflow-y: auto;
   padding: 9px 10px;
   gap: 8px;
-  background: #fff;
+  background: var(--pos-panel);
 }
 .oryx-pos--premium .oryx-pos__lines > [data-testid^="pos-cart-line-"] {
-  background: #fbfafe;
-  border: 1px solid #e9e6f1;
-  color: #22203c;
+  background: var(--pos-raised);
+  border: 1px solid var(--pos-line);
+  color: var(--pos-ink);
   border-radius: 12px;
   flex-shrink: 0;
 }
 .oryx-pos--premium .oryx-pos__empty { flex: 1; }
 .oryx-modal--pos .oryx-pos--premium .oryx-pos__customer-warehouse {
-  background: #fff;
-  border-color: #e9e6f1;
+  background: var(--pos-panel);
+  border-color: var(--pos-line);
   padding: 8px;
   gap: 8px;
 }
 .oryx-modal--pos .oryx-pos--premium .oryx-pos__tender {
-  background: #fff;
-  border-top: 1px solid #e7e5ee;
+  background: var(--pos-panel);
+  border-top: 1px solid var(--pos-line);
   padding: 10px 12px;
   gap: 7px;
   max-height: 43%;
@@ -3707,27 +3724,27 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   padding: 11px;
   border: 0;
   border-radius: 11px;
-  background: #efe8fd;
-  color: #4e269e;
+  background: var(--pos-tint);
+  color: var(--pos-accent);
   font-size: 18px;
 }
 .oryx-pos--premium .oryx-pay-method {
-  background: #f7f5fd;
-  color: #51466e;
-  border-color: #e7e2f1;
+  background: var(--pos-tint);
+  color: var(--pos-soft);
+  border-color: var(--pos-line);
   border-radius: 9px;
   min-height: 35px;
 }
 .oryx-pos--premium .oryx-pay-method--active {
-  color: #fff;
-  background: #6636b9;
-  border-color: #6636b9;
+  color: var(--pos-action-ink);
+  background: var(--pos-action);
+  border-color: var(--pos-action);
 }
 .oryx-pos--premium .oryx-pos__tender .oryx-btn--primary {
   min-height: 45px;
   border-radius: 11px;
-  background: #6636b9;
-  color: #fff;
+  background: var(--pos-action);
+  color: var(--pos-action-ink);
 }
 .oryx-pos--premium input,
 .oryx-pos--premium button { font-family: inherit; }
@@ -3787,7 +3804,7 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   margin-top: 8px;
 }
 .oryx-pos--premium .oryx-pos__line-quick > strong {
-  color: #37264f;
+  color: var(--pos-ink);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -3795,16 +3812,16 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   display: flex;
   align-items: center;
   overflow: hidden;
-  border: 1px solid #e3def2;
+  border: 1px solid var(--pos-line);
   border-radius: 9px;
-  background: #fff;
+  background: var(--pos-panel);
 }
 .oryx-pos--premium .oryx-pos__quantity-stepper button {
   width: 27px;
   min-height: 28px;
   border: 0;
-  background: #f6f2fc;
-  color: #6136ac;
+  background: var(--pos-tint);
+  color: var(--pos-accent);
   font-weight: 800;
   cursor: pointer;
 }
@@ -3817,5 +3834,5 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   text-align: center;
   font-size: 12px;
   font-weight: 800;
-  color: #33294a;
+  color: var(--pos-ink);
 }
