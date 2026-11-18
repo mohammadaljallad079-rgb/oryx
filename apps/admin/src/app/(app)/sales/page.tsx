@@ -716,7 +716,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
 // ------------------------------------------------------------------- POS
 
 function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boolean }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const { companyId } = useAuth();
   const [roundingMode, setRoundingMode] = useState<RoundingMode>('NONE');
   const [currencyScale, setCurrencyScale] = useState(currencyScaleOf('BHD'));
