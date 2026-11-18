@@ -102,7 +102,7 @@ export class OcrExtractDto {
 // --------------------------------------------------------------- inspections
 
 export class CreateInspectionServiceDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
   @IsString() @MinLength(2) @MaxLength(160) nameEn!: string;
   @IsString() @MinLength(2) @MaxLength(160) nameAr!: string;
   @IsOptional() @IsString() @MaxLength(600) description?: string;
