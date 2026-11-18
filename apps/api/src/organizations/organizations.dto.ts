@@ -12,9 +12,10 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 
 export class CreateCompanyDto {
+  @Transform(({ value }) => value === '' ? undefined : value)
   @IsOptional()
   @IsString()
   @Matches(/^[A-Z0-9][A-Z0-9-]{1,30}$/, { message: 'code must be uppercase letters, digits or dashes' })
@@ -199,6 +200,7 @@ export class DeleteCompanyDto {
 }
 
 export class CreateBranchDto {
+  @Transform(({ value }) => value === '' ? undefined : value)
   @IsOptional()
   @IsString()
   @Matches(/^[A-Z0-9][A-Z0-9-]{0,20}$/, { message: 'code must be uppercase letters, digits or dashes' })
