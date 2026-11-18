@@ -124,6 +124,25 @@ export class ListQueryDto {
   customerId?: string;
 }
 
+/** Customer-master filters are validated independently from document register filters. */
+export class CustomerListQueryDto extends ListQueryDto {
+  @IsOptional()
+  @IsIn(['COMPANY', 'INDIVIDUAL'])
+  kind?: 'COMPANY' | 'INDIVIDUAL';
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  active?: 'true' | 'false';
+
+  @IsOptional()
+  @IsString()
+  sourceId?: string;
+
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
+}
+
 export class CreateCustomerDto {
   @IsString()
   @MinLength(1)
