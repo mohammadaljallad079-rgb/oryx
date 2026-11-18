@@ -230,7 +230,7 @@ function SalesInner() {
       </div>
 
       {tab === 'dashboard' ? <ModuleDashboard moduleKey="sales_pos" /> : null}
-      {tab === 'invoices' ? <InvoicesTab canManage={can('erp.sales.invoice.manage')} /> : null}
+      {tab === 'invoices' ? <InvoicesTab canManage={can('erp.sales.invoice.manage')} onOpenReturns={() => setTab('returns')} /> : null}
       {tab === 'quotations' ? <QuotationsTab canManage={can('erp.sales.order.manage')} /> : null}
       {tab === 'returns' ? <CreditNotesTab canManage={can('erp.sales.credit_note.manage')} /> : null}
       {tab === 'pos' ? <PosTab canOperate={can('erp.sales.pos.operate')} canManage={can('erp.sales.pos.manage')} /> : null}
@@ -309,7 +309,7 @@ function InvoiceLineBreakdown({ document: doc }: { document: SalesDocumentDto })
 
 // ------------------------------------------------------------------ invoices
 
-function InvoicesTab({ canManage }: { canManage: boolean }) {
+function InvoicesTab({ canManage, onOpenReturns }: { canManage: boolean; onOpenReturns: () => void }) {
   const { t } = useUi();
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
@@ -386,6 +386,21 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                         >
                           <Icon name="trash" size={14} />
                           {t('common.delete')}
+                        </Button>
+                      </>
+                    ) : null}
+                    {canManage && inv.status !== 'DRAFT' ? (
+                      <>
+                        <Button size="sm" variant="ghost" disabled
+                          title="Posted invoices cannot be permanently deleted because doing so would corrupt journal entries, payments, tax and stock. Issue a credit note instead."
+                          aria-label={t('common.delete')}
+                          data-testid={`delete-invoice-blocked-${inv.invoiceNumber}`}>
+                          <Icon name="trash" size={14} />
+                          {t('common.delete')}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={onOpenReturns}
+                          data-testid={`reverse-invoice-${inv.invoiceNumber}`}>
+                          {t('erp.sales.returns')}
                         </Button>
                       </>
                     ) : null}
