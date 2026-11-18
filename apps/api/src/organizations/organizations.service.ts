@@ -105,6 +105,8 @@ export class OrganizationsService {
   }
 
   async createCompany(dto: CreateCompanyDto, actor: ActorContext) {
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a company or branch name in Arabic or English.');
     const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'CO');
     if (actor.kind !== 'PLATFORM') {
       throw forbidden(ERROR_CODES.FORBIDDEN_PLATFORM_ONLY, 'Only a platform administrator may create companies.');
@@ -138,8 +140,7 @@ export class OrganizationsService {
       const created = await tx.company.create({
         data: {
           code: code,
-          nameEn: dto.nameEn,
-          nameAr: dto.nameAr,
+          ...names,
           legalNameEn: dto.legalNameEn ?? null,
           type: dto.type,
           status: 'ACTIVE',
@@ -194,7 +195,7 @@ export class OrganizationsService {
       action: 'company.created',
       targetType: 'COMPANY',
       targetId: company.id,
-      summary: `Created ${dto.type === 'INTERNAL' ? 'internal company' : 'SaaS tenant'} ${dto.nameEn} (${code})`,
+      summary: `Created ${dto.type === 'INTERNAL' ? 'internal company' : 'SaaS tenant'} ${names.nameEn} (${code})`,
       metadata: { type: dto.type, planId: dto.planId ?? null },
       ipAddress: actor.ip ?? null,
       userAgent: actor.userAgent ?? null,
@@ -359,6 +360,8 @@ export class OrganizationsService {
   }
 
   async createBranch(companyId: string, dto: CreateBranchDto, actor: ActorContext) {
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a company or branch name in Arabic or English.');
     const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'BR');
     this.assertCompanyAccess(companyId, actor);
     if (dto.responsibleUserId) await this.assertBranchResponsibleUser(companyId, dto.responsibleUserId);
@@ -391,8 +394,7 @@ export class OrganizationsService {
       data: {
         companyId,
         code: code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        ...names,
         city: dto.city ?? null,
         countryCode: dto.countryCode ?? DEFAULT_COUNTRY_CODE,
         addressLine: dto.addressLine ?? null,
