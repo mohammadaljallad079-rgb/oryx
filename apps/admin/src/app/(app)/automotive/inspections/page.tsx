@@ -176,11 +176,12 @@ function JobsTab({ canWrite }: { canWrite: boolean }) {
                         <Button size="sm" onClick={() => router.push(`/automotive/inspections/${j.id}`)} data-testid={`open-job-${j.id}`}>
                           {t('inspection.open')}
                         </Button>
-                        {canWrite && j.status !== 'APPROVED' ? (
+                        {canWrite ? (
                           <Button
                             size="sm"
                             variant="danger"
-                            disabled={busyId === j.id}
+                            disabled={busyId === j.id || j.status === 'APPROVED'}
+                            title={j.status === 'APPROVED' ? t('inspection.deleteBlocked') : t('inspection.delete')}
                             onClick={() => void remove(j.id)}
                             data-testid={`delete-job-${j.id}`}
                           >
