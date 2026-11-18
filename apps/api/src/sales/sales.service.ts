@@ -17,6 +17,7 @@ import type {
   CreateCashierSessionDto,
   CreateCreditNoteDto,
   CreateCustomerDto,
+  CustomerListQueryDto,
   CreateInvoiceDto,
   CreatePosSaleDto,
   CreateQuotationDto,
@@ -124,12 +125,16 @@ export class SalesService {
 
   // --------------------------------------------------------------- customers
 
-  async listCustomers(query: ListQueryDto, principal: RequestPrincipal) {
+  async listCustomers(query: CustomerListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? 200, 500);
     const where = {
       companyId,
+      ...(query.kind ? { kind: query.kind } : {}),
+      ...(query.active !== undefined ? { isActive: query.active === 'true' } : {}),
+      ...(query.sourceId ? { sourceId: query.sourceId } : {}),
+      ...(query.departmentId ? { departmentId: query.departmentId } : {}),
       ...(query.search
         ? {
             OR: [
