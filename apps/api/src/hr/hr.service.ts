@@ -85,10 +85,11 @@ export class HrService {
     return { items: rows.map((d) => ({ ...d, employeeCount: d._count.employees })), total: rows.length, page: 1, pageSize: rows.length };
   }
 
-  async createDepartment(
+  async createDepartment(dto: CreateDepartmentDto, principal: RequestPrincipal, actor: ActorContext) {
+
     const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
     if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Enter a name in Arabic or English.');
-dto: CreateDepartmentDto, principal: RequestPrincipal, actor: ActorContext) {
+
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal, dto.companyId);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     if (dto.parentId) await this.assertDepartment(companyId, dto.parentId);
@@ -155,10 +156,11 @@ dto: CreateDepartmentDto, principal: RequestPrincipal, actor: ActorContext) {
     return { items: rows, total: rows.length, page: 1, pageSize: rows.length };
   }
 
-  async createJobTitle(
+  async createJobTitle(dto: CreateJobTitleDto, principal: RequestPrincipal, actor: ActorContext) {
+
     const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
     if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Enter a name in Arabic or English.');
-dto: CreateJobTitleDto, principal: RequestPrincipal, actor: ActorContext) {
+
     const { companyId } = await this.context.resolveCompanyScope(principal);
     if (dto.departmentId) await this.assertDepartment(companyId, dto.departmentId);
     const dup = await this.prisma.jobTitle.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
@@ -226,10 +228,11 @@ dto: CreateJobTitleDto, principal: RequestPrincipal, actor: ActorContext) {
     return toEmployeeDetailDto(employee);
   }
 
-  async createEmployee(
+  async createEmployee(dto: CreateEmployeeDto, principal: RequestPrincipal, actor: ActorContext) {
+
     const names = { nameEn: dto.fullNameEn?.trim() || dto.fullNameAr?.trim() || '', nameAr: dto.fullNameAr?.trim() || dto.fullNameEn?.trim() || '' };
     if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Employee name is required in Arabic or English.');
-dto: CreateEmployeeDto, principal: RequestPrincipal, actor: ActorContext) {
+
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     if (dto.departmentId) await this.assertDepartment(companyId, dto.departmentId);
