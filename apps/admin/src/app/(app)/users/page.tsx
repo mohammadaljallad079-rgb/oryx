@@ -734,6 +734,7 @@ function AddUserModal({
       password: '',
       nationalId: '',
       nationality: '',
+      phone: '',
       address: '',
       roleId: '',
     });
@@ -922,7 +923,7 @@ function EditProfileModal({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const [form, setForm] = useState({
     fullNameEn: '',
     fullNameAr: '',
