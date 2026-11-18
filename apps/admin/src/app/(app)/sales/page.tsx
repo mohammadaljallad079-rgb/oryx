@@ -1938,7 +1938,7 @@ function LineEditor({
             className="text-end tabular-nums text-[12.5px] font-semibold"
             data-testid={`${testIdPrefix}-line-amount-${i}`}
           >
-            {money(totals.priced[i]?.lineTotalMinor ?? 0, currency)}
+            {money((totals.priced[i]?.lineSubtotalMinor ?? 0) - (totals.priced[i]?.discountMinor ?? 0), currency)}
           </span>
           <Button
             size="sm"
