@@ -366,7 +366,7 @@ function CreateOpportunityModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="opportunity-code" />
+          <input className="oryx-input" value="" readOnly placeholder="Automatic / تلقائي" data-testid="opportunity-code" />
         </Field>
         <Field label={t('erp.crm.title')} required>
           <input className="oryx-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="opportunity-title" />
