@@ -198,7 +198,7 @@ test.describe('expiry and revocation', () => {
 
     await page.goto('/companies', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('login-form')).toBeVisible({ timeout: 30_000 });
-    await expect(page).toHaveURL(/\\/login(?:[?#]|$)/);
+    await expect(page).toHaveURL('**/login');
   });
 
   test('an unauthenticated visit to a protected route redirects to sign-in', async ({ page }) => {
