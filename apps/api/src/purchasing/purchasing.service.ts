@@ -67,14 +67,18 @@ export class PurchasingService {
       this.context.companyCurrency(companyId),
       this.context.companyCountryCode(companyId),
     ]);
+    // One name in either language is enough; persist a fallback for existing
+    // consumers whose schema expects both name columns to be populated.
+    const name = dto.nameEn?.trim() || dto.nameAr?.trim();
+    if (!name) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Supplier name is required in Arabic or English.');
     const dup = await this.prisma.supplier.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Supplier code ${dto.code} already exists.`);
     const supplier = await this.prisma.supplier.create({
       data: {
         companyId,
         code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        nameEn: dto.nameEn?.trim() || name,
+        nameAr: dto.nameAr?.trim() || name,
         email: dto.email ?? null,
         phone: dto.phone ?? null,
         taxNumber: dto.taxNumber ?? null,
@@ -101,6 +105,9 @@ export class PurchasingService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const supplier = await this.prisma.supplier.findFirst({ where: { id, companyId } });
     if (!supplier) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Supplier not found.');
+    const nextNameEn = dto.nameEn?.trim() || supplier.nameEn;
+    const nextNameAr = dto.nameAr?.trim() || supplier.nameAr;
+    if (!nextNameEn && !nextNameAr) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Supplier name is required.');
     const updated = await this.prisma.supplier.update({
       where: { id },
       data: {
