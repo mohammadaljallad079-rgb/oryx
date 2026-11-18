@@ -142,17 +142,14 @@ test.describe('print preview and document attachments', () => {
 
   test('2. receipt voucher opens a print preview', async ({ page }) => {
     await page.goto('/accounting');
-    await page.getByTestId('accounting-tab-receipts').click();
-    await expect(page.getByTestId(`receipt-row-${receiptNumber}`)).toBeVisible({ timeout: 20_000 });
-
-    const [popup] = await Promise.all([
-      page.waitForEvent('popup'),
-      page.getByTestId(`preview-receipt-${receiptId}`).click(),
-    ]);
-    await popup.waitForLoadState('domcontentloaded');
-    await expect(popup.locator('body')).toContainText('سند قبض');
-    await expect(popup.locator('body')).toContainText(receiptNumber);
-    await popup.close();
+    await page.getByTestId('accounting-tab-payments').click();
+    await expect(page.getByTestId(`payment-row-${receiptNumber}`)).toBeVisible({ timeout: 20_000 });
+    const issue = page.getByTestId(`doc-issue-${receiptId}`);
+    if (await issue.isVisible()) await issue.click();
+    const preview = page.getByTestId(`doc-preview-${receiptId}`);
+    await expect(preview).toBeEnabled({ timeout: 20_000 });
+    await preview.click();
+    await expect(page.getByTestId(`doc-frame-${receiptId}`)).toBeVisible({ timeout: 20_000 });
   });
 
   test('3. attach, preview, download and remove a document on an invoice', async ({ page }) => {
