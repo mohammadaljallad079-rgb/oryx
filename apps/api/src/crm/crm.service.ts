@@ -32,6 +32,14 @@ import type {
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
+/** Require at least one human-readable name, accepting either writing system. */
+function bilingualName(nameEn?: string | null, nameAr?: string | null) {
+  const en = nameEn?.trim() || '';
+  const ar = nameAr?.trim() || '';
+  if (!en && !ar) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a name in Arabic or English.');
+  return { nameEn: en || ar, nameAr: ar || en };
+}
+
 @Injectable()
 export class CrmService {
   constructor(
@@ -54,7 +62,7 @@ export class CrmService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const dup = await this.prisma.leadSource.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Lead source ${dto.code} already exists.`);
-    const source = await this.prisma.leadSource.create({ data: { companyId, code: dto.code, nameEn: dto.nameEn, nameAr: dto.nameAr } });
+    const source = await this.prisma.leadSource.create({ data: { companyId, code: dto.code, ...bilingualName(dto.nameEn, dto.nameAr) } });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'crm.lead_source_created', targetType: 'LEAD_SOURCE', targetId: source.id, summary: `Created lead source ${source.code}` });
     return source;
   }
@@ -94,8 +102,7 @@ export class CrmService {
       data: {
         companyId,
         code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        ...bilingualName(dto.nameEn, dto.nameAr),
         contactName: dto.contactName ?? null,
         email: dto.email ?? null,
         phone: dto.phone ?? null,
@@ -117,8 +124,7 @@ export class CrmService {
     const updated = await this.prisma.lead.update({
       where: { id },
       data: {
-        ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
-        ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
+        ...(dto.nameEn !== undefined || dto.nameAr !== undefined ? bilingualName(dto.nameEn ?? lead.nameEn, dto.nameAr ?? lead.nameAr) : {}),
         ...(dto.contactName !== undefined ? { contactName: dto.contactName } : {}),
         ...(dto.email !== undefined ? { email: dto.email } : {}),
         ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
@@ -177,8 +183,8 @@ export class CrmService {
       for (const [i, s] of dto.stages.entries()) {
         await tx.pipelineStage.upsert({
           where: { pipelineId_code: { pipelineId, code: s.code } },
-          create: { companyId, pipelineId, code: s.code, nameEn: s.nameEn, nameAr: s.nameAr, sortOrder: i, probabilityBp: s.probabilityBp ?? 0, isWon: s.isWon ?? false, isLost: s.isLost ?? false },
-          update: { nameEn: s.nameEn, nameAr: s.nameAr, sortOrder: i, probabilityBp: s.probabilityBp ?? 0, isWon: s.isWon ?? false, isLost: s.isLost ?? false },
+          create: { companyId, pipelineId, code: s.code, ...bilingualName(s.nameEn, s.nameAr), sortOrder: i, probabilityBp: s.probabilityBp ?? 0, isWon: s.isWon ?? false, isLost: s.isLost ?? false },
+          update: { ...bilingualName(s.nameEn, s.nameAr), sortOrder: i, probabilityBp: s.probabilityBp ?? 0, isWon: s.isWon ?? false, isLost: s.isLost ?? false },
         });
       }
       return tx.pipelineStage.findMany({ where: { pipelineId }, orderBy: { sortOrder: 'asc' } });
@@ -335,7 +341,7 @@ export class CrmService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     await this.assertCustomer(companyId, customerId);
     const contact = await this.prisma.customerContact.create({
-      data: { companyId, customerId, nameEn: dto.nameEn, nameAr: dto.nameAr, email: dto.email ?? null, phone: dto.phone ?? null, role: dto.role ?? null, isPrimary: dto.isPrimary ?? false },
+      data: { companyId, customerId, ...bilingualName(dto.nameEn, dto.nameAr), email: dto.email ?? null, phone: dto.phone ?? null, role: dto.role ?? null, isPrimary: dto.isPrimary ?? false },
     });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'crm.contact_created', targetType: 'CUSTOMER_CONTACT', targetId: contact.id, summary: `Added contact ${contact.nameEn}` });
     return contact;
