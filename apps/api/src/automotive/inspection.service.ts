@@ -845,6 +845,22 @@ export class InspectionService {
         'An approved inspection cannot be deleted. Cancel or archive the report instead.',
       );
     }
+    // The booking may have already produced a billed report even if the
+    // structured inspection itself was not approved. The report/invoice link is
+    // not a foreign key on InspectionSession, so a plain cascade would otherwise
+    // allow deleting evidence for a financially posted operation.
+    if (session.bookingId) {
+      const invoicedReport = await this.prisma.inspectionReport.findFirst({
+        where: { companyId, bookingId: session.bookingId, invoiceId: { not: null } },
+        select: { id: true },
+      });
+      if (invoicedReport) {
+        throw conflict(
+          ERROR_CODES.RESOURCE_CONFLICT,
+          'This inspection is linked to an invoice. Preserve the inspection and reverse the invoice through accounting instead.',
+        );
+      }
+    }
 
     await this.prisma.inspectionSession.delete({ where: { id } });
 
