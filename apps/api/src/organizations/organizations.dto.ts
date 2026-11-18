@@ -15,9 +15,10 @@ import {
 import { Type } from 'class-transformer';
 
 export class CreateCompanyDto {
+  @IsOptional()
   @IsString()
   @Matches(/^[A-Z0-9][A-Z0-9-]{1,30}$/, { message: 'code must be uppercase letters, digits or dashes' })
-  code!: string;
+  code?: string;
 
   @IsString()
   @MinLength(2)
@@ -198,9 +199,10 @@ export class DeleteCompanyDto {
 }
 
 export class CreateBranchDto {
+  @IsOptional()
   @IsString()
   @Matches(/^[A-Z0-9][A-Z0-9-]{0,20}$/, { message: 'code must be uppercase letters, digits or dashes' })
-  code!: string;
+  code?: string;
 
   @IsString()
   @MinLength(2)
