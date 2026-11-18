@@ -85,14 +85,17 @@ export class HrService {
     return { items: rows.map((d) => ({ ...d, employeeCount: d._count.employees })), total: rows.length, page: 1, pageSize: rows.length };
   }
 
-  async createDepartment(dto: CreateDepartmentDto, principal: RequestPrincipal, actor: ActorContext) {
+  async createDepartment(
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Enter a name in Arabic or English.');
+dto: CreateDepartmentDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal, dto.companyId);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     if (dto.parentId) await this.assertDepartment(companyId, dto.parentId);
     const dup = await this.prisma.department.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Department code ${dto.code} already exists.`);
     const dept = await this.prisma.department.create({
-      data: { companyId, code: dto.code, nameEn: dto.nameEn, nameAr: dto.nameAr, parentId: dto.parentId ?? null, branchId: dto.branchId ?? null },
+      data: { companyId, code: dto.code, ...names, parentId: dto.parentId ?? null, branchId: dto.branchId ?? null },
     });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.department_created', targetType: 'DEPARTMENT', targetId: dept.id, summary: `Created department ${dept.code}` });
     return dept;
@@ -152,12 +155,15 @@ export class HrService {
     return { items: rows, total: rows.length, page: 1, pageSize: rows.length };
   }
 
-  async createJobTitle(dto: CreateJobTitleDto, principal: RequestPrincipal, actor: ActorContext) {
+  async createJobTitle(
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Enter a name in Arabic or English.');
+dto: CreateJobTitleDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     if (dto.departmentId) await this.assertDepartment(companyId, dto.departmentId);
     const dup = await this.prisma.jobTitle.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Job title code ${dto.code} already exists.`);
-    const title = await this.prisma.jobTitle.create({ data: { companyId, code: dto.code, nameEn: dto.nameEn, nameAr: dto.nameAr, departmentId: dto.departmentId ?? null } });
+    const title = await this.prisma.jobTitle.create({ data: { companyId, code: dto.code, ...names, departmentId: dto.departmentId ?? null } });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'hr.job_title_created', targetType: 'JOB_TITLE', targetId: title.id, summary: `Created job title ${title.code}` });
     return title;
   }
@@ -220,7 +226,10 @@ export class HrService {
     return toEmployeeDetailDto(employee);
   }
 
-  async createEmployee(dto: CreateEmployeeDto, principal: RequestPrincipal, actor: ActorContext) {
+  async createEmployee(
+    const names = { nameEn: dto.fullNameEn?.trim() || dto.fullNameAr?.trim() || '', nameAr: dto.fullNameAr?.trim() || dto.fullNameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Employee name is required in Arabic or English.');
+dto: CreateEmployeeDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     if (dto.departmentId) await this.assertDepartment(companyId, dto.departmentId);
@@ -234,8 +243,8 @@ export class HrService {
         data: {
           companyId,
           code: dto.code,
-          fullNameEn: dto.fullNameEn,
-          fullNameAr: dto.fullNameAr,
+          fullNameEn: names.nameEn,
+          fullNameAr: names.nameAr,
           email: dto.email ?? null,
           phone: dto.phone ?? null,
           secondaryPhone: dto.secondaryPhone ?? null,
