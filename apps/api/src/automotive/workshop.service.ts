@@ -129,11 +129,13 @@ export class WorkshopService {
   }
 
   async createBay(dto: CreateWorkshopBayDto, principal: RequestPrincipal, actor: ActorContext) {
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Name required in Arabic or English.');
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     const dup = await this.prisma.workshopBay.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Bay ${dto.code} already exists.`);
-    const bay = await this.prisma.workshopBay.create({ data: { companyId, branchId: dto.branchId ?? null, code: dto.code, nameEn: dto.nameEn, nameAr: dto.nameAr } });
+    const bay = await this.prisma.workshopBay.create({ data: { companyId, branchId: dto.branchId ?? null, code: dto.code, ...names } });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'automotive.bay_created', targetType: 'WORKSHOP_BAY', targetId: bay.id, summary: `Created bay ${bay.code}` });
     return bay;
   }
@@ -784,13 +786,14 @@ export class WorkshopService {
   }
 
   async createProvider(dto: CreateProviderDto, principal: RequestPrincipal, actor: ActorContext) {
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Name required in Arabic or English.');
     const dup = await this.prisma.marketplaceProvider.findUnique({ where: { code: dto.code } });
     if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Provider ${dto.code} already exists.`);
     const provider = await this.prisma.marketplaceProvider.create({
       data: {
         code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        ...names,
         categoryKey: dto.categoryKey ?? null,
         email: dto.email ?? null,
         phone: dto.phone ?? null,
@@ -821,10 +824,12 @@ export class WorkshopService {
   }
 
   async createListing(providerId: string, dto: CreateListingDto, principal: RequestPrincipal, actor: ActorContext) {
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Name required in Arabic or English.');
     const provider = await this.prisma.marketplaceProvider.findUnique({ where: { id: providerId } });
     if (!provider) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Provider not found.');
     const listing = await this.prisma.providerServiceListing.create({
-      data: { providerId, categoryKey: dto.categoryKey, nameEn: dto.nameEn, nameAr: dto.nameAr, description: dto.description ?? null, priceMinor: dto.priceMinor ?? 0 },
+      data: { providerId, categoryKey: dto.categoryKey, ...names, description: dto.description ?? null, priceMinor: dto.priceMinor ?? 0 },
     });
     await this.audit.record({ actorUserId: actor.userId, companyId: null, action: 'marketplace.listing_created', targetType: 'PROVIDER_SERVICE_LISTING', targetId: listing.id, summary: `Created listing ${listing.nameEn}` });
     return listing;
