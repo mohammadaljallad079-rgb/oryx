@@ -105,6 +105,12 @@ test.describe('Point of sale — card terminal', () => {
       await price.blur();
       await expect(price).toHaveValue('5.000');
     }
+    // Regression: one 28.000 BHD item must total 28 dinars before VAT,
+    // never mere fils because the shared pricing engine expects 10^4 quantity units.
+    const exactPrice = page.getByTestId(`pos-price-${setup.product.sku}`);
+    await exactPrice.fill('28.000');
+    await exactPrice.blur();
+    await expect(page.locator('.oryx-pos__totals')).toContainText('28.000 BHD');
     const total = page.getByTestId('pos-total');
     await expect(total).toBeVisible();
     const firstTotal = await total.textContent();
