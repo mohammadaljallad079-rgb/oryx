@@ -1743,6 +1743,7 @@ export class SalesService {
         quantity: l.quantity,
         unitPriceMinor: l.unitPriceMinor,
         discountPercentBp: l.discountPercentBp ?? 0,
+        discountAmountMinor: l.discountAmountMinor,
         taxPercentBp: l.taxPercentBp ?? 0,
       }));
       const rounding = await this.context.companyRoundingMode(companyId, tx);
