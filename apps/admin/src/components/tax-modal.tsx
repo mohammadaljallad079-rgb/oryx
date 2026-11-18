@@ -71,8 +71,8 @@ export function TaxModal({
     const rateBp = Math.round((Number(form.ratePercent) || 0) * 100);
     try {
       const body = {
-        nameEn: form.nameEn,
-        nameAr: form.nameAr,
+        nameEn: form.nameEn.trim() || form.nameAr.trim(),
+        nameAr: form.nameAr.trim() || form.nameEn.trim()
         rateBp,
         scope: form.scope,
         applicationLevel: form.applicationLevel,
@@ -81,7 +81,7 @@ export function TaxModal({
       };
       const saved = tax
         ? await api.updateTax(tax.id, body)
-        : await api.createTax({ ...body, code: form.code });
+        : await api.createTax({ ...body, code: '' });
       await onSaved(saved);
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
@@ -105,7 +105,7 @@ export function TaxModal({
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
-            disabled={busy || !form.nameEn || !form.nameAr || (!tax && !form.code) || rateInvalid}
+            disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim()) || rateInvalid}
             onClick={submit}
             data-testid="save-tax"
           >
@@ -119,9 +119,9 @@ export function TaxModal({
         <Field label={t('common.code')} required>
           <input
             className="oryx-input"
-            value={form.code}
-            disabled={Boolean(tax)}
-            onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
+            value={tax?.code ?? ''}
+            readOnly
+            placeholder="Automatic / تلقائي"
             data-testid="tax-code"
           />
         </Field>
