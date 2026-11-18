@@ -375,7 +375,7 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
   .c-price, .c-amt { text-align:right; }
 
   /* watermark - the reference's oversized lockup, behind the items and totals */
-  .watermark { position:absolute; left:calc(50% - 165pt); top:260pt; width:330pt; height:185pt; opacity:0.08; line-height:0; pointer-events:none; overflow:hidden; }
+  .watermark { position:absolute; left:calc(50% - 155pt); top:285pt; width:310pt; height:120pt; opacity:0.08; line-height:0; pointer-events:none; overflow:hidden; }
   .watermark img { display:block; width:100%; height:100%; object-fit:contain; }
 
   /* totals - right aligned, a rule above the grand total */
