@@ -4085,7 +4085,8 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   }
   .oryx-pos--command .oryx-pos__command-status { display:none; }
   .oryx-modal--pos .oryx-pos--command .oryx-pos__grid {
-    grid-template-columns: repeat(auto-fill, minmax(132px,1fr));
+    grid-template-columns: repeat(auto-fill, minmax(110px,1fr));
+    gap: 9px;
   }
 }
 @media (max-width: 900px) {
