@@ -1,3 +1,4 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
 import { basisPointsOfMinor, lineAmountMinor, sumMinor } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
@@ -61,6 +62,8 @@ export class PurchasingService {
   }
 
   async createSupplier(dto: CreateSupplierDto, principal: RequestPrincipal, actor: ActorContext) {
+    // Server allocates the code when a form omits it; legacy imports may supply their own.
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'SUP');
     const { companyId } = await this.context.resolveCompanyScope(principal);
     // A new supplier inherits the tenant's own market, not a hard-coded one.
     const [defaultCurrency, defaultCountry] = await Promise.all([
@@ -71,12 +74,12 @@ export class PurchasingService {
     // consumers whose schema expects both name columns to be populated.
     const name = dto.nameEn?.trim() || dto.nameAr?.trim();
     if (!name) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Supplier name is required in Arabic or English.');
-    const dup = await this.prisma.supplier.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Supplier code ${dto.code} already exists.`);
+    const dup = await this.prisma.supplier.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Supplier code ${code} already exists.`);
     const supplier = await this.prisma.supplier.create({
       data: {
         companyId,
-        code: dto.code,
+        code: code,
         nameEn: dto.nameEn?.trim() || name,
         nameAr: dto.nameAr?.trim() || name,
         email: dto.email ?? null,
