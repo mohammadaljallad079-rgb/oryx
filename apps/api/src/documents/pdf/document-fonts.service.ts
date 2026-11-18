@@ -51,10 +51,11 @@ const FACES: readonly FontFace[] = [
  * faces stay at the tail as a last resort for any glyph the approved pair lacks,
  * so a document can never render a missing glyph as a box.
  */
+// Arial is embedded as ORYX Arabic and supports both Latin and Arabic glyphs.
+// Use the same leading face in every PDF instead of mixing Verdana and Arial.
 export const DOCUMENT_FONT_STACK =
-  "'ORYX Latin', 'ORYX Arabic', 'ORYX Naskh', 'ORYX Sans', sans-serif";
-export const DOCUMENT_LATIN_STACK =
-  "'ORYX Latin', 'ORYX Arabic', 'ORYX Sans', sans-serif";
+  "'ORYX Arabic', 'ORYX Naskh', 'ORYX Sans', sans-serif";
+export const DOCUMENT_LATIN_STACK = DOCUMENT_FONT_STACK;
 
 @Injectable()
 export class DocumentFontService {
