@@ -287,7 +287,7 @@ function PlanEditor({
     try {
       const payload = {
         nameEn: form.nameEn.trim() || form.nameAr.trim(),
-        nameAr: form.nameAr.trim() || form.nameEn.trim()
+        nameAr: form.nameAr.trim() || form.nameEn.trim(),
         descriptionEn: form.descriptionEn,
         descriptionAr: form.descriptionAr,
         monthlyPrice: Number(form.monthlyPrice),
