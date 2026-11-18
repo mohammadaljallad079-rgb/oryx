@@ -1099,6 +1099,7 @@ export class SalesService {
           quantity: l.quantity,
           unitPriceMinor: l.unitPriceMinor,
           discountPercentBp: l.discountPercentBp,
+          discountAmountMinor: l.discountMinor > 0 ? l.discountMinor : undefined,
           taxPercentBp: l.taxPercentBp,
         }));
       } else {
@@ -1112,6 +1113,7 @@ export class SalesService {
           quantity: l.quantity,
           unitPriceMinor: l.unitPriceMinor,
           discountPercentBp: l.discountPercentBp,
+          discountAmountMinor: l.discountAmountMinor,
           taxPercentBp: l.taxPercentBp,
         }));
       }
