@@ -103,7 +103,7 @@ interface CartLine {
   quantity: number;
   unitPriceMinor: number;
   taxPercentBp: number;
-  discountPercentBp: number;
+  discountAmountMinor: number;
 }
 
 /**
@@ -121,7 +121,7 @@ function computePosTotals(
   lines: Array<{
     quantity: number;
     unitPriceMinor: number;
-    discountPercentBp: number;
+    discountAmountMinor: number;
     taxPercentBp: number;
   }>,
   roundingMode: RoundingMode,
@@ -130,7 +130,7 @@ function computePosTotals(
   const priced = lines.map((l) => {
     // Cart quantities are human units; the shared money helper expects 10^4-scaled units.
     const lineSubtotalMinor = lineAmountMinor(l.quantity * 10000, l.unitPriceMinor);
-    const discountMinor = basisPointsOfMinor(lineSubtotalMinor, l.discountPercentBp);
+    const discountMinor = Math.min(lineSubtotalMinor, Math.max(0, l.discountAmountMinor));
     const net = lineSubtotalMinor - discountMinor;
     const taxMinor = basisPointsOfMinor(net, l.taxPercentBp);
     return { lineSubtotalMinor, discountMinor, taxMinor, lineTotalMinor: net + taxMinor };
@@ -1046,7 +1046,7 @@ function PosSaleModal({
           quantity: 1,
           unitPriceMinor: product.salesPriceMinor,
           taxPercentBp: product.taxRateBp,
-          discountPercentBp: 0,
+          discountAmountMinor: 0,
         };
         return [...prev, line];
       });
@@ -1095,7 +1095,7 @@ function PosSaleModal({
         cart.map((l) => ({
           quantity: l.quantity,
           unitPriceMinor: l.unitPriceMinor,
-          discountPercentBp: l.discountPercentBp,
+          discountAmountMinor: l.discountAmountMinor,
           taxPercentBp: l.taxPercentBp,
         })),
         roundingMode,
@@ -1143,7 +1143,7 @@ function PosSaleModal({
           // The API's invoice/stock engine also uses 10^4-scaled quantities.
           quantity: l.quantity * 10000,
           unitPriceMinor: l.unitPriceMinor,
-          discountPercentBp: l.discountPercentBp,
+          discountAmountMinor: l.discountAmountMinor,
           taxPercentBp: l.taxPercentBp,
         })),
       });
@@ -1575,7 +1575,7 @@ function CartRow({
   };
   const lineTotal = computePosTotals(
     [{ quantity: line.quantity, unitPriceMinor: line.unitPriceMinor,
-       discountPercentBp: line.discountPercentBp, taxPercentBp: line.taxPercentBp }],
+       discountAmountMinor: line.discountAmountMinor, taxPercentBp: line.taxPercentBp }],
     'NONE', currencyScale,
   ).totalMinor;
   const imageUrl = api.resolveImage(line.imageUrl);
@@ -1643,23 +1643,24 @@ function CartRow({
             data-testid={`pos-price-${line.sku}`} />
         </label>
         <label className="flex flex-col gap-1 text-xs">
-          <span>{t('erp.sales.discount')} %</span>
+          <span>{t('erp.sales.discount')} (BHD)</span>
           <input className="oryx-input text-center tabular-nums" inputMode="decimal" type="number"
-            min={0} max={100} step="0.01" value={line.discountPercentBp / 100}
+            min={0} step={currencyScale === 3 ? '0.001' : '0.01'}
+            value={line.discountAmountMinor / (10 ** currencyScale)}
             onChange={e => {
               const next = Number(e.target.value);
-              onChange({ discountPercentBp: Math.max(0, Math.min(10000, Math.round((Number.isFinite(next) ? next : 0) * 100))) });
+              onChange({ discountAmountMinor: Math.max(0, Math.round((Number.isFinite(next) ? next : 0) * (10 ** currencyScale))) });
             }}
             data-testid={`pos-discount-${line.sku}`} />
         </label>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-1" aria-label={ar ? 'خصم سريع' : 'Quick discount'}>
-          {[0, 5, 10, 15].map(percent => (
-            <button key={percent} type="button"
-              className={`oryx-btn oryx-btn--sm ${line.discountPercentBp === percent * 100 ? 'oryx-btn--primary' : ''}`}
-              onClick={() => onChange({ discountPercentBp: percent * 100 })}
-              data-testid={`pos-discount-preset-${percent}-${line.sku}`}>{percent}%</button>
+          {[0, 1, 2, 5].map(amount => (
+            <button key={amount} type="button"
+              className={`oryx-btn oryx-btn--sm ${line.discountAmountMinor === amount * (10 ** currencyScale) ? 'oryx-btn--primary' : ''}`}
+              onClick={() => onChange({ discountAmountMinor: amount * (10 ** currencyScale) })}
+              data-testid={`pos-discount-preset-${amount}-${line.sku}`}>{amount} BHD</button>
           ))}
         </div>
         <span className="text-xs text-[var(--muted)]">
