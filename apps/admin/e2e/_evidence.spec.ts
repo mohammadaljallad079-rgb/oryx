@@ -76,14 +76,16 @@ test('evidence: HR work-site edit/delete actions', async ({ page }) => {
   // Create a disposable site so the row, its Edit and its Delete buttons are on
   // screen for the capture; remove it afterwards to leave the tenant as found.
   await page.getByTestId('new-work-site').click();
-  const code = `EVD${Date.now().toString().slice(-6)}`;
-  await page.getByTestId('work-site-code').fill(code);
+  await expect(page.getByTestId('work-site-code')).toHaveAttribute('readonly', '');
   await page.getByTestId('work-site-name-en').fill('Evidence Site');
   await page.getByTestId('work-site-lat').fill('26.2285');
   await page.getByTestId('work-site-lng').fill('50.5860');
   await page.getByTestId('submit-work-site').click();
   await expect(page.locator('.oryx-modal')).toHaveCount(0, { timeout: 20_000 });
-  await expect(page.getByTestId(`edit-work-site-${code}`)).toBeVisible({ timeout: 20_000 });
+  const editId = await page.getByRole('row').filter({ hasText: 'Evidence Site' }).locator('[data-testid^="edit-work-site-"]').getAttribute('data-testid');
+  expect(editId).toBeTruthy();
+  const code = editId!.replace('edit-work-site-', '');
+  await expect(page.getByTestId(editId!)).toBeVisible({ timeout: 20_000 });
   await page.screenshot({ path: `${OUT}/e09-work-site-actions-en-light.png`, fullPage: true });
 
   page.once('dialog', (dialog) => dialog.accept());
