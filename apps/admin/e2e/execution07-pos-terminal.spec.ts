@@ -120,7 +120,7 @@ test.describe('Point of sale — card terminal', () => {
     await tile.click();
     // Selecting a product must immediately display a real line in the
     // independently scrolling order rail, without opening another panel.
-    await expect(page.locator('.oryx-pos__lines .oryx-pos__line').first()).toBeVisible();
+    await expect(page.getByTestId(`pos-cart-line-${setup.product.sku}`)).toBeVisible();
     if (setup.product.salesPriceMinor <= 1) {
       await expect(page.getByTestId('save-pos-sale')).toBeDisabled();
       const price = page.getByTestId(`pos-price-${setup.product.sku}`);
