@@ -156,7 +156,7 @@ export function toPrintLines(lines: PrintLineSource[], currency: string) {
     unitPrice: fromMinor(line.unitPriceMinor, scale),
     taxLabel: rateLabel(line.taxPercentBp),
     discountPercent: line.discountAmountMinor && line.discountAmountMinor > 0
-      ? `${fromMinor(line.discountAmountMinor, scale)} ${symbol}`
+      ? `${fromMinor(totals.lines[index].discountMinor, scale)} ${symbol}`
       : line.discountPercentBp > 0 ? `${line.discountPercentBp / 100}%` : '—',
     // Print the net line amount excluding VAT. Tax is displayed in totals only.
     amount: `${fromMinor(totals.lines[index].lineSubtotalMinor - totals.lines[index].discountMinor, scale)} ${symbol}`,
