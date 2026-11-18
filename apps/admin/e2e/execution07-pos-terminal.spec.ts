@@ -269,5 +269,13 @@ test.describe('Point of sale — card terminal', () => {
     await expect(page.getByTestId('pos-paid-round')).toHaveCount(0);
     await page.getByTestId('pos-pay-CASH').click();
     await expect(page.getByTestId('pos-paid-round')).toBeVisible();
+
+    // The redesigned POS inherits the ORYX theme instead of forcing lavender.
+    const workstation = page.getByTestId('pos-premium-workstation');
+    const darkColor = await workstation.evaluate((el) => getComputedStyle(el).backgroundColor);
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
+    const lightColor = await workstation.evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(lightColor).not.toBe(darkColor);
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
   });
 });
