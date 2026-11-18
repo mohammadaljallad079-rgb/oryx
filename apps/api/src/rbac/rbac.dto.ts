@@ -13,10 +13,10 @@ import {
 import { TrimString } from '../common/transformers';
 
 export class CreateRoleDto {
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(60)
-  code!: string;
+  code?: string;
 
   @IsString()
   @MinLength(2)
