@@ -99,6 +99,7 @@ export interface PrintLineSource {
   quantity: number;
   unitPriceMinor: number;
   discountPercentBp: number;
+  discountAmountMinor?: number;
   taxPercentBp: number;
 }
 
@@ -135,6 +136,7 @@ export function toPrintLines(lines: PrintLineSource[], currency: string) {
     quantity: l.quantity,
     unitPriceMinor: l.unitPriceMinor,
     discountPercentBp: l.discountPercentBp,
+    discountAmountMinor: l.discountAmountMinor && l.discountAmountMinor > 0 ? l.discountAmountMinor : undefined,
     taxPercentBp: l.taxPercentBp,
   }));
   const totals = computeDocumentTotals(priced);
@@ -153,7 +155,9 @@ export function toPrintLines(lines: PrintLineSource[], currency: string) {
     quantity: fromQuantity(line.quantity).replace(/\.?0+$/, '') || '0',
     unitPrice: fromMinor(line.unitPriceMinor, scale),
     taxLabel: rateLabel(line.taxPercentBp),
-    discountPercent: line.discountPercentBp > 0 ? `${line.discountPercentBp / 100}%` : '—',
+    discountPercent: line.discountAmountMinor && line.discountAmountMinor > 0
+      ? `${fromMinor(line.discountAmountMinor, scale)} ${symbol}`
+      : line.discountPercentBp > 0 ? `${line.discountPercentBp / 100}%` : '—',
     // Print the net line amount excluding VAT. Tax is displayed in totals only.
     amount: `${fromMinor(totals.lines[index].lineSubtotalMinor - totals.lines[index].discountMinor, scale)} ${symbol}`,
     };
