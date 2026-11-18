@@ -146,7 +146,7 @@ export class RbacService {
     if (actor.kind === 'COMPANY' && actor.companyId !== companyId) {
       throw forbidden(ERROR_CODES.FORBIDDEN_TENANT, 'Cross-tenant access is not permitted.');
     }
-    const code = (dto.code?.trim() || await nextMasterCode(this.prisma, 'RL')).toLowerCase().replace(/\\s+/g, '_');
+    const code = (dto.code?.trim() || await nextMasterCode(this.prisma, 'RL')).toLowerCase().replace(/\s+/g, '_');
     const existing = await this.prisma.role.findFirst({ where: { companyId, code } });
     if (existing) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Role code "${code}" already exists.`);
 
