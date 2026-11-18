@@ -1,3 +1,4 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@oryx/database';
 import { PrismaService } from '../common/prisma.service';
@@ -53,20 +54,22 @@ export class TaxService {
   }
 
   async create(dto: CreateTaxRateDto, principal: RequestPrincipal, actor: ActorContext) {
+    const code = (dto.code?.trim() || await nextMasterCode(this.prisma, 'TAX')).toUpperCase();
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a name in Arabic or English.');
     const { companyId } = await this.context.resolveCompanyScope(principal);
     const dup = await this.prisma.taxRate.findUnique({
-      where: { companyId_code: { companyId, code: dto.code } },
+      where: { companyId_code: { companyId, code: code } },
     });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Tax ${dto.code} already exists.`);
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Tax ${code} already exists.`);
 
     const row = await this.prisma.$transaction(async (tx) => {
       if (dto.isDefault) await this.clearDefault(tx, companyId);
       return tx.taxRate.create({
         data: {
           companyId,
-          code: dto.code,
-          nameEn: dto.nameEn,
-          nameAr: dto.nameAr,
+          code: code,
+          ...names,
           rateBp: dto.rateBp,
           scope: dto.scope ?? 'BOTH',
           applicationLevel: dto.applicationLevel ?? 'LINE',
