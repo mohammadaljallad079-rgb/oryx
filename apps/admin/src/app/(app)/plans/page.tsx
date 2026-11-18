@@ -286,8 +286,8 @@ function PlanEditor({
     setError(null);
     try {
       const payload = {
-        nameEn: form.nameEn,
-        nameAr: form.nameAr,
+        nameEn: form.nameEn.trim() || form.nameAr.trim(),
+        nameAr: form.nameAr.trim() || form.nameEn.trim()
         descriptionEn: form.descriptionEn,
         descriptionAr: form.descriptionAr,
         monthlyPrice: Number(form.monthlyPrice),
@@ -306,7 +306,7 @@ function PlanEditor({
       if (plan) {
         await api.updatePlan(plan.id, payload);
       } else {
-        await api.createPlan({ ...payload, code: form.code });
+        await api.createPlan({ ...payload, code: '' });
       }
       await onSaved();
     } catch (err) {
@@ -326,7 +326,7 @@ function PlanEditor({
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
-            disabled={busy || form.modules.length === 0 || !form.nameEn || !form.nameAr || (!plan && !form.code)}
+            disabled={busy || form.modules.length === 0 || (!form.nameEn.trim() && !form.nameAr.trim())}
             onClick={submit}
             data-testid="save-plan"
           >
@@ -350,8 +350,9 @@ function PlanEditor({
           <Field label={t('common.code')} required hint={t('plans.codeHint')}>
             <input
               className="oryx-input"
-              value={form.code}
-              onChange={(e) => setForm({ ...form, code: e.target.value.toLowerCase() })}
+              value=""
+              readOnly
+              placeholder="Automatic / تلقائي"
               data-testid="plan-code"
             />
           </Field>
