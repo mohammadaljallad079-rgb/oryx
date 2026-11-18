@@ -244,6 +244,7 @@ type SalesLine = {
   quantity?: number;
   unitPriceMinor?: number;
   discountPercentBp?: number;
+  discountMinor?: number;
   taxPercentBp?: number;
   lineTotalMinor?: number;
 };
@@ -279,9 +280,9 @@ function InvoiceLineBreakdown({ document: doc }: { document: SalesDocumentDto })
                 <td className="py-1.5 text-start">{line.description || '—'}</td>
                 <td className="py-1.5 text-end tabular-nums">{qty(line.quantity)}</td>
                 <td className="py-1.5 text-end tabular-nums">{money(line.unitPriceMinor, currency)}</td>
-                <td className="py-1.5 text-end tabular-nums">{((line.discountPercentBp ?? 0) / 100).toFixed(2)}%</td>
+                <td className="py-1.5 text-end tabular-nums">{money((line.discountMinor && line.discountMinor > 0 ? line.discountMinor : basisPointsOfMinor(lineAmountMinor(line.quantity ?? 0, line.unitPriceMinor ?? 0), line.discountPercentBp ?? 0)), currency)}</td>
                 <td className="py-1.5 text-end tabular-nums">{((line.taxPercentBp ?? 0) / 100).toFixed(2)}%</td>
-                <td className="py-1.5 text-end tabular-nums font-semibold">{money(line.lineTotalMinor, currency)}</td>
+                <td className="py-1.5 text-end tabular-nums font-semibold">{money(lineAmountMinor(line.quantity ?? 0, line.unitPriceMinor ?? 0) - (line.discountMinor && line.discountMinor > 0 ? line.discountMinor : basisPointsOfMinor(lineAmountMinor(line.quantity ?? 0, line.unitPriceMinor ?? 0), line.discountPercentBp ?? 0)), currency)}</td>
               </tr>
             ))}
           </tbody>
