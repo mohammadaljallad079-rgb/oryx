@@ -1,3 +1,4 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
 import { allocateMinor, DEFAULT_CURRENCY, fromMinor, sumMinor, toMinor } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
@@ -408,18 +409,19 @@ export class AccountingService {
 
   async createFiscalYear(dto: CreateFiscalYearDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'FY');
     const startDate = new Date(dto.startDate);
     const endDate = new Date(dto.endDate);
     if (endDate <= startDate) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'endDate must be after startDate.');
 
-    const dup = await this.prisma.fiscalYear.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Fiscal year ${dto.code} already exists.`);
+    const dup = await this.prisma.fiscalYear.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Fiscal year ${code} already exists.`);
 
     const periods = buildMonthlyPeriods(startDate, endDate);
     const year = await this.prisma.fiscalYear.create({
       data: {
         companyId,
-        code: dto.code,
+        code: code,
         startDate,
         endDate,
         periods: {
