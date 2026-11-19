@@ -649,15 +649,16 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
                 <td>
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     <Button size="sm" variant="ghost" onClick={() => setDetail(n)}
-                      data-testid={`return-attachments-${n.creditNoteNumber}`}>
+                      data-testid={`return-attachments-${n.creditNoteNumber}`}
+                      title={t('common.details')} aria-label={t('common.details')}>
                       <Icon name="list" size={15} />
-                      {t('common.details')}
                     </Button>
                     <DocumentActions
                       sourceType="CreditNote"
                       sourceId={n.id}
                       type="SALES_RETURN"
                       permissions={['erp.sales.read', 'erp.accounting.read']}
+                      iconsOnly
                     />
                   </div>
                 </td>
@@ -907,6 +908,7 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
                       sourceId={p.id}
                       type="POS_RECEIPT"
                       permissions={['erp.sales.read']}
+                      iconsOnly
                     />
                   </td>
                 </tr>
@@ -1233,7 +1235,7 @@ function PosSaleModal({
         </p>
       ) : null}
 
-      <div className="oryx-pos oryx-pos--premium oryx-pos--command grid min-h-0 flex-1 gap-3" data-testid="pos-premium-workstation">
+      <div className="oryx-pos oryx-pos--premium oryx-pos--command oryx-pos--workspace-v4 grid min-h-0 flex-1 gap-3" data-testid="pos-premium-workstation">
         <header className="oryx-pos__command-bar" data-testid="pos-command-bar">
           <div className="oryx-pos__command-identity">
             <span className="oryx-pos__command-monogram">O</span>
@@ -1305,7 +1307,7 @@ function PosSaleModal({
           ) : items.length === 0 ? (
             <EmptyState title={t('common.empty')} hint={t('erp.sales.pos.notFound')} />
           ) : (
-            <div className="oryx-pos__grid" data-testid="pos-grid">
+            <div className="oryx-pos__grid" data-testid="pos-grid" role="list" aria-label={locale === 'ar' ? 'المنتجات المتاحة' : 'Available products'}>
               {items.map((p) => (
                 <div key={p.id} className="flex min-w-0 flex-col gap-1">
                   <PosProductTile product={p} onAdd={() => addProduct(p)} selectedQuantity={cart.find((line) => line.productId === p.id)?.quantity ?? 0} />
@@ -1346,7 +1348,7 @@ function PosSaleModal({
         </aside>
 
         {/* ---------------------------------------------------- order rail */}
-        <div className="oryx-pos__rail" data-testid="pos-checkout-cart">
+        <div className="oryx-pos__rail" data-testid="pos-checkout-cart" aria-label={locale === 'ar' ? 'سلة المنتجات المختارة' : 'Selected products cart'}>
           <div className="oryx-pos__rail-head">
             <p className="oryx-pos__rail-title">
               <span className="oryx-pos__rail-icon"><Icon name="cart" size={19} /></span>
