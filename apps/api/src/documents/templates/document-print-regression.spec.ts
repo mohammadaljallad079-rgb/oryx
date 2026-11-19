@@ -42,6 +42,9 @@ describe('official print layout regressions', () => {
     expect(html).toContain('خبراء فحص المركبات');
     expect(html).toContain('VEHICLE INSPECTION EXPERTS');
     expect(html).toContain('class="of-badge"');
+    expect(html).toContain('viewBox="0 0 145 145"');
+    expect(html).toContain('M116 29 L108 29 102 31');
+    expect(html).not.toContain('<circle cx="12" cy="12" r="11"');
     expect(html).toContain('lang="ar" dir="rtl"');
     expect(html).toContain('lang="en" dir="ltr"');
   });
