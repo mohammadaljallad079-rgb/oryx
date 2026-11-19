@@ -4,6 +4,7 @@ import {
   IsArray,
   IsBoolean,
   IsInt,
+  IsIn,
   IsISO8601,
   IsOptional,
   IsString,
@@ -50,6 +51,9 @@ export class ListQueryDto {
 }
 
 export class CreateSupplierDto {
+  @IsOptional() @IsIn(['INDIVIDUAL', 'COMPANY']) kind?: 'INDIVIDUAL' | 'COMPANY';
+  @IsOptional() @IsString() @MaxLength(200) contactPerson?: string;
+  @IsOptional() @IsString() @MaxLength(80) idNumber?: string;
   @IsOptional() @IsString() @MaxLength(40) code?: string;
 
   @IsOptional()
@@ -110,6 +114,9 @@ export class CreateSupplierDto {
 }
 
 export class UpdateSupplierDto {
+  @IsOptional() @IsIn(['INDIVIDUAL', 'COMPANY']) kind?: 'INDIVIDUAL' | 'COMPANY';
+  @IsOptional() @IsString() @MaxLength(200) contactPerson?: string;
+  @IsOptional() @IsString() @MaxLength(80) idNumber?: string;
   @IsOptional()
   @IsString()
   @MaxLength(200)
