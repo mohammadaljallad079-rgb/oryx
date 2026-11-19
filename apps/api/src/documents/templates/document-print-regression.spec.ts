@@ -109,7 +109,8 @@ describe('official footer contact visibility contract', () => {
     const html = officialFooterTemplate(issuer);
     expect(html).toContain('height:40pt');
     expect(html).toContain('border-top:0.75px solid #94a3b8');
-    expect(html).toContain('white-space:nowrap;overflow:hidden;text-overflow:ellipsis');
+    expect(html).toContain('grid-template-columns:repeat(3,minmax(0,1fr))');
+    expect(html).not.toContain('text-overflow:ellipsis');
     expect(html).toContain('Page <span class="pageNumber"></span> of <span class="totalPages"></span>');
   });
   it('renders every configured phone, email, website and address in the printable footer', () => {
