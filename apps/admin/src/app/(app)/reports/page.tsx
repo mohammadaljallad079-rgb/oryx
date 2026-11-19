@@ -108,14 +108,10 @@ export default function ReportsPage() {
     }
   };
 
-  const openPdf = async (kind: string) => {
-    setBusy(`pdf-${kind}`);
-    try {
-      const url = await api.reportPdfBlobUrl(kind, params);
-      window.open(url, '_blank', 'noopener');
-    } finally {
-      setBusy(null);
-    }
+  // Open the existing preview modal synchronously in the click gesture.
+  // An async fetch followed by window.open is blocked by popup protection.
+  const openPdf = (kind: string) => {
+    setPreviewKind(kind);
   };
 
   const downloadPdf = async (kind: string) => {
