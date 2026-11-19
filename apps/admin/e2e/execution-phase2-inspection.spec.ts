@@ -324,25 +324,19 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await expect(page.getByTestId('inspection-submit')).toBeEnabled();
   });
 
-  test('records a computer-unit fault and can remove it again', async ({ page }) => {
+  test('records computer-unit notes without creating a fault and allows submission', async ({ page }) => {
     const id = await seedJob(page, ['COMPUTER_UNIT']);
     await page.goto(`/automotive/inspections/${id}`);
     await expect(page.getByTestId('inspection-workspace')).toBeVisible();
+    await expect(page.getByTestId('diagnostic-list')).toHaveCount(0);
+    await expect(page.getByTestId('diagnostic-add')).toHaveCount(0);
+    await expect(page.getByTestId('attachment-input')).toBeVisible();
 
-    await expect(page.getByTestId('diagnostic-list')).toBeVisible();
-    // The form collects a description and an optional note only: the module name
-    // and fault code are no longer asked for.
-    await expect(page.getByTestId('diagnostic-module')).toHaveCount(0);
-    await expect(page.getByTestId('diagnostic-code')).toHaveCount(0);
-    await page.getByTestId('diagnostic-description').fill('System too lean (bank 1)');
-    await page.getByTestId('diagnostic-observation').fill('Bank 1 sensor drift');
-    await page.getByTestId('diagnostic-add').click();
-
-    const entry = page.locator('[data-testid^="diagnostic-"]').filter({ hasText: 'System too lean' }).first();
-    await expect(entry).toBeVisible();
-
-    await entry.locator('[data-testid^="diagnostic-remove-"]').click();
-    await expect(page.locator('[data-testid^="diagnostic-"]').filter({ hasText: 'System too lean' })).toHaveCount(0);
+    await page.getByTestId('remarks-COMPUTER_UNIT').fill('Computer scan examined; no fault entry required.');
+    await page.getByTestId('save-section-COMPUTER_UNIT').click();
+    await expect(page.getByTestId('inspection-submit')).toBeEnabled();
+    await page.reload();
+    await expect(page.getByTestId('remarks-COMPUTER_UNIT')).toHaveValue('Computer scan examined; no fault entry required.');
   });
 
   test('adds an inspection type after creation but before approval', async ({ page }) => {
@@ -459,10 +453,9 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await page.goto(`/automotive/inspections/${id}`);
     await expect(page.getByTestId('inspection-workspace')).toBeVisible();
 
-    // Exactly one session-level notes field: the former second field (final
-    // assessment) is gone, so there is no duplicate surface for the same note.
-    await expect(page.getByTestId('inspection-notes')).toBeVisible();
-    await expect(page.getByTestId('inspection-notes-input')).toHaveCount(1);
+    // Exactly one section-specific notes field; no duplicate global editor.
+    await expect(page.getByTestId('remarks-EXTERIOR')).toHaveCount(1);
+    await expect(page.getByTestId('inspection-notes')).toHaveCount(0);
     await expect(page.getByTestId('final-assessment')).toHaveCount(0);
 
     // Notes are optional: a fully passing inspection submits with the field
@@ -488,13 +481,13 @@ test.describe('Execution Phase 2 — inspection workspace', () => {
     await page.goto(`/automotive/inspections/${id}`);
     await expect(page.getByTestId('inspection-workspace')).toBeVisible();
 
-    await page.getByTestId('inspection-notes-input').fill('Minor stone chips on the front bumper.');
-    await page.getByTestId('save-inspection-notes').click();
-    await expect(page.getByTestId('inspection-notes-input')).toHaveValue('Minor stone chips on the front bumper.');
+    await page.getByTestId('remarks-EXTERIOR').fill('Minor stone chips on the front bumper.');
+    await page.getByTestId('save-sections-group').click();
+    await expect(page.getByTestId('remarks-EXTERIOR')).toHaveValue('Minor stone chips on the front bumper.');
 
-    // Reload from the server: the note is stored, not held in component state.
+    // Reload from the server: the section note is stored, not held in component state.
     await page.reload();
     await expect(page.getByTestId('inspection-workspace')).toBeVisible();
-    await expect(page.getByTestId('inspection-notes-input')).toHaveValue('Minor stone chips on the front bumper.');
+    await expect(page.getByTestId('remarks-EXTERIOR')).toHaveValue('Minor stone chips on the front bumper.');
   });
 });
