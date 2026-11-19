@@ -1,4 +1,5 @@
 import { docStamp, esc, escMultiline, money, moneyPlain, quantity, countryName } from './html.util';
+import { lineAmountMinor } from '@oryx/shared';
 import { oryxLogoMark } from './oryx-logo.asset';
 import { CHROME_CSS, watermarkSizePt } from './chrome';
 import { DOCUMENT_LATIN_STACK } from '../pdf/document-fonts.service';
@@ -388,7 +389,7 @@ function lineTable(
         <td class="of-c-qty num">${esc(quantity(line.quantity))}</td>
         <td class="of-c-price num">${esc(moneyPlain(line.unitPriceMinor, payload.currency))}</td>
         <td class="of-c-tax">${esc(taxLabel(line.taxPercentBp))}</td>
-        <td class="of-c-amt num">${esc(money(line.lineTotalMinor - line.taxMinor, payload.currency, locale))}</td>
+        <td class="of-c-amt num">${esc(money(lineAmountMinor(line.quantity, line.unitPriceMinor), payload.currency, locale))}</td>
       </tr>`;
     })
     .join('');
