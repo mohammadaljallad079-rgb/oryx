@@ -1735,8 +1735,8 @@ export class SalesService {
           where: { companyId, invoiceId, status: 'POSTED' },
           include: { lines: true },
         });
-        const key = (line: { productId: string | null; description: string; unitPriceMinor: number; taxPercentBp: number }) =>
-          JSON.stringify([line.productId, line.description, line.unitPriceMinor, line.taxPercentBp]);
+        const key = (line: { productId: string | null; description: string; unitPriceMinor: number; taxPercentBp?: number | null }) =>
+          JSON.stringify([line.productId, line.description, line.unitPriceMinor, line.taxPercentBp ?? 0]);
         const available = new Map<string, number>();
         for (const line of invoice.lines) {
           const k = key(line);
