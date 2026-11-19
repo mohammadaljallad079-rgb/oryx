@@ -5027,7 +5027,7 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
     display: grid;
     grid-template-areas: "quickbar categories" "catalog cart";
     grid-template-columns: minmax(0, 1fr) clamp(310px, 30vw, 410px);
-    grid-template-rows: minmax(42px, auto) minmax(0, 1fr);
+    grid-template-rows: 38px minmax(0, 1fr);
     height: 100%;
     min-height: 0;
     max-height: 100%;
@@ -5037,8 +5037,8 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   }
   .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__quickbar,
   .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__categories {
-    height: 42px;
-    max-height: 42px;
+    height: 38px;
+    max-height: 38px;
     min-height: 0;
     min-width: 0;
     box-sizing: border-box;
