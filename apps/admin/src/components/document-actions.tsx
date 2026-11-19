@@ -240,6 +240,11 @@ export function DocumentActions({ sourceType, sourceId, type, permissions, autoO
     setError(null);
     try {
       const created = await api.issueFinancialDocument(type, sourceId);
+      // An official PDF is an immutable issued version. Invalidate the old blob
+      // when a new version is issued; otherwise preview/print can keep showing
+      // the previous file even though the reissue succeeded.
+      if (preview) URL.revokeObjectURL(preview);
+      setPreview(null);
       setDocument(created);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : t('common.error'));
@@ -342,7 +347,7 @@ export function DocumentActions({ sourceType, sourceId, type, permissions, autoO
             title={!document.downloadable ? t('documents.notPrintable') : t('documents.preview')}
             aria-label={aria('documents.preview')}
           >
-            <Icon name="scroll" size={14} />
+            <Icon name="eye" size={16} />
             {label('documents.preview')}
           </Button>
           <Button
