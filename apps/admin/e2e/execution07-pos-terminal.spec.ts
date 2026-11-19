@@ -224,6 +224,19 @@ test.describe('Point of sale — card terminal', () => {
     const exactPrice = page.getByTestId(`pos-price-${setup.product.sku}`);
     await exactPrice.fill('28.000');
     await exactPrice.blur();
+
+    // Cart Amount is QTY × UNIT PRICE. A discount must never reduce this
+    // displayed amount; tax belongs exclusively in the totals calculation.
+    const lineAmount = page.getByTestId(`pos-line-amount-${setup.product.sku}`);
+    await expect(lineAmount).toContainText('28.000 BHD');
+    const lineDiscount = page.getByTestId(`pos-discount-${setup.product.sku}`);
+    await lineDiscount.fill('1.000');
+    await expect(lineAmount).toContainText('28.000 BHD');
+    await expect(page.getByTestId(`pos-line-total-${setup.product.sku}`)).toContainText('28.000 BHD');
+    await page.getByTestId(`pos-increment-${setup.product.sku}`).click();
+    await expect(lineAmount).toContainText('56.000 BHD');
+    await page.getByTestId(`pos-decrement-${setup.product.sku}`).click();
+    await lineDiscount.fill('0');
     await expect(page.locator('.oryx-pos__totals')).toContainText('28.000 BHD');
     const total = page.getByTestId('pos-total');
     await expect(total).toBeVisible();
