@@ -330,7 +330,7 @@ function infoPanel(
         payload.paymentMethod === 'CREDIT' && payload.balanceMinor > 0
           ? `<div class="of-field">
                <span class="of-field-label">Payment Status</span>
-               <span class="of-field-value">Unpaid</span>
+               <span class="of-field-value">${payload.paidMinor > 0 ? 'Partially Paid' : 'Unpaid'}</span>
              </div>`
           : ''
       }
