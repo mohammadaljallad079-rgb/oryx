@@ -1650,11 +1650,10 @@ function CartRow({
       setPriceError(true);
     }
   };
-  const lineTotal = computePosTotals(
-    [{ quantity: line.quantity, unitPriceMinor: line.unitPriceMinor,
-       discountAmountMinor: line.discountAmountMinor, taxPercentBp: line.taxPercentBp }],
-    'NONE', currencyScale,
-  ).totalMinor;
+  // Amount is the extended unit price, before any line discount or VAT.
+  // Discounts and tax stay in the checkout totals below the cart, where the
+  // shared POS pricing engine already calculates them correctly.
+  const lineAmountMinor = line.unitPriceMinor * line.quantity;
   const imageUrl = api.resolveImage(line.imageUrl);
   // One fils is a common unconfigured placeholder in BHD catalogue imports.
   const needsPrice = line.unitPriceMinor <= (currencyScale === 3 ? 1 : 0);
@@ -1683,7 +1682,7 @@ function CartRow({
                 data-testid={`pos-increment-${line.sku}`}
                 onClick={() => onChange({ quantity: line.quantity + 1 })}>+</button>
             </div>
-            <strong className="tabular-nums">{money(lineTotal)}</strong>
+            <strong className="tabular-nums" data-testid={`pos-line-amount-${line.sku}`}>{money(lineAmountMinor)}</strong>
           </div>
         </div>
         <Button size="sm" variant="ghost" onClick={() => setExpanded(value => !value)}
@@ -1745,8 +1744,8 @@ function CartRow({
         </span>
       </div>
       <div className="flex items-center justify-between border-t border-[var(--border)] pt-2 text-sm font-bold">
-        <span>{t('erp.sales.total')}</span>
-        <span className="tabular-nums" data-testid={`pos-line-total-${line.sku}`}>{money(lineTotal)}</span>
+        <span>{ar ? 'المبلغ قبل الخصم والضريبة' : 'Amount before discount & tax'}</span>
+        <span className="tabular-nums" data-testid={`pos-line-total-${line.sku}`}>{money(lineAmountMinor)}</span>
       </div>
       </> : null}
     </div>
