@@ -904,9 +904,12 @@ export class DocumentsService {
     const branch = company.branches[0];
     const addressLine = pick(general.addressLine, branch?.addressLine, company.addressLine);
     const city = pick(general.city, branch?.city);
-    const phone = pick(general.phone, company.branding?.supportPhone, branch?.phone);
-    const email = pick(general.email, company.branding?.supportEmail);
-    const websiteUrl = pick(general.website, company.branding?.websiteUrl);
+    // Older company administration screens persist contact values on Company.
+    // Include those fields, otherwise the printed address can appear while
+    // phone/email/website disappear whenever General and Branding are blank.
+    const phone = pick(general.phone, company.phone, company.branding?.supportPhone, branch?.phone);
+    const email = pick(general.email, company.email, company.branding?.supportEmail);
+    const websiteUrl = pick(general.website, company.website, company.branding?.websiteUrl);
     // The registered legal name and the VAT/CR numbers are identity fields, not
     // contact details: they fall back to the company record the seed and the
     // company panel write.
