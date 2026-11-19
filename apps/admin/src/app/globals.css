@@ -4397,7 +4397,14 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   overflow-wrap: anywhere;
 }
 .oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__customer-warehouse {
-  flex: 0 0 auto; min-width: 0; padding: 7px; gap: 6px;
+  flex: 0 0 auto; min-width: 0; max-width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 7px; gap: 6px; overflow-x: hidden;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__customer-warehouse > *,
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__customer-warehouse input,
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__customer-warehouse button {
+  min-width: 0; max-width: 100%;
 }
 .oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__tender {
   flex: 0 1 auto;
