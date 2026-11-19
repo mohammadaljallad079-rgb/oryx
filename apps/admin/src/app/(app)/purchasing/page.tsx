@@ -4,7 +4,7 @@ import { Suspense, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
-import { useAsync } from '@/lib/hooks';
+import { useAsync, useDebounced } from '@/lib/hooks';
 import { minorToInput, money, toMinorInput, toQuantityInput, todayIso } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
 import { DocumentActions } from '@/components/document-actions';
@@ -242,6 +242,50 @@ function SuppliersTab({ canManage }: { canManage: boolean }) {
 }
 
 
+/** Shared searchable filter controls for purchasing registers.
+ * The query is sent to the API, not applied only to the visible page.
+ */
+function PurchasingListFilters({
+  search, onSearch, status, onStatus, statuses,
+}: {
+  search: string;
+  onSearch: (value: string) => void;
+  status: string;
+  onStatus: (value: string) => void;
+  statuses: string[];
+}) {
+  const { t, locale } = useUi();
+  return (
+    <div className="flex flex-wrap items-end gap-3 border-b border-[var(--border)] px-4 py-3"
+      data-testid="purchasing-list-filters">
+      <label className="min-w-[220px] flex-[2]">
+        <span className="oryx-label">{t('common.search')}</span>
+        <input className="oryx-input" type="search" value={search}
+          placeholder={locale === 'ar' ? 'ابحث بالرقم، المورد، الكود، الملاحظات أو الأصناف' : 'Search number, supplier, code, notes or items'}
+          onChange={(event) => onSearch(event.target.value)}
+          data-testid="purchasing-list-search" />
+      </label>
+      <label className="min-w-[155px] flex-1">
+        <span className="oryx-label">{t('common.status')}</span>
+        <select className="oryx-select" value={status}
+          onChange={(event) => onStatus(event.target.value)}
+          data-testid="purchasing-list-status">
+          <option value="">{locale === 'ar' ? 'كل الحالات' : 'All statuses'}</option>
+          {Array.from(new Set([...statuses, ...(status ? [status] : [])]))
+            .filter(Boolean).sort().map((value) => (
+              <option value={value} key={value}>{value}</option>
+            ))}
+        </select>
+      </label>
+      {(search || status) ? (
+        <Button size="sm" variant="ghost" onClick={() => { onSearch(''); onStatus(''); }}>
+          {locale === 'ar' ? 'مسح الفلاتر' : 'Clear filters'}
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- requisitions
 
 function RequisitionsTab({ canManage }: { canManage: boolean }) {
@@ -249,7 +293,10 @@ function RequisitionsTab({ canManage }: { canManage: boolean }) {
   const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
   const { t } = useUi();
   const [open, setOpen] = useState(false);
-  const list = useAsync(() => api.requisitions(), []);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const debouncedSearch = useDebounced(search, 300);
+  const list = useAsync(() => api.requisitions({ search: debouncedSearch || undefined, status: status || undefined }), [debouncedSearch, status]);
   const suppliers = useAsync(() => api.suppliers(), []);
   const products = useAsync(() => api.products(), []);
 
@@ -264,6 +311,10 @@ function RequisitionsTab({ canManage }: { canManage: boolean }) {
           </Button>
         ) : null}
       </div>
+      <PurchasingListFilters
+        search={search} onSearch={setSearch} status={status} onStatus={setStatus}
+        statuses={(list.data?.items ?? []).map((item) => item.status)}
+      />
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
       {list.loading ? <div className="p-4"><Skeleton height={120} /></div> : (list.data?.items.length ?? 0) === 0 ? (
         <EmptyState title={t('common.empty')} hint={t('erp.purchasing.emptyRequisitions')} />
@@ -431,7 +482,10 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
   const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
   const { t } = useUi();
   const [open, setOpen] = useState(false);
-  const list = useAsync(() => api.purchaseOrders(), []);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const debouncedSearch = useDebounced(search, 300);
+  const list = useAsync(() => api.purchaseOrders({ search: debouncedSearch || undefined, status: status || undefined }), [debouncedSearch, status]);
   const suppliers = useAsync(() => api.suppliers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
@@ -447,6 +501,10 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
           </Button>
         ) : null}
       </div>
+      <PurchasingListFilters
+        search={search} onSearch={setSearch} status={status} onStatus={setStatus}
+        statuses={(list.data?.items ?? []).map((item) => item.status)}
+      />
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
       {list.loading ? <div className="p-4"><Skeleton height={120} /></div> : (list.data?.items.length ?? 0) === 0 ? (
         <EmptyState title={t('common.empty')} hint={t('erp.purchasing.emptyOrders')} />
@@ -689,7 +747,10 @@ function PurchaseOrderModal({
 
 function ReceiptsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
-  const list = useAsync(() => api.goodsReceipts(), []);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const debouncedSearch = useDebounced(search, 300);
+  const list = useAsync(() => api.goodsReceipts({ search: debouncedSearch || undefined, status: status || undefined }), [debouncedSearch, status]);
   const orders = useAsync(() => api.purchaseOrders({ status: 'APPROVED' }), []);
 
   return (
@@ -713,6 +774,10 @@ function ReceiptsTab({ canManage }: { canManage: boolean }) {
           </Button>
         ) : null}
       </div>
+      <PurchasingListFilters
+        search={search} onSearch={setSearch} status={status} onStatus={setStatus}
+        statuses={(list.data?.items ?? []).map((item) => item.status)}
+      />
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
       {list.loading ? <div className="p-4"><Skeleton height={120} /></div> : (list.data?.items.length ?? 0) === 0 ? (
         <EmptyState title={t('common.empty')} hint={t('erp.purchasing.emptyReceipts')} />
@@ -751,7 +816,10 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
   const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
   const { t } = useUi();
   const [open, setOpen] = useState(false);
-  const list = useAsync(() => api.supplierInvoices(), []);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const debouncedSearch = useDebounced(search, 300);
+  const list = useAsync(() => api.supplierInvoices({ search: debouncedSearch || undefined, status: status || undefined }), [debouncedSearch, status]);
   const suppliers = useAsync(() => api.suppliers(), []);
   const products = useAsync(() => api.products(), []);
   const branches = useAsync(() => (companyId ? api.listBranches(companyId, { pageSize: 100 }) : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 100 })), [companyId]);
@@ -768,6 +836,10 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
           </Button>
         ) : null}
       </div>
+      <PurchasingListFilters
+        search={search} onSearch={setSearch} status={status} onStatus={setStatus}
+        statuses={(list.data?.items ?? []).map((item) => item.status)}
+      />
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
       {list.loading ? <div className="p-4"><Skeleton height={120} /></div> : (list.data?.items.length ?? 0) === 0 ? (
         <EmptyState title={t('common.empty')} hint={t('erp.purchasing.emptyInvoices')} />
@@ -978,7 +1050,10 @@ function ReturnsTab({ canManage }: { canManage: boolean }) {
   const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
   const { t } = useUi();
   const [open, setOpen] = useState(false);
-  const list = useAsync(() => api.purchaseReturns(), []);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const debouncedSearch = useDebounced(search, 300);
+  const list = useAsync(() => api.purchaseReturns({ search: debouncedSearch || undefined, status: status || undefined }), [debouncedSearch, status]);
   const suppliers = useAsync(() => api.suppliers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
@@ -994,6 +1069,10 @@ function ReturnsTab({ canManage }: { canManage: boolean }) {
           </Button>
         ) : null}
       </div>
+      <PurchasingListFilters
+        search={search} onSearch={setSearch} status={status} onStatus={setStatus}
+        statuses={(list.data?.items ?? []).map((item) => item.status)}
+      />
       {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
       {list.loading ? <div className="p-4"><Skeleton height={120} /></div> : (list.data?.items.length ?? 0) === 0 ? (
         <EmptyState title={t('common.empty')} hint={t('erp.purchasing.emptyReturns')} />
