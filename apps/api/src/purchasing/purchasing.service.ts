@@ -450,7 +450,20 @@ export class PurchasingService {
   async listReceipts(query: ListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const rows = await this.prisma.goodsReceipt.findMany({
-      where: { companyId },
+      where: {
+        companyId,
+        ...(query.status ? { status: query.status as never } : {}),
+        ...(query.search ? { OR: [
+          { receiptNumber: { contains: query.search, mode: 'insensitive' as const } },
+          { notes: { contains: query.search, mode: 'insensitive' as const } },
+          { supplier: { is: { OR: [
+            { nameEn: { contains: query.search, mode: 'insensitive' as const } },
+            { nameAr: { contains: query.search } },
+            { code: { contains: query.search, mode: 'insensitive' as const } },
+          ] } } },
+          { lines: { some: { description: { contains: query.search, mode: 'insensitive' as const } } } },
+        ] } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       take: 200,
       include: { lines: true, supplier: { select: { nameEn: true, nameAr: true } } },
@@ -778,7 +791,20 @@ export class PurchasingService {
   async listReturns(query: ListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const rows = await this.prisma.purchaseReturn.findMany({
-      where: { companyId },
+      where: {
+        companyId,
+        ...(query.status ? { status: query.status as never } : {}),
+        ...(query.search ? { OR: [
+          { returnNumber: { contains: query.search, mode: 'insensitive' as const } },
+          { reason: { contains: query.search, mode: 'insensitive' as const } },
+          { supplier: { is: { OR: [
+            { nameEn: { contains: query.search, mode: 'insensitive' as const } },
+            { nameAr: { contains: query.search } },
+            { code: { contains: query.search, mode: 'insensitive' as const } },
+          ] } } },
+          { lines: { some: { description: { contains: query.search, mode: 'insensitive' as const } } } },
+        ] } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       take: 200,
       include: { lines: true, supplier: { select: { nameEn: true, nameAr: true } } },
