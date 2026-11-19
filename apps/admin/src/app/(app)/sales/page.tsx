@@ -231,7 +231,7 @@ function SalesInner() {
 
       {tab === 'dashboard' ? <ModuleDashboard moduleKey="sales_pos" /> : null}
       {tab === 'invoices' ? <InvoicesTab canManage={can('erp.sales.invoice.manage')} /> : null}
-      {tab === 'quotations' ? <QuotationsTab canManage={can('erp.sales.order.manage')} /> : null}
+      {tab === 'quotations' ? <QuotationsTab canManage={can('erp.sales.order.manage')} canConvertToInvoice={can('erp.sales.invoice.manage')} onConverted={() => setTab('invoices')} /> : null}
       {tab === 'returns' ? <CreditNotesTab canManage={can('erp.sales.credit_note.manage')} /> : null}
       {tab === 'pos' ? <PosTab canOperate={can('erp.sales.pos.operate')} canManage={can('erp.sales.pos.manage')} /> : null}
     </div>
@@ -454,7 +454,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
 
 // ---------------------------------------------------------------- quotations
 
-function QuotationsTab({ canManage }: { canManage: boolean }) {
+function QuotationsTab({ canManage, canConvertToInvoice, onConverted }: { canManage: boolean; canConvertToInvoice: boolean; onConverted: () => void }) {
   const { t } = useUi();
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
@@ -508,12 +508,13 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
                       type="QUOTATION"
                       permissions={['erp.sales.read', 'erp.accounting.read']}
                     />
-                    {canManage && q.status !== 'CONVERTED' ? (
+                    {canManage && canConvertToInvoice && q.status !== 'CONVERTED' ? (
                       <Button
                         size="sm"
                         onClick={async () => {
-                          await api.convertQuotation(q.id, warehouses.data?.items[0]?.id);
+                          await api.convertQuotationToDraftInvoice(q.id, warehouses.data?.items[0]?.id);
                           await list.reload();
+                          onConverted();
                         }}
                         data-testid={`convert-quotation-${q.quoteNumber}`}
                       >
