@@ -1014,6 +1014,9 @@ export interface CustomerDetailDto extends CustomerDto {
 }
 
 export interface SupplierDto {
+  kind: 'INDIVIDUAL' | 'COMPANY';
+  contactPerson: string | null;
+  idNumber: string | null;
   id: string;
   code: string;
   nameEn: string;
