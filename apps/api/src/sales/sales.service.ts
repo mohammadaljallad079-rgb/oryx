@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { fromQuantity, sumMinor, withDefaults, type RoundingMode } from '@oryx/shared';
+import { fromQuantity, lineAmountMinor, sumMinor, withDefaults, type RoundingMode } from '@oryx/shared';
 import type { PaymentMethod } from '@oryx/database';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
@@ -945,7 +945,7 @@ export class SalesService {
           createdById: actor.userId,
           lines: {
             create: quote.lines.map((line) => {
-              const subtotal = Math.round(line.quantity * line.unitPriceMinor / 10000);
+              const subtotal = lineAmountMinor(line.quantity, line.unitPriceMinor);
               const net = subtotal - line.discountMinor;
               return {
                 productId: line.productId,
