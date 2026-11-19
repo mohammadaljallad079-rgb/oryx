@@ -699,7 +699,7 @@ describe('ORYX ERP core (e2e)', () => {
       expect(issued.body.outstandingMinor).toBe(0);
       const receipts = await ctx.prisma.payment.findMany({
         where: { companyId: tenantId, idempotencyKey: `auto-sales-invoice:${issued.body.id}` },
-        include: { allocations: true, journalEntry: true },
+        include: { allocations: true },
       });
       expect(receipts).toHaveLength(1);
       expect(receipts[0]!.allocations).toEqual([
