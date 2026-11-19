@@ -615,6 +615,8 @@ describe('ORYX ERP core (e2e)', () => {
           body: {
             customerId,
             invoiceDate: '2026-05-02',
+            paymentMethod: 'CREDIT',
+            dueDate: '2026-06-02',
             warehouseId,
             lines: [{ productId, description: 'Widget', quantity: 10000, unitPriceMinor: 10000, taxPercentBp: 1500 }],
           },
@@ -677,6 +679,38 @@ describe('ORYX ERP core (e2e)', () => {
       expect(res.body.code).toBe('erp.over_allocation');
     });
 
+    it('automatically settles a non-credit sales invoice and records the receipt once', async () => {
+      const issued = await erp<{
+        id: string; status: string; totalMinor: number;
+        amountPaidMinor: number; outstandingMinor: number;
+      }>('/sales/invoices', {
+        method: 'POST',
+        body: {
+          customerId,
+          invoiceDate: '2026-05-04',
+          paymentMethod: 'CASH',
+          issueStock: false,
+          lines: [{ description: 'Paid service', quantity: 10000, unitPriceMinor: 10000, taxPercentBp: 1000 }],
+        },
+      });
+      expect(issued.status).toBe(201);
+      expect(issued.body.status).toBe('PAID');
+      expect(issued.body.amountPaidMinor).toBe(issued.body.totalMinor);
+      expect(issued.body.outstandingMinor).toBe(0);
+      const receipts = await ctx.prisma.payment.findMany({
+        where: { companyId: tenantId, idempotencyKey: `auto-sales-invoice:${issued.body.id}` },
+        include: { allocations: true },
+      });
+      expect(receipts).toHaveLength(1);
+      expect(receipts[0]!.allocations).toEqual([
+        expect.objectContaining({
+          salesInvoiceId: issued.body.id,
+          amountMinor: issued.body.totalMinor,
+        }),
+      ]);
+      expect(receipts[0]!.journalEntryId).toBeTruthy();
+    });
+
     it('issues a credit note that reverses revenue and restocks the goods', async () => {
       const before = await ctx.prisma.stockLevel.findUniqueOrThrow({
         where: { warehouseId_productId: { warehouseId, productId } },
@@ -712,6 +746,8 @@ describe('ORYX ERP core (e2e)', () => {
         body: {
           customerId: tight.body.id,
           invoiceDate: '2026-05-06',
+          paymentMethod: 'CREDIT',
+          dueDate: '2026-06-06',
           warehouseId,
           issueStock: false,
           lines: [{ description: 'Service', quantity: 10000, unitPriceMinor: 100000, taxPercentBp: 0 }],
@@ -741,6 +777,7 @@ describe('ORYX ERP core (e2e)', () => {
           customerId: openCustomerId,
           invoiceDate: '2026-01-05',
           dueDate: '2026-02-05',
+          paymentMethod: 'CREDIT',
           warehouseId,
           issueStock: false,
           lines: [{ description: 'Consulting', quantity: 10000, unitPriceMinor: 50000, taxPercentBp: 0 }],

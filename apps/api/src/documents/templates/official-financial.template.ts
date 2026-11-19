@@ -192,8 +192,8 @@ export function identityBand(issuer: DocumentIssuer): string {
   <div class="of-band">
     <div class="of-band-lead">${logo}</div>
     <div class="of-band-trail">
-      <div class="of-tag-ar">خبراء فحص المركبات</div>
-      <div class="of-tag-en">VEHICLE INSPECTION EXPERTS</div>
+      <div class="of-tag-ar" lang="ar" dir="rtl">خبراء فحص المركبات</div>
+      <div class="of-tag-en" lang="en" dir="ltr">VEHICLE INSPECTION EXPERTS</div>
     </div>
     <div class="of-badge" aria-hidden="true">
       <svg width="22" height="22" viewBox="0 0 24 24">
@@ -258,8 +258,8 @@ function titleBlock(payload: FinancialDocumentPayload): string {
   const title = documentTitle(payload);
   return `
   <div class="of-title">
-    <div class="of-title-ar">${esc(title.ar)}</div>
-    <div class="of-title-en">${esc(title.en)}</div>
+    <div class="of-title-ar" lang="ar" dir="rtl">${esc(title.ar)}</div>
+    <div class="of-title-en" lang="en" dir="ltr">${esc(title.en)}</div>
   </div>`;
 }
 
@@ -326,6 +326,14 @@ function infoPanel(
                </div>`
             : ''
       }
+      ${
+        payload.paymentMethod === 'CREDIT' && payload.balanceMinor > 0
+          ? `<div class="of-field">
+               <span class="of-field-label">Payment Status</span>
+               <span class="of-field-value">${payload.paidMinor > 0 ? 'Partially Paid' : 'Unpaid'}</span>
+             </div>`
+          : ''
+      }
     </div>
     <div class="of-panel-right">
       <div class="of-cp-row">
@@ -370,7 +378,7 @@ function lineTable(
         <td class="of-c-qty num">${esc(quantity(line.quantity))}</td>
         <td class="of-c-price num">${esc(moneyPlain(line.unitPriceMinor, payload.currency))}</td>
         <td class="of-c-tax">${esc(taxLabel(line.taxPercentBp))}</td>
-        <td class="of-c-amt num">${esc(money(line.lineTotalMinor, payload.currency, locale))}</td>
+        <td class="of-c-amt num">${esc(money(line.lineTotalMinor - line.taxMinor, payload.currency, locale))}</td>
       </tr>`;
     })
     .join('');
@@ -419,10 +427,9 @@ function totalsBlock(payload: FinancialDocumentPayload, locale: 'ar' | 'en'): st
     rows.push(['Rounding', money(payload.roundingMinor, payload.currency, locale)]);
   }
   rows.push(['Total', money(payload.totalMinor, payload.currency, locale)]);
-  if (payload.paidMinor) {
-    rows.push(['Paid', money(payload.paidMinor, payload.currency, locale)]);
-    rows.push(['Balance Due', money(payload.balanceMinor, payload.currency, locale)]);
-  }
+  // The financial document shows the amount before VAT, VAT, the fixed
+  // currency discount and the final total. Paid/Balance Due belong in the
+  // payment ledger, not as duplicate totals on a settled invoice.
   return `
   <table class="of-totals">
     ${rows
@@ -554,12 +561,12 @@ export const OFFICIAL_FINANCIAL_CSS = `
   .of-logo{ height:44.5pt; width:auto; }
   .of-wordmark-ar{ font-size:14.5pt; font-weight:700; color:#0a1f44; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
   .of-wordmark-en{ font-size:14.2pt; font-weight:700; color:#0a1f44; letter-spacing:.5px; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
-  .of-tag-ar{ font-size:11.8pt; font-weight:700; color:#102749; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
+  .of-tag-ar{ font-size:11.8pt; font-weight:700; color:#102749; direction:rtl; unicode-bidi:isolate; font-family:'ORYX Arabic','ORYX Sans',Arial,sans-serif; }
   .of-tag-en{ font-size:7.9pt; font-weight:700; color:#102749; letter-spacing:0; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
   .of-title{ text-align:center; margin-top:15.3pt; }
   /* The reference sets the title and the document number in the brand display
      face (Codec Pro Bold); the Latin labels and figures stay in Verdana. */
-  .of-title-ar{ font-size:12.3pt; font-weight:700; color:#0f2b48; line-height:1.15; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
+  .of-title-ar{ font-size:12.3pt; font-weight:700; color:#0f2b48; line-height:1.35; direction:rtl; unicode-bidi:isolate; font-family:'ORYX Arabic','ORYX Sans',Arial,sans-serif; }
   .of-title-en{ font-size:12.3pt; font-weight:700; color:#0f2b48; letter-spacing:.6px; line-height:1.15; font-family:'ORYX Display','ORYX Arabic','ORYX Sans',sans-serif; }
   /* The reference navy strip is 16.5pt tall (measured y 108.5-125.0) around one
      8.8pt line, so its vertical padding is ~3.85pt, not the 2pt a bare line box

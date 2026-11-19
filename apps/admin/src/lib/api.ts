@@ -1119,7 +1119,12 @@ export const api = {
       cache: 'no-store',
     });
     if (!res.ok) throw new ApiError(res.status, 'report_pdf_failed', 'The report PDF could not be generated.');
-    return URL.createObjectURL(await res.blob());
+    const blob = await res.blob();
+    // Reject JSON/HTML error responses masquerading as successful PDFs.
+    if ((await blob.slice(0, 5).text()) !== '%PDF-') {
+      throw new ApiError(502, 'invalid_report_pdf', 'The server did not return a valid PDF.');
+    }
+    return URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
   },
   /** Download one catalogue report as a print-ready PDF file. */
   downloadReportPdf: async (kind: string, params: Record<string, unknown> = {}): Promise<void> => {
@@ -1136,12 +1141,19 @@ export const api = {
       cache: 'no-store',
     });
     if (!res.ok) throw new ApiError(res.status, 'report_pdf_failed', 'The report PDF could not be generated.');
-    const url = URL.createObjectURL(await res.blob());
+    const blob = await res.blob();
+    if ((await blob.slice(0, 5).text()) !== '%PDF-') {
+      throw new ApiError(502, 'invalid_report_pdf', 'The server did not return a valid PDF.');
+    }
+    const url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = `oryx-report-${kind}-${new Date().toISOString().slice(0, 10)}.pdf`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    // A synchronous revoke can invalidate a download before the browser reads it.
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
   },
   /** Download one catalogue report as CSV. */
   downloadReportCsv: async (kind: string, params: Record<string, unknown> = {}): Promise<void> => {
