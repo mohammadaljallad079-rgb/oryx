@@ -397,7 +397,7 @@ export function footerTemplate(chrome: DocumentFooterInput): string {
   <div style="display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid #9aa4b2;padding-top:4px;">
     <span>${esc(issuer.nameEn)}${issuer.code ? ` · ${esc(issuer.code)}` : ''}</span>
     <span style="font-weight:700;color:#0F2B48;">${esc(chrome.documentNumber)}</span>
-    <span><span class="pageNumber"></span> / <span class="totalPages"></span></span>
+    <span style="direction:ltr;unicode-bidi:isolate;position:relative;top:2px;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
   </div>
   ${meta ? `<div style="margin-top:2px;text-align:center;font-size:7px;">${esc(meta)}</div>` : ''}
 </div>`;
