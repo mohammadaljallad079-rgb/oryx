@@ -145,8 +145,13 @@ test.describe('print preview and document attachments', () => {
     await page.getByTestId('accounting-tab-payments').click();
     await expect(page.getByTestId(`payment-row-${receiptNumber}`)).toBeVisible({ timeout: 20_000 });
     const issue = page.getByTestId(`doc-issue-${receiptId}`);
-    if (await issue.isVisible()) await issue.click();
     const preview = page.getByTestId(`doc-preview-${receiptId}`);
+    // The document lookup loads asynchronously. Wait for either available action
+    // before deciding whether a new official receipt needs issuing.
+    await expect(issue.or(preview).first()).toBeVisible({ timeout: 20_000 });
+    if (await issue.isVisible()) {
+      await issue.click();
+    }
     await expect(preview).toBeEnabled({ timeout: 20_000 });
     await preview.click();
     await expect(page.getByTestId(`doc-frame-${receiptId}`)).toBeVisible({ timeout: 20_000 });
