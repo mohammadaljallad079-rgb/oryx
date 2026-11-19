@@ -467,6 +467,7 @@ function QuotationsTab({ canManage, canConvertToInvoice, onConverted }: { canMan
   const { t, locale } = useUi();
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
   const [filters, setFilters] = useState<SalesRegisterFilterValues>({ ...EMPTY_SALES_REGISTER_FILTERS });
   const list = useAsync(() => api.quotations({ page: 1, ...salesFilterQuery(filters) }), [filters]);
   const customers = useAsync(() => api.salesCustomers(), []);
@@ -521,6 +522,11 @@ function QuotationsTab({ canManage, canConvertToInvoice, onConverted }: { canMan
                 <td><StatusBadge status={q.status} label={q.status} /></td>
                 <td>
                   <div className="flex flex-wrap items-center justify-end gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => setDetail(q)}
+                      data-testid={`quotation-details-${q.quoteNumber}`}
+                      title={t('common.details')} aria-label={t('common.details')}>
+                      <Icon name="list" size={15} />
+                    </Button>
                     <DocumentActions
                       sourceType="Quotation"
                       sourceId={q.id}
@@ -548,6 +554,20 @@ function QuotationsTab({ canManage, canConvertToInvoice, onConverted }: { canMan
           </tbody>
         </TableShell>
       )}
+      <Modal open={detail !== null}
+        title={`${t('erp.sales.quoteNumber')} ${detail?.quoteNumber ?? ''}`}
+        onClose={() => setDetail(null)}>
+        {detail ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[13px] font-semibold">{detail.customerNameEn || detail.customerNameAr}</span>
+              <DocumentActions sourceType="Quotation" sourceId={detail.id} type="QUOTATION"
+                permissions={['erp.sales.read', 'erp.accounting.read']} iconsOnly />
+            </div>
+            <InvoiceLineBreakdown document={detail} />
+          </div>
+        ) : null}
+      </Modal>
       <DocumentModal
         open={open}
         title={t('erp.sales.newQuotation')}
