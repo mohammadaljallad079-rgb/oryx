@@ -285,23 +285,21 @@ function contactRow(issuer: DocumentIssuer): string {
   const address = [issuer.addressLine, issuer.city].filter(Boolean).join(' - ');
   const registration = issuer.crNumber ? `CR ${esc(issuer.crNumber)}` : '';
   const addressLine = [address, registration].filter(Boolean).join(' | ');
-  // Keep every contact field readable instead of clipping it with ellipsis.
-  // An A4 footer has room for the 40pt signature band plus two compact rows in
-  // the reserved 28mm margin. Long text wraps inside its assigned column.
-  const contact = 'font-size:6.5pt;font-weight:700;color:#334155;line-height:1.15;overflow-wrap:anywhere;word-break:break-word;';
-  const item = (html: string) =>
-    html
-      ? `<span dir="ltr" style="${contact}display:inline-flex;align-items:center;gap:2pt;min-width:0;">${html}</span>`
-      : '';
+  // Page numbering occupies its own fixed left cell. Contact details form a
+  // single right-aligned group; their positions cannot collapse beside Page 1.
+  // Use text-wrapping spans rather than inline-flex around the icons, which
+  // previously made the phone appear immediately next to the page counter.
+  const contact = 'display:inline-block;min-width:0;font-size:6.5pt;font-weight:700;color:#334155;line-height:1.15;overflow-wrap:anywhere;word-break:break-word;text-align:right;';
+  const item = (html: string, key: string) =>
+    html ? `<span data-contact="${key}" dir="ltr" style="${contact}">${html}</span>` : '';
   return `
   <div style="border-top:0.75px solid #94a3b8;margin:2pt 13.3mm 0 13.3mm;"></div>
-  <div style="padding:2pt 13.3mm 0;display:flex;align-items:center;gap:7pt;font-size:6.5pt;line-height:1.15;">
-    <span lang="en" dir="ltr" style="flex:0 0 auto;direction:ltr;unicode-bidi:isolate;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
-    <span dir="ltr" style="flex:1 1 auto;min-width:0;display:flex;gap:5pt;justify-content:flex-end;align-items:center;">
-      ${item(phone)}${item(email)}
+  <div style="padding:2pt 13.3mm 0;display:flex;align-items:flex-start;justify-content:space-between;gap:14pt;font-size:6.5pt;line-height:1.15;width:100%;box-sizing:border-box;">
+    <span lang="en" dir="ltr" style="flex:0 0 auto;white-space:nowrap;direction:ltr;unicode-bidi:isolate;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+    <span data-contact-group="right" dir="ltr" style="flex:1 1 auto;min-width:0;display:flex;justify-content:flex-end;align-items:flex-start;flex-wrap:wrap;column-gap:12pt;row-gap:1pt;text-align:right;">
+      ${item(phone, 'phone')}${item(email, 'email')}${item(website, 'website')}
     </span>
   </div>
-  ${website ? `<div dir="ltr" style="padding:0 13.3mm;text-align:right;font-size:6.5pt;line-height:1.15;font-weight:700;color:#334155;overflow-wrap:anywhere;">${website}</div>` : ''}
   ${
     addressLine
       ? `<div dir="ltr" style="padding:2pt 13.3mm 0;text-align:right;font-size:6.5pt;line-height:1.15;font-weight:600;color:#475569;overflow-wrap:anywhere;">${esc(addressLine)}</div>`
