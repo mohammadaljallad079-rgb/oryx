@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { AgingRowDto, ReportColumn, ReportDefinition, ReportResultDto } from '@oryx/shared';
 import { api } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
@@ -46,6 +46,7 @@ export default function ReportsPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [previewKind, setPreviewKind] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [legacyTab, setLegacyTab] = useState<LegacyTab>('sales');
 
   const params = useMemo(() => ({ from: from || undefined, to: to || undefined }), [from, to]);
@@ -115,9 +116,12 @@ export default function ReportsPage() {
   };
 
   const downloadPdf = async (kind: string) => {
+    setExportError(null);
     setBusy(`pdf-${kind}`);
     try {
       await api.downloadReportPdf(kind, params);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Report PDF download failed.');
     } finally {
       setBusy(null);
     }
@@ -406,11 +410,12 @@ export default function ReportsPage() {
       {/* The operational summaries, preserved from the ERP core. */}
       <LegacySummaries tab={legacyTab} setTab={setLegacyTab} from={from} to={to} />
 
+      {exportError ? <ErrorBanner message={exportError} onRetry={() => setExportError(null)} /> : null}
       <ReportPreviewModal
         kind={previewKind}
         params={params}
         onClose={() => setPreviewKind(null)}
-        title={activeDefinition ? (locale === 'ar' ? activeDefinition.titleAr : activeDefinition.titleEn) : ''}
+        title={(() => { const preview = definitions.find((definition) => definition.kind === previewKind); return preview ? (locale === 'ar' ? preview.titleAr : preview.titleEn) : ''; })()}
       />
     </div>
   );
@@ -498,6 +503,13 @@ function ReportPreviewModal({
     () => (kind ? api.reportPdfBlobUrl(kind, params) : Promise.resolve(null)),
     [kind, params.from, params.to],
   );
+  // Every preview owns a browser object URL; release the previous PDF on change/unmount.
+  useEffect(() => {
+    const pdfUrl = url.data;
+    return () => {
+      if (pdfUrl?.startsWith('blob:')) URL.revokeObjectURL(pdfUrl);
+    };
+  }, [url.data]);
 
   return (
     <Modal
