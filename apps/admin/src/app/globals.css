@@ -4614,3 +4614,129 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* V5 is a deliberately new POS header, not the old premium/banner shell. */
+.oryx-modal--pos .oryx-pos--new-cashier {
+  display: grid;
+  grid-template-areas: "quickbar quickbar" "categories categories" "catalog cart";
+  grid-template-columns: minmax(0, 1fr) clamp(320px, 29vw, 390px);
+  grid-template-rows: minmax(0, auto) auto minmax(0, 1fr);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  align-content: stretch;
+  overflow: hidden;
+  direction: rtl;
+}
+.oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__quickbar {
+  grid-area: quickbar;
+  display: flex;
+  min-width: 0;
+  min-height: 54px;
+  max-height: 70px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 13px;
+  border: 1px solid var(--pos-line);
+  border-radius: 12px;
+  background: var(--pos-panel);
+}
+.oryx-pos__quickbar-heading {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+.oryx-pos__quickbar-heading > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+.oryx-pos__quickbar-heading strong { font-size: 16px; line-height: 1.2; }
+.oryx-pos__quickbar-heading span:not(.oryx-pos__quickbar-mark) {
+  color: var(--pos-soft); font-size: 11px;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.oryx-pos__quickbar-mark {
+  flex: 0 0 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #061a30;
+}
+.oryx-pos__quickbar-session {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--pos-soft);
+}
+.oryx-pos__quickbar-session b { color: var(--pos-ink); }
+.oryx-pos__quickbar-live {
+  display: block; flex: 0 0 7px; width: 7px; height: 7px;
+  border-radius: 50%; background: #22c55e;
+}
+.oryx-pos__quickbar-summary {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 12px;
+  min-width: 0;
+  font-size: 12px;
+}
+.oryx-pos__quickbar-summary b { font-size: 14px; }
+.oryx-pos__quickbar-summary > strong {
+  font-size: 17px; color: var(--accent); white-space: nowrap;
+}
+.oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__catalog,
+.oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__rail {
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+}
+.oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__categories {
+  min-height: 40px; max-height: 50px; overflow-x: auto;
+}
+@media (max-width: 980px) {
+  .oryx-modal--pos .oryx-pos--new-cashier {
+    grid-template-columns: minmax(0, 1fr) 315px;
+  }
+  .oryx-pos__quickbar-session { display: none; }
+}
+@media (max-width: 720px) {
+  .oryx-modal--pos:has(.oryx-pos--new-cashier) > div:nth-child(2) {
+    overflow-y: auto;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__quickbar {
+    flex: 0 0 auto; width: 100%; max-height: none; flex-wrap: wrap;
+  }
+  .oryx-pos__quickbar-summary { flex-wrap: wrap; }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__categories {
+    flex: 0 0 auto; width: 100%;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__catalog {
+    flex: 0 0 auto; height: auto; min-height: 420px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__rail {
+    flex: 0 0 auto; height: auto; min-height: 440px;
+  }
+}
