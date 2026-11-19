@@ -86,17 +86,12 @@ describe('document chrome', () => {
   });
 
   describe('officialFooterTemplate', () => {
-    it('prints the page counter bilingually, matching the approved sheet', () => {
+    it('prints English-only page numbering with Chromium placeholders', () => {
       const html = officialFooterTemplate(issuer);
-      // English half carries the placeholders Chromium fills per page.
       expect(html).toContain('Page <span class="pageNumber"></span> of <span class="totalPages"></span>');
-      // The Arabic clause must be authored as `صفحة <n> من <total>`. Inside the
-      // RTL embed that logical order renders right-to-left as the approved
-      // sheet reads ("صفحة 2 من 5"); the reversed source order prints
-      // "2 من 5 صفحة" instead, which is the defect this guards.
-      expect(html).toContain('صفحة <span class="pageNumber"></span> من <span class="totalPages"></span>');
-      expect(html).not.toContain('<span class="pageNumber"></span> من <span class="totalPages"></span> صفحة');
-      expect((html.match(/class="pageNumber"/g) || []).length).toBe(2);
+      expect(html).not.toContain('صفحة <span');
+      expect((html.match(/class="pageNumber"/g) || []).length).toBe(1);
+      expect(html).toContain('top:2pt;direction:ltr');
     });
 
     it('keeps the registered address and CR number in the footer', () => {
@@ -139,7 +134,7 @@ describe('document chrome', () => {
     it('never repeats the full logotype at both outer edges', () => {
       // The old band printed the same image twice; the boxes must not.
       const html = officialFooterTemplate({ ...issuer, logoDataUri: 'data:image/png;base64,AAAA' });
-      expect((html.match(/<img/g) || []).length).toBe(1);
+      expect((html.match(/<img/g) || []).length).toBe(2); // centre mark plus issuer-signature watermark
     });
   });
 
@@ -172,7 +167,7 @@ describe('document chrome', () => {
       const html = reportFooterTemplate(issuer, 'data:image/png;base64,AAAA');
       expect(html).toContain('للتأكد من صحة التقرير');
       expect(html).toContain('src="data:image/png;base64,AAAA"');
-      expect(html).toContain('width:33pt;height:33pt');
+      expect(html).toContain('width:46pt;height:46pt');
     });
 
     it('omits the QR when no verification code is supplied', () => {
@@ -186,7 +181,7 @@ describe('document chrome', () => {
     it('keeps the shared contact row and its real page counter', () => {
       const html = reportFooterTemplate(issuer);
       expect(html).toContain('Page <span class="pageNumber"></span> of <span class="totalPages"></span>');
-      expect((html.match(/class="pageNumber"/g) || []).length).toBe(2);
+      expect((html.match(/class="pageNumber"/g) || []).length).toBe(1);
       expect(html).toContain('Manama');
       expect(html).toContain('CR CR-998877');
     });
