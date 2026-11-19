@@ -1673,9 +1673,46 @@ export class SalesService {
       let invoiceId: string | null = dto.invoiceId ?? null;
       let warehouseId = dto.warehouseId ?? null;
       if (invoiceId) {
-        const invoice = await tx.salesInvoice.findFirst({ where: { id: invoiceId, companyId } });
+        const invoice = await tx.salesInvoice.findFirst({
+          where: { id: invoiceId, companyId }, include: { lines: true },
+        });
         if (!invoice) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Sales invoice not found.');
-        warehouseId = warehouseId ?? invoice.warehouseId;
+        if (invoice.customerId !== dto.customerId || invoice.status === 'DRAFT') {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Select a posted invoice belonging to the selected customer.');
+        }
+        if (dto.currency && dto.currency !== invoice.currency) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Return currency must match the original invoice.');
+        }
+        // Acquire a row lock by updating the parent invoice within the same
+        // transaction. Concurrent returns for one invoice then serialize before
+        // checking historical quantities, preventing double refunds.
+        await tx.salesInvoice.update({ where: { id: invoice.id }, data: { updatedAt: new Date() } });
+        const priorReturns = await tx.creditNote.findMany({
+          where: { companyId, invoiceId, status: 'POSTED' },
+          include: { lines: true },
+        });
+        const key = (line: { productId: string | null; description: string; unitPriceMinor: number; taxPercentBp: number }) =>
+          JSON.stringify([line.productId, line.description, line.unitPriceMinor, line.taxPercentBp]);
+        const available = new Map<string, number>();
+        for (const line of invoice.lines) {
+          const k = key(line);
+          available.set(k, (available.get(k) ?? 0) + line.quantity);
+        }
+        for (const previous of priorReturns) {
+          for (const line of previous.lines) {
+            const k = key(line);
+            available.set(k, (available.get(k) ?? 0) - line.quantity);
+          }
+        }
+        for (const line of dto.lines) {
+          const k = key({ ...line, productId: line.productId ?? null });
+          const remaining = available.get(k) ?? 0;
+          if (remaining < line.quantity || line.quantity <= 0) {
+            throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Return exceeds the remaining quantity or differs from the original invoice price/tax.');
+          }
+          available.set(k, remaining - line.quantity);
+        }
+        warehouseId = invoice.warehouseId;
       }
 
       const rounding = await this.context.companyRoundingMode(companyId, tx);
@@ -1735,7 +1772,8 @@ export class SalesService {
           ? await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.ROUNDING_GAIN_LOSS)
           : null;
       const journalLines = [
-        { accountId: revenueAccount, debit: totals.subtotalMinor },
+        // A fixed discount reduces the revenue being reversed, not VAT or AR.
+        { accountId: revenueAccount, debit: totals.subtotalMinor - totals.discountMinor },
         ...(totals.taxMinor > 0
           ? [{ accountId: await this.posting.systemAccount(tx, companyId, SYSTEM_ROLES.VAT_OUTPUT), debit: totals.taxMinor }]
           : []),
