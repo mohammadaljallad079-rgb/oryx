@@ -2258,7 +2258,7 @@ function DocumentModal({
     <Modal
       open={open}
       title={title}
-      size="document"
+      size="full"
       onClose={onClose}
       footer={
         <>
