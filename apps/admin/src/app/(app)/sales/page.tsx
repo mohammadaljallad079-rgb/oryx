@@ -357,7 +357,14 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
           <tbody>
             {list.data!.items.map((inv: SalesDocumentDto) => (
               <tr key={inv.id} data-testid={`invoice-row-${inv.invoiceNumber}`}>
-                <td className="font-mono text-[12px]">{inv.invoiceNumber}</td>
+                <td className="font-mono text-[12px]">
+                  <div>{inv.invoiceNumber}</div>
+                  {(inv as SalesDocumentDto & { sourceQuotationNumber?: string | null }).sourceQuotationNumber ? (
+                    <div className="text-[11px] text-[var(--muted)]" data-testid={`invoice-source-quote-${inv.invoiceNumber}`}>
+                      {t('erp.sales.quoteNumber')}: {(inv as SalesDocumentDto & { sourceQuotationNumber?: string | null }).sourceQuotationNumber}
+                    </div>
+                  ) : null}
+                </td>
                 <td className="text-[12.5px]">{inv.invoiceDate?.slice(0, 10)}</td>
                 <td className="text-[12.5px]">{inv.customerNameEn}</td>
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(inv.totalMinor, inv.currency)}</td>
