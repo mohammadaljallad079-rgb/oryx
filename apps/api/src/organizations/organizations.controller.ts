@@ -57,6 +57,13 @@ export class CompaniesController {
     return this.orgs.listCompanies(query, actorFrom(p, req));
   }
 
+  @Get('available-managers')
+  @RequirePermissions('platform.company.create')
+  @ApiOperation({ summary: 'Search existing active user accounts for company administrator assignment' })
+  availableManagers(@Query('search') search: string | undefined, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.orgs.availableCompanyManagers(search, actorFrom(p, req));
+  }
+
   @Post()
   @RequirePermissions('platform.company.create')
   @ApiOperation({ summary: 'Provision a new internal company or SaaS tenant' })
