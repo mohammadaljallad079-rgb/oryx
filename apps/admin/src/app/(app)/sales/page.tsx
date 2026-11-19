@@ -526,6 +526,7 @@ function QuotationsTab({ canManage, canConvertToInvoice, onConverted }: { canMan
                       sourceId={q.id}
                       type="QUOTATION"
                       permissions={['erp.sales.read', 'erp.accounting.read']}
+                      iconsOnly
                     />
                     {canManage && canConvertToInvoice && q.status !== 'CONVERTED' ? (
                       <Button
