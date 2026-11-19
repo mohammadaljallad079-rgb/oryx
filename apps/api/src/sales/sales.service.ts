@@ -123,6 +123,97 @@ export class SalesService {
     };
   }
 
+  /**
+   * An invoice paid by cash, card, Benefit or bank transfer must settle in the
+   * same transaction as the posted invoice. Changing status alone would leave
+   * accounts receivable open and omit the cash/bank journal.
+   */
+  private async settleImmediateInvoice(
+    tx: Tx,
+    input: {
+      companyId: string;
+      branchId: string | null;
+      customerId: string;
+      invoiceId: string;
+      totalMinor: number;
+      currency: string;
+      method: PaymentMethod;
+      paidAt: Date;
+      actorUserId: string;
+      reference?: string | null;
+    },
+  ): Promise<void> {
+    if (input.method === 'CREDIT') return;
+
+    if (input.totalMinor <= 0) {
+      await tx.salesInvoice.update({
+        where: { id: input.invoiceId },
+        data: { status: 'PAID', amountPaidMinor: input.totalMinor },
+      });
+      return;
+    }
+
+    const idempotencyKey = `auto-sales-invoice:${input.invoiceId}`;
+    const existing = await tx.payment.findFirst({
+      where: { companyId: input.companyId, idempotencyKey },
+    });
+    if (existing) return;
+
+    const paymentNumber = await this.sequences.next(tx, input.companyId, 'payment');
+    const payment = await tx.payment.create({
+      data: {
+        companyId: input.companyId,
+        branchId: input.branchId,
+        direction: 'RECEIPT',
+        partyType: 'CUSTOMER',
+        customerId: input.customerId,
+        paymentNumber,
+        method: input.method,
+        amountMinor: input.totalMinor,
+        currency: input.currency,
+        reference: input.reference ?? null,
+        notes: 'Automatic full settlement of sales invoice',
+        paidAt: input.paidAt,
+        idempotencyKey,
+        createdById: input.actorUserId,
+      },
+    });
+
+    await tx.paymentAllocation.create({
+      data: {
+        companyId: input.companyId,
+        paymentId: payment.id,
+        target: 'SALES_INVOICE',
+        salesInvoiceId: input.invoiceId,
+        amountMinor: input.totalMinor,
+      },
+    });
+    const settlementAccount = await this.posting.systemAccount(
+      tx,
+      input.companyId,
+      input.method === 'CASH' ? SYSTEM_ROLES.CASH : SYSTEM_ROLES.BANK,
+    );
+    const arAccount = await this.posting.systemAccount(tx, input.companyId, SYSTEM_ROLES.AR_CONTROL);
+    const journal = await this.posting.postJournal(tx, {
+      companyId: input.companyId,
+      branchId: input.branchId,
+      entryDate: input.paidAt,
+      memo: `Automatic receipt ${paymentNumber}`,
+      sourceType: 'CUSTOMER_RECEIPT',
+      sourceId: payment.id,
+      actorUserId: input.actorUserId,
+      lines: [
+        { accountId: settlementAccount, debit: input.totalMinor },
+        { accountId: arAccount, credit: input.totalMinor },
+      ],
+    });
+    await tx.payment.update({ where: { id: payment.id }, data: { journalEntryId: journal.id } });
+    await tx.salesInvoice.update({
+      where: { id: input.invoiceId },
+      data: { status: 'PAID', amountPaidMinor: input.totalMinor },
+    });
+  }
+
   // --------------------------------------------------------------- customers
 
   async listCustomers(query: CustomerListQueryDto, principal: RequestPrincipal) {
@@ -942,10 +1033,12 @@ export class SalesService {
       const rounding = await this.context.companyRoundingMode(companyId, tx);
       const totals = computeDocumentTotals(lineInputs, rounding.mode, rounding.scale);
       const invoiceDate = new Date(resolveDocumentDate(dto)!);
-      const dueDate = dto.dueDate ? new Date(dto.dueDate) : current.dueDate;
       const selectedPayment = await this.resolveCompanyPayment(tx, companyId,
         dto.paymentMethodCode ?? current.paymentMethodCode ?? undefined,
         (dto.paymentMethod as PaymentMethod | undefined) ?? current.paymentMethod, 'invoices');
+      const dueDate = selectedPayment.paymentMethod === 'CREDIT'
+        ? (dto.dueDate ? new Date(dto.dueDate) : current.dueDate)
+        : null;
       if (selectedPayment.paymentMethod === 'CREDIT' && !dueDate) {
         throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'A due date is required for credit invoices.');
       }
@@ -987,6 +1080,18 @@ export class SalesService {
         roundingMode: rounding.mode,
         roundingScale: rounding.scale,
       });
+      await this.settleImmediateInvoice(tx, {
+        companyId,
+        branchId: current.branchId,
+        customerId: dto.customerId,
+        invoiceId: id,
+        totalMinor: totals.totalMinor,
+        currency: current.currency,
+        method: selectedPayment.paymentMethod,
+        paidAt: invoiceDate,
+        actorUserId: actor.userId,
+        reference: dto.paymentReference,
+      });
       if (current.orderId) {
         const orderLines = await tx.salesOrderLine.findMany({ where: { orderId: current.orderId } });
         for (const line of orderLines) {
@@ -997,7 +1102,12 @@ export class SalesService {
         }
         await tx.salesOrder.update({ where: { id: current.orderId }, data: { status: 'INVOICED' } });
       }
-      return posted;
+      if (selectedPayment.paymentMethod === 'CREDIT') return posted;
+      const settled = await tx.salesInvoice.findUniqueOrThrow({
+        where: { id },
+        include: { customer: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
+      });
+      return toInvoiceDto(settled);
     });
     await this.audit.record({
       actorUserId: actor.userId,
@@ -1135,9 +1245,9 @@ export class SalesService {
       if (selectedPayment.paymentMethod === 'CREDIT' && !dto.dueDate) {
         throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Select the due date for a credit invoice.');
       }
-      const dueDate = dto.dueDate
-        ? new Date(dto.dueDate)
-        : await computeDueDate(tx, companyId, customerId!, invoiceDate);
+      const dueDate = selectedPayment.paymentMethod === 'CREDIT'
+        ? new Date(dto.dueDate!)
+        : null;
 
       const invoice = await tx.salesInvoice.create({
         data: {
@@ -1194,7 +1304,24 @@ export class SalesService {
           }
           await tx.salesOrder.update({ where: { id: orderId }, data: { status: 'INVOICED' } });
         }
-        return posted;
+        await this.settleImmediateInvoice(tx, {
+          companyId,
+          branchId: invoice.branchId,
+          customerId: customerId!,
+          invoiceId: invoice.id,
+          totalMinor: totals.totalMinor,
+          currency,
+          method: selectedPayment.paymentMethod,
+          paidAt: invoiceDate,
+          actorUserId: actor.userId,
+          reference: dto.paymentReference,
+        });
+        if (selectedPayment.paymentMethod === 'CREDIT') return posted;
+        const settled = await tx.salesInvoice.findUniqueOrThrow({
+          where: { id: invoice.id },
+          include: { customer: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
+        });
+        return toInvoiceDto(settled);
       }
       return toInvoiceDto(invoice);
     });
