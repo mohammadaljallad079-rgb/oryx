@@ -110,6 +110,8 @@ describe('official footer contact visibility contract', () => {
     expect(html).toContain('height:40pt');
     expect(html).toContain('border-top:0.75px solid #94a3b8');
     expect(html).toContain('text-align:right;font-size:6.5pt');
+    expect(html).toContain('data-contact-group="right"');
+    expect(html).toContain('justify-content:space-between;gap:14pt');
     expect(html).not.toContain('grid-template-columns:repeat(3,minmax(0,1fr))');
     expect(html).not.toContain('text-overflow:ellipsis');
     expect(html).toContain('Page <span class="pageNumber"></span> of <span class="totalPages"></span>');
@@ -128,6 +130,13 @@ describe('official footer contact visibility contract', () => {
       expect(html).toContain(value);
     }
     expect(html).toContain('Page <span class="pageNumber"></span> of <span class="totalPages"></span>');
+    const pagePosition = html.indexOf('Page <span class="pageNumber">');
+    const contactPosition = html.indexOf('data-contact-group="right"');
+    expect(pagePosition).toBeGreaterThan(-1);
+    expect(contactPosition).toBeGreaterThan(pagePosition);
+    expect(html).toContain('data-contact="phone"');
+    expect(html).toContain('data-contact="email"');
+    expect(html).toContain('data-contact="website"');
   });
   it('does not fabricate contact details when company settings are empty', () => {
     const html = officialFooterTemplate(issuer);
