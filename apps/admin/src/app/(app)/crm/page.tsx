@@ -6,6 +6,9 @@ import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput } from '@/lib/erp-format';
+import { useFormAttachments } from '@/lib/use-form-attachments';
+import { AttachmentField } from '@/components/attachments';
+import { RecordPreview } from '@/components/record-preview';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -95,6 +98,7 @@ function LeadsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<LeadDto | null>(null);
   const list = useAsync(() => api.crmLeads({ search: search || undefined }), [search]);
 
   return (
@@ -125,6 +129,7 @@ function LeadsTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.crm.contact')}</th>
               <th>{t('erp.crm.estimatedValue')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -138,11 +143,40 @@ function LeadsTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{l.contactName ?? l.email ?? l.phone ?? '—'}</td>
                 <td className="tabular-nums text-[12.5px]">{money(l.estimatedValueMinor, l.currency)}</td>
                 <td><StatusBadge status={l.status} label={l.status} /></td>
+                <td>
+                  <Button size="sm" onClick={() => setDetail(l)} data-testid={`preview-lead-${l.code}`}>
+                    {t('attach.preview')}
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={detail ? `${detail.code} — ${detail.nameEn}` : ''}
+        subtitle={detail?.nameAr}
+        entityType="LEAD"
+        entityId={detail?.id ?? null}
+        canWriteAttachments={canManage}
+        testId="lead-preview"
+        fields={
+          detail
+            ? [
+                { label: t('common.code'), value: detail.code },
+                { label: `${t('common.name')} (EN)`, value: detail.nameEn },
+                { label: `${t('common.name')} (AR)`, value: detail.nameAr },
+                { label: t('erp.crm.contact'), value: detail.contactName ?? '—' },
+                { label: t('common.email'), value: detail.email ?? '—' },
+                { label: t('erp.sales.phone'), value: detail.phone ?? '—' },
+                { label: t('erp.crm.estimatedValue'), value: money(detail.estimatedValueMinor, detail.currency) },
+                { label: t('common.status'), value: detail.status },
+              ]
+            : []
+        }
+      />
       <CreateLeadModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
     </Card>
   );
@@ -153,12 +187,13 @@ function CreateLeadModal({ open, onClose, onCreated }: { open: boolean; onClose:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', contactName: '', email: '', phone: '', estimatedValue: '0.00' });
+  const attach = useFormAttachments();
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.createLead({
+      const created = await api.createLead({
         code: form.code,
         nameEn: form.nameEn,
         nameAr: form.nameAr,
@@ -167,6 +202,8 @@ function CreateLeadModal({ open, onClose, onCreated }: { open: boolean; onClose:
         phone: form.phone || undefined,
         estimatedValueMinor: toMinorInput(form.estimatedValue),
       });
+      await attach.flush(created.id);
+      attach.reset();
       await onCreated();
       onClose();
     } catch (e) {
@@ -209,6 +246,17 @@ function CreateLeadModal({ open, onClose, onCreated }: { open: boolean; onClose:
           <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
         </Field>
       </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField
+          entityType="LEAD"
+          entityId={null}
+          value={attach.items}
+          onChange={attach.setItems}
+          registerFlush={attach.register}
+          canWrite
+          testId="new-lead-attachments"
+        />
+      </div>
     </Modal>
   );
 }
@@ -219,6 +267,7 @@ function OpportunitiesTab({ canManage, canConvert }: { canManage: boolean; canCo
   const pipelines = useAsync(() => api.crmPipelines(), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<OpportunityDto | null>(null);
 
   return (
     <Card>
@@ -258,19 +307,47 @@ function OpportunitiesTab({ canManage, canConvert }: { canManage: boolean; canCo
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(o.amountMinor, o.currency)}</td>
                 <td><StatusBadge status={o.status} label={o.status} /></td>
                 <td>
-                  {canConvert && o.status === 'WON' && !o.quotationId ? (
-                    <Button size="sm" data-testid={`convert-opportunity-${o.code}`} onClick={async () => { await api.convertOpportunity(o.id); await list.reload(); }}>
-                      {t('erp.crm.convert')}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" onClick={() => setDetail(o)} data-testid={`preview-opportunity-${o.code}`}>
+                      {t('attach.preview')}
                     </Button>
-                  ) : o.quotationId ? (
-                    <span className="oryx-faint text-[11.5px]">{t('erp.crm.converted')}</span>
-                  ) : null}
+                    {canConvert && o.status === 'WON' && !o.quotationId ? (
+                      <Button size="sm" data-testid={`convert-opportunity-${o.code}`} onClick={async () => { await api.convertOpportunity(o.id); await list.reload(); }}>
+                        {t('erp.crm.convert')}
+                      </Button>
+                    ) : o.quotationId ? (
+                      <span className="oryx-faint text-[11.5px]">{t('erp.crm.converted')}</span>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={detail ? `${detail.code} — ${detail.title}` : ''}
+        subtitle={detail?.pipelineNameEn ?? undefined}
+        entityType="OPPORTUNITY"
+        entityId={detail?.id ?? null}
+        canWriteAttachments={canManage}
+        testId="opportunity-preview"
+        fields={
+          detail
+            ? [
+                { label: t('common.code'), value: detail.code },
+                { label: t('erp.crm.title'), value: detail.title },
+                { label: t('erp.crm.stage'), value: detail.stageNameEn ?? '—' },
+                { label: t('erp.crm.probability'), value: `${(detail.probabilityBp / 100).toFixed(0)}%` },
+                { label: t('erp.crm.amount'), value: money(detail.amountMinor, detail.currency) },
+                { label: t('erp.crm.expectedClose'), value: detail.expectedCloseDate?.slice(0, 10) ?? '—' },
+                { label: t('common.status'), value: detail.status },
+              ]
+            : []
+        }
+      />
       <CreateOpportunityModal
         open={open}
         pipelines={pipelines.data?.items ?? []}
@@ -299,6 +376,7 @@ function CreateOpportunityModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ code: '', title: '', pipelineId: '', stageId: '', customerId: '', amount: '0.00' });
+  const attach = useFormAttachments();
 
   const stages = pipelines.find((p) => p.id === form.pipelineId)?.stages ?? [];
 
@@ -306,7 +384,7 @@ function CreateOpportunityModal({
     setBusy(true);
     setError(null);
     try {
-      await api.createOpportunity({
+      const created = await api.createOpportunity({
         code: form.code,
         title: form.title,
         pipelineId: form.pipelineId,
@@ -314,6 +392,8 @@ function CreateOpportunityModal({
         customerId: form.customerId || undefined,
         amountMinor: toMinorInput(form.amount),
       });
+      await attach.flush(created.id);
+      attach.reset();
       await onCreated();
       onClose();
     } catch (e) {
@@ -365,6 +445,17 @@ function CreateOpportunityModal({
           <input className="oryx-input" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} data-testid="opportunity-amount" />
         </Field>
       </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField
+          entityType="OPPORTUNITY"
+          entityId={null}
+          value={attach.items}
+          onChange={attach.setItems}
+          registerFlush={attach.register}
+          canWrite
+          testId="new-opportunity-attachments"
+        />
+      </div>
     </Modal>
   );
 }
@@ -373,6 +464,7 @@ function TicketsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<SupportTicketDto | null>(null);
   const list = useAsync(() => api.crmTickets({ search: search || undefined }), [search]);
 
   return (
@@ -415,17 +507,43 @@ function TicketsTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{k.resolutionDueAt ? k.resolutionDueAt.slice(0, 16).replace('T', ' ') : '—'}</td>
                 <td><StatusBadge status={k.status} label={k.status} /></td>
                 <td>
-                  {canManage && k.status !== 'RESOLVED' && k.status !== 'CLOSED' ? (
-                    <Button size="sm" data-testid={`resolve-ticket-${k.ticketNumber}`} onClick={async () => { await api.updateTicket(k.id, { status: 'RESOLVED' }); await list.reload(); }}>
-                      {t('erp.crm.resolve')}
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => setDetail(k)} data-testid={`preview-ticket-${k.ticketNumber}`}>
+                      {t('attach.preview')}
                     </Button>
-                  ) : null}
+                    {canManage && k.status !== 'RESOLVED' && k.status !== 'CLOSED' ? (
+                      <Button size="sm" data-testid={`resolve-ticket-${k.ticketNumber}`} onClick={async () => { await api.updateTicket(k.id, { status: 'RESOLVED' }); await list.reload(); }}>
+                        {t('erp.crm.resolve')}
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={detail ? `${detail.ticketNumber} — ${detail.subject}` : ''}
+        entityType="SUPPORT_TICKET"
+        entityId={detail?.id ?? null}
+        canWriteAttachments={canManage}
+        testId="ticket-preview"
+        fields={
+          detail
+            ? [
+                { label: t('erp.crm.ticketNumber'), value: detail.ticketNumber },
+                { label: t('erp.crm.subject'), value: detail.subject },
+                { label: t('erp.crm.priority'), value: detail.priority },
+                { label: t('erp.crm.resolutionDue'), value: detail.resolutionDueAt?.slice(0, 16).replace('T', ' ') ?? '—' },
+                { label: t('erp.crm.satisfaction'), value: detail.satisfactionScore !== null ? `${detail.satisfactionScore}` : '—' },
+                { label: t('common.status'), value: detail.status },
+              ]
+            : []
+        }
+      />
       <CreateTicketModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
     </Card>
   );
@@ -436,12 +554,15 @@ function CreateTicketModal({ open, onClose, onCreated }: { open: boolean; onClos
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ subject: '', description: '', priority: 'NORMAL' });
+  const attach = useFormAttachments();
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.createTicket({ subject: form.subject, description: form.description || undefined, priority: form.priority });
+      const created = await api.createTicket({ subject: form.subject, description: form.description || undefined, priority: form.priority });
+      await attach.flush(created.id);
+      attach.reset();
       await onCreated();
       onClose();
     } catch (e) {
@@ -476,6 +597,17 @@ function CreateTicketModal({ open, onClose, onCreated }: { open: boolean; onClos
         <Field label={t('erp.accounting.description')}>
           <textarea className="oryx-input" rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
         </Field>
+      </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField
+          entityType="SUPPORT_TICKET"
+          entityId={null}
+          value={attach.items}
+          onChange={attach.setItems}
+          registerFlush={attach.register}
+          canWrite
+          testId="new-ticket-attachments"
+        />
       </div>
     </Modal>
   );

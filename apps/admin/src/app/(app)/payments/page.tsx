@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
+import { RecordPreview } from '@/components/record-preview';
 import {
   Badge,
   Button,
@@ -38,7 +39,14 @@ interface IntentRow {
   description: string | null;
   succeededAt: string | null;
   createdAt: string;
-  refunds?: Array<{ id: string; refundNumber: string; amountMinor: number; status: string }>;
+  refunds?: RefundRow[];
+}
+
+interface RefundRow {
+  id: string;
+  refundNumber: string;
+  amountMinor: number;
+  status: string;
 }
 
 type Tab = 'intents' | 'providers' | 'reconciliation';
@@ -172,6 +180,7 @@ function IntentModal({
   const [reference, setReference] = useState('');
   const [reason, setReason] = useState('');
   const [refundAmount, setRefundAmount] = useState('');
+  const [refundPreview, setRefundPreview] = useState<RefundRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const intent = detail.data as unknown as IntentRow | null;
@@ -193,69 +202,79 @@ function IntentModal({
   const scale = intent?.currencyScale ?? 3;
 
   return (
-    <Modal open={open} title={intent?.intentNumber ?? t('common.loading')} onClose={onClose}>
-      {detail.loading ? <Skeleton height={180} /> : null}
-      {detail.error ? <ErrorBanner message={detail.error} onRetry={detail.reload} /> : null}
-      {error ? <ErrorBanner message={error} /> : null}
-      {intent ? (
-        <div className="flex flex-col gap-4">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Detail label={t('common.status')} value={status} />
-            <Detail
-              label={t('erp.payments.amount')}
-              value={`${(intent.amountMinor / 10 ** scale).toFixed(scale)} ${intent.currency}`}
-            />
-            <Detail label={t('erp.payments.provider')} value={intent.provider} />
-            <Detail label={t('erp.payments.target')} value={intent.targetType} />
-            <Detail label={t('erp.payments.description')} value={intent.description ?? '—'} />
-            <Detail
-              label={t('erp.payments.succeededAt')}
-              value={intent.succeededAt ? new Date(intent.succeededAt).toLocaleString() : '—'}
-            />
-          </div>
+    <>
+      <RecordPreview
+        open={open}
+        onClose={onClose}
+        title={intent ? intent.intentNumber : t('common.loading')}
+        subtitle={intent ? `${intent.provider} · ${intent.targetType}` : undefined}
+        entityType="PAYMENT_INTENT"
+        entityId={id}
+        canWriteAttachments={canManage}
+        testId="payment-intent-preview"
+        fields={
+          intent
+            ? [
+                { label: t('common.status'), value: status },
+                { label: t('erp.payments.amount'), value: `${(intent.amountMinor / 10 ** scale).toFixed(scale)} ${intent.currency}` },
+                { label: t('erp.payments.provider'), value: intent.provider },
+                { label: t('erp.payments.target'), value: intent.targetType },
+                { label: t('erp.payments.description'), value: intent.description ?? '—' },
+                { label: t('erp.payments.succeededAt'), value: intent.succeededAt ? new Date(intent.succeededAt).toLocaleString() : '—' },
+              ]
+            : []
+        }
+      >
+        {detail.loading ? <Skeleton height={180} /> : null}
+        {detail.error ? <ErrorBanner message={detail.error} onRetry={detail.reload} /> : null}
+        {error ? <ErrorBanner message={error} /> : null}
+        {intent ? (
+          <div className="flex flex-col gap-4">
+            {intent.refunds && intent.refunds.length > 0 ? (
+              <div>
+                <div className="mb-1 text-[12px] font-semibold">{t('erp.payments.refunds')}</div>
+                <ul className="flex flex-col gap-1" data-testid="intent-refunds">
+                  {intent.refunds.map((r) => (
+                    <li key={r.id} className="flex items-center justify-between gap-2 text-[12.5px]">
+                      <span className="font-mono text-[11px]">{r.refundNumber}</span>
+                      <span className="tabular-nums">{(r.amountMinor / 10 ** scale).toFixed(scale)}</span>
+                      <StatusBadge status={r.status} label={r.status} />
+                      <Button size="sm" variant="ghost" onClick={() => setRefundPreview(r)} data-testid={`preview-refund-${r.refundNumber}`}>
+                        {t('attach.preview')}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
-          {intent.refunds && intent.refunds.length > 0 ? (
-            <div>
-              <div className="mb-1 text-[12px] font-semibold">{t('erp.payments.refunds')}</div>
-              <ul className="flex flex-col gap-1" data-testid="intent-refunds">
-                {intent.refunds.map((r) => (
-                  <li key={r.id} className="flex items-center justify-between text-[12.5px]">
-                    <span className="font-mono text-[11px]">{r.refundNumber}</span>
-                    <span className="tabular-nums">{(r.amountMinor / 10 ** scale).toFixed(scale)}</span>
-                    <StatusBadge status={r.status} label={r.status} />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
-          {canManage ? (
-            <div className="flex flex-col gap-3 border-t border-[var(--border)] pt-3">
-              {status === 'PENDING' || status === 'REQUIRES_ACTION' ? (
-                <>
-                  <Field label={t('erp.payments.manualReference')} hint={t('erp.payments.manualReferenceHint')}>
-                    <input className="oryx-input" value={reference} onChange={(e) => setReference(e.target.value)} data-testid="intent-reference" />
-                  </Field>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      disabled={busy || !reference.trim()}
-                      onClick={() => run(() => api.confirmPaymentIntent(intent.id, reference.trim()))}
-                      data-testid="intent-confirm"
-                    >
-                      {t('erp.payments.confirmManual')}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      disabled={busy || !reason.trim()}
-                      onClick={() => run(() => api.cancelPaymentIntent(intent.id, reason.trim()))}
-                      data-testid="intent-cancel"
-                    >
-                      {t('erp.payments.cancelIntent')}
-                    </Button>
-                  </div>
+            {canManage ? (
+              <div className="flex flex-col gap-3 border-t border-[var(--border)] pt-3">
+                {status === 'PENDING' || status === 'REQUIRES_ACTION' ? (
+                  <>
+                    <Field label={t('erp.payments.manualReference')} hint={t('erp.payments.manualReferenceHint')}>
+                      <input className="oryx-input" value={reference} onChange={(e) => setReference(e.target.value)} data-testid="intent-reference" />
+                    </Field>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        disabled={busy || !reference.trim()}
+                        onClick={() => run(() => api.confirmPaymentIntent(intent.id, reference.trim()))}
+                        data-testid="intent-confirm"
+                      >
+                        {t('erp.payments.confirmManual')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={busy || !reason.trim()}
+                        onClick={() => run(() => api.cancelPaymentIntent(intent.id, reason.trim()))}
+                        data-testid="intent-cancel"
+                      >
+                        {t('erp.payments.cancelIntent')}
+                      </Button>
+                    </div>
                 </>
               ) : null}
 
@@ -292,7 +311,29 @@ function IntentModal({
           ) : null}
         </div>
       ) : null}
-    </Modal>
+    </RecordPreview>
+
+      <RecordPreview
+        open={refundPreview !== null}
+        onClose={() => setRefundPreview(null)}
+        title={refundPreview ? `${t('erp.payments.refunds')} — ${refundPreview.refundNumber}` : ''}
+        subtitle={intent?.intentNumber}
+        entityType="REFUND"
+        entityId={refundPreview?.id ?? null}
+        canWriteAttachments={canManage}
+        testId="refund-preview"
+        fields={
+          refundPreview
+            ? [
+                { label: t('erp.payments.refundNumber'), value: refundPreview.refundNumber },
+                { label: t('erp.payments.amount'), value: `${(refundPreview.amountMinor / 10 ** scale).toFixed(scale)} ${intent?.currency ?? ''}` },
+                { label: t('common.status'), value: refundPreview.status },
+                { label: t('erp.payments.intentNumber'), value: intent?.intentNumber ?? '—' },
+              ]
+            : []
+        }
+      />
+    </>
   );
 }
 
@@ -447,11 +488,3 @@ function ReconciliationTab({ canManage }: { canManage: boolean }) {
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-[11px] uppercase tracking-wide text-[var(--muted)]">{label}</div>
-      <div className="text-[12.5px]">{value}</div>
-    </div>
-  );
-}

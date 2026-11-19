@@ -5,6 +5,10 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
+import { useFormAttachments } from '@/lib/use-form-attachments';
+import { money } from '@/lib/erp-format';
+import { AttachmentField } from '@/components/attachments';
+import { RecordPreview } from '@/components/record-preview';
 import {
   Badge,
   Button,
@@ -29,6 +33,17 @@ interface ProviderRow {
   commissionPercentBp: number;
   approvedAt: string | null;
   _count?: { listings: number; requests: number };
+}
+
+interface ListingRow {
+  id: string;
+  categoryKey: string;
+  nameEn: string;
+  nameAr: string;
+  description?: string | null;
+  priceMinor: number;
+  currency: string;
+  isActive: boolean;
 }
 
 interface RequestRow {
@@ -191,6 +206,8 @@ function ProviderModal({
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [listing, setListing] = useState<ListingRow | null>(null);
+  const attach = useFormAttachments();
 
   async function decide(decision: 'APPROVED' | 'REJECTED' | 'SUSPENDED') {
     if (!provider) return;
@@ -227,10 +244,13 @@ function ProviderModal({
               <p className="text-[12px] text-[var(--muted)]">{t('common.empty')}</p>
             ) : (
               <ul className="flex flex-col gap-1" data-testid="provider-listings">
-                {(listings.data!.items as Array<Record<string, unknown>>).map((l) => (
-                  <li key={String(l.id)} className="flex items-center justify-between text-[12.5px]">
-                    <span>{String(l.titleEn ?? l.nameEn ?? l.serviceRef ?? l.id)}</span>
-                    <span className="tabular-nums text-[var(--muted)]">{String(l.priceMinor ?? '')}</span>
+                {(listings.data!.items as unknown as ListingRow[]).map((l) => (
+                  <li key={l.id} className="flex items-center justify-between gap-2 text-[12.5px]">
+                    <span>{l.nameEn}</span>
+                    <span className="tabular-nums text-[var(--muted)]">{money(l.priceMinor, l.currency)}</span>
+                    <Button size="sm" variant="ghost" onClick={() => setListing(l)} data-testid={`preview-listing-${l.id}`}>
+                      {t('attach.preview')}
+                    </Button>
                   </li>
                 ))}
               </ul>
@@ -255,8 +275,42 @@ function ProviderModal({
               </div>
             </div>
           ) : null}
+          <div className="border-t border-[var(--border)] pt-3">
+            <AttachmentField
+              entityType="MARKETPLACE_PROVIDER"
+              entityId={provider.id}
+              value={attach.items}
+              onChange={attach.setItems}
+              registerFlush={attach.register}
+              canWrite={canDecide}
+              testId="provider-attachments"
+            />
+          </div>
         </div>
       ) : null}
+
+      <RecordPreview
+        open={listing !== null}
+        onClose={() => setListing(null)}
+        title={listing ? listing.nameEn : ''}
+        subtitle={provider ? `${provider.code} · ${provider.nameEn}` : undefined}
+        entityType="PROVIDER_SERVICE_LISTING"
+        entityId={listing?.id ?? null}
+        canWriteAttachments={canDecide}
+        testId="provider-listing-preview"
+        fields={
+          listing
+            ? [
+                { label: t('common.name'), value: listing.nameEn },
+                { label: t('erp.providers.nameAr'), value: listing.nameAr },
+                { label: t('erp.providers.category'), value: listing.categoryKey },
+                { label: t('erp.providers.commission'), value: money(listing.priceMinor, listing.currency) },
+                { label: t('erp.accounting.description'), value: listing.description ?? '—' },
+                { label: t('common.status'), value: listing.isActive ? t('common.active') : t('common.inactive') },
+              ]
+            : []
+        }
+      />
     </Modal>
   );
 }
@@ -267,6 +321,7 @@ function RequestsTab({ canAssign }: { canAssign: boolean }) {
   const list = useAsync(() => api.serviceRequests({ status: status || undefined }), [status]);
   const providers = useAsync(() => api.marketplaceProviders({ status: 'APPROVED' }), []);
   const [assignId, setAssignId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<RequestRow | null>(null);
   const [providerId, setProviderId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -325,11 +380,16 @@ function RequestsTab({ canAssign }: { canAssign: boolean }) {
                 <td className="text-[12.5px]">{r.provider?.nameEn ?? '—'}</td>
                 <td><StatusBadge status={r.status} label={r.status} /></td>
                 <td className="text-end">
-                  {canAssign ? (
-                    <Button size="sm" disabled={r.status === 'COMPLETED'} onClick={() => { setAssignId(r.id); setProviderId(r.providerId ?? ''); }} data-testid={`request-assign-${r.requestNumber}`}>
-                      {t('erp.providers.assign')}
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button size="sm" onClick={() => setPreview(r)} data-testid={`preview-request-${r.requestNumber}`}>
+                      {t('attach.preview')}
                     </Button>
-                  ) : null}
+                    {canAssign ? (
+                      <Button size="sm" disabled={r.status === 'COMPLETED'} onClick={() => { setAssignId(r.id); setProviderId(r.providerId ?? ''); }} data-testid={`request-assign-${r.requestNumber}`}>
+                        {t('erp.providers.assign')}
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -337,6 +397,27 @@ function RequestsTab({ canAssign }: { canAssign: boolean }) {
         </TableShell>
       )}
 
+      <RecordPreview
+        open={preview !== null}
+        onClose={() => setPreview(null)}
+        title={preview ? `${t('erp.providers.requestNumber')} — ${preview.requestNumber}` : ''}
+        subtitle={preview?.provider?.nameEn ?? undefined}
+        entityType="SERVICE_REQUEST"
+        entityId={preview?.id ?? null}
+        canWriteAttachments={canAssign}
+        testId="service-request-preview"
+        fields={
+          preview
+            ? [
+                { label: t('erp.providers.requestNumber'), value: preview.requestNumber },
+                { label: t('erp.providers.category'), value: preview.categoryKey },
+                { label: t('erp.providers.assignedTo'), value: preview.provider?.nameEn ?? '—' },
+                { label: t('common.status'), value: preview.status },
+                { label: t('common.date'), value: preview.createdAt.slice(0, 10) },
+              ]
+            : []
+        }
+      />
       <Modal
         open={assignId !== null}
         title={t('erp.providers.assign')}
@@ -369,6 +450,7 @@ function RequestsTab({ canAssign }: { canAssign: boolean }) {
 function SettlementsTab({ canSettle }: { canSettle: boolean }) {
   const { t } = useUi();
   const [status, setStatus] = useState('');
+  const [preview, setPreview] = useState<SettlementRow | null>(null);
   const list = useAsync(() => api.settlements({ status: status || undefined }), [status]);
 
   return (
@@ -401,6 +483,7 @@ function SettlementsTab({ canSettle }: { canSettle: boolean }) {
               <th>{t('erp.providers.commission')}</th>
               <th>{t('erp.providers.net')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -414,11 +497,37 @@ function SettlementsTab({ canSettle }: { canSettle: boolean }) {
                 <td className="tabular-nums text-[12.5px]">{(s.commissionMinor / 1000).toFixed(3)}</td>
                 <td className="tabular-nums text-[12.5px] font-semibold">{(s.netMinor / 1000).toFixed(3)}</td>
                 <td><StatusBadge status={s.status} label={s.status} /></td>
+                <td>
+                  <Button size="sm" onClick={() => setPreview(s)} data-testid={`preview-settlement-${s.id}`}>{t('attach.preview')}</Button>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+
+      <RecordPreview
+        open={preview !== null}
+        onClose={() => setPreview(null)}
+        title={preview ? `${t('erp.providers.settlements')} — ${preview.provider?.nameEn ?? preview.providerId}` : ''}
+        subtitle={preview ? `${preview.periodStart.slice(0, 10)} → ${preview.periodEnd.slice(0, 10)}` : undefined}
+        entityType="PROVIDER_SETTLEMENT"
+        entityId={preview?.id ?? null}
+        canWriteAttachments={canSettle}
+        testId="settlement-preview"
+        fields={
+          preview
+            ? [
+                { label: t('erp.providers.provider'), value: preview.provider?.nameEn ?? preview.providerId },
+                { label: t('erp.providers.period'), value: `${preview.periodStart.slice(0, 10)} → ${preview.periodEnd.slice(0, 10)}` },
+                { label: t('erp.providers.gross'), value: money(preview.grossMinor, preview.currency) },
+                { label: t('erp.providers.commission'), value: money(preview.commissionMinor, preview.currency) },
+                { label: t('erp.providers.net'), value: money(preview.netMinor, preview.currency) },
+                { label: t('common.status'), value: preview.status },
+              ]
+            : []
+        }
+      />
     </Card>
   );
 }

@@ -6,6 +6,9 @@ import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, qty, toMinorInput, toQuantityInput } from '@/lib/erp-format';
+import { useFormAttachments } from '@/lib/use-form-attachments';
+import { AttachmentField } from '@/components/attachments';
+import { RecordPreview } from '@/components/record-preview';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -149,6 +152,7 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<ProductDto | null>(null);
   const list = useAsync(() => api.products({ search: search || undefined }), [search]);
 
   return (
@@ -183,6 +187,7 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.inventory.costPrice')}</th>
               <th>{t('erp.inventory.taxRate')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -200,11 +205,41 @@ function ProductsTab({ canManage }: { canManage: boolean }) {
                 <td>
                   <Badge tone={p.isActive ? 'success' : 'neutral'}>{p.isActive ? t('common.active') : t('common.inactive')}</Badge>
                 </td>
+                <td>
+                  <Button size="sm" onClick={() => setDetail(p)} data-testid={`preview-product-${p.sku}`}>
+                    {t('attach.preview')}
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={detail ? `${detail.sku} — ${detail.nameEn}` : ''}
+        subtitle={detail?.nameAr}
+        entityType="PRODUCT"
+        entityId={detail?.id ?? null}
+        canWriteAttachments={canManage}
+        testId="product-preview"
+        fields={
+          detail
+            ? [
+                { label: t('erp.inventory.sku'), value: detail.sku },
+                { label: `${t('common.name')} (EN)`, value: detail.nameEn },
+                { label: `${t('common.name')} (AR)`, value: detail.nameAr },
+                { label: t('erp.inventory.unit'), value: detail.unit },
+                { label: t('erp.inventory.salesPrice'), value: money(detail.salesPriceMinor) },
+                { label: t('erp.inventory.costPrice'), value: money(detail.costPriceMinor) },
+                { label: t('erp.inventory.taxRate'), value: `${(detail.taxRateBp / 100).toFixed(2)}%` },
+                { label: t('erp.inventory.reorderLevel'), value: `${detail.reorderLevel}` },
+                { label: t('common.status'), value: detail.isActive ? t('common.active') : t('common.inactive') },
+              ]
+            : []
+        }
+      />
       <CreateProductModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
     </Card>
   );
@@ -218,11 +253,13 @@ function CreateProductModal({ open, onClose, onCreated }: { open: boolean; onClo
     sku: '', nameEn: '', nameAr: '', unit: 'unit', salesPrice: '0.00', costPrice: '0.00', taxRate: '15',
   });
 
+  const attach = useFormAttachments();
+
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.createProduct({
+      const created = await api.createProduct({
         sku: form.sku,
         nameEn: form.nameEn,
         nameAr: form.nameAr,
@@ -231,6 +268,8 @@ function CreateProductModal({ open, onClose, onCreated }: { open: boolean; onClo
         costPriceMinor: toMinorInput(form.costPrice),
         taxRateBp: Math.round(Number(form.taxRate) * 100),
       });
+      await attach.flush(created.id);
+      attach.reset();
       await onCreated();
       onClose();
     } catch (e) {
@@ -278,6 +317,17 @@ function CreateProductModal({ open, onClose, onCreated }: { open: boolean; onClo
           <input className="oryx-input" value={form.taxRate} onChange={(e) => setForm({ ...form, taxRate: e.target.value })} />
         </Field>
       </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField
+          entityType="PRODUCT"
+          entityId={null}
+          value={attach.items}
+          onChange={attach.setItems}
+          registerFlush={attach.register}
+          canWrite
+          testId="new-product-attachments"
+        />
+      </div>
     </Modal>
   );
 }
@@ -285,6 +335,7 @@ function CreateProductModal({ open, onClose, onCreated }: { open: boolean; onClo
 function WarehousesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<WarehouseDto | null>(null);
   const list = useAsync(() => api.warehouses(), []);
 
   return (
@@ -309,6 +360,7 @@ function WarehousesTab({ canManage }: { canManage: boolean }) {
               <th>{t('common.name')}</th>
               <th>{t('erp.inventory.branch')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -318,11 +370,37 @@ function WarehousesTab({ canManage }: { canManage: boolean }) {
                 <td>{w.nameEn}</td>
                 <td className="text-[12.5px]">{w.branchNameEn ?? '—'}</td>
                 <td><Badge tone={w.isActive ? 'success' : 'neutral'}>{w.isActive ? t('common.active') : t('common.inactive')}</Badge></td>
+                <td>
+                  <Button size="sm" onClick={() => setDetail(w)} data-testid={`preview-warehouse-${w.code}`}>
+                    {t('attach.preview')}
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={detail ? `${detail.code} — ${detail.nameEn}` : ''}
+        subtitle={detail?.nameAr}
+        entityType="WAREHOUSE"
+        entityId={detail?.id ?? null}
+        canWriteAttachments={canManage}
+        testId="warehouse-preview"
+        fields={
+          detail
+            ? [
+                { label: t('common.code'), value: detail.code },
+                { label: `${t('common.name')} (EN)`, value: detail.nameEn },
+                { label: `${t('common.name')} (AR)`, value: detail.nameAr },
+                { label: t('erp.inventory.branch'), value: detail.branchNameEn ?? '—' },
+                { label: t('common.status'), value: detail.isActive ? t('common.active') : t('common.inactive') },
+              ]
+            : []
+        }
+      />
       <CreateWarehouseModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
     </Card>
   );
@@ -333,12 +411,15 @@ function CreateWarehouseModal({ open, onClose, onCreated }: { open: boolean; onC
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '' });
+  const attach = useFormAttachments();
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.createWarehouse(form);
+      const created = await api.createWarehouse(form);
+      await attach.flush(created.id);
+      attach.reset();
       await onCreated();
       onClose();
     } catch (e) {
@@ -373,6 +454,17 @@ function CreateWarehouseModal({ open, onClose, onCreated }: { open: boolean; onC
         <Field label={`${t('common.name')} (AR)`} required>
           <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="warehouse-name-ar" />
         </Field>
+      </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField
+          entityType="WAREHOUSE"
+          entityId={null}
+          value={attach.items}
+          onChange={attach.setItems}
+          registerFlush={attach.register}
+          canWrite
+          testId="new-warehouse-attachments"
+        />
       </div>
     </Modal>
   );
@@ -455,12 +547,13 @@ function RecordMovementModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ warehouseId: '', productId: '', direction: 'IN', quantity: '1', unitCost: '0.00' });
+  const attach = useFormAttachments();
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.recordStockMovement({
+      const created = await api.recordStockMovement({
         warehouseId: form.warehouseId,
         productId: form.productId,
         direction: form.direction,
@@ -468,6 +561,8 @@ function RecordMovementModal({
         unitCostMinor: toMinorInput(form.unitCost),
         occurredAt: new Date().toISOString(),
       });
+      await attach.flush(String(created.id));
+      attach.reset();
       await onDone();
       onClose();
     } catch (e) {
@@ -518,6 +613,9 @@ function RecordMovementModal({
           <input className="oryx-input" value={form.unitCost} onChange={(e) => setForm({ ...form, unitCost: e.target.value })} data-testid="movement-cost" />
         </Field>
       </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField entityType="STOCK_ADJUSTMENT" entityId={null} value={attach.items} onChange={attach.setItems} registerFlush={attach.register} canWrite testId="new-movement-attachments" />
+      </div>
     </Modal>
   );
 }
@@ -525,6 +623,7 @@ function RecordMovementModal({
 function TransfersTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const list = useAsync(() => api.stockTransfers(), []);
+  const [detail, setDetail] = useState<StockTransferDto | null>(null);
 
   return (
     <Card>
@@ -555,23 +654,53 @@ function TransfersTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px]">{tr.lines.length}</td>
                 <td><StatusBadge status={tr.status} label={tr.status} /></td>
                 <td>
-                  {canManage && tr.status === 'DRAFT' ? (
-                    <Button
-                      size="sm"
-                      onClick={async () => {
-                        await api.postStockTransfer(tr.id);
-                        await list.reload();
-                      }}
-                    >
-                      {t('erp.inventory.post')}
-                    </Button>
-                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => setDetail(tr)} data-testid={`preview-transfer-${tr.transferNumber}`}>{t('attach.preview')}</Button>
+                    {canManage && tr.status === 'DRAFT' ? (
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          await api.postStockTransfer(tr.id);
+                          await list.reload();
+                        }}
+                      >
+                        {t('erp.inventory.post')}
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={detail ? `${t('erp.inventory.transfers')} — ${detail.transferNumber}` : ''}
+        subtitle={detail ? `${detail.fromWarehouseId.slice(-6)} → ${detail.toWarehouseId.slice(-6)}` : undefined}
+        entityType="STOCK_TRANSFER"
+        entityId={detail?.id ?? null}
+        canWriteAttachments={canManage}
+        testId="stock-transfer-preview"
+        fields={
+          detail
+            ? [
+                { label: t('erp.inventory.transferNumber'), value: detail.transferNumber },
+                { label: t('erp.inventory.from'), value: detail.fromWarehouseId.slice(-6) },
+                { label: t('erp.inventory.to'), value: detail.toWarehouseId.slice(-6) },
+                { label: t('common.status'), value: detail.status },
+                { label: t('common.date'), value: detail.createdAt.slice(0, 10) },
+                { label: t('common.notes'), value: detail.notes ?? '—' },
+              ]
+            : []
+        }
+        table={{
+          headers: [t('erp.inventory.sku'), t('erp.inventory.quantity')],
+          rows: (detail?.lines ?? []).map((l) => [l.productId.slice(-6), l.quantityText]),
+        }}
+      />
     </Card>
   );
 }
@@ -579,6 +708,7 @@ function TransfersTab({ canManage }: { canManage: boolean }) {
 function AdjustmentsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const list = useAsync(() => api.stockAdjustments(), []);
+  const [detail, setDetail] = useState<StockAdjustmentDto | null>(null);
 
   return (
     <Card>
@@ -607,23 +737,52 @@ function AdjustmentsTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px]">{a.lines.length}</td>
                 <td><StatusBadge status={a.status} label={a.status} /></td>
                 <td>
-                  {canManage && a.status === 'DRAFT' ? (
-                    <Button
-                      size="sm"
-                      onClick={async () => {
-                        await api.postStockAdjustment(a.id);
-                        await list.reload();
-                      }}
-                    >
-                      {t('erp.inventory.post')}
-                    </Button>
-                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => setDetail(a)} data-testid={`preview-adjustment-${a.adjustmentNumber}`}>{t('attach.preview')}</Button>
+                    {canManage && a.status === 'DRAFT' ? (
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          await api.postStockAdjustment(a.id);
+                          await list.reload();
+                        }}
+                      >
+                        {t('erp.inventory.post')}
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={detail ? `${t('erp.inventory.adjustments')} — ${detail.adjustmentNumber}` : ''}
+        subtitle={detail?.reason}
+        entityType="STOCK_ADJUSTMENT"
+        entityId={detail?.id ?? null}
+        canWriteAttachments={canManage}
+        testId="stock-adjustment-preview"
+        fields={
+          detail
+            ? [
+                { label: t('erp.inventory.adjustmentNumber'), value: detail.adjustmentNumber },
+                { label: t('erp.inventory.reason'), value: detail.reason },
+                { label: t('common.status'), value: detail.status },
+                { label: t('common.date'), value: detail.createdAt.slice(0, 10) },
+                { label: t('erp.inventory.postedAt'), value: detail.postedAt?.slice(0, 10) ?? '—' },
+              ]
+            : []
+        }
+        table={{
+          headers: [t('erp.inventory.sku'), t('erp.inventory.quantity')],
+          rows: (detail?.lines ?? []).map((l) => [l.productId.slice(-6), l.quantityDeltaText]),
+        }}
+      />
     </Card>
   );
 }

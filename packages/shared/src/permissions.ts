@@ -177,6 +177,9 @@ export const PERMISSIONS: PermissionDefinition[] = [
   P('erp.hr.payroll.approve', 'ERP', 'Approve & post payroll', 'اعتماد وترحيل الرواتب', 'COMPANY', true, 'Approve, post and lock payroll runs.', 'human_resources'),
   P('erp.hr.advance.manage', 'ERP', 'Manage employee advances', 'إدارة سلف الموظفين', 'COMPANY', true, 'Issue and settle employee advances.', 'human_resources'),
   P('erp.hr.report.read', 'ERP', 'View HR reports', 'عرض تقارير الموارد البشرية', 'COMPANY', true, 'Read workforce dashboards and HR reports.', 'human_resources'),
+  P('erp.hr.salary.read', 'ERP', 'View salaries & bank details', 'عرض الرواتب والبيانات البنكية', 'COMPANY', true, 'Read basic salary, allowances, payslips and bank details in the employee file.', 'human_resources'),
+  P('erp.hr.penalty.manage', 'ERP', 'Manage disciplinary actions', 'إدارة العقوبات والإجراءات الإدارية', 'COMPANY', true, 'Record, edit and print employee penalties and administrative actions.', 'human_resources'),
+  P('erp.hr.bonus.manage', 'ERP', 'Manage bonuses & incentives', 'إدارة الحوافز والمكافآت', 'COMPANY', true, 'Grant and approve employee bonuses and incentives for payroll.', 'human_resources'),
 
   // --------------------------------------------------------- Execution 03 — CRM
   P('erp.crm.lead.manage', 'ERP', 'Manage leads', 'إدارة العملاء المحتملين', 'COMPANY', true, 'Create and edit leads and lead sources.', 'crm'),

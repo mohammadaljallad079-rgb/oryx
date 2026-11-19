@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { api } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
+import { RecordPreview } from '@/components/record-preview';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -24,6 +25,7 @@ function SupportPageInner() {
   const sessions = useAsync(() => api.supportSessions(), []);
   const companies = useAsync(() => api.listCompanies({ pageSize: 100 }), []);
   const [open, setOpen] = useState(false);
+  const [previewOf, setPreviewOf] = useState<Record<string, unknown> | null>(null);
 
   return (
     <div className="flex flex-col gap-5" data-testid="support-page">
@@ -92,18 +94,23 @@ function SupportPageInner() {
                       </div>
                     </td>
                     <td>
-                      {status === 'ACTIVE' ? (
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={async () => {
-                            await api.endSupportSession(String(s.id));
-                            await sessions.reload();
-                          }}
-                        >
-                          {t('support.end')}
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" onClick={() => setPreviewOf(s)} data-testid={`preview-support-${String(s.id ?? i)}`}>
+                          {t('attach.preview')}
                         </Button>
-                      ) : null}
+                        {status === 'ACTIVE' ? (
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={async () => {
+                              await api.endSupportSession(String(s.id));
+                              await sessions.reload();
+                            }}
+                          >
+                            {t('support.end')}
+                          </Button>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -112,6 +119,28 @@ function SupportPageInner() {
           </TableShell>
         )}
       </Card>
+
+      <RecordPreview
+        open={previewOf !== null}
+        onClose={() => setPreviewOf(null)}
+        title={previewOf ? String(locale === 'ar' ? previewOf.companyNameAr : previewOf.companyNameEn) : ''}
+        subtitle={previewOf ? String(previewOf.reason) : undefined}
+        entityType="COMPANY"
+        entityId={previewOf ? String(previewOf.companyId ?? '') || null : null}
+        testId="support-preview"
+        fields={
+          previewOf
+            ? [
+                { label: t('context.company'), value: String(locale === 'ar' ? previewOf.companyNameAr : previewOf.companyNameEn) },
+                { label: t('support.reason'), value: String(previewOf.reason) },
+                { label: t('audit.actor'), value: String(previewOf.actorEmail ?? '—') },
+                { label: t('common.status'), value: String(previewOf.status) },
+                { label: t('common.created'), value: String(previewOf.createdAt ?? '—').slice(0, 10) },
+                { label: t('support.expiresAt'), value: String(previewOf.expiresAt ?? '—').slice(0, 19).replace('T', ' ') },
+              ]
+            : []
+        }
+      />
 
       <OpenSupportModal
         open={open}

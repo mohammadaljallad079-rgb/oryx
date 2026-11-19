@@ -8,6 +8,9 @@ import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
+import { useFormAttachments } from '@/lib/use-form-attachments';
+import { AttachmentField } from '@/components/attachments';
+import { RecordPreview } from '@/components/record-preview';
 import {
   Badge,
   Button,
@@ -59,6 +62,7 @@ function RolesInner() {
 
   const [editing, setEditing] = useState<RoleDto | null>(null);
   const [creating, setCreating] = useState(false);
+  const [preview, setPreview] = useState<RoleDto | null>(null);
 
   const delegableSet = useMemo(() => new Set(delegable.data?.permissions ?? []), [delegable.data]);
   const catalogByCode = useMemo(() => {
@@ -150,6 +154,9 @@ function RolesInner() {
                   <Badge tone="neutral">
                     {r.permissions.length} {t('roles.permissionCount')}
                   </Badge>
+                  <Button size="sm" onClick={() => setPreview(r)} data-testid={`preview-role-${r.code}`}>
+                    {t('attach.preview')}
+                  </Button>
                   {!r.isSystem && can('company.role.update') ? (
                     <Button size="sm" onClick={() => setEditing(r)} data-testid={`edit-role-${r.code}`}>
                       {t('common.edit')}
@@ -161,6 +168,34 @@ function RolesInner() {
               </Card>
             ))}
       </div>
+
+      <RecordPreview
+        open={preview !== null}
+        onClose={() => setPreview(null)}
+        title={preview ? (locale === 'ar' ? preview.nameAr : preview.nameEn) : ''}
+        subtitle={preview?.code}
+        entityType="ROLE"
+        entityId={preview?.id ?? null}
+        canWriteAttachments={!preview?.isSystem && can('company.role.update')}
+        testId="role-preview"
+        fields={
+          preview
+            ? [
+                { label: t('roles.nameEn'), value: preview.nameEn },
+                { label: t('roles.nameAr'), value: preview.nameAr },
+                { label: t('common.code'), value: preview.code },
+                { label: t('common.type'), value: preview.isSystem ? t('roles.system') : t('roles.custom') },
+                { label: t('roles.members'), value: String(preview.memberCount ?? 0) },
+                { label: t('roles.permissionCount'), value: String(preview.permissions.length) },
+                { label: t('common.notes'), value: preview.descriptionEn ?? '—' },
+              ]
+            : []
+        }
+        table={{
+          headers: [t('roles.permissionCount')],
+          rows: (preview?.permissions ?? []).map((p) => [p]),
+        }}
+      />
 
       <Card className="p-5" data-testid="permission-catalog">
         <p className="oryx-panel-title m-0 mb-1">Permission catalog</p>
@@ -265,12 +300,16 @@ function RoleEditor({
     return map;
   }, [catalog]);
 
+  const attach = useFormAttachments();
+
   async function submit() {
     setBusy(true);
     setError(null);
     try {
       const permissions = [...selected];
       if (role) {
+        await attach.flush(role.id);
+        attach.reset();
         await api.updateRole(role.id, {
           nameEn: form.nameEn,
           nameAr: form.nameAr,
@@ -278,13 +317,15 @@ function RoleEditor({
           permissions,
         });
       } else {
-        await api.createRole(companyId, {
+        const created = await api.createRole(companyId, {
           code: form.code,
           nameEn: form.nameEn,
           nameAr: form.nameAr,
           descriptionEn: form.descriptionEn || undefined,
           permissions,
         });
+        await attach.flush(created.id);
+        attach.reset();
       }
       await onSaved();
     } catch (err) {
@@ -397,6 +438,9 @@ function RoleEditor({
             </div>
           </div>
         ))}
+      </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField entityType="ROLE" entityId={role?.id ?? null} value={attach.items} onChange={attach.setItems} registerFlush={attach.register} canWrite testId="role-attachments" />
       </div>
     </Modal>
   );

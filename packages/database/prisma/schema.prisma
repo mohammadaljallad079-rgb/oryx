@@ -249,6 +249,8 @@ model Company {
   payslips            Payslip[]
   employeeAdvances    EmployeeAdvance[]
   advanceSettlements  AdvanceSettlement[]
+  employeePenalties   EmployeePenalty[]
+  employeeBonuses     EmployeeBonus[]
 
   leadSources         LeadSource[]
   leads               Lead[]
@@ -2262,6 +2264,7 @@ model JobTitle {
 model Employee {
   id             String         @id @default(cuid())
   companyId      String
+  /** Auto-generated when omitted: EMP-0001 per company. */
   code           String
   fullNameEn     String
   fullNameAr     String
@@ -2280,7 +2283,13 @@ model Employee {
   terminationDate DateTime?
   dateOfBirth    DateTime?
   gender         String?
+  nationality    String?
   addressLine    String?
+  /** Bank details, shown only with `erp.hr.salary.read`. */
+  bankName       String?
+  bankAccountIban String?
+  /** Contract type used for the personal card when no contract row exists yet. */
+  contractType   ContractType @default(PERMANENT)
   notes          String?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
@@ -2302,11 +2311,66 @@ model Employee {
   salaryStructures SalaryStructure[]
   payslips       Payslip[]
   advances       EmployeeAdvance[]
+  penalties      EmployeePenalty[]
+  bonuses        EmployeeBonus[]
 
   @@unique([companyId, code])
   @@index([companyId, status])
   @@index([companyId, departmentId])
   @@index([managerId])
+}
+
+/** A disciplinary action recorded against an employee. */
+model EmployeePenalty {
+  id          String   @id @default(cuid())
+  companyId   String
+  employeeId  String
+  actionType  String
+  reason      String
+  /** Date the decision takes effect. */
+  effectiveDate DateTime
+  /** 0 means "no monetary penalty". */
+  amountMinor Int      @default(0)
+  currency    String   @default("SAR")
+  decidedByName String?
+  notes       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, employeeId])
+  @@index([companyId, effectiveDate])
+}
+
+/** A bonus or financial incentive granted to an employee. */
+model EmployeeBonus {
+  id          String   @id @default(cuid())
+  companyId   String
+  employeeId  String
+  /** BONUS, INCENTIVE, COMMISSION, OVERTIME_AWARD or OTHER. */
+  type        String   @default("BONUS")
+  reason      String
+  amountMinor Int
+  currency    String   @default("SAR")
+  /** The payroll period the bonus is payable in. */
+  payPeriodId String?
+  approvedAt  DateTime?
+  /** Set once a payroll run has consumed the bonus, preventing double payment. */
+  payslipId   String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company   Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee  Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  payPeriod PayrollPeriod? @relation(fields: [payPeriodId], references: [id], onDelete: SetNull)
+  payslip   Payslip?      @relation(fields: [payslipId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, employeeId])
+  @@index([companyId, payslipId])
 }
 
 model EmploymentContract {
@@ -2572,6 +2636,7 @@ model PayrollPeriod {
 
   company Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   runs    PayrollRun[]
+  bonuses EmployeeBonus[]
 
   @@unique([companyId, code])
   @@index([companyId, status])
@@ -2631,6 +2696,7 @@ model Payslip {
   payrollRun PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
   employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   lines      PayslipLine[]
+  bonuses    EmployeeBonus[]
 
   @@unique([payrollRunId, employeeId])
   @@index([companyId, employeeId])
@@ -3101,8 +3167,14 @@ model EntityAttachment {
   fileName   String
   mimeType   String?
   sizeBytes  Int      @default(0)
-  /** Opaque storage reference; no binary is stored in the database. */
+  /** Relative path under the configured upload root; no binary is stored in the database. */
   storageRef String?
+  /** SHA-256 of the stored bytes, used to detect a replaced file. */
+  checksum   String?
+  /** The record's lead image (the employee photograph, for example). */
+  isPrimary  Boolean  @default(false)
+  /** Reading a confidential attachment needs the owning module's confidential permission. */
+  isConfidential Boolean @default(false)
   uploadedById String?
   createdAt  DateTime @default(now())
 

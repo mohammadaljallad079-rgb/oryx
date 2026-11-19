@@ -1,12 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import type { AttachmentDto } from '@oryx/shared';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
+import { useFormAttachments } from '@/lib/use-form-attachments';
 import { money, toMinorInput } from '@/lib/erp-format';
 import { Icon } from '@/components/icons';
+import { AttachmentField, type AttachmentFieldHandle } from '@/components/attachments';
+import { RecordPreview } from '@/components/record-preview';
 import {
   Badge,
   Button,
@@ -20,7 +25,7 @@ import {
   StatusBadge,
   TableShell,
 } from '@/components/ui';
-import type { EmployeeDto, LeaveRequestDto, PayrollRunDto } from '@oryx/shared';
+import type { AttendanceDto, EmployeeAdvanceDto, EmployeeDto, LeaveRequestDto, PayrollRunDto } from '@oryx/shared';
 
 type Tab = 'dashboard' | 'employees' | 'leave' | 'attendance' | 'payroll' | 'advances';
 
@@ -101,6 +106,7 @@ function DashboardTab() {
 
 function EmployeesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
+  const router = useRouter();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const list = useAsync(() => api.hrEmployees({ search: search || undefined }), [search]);
@@ -135,6 +141,7 @@ function EmployeesTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.hr.jobTitle')}</th>
               <th>{t('erp.hr.hireDate')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -149,6 +156,15 @@ function EmployeesTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{e.jobTitleNameEn ?? '—'}</td>
                 <td className="text-[12.5px]">{e.hireDate.slice(0, 10)}</td>
                 <td><StatusBadge status={e.status} label={e.status} /></td>
+                <td>
+                  <Button
+                    size="sm"
+                    onClick={() => router.push(`/hr/employees/${e.id}`)}
+                    data-testid={`preview-employee-${e.code}`}
+                  >
+                    {t('attach.preview')}
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -171,23 +187,35 @@ function CreateEmployeeModal({
   onCreated: () => Promise<void>;
 }) {
   const { t } = useUi();
+  const { can } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: '', fullNameEn: '', fullNameAr: '', email: '', departmentId: '', hireDate: new Date().toISOString().slice(0, 10) });
+  const [form, setForm] = useState({ fullNameEn: '', fullNameAr: '', email: '', phone: '', departmentId: '', hireDate: new Date().toISOString().slice(0, 10) });
+  const [attachments, setAttachments] = useState<AttachmentDto[]>([]);
+  const fieldRef = useRef<AttachmentFieldHandle | null>(null);
+  // The employee number is assigned by the server; the form only shows the
+  // value the next save will allocate, refreshed after every successful create.
+  const nextCode = useAsync(() => (open ? api.nextEmployeeCode() : Promise.resolve(null)), [open]);
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.createEmployee({
-        code: form.code,
+      const created = await api.createEmployee({
         fullNameEn: form.fullNameEn,
         fullNameAr: form.fullNameAr,
         email: form.email || undefined,
+        phone: form.phone || undefined,
         departmentId: form.departmentId || undefined,
         hireDate: form.hireDate,
       });
+      // Attachments are part of the same save: the files picked in this form are
+      // uploaded against the new employee before the modal closes.
+      await fieldRef.current?.flush(created.id);
       await onCreated();
+      setAttachments([]);
+      setForm({ fullNameEn: '', fullNameAr: '', email: '', phone: '', departmentId: '', hireDate: new Date().toISOString().slice(0, 10) });
+      await nextCode.reload();
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
@@ -210,8 +238,14 @@ function CreateEmployeeModal({
     >
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="employee-code" />
+        <Field label={t('common.code')} hint={t('erp.hr.codeAutoHint')}>
+          <input
+            className="oryx-input"
+            value={nextCode.data?.code ?? '…'}
+            readOnly
+            disabled
+            data-testid="employee-code"
+          />
         </Field>
         <Field label={t('erp.hr.department')}>
           <select className="oryx-select" value={form.departmentId} onChange={(e) => setForm({ ...form, departmentId: e.target.value })}>
@@ -225,12 +259,29 @@ function CreateEmployeeModal({
         <Field label={`${t('common.name')} (AR)`} required>
           <input className="oryx-input" value={form.fullNameAr} onChange={(e) => setForm({ ...form, fullNameAr: e.target.value })} data-testid="employee-name-ar" />
         </Field>
+        <Field label={t('common.email')}>
+          <input className="oryx-input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="employee-email" />
+        </Field>
         <Field label={t('erp.sales.phone')}>
-          <input className="oryx-input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          <input className="oryx-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} data-testid="employee-phone" />
         </Field>
         <Field label={t('erp.hr.hireDate')} required>
           <input type="date" className="oryx-input" value={form.hireDate} onChange={(e) => setForm({ ...form, hireDate: e.target.value })} />
         </Field>
+      </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField
+          entityType="EMPLOYEE_DOCUMENT"
+          entityId={null}
+          value={attachments}
+          onChange={setAttachments}
+          registerFlush={(handle) => {
+            fieldRef.current = handle;
+          }}
+          canWrite={can('erp.hr.employee.manage')}
+          canMarkConfidential={can('erp.hr.document.confidential')}
+          testId="new-employee-attachments"
+        />
       </div>
     </Modal>
   );
@@ -242,6 +293,7 @@ function LeaveTab({ canRequest, canApprove }: { canRequest: boolean; canApprove:
   const employees = useAsync(() => api.hrEmployees(), []);
   const types = useAsync(() => api.leaveTypes(), []);
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<LeaveRequestDto | null>(null);
 
   return (
     <Card>
@@ -278,22 +330,48 @@ function LeaveTab({ canRequest, canApprove }: { canRequest: boolean; canApprove:
                 <td className="tabular-nums text-[12.5px]">{(r.days / 100).toFixed(2)}</td>
                 <td><StatusBadge status={r.status} label={r.status} /></td>
                 <td>
-                  {canApprove && r.status === 'SUBMITTED' ? (
-                    <div className="flex gap-2">
-                      <Button size="sm" data-testid={`approve-leave-${r.id}`} onClick={async () => { await api.decideLeave(r.id, 'APPROVED'); await list.reload(); }}>
-                        {t('erp.hr.approve')}
-                      </Button>
-                      <Button size="sm" variant="danger" onClick={async () => { await api.decideLeave(r.id, 'REJECTED'); await list.reload(); }}>
-                        {t('erp.hr.reject')}
-                      </Button>
-                    </div>
-                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => setDetail(r)} data-testid={`preview-leave-${r.id}`}>{t('attach.preview')}</Button>
+                    {canApprove && r.status === 'SUBMITTED' ? (
+                      <>
+                        <Button size="sm" data-testid={`approve-leave-${r.id}`} onClick={async () => { await api.decideLeave(r.id, 'APPROVED'); await list.reload(); }}>
+                          {t('erp.hr.approve')}
+                        </Button>
+                        <Button size="sm" variant="danger" onClick={async () => { await api.decideLeave(r.id, 'REJECTED'); await list.reload(); }}>
+                          {t('erp.hr.reject')}
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={detail ? `${t('erp.hr.leaveType')} — ${detail.leaveTypeNameEn}` : ''}
+        subtitle={detail ? `${detail.employeeNameEn} (${detail.employeeCode})` : undefined}
+        entityType="LEAVE_REQUEST"
+        entityId={detail?.id ?? null}
+        canWriteAttachments={canRequest}
+        testId="hr-leave-preview"
+        fields={
+          detail
+            ? [
+                { label: t('erp.hr.employee'), value: `${detail.employeeNameEn} (${detail.employeeCode})` },
+                { label: t('erp.hr.leaveType'), value: detail.leaveTypeNameEn },
+                { label: t('erp.reports.from'), value: detail.startDate.slice(0, 10) },
+                { label: t('erp.reports.to'), value: detail.endDate.slice(0, 10) },
+                { label: t('erp.hr.days'), value: (detail.days / 100).toFixed(2) },
+                { label: t('common.status'), value: detail.status },
+                { label: t('hr.file.reason'), value: detail.reason ?? '—' },
+              ]
+            : []
+        }
+      />
       <LeaveRequestModal
         open={open}
         employees={employees.data?.items ?? []}
@@ -322,18 +400,21 @@ function LeaveRequestModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ employeeId: '', leaveTypeId: '', startDate: '', endDate: '', reason: '' });
+  const attach = useFormAttachments();
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.requestLeave({
+      const created = await api.requestLeave({
         employeeId: form.employeeId,
         leaveTypeId: form.leaveTypeId,
         startDate: form.startDate,
         endDate: form.endDate,
         reason: form.reason || undefined,
       });
+      await attach.flush(created.id);
+      attach.reset();
       await onCreated();
       onClose();
     } catch (e) {
@@ -375,6 +456,20 @@ function LeaveRequestModal({
         <Field label={t('erp.reports.to')} required>
           <input type="date" className="oryx-input" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} data-testid="leave-end" />
         </Field>
+        <Field label={t('common.notes')}>
+          <input className="oryx-input" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} data-testid="leave-reason" />
+        </Field>
+      </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField
+          entityType="LEAVE_REQUEST"
+          entityId={null}
+          value={attach.items}
+          onChange={attach.setItems}
+          registerFlush={attach.register}
+          canWrite
+          testId="new-leave-attachments"
+        />
       </div>
     </Modal>
   );
@@ -383,6 +478,7 @@ function LeaveRequestModal({
 function AttendanceTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const list = useAsync(() => api.hrAttendance(), []);
+  const [detail, setDetail] = useState<AttendanceDto | null>(null);
   return (
     <Card>
       <div className="border-b border-[var(--border)] p-4">
@@ -400,6 +496,7 @@ function AttendanceTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.hr.workedMinutes')}</th>
               <th>{t('erp.hr.overtime')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -410,11 +507,37 @@ function AttendanceTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px]">{a.workedMinutes}</td>
                 <td className="tabular-nums text-[12.5px]">{a.overtimeMinutes}</td>
                 <td><StatusBadge status={a.status} label={a.status} /></td>
+                <td>
+                  <Button size="sm" onClick={() => setDetail(a)} data-testid={`preview-attendance-${a.id}`}>{t('attach.preview')}</Button>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={detail ? `${t('erp.hr.attendance')} — ${detail.workDate.slice(0, 10)}` : ''}
+        subtitle={detail?.employeeNameEn ?? undefined}
+        entityType="ATTENDANCE_RECORD"
+        entityId={detail?.id ?? null}
+        canWriteAttachments={canManage}
+        testId="attendance-preview"
+        fields={
+          detail
+            ? [
+                { label: t('erp.hr.employee'), value: detail.employeeNameEn ?? '—' },
+                { label: t('common.code'), value: detail.employeeCode ?? '—' },
+                { label: t('common.date'), value: detail.workDate.slice(0, 10) },
+                { label: t('erp.hr.workedMinutes'), value: String(detail.workedMinutes) },
+                { label: t('erp.hr.overtime'), value: String(detail.overtimeMinutes) },
+                { label: t('common.status'), value: detail.status },
+              ]
+            : []
+        }
+      />
       <span className="hidden">{canManage ? '1' : '0'}</span>
     </Card>
   );
@@ -425,8 +548,8 @@ function PayrollTab({ canRun, canApprove }: { canRun: boolean; canApprove: boole
   const runs = useAsync(() => api.payrollRuns(), []);
   const periods = useAsync(() => api.payrollPeriods(), []);
   const [open, setOpen] = useState(false);
-  const [detail, setDetail] = useState<string | null>(null);
-  const run = useAsync(() => (detail ? api.payrollRun(detail) : Promise.resolve(null)), [detail]);
+  const [detail, setDetail] = useState<PayrollRunDto | null>(null);
+  const run = useAsync(() => (detail ? api.payrollRun(detail.id) : Promise.resolve(null)), [detail?.id]);
 
   return (
     <Card>
@@ -466,7 +589,7 @@ function PayrollTab({ canRun, canApprove }: { canRun: boolean; canApprove: boole
                 <td><StatusBadge status={r.status} label={r.status} /></td>
                 <td>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => setDetail(r.id)} data-testid={`view-payroll-${r.runNumber}`}>{t('common.details')}</Button>
+                    <Button size="sm" onClick={() => setDetail(r)} data-testid={`view-payroll-${r.runNumber}`}>{t('attach.preview')}</Button>
                     {canApprove && r.status === 'DRAFT' ? (
                       <Button size="sm" variant="primary" data-testid={`approve-payroll-${r.runNumber}`} onClick={async () => { await api.approvePayrollRun(r.id); await runs.reload(); }}>
                         {t('erp.hr.approve')}
@@ -485,38 +608,43 @@ function PayrollTab({ canRun, canApprove }: { canRun: boolean; canApprove: boole
         </TableShell>
       )}
 
-      {detail ? (
-        <div className="border-t border-[var(--border)] p-4" data-testid="payroll-detail">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="oryx-panel-title m-0">{t('erp.hr.payslips')}</p>
-            <Button size="sm" variant="ghost" onClick={() => setDetail(null)}><Icon name="close" size={14} /></Button>
-          </div>
-          {run.loading ? <Skeleton height={100} /> : (
-            <TableShell>
-              <thead>
-                <tr>
-                  <th>{t('erp.hr.employee')}</th>
-                  <th>{t('erp.hr.basic')}</th>
-                  <th>{t('erp.hr.allowances')}</th>
-                  <th>{t('erp.hr.deductions')}</th>
-                  <th>{t('erp.hr.net')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {((run.data?.payslips ?? []) as Array<Record<string, number | string>>).map((p, i) => (
-                  <tr key={i}>
-                    <td className="text-[12.5px]">{String(p.employeeNameEn)} ({String(p.employeeCode)})</td>
-                    <td className="tabular-nums text-[12.5px]">{money(Number(p.basicMinor))}</td>
-                    <td className="tabular-nums text-[12.5px]">{money(Number(p.allowancesMinor))}</td>
-                    <td className="tabular-nums text-[12.5px]">{money(Number(p.deductionsMinor))}</td>
-                    <td className="tabular-nums text-[12.5px] font-semibold">{money(Number(p.netMinor))}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </TableShell>
-          )}
-        </div>
-      ) : null}
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={detail ? `${t('erp.hr.payroll')} — ${detail.runNumber}` : ''}
+        subtitle={detail?.periodNameEn ?? undefined}
+        entityType="PAYROLL_RUN"
+        entityId={detail?.id ?? null}
+        canWriteAttachments={canRun}
+        canMarkConfidential
+        testId="payroll-run-preview"
+        fields={
+          detail
+            ? [
+                { label: t('erp.hr.runNumber'), value: detail.runNumber },
+                { label: t('erp.hr.period'), value: detail.periodNameEn ?? '—' },
+                { label: t('erp.hr.employees'), value: String(detail.employeeCount) },
+                { label: t('erp.hr.gross'), value: money(detail.grossMinor, detail.currency) },
+                { label: t('erp.hr.allowances'), value: money(detail.allowancesMinor, detail.currency) },
+                { label: t('erp.hr.deductions'), value: money(detail.deductionsMinor, detail.currency) },
+                { label: t('erp.hr.net'), value: money(detail.netMinor, detail.currency) },
+                { label: t('common.status'), value: detail.status },
+              ]
+            : []
+        }
+        table={{
+          headers: [t('erp.hr.employee'), t('erp.hr.basic'), t('erp.hr.allowances'), t('erp.hr.deductions'), t('erp.hr.net')],
+          rows: ((run.data?.payslips ?? []) as Array<Record<string, number | string>>).map((p) => [
+            `${String(p.employeeNameEn)} (${String(p.employeeCode)})`,
+            money(Number(p.basicMinor)),
+            money(Number(p.allowancesMinor)),
+            money(Number(p.deductionsMinor)),
+            money(Number(p.netMinor)),
+          ]),
+        }}
+      >
+        {run.loading ? <Skeleton height={100} /> : null}
+      </RecordPreview>
 
       <RunPayrollModal
         open={open}
@@ -543,12 +671,15 @@ function RunPayrollModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [periodId, setPeriodId] = useState('');
+  const attach = useFormAttachments();
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.createPayrollRun({ periodId });
+      const created = await api.createPayrollRun({ periodId });
+      await attach.flush(created.id);
+      attach.reset();
       await onCreated();
       onClose();
     } catch (e) {
@@ -577,6 +708,18 @@ function RunPayrollModal({
           {periods.filter((p) => p.status === 'OPEN').map((p) => <option key={p.id} value={p.id}>{p.code} — {p.nameEn}</option>)}
         </select>
       </Field>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField
+          entityType="PAYROLL_RUN"
+          entityId={null}
+          value={attach.items}
+          onChange={attach.setItems}
+          registerFlush={attach.register}
+          canWrite
+          canMarkConfidential
+          testId="new-payroll-attachments"
+        />
+      </div>
     </Modal>
   );
 }
@@ -584,6 +727,7 @@ function RunPayrollModal({
 function AdvancesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const list = useAsync(() => api.hrAdvances(), []);
+  const [detail, setDetail] = useState<EmployeeAdvanceDto | null>(null);
   return (
     <Card>
       <div className="border-b border-[var(--border)] p-4">
@@ -601,6 +745,7 @@ function AdvancesTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.hr.amount')}</th>
               <th>{t('erp.hr.outstanding')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -611,11 +756,41 @@ function AdvancesTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px]">{money(a.amountMinor, a.currency)}</td>
                 <td className="tabular-nums text-[12.5px]">{money(a.outstandingMinor, a.currency)}</td>
                 <td><StatusBadge status={a.status} label={a.status} /></td>
+                <td>
+                  <Button size="sm" onClick={() => setDetail(a)} data-testid={`preview-advance-${a.advanceNumber}`}>{t('attach.preview')}</Button>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={detail ? `${t('erp.hr.advances')} — ${detail.advanceNumber}` : ''}
+        subtitle={detail?.employeeNameEn ?? undefined}
+        entityType="EMPLOYEE_ADVANCE"
+        entityId={detail?.id ?? null}
+        canWriteAttachments={canManage}
+        canMarkConfidential
+        testId="advance-preview"
+        fields={
+          detail
+            ? [
+                { label: t('erp.hr.advanceNumber'), value: detail.advanceNumber },
+                { label: t('erp.hr.employee'), value: detail.employeeNameEn ?? '—' },
+                { label: t('erp.hr.amount'), value: money(detail.amountMinor, detail.currency) },
+                { label: t('erp.hr.settled'), value: money(detail.settledMinor, detail.currency) },
+                { label: t('erp.hr.outstanding'), value: money(detail.outstandingMinor, detail.currency) },
+                { label: t('erp.hr.installments'), value: String(detail.installments) },
+                { label: t('common.date'), value: detail.issuedAt.slice(0, 10) },
+                { label: t('hr.file.reason'), value: detail.reason ?? '—' },
+                { label: t('common.status'), value: detail.status },
+              ]
+            : []
+        }
+      />
       <span className="hidden">{canManage ? '1' : '0'} {toMinorInput('0')}</span>
     </Card>
   );

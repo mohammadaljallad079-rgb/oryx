@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsBoolean, IsOptional } from 'class-validator';
 import {
@@ -10,9 +10,12 @@ import {
 } from '../auth/auth.decorators';
 import { actorFrom } from '../common/erp-context.service';
 import { HrService } from './hr.service';
+import { EmployeeFileService } from './employee-file.service';
 import {
   AdjustBalanceDto,
   CreateAdvanceDto,
+  CreateBonusDto,
+  CreatePenaltyDto,
   CreateContractDto,
   CreateDepartmentDto,
   CreateDocumentDto,
@@ -24,12 +27,15 @@ import {
   CreateSalaryStructureDto,
   CreateShiftDto,
   DecideLeaveDto,
+  FileRangeQueryDto,
   ListQueryDto,
   RecordAttendanceDto,
   RequestLeaveDto,
   SettleAdvanceDto,
   StartLifecycleDto,
+  UpdateBonusDto,
   UpdateEmployeeDto,
+  UpdatePenaltyDto,
 } from './hr.dto';
 
 interface RequestLike {
@@ -48,7 +54,10 @@ class ToggleItemDto {
 @RequireModule('human_resources')
 @Controller('hr')
 export class HrController {
-  constructor(private readonly hr: HrService) {}
+  constructor(
+    private readonly hr: HrService,
+    private readonly file: EmployeeFileService,
+  ) {}
 
   // ------------------------------------------------------------ departments
   @Get('departments')
@@ -85,6 +94,20 @@ export class HrController {
   @ApiOperation({ summary: 'List employees' })
   employees(@Query() query: ListQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
     return this.hr.listEmployees(query, p);
+  }
+
+  /**
+   * The number the next employee will receive.
+   *
+   * The form shows it read-only: the operator never types an employee number,
+   * and the value is a preview because the real allocation happens inside the
+   * create transaction.
+   */
+  @Get('employees/next-code')
+  @RequirePermissions('erp.hr.employee.manage')
+  @ApiOperation({ summary: 'Preview the next employee number' })
+  nextEmployeeCode(@CurrentPrincipal() p: RequestPrincipal) {
+    return this.hr.previewEmployeeCode(p);
   }
 
   @Get('employees/:id')
@@ -303,6 +326,105 @@ export class HrController {
   @ApiOperation({ summary: 'Settle part of an advance' })
   settleAdvance(@Param('id') id: string, @Body() dto: SettleAdvanceDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
     return this.hr.settleAdvance(id, dto, p, actorFrom(p, req));
+  }
+
+  // ---------------------------------------------------- employee file (tabs)
+  @Get('employees/:id/file/counts')
+  @RequireAnyPermission('erp.hr.read', 'erp.hr.employee.manage')
+  @ApiOperation({ summary: 'Tab badge counts for the employee electronic file' })
+  fileCounts(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.file.counts(id, p);
+  }
+
+  @Get('employees/:id/file/personal-card')
+  @RequireAnyPermission('erp.hr.read', 'erp.hr.employee.manage')
+  @ApiOperation({ summary: 'Personal card tab (salary and bank details need erp.hr.salary.read)' })
+  filePersonalCard(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.file.personalCard(id, p);
+  }
+
+  @Get('employees/:id/file/payroll')
+  @RequirePermissions('erp.hr.salary.read')
+  @ApiOperation({ summary: 'Payroll ledger tab, optionally narrowed to a period window' })
+  filePayroll(@Param('id') id: string, @Query() query: FileRangeQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.file.payrollLedger(id, query, p);
+  }
+
+  @Get('employees/:id/file/leave')
+  @RequireAnyPermission('erp.hr.read', 'erp.hr.employee.manage')
+  @ApiOperation({ summary: 'Leave tab: requests and balances' })
+  fileLeave(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.file.leave(id, p);
+  }
+
+  @Get('employees/:id/file/penalties')
+  @RequireAnyPermission('erp.hr.read', 'erp.hr.penalty.manage')
+  @ApiOperation({ summary: 'Disciplinary actions tab' })
+  filePenalties(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.file.listPenalties(id, p);
+  }
+
+  @Post('employees/:id/file/penalties')
+  @RequirePermissions('erp.hr.penalty.manage')
+  @ApiOperation({ summary: 'Record a disciplinary action' })
+  createPenalty(@Param('id') id: string, @Body() dto: CreatePenaltyDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.file.createPenalty(id, dto, p, actorFrom(p, req));
+  }
+
+  @Patch('file/penalties/:penaltyId')
+  @RequirePermissions('erp.hr.penalty.manage')
+  @ApiOperation({ summary: 'Edit a disciplinary action' })
+  updatePenalty(@Param('penaltyId') penaltyId: string, @Body() dto: UpdatePenaltyDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.file.updatePenalty(penaltyId, dto, p, actorFrom(p, req));
+  }
+
+  @Delete('file/penalties/:penaltyId')
+  @RequirePermissions('erp.hr.penalty.manage')
+  @ApiOperation({ summary: 'Delete a disciplinary action' })
+  deletePenalty(@Param('penaltyId') penaltyId: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.file.deletePenalty(penaltyId, p, actorFrom(p, req));
+  }
+
+  @Get('employees/:id/file/bonuses')
+  @RequirePermissions('erp.hr.salary.read')
+  @ApiOperation({ summary: 'Bonuses and incentives tab' })
+  fileBonuses(@Param('id') id: string, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.file.listBonuses(id, p);
+  }
+
+  @Post('employees/:id/file/bonuses')
+  @RequirePermissions('erp.hr.bonus.manage')
+  @ApiOperation({ summary: 'Grant a bonus or incentive' })
+  createBonus(@Param('id') id: string, @Body() dto: CreateBonusDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.file.createBonus(id, dto, p, actorFrom(p, req));
+  }
+
+  @Patch('file/bonuses/:bonusId')
+  @RequirePermissions('erp.hr.bonus.manage')
+  @ApiOperation({ summary: 'Edit an unpaid bonus' })
+  updateBonus(@Param('bonusId') bonusId: string, @Body() dto: UpdateBonusDto, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.file.updateBonus(bonusId, dto, p, actorFrom(p, req));
+  }
+
+  @Post('file/bonuses/:bonusId/approve')
+  @RequirePermissions('erp.hr.bonus.manage')
+  @ApiOperation({ summary: 'Approve a bonus so the next payroll run consumes it' })
+  approveBonus(@Param('bonusId') bonusId: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.file.approveBonus(bonusId, p, actorFrom(p, req));
+  }
+
+  @Delete('file/bonuses/:bonusId')
+  @RequirePermissions('erp.hr.bonus.manage')
+  @ApiOperation({ summary: 'Delete an unpaid bonus' })
+  deleteBonus(@Param('bonusId') bonusId: string, @CurrentPrincipal() p: RequestPrincipal, @Req() req: RequestLike) {
+    return this.file.deleteBonus(bonusId, p, actorFrom(p, req));
+  }
+
+  @Get('employees/:id/file/reports')
+  @RequireAnyPermission('erp.hr.report.read', 'erp.hr.read')
+  @ApiOperation({ summary: 'Employee report pack for a date window' })
+  fileReports(@Param('id') id: string, @Query() query: FileRangeQueryDto, @CurrentPrincipal() p: RequestPrincipal) {
+    return this.file.reports(id, query, p);
   }
 
   // --------------------------------------------------------------- reporting

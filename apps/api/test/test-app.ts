@@ -297,6 +297,10 @@ export async function cleanupFixtures(prisma: PrismaService): Promise<void> {
   await prisma.supplier.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.documentSequence.deleteMany({ where: { companyId: { in: ids } } });
 
+  // Execution 06 — the bonus register references payslips, so it goes first.
+  await prisma.employeeBonus.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.employeePenalty.deleteMany({ where: { companyId: { in: ids } } });
+
   // Execution 03 — delete children before parents so foreign keys hold.
   await prisma.advanceSettlement.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.employeeAdvance.deleteMany({ where: { companyId: { in: ids } } });

@@ -1,11 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
+import { useFormAttachments } from '@/lib/use-form-attachments';
 import { Icon } from '@/components/icons';
+import { AttachmentField, type AttachmentFieldHandle } from '@/components/attachments';
+import { RecordPreview } from '@/components/record-preview';
 import {
   Badge,
   Button,
@@ -19,7 +22,7 @@ import {
   StatusBadge,
   TableShell,
 } from '@/components/ui';
-import type { ProjectDto, ProjectTaskDto, WorkOrderDto } from '@oryx/shared';
+import type { AttachmentDto, ProjectDto, ProjectTaskDto, WorkOrderDto } from '@oryx/shared';
 
 type Tab = 'dashboard' | 'projects' | 'tasks' | 'work-orders' | 'approvals' | 'calendar' | 'notifications';
 
@@ -98,6 +101,7 @@ function ProjectsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const list = useAsync(() => api.operationsProjects(), []);
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<ProjectDto | null>(null);
   return (
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
@@ -120,6 +124,7 @@ function ProjectsTab({ canManage }: { canManage: boolean }) {
               <th>{t('common.name')}</th>
               <th>{t('erp.operations.tasksCount')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -129,11 +134,35 @@ function ProjectsTab({ canManage }: { canManage: boolean }) {
                 <td className="font-semibold">{p.nameEn}</td>
                 <td className="tabular-nums text-[12.5px]">{p.taskCount ?? 0}</td>
                 <td><StatusBadge status={p.status} label={p.status} /></td>
+                <td>
+                  <Button size="sm" onClick={() => setDetail(p)} data-testid={`preview-project-${p.code}`}>{t('attach.preview')}</Button>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={detail ? `${detail.code} — ${detail.nameEn}` : ''}
+        subtitle={detail?.nameAr}
+        entityType="PROJECT"
+        entityId={detail?.id ?? null}
+        canWriteAttachments={canManage}
+        testId="project-preview"
+        fields={
+          detail
+            ? [
+                { label: t('common.code'), value: detail.code },
+                { label: `${t('common.name')} (EN)`, value: detail.nameEn },
+                { label: `${t('common.name')} (AR)`, value: detail.nameAr },
+                { label: t('erp.operations.tasksCount'), value: String(detail.taskCount ?? 0) },
+                { label: t('common.status'), value: detail.status },
+              ]
+            : []
+        }
+      />
       <CreateProjectModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
     </Card>
   );
@@ -144,10 +173,13 @@ function CreateProjectModal({ open, onClose, onCreated }: { open: boolean; onClo
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '' });
+  const attach = useFormAttachments();
   const submit = async () => {
     setBusy(true); setError(null);
     try {
-      await api.createOperationsProject(form);
+      const created = await api.createOperationsProject(form);
+      await attach.flush(created.id);
+      attach.reset();
       await onCreated();
       onClose();
     } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); } finally { setBusy(false); }
@@ -161,6 +193,9 @@ function CreateProjectModal({ open, onClose, onCreated }: { open: boolean; onClo
         <Field label={`${t('common.name')} (EN)`} required><input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="project-name-en" /></Field>
         <Field label={`${t('common.name')} (AR)`} required><input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="project-name-ar" /></Field>
       </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField entityType="PROJECT" entityId={null} value={attach.items} onChange={attach.setItems} registerFlush={attach.register} canWrite testId="new-project-attachments" />
+      </div>
     </Modal>
   );
 }
@@ -170,8 +205,8 @@ function WorkOrdersTab({ canManage }: { canManage: boolean }) {
   const list = useAsync(() => api.workOrders(), []);
   const projects = useAsync(() => api.operationsProjects(), []);
   const [open, setOpen] = useState(false);
-  const [detail, setDetail] = useState<string | null>(null);
-  const order = useAsync(() => (detail ? api.workOrder(detail) : Promise.resolve(null)), [detail]);
+  const [detail, setDetail] = useState<WorkOrderDto | null>(null);
+  const order = useAsync(() => (detail ? api.workOrder(detail.id) : Promise.resolve(null)), [detail?.id]);
 
   return (
     <Card>
@@ -207,7 +242,7 @@ function WorkOrdersTab({ canManage }: { canManage: boolean }) {
                 <td><StatusBadge status={w.status} label={w.status} /></td>
                 <td>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => setDetail(w.id)} data-testid={`view-work-order-${w.orderNumber}`}>{t('common.details')}</Button>
+                    <Button size="sm" onClick={() => setDetail(w)} data-testid={`view-work-order-${w.orderNumber}`}>{t('attach.preview')}</Button>
                     {canManage && w.status === 'OPEN' ? (
                       <Button size="sm" variant="primary" data-testid={`start-work-order-${w.orderNumber}`} onClick={async () => { await api.updateWorkOrder(w.id, { status: 'IN_PROGRESS' }); await list.reload(); }}>
                         {t('erp.operations.start')}
@@ -226,30 +261,45 @@ function WorkOrdersTab({ canManage }: { canManage: boolean }) {
         </TableShell>
       )}
 
-      {detail ? (
-        <div className="border-t border-[var(--border)] p-4" data-testid="work-order-detail">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="oryx-panel-title m-0">{t('erp.operations.checklist')}</p>
-            <Button size="sm" variant="ghost" onClick={() => setDetail(null)}><Icon name="close" size={14} /></Button>
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={detail ? `${detail.orderNumber} — ${detail.title}` : ''}
+        subtitle={detail ? `${t('erp.operations.workOrders')} · ${detail.status}` : undefined}
+        entityType="WORK_ORDER"
+        entityId={detail?.id ?? null}
+        canWriteAttachments={canManage}
+        canMarkConfidential={canManage}
+        testId="work-order-preview"
+        fields={[
+          { label: t('erp.operations.orderNumber'), value: detail?.orderNumber ?? '—' },
+          { label: t('erp.operations.title'), value: detail?.title ?? '—' },
+          { label: t('erp.crm.priority'), value: detail?.priority ?? '—' },
+          { label: t('common.status'), value: detail?.status ?? '—' },
+        ]}
+      >
+        {detail ? (
+          <div data-testid="work-order-detail">
+            <p className="oryx-panel-title m-0 mb-2">{t('erp.operations.checklist')}</p>
+            {order.loading ? <Skeleton height={80} /> : (
+              <div className="flex flex-col gap-2">
+                {(order.data?.checklist ?? []).map((c) => (
+                  <label key={c.id} className="flex items-center gap-2 text-[13px]">
+                    <input
+                      type="checkbox"
+                      checked={c.isDone}
+                      disabled={!canManage}
+                      onChange={async () => { await api.toggleWorkOrderChecklist(c.id, !c.isDone); await order.reload(); }}
+                      data-testid={`checklist-${c.id}`}
+                    />
+                    <span className={c.isDone ? 'line-through opacity-60' : ''}>{c.label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
-          {order.loading ? <Skeleton height={80} /> : (
-            <div className="flex flex-col gap-2">
-              {(order.data?.checklist ?? []).map((c) => (
-                <label key={c.id} className="flex items-center gap-2 text-[13px]">
-                  <input
-                    type="checkbox"
-                    checked={c.isDone}
-                    disabled={!canManage}
-                    onChange={async () => { await api.toggleWorkOrderChecklist(c.id, !c.isDone); await order.reload(); }}
-                    data-testid={`checklist-${c.id}`}
-                  />
-                  <span className={c.isDone ? 'line-through opacity-60' : ''}>{c.label}</span>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : null}
+        ) : null}
+      </RecordPreview>
 
       <CreateWorkOrderModal open={open} projects={projects.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
     </Card>
@@ -268,9 +318,12 @@ function CreateWorkOrderModal({
   onCreated: () => Promise<void>;
 }) {
   const { t } = useUi();
+  const { can } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ title: '', description: '', projectId: '', priority: 'NORMAL', checklist: '' });
+  const [attachments, setAttachments] = useState<AttachmentDto[]>([]);
+  const fieldRef = useRef<AttachmentFieldHandle | null>(null);
   const submit = async () => {
     setBusy(true); setError(null);
     try {
@@ -279,14 +332,17 @@ function CreateWorkOrderModal({
         .map((s) => s.trim())
         .filter(Boolean)
         .map((label) => ({ label }));
-      await api.createWorkOrder({
+      const created = await api.createWorkOrder({
         title: form.title,
         description: form.description || undefined,
         projectId: form.projectId || undefined,
         priority: form.priority,
         checklist: checklist.length > 0 ? checklist : undefined,
       });
+      // Attachments belong to the same save as the record.
+      await fieldRef.current?.flush(created.id);
       await onCreated();
+      setAttachments([]);
       onClose();
     } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); } finally { setBusy(false); }
   };
@@ -314,6 +370,19 @@ function CreateWorkOrderModal({
           <textarea className="oryx-input" rows={3} value={form.checklist} onChange={(e) => setForm({ ...form, checklist: e.target.value })} data-testid="work-order-checklist" />
         </Field>
       </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField
+          entityType="WORK_ORDER"
+          entityId={null}
+          value={attachments}
+          onChange={setAttachments}
+          registerFlush={(handle) => {
+            fieldRef.current = handle;
+          }}
+          canWrite={can('erp.operations.workorder.manage')}
+          testId="new-work-order-attachments"
+        />
+      </div>
     </Modal>
   );
 }
@@ -321,6 +390,7 @@ function CreateWorkOrderModal({
 function TasksTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const list = useAsync(() => api.operationsTasks(), []);
+  const [detail, setDetail] = useState<ProjectTaskDto | null>(null);
   return (
     <Card>
       <div className="border-b border-[var(--border)] p-4">
@@ -348,15 +418,38 @@ function TasksTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{task.dueDate ? task.dueDate.slice(0, 10) : '—'}</td>
                 <td><StatusBadge status={task.status} label={task.status} /></td>
                 <td>
-                  {canManage && task.status !== 'DONE' ? (
-                    <Button size="sm" onClick={async () => { await api.updateOperationsTask(task.id, { status: 'DONE' }); await list.reload(); }}>{t('erp.operations.complete')}</Button>
-                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => setDetail(task)} data-testid={`preview-task-${task.id}`}>{t('attach.preview')}</Button>
+                    {canManage && task.status !== 'DONE' ? (
+                      <Button size="sm" onClick={async () => { await api.updateOperationsTask(task.id, { status: 'DONE' }); await list.reload(); }}>{t('erp.operations.complete')}</Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={detail?.title ?? ''}
+        entityType="PROJECT_TASK"
+        entityId={detail?.id ?? null}
+        canWriteAttachments={canManage}
+        testId="task-preview"
+        fields={
+          detail
+            ? [
+                { label: t('erp.operations.title'), value: detail.title },
+                { label: t('erp.crm.priority'), value: detail.priority },
+                { label: t('erp.crm.dueAt'), value: detail.dueDate ? detail.dueDate.slice(0, 10) : '—' },
+                { label: t('common.status'), value: detail.status },
+              ]
+            : []
+        }
+      />
     </Card>
   );
 }
@@ -364,6 +457,7 @@ function TasksTab({ canManage }: { canManage: boolean }) {
 function ApprovalsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const list = useAsync(() => api.operationsApprovals(), []);
+  const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
   return (
     <Card>
       <div className="border-b border-[var(--border)] p-4">
@@ -387,18 +481,40 @@ function ApprovalsTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{String(a.entityType)}</td>
                 <td><StatusBadge status={String(a.status)} label={String(a.status)} /></td>
                 <td>
-                  {canManage && a.status === 'PENDING' ? (
-                    <div className="flex gap-2">
-                      <Button size="sm" data-testid={`approve-${String(a.id)}`} onClick={async () => { await api.decideApproval(String(a.id), 'APPROVED'); await list.reload(); }}>{t('erp.hr.approve')}</Button>
-                      <Button size="sm" variant="danger" onClick={async () => { await api.decideApproval(String(a.id), 'REJECTED'); await list.reload(); }}>{t('erp.hr.reject')}</Button>
-                    </div>
-                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => setDetail(a)} data-testid={`preview-approval-${String(a.id)}`}>{t('attach.preview')}</Button>
+                    {canManage && a.status === 'PENDING' ? (
+                      <>
+                        <Button size="sm" data-testid={`approve-${String(a.id)}`} onClick={async () => { await api.decideApproval(String(a.id), 'APPROVED'); await list.reload(); }}>{t('erp.hr.approve')}</Button>
+                        <Button size="sm" variant="danger" onClick={async () => { await api.decideApproval(String(a.id), 'REJECTED'); await list.reload(); }}>{t('erp.hr.reject')}</Button>
+                      </>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={detail ? `${t('erp.operations.approvals')} — ${String(detail.entityType)}` : ''}
+        entityType="APPROVAL_REQUEST"
+        entityId={detail ? String(detail.id) : null}
+        canWriteAttachments={canManage}
+        testId="approval-preview"
+        fields={
+          detail
+            ? [
+                { label: t('erp.operations.entity'), value: String(detail.entityType) },
+                { label: t('common.status'), value: String(detail.status) },
+                { label: t('common.date'), value: detail.createdAt ? String(detail.createdAt).slice(0, 10) : '—' },
+              ]
+            : []
+        }
+      />
     </Card>
   );
 }

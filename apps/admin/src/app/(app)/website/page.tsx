@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
+import { RecordPreview } from '@/components/record-preview';
 import {
   Badge,
   Button,
@@ -30,6 +31,8 @@ function WebsiteCmsPageInner() {
   const [editingBanner, setEditingBanner] = useState<CmsBannerDto | null>(null);
   const [creatingPage, setCreatingPage] = useState(false);
   const [creatingBanner, setCreatingBanner] = useState(false);
+  const [previewPage, setPreviewPage] = useState<CmsPageDto | null>(null);
+  const [previewBanner, setPreviewBanner] = useState<CmsBannerDto | null>(null);
 
   return (
     <div className="flex flex-col gap-5" data-testid="website-page">
@@ -119,6 +122,9 @@ function WebsiteCmsPageInner() {
                     </td>
                     <td>
                       <div className="flex gap-2">
+                        <Button size="sm" onClick={() => setPreviewPage(p)} data-testid={`preview-cms-page-${p.slug}`}>
+                          {t('attach.preview')}
+                        </Button>
                         <Button size="sm" onClick={() => setEditingPage(p)}>
                           {t('common.edit')}
                         </Button>
@@ -181,9 +187,14 @@ function WebsiteCmsPageInner() {
                       </Badge>
                     </td>
                     <td>
-                      <Button size="sm" onClick={() => setEditingBanner(b)}>
-                        {t('common.edit')}
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => setPreviewBanner(b)} data-testid={`preview-cms-banner-${b.id}`}>
+                          {t('attach.preview')}
+                        </Button>
+                        <Button size="sm" onClick={() => setEditingBanner(b)}>
+                          {t('common.edit')}
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -192,6 +203,56 @@ function WebsiteCmsPageInner() {
           )}
         </Card>
       )}
+
+      <RecordPreview
+        open={previewPage !== null}
+        onClose={() => setPreviewPage(null)}
+        title={previewPage?.title ?? ''}
+        subtitle={previewPage ? `/${previewPage.slug} · ${previewPage.locale.toUpperCase()}` : undefined}
+        entityId={previewPage?.id ?? null}
+        testId="cms-page-preview"
+        fields={
+          previewPage
+            ? [
+                { label: t('cms.slug'), value: previewPage.slug },
+                { label: t('cms.titleField'), value: previewPage.title },
+                { label: t('cms.locale'), value: previewPage.locale.toUpperCase() },
+                { label: t('common.status'), value: previewPage.status },
+                { label: t('cms.excerpt'), value: previewPage.excerpt ?? '—' },
+                { label: t('common.created'), value: previewPage.publishedAt?.slice(0, 10) ?? '—' },
+                { label: t('common.updated'), value: previewPage.updatedAt.slice(0, 10) },
+              ]
+            : []
+        }
+      >
+        {previewPage ? (
+          <div className="max-h-[40vh] overflow-auto rounded-lg border p-3 text-[12.5px]" style={{ borderColor: 'var(--border)' }}>
+            {previewPage.body}
+          </div>
+        ) : null}
+      </RecordPreview>
+
+      <RecordPreview
+        open={previewBanner !== null}
+        onClose={() => setPreviewBanner(null)}
+        title={previewBanner?.title ?? ''}
+        subtitle={previewBanner ? `${previewBanner.placement} · ${previewBanner.locale.toUpperCase()}` : undefined}
+        entityId={previewBanner?.id ?? null}
+        testId="cms-banner-preview"
+        fields={
+          previewBanner
+            ? [
+                { label: t('cms.placement'), value: previewBanner.placement },
+                { label: t('cms.titleField'), value: previewBanner.title },
+                { label: t('cms.subtitleField'), value: previewBanner.subtitle ?? '—' },
+                { label: t('cms.locale'), value: previewBanner.locale.toUpperCase() },
+                { label: t('common.active'), value: previewBanner.isActive ? t('common.yes') : t('common.no') },
+                { label: t('cms.actionUrl'), value: previewBanner.actionUrl ?? '—' },
+                { label: t('cms.imageUrl'), value: previewBanner.imageUrl ?? '—' },
+              ]
+            : []
+        }
+      />
 
       <PageEditor
         open={creatingPage || Boolean(editingPage)}

@@ -3,11 +3,15 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 
+import type { BranchDto } from '@oryx/shared';
 import { api } from '@/lib/api';
 import { errorMessageKey, useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
+import { useFormAttachments } from '@/lib/use-form-attachments';
+import { AttachmentField } from '@/components/attachments';
+import { RecordPreview } from '@/components/record-preview';
 import {
   Badge,
   Button,
@@ -37,6 +41,7 @@ function BranchesInner() {
   const scopeCompanyId = queryCompanyId ?? companyId;
 
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<BranchDto | null>(null);
   const [limit, setLimit] = useState<{ maxBranches: number; used: number } | null>(null);
 
   const list = useAsync(
@@ -131,19 +136,24 @@ function BranchesInner() {
                     </Badge>
                   </td>
                   <td>
-                    {can('company.branch.delete') ? (
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        disabled={!b.isActive}
-                        onClick={async () => {
-                          await api.deleteBranch(b.id);
-                          await list.reload();
-                        }}
-                      >
-                        {t('branches.deactivate')}
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => setDetail(b)} data-testid={`preview-branch-${b.code}`}>
+                        {t('attach.preview')}
                       </Button>
-                    ) : null}
+                      {can('company.branch.delete') ? (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          disabled={!b.isActive}
+                          onClick={async () => {
+                            await api.deleteBranch(b.id);
+                            await list.reload();
+                          }}
+                        >
+                          {t('branches.deactivate')}
+                        </Button>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -152,6 +162,31 @@ function BranchesInner() {
         )}
       </Card>
 
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={detail ? `${detail.code} — ${detail.nameEn}` : ''}
+        subtitle={detail?.nameAr}
+        entityType="BRANCH"
+        entityId={detail?.id ?? null}
+        canWriteAttachments={can('company.branch.update')}
+        testId="branch-preview"
+        fields={
+          detail
+            ? [
+                { label: t('common.code'), value: detail.code },
+                { label: `${t('common.name')} (EN)`, value: detail.nameEn },
+                { label: `${t('common.name')} (AR)`, value: detail.nameAr },
+                { label: t('context.company'), value: detail.companyNameEn },
+                { label: t('common.city'), value: detail.city ?? '—' },
+                { label: t('companies.country'), value: detail.countryCode ?? '—' },
+                { label: t('branches.timezone'), value: detail.timezone },
+                { label: t('branches.usersAssigned'), value: String(detail.userCount ?? 0) },
+                { label: t('common.status'), value: detail.isActive ? t('common.active') : t('common.inactive') },
+              ]
+            : []
+        }
+      />
       <CreateBranchModal
         open={open}
         companyId={scopeCompanyId}
@@ -189,18 +224,21 @@ function CreateBranchModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', city: '', phone: '' });
+  const attach = useFormAttachments();
 
   async function submit() {
     setBusy(true);
     setError(null);
     try {
-      await api.createBranch(companyId, {
+      const created = await api.createBranch(companyId, {
         code: form.code.toUpperCase(),
         nameEn: form.nameEn,
         nameAr: form.nameAr,
         city: form.city || undefined,
         phone: form.phone || undefined,
       });
+      await attach.flush(created.id);
+      attach.reset();
       await onCreated();
       setForm({ code: '', nameEn: '', nameAr: '', city: '', phone: '' });
     } catch (err) {
@@ -286,6 +324,9 @@ function CreateBranchModal({
             data-testid="branch-name-ar"
           />
         </Field>
+      </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField entityType="BRANCH" entityId={null} value={attach.items} onChange={attach.setItems} registerFlush={attach.register} canWrite testId="new-branch-attachments" />
       </div>
     </Modal>
   );

@@ -44,7 +44,7 @@ export class CreateJobTitleDto {
 // --------------------------------------------------------------- employees
 
 export class CreateEmployeeDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
+  /** Optional: the API allocates EMP-0001 per company when omitted. */
   @IsString() @MinLength(2) @MaxLength(200) fullNameEn!: string;
   @IsString() @MinLength(2) @MaxLength(200) fullNameAr!: string;
   @IsOptional() @IsString() @MaxLength(160) email?: string;
@@ -57,7 +57,11 @@ export class CreateEmployeeDto {
   @IsISO8601() hireDate!: string;
   @IsOptional() @IsISO8601() dateOfBirth?: string;
   @IsOptional() @IsString() @MaxLength(20) gender?: string;
+  @IsOptional() @IsString() @MaxLength(80) nationality?: string;
   @IsOptional() @IsString() @MaxLength(240) addressLine?: string;
+  @IsOptional() @IsString() @MaxLength(160) bankName?: string;
+  @IsOptional() @IsString() @MaxLength(60) bankAccountIban?: string;
+  @IsOptional() @IsIn(['PERMANENT', 'FIXED_TERM', 'PART_TIME', 'CONTRACTOR']) contractType?: string;
   @IsOptional() @IsString() @MaxLength(600) notes?: string;
 }
 
@@ -72,7 +76,14 @@ export class UpdateEmployeeDto {
   @IsOptional() @IsString() managerId?: string;
   @IsOptional() @IsIn(['ACTIVE', 'ON_LEAVE', 'SUSPENDED', 'TERMINATED']) status?: string;
   @IsOptional() @IsISO8601() terminationDate?: string;
+  @IsOptional() @IsString() @MaxLength(40) nationalId?: string;
+  @IsOptional() @IsISO8601() dateOfBirth?: string;
+  @IsOptional() @IsString() @MaxLength(20) gender?: string;
+  @IsOptional() @IsString() @MaxLength(80) nationality?: string;
   @IsOptional() @IsString() @MaxLength(240) addressLine?: string;
+  @IsOptional() @IsString() @MaxLength(160) bankName?: string;
+  @IsOptional() @IsString() @MaxLength(60) bankAccountIban?: string;
+  @IsOptional() @IsIn(['PERMANENT', 'FIXED_TERM', 'PART_TIME', 'CONTRACTOR']) contractType?: string;
   @IsOptional() @IsString() @MaxLength(600) notes?: string;
 }
 
@@ -208,4 +219,47 @@ export class CreateAdvanceDto {
 export class SettleAdvanceDto {
   @Type(() => Number) @IsInt() @Min(1) amountMinor!: number;
   @IsOptional() @IsString() @MaxLength(400) note?: string;
+}
+
+// ------------------------------------------- employee file: penalties & bonuses
+
+export class CreatePenaltyDto {
+  @IsString() @MinLength(1) @MaxLength(80) actionType!: string;
+  @IsString() @MinLength(2) @MaxLength(600) reason!: string;
+  @IsISO8601() effectiveDate!: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) amountMinor?: number;
+  @IsOptional() @IsString() @MaxLength(3) currency?: string;
+  @IsOptional() @IsString() @MaxLength(160) decidedByName?: string;
+  @IsOptional() @IsString() @MaxLength(600) notes?: string;
+}
+
+export class UpdatePenaltyDto {
+  @IsOptional() @IsString() @MinLength(1) @MaxLength(80) actionType?: string;
+  @IsOptional() @IsString() @MinLength(2) @MaxLength(600) reason?: string;
+  @IsOptional() @IsISO8601() effectiveDate?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) amountMinor?: number;
+  @IsOptional() @IsString() @MaxLength(160) decidedByName?: string;
+  @IsOptional() @IsString() @MaxLength(600) notes?: string;
+}
+
+export class CreateBonusDto {
+  @IsOptional() @IsIn(['BONUS', 'INCENTIVE', 'COMMISSION', 'OVERTIME_AWARD', 'OTHER']) type?: string;
+  @IsString() @MinLength(2) @MaxLength(600) reason!: string;
+  @Type(() => Number) @IsInt() @Min(1) amountMinor!: number;
+  @IsOptional() @IsString() @MaxLength(3) currency?: string;
+  @IsOptional() @IsString() payPeriodId?: string;
+  @IsOptional() @IsBoolean() approveNow?: boolean;
+}
+
+export class UpdateBonusDto {
+  @IsOptional() @IsIn(['BONUS', 'INCENTIVE', 'COMMISSION', 'OVERTIME_AWARD', 'OTHER']) type?: string;
+  @IsOptional() @IsString() @MinLength(2) @MaxLength(600) reason?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) amountMinor?: number;
+  @IsOptional() @IsString() payPeriodId?: string;
+}
+
+/** Date window for the employee-file reports and payslip exports. */
+export class FileRangeQueryDto {
+  @IsOptional() @IsISO8601() from?: string;
+  @IsOptional() @IsISO8601() to?: string;
 }

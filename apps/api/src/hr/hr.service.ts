@@ -158,18 +158,29 @@ export class HrService {
     return toEmployeeDetailDto(employee);
   }
 
+  /**
+   * The employee number the next create will allocate, for the read-only field
+   * in the form. The allocation itself happens inside `createEmployee`.
+   */
+  async previewEmployeeCode(principal: RequestPrincipal): Promise<{ code: string }> {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    return { code: await this.sequences.peek(companyId, 'employee') };
+  }
+
   async createEmployee(dto: CreateEmployeeDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
-    const dup = await this.prisma.employee.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Employee code ${dto.code} already exists.`);
     if (dto.managerId) await this.assertEmployee(companyId, dto.managerId);
 
     const employee = await this.posting.withTransaction(async (tx) => {
+      // The employee number is always server-assigned, inside the transaction:
+      // a rolled-back create does not burn a number and two concurrent creates
+      // never receive the same one.
+      const code = await this.sequences.next(tx, companyId, 'employee');
       const created = await tx.employee.create({
         data: {
           companyId,
-          code: dto.code,
+          code,
           fullNameEn: dto.fullNameEn,
           fullNameAr: dto.fullNameAr,
           email: dto.email ?? null,
@@ -182,7 +193,11 @@ export class HrService {
           hireDate: new Date(dto.hireDate),
           dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
           gender: dto.gender ?? null,
+          nationality: dto.nationality ?? null,
           addressLine: dto.addressLine ?? null,
+          bankName: dto.bankName ?? null,
+          bankAccountIban: dto.bankAccountIban ?? null,
+          contractType: (dto.contractType as never) ?? 'PERMANENT',
           notes: dto.notes ?? null,
         },
       });
@@ -224,7 +239,14 @@ export class HrService {
         ...(dto.managerId !== undefined ? { managerId: dto.managerId } : {}),
         ...(dto.status !== undefined ? { status: dto.status as never } : {}),
         ...(dto.terminationDate !== undefined ? { terminationDate: new Date(dto.terminationDate) } : {}),
+        ...(dto.nationalId !== undefined ? { nationalId: dto.nationalId } : {}),
+        ...(dto.dateOfBirth !== undefined ? { dateOfBirth: new Date(dto.dateOfBirth) } : {}),
+        ...(dto.gender !== undefined ? { gender: dto.gender } : {}),
+        ...(dto.nationality !== undefined ? { nationality: dto.nationality } : {}),
         ...(dto.addressLine !== undefined ? { addressLine: dto.addressLine } : {}),
+        ...(dto.bankName !== undefined ? { bankName: dto.bankName } : {}),
+        ...(dto.bankAccountIban !== undefined ? { bankAccountIban: dto.bankAccountIban } : {}),
+        ...(dto.contractType !== undefined ? { contractType: dto.contractType as never } : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
       },
     });
@@ -658,6 +680,9 @@ export class HrService {
         salaryStructures: { where: { isActive: true }, include: { components: true } },
         advances: { where: { status: { in: ['OPEN', 'PARTIALLY_SETTLED'] } } },
         attendance: { where: { workDate: { gte: period.startDate, lte: period.endDate } } },
+        // Only approved, unpaid bonuses are consumed. A bonus already linked to
+        // a payslip is never paid a second time.
+        bonuses: { where: { payslipId: null, approvedAt: { not: null } } },
       },
     });
     if (employees.length === 0) throw badRequest(ERROR_CODES.PAYROLL_NO_EMPLOYEES, 'No active employees with a salary structure.');
@@ -702,9 +727,22 @@ export class HrService {
             )
           : 0;
 
+        // Approved bonuses join the run as earning lines and are stamped with
+        // the payslip id below, which is what makes the payment single-use.
+        const bonusComponents: SalaryComponentInput[] = employee.bonuses.map((bonus, index) => ({
+          type: 'ALLOWANCE',
+          code: `BONUS_${bonus.type}`,
+          nameEn: `Bonus — ${bonus.reason}`,
+          nameAr: `مكافأة — ${bonus.reason}`,
+          amountMinor: bonus.amountMinor,
+          isPercentage: false,
+          percentBp: 0,
+          sortOrder: 8000 + index,
+        }));
+
         const slip = computePayslip({
           basicMinor: structure.basicMinor,
-          components,
+          components: [...components, ...bonusComponents],
           overtimeHours,
           overtimeMultiplierBp: dto.overtimeMultiplierBp ?? 10000,
           advanceDeductionMinor: advanceDeduction,
@@ -736,6 +774,15 @@ export class HrService {
             lines: { create: slip.lines.map((l) => ({ type: l.type as never, code: l.code, nameEn: l.nameEn, nameAr: l.nameAr, amountMinor: l.amountMinor, sortOrder: l.sortOrder })) },
           },
         });
+
+        // Mark the consumed bonuses inside the same transaction so a retried
+        // run cannot pay them again.
+        if (employee.bonuses.length > 0) {
+          await tx.employeeBonus.updateMany({
+            where: { id: { in: employee.bonuses.map((b) => b.id) }, payslipId: null },
+            data: { payslipId: payslip.id },
+          });
+        }
 
         // Settle the advance inside the same transaction.
         if (advance && advanceDeduction > 0) {

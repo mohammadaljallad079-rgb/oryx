@@ -7,6 +7,9 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
+import { useFormAttachments } from '@/lib/use-form-attachments';
+import { AttachmentField } from '@/components/attachments';
+import { RecordPreview } from '@/components/record-preview';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -38,6 +41,7 @@ function UsersInner() {
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserDto | null>(null);
+  const [previewUser, setPreviewUser] = useState<UserDto | null>(null);
 
   const users = useAsync(
     () => (scopeCompanyId ? api.listUsers(scopeCompanyId) : Promise.resolve(null)),
@@ -135,9 +139,14 @@ function UsersInner() {
                       <StatusBadge status={u.status} label={userStatusLabel(u.status, t)} />
                     </td>
                     <td>
-                      <Button size="sm" onClick={() => setSelectedUser(u)} data-testid={`view-perms-${u.email}`}>
-                        {t('users.effective')}
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" onClick={() => setPreviewUser(u)} data-testid={`preview-user-${u.email}`}>
+                          {t('attach.preview')}
+                        </Button>
+                        <Button size="sm" onClick={() => setSelectedUser(u)} data-testid={`view-perms-${u.email}`}>
+                          {t('users.effective')}
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -204,6 +213,30 @@ function UsersInner() {
         }}
       />
 
+      <RecordPreview
+        open={previewUser !== null}
+        onClose={() => setPreviewUser(null)}
+        title={previewUser ? (locale === 'ar' ? previewUser.fullNameAr : previewUser.fullNameEn) : ''}
+        subtitle={previewUser?.email}
+        entityType="USER"
+        entityId={previewUser?.id ?? null}
+        canWriteAttachments={can('company.user.update')}
+        testId="user-preview"
+        fields={
+          previewUser
+            ? [
+                { label: `${t('common.name')} (EN)`, value: previewUser.fullNameEn },
+                { label: `${t('common.name')} (AR)`, value: previewUser.fullNameAr },
+                { label: t('auth.email'), value: previewUser.email },
+                { label: t('users.role'), value: previewUser.memberships[0] ? (locale === 'ar' ? previewUser.memberships[0].roleNameAr : previewUser.memberships[0].roleNameEn) : '—' },
+                { label: t('users.branchScope'), value: String(previewUser.memberships[0]?.branchIds.length ?? 0) },
+                { label: t('common.status'), value: previewUser.status },
+                { label: t('users.superAdmin'), value: previewUser.isSuperAdmin ? t('common.yes') : t('common.no') },
+                { label: t('users.lastLogin'), value: previewUser.lastLoginAt ? new Date(previewUser.lastLoginAt).toLocaleString() : '—' },
+              ]
+            : []
+        }
+      />
       <EffectivePermissionsModal
         user={selectedUser}
         companyId={scopeCompanyId}
@@ -261,6 +294,7 @@ function InviteModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const attach = useFormAttachments();
 
   useEffect(() => {
     if (!open) return;
@@ -293,6 +327,8 @@ function InviteModal({
         fullNameAr: form.fullNameAr || form.email,
         roleId: form.roleId,
       });
+      await attach.flush(res.id);
+      attach.reset();
       setToken(res.inviteToken ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('common.error'));
@@ -394,6 +430,9 @@ function InviteModal({
                 onChange={(e) => setForm({ ...form, fullNameAr: e.target.value })}
               />
             </Field>
+          </div>
+          <div className="mt-4 border-t border-[var(--border)] pt-3">
+            <AttachmentField entityType="USER" entityId={null} value={attach.items} onChange={attach.setItems} registerFlush={attach.register} canWrite testId="invite-attachments" />
           </div>
         </>
       )}

@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import type { PlanDto } from '@oryx/shared';
+import type { CompanyDto, PlanDto } from '@oryx/shared';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync, useDebounced } from '@/lib/hooks';
 import { Icon } from '@/components/icons';
+import { useFormAttachments } from '@/lib/use-form-attachments';
+import { AttachmentField } from '@/components/attachments';
+import { RecordPreview } from '@/components/record-preview';
 import {
   Badge,
   Button,
@@ -40,6 +43,7 @@ export default function CompaniesPage() {
   );
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [detail, setDetail] = useState<CompanyDto | null>(null);
 
   return (
     <div className="flex flex-col gap-5" data-testid="companies-page">
@@ -159,6 +163,9 @@ export default function CompaniesPage() {
                     </td>
                     <td>
                       <div className="flex flex-wrap gap-2">
+                        <Button size="sm" onClick={() => setDetail(c)} data-testid={`preview-company-${c.code}`}>
+                          {t('attach.preview')}
+                        </Button>
                         <Link href={`/branches?companyId=${c.id}`} className="oryx-btn oryx-btn--sm">
                           {t('companies.branches')}
                         </Link>
@@ -199,6 +206,34 @@ export default function CompaniesPage() {
         )}
       </Card>
 
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={detail ? `${detail.code} — ${detail.nameEn}` : ''}
+        subtitle={detail?.nameAr}
+        entityType="COMPANY"
+        entityId={detail?.id ?? null}
+        canWriteAttachments={can('company.update')}
+        testId="company-preview"
+        fields={
+          detail
+            ? [
+                { label: t('common.code'), value: detail.code },
+                { label: `${t('common.name')} (EN)`, value: detail.nameEn },
+                { label: `${t('common.name')} (AR)`, value: detail.nameAr },
+                { label: t('common.type'), value: detail.type },
+                { label: t('companies.parent'), value: detail.parentCompanyNameEn ?? '—' },
+                { label: t('companies.industry'), value: detail.industry ?? '—' },
+                { label: t('companies.country'), value: detail.countryCode ?? '—' },
+                { label: t('common.currency'), value: detail.currency },
+                { label: t('companies.branches'), value: String(detail.branchCount ?? 0) },
+                { label: t('companies.users'), value: String(detail.userCount ?? 0) },
+                { label: t('companies.plan'), value: detail.subscription ? (locale === 'ar' ? detail.subscription.planNameAr : detail.subscription.planNameEn) : t('companies.noPlan') },
+                { label: t('common.status'), value: detail.status },
+              ]
+            : []
+        }
+      />
       <CreateCompanyModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
@@ -262,6 +297,8 @@ function CreateCompanyModal({
     })();
   }, [open]);
 
+  const attach = useFormAttachments();
+
   async function submit() {
     setBusy(true);
     setError(null);
@@ -274,6 +311,11 @@ function CreateCompanyModal({
         industry: form.industry || undefined,
         planId: form.planId || undefined,
       });
+
+      if (res.company?.id) {
+        await attach.flush(res.company.id);
+        attach.reset();
+      }
 
       // Invite the first company administrator if an email was supplied.
       if (form.adminEmail && res.company?.id) {
@@ -421,6 +463,9 @@ function CreateCompanyModal({
             onChange={(e) => setForm({ ...form, adminFullNameAr: e.target.value })}
           />
         </Field>
+      </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField entityType="COMPANY" entityId={null} value={attach.items} onChange={attach.setItems} registerFlush={attach.register} canWrite testId="new-company-attachments" />
       </div>
     </Modal>
   );

@@ -5,6 +5,7 @@ import type { CompanyDto, PlanDto, SubscriptionDto } from '@oryx/shared';
 import { api } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
+import { RecordPreview } from '@/components/record-preview';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -30,6 +31,7 @@ export default function SubscriptionsPage() {
 
   const [assignTo, setAssignTo] = useState<CompanyDto | null>(null);
   const [historyOf, setHistoryOf] = useState<SubscriptionRow | null>(null);
+  const [previewOf, setPreviewOf] = useState<SubscriptionRow | null>(null);
 
   return (
     <div className="flex flex-col gap-5" data-testid="subscriptions-page">
@@ -85,6 +87,9 @@ export default function SubscriptionsPage() {
                   </td>
                   <td>
                     <div className="flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => setPreviewOf(s)} data-testid={`preview-subscription-${s.companyId}`}>
+                        {t('attach.preview')}
+                      </Button>
                       <Button size="sm" onClick={() => setHistoryOf(s)}>
                         {t('subscriptions.history')}
                       </Button>
@@ -132,6 +137,37 @@ export default function SubscriptionsPage() {
       />
 
       <HistoryModal subscription={historyOf} onClose={() => setHistoryOf(null)} />
+
+      <RecordPreview
+        open={previewOf !== null}
+        onClose={() => setPreviewOf(null)}
+        title={previewOf ? (locale === 'ar' ? previewOf.companyNameAr : previewOf.companyNameEn) : ''}
+        subtitle={previewOf ? `${locale === 'ar' ? previewOf.planNameAr : previewOf.planNameEn} · ${previewOf.currency} ${previewOf.price.toLocaleString()}` : undefined}
+        entityType="COMPANY"
+        entityId={previewOf?.companyId ?? null}
+        testId="subscription-preview"
+        fields={
+          previewOf
+            ? [
+                { label: t('context.company'), value: locale === 'ar' ? previewOf.companyNameAr : previewOf.companyNameEn },
+                { label: t('companies.plan'), value: locale === 'ar' ? previewOf.planNameAr : previewOf.planNameEn },
+                { label: t('common.status'), value: previewOf.status },
+                { label: t('subscriptions.period'), value: previewOf.billingPeriod === 'ANNUAL' ? t('plans.annual') : t('plans.monthly') },
+                { label: t('subscriptions.price'), value: `${previewOf.currency} ${previewOf.price.toLocaleString()}` },
+                { label: t('subscriptions.licence'), value: String(previewOf.licensedModules.length) },
+                { label: t('subscriptions.periodEnd'), value: previewOf.currentPeriodEnd?.slice(0, 10) ?? '—' },
+              ]
+            : []
+        }
+        table={
+          previewOf
+            ? {
+                headers: [t('subscriptions.licence')],
+                rows: previewOf.licensedModules.map((m) => [m]),
+              }
+            : undefined
+        }
+      />
     </div>
   );
 }

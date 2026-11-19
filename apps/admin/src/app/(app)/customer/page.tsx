@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
+import { RecordPreview } from '@/components/record-preview';
 import {
   Badge,
   Button,
@@ -12,7 +13,6 @@ import {
   EmptyState,
   ErrorBanner,
   Field,
-  Modal,
   SectionHeader,
   Skeleton,
   StatusBadge,
@@ -202,20 +202,32 @@ function AccountModal({
   }
 
   return (
-    <Modal open={open} title={account?.fullName ?? t('common.loading')} onClose={onClose}>
+    <RecordPreview
+      open={open}
+      onClose={onClose}
+      title={account ? account.fullName : t('common.loading')}
+      subtitle={account ? account.email : undefined}
+      entityType="CUSTOMER_ACCOUNT"
+      entityId={id}
+      canWriteAttachments={canManage}
+      testId="customer-account-preview"
+      fields={
+        account
+          ? [
+              { label: t('common.email'), value: account.email },
+              { label: t('erp.customerPlatform.phone'), value: account.phone ?? '—' },
+              { label: t('common.status'), value: account.status },
+              { label: t('erp.customerPlatform.locale'), value: `${account.preferredLocale} / ${account.preferredTheme}` },
+              { label: t('erp.customerPlatform.mfa'), value: account.mfaEnabled ? t('common.yes') : t('common.no') },
+            ]
+          : []
+      }
+    >
       {detail.loading ? <Skeleton height={200} /> : null}
       {detail.error ? <ErrorBanner message={detail.error} onRetry={detail.reload} /> : null}
       {error ? <ErrorBanner message={error} /> : null}
       {account ? (
         <div className="flex flex-col gap-4">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Detail label={t('common.email')} value={account.email} />
-            <Detail label={t('erp.customerPlatform.phone')} value={account.phone ?? '—'} />
-            <Detail label={t('common.status')} value={account.status} />
-            <Detail label={t('erp.customerPlatform.locale')} value={`${account.preferredLocale} / ${account.preferredTheme}`} />
-            <Detail label={t('erp.customerPlatform.mfa')} value={account.mfaEnabled ? t('common.yes') : t('common.no')} />
-          </div>
-
           <Section title={`${t('erp.customerPlatform.garage')} (${account.vehicles.length})`}>
             {account.vehicles.length === 0 ? (
               <p className="text-[12px] text-[var(--muted)]">{t('common.empty')}</p>
@@ -274,18 +286,10 @@ function AccountModal({
           ) : null}
         </div>
       ) : null}
-    </Modal>
+    </RecordPreview>
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-[11px] uppercase tracking-wide text-[var(--muted)]">{label}</div>
-      <div className="text-[12.5px]">{value}</div>
-    </div>
-  );
-}
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (

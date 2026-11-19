@@ -52,6 +52,7 @@ secrets**. Copy it and replace every placeholder.
 | `THROTTLE_LIMIT` | Global requests per minute per IP. Default 120 |
 | `API_PORT` | Default 3001 |
 | `API_PREFIX` | Default `api`. Routes become `/api/v1/...` |
+| `UPLOAD_DIR` | Absolute path for uploaded attachments. **Required in production** — the default lives inside the API directory and is lost on redeploy. Back it up with the database |
 
 ### Admin application
 
@@ -241,10 +242,16 @@ pg_dump "$DATABASE_URL" --format=custom --file="oryx-$(date +%F-%H%M).dump"
 
 # Verify it is readable before trusting it
 pg_restore --list "oryx-$(date +%F-%H%M).dump" | head
+
+# Attachments are files on disk, not rows: back up the upload root too.
+# A database restore without this leaves rows pointing at missing files.
+tar --create --gzip --file="oryx-uploads-$(date +%F-%H%M).tar.gz" --directory="$UPLOAD_DIR" .
 ```
 
 Schedule at least daily, retain at least 30 days, and store copies off the
-database host. Take an extra backup immediately before any migration.
+database host. Take an extra backup immediately before any migration. The
+database dump and the upload archive must be taken close together and kept as a
+pair — restoring one without the other loses either the records or the files.
 
 ### Restore
 
@@ -315,3 +322,102 @@ of truth for who changed what.
 **Not implemented in Execution 01.** No payment gateway, no email/SMS/push
 delivery, no storage or API-request metering, no automated off-site backup. Do
 not assume any of these exist.
+
+---
+
+## 11. Deploying the attachments release (Execution 06)
+
+This release adds two tables, four nullable columns on `Employee`, three
+defaulted columns on `EntityAttachment` and a new files-on-disk store. The
+migration is **additive**: it creates tables, adds columns with defaults and
+drops nothing, so it can be applied to a live database. The files are the part
+that has no migration — they must be given a durable home before the API starts
+writing them.
+
+### Before you deploy
+
+1. **Create and back up the upload root.**
+
+   ```bash
+   sudo mkdir -p /var/lib/oryx/uploads
+   sudo chown oryx:oryx /var/lib/oryx/uploads
+   tar --create --gzip --file="oryx-uploads-pre-e06-$(date +%F).tar.gz" \
+       --directory=/var/lib/oryx/uploads .
+   ```
+
+   Nothing is there yet, so the archive is empty — it exists so the rollback
+   step has a known-good baseline rather than a missing path.
+
+2. **Set `UPLOAD_DIR` in the API environment.** Without it the API writes into
+   `apps/api/var/uploads`, which a redeploy deletes. The default is a
+   development convenience, not a production location.
+
+   ```bash
+   UPLOAD_DIR=/var/lib/oryx/uploads
+   ```
+
+3. **Take the database backup** described in section 8 and keep it beside the
+   upload archive. The two are one restore unit.
+
+4. **Check disk headroom.** Each attachment may be up to 20 MB and up to 10
+   files are accepted per request. Alert at 80 % of the volume.
+
+### Deploy
+
+```bash
+# 1. Schema first — additive, safe while the old build is still serving
+pnpm db:migrate
+
+# 2. New build
+pnpm --filter @oryx/shared build
+pnpm --filter @oryx/database build
+pnpm --filter @oryx/api build
+pnpm --filter @oryx/admin build
+
+# 3. Restart API, then admin. Restart the API first: the admin calls the new
+#    attachment routes on first render of a preview.
+```
+
+The seed does not need to run: the three new permissions
+(`erp.hr.salary.read`, `erp.hr.penalty.manage`, `erp.hr.bonus.manage`) are
+declared in `packages/shared` and the role catalogue reads them from there.
+Existing roles keep their current grants, so nobody gains access to salaries by
+deploying. Grant the three permissions deliberately to the roles that need them.
+
+### Verify
+
+- [ ] `GET /api/health` returns `"database":"up"`
+- [ ] Open any record's preview and upload a file; the file appears in the list
+- [ ] Reload the page; the file is still listed and opens in the preview
+- [ ] Download the file; the bytes match the upload
+- [ ] Open the same record as a user from another company; the attachment is
+      absent and a direct content request returns 403/404
+- [ ] Open an employee file; the seven tabs load and the payroll tab shows the
+      payslips that already exist for that employee
+- [ ] Sign in as a role **without** `erp.hr.salary.read`; the card renders and
+      the salary and bank fields are absent, not blank
+- [ ] Print an employee card in Arabic; the layout is right-to-left and the
+      photograph is present
+- [ ] `ls -R "$UPLOAD_DIR"` shows one directory per company and the files just
+      uploaded
+
+### Rollback
+
+| Step | Action |
+| --- | --- |
+| Application | Redeploy the previous build. The old build ignores the new tables and the three defaulted columns, so it keeps working |
+| Migration | Prisma has no down-migration. Restoring the pre-deploy dump is the only reversal, and it discards every attachment uploaded since |
+| Uploads | Restore the archive **only** together with the matching database dump. Restoring the files alone leaves rows pointing at missing files; restoring the dump alone leaves files with no rows |
+
+Because a schema rollback means losing the uploads made since the deploy,
+schedule this release in a window where a short revert is acceptable, and take
+the dump immediately before step 1 of the deploy.
+
+### Known limits
+
+- The storage driver is local disk. A second API instance cannot see the first
+  one's files, so run a single API instance or move to a shared volume before
+  scaling out. `AttachmentStorageService` is the single seam for that change.
+- There is no antivirus scan on upload and no automatic retention policy.
+  Uploads are restricted by declared MIME type and size, not by content
+  inspection.

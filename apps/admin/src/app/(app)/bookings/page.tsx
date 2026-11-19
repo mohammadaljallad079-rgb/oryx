@@ -5,6 +5,9 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
+import { useFormAttachments } from '@/lib/use-form-attachments';
+import { AttachmentField } from '@/components/attachments';
+import { RecordPreview } from '@/components/record-preview';
 import {
   Badge,
   Button,
@@ -213,18 +216,21 @@ function ResourcesTab({ canManage }: { canManage: boolean }) {
   const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', kind: 'BAY', capacity: '1' });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const attach = useFormAttachments();
 
   async function submit() {
     setBusy(true);
     setError(null);
     try {
-      await api.createBookingResource({
+      const created = await api.createBookingResource({
         code: form.code.trim(),
         nameEn: form.nameEn.trim(),
         nameAr: form.nameAr.trim() || form.nameEn.trim(),
         kind: form.kind,
         capacity: Number(form.capacity) || 1,
       });
+      await attach.flush(String(created.id));
+      attach.reset();
       setOpen(false);
       setForm({ code: '', nameEn: '', nameAr: '', kind: 'BAY', capacity: '1' });
       await list.reload();
@@ -311,6 +317,9 @@ function ResourcesTab({ canManage }: { canManage: boolean }) {
             <input className="oryx-input" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} data-testid="resource-capacity" />
           </Field>
         </div>
+        <div className="mt-4 border-t border-[var(--border)] pt-3">
+          <AttachmentField entityType="BOOKING_RESOURCE" entityId={null} value={attach.items} onChange={attach.setItems} registerFlush={attach.register} canWrite testId="new-resource-attachments" />
+        </div>
       </Modal>
     </Card>
   );
@@ -332,7 +341,6 @@ function BookingModal({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const booking = detail.data as Record<string, unknown> | null;
-
   async function act(fn: (bookingId: string) => Promise<unknown>) {
     if (!id) return;
     setBusy(true);
@@ -350,18 +358,31 @@ function BookingModal({
   const status = String(booking?.status ?? '');
 
   return (
-    <Modal open={open} title={String(booking?.bookingType ?? t('common.loading'))} onClose={onClose}>
+    <RecordPreview
+      open={open}
+      onClose={onClose}
+      title={booking ? `${String(booking.bookingType)}` : t('common.loading')}
+      subtitle={booking ? new Date(String(booking.startsAt)).toLocaleString() : undefined}
+      entityType="BOOKING"
+      entityId={id}
+      canWriteAttachments={canManage}
+      testId="booking-preview"
+      fields={
+        booking
+          ? [
+              { label: t('common.status'), value: status },
+              { label: t('erp.booking.when'), value: new Date(String(booking.startsAt)).toLocaleString() },
+              { label: t('erp.booking.duration'), value: `${String(booking.durationMinutes)} ${t('erp.customerPlatform.minutes')}` },
+              { label: t('erp.booking.serviceRef'), value: String(booking.serviceRef ?? '—') },
+            ]
+          : []
+      }
+    >
       {detail.loading ? <Skeleton height={180} /> : null}
       {detail.error ? <ErrorBanner message={detail.error} onRetry={detail.reload} /> : null}
       {error ? <ErrorBanner message={error} /> : null}
       {booking ? (
         <div className="flex flex-col gap-4">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Detail label={t('common.status')} value={status} />
-            <Detail label={t('erp.booking.when')} value={new Date(String(booking.startsAt)).toLocaleString()} />
-            <Detail label={t('erp.booking.duration')} value={`${String(booking.durationMinutes)} ${t('erp.customerPlatform.minutes')}`} />
-            <Detail label={t('erp.booking.serviceRef')} value={String(booking.serviceRef ?? '—')} />
-          </div>
           {canManage ? (
             <div className="flex flex-wrap gap-2 border-t border-[var(--border)] pt-3">
               <Button size="sm" disabled={busy || status !== 'PENDING'} onClick={() => act(api.confirmBooking)} data-testid="booking-confirm">
@@ -383,15 +404,7 @@ function BookingModal({
           ) : null}
         </div>
       ) : null}
-    </Modal>
+    </RecordPreview>
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-[11px] uppercase tracking-wide text-[var(--muted)]">{label}</div>
-      <div className="text-[12.5px]">{value}</div>
-    </div>
-  );
-}

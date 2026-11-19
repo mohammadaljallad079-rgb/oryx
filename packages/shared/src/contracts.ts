@@ -1,3 +1,4 @@
+import type { AttachmentPreviewKind } from './attachments';
 import type {
   IntegrationCategory,
   IntegrationImplementation,
@@ -1421,4 +1422,329 @@ export interface CustomerCapabilitiesResponse {
     whatsapp: boolean;
     push: boolean;
   };
+}
+
+// ------------------------------------------------------------- attachments (E06)
+
+/** One stored attachment as the API returns it. Values never leave the API. */
+export interface AttachmentDto {
+  id: string;
+  companyId: string;
+  entityType: string;
+  entityId: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  /** The record's lead image, for example the employee photograph. */
+  isPrimary: boolean;
+  isConfidential: boolean;
+  previewKind: AttachmentPreviewKind;
+  uploadedById: string | null;
+  createdAt: string;
+  canDownload: boolean;
+}
+
+export interface AttachmentListResponse {
+  items: AttachmentDto[];
+  total: number;
+}
+
+// ------------------------------------------------------- employee file (E06)
+
+export interface EmployeeFileCounts {
+  payslips: number;
+  leave: number;
+  penalties: number;
+  bonuses: number;
+  attendance: number;
+}
+
+export interface EmployeeFileComponent {
+  id: string;
+  type: 'ALLOWANCE' | 'DEDUCTION';
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  amountMinor: number;
+  isPercentage: boolean;
+  percentBp: number;
+}
+
+/**
+ * Salary visibility is an explicit discriminated union, not an optional field:
+ * the UI must render "not permitted" differently from "not recorded".
+ */
+export type EmployeeFileCompensation =
+  | {
+      visible: true;
+      basicMinor: number | null;
+      allowancesMinor: number;
+      deductionsMinor: number;
+      currency: string;
+      effectiveFrom: string | null;
+      components: EmployeeFileComponent[];
+      bankName: string | null;
+      bankAccountIban: string | null;
+    }
+  | { visible: false; reason: string };
+
+export interface EmployeeFileContract {
+  id: string;
+  contractNumber: string;
+  type: string;
+  status: string;
+  startDate: string;
+  endDate: string | null;
+  baseSalaryMinor?: number;
+  currency?: string;
+  probationDays: number;
+}
+
+export interface EmployeeFilePersonalCard {
+  employee: {
+    id: string;
+    code: string;
+    fullNameEn: string;
+    fullNameAr: string;
+    email: string | null;
+    phone: string | null;
+    nationalId: string | null;
+    nationality: string | null;
+    dateOfBirth: string | null;
+    gender: string | null;
+    addressLine: string | null;
+    status: string;
+    hireDate: string;
+    terminationDate: string | null;
+    contractType: string;
+    notes: string | null;
+    departmentId: string | null;
+    departmentNameEn: string | null;
+    departmentNameAr: string | null;
+    jobTitleId: string | null;
+    jobTitleNameEn: string | null;
+    jobTitleNameAr: string | null;
+    branchId: string | null;
+    branchNameEn: string | null;
+    branchNameAr: string | null;
+    managerCode: string | null;
+    managerNameEn: string | null;
+    managerNameAr: string | null;
+  };
+  compensation: EmployeeFileCompensation;
+  contracts: EmployeeFileContract[];
+}
+
+export interface PayslipLineDto {
+  id: string;
+  type: 'ALLOWANCE' | 'DEDUCTION';
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  amountMinor: number;
+}
+
+export type PayslipPaymentStatus = 'DRAFT' | 'APPROVED' | 'PAID' | 'LOCKED' | 'CANCELLED';
+
+export interface EmployeePayslipDto {
+  id: string;
+  payrollRunId: string;
+  runNumber: string;
+  runStatus: string;
+  paymentStatus: PayslipPaymentStatus;
+  periodCode: string;
+  periodNameEn: string;
+  periodNameAr: string;
+  periodStart: string;
+  periodEnd: string;
+  paidAt: string | null;
+  basicMinor: number;
+  allowancesMinor: number;
+  deductionsMinor: number;
+  grossMinor: number;
+  netMinor: number;
+  advanceDeductionMinor: number;
+  currency: string;
+  lines: PayslipLineDto[];
+}
+
+export interface EmployeeFilePayroll {
+  items: EmployeePayslipDto[];
+  totals: {
+    basicMinor: number;
+    allowancesMinor: number;
+    deductionsMinor: number;
+    grossMinor: number;
+    netMinor: number;
+    currency: string;
+    payslipCount: number;
+  };
+  from: string | null;
+  to: string | null;
+}
+
+export interface EmployeeLeaveRecordDto {
+  id: string;
+  leaveTypeId: string;
+  leaveTypeCode: string;
+  leaveTypeNameEn: string;
+  leaveTypeNameAr: string;
+  isPaid: boolean;
+  startDate: string;
+  endDate: string;
+  days: number;
+  status: string;
+  reason: string | null;
+  decisionNote: string | null;
+  decidedAt: string | null;
+}
+
+export interface EmployeeLeaveBalanceDto {
+  id: string;
+  leaveTypeId: string;
+  leaveTypeCode: string;
+  leaveTypeNameEn: string;
+  leaveTypeNameAr: string;
+  year: number;
+  entitledDays: number;
+  accruedDays: number;
+  usedDays: number;
+  pendingDays: number;
+  remainingDays: number;
+}
+
+export interface EmployeeFileLeave {
+  items: EmployeeLeaveRecordDto[];
+  balances: EmployeeLeaveBalanceDto[];
+  year: number;
+}
+
+export interface EmployeePenaltyDto {
+  id: string;
+  actionType: string;
+  reason: string;
+  effectiveDate: string;
+  amountMinor?: number;
+  currency?: string;
+  decidedByName: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface EmployeeFilePenalties {
+  items: EmployeePenaltyDto[];
+  total: number;
+}
+
+export interface EmployeeBonusDto {
+  id: string;
+  type: string;
+  reason: string;
+  amountMinor: number;
+  currency: string;
+  payPeriodId: string | null;
+  payPeriodCode: string | null;
+  payPeriodNameEn: string | null;
+  payPeriodNameAr: string | null;
+  approvedAt: string | null;
+  payslipId: string | null;
+  paid: boolean;
+  createdAt: string;
+}
+
+export interface EmployeeFileBonuses {
+  items: EmployeeBonusDto[];
+  totals: { approvedMinor: number; paidMinor: number; currency: string };
+}
+
+export interface EmployeeFileReports {
+  employee: {
+    id: string;
+    code: string;
+    fullNameEn: string;
+    fullNameAr: string;
+    hireDate: string;
+    status: string;
+  };
+  window: { from: string; to: string };
+  attendance: {
+    records: Array<{
+      id: string;
+      workDate: string;
+      status: string;
+      workedMinutes: number;
+      overtimeMinutes: number;
+      checkInAt: string | null;
+      checkOutAt: string | null;
+    }>;
+    summary: {
+      presentDays: number;
+      lateDays: number;
+      absentDays: number;
+      halfDays: number;
+      workedMinutes: number;
+      overtimeMinutes: number;
+      recordedDays: number;
+    };
+  };
+  leave: {
+    records: Array<{
+      id: string;
+      leaveTypeCode: string;
+      leaveTypeNameEn: string;
+      leaveTypeNameAr: string;
+      startDate: string;
+      endDate: string;
+      days: number;
+      status: string;
+    }>;
+    summary: { requestCount: number; approvedDays: number; pendingCount: number };
+  };
+  penalties: {
+    records: Array<{
+      id: string;
+      actionType: string;
+      reason: string;
+      effectiveDate: string;
+      amountMinor?: number;
+      currency?: string;
+      decidedByName: string | null;
+    }>;
+    summary: { count: number; totalMinor?: number };
+  };
+  bonuses: {
+    records: Array<{
+      id: string;
+      type: string;
+      reason: string;
+      amountMinor?: number;
+      currency?: string;
+      approvedAt: string | null;
+      paid: boolean;
+    }>;
+    summary: { count: number; approvedMinor?: number; paidMinor?: number };
+  };
+  payroll:
+    | {
+        visible: true;
+        payslips: Array<{
+          id: string;
+          basicMinor: number;
+          allowancesMinor: number;
+          deductionsMinor: number;
+          grossMinor: number;
+          netMinor: number;
+          currency: string;
+          createdAt: string;
+        }>;
+        totals: {
+          grossMinor: number;
+          netMinor: number;
+          allowancesMinor: number;
+          deductionsMinor: number;
+          payslipCount: number;
+          currency: string;
+        };
+      }
+    | { visible: false; reason: string };
 }

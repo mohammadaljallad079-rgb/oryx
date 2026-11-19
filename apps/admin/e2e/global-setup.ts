@@ -4,16 +4,19 @@ import path from 'node:path';
 /**
  * Playwright global setup.
  *
- * Restores the documented MFA baseline on the seeded development accounts
- * before the UI suites run, so a previously interrupted run cannot leave an
- * account stuck behind a second factor that the tests do not know about.
+ * Restores the documented MFA baseline on the seeded development accounts and
+ * removes fixture rows left behind by an interrupted run, so the suites always
+ * start from the seeded tenant.
  */
 export default function globalSetup() {
-  const script = path.resolve(__dirname, '../../../scripts/reset-seed-mfa.mjs');
-  const output = execFileSync('node', [script], {
-    cwd: path.resolve(__dirname, '../../..'),
-    env: process.env,
-    encoding: 'utf8',
-  });
-  console.log(output.trim());
+  const root = path.resolve(__dirname, '../../..');
+  const scripts = ['reset-seed-mfa.mjs', 'purge-ui-fixtures.mjs'];
+  for (const name of scripts) {
+    const output = execFileSync('node', [path.resolve(root, 'scripts', name)], {
+      cwd: root,
+      env: process.env,
+      encoding: 'utf8',
+    });
+    console.log(output.trim());
+  }
 }

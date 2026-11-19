@@ -6,6 +6,9 @@ import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, qty, toMinorInput, toQuantityInput } from '@/lib/erp-format';
+import { useFormAttachments } from '@/lib/use-form-attachments';
+import { AttachmentField } from '@/components/attachments';
+import { RecordPreview } from '@/components/record-preview';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -94,6 +97,7 @@ function CustomersTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<CustomerDto | null>(null);
   const list = useAsync(() => api.salesCustomers({ search: search || undefined }), [search]);
 
   return (
@@ -124,6 +128,7 @@ function CustomersTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.sales.phone')}</th>
               <th>{t('erp.sales.creditLimit')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -137,11 +142,40 @@ function CustomersTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{c.phone ?? '—'}</td>
                 <td className="tabular-nums text-[12.5px]">{money(c.creditLimitMinor)}</td>
                 <td><Badge tone={c.isActive ? 'success' : 'neutral'}>{c.isActive ? t('common.active') : t('common.inactive')}</Badge></td>
+                <td>
+                  <Button size="sm" onClick={() => setDetail(c)} data-testid={`preview-customer-${c.code}`}>
+                    {t('attach.preview')}
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={detail ? `${detail.code} — ${detail.nameEn}` : ''}
+        subtitle={detail?.nameAr}
+        entityType="CUSTOMER"
+        entityId={detail?.id ?? null}
+        canWriteAttachments={canManage}
+        testId="customer-preview"
+        fields={
+          detail
+            ? [
+                { label: t('common.code'), value: detail.code },
+                { label: `${t('common.name')} (EN)`, value: detail.nameEn },
+                { label: `${t('common.name')} (AR)`, value: detail.nameAr },
+                { label: t('erp.sales.phone'), value: detail.phone ?? '—' },
+                { label: t('common.email'), value: detail.email ?? '—' },
+                { label: t('erp.sales.creditLimit'), value: money(detail.creditLimitMinor, detail.currency) },
+                { label: t('erp.sales.paymentTerms'), value: `${detail.paymentTermsDays}` },
+                { label: t('common.status'), value: detail.isActive ? t('common.active') : t('common.inactive') },
+              ]
+            : []
+        }
+      />
       <CustomerModal open={open} onClose={() => setOpen(false)} onCreated={list.reload} />
     </Card>
   );
@@ -152,12 +186,13 @@ function CustomerModal({ open, onClose, onCreated }: { open: boolean; onClose: (
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', phone: '', creditLimit: '0.00', paymentTermsDays: '30' });
+  const attach = useFormAttachments();
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.createCustomer({
+      const created = await api.createCustomer({
         code: form.code,
         nameEn: form.nameEn,
         nameAr: form.nameAr,
@@ -165,6 +200,7 @@ function CustomerModal({ open, onClose, onCreated }: { open: boolean; onClose: (
         creditLimitMinor: toMinorInput(form.creditLimit),
         paymentTermsDays: Number(form.paymentTermsDays) || 0,
       });
+      await attach.flush(created.id);
       await onCreated();
       onClose();
     } catch (e) {
@@ -209,6 +245,17 @@ function CustomerModal({ open, onClose, onCreated }: { open: boolean; onClose: (
           <input className="oryx-input" value={form.paymentTermsDays} onChange={(e) => setForm({ ...form, paymentTermsDays: e.target.value })} />
         </Field>
       </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField
+          entityType="CUSTOMER"
+          entityId={null}
+          value={attach.items}
+          onChange={attach.setItems}
+          registerFlush={attach.register}
+          canWrite
+          testId="new-customer-attachments"
+        />
+      </div>
     </Modal>
   );
 }
@@ -218,6 +265,7 @@ function CustomerModal({ open, onClose, onCreated }: { open: boolean; onClose: (
 function InvoicesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
   const list = useAsync(() => api.salesInvoices({ page: 1 }), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
@@ -249,6 +297,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.sales.total')}</th>
               <th>{t('erp.sales.outstanding')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -260,11 +309,24 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(inv.totalMinor, inv.currency)}</td>
                 <td className="tabular-nums text-[12.5px]">{money(inv.outstandingMinor ?? 0, inv.currency)}</td>
                 <td><StatusBadge status={inv.status} label={inv.status} /></td>
+                <td>
+                  <Button size="sm" onClick={() => setDetail(inv)} data-testid={`preview-invoice-${inv.invoiceNumber}`}>
+                    {t('attach.preview')}
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+      <SalesDocumentPreview
+        detail={detail}
+        entityType="SALES_INVOICE"
+        numberKey="invoiceNumber"
+        canManage={canManage}
+        onClose={() => setDetail(null)}
+        testId="invoice-preview"
+      />
       <DocumentModal
         open={open}
         title={t('erp.sales.newInvoice')}
@@ -273,13 +335,76 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
         warehouses={warehouses.data?.items ?? []}
         showWarehouse
         testIdPrefix="invoice"
+        attachmentEntityType="SALES_INVOICE"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
-          await api.createSalesInvoice(payload);
+          const created = await api.createSalesInvoice(payload);
           await list.reload();
+          return created.id;
         }}
       />
     </Card>
+  );
+}
+
+// ------------------------------------------------------- document preview
+
+/**
+ * Preview for a sales document. The four document kinds share one shape, so a
+ * single preview keeps the details, the lines and the attachments identical
+ * across invoices, orders, quotations and credit notes.
+ */
+function SalesDocumentPreview({
+  detail,
+  entityType,
+  numberKey,
+  canManage,
+  onClose,
+  testId,
+}: {
+  detail: SalesDocumentDto | null;
+  entityType: string;
+  numberKey: 'invoiceNumber' | 'orderNumber' | 'quoteNumber' | 'creditNoteNumber';
+  canManage: boolean;
+  onClose: () => void;
+  testId: string;
+}) {
+  const { t } = useUi();
+  const number = detail ? (detail[numberKey] ?? '—') : '';
+  const lines = (detail?.lines ?? []) as Array<Record<string, unknown>>;
+
+  return (
+    <RecordPreview
+      open={detail !== null}
+      onClose={onClose}
+      title={detail ? `${number} — ${detail.customerNameEn}` : ''}
+      subtitle={detail?.customerNameAr}
+      entityType={entityType}
+      entityId={detail?.id ?? null}
+      canWriteAttachments={canManage}
+      testId={testId}
+      fields={
+        detail
+          ? [
+              { label: t('common.date'), value: (detail.issueDate ?? detail.orderDate ?? detail.invoiceDate ?? '—').slice(0, 10) },
+              { label: t('erp.sales.customer'), value: detail.customerNameEn },
+              { label: t('erp.sales.subtotal'), value: money(detail.subtotalMinor, detail.currency) },
+              { label: t('erp.sales.tax'), value: money(detail.taxMinor, detail.currency) },
+              { label: t('erp.sales.total'), value: money(detail.totalMinor, detail.currency) },
+              { label: t('common.status'), value: detail.status },
+            ]
+          : []
+      }
+      table={{
+        headers: [t('erp.sales.description'), t('erp.sales.quantity'), t('erp.sales.unitPrice'), t('erp.sales.lineTotal')],
+        rows: lines.map((line) => [
+          String(line.description ?? ''),
+          qty(Number(line.quantity ?? 0)),
+          money(Number(line.unitPriceMinor ?? 0), detail?.currency),
+          money(Number(line.lineTotalMinor ?? line.totalMinor ?? 0), detail?.currency),
+        ]),
+      }}
+    />
   );
 }
 
@@ -288,6 +413,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
 function OrdersTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
   const list = useAsync(() => api.salesOrders(), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
@@ -316,6 +442,7 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.sales.customer')}</th>
               <th>{t('erp.sales.total')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -326,11 +453,24 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{o.customerNameEn}</td>
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(o.totalMinor, o.currency)}</td>
                 <td><StatusBadge status={o.status} label={o.status} /></td>
+                <td>
+                  <Button size="sm" onClick={() => setDetail(o)} data-testid={`preview-order-${o.orderNumber}`}>
+                    {t('attach.preview')}
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+      <SalesDocumentPreview
+        detail={detail}
+        entityType="SALES_ORDER"
+        numberKey="orderNumber"
+        canManage={canManage}
+        onClose={() => setDetail(null)}
+        testId="order-preview"
+      />
       <DocumentModal
         open={open}
         title={t('erp.sales.newOrder')}
@@ -339,10 +479,12 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
         warehouses={warehouses.data?.items ?? []}
         showWarehouse
         testIdPrefix="order"
+        attachmentEntityType="SALES_ORDER"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
-          await api.createSalesOrder({ ...payload, confirm: true });
+          const created = await api.createSalesOrder({ ...payload, confirm: true });
           await list.reload();
+          return created.id;
         }}
       />
     </Card>
@@ -354,6 +496,7 @@ function OrdersTab({ canManage }: { canManage: boolean }) {
 function QuotationsTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
   const list = useAsync(() => api.quotations(), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
@@ -394,24 +537,37 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(q.totalMinor, q.currency)}</td>
                 <td><StatusBadge status={q.status} label={q.status} /></td>
                 <td>
-                  {canManage && q.status !== 'CONVERTED' ? (
-                    <Button
-                      size="sm"
-                      onClick={async () => {
-                        await api.convertQuotation(q.id, warehouses.data?.items[0]?.id);
-                        await list.reload();
-                      }}
-                      data-testid={`convert-quotation-${q.quoteNumber}`}
-                    >
-                      {t('erp.sales.convert')}
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => setDetail(q)} data-testid={`preview-quotation-${q.quoteNumber}`}>
+                      {t('attach.preview')}
                     </Button>
-                  ) : null}
+                    {canManage && q.status !== 'CONVERTED' ? (
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          await api.convertQuotation(q.id, warehouses.data?.items[0]?.id);
+                          await list.reload();
+                        }}
+                        data-testid={`convert-quotation-${q.quoteNumber}`}
+                      >
+                        {t('erp.sales.convert')}
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+      <SalesDocumentPreview
+        detail={detail}
+        entityType="QUOTATION"
+        numberKey="quoteNumber"
+        canManage={canManage}
+        onClose={() => setDetail(null)}
+        testId="quotation-preview"
+      />
       <DocumentModal
         open={open}
         title={t('erp.sales.newQuotation')}
@@ -419,10 +575,12 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
         products={products.data?.items ?? []}
         warehouses={warehouses.data?.items ?? []}
         testIdPrefix="quotation"
+        attachmentEntityType="QUOTATION"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
-          await api.createQuotation(payload);
+          const created = await api.createQuotation(payload);
           await list.reload();
+          return created.id;
         }}
       />
     </Card>
@@ -434,6 +592,7 @@ function QuotationsTab({ canManage }: { canManage: boolean }) {
 function CreditNotesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
   const list = useAsync(() => api.creditNotes(), []);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
@@ -463,6 +622,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
               <th>{t('erp.sales.total')}</th>
               <th>{t('erp.sales.restock')}</th>
               <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -474,11 +634,24 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(n.totalMinor, n.currency)}</td>
                 <td className="text-[12.5px]">{(n as { restockInventory?: boolean }).restockInventory ? '✓' : '—'}</td>
                 <td><StatusBadge status={n.status} label={n.status} /></td>
+                <td>
+                  <Button size="sm" onClick={() => setDetail(n)} data-testid={`preview-credit-note-${n.creditNoteNumber}`}>
+                    {t('attach.preview')}
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+      <SalesDocumentPreview
+        detail={detail}
+        entityType="CREDIT_NOTE"
+        numberKey="creditNoteNumber"
+        canManage={canManage}
+        onClose={() => setDetail(null)}
+        testId="credit-note-preview"
+      />
       <DocumentModal
         open={open}
         title={t('erp.sales.newCreditNote')}
@@ -488,10 +661,12 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
         showWarehouse
         showRestock
         testIdPrefix="credit-note"
+        attachmentEntityType="CREDIT_NOTE"
         onClose={() => setOpen(false)}
         onSubmit={async (payload) => {
-          await api.createCreditNote(payload);
+          const created = await api.createCreditNote(payload);
           await list.reload();
+          return created.id;
         }}
       />
     </Card>
@@ -509,6 +684,8 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
   const products = useAsync(() => api.products(), []);
   const [saleOpen, setSaleOpen] = useState(false);
   const [closeTarget, setCloseTarget] = useState<CashierSessionDto | null>(null);
+  const [sessionPreview, setSessionPreview] = useState<CashierSessionDto | null>(null);
+  const [salePreview, setSalePreview] = useState<PosSaleDto | null>(null);
 
   const openSession = sessions.data?.items.find((s) => s.status === 'OPEN');
 
@@ -566,11 +743,16 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
                   <td className="tabular-nums text-[12.5px]">{s.varianceMinor !== null ? money(s.varianceMinor) : '—'}</td>
                   <td><StatusBadge status={s.status} label={s.status} /></td>
                   <td>
-                    {canManage && s.status === 'OPEN' ? (
-                      <Button size="sm" onClick={() => setCloseTarget(s)} data-testid={`close-session-${s.sessionNumber}`}>
-                        {t('erp.sales.closeSession')}
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => setSessionPreview(s)} data-testid={`preview-session-${s.sessionNumber}`}>
+                        {t('attach.preview')}
                       </Button>
-                    ) : null}
+                      {canManage && s.status === 'OPEN' ? (
+                        <Button size="sm" onClick={() => setCloseTarget(s)} data-testid={`close-session-${s.sessionNumber}`}>
+                          {t('erp.sales.closeSession')}
+                        </Button>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -595,6 +777,7 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
                 <th>{t('erp.sales.paid')}</th>
                 <th>{t('erp.sales.change')}</th>
                 <th>{t('erp.sales.method')}</th>
+                <th>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -606,12 +789,70 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
                   <td className="tabular-nums text-[12.5px]">{money(p.paidMinor)}</td>
                   <td className="tabular-nums text-[12.5px]">{money(p.changeMinor)}</td>
                   <td><Badge tone="info">{p.paymentMethod}</Badge></td>
+                  <td>
+                    <Button size="sm" onClick={() => setSalePreview(p)} data-testid={`preview-pos-${p.receiptNumber}`}>
+                      {t('attach.preview')}
+                    </Button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </TableShell>
         )}
       </Card>
+
+      <RecordPreview
+        open={sessionPreview !== null}
+        onClose={() => setSessionPreview(null)}
+        title={sessionPreview ? `${t('erp.sales.cashierSessions')} — ${sessionPreview.sessionNumber}` : ''}
+        subtitle={sessionPreview?.branchNameEn}
+        entityType="CASHIER_SESSION"
+        entityId={sessionPreview?.id ?? null}
+        canWriteAttachments={canManage}
+        testId="cashier-session-preview"
+        fields={
+          sessionPreview
+            ? [
+                { label: t('erp.sales.sessionNumber'), value: sessionPreview.sessionNumber },
+                { label: t('erp.inventory.branch'), value: sessionPreview.branchNameEn },
+                { label: t('erp.sales.openingFloat'), value: money(sessionPreview.openingFloatMinor) },
+                { label: t('erp.sales.expectedCash'), value: money(sessionPreview.expectedCashMinor) },
+                { label: t('erp.sales.countedCash'), value: sessionPreview.countedCashMinor !== null ? money(sessionPreview.countedCashMinor) : '—' },
+                { label: t('erp.sales.variance'), value: sessionPreview.varianceMinor !== null ? money(sessionPreview.varianceMinor) : '—' },
+                { label: t('common.status'), value: sessionPreview.status },
+                { label: t('common.date'), value: sessionPreview.openedAt.slice(0, 10) },
+                { label: t('common.notes'), value: sessionPreview.notes ?? '—' },
+              ]
+            : []
+        }
+      />
+
+      <RecordPreview
+        open={salePreview !== null}
+        onClose={() => setSalePreview(null)}
+        title={salePreview ? `${t('erp.sales.posSales')} — ${salePreview.receiptNumber}` : ''}
+        subtitle={salePreview ? `${salePreview.paymentMethod} · ${salePreview.createdAt.slice(0, 10)}` : undefined}
+        entityType="POS_SALE"
+        entityId={salePreview?.id ?? null}
+        canWriteAttachments={canOperate}
+        testId="pos-sale-preview"
+        fields={
+          salePreview
+            ? [
+                { label: t('erp.sales.receiptNumber'), value: salePreview.receiptNumber },
+                { label: t('common.date'), value: salePreview.createdAt.slice(0, 10) },
+                { label: t('erp.sales.method'), value: salePreview.paymentMethod },
+                { label: t('erp.sales.subtotal'), value: money(salePreview.subtotalMinor, salePreview.currency) },
+                { label: t('erp.sales.discount'), value: money(salePreview.discountMinor, salePreview.currency) },
+                { label: t('erp.sales.tax'), value: money(salePreview.taxMinor, salePreview.currency) },
+                { label: t('erp.sales.total'), value: money(salePreview.totalMinor, salePreview.currency) },
+                { label: t('erp.sales.paid'), value: money(salePreview.paidMinor, salePreview.currency) },
+                { label: t('erp.sales.change'), value: money(salePreview.changeMinor, salePreview.currency) },
+                { label: t('common.status'), value: salePreview.status },
+              ]
+            : []
+        }
+      />
 
       <PosSaleModal
         open={saleOpen}
@@ -654,6 +895,7 @@ function PosSaleModal({
   const [error, setError] = useState<string | null>(null);
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
   const [paid, setPaid] = useState('');
+  const attach = useFormAttachments();
 
   const total = lines.reduce((sum, l) => {
     const net = toQuantityInput(l.quantity) * toMinorInput(l.unitPrice) / 10000;
@@ -666,7 +908,7 @@ function PosSaleModal({
     setBusy(true);
     setError(null);
     try {
-      await api.createPosSale({
+      const created = await api.createPosSale({
         branchId: session.branchId,
         cashierSessionId: session.id,
         warehouseId: session.warehouseId ?? undefined,
@@ -680,6 +922,8 @@ function PosSaleModal({
           taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
         })),
       });
+      await attach.flush(created.id);
+      attach.reset();
       await onDone();
       onClose();
       setLines([emptyLine()]);
@@ -717,6 +961,9 @@ function PosSaleModal({
           </span>
         </div>
       </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField entityType="POS_SALE" entityId={null} value={attach.items} onChange={attach.setItems} registerFlush={attach.register} canWrite testId="new-pos-sale-attachments" />
+      </div>
     </Modal>
   );
 }
@@ -734,6 +981,7 @@ function CloseSessionModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [counted, setCounted] = useState('');
+  const attach = useFormAttachments();
 
   const submit = async () => {
     if (!session) return;
@@ -741,6 +989,8 @@ function CloseSessionModal({
     setError(null);
     try {
       await api.closeCashierSession(session.id, toMinorInput(counted));
+      await attach.flush(session.id);
+      attach.reset();
       await onDone();
       onClose();
       setCounted('');
@@ -772,6 +1022,9 @@ function CloseSessionModal({
       <Field label={t('erp.sales.countedCash')} required>
         <input className="oryx-input" value={counted} onChange={(e) => setCounted(e.target.value)} data-testid="counted-cash" />
       </Field>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField entityType="CASHIER_SESSION" entityId={session?.id ?? null} value={attach.items} onChange={attach.setItems} registerFlush={attach.register} canWrite testId="close-session-attachments" />
+      </div>
     </Modal>
   );
 }
@@ -872,6 +1125,7 @@ function DocumentModal({
   showWarehouse,
   showRestock,
   testIdPrefix,
+  attachmentEntityType,
   onClose,
   onSubmit,
 }: {
@@ -883,8 +1137,11 @@ function DocumentModal({
   showWarehouse?: boolean;
   showRestock?: boolean;
   testIdPrefix: string;
+  /** Attachment catalogue key; omit for a document that cannot be attached to. */
+  attachmentEntityType?: string;
   onClose: () => void;
-  onSubmit: (payload: Record<string, unknown>) => Promise<void>;
+  /** Return the created record id so the picked files can be attached to it. */
+  onSubmit: (payload: Record<string, unknown>) => Promise<string | void>;
 }) {
   const { t } = useUi();
   const [busy, setBusy] = useState(false);
@@ -893,12 +1150,13 @@ function DocumentModal({
   const [warehouseId, setWarehouseId] = useState('');
   const [restock, setRestock] = useState(true);
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
+  const attach = useFormAttachments();
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await onSubmit({
+      const createdId = await onSubmit({
         customerId,
         warehouseId: warehouseId || undefined,
         issueDate: new Date().toISOString(),
@@ -913,9 +1171,11 @@ function DocumentModal({
           taxPercentBp: Math.round((Number(l.taxPercent) || 0) * 100),
         })),
       });
+      if (createdId) await attach.flush(createdId);
       onClose();
       setLines([emptyLine()]);
       setCustomerId('');
+      attach.reset();
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
@@ -973,6 +1233,19 @@ function DocumentModal({
       <div className="mt-4">
         <LineEditor lines={lines} setLines={setLines} products={products} testIdPrefix={testIdPrefix} />
       </div>
+      {attachmentEntityType ? (
+        <div className="mt-4 border-t border-[var(--border)] pt-3">
+          <AttachmentField
+            entityType={attachmentEntityType}
+            entityId={null}
+            value={attach.items}
+            onChange={attach.setItems}
+            registerFlush={attach.register}
+            canWrite
+            testId={`new-${testIdPrefix}-attachments`}
+          />
+        </div>
+      ) : null}
       <span className="hidden">{qty(0)}</span>
     </Modal>
   );

@@ -39,6 +39,8 @@ export const DOCUMENT_SEQUENCE_KEYS = {
   jobCard: { key: 'JOB_CARD', prefix: 'JC' },
   repairEstimate: { key: 'REPAIR_ESTIMATE', prefix: 'EST' },
   serviceRequest: { key: 'SERVICE_REQUEST', prefix: 'SR' },
+  // Execution 06
+  employee: { key: 'EMPLOYEE', prefix: 'EMP' },
 } as const;
 
 export type DocumentSequenceName = keyof typeof DOCUMENT_SEQUENCE_KEYS;
@@ -70,5 +72,23 @@ export class DocumentSequenceService {
     // out is one less than what is now stored.
     const number = allocated.nextNumber - 1;
     return `${allocated.prefix}-${String(number).padStart(allocated.padding, '0')}`;
+  }
+
+  /**
+   * Preview the number `next` would allocate, without consuming it.
+   *
+   * Used to show the operator the number the form will assign. It is advisory
+   * only: the authoritative value is the one `next` allocates inside the save
+   * transaction, so a concurrent create can still take the previewed number and
+   * the UI must treat the response as the truth.
+   */
+  async peek(companyId: string, name: DocumentSequenceName): Promise<string> {
+    const { key, prefix } = DOCUMENT_SEQUENCE_KEYS[name];
+    const sequence = await this.prisma.documentSequence.findUnique({
+      where: { companyId_key: { companyId, key } },
+    });
+    const nextNumber = sequence?.nextNumber ?? 1;
+    const padding = sequence?.padding ?? 5;
+    return `${sequence?.prefix ?? prefix}-${String(nextNumber).padStart(padding, '0')}`;
   }
 }

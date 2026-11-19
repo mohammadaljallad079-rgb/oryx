@@ -76,6 +76,15 @@ import type {
   ServiceRequestDto,
   ProviderSettlementDto,
   WarehouseDto,
+  AttachmentDto,
+  AttachmentListResponse,
+  EmployeeFilePersonalCard,
+  EmployeeFilePayroll,
+  EmployeeFileLeave,
+  EmployeeFilePenalties,
+  EmployeeFileBonuses,
+  EmployeeFileReports,
+  EmployeeFileCounts,
 } from '@oryx/shared';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api';
@@ -302,6 +311,108 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+
+/**
+ * Multipart upload helper.
+ *
+ * `request` always serialises JSON, so uploads need their own path. It reuses
+ * the same bearer token, company headers and CSRF echo, and the same
+ * single-flight refresh on a 401.
+ */
+async function requestForm<T>(path: string, form: FormData, method: 'POST' | 'PATCH' = 'POST', noRetry = false): Promise<T> {
+  const headers: Record<string, string> = {};
+  const token = tokenStore.access;
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const companyId = tokenStore.companyId;
+  const branchId = tokenStore.branchId;
+  if (companyId) headers['x-oryx-company-id'] = companyId;
+  if (branchId) headers['x-oryx-branch-id'] = branchId;
+  const csrf = readCookie(CSRF_COOKIE);
+  if (csrf) headers[CSRF_HEADER] = csrf;
+
+  const res = await fetch(`${API_BASE}/v1${path}`, {
+    method,
+    headers,
+    credentials: 'include',
+    body: form,
+    cache: 'no-store',
+  });
+
+  if (res.status === 401 && !noRetry) {
+    const refreshed = await refreshSession();
+    if (refreshed) return requestForm<T>(path, form, method, true);
+    tokenStore.notifySessionLost();
+  }
+  if (!res.ok) {
+    let body: { message?: string | string[]; code?: string; error?: string } = {};
+    try {
+      body = await res.json();
+    } catch {
+      /* non-JSON error body */
+    }
+    const message = Array.isArray(body.message)
+      ? body.message.join(', ')
+      : body.message ?? body.error ?? `Upload failed with status ${res.status}`;
+    throw new ApiError(res.status, body.code ?? 'unknown_error', message);
+  }
+  if (res.status === 204) return undefined as T;
+  return (await res.json()) as T;
+}
+
+/** Absolute URL for an attachment's bytes, used by preview and download. */
+export function attachmentContentUrl(id: string, disposition: 'inline' | 'download' = 'inline'): string {
+  return `${API_BASE}/v1/attachments/${id}/content?disposition=${disposition}`;
+}
+
+/**
+ * Fetch attachment bytes with the session headers.
+ *
+ * The preview cannot use a bare `<img src>` or `<iframe src>`: those requests
+ * carry no Authorization header. This returns an object URL instead, and the
+ * caller revokes it.
+ */
+export async function fetchAttachmentBlob(id: string): Promise<Blob> {
+  const headers: Record<string, string> = {};
+  const token = tokenStore.access;
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const companyId = tokenStore.companyId;
+  if (companyId) headers['x-oryx-company-id'] = companyId;
+  const res = await fetch(attachmentContentUrl(id, 'inline'), { headers, credentials: 'include', cache: 'no-store' });
+  if (!res.ok) throw new ApiError(res.status, 'attachment_unavailable', 'The attachment could not be opened.');
+  return res.blob();
+}
+
+/**
+ * Read an attachment as a `data:` URL.
+ *
+ * Used where the bytes must be embedded in a document that is opened outside
+ * the page — the printed employee card, for example. The blob is small (an
+ * image attachment), and the caller is expected to have already checked the
+ * read permission by listing the record's attachments.
+ */
+export async function fetchAttachmentDataUrl(id: string): Promise<string> {
+  const blob = await fetchAttachmentBlob(id);
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onerror = () => reject(reader.error ?? new Error('The attachment could not be read.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Download an attachment through the authenticated path. */
+export async function downloadAttachment(id: string, fileName: string): Promise<void> {
+  const blob = await fetchAttachmentBlob(id);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 export const api = {
@@ -688,6 +799,7 @@ export const api = {
   hrEmployees: (params: { companyId?: string; search?: string; status?: string; page?: number } = {}) =>
     request<Paginated<EmployeeDto>>(`/hr/employees?${toQuery(params)}`),
   hrEmployee: (id: string) => request<Record<string, unknown>>(`/hr/employees/${id}`),
+  nextEmployeeCode: () => request<{ code: string }>('/hr/employees/next-code'),
   createEmployee: (body: Record<string, unknown>) => request<EmployeeDto>('/hr/employees', { method: 'POST', body }),
   updateEmployee: (id: string, body: Record<string, unknown>) =>
     request<EmployeeDto>(`/hr/employees/${id}`, { method: 'PATCH', body }),
@@ -953,6 +1065,58 @@ export const api = {
     request<Record<string, unknown>>('/payments/reconciliations', { method: 'POST', body }),
   paymentReconciliations: (onlyUnmatched = false) =>
     request<Array<Record<string, unknown>>>(`/payments/reconciliations?onlyUnmatched=${onlyUnmatched}`),
+
+  // ------------------------------------------------- attachments (all modules)
+  attachments: (entityType: string, entityId: string) =>
+    request<AttachmentListResponse>(`/attachments?${toQuery({ entityType, entityId })}`),
+  uploadAttachments: (
+    entityType: string,
+    entityId: string,
+    files: File[],
+    options: { isConfidential?: boolean; isPrimary?: boolean } = {},
+  ) => {
+    const form = new FormData();
+    form.set('entityType', entityType);
+    form.set('entityId', entityId);
+    if (options.isConfidential) form.set('isConfidential', 'true');
+    if (options.isPrimary) form.set('isPrimary', 'true');
+    for (const file of files) form.append('files', file);
+    return requestForm<{ items: AttachmentDto[] }>('/attachments', form);
+  },
+  replaceAttachment: (id: string, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return requestForm<AttachmentDto>(`/attachments/${id}/replace`, form);
+  },
+  updateAttachment: (id: string, body: { fileName?: string; isPrimary?: boolean; isConfidential?: boolean }) =>
+    request<AttachmentDto>(`/attachments/${id}`, { method: 'PATCH', body }),
+  deleteAttachment: (id: string) => request<{ id: string }>(`/attachments/${id}`, { method: 'DELETE' }),
+
+  // ------------------------------------------------------- employee file (E06)
+  employeeFileCounts: (id: string) => request<EmployeeFileCounts>(`/hr/employees/${id}/file/counts`),
+  employeeFilePersonalCard: (id: string) =>
+    request<EmployeeFilePersonalCard>(`/hr/employees/${id}/file/personal-card`),
+  employeeFilePayroll: (id: string, params: { from?: string; to?: string } = {}) =>
+    request<EmployeeFilePayroll>(`/hr/employees/${id}/file/payroll?${toQuery(params)}`),
+  employeeFileLeave: (id: string) => request<EmployeeFileLeave>(`/hr/employees/${id}/file/leave`),
+  employeeFilePenalties: (id: string) => request<EmployeeFilePenalties>(`/hr/employees/${id}/file/penalties`),
+  createEmployeePenalty: (id: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/hr/employees/${id}/file/penalties`, { method: 'POST', body }),
+  updateEmployeePenalty: (penaltyId: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/hr/file/penalties/${penaltyId}`, { method: 'PATCH', body }),
+  deleteEmployeePenalty: (penaltyId: string) =>
+    request<{ id: string }>(`/hr/file/penalties/${penaltyId}`, { method: 'DELETE' }),
+  employeeFileBonuses: (id: string) => request<EmployeeFileBonuses>(`/hr/employees/${id}/file/bonuses`),
+  createEmployeeBonus: (id: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/hr/employees/${id}/file/bonuses`, { method: 'POST', body }),
+  updateEmployeeBonus: (bonusId: string, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/hr/file/bonuses/${bonusId}`, { method: 'PATCH', body }),
+  approveEmployeeBonus: (bonusId: string) =>
+    request<Record<string, unknown>>(`/hr/file/bonuses/${bonusId}/approve`, { method: 'POST', body: {} }),
+  deleteEmployeeBonus: (bonusId: string) =>
+    request<{ id: string }>(`/hr/file/bonuses/${bonusId}`, { method: 'DELETE' }),
+  employeeFileReports: (id: string, params: { from?: string; to?: string } = {}) =>
+    request<EmployeeFileReports>(`/hr/employees/${id}/file/reports?${toQuery(params)}`),
 
   // ------------------------------------------------------- integrations center
   integrations: () => request<IntegrationCenterResponse>('/integrations'),

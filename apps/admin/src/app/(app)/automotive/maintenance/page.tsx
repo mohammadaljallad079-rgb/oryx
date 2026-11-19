@@ -6,6 +6,9 @@ import { useAuth } from '@/lib/auth-context';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, toMinorInput, toQuantityInput } from '@/lib/erp-format';
+import { useFormAttachments } from '@/lib/use-form-attachments';
+import { AttachmentField } from '@/components/attachments';
+import { RecordPreview } from '@/components/record-preview';
 import { Icon } from '@/components/icons';
 import {
   Badge,
@@ -22,7 +25,7 @@ import {
 } from '@/components/ui';
 import type { JobCardDto, MarketplaceProviderDto, ServiceRequestDto } from '@oryx/shared';
 
-type Tab = 'job-cards' | 'bay' | 'warranties' | 'providers' | 'requests';
+type Tab = 'job-cards' | 'bookings' | 'bay' | 'warranties' | 'providers' | 'requests';
 
 export default function MaintenancePage() {
   const { t } = useUi();
@@ -31,6 +34,7 @@ export default function MaintenancePage() {
 
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'job-cards', label: t('erp.automotive.jobCards') },
+    { key: 'bookings', label: t('erp.automotive.maintenanceBookings') },
     { key: 'bay', label: t('erp.automotive.bays') },
     { key: 'warranties', label: t('erp.automotive.warranties') },
     { key: 'providers', label: t('erp.automotive.providers') },
@@ -70,6 +74,7 @@ export default function MaintenancePage() {
           canIssue={can('erp.parts.issue')}
         />
       ) : null}
+      {tab === 'bookings' ? <BookingsTab canManage={can('erp.maintenance.booking.manage')} /> : null}
       {tab === 'bay' ? <BaysTab canManage={can('erp.maintenance.booking.manage')} /> : null}
       {tab === 'warranties' ? <WarrantiesTab canManage={can('erp.maintenance.warranty.manage')} /> : null}
       {tab === 'providers' ? <ProvidersTab canManage={can('erp.marketplace.provider.manage')} /> : null}
@@ -97,6 +102,7 @@ function JobCardsTab({
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<JobCardDto | null>(null);
   const [estimateTarget, setEstimateTarget] = useState<JobCardDto | null>(null);
   const [reserveTarget, setReserveTarget] = useState<JobCardDto | null>(null);
 
@@ -134,6 +140,9 @@ function JobCardsTab({
                 <td><StatusBadge status={j.status} label={j.status} /></td>
                 <td>
                   <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => setDetail(j)} data-testid={`preview-job-${j.jobNumber}`}>
+                      {t('attach.preview')}
+                    </Button>
                     {canEstimate ? (
                       <Button size="sm" onClick={() => setEstimateTarget(j)} data-testid={`estimate-job-${j.jobNumber}`}>
                         {t('erp.automotive.estimate')}
@@ -167,6 +176,30 @@ function JobCardsTab({
         </TableShell>
       )}
 
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={detail ? `${t('erp.automotive.jobCard')} — ${detail.jobNumber}` : ''}
+        subtitle={detail ? `${detail.make ?? ''} ${detail.model ?? ''} ${detail.plateNumber ? `· ${detail.plateNumber}` : ''}`.trim() : undefined}
+        entityType="JOB_CARD"
+        entityId={detail?.id ?? null}
+        canWriteAttachments={canManage}
+        testId="job-card-preview"
+        fields={
+          detail
+            ? [
+                { label: t('erp.automotive.jobNumber'), value: detail.jobNumber },
+                { label: t('erp.automotive.vin'), value: detail.vin ?? '—' },
+                { label: t('erp.automotive.vehicle'), value: `${detail.make ?? '—'} ${detail.model ?? ''}`.trim() },
+                { label: t('erp.automotive.plate'), value: detail.plateNumber ?? '—' },
+                { label: t('erp.automotive.odometer'), value: detail.odometer !== null && detail.odometer !== undefined ? String(detail.odometer) : '—' },
+                { label: t('erp.automotive.complaint'), value: detail.complaint ?? '—' },
+                { label: t('common.status'), value: detail.status },
+                { label: t('common.date'), value: detail.createdAt.slice(0, 10) },
+              ]
+            : []
+        }
+      />
       <CreateJobCardModal open={open} vehicles={vehicles.data?.items ?? []} onClose={() => setOpen(false)} onCreated={list.reload} />
       <EstimateModal
         job={estimateTarget}
@@ -201,12 +234,13 @@ function EstimateModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [line, setLine] = useState({ productId: '', description: '', quantity: '1', unitPrice: '0.00', taxRate: '15' });
+  const attach = useFormAttachments();
 
   const submit = async () => {
     if (!job) return;
     setBusy(true); setError(null);
     try {
-      await api.createEstimate(job.id, {
+      const created = await api.createEstimate(job.id, {
         lines: [
           {
             type: line.productId ? 'PART' : 'LABOUR',
@@ -218,6 +252,8 @@ function EstimateModal({
           },
         ],
       });
+      await attach.flush(String(created.id));
+      attach.reset();
       await onDone();
       onClose();
     } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); } finally { setBusy(false); }
@@ -247,6 +283,9 @@ function EstimateModal({
           <input className="oryx-input" value={line.unitPrice} onChange={(e) => setLine({ ...line, unitPrice: e.target.value })} data-testid="estimate-price" />
         </Field>
       </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField entityType="REPAIR_ESTIMATE" entityId={null} value={attach.items} onChange={attach.setItems} registerFlush={attach.register} canWrite testId="new-estimate-attachments" />
+      </div>
     </Modal>
   );
 }
@@ -271,6 +310,7 @@ function ReserveModal({
   const [error, setError] = useState<string | null>(null);
   const [reservationId, setReservationId] = useState<string | null>(null);
   const [line, setLine] = useState({ productId: '', quantity: '1', warehouseId: '' });
+  const attach = useFormAttachments();
 
   const reserve = async () => {
     if (!job) return;
@@ -282,6 +322,8 @@ function ReserveModal({
         lines: [{ productId: line.productId, quantity: toQuantityInput(line.quantity) }],
       });
       setReservationId(r.id);
+      await attach.flush(job.id);
+      attach.reset();
       await onDone();
     } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); } finally { setBusy(false); }
   };
@@ -330,6 +372,9 @@ function ReserveModal({
           </Field>
         </div>
       )}
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField entityType="JOB_CARD" entityId={job?.id ?? null} value={attach.items} onChange={attach.setItems} registerFlush={attach.register} canWrite testId="reserve-attachments" />
+      </div>
     </Modal>
   );
 }
@@ -350,14 +395,18 @@ function CreateJobCardModal({
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ vehicleId: '', complaint: '', odometer: '' });
 
+  const attach = useFormAttachments();
+
   const submit = async () => {
     setBusy(true); setError(null);
     try {
-      await api.createJobCard({
+      const created = await api.createJobCard({
         vehicleId: form.vehicleId,
         complaint: form.complaint || undefined,
         odometer: form.odometer ? Number(form.odometer) : undefined,
       });
+      await attach.flush(created.id);
+      attach.reset();
       await onCreated();
       onClose();
     } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); } finally { setBusy(false); }
@@ -381,7 +430,172 @@ function CreateJobCardModal({
           <input className="oryx-input" value={form.complaint} onChange={(e) => setForm({ ...form, complaint: e.target.value })} data-testid="job-complaint" />
         </Field>
       </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField entityType="JOB_CARD" entityId={null} value={attach.items} onChange={attach.setItems} registerFlush={attach.register} canWrite testId="new-job-card-attachments" />
+      </div>
     </Modal>
+  );
+}
+
+interface MaintenanceBookingRow {
+  id: string;
+  bookingNumber: string;
+  scheduledAt: string;
+  status: string;
+  complaint: string | null;
+  notes: string | null;
+  vehicle?: { vin: string; make: string; model: string; plateNumber: string | null } | null;
+  _count?: { jobCards: number };
+}
+
+function BookingsTab({ canManage }: { canManage: boolean }) {
+  const { t } = useUi();
+  const list = useAsync(() => api.maintenanceBookings(), []);
+  const vehicles = useAsync(() => api.vehicles(), []);
+  const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState<MaintenanceBookingRow | null>(null);
+  const [form, setForm] = useState({ vehicleId: '', scheduledAt: '', complaint: '', notes: '' });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const attach = useFormAttachments();
+
+  const closeCreate = () => {
+    setOpen(false);
+    setForm({ vehicleId: '', scheduledAt: '', complaint: '', notes: '' });
+    attach.reset();
+    setError(null);
+  };
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const created = await api.createMaintenanceBooking({
+        vehicleId: form.vehicleId,
+        scheduledAt: new Date(form.scheduledAt).toISOString(),
+        complaint: form.complaint || undefined,
+        notes: form.notes || undefined,
+      });
+      await attach.flush(String(created.id));
+      await list.reload();
+      closeCreate();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rows = (list.data?.items ?? []) as unknown as MaintenanceBookingRow[];
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-4">
+        <p className="oryx-panel-title m-0">{t('erp.automotive.maintenanceBookings')}</p>
+        {canManage ? (
+          <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-maintenance-booking">
+            <Icon name="plus" size={16} />
+            {t('erp.automotive.newBooking')}
+          </Button>
+        ) : null}
+      </div>
+      {list.error ? <div className="p-4"><ErrorBanner message={list.error} onRetry={list.reload} /></div> : null}
+      {list.loading ? <div className="p-4"><Skeleton height={140} /></div> : rows.length === 0 ? (
+        <EmptyState title={t('common.empty')} hint={t('erp.automotive.emptyBookings')} />
+      ) : (
+        <TableShell>
+          <thead>
+            <tr>
+              <th>{t('erp.automotive.bookingNumber')}</th>
+              <th>{t('erp.automotive.vehicle')}</th>
+              <th>{t('erp.automotive.scheduledAt')}</th>
+              <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((b) => (
+              <tr key={b.id} data-testid={`maintenance-booking-row-${b.bookingNumber}`}>
+                <td className="font-mono text-[12px]">{b.bookingNumber}</td>
+                <td className="text-[12.5px]">
+                  {b.vehicle ? `${b.vehicle.make} ${b.vehicle.model}` : '—'}
+                  {b.vehicle?.plateNumber ? <span className="oryx-faint"> · {b.vehicle.plateNumber}</span> : null}
+                </td>
+                <td className="text-[12.5px]">{b.scheduledAt.slice(0, 16).replace('T', ' ')}</td>
+                <td><StatusBadge status={b.status} label={b.status} /></td>
+                <td>
+                  <Button size="sm" onClick={() => setPreview(b)} data-testid={`preview-maintenance-booking-${b.bookingNumber}`}>
+                    {t('attach.preview')}
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </TableShell>
+      )}
+
+      <RecordPreview
+        open={preview !== null}
+        onClose={() => setPreview(null)}
+        title={preview ? preview.bookingNumber : ''}
+        subtitle={preview?.vehicle ? `${preview.vehicle.make} ${preview.vehicle.model} · ${preview.vehicle.vin}` : undefined}
+        entityType="MAINTENANCE_BOOKING"
+        entityId={preview?.id ?? null}
+        canWriteAttachments={canManage}
+        testId="maintenance-booking-preview"
+        fields={
+          preview
+            ? [
+                { label: t('erp.automotive.bookingNumber'), value: preview.bookingNumber },
+                { label: t('common.status'), value: preview.status },
+                { label: t('erp.automotive.scheduledAt'), value: preview.scheduledAt.slice(0, 16).replace('T', ' ') },
+                { label: t('erp.automotive.plateNumber'), value: preview.vehicle?.plateNumber ?? '—' },
+                { label: t('erp.automotive.complaint'), value: preview.complaint ?? '—' },
+                { label: t('erp.automotive.notes'), value: preview.notes ?? '—' },
+                { label: t('erp.automotive.jobCards'), value: String(preview._count?.jobCards ?? 0) },
+              ]
+            : []
+        }
+      />
+
+      <Modal
+        open={open}
+        title={t('erp.automotive.newBooking')}
+        onClose={closeCreate}
+        footer={
+          <>
+            <Button onClick={closeCreate}>{t('common.cancel')}</Button>
+            <Button variant="primary" disabled={busy || !form.vehicleId || !form.scheduledAt} onClick={submit} data-testid="save-maintenance-booking">
+              {busy ? t('common.loading') : t('common.save')}
+            </Button>
+          </>
+        }
+      >
+        {error ? <ErrorBanner message={error} /> : null}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={t('erp.automotive.vehicle')} required>
+            <select className="oryx-select" value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })} data-testid="maintenance-vehicle">
+              <option value="">—</option>
+              {(vehicles.data?.items ?? []).map((v) => (
+                <option key={v.id} value={v.id}>{v.vin} — {v.make} {v.model}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label={t('erp.automotive.scheduledAt')} required>
+            <input type="datetime-local" className="oryx-input" value={form.scheduledAt} onChange={(e) => setForm({ ...form, scheduledAt: e.target.value })} data-testid="maintenance-scheduled-at" />
+          </Field>
+          <Field label={t('erp.automotive.complaint')}>
+            <input className="oryx-input" value={form.complaint} onChange={(e) => setForm({ ...form, complaint: e.target.value })} />
+          </Field>
+          <Field label={t('erp.automotive.notes')}>
+            <input className="oryx-input" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          </Field>
+        </div>
+        <div className="mt-4 border-t border-[var(--border)] pt-3">
+          <AttachmentField entityType="MAINTENANCE_BOOKING" entityId={null} value={attach.items} onChange={attach.setItems} registerFlush={attach.register} canWrite testId="new-maintenance-booking-attachments" />
+        </div>
+      </Modal>
+    </Card>
   );
 }
 
@@ -416,6 +630,7 @@ function BaysTab({ canManage }: { canManage: boolean }) {
 function WarrantiesTab({ canManage }: { canManage: boolean }) {
   const { t } = useUi();
   const list = useAsync(() => api.warranties(), []);
+  const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
   return (
     <Card>
       <div className="border-b border-[var(--border)] p-4"><p className="oryx-panel-title m-0">{t('erp.automotive.warranties')}</p></div>
@@ -424,7 +639,7 @@ function WarrantiesTab({ canManage }: { canManage: boolean }) {
         <EmptyState title={t('common.empty')} hint={t('erp.automotive.emptyWarranties')} />
       ) : (
         <TableShell>
-          <thead><tr><th>{t('erp.automotive.vehicle')}</th><th>{t('erp.accounting.description')}</th><th>{t('erp.automotive.expiresAt')}</th><th>{t('common.status')}</th></tr></thead>
+          <thead><tr><th>{t('erp.automotive.vehicle')}</th><th>{t('erp.accounting.description')}</th><th>{t('erp.automotive.expiresAt')}</th><th>{t('common.status')}</th><th>{t('common.actions')}</th></tr></thead>
           <tbody>
             {list.data!.items.map((w) => (
               <tr key={String(w.id)}>
@@ -432,11 +647,35 @@ function WarrantiesTab({ canManage }: { canManage: boolean }) {
                 <td className="text-[12.5px]">{String(w.description)}</td>
                 <td className="text-[12.5px]">{w.expiresAt ? String(w.expiresAt).slice(0, 10) : '—'}</td>
                 <td><Badge tone={w.isActive ? 'success' : 'neutral'}>{w.isActive ? 'Active' : 'Inactive'}</Badge></td>
+                <td>
+                  <Button size="sm" onClick={() => setDetail(w)} data-testid={`preview-warranty-${String(w.id)}`}>{t('attach.preview')}</Button>
+                </td>
               </tr>
             ))}
           </tbody>
         </TableShell>
       )}
+
+      <RecordPreview
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        title={t('erp.automotive.warranties')}
+        subtitle={detail ? String((detail.vehicle as { vin?: string } | undefined)?.vin ?? '') : undefined}
+        entityType="VEHICLE"
+        entityId={detail ? String((detail.vehicle as { id?: string } | undefined)?.id ?? '') || null : null}
+        canWriteAttachments={canManage}
+        testId="warranty-preview"
+        fields={
+          detail
+            ? [
+                { label: t('erp.automotive.vehicle'), value: String((detail.vehicle as { vin?: string } | undefined)?.vin ?? '—') },
+                { label: t('erp.accounting.description'), value: String(detail.description ?? '—') },
+                { label: t('erp.automotive.expiresAt'), value: detail.expiresAt ? String(detail.expiresAt).slice(0, 10) : '—' },
+                { label: t('common.status'), value: detail.isActive ? t('common.active') : t('common.inactive') },
+              ]
+            : []
+        }
+      />
       <span className="hidden">{canManage ? '1' : '0'}</span>
     </Card>
   );
@@ -493,10 +732,14 @@ function CreateProviderModal({ open, onClose, onCreated }: { open: boolean; onCl
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ code: '', nameEn: '', nameAr: '', categoryKey: 'WORKSHOP', commission: '10' });
+  const attach = useFormAttachments();
+
   const submit = async () => {
     setBusy(true); setError(null);
     try {
-      await api.createProvider({ ...form, commissionPercentBp: Math.round(Number(form.commission) * 100) });
+      const created = await api.createProvider({ ...form, commissionPercentBp: Math.round(Number(form.commission) * 100) });
+      await attach.flush(created.id);
+      attach.reset();
       await onCreated();
       onClose();
     } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); } finally { setBusy(false); }
@@ -510,6 +753,9 @@ function CreateProviderModal({ open, onClose, onCreated }: { open: boolean; onCl
         <Field label={t('erp.automotive.commission')}><input className="oryx-input" value={form.commission} onChange={(e) => setForm({ ...form, commission: e.target.value })} /></Field>
         <Field label={`${t('common.name')} (EN)`} required><input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="provider-name-en" /></Field>
         <Field label={`${t('common.name')} (AR)`} required><input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="provider-name-ar" /></Field>
+      </div>
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <AttachmentField entityType="MARKETPLACE_PROVIDER" entityId={null} value={attach.items} onChange={attach.setItems} registerFlush={attach.register} canWrite testId="new-provider-attachments" />
       </div>
     </Modal>
   );

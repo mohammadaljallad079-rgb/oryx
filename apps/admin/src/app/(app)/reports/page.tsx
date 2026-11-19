@@ -5,13 +5,14 @@ import { api } from '@/lib/api';
 import { useUi } from '@/lib/ui-context';
 import { useAsync } from '@/lib/hooks';
 import { money, qty } from '@/lib/erp-format';
+import { exportCsv, printDocument } from '@/lib/print';
+import { Icon } from '@/components/icons';
 import {
   Badge,
   Button,
   Card,
   EmptyState,
   ErrorBanner,
-  Field,
   SectionHeader,
   Skeleton,
   TableShell,
@@ -26,7 +27,7 @@ import type {
 type Tab = 'accounting' | 'sales' | 'purchasing' | 'inventory';
 
 export default function ReportsPage() {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const [tab, setTab] = useState<Tab>('sales');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -52,6 +53,181 @@ export default function ReportsPage() {
     void accounting.reload();
   };
 
+  const windowLabel = `${from || '—'} → ${to || '—'}`;
+
+  const printReport = () => {
+    const footer = new Date().toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-GB');
+    if (tab === 'sales' && sales.data) {
+      const d = sales.data;
+      printDocument({
+        title: t('erp.reports.sales'),
+        subtitle: windowLabel,
+        locale,
+        footer,
+        sections: [
+          {
+            heading: t('erp.reports.sales'),
+            fields: [
+              { label: t('erp.reports.invoices'), value: String(d.invoiceCount) },
+              { label: t('erp.reports.totalSales'), value: money(d.totalSalesMinor) },
+              { label: t('erp.reports.totalTax'), value: money(d.totalTaxMinor) },
+              { label: t('erp.reports.collected'), value: money(d.totalPaidMinor) },
+              { label: t('erp.reports.outstanding'), value: money(d.totalOutstandingMinor) },
+            ],
+            table: {
+              columns: [
+                { header: t('erp.sales.customer'), value: (r) => String(r.nameEn) },
+                { header: t('erp.reports.invoices'), value: (r) => String(r.invoiceCount) },
+                { header: t('erp.sales.total'), value: (r) => money(Number(r.totalMinor)), align: 'end' },
+                { header: t('erp.reports.collected'), value: (r) => money(Number(r.paidMinor)), align: 'end' },
+                { header: t('erp.reports.outstanding'), value: (r) => money(Number(r.outstandingMinor)), align: 'end' },
+              ],
+              rows: d.byCustomer as unknown as Array<Record<string, unknown>>,
+            },
+          },
+          {
+            heading: t('erp.reports.byBranch'),
+            table: {
+              columns: [
+                { header: t('erp.inventory.branch'), value: (r) => String(r.nameEn) },
+                { header: t('erp.reports.invoices'), value: (r) => String(r.invoiceCount) },
+                { header: t('erp.sales.total'), value: (r) => money(Number(r.totalMinor)), align: 'end' },
+                { header: t('erp.reports.totalTax'), value: (r) => money(Number(r.taxMinor)), align: 'end' },
+              ],
+              rows: d.byBranch as unknown as Array<Record<string, unknown>>,
+            },
+          },
+        ],
+      });
+      return;
+    }
+    if (tab === 'purchasing' && purchasing.data) {
+      const d = purchasing.data;
+      printDocument({
+        title: t('erp.reports.purchasing'),
+        subtitle: windowLabel,
+        locale,
+        footer,
+        sections: [
+          {
+            heading: t('erp.reports.purchasing'),
+            fields: [
+              { label: t('erp.purchasing.orders'), value: String(d.orderCount) },
+              { label: t('erp.reports.ordered'), value: money(d.totalOrderedMinor) },
+              { label: t('erp.reports.invoiced'), value: money(d.totalInvoicedMinor) },
+              { label: t('erp.reports.paid'), value: money(d.totalPaidMinor) },
+              { label: t('erp.reports.outstanding'), value: money(d.totalOutstandingMinor) },
+            ],
+            table: {
+              columns: [
+                { header: t('erp.purchasing.supplier'), value: (r) => String(r.nameEn) },
+                { header: t('erp.reports.ordered'), value: (r) => money(Number(r.orderedMinor)), align: 'end' },
+                { header: t('erp.reports.invoiced'), value: (r) => money(Number(r.invoicedMinor)), align: 'end' },
+                { header: t('erp.reports.paid'), value: (r) => money(Number(r.paidMinor)), align: 'end' },
+                { header: t('erp.reports.outstanding'), value: (r) => money(Number(r.outstandingMinor)), align: 'end' },
+              ],
+              rows: d.bySupplier as unknown as Array<Record<string, unknown>>,
+            },
+          },
+        ],
+      });
+      return;
+    }
+    if (tab === 'inventory' && inventory.data) {
+      const d = inventory.data;
+      printDocument({
+        title: t('erp.reports.inventory'),
+        subtitle: windowLabel,
+        locale,
+        footer,
+        sections: [
+          {
+            heading: t('erp.reports.inventory'),
+            fields: [
+              { label: t('erp.inventory.totalValue'), value: money(d.totalValueMinor) },
+              { label: t('erp.inventory.totalQty'), value: qty(d.totalQuantity) },
+              { label: t('erp.inventory.reorder'), value: String(d.reorderAlerts.length) },
+            ],
+            table: {
+              columns: [
+                { header: t('erp.inventory.sku'), value: (r) => String(r.sku) },
+                { header: t('erp.inventory.warehouse'), value: (r) => String(r.warehouseCode) },
+                { header: t('erp.inventory.onHand'), value: (r) => qty(Number(r.quantity)), align: 'end' },
+                { header: t('erp.inventory.avgCost'), value: (r) => money(Number(r.averageCostMinor)), align: 'end' },
+                { header: t('erp.inventory.value'), value: (r) => money(Number(r.valueMinor)), align: 'end' },
+              ],
+              rows: d.valuation as unknown as Array<Record<string, unknown>>,
+            },
+          },
+        ],
+      });
+      return;
+    }
+    if (tab === 'accounting' && accounting.data) {
+      const d = accounting.data;
+      printDocument({
+        title: t('erp.reports.accounting'),
+        subtitle: windowLabel,
+        locale,
+        footer,
+        sections: [
+          {
+            heading: t('erp.reports.accounting'),
+            fields: [
+              { label: t('erp.reports.journals'), value: String(d.journalCount) },
+              { label: t('erp.accounting.debit'), value: money(d.totalDebitMinor) },
+              { label: t('erp.accounting.credit'), value: money(d.totalCreditMinor) },
+              { label: t('erp.accounting.balanced'), value: d.balanced ? t('common.yes') : t('common.no') },
+            ],
+            table: {
+              columns: [
+                { header: t('erp.accounting.source'), value: (r) => String(r.sourceType) },
+                { header: t('erp.reports.journals'), value: (r) => String(r.count) },
+                { header: t('erp.accounting.debit'), value: (r) => money(Number(r.debitMinor)), align: 'end' },
+                { header: t('erp.accounting.credit'), value: (r) => money(Number(r.creditMinor)), align: 'end' },
+              ],
+              rows: d.bySourceType as unknown as Array<Record<string, unknown>>,
+            },
+          },
+        ],
+      });
+    }
+  };
+
+  const exportReport = () => {
+    if (tab === 'sales' && sales.data) {
+      exportCsv(
+        'sales-report',
+        [t('erp.sales.customer'), t('erp.reports.invoices'), t('erp.sales.total'), t('erp.reports.collected'), t('erp.reports.outstanding')],
+        sales.data.byCustomer.map((c) => [c.nameEn, String(c.invoiceCount), money(c.totalMinor), money(c.paidMinor), money(c.outstandingMinor)]),
+      );
+      return;
+    }
+    if (tab === 'purchasing' && purchasing.data) {
+      exportCsv(
+        'purchasing-report',
+        [t('erp.purchasing.supplier'), t('erp.reports.ordered'), t('erp.reports.invoiced'), t('erp.reports.paid'), t('erp.reports.outstanding')],
+        purchasing.data.bySupplier.map((s) => [s.nameEn, money(s.orderedMinor), money(s.invoicedMinor), money(s.paidMinor), money(s.outstandingMinor)]),
+      );
+      return;
+    }
+    if (tab === 'inventory' && inventory.data) {
+      exportCsv(
+        'inventory-report',
+        [t('erp.inventory.sku'), t('erp.inventory.warehouse'), t('erp.inventory.onHand'), t('erp.inventory.avgCost'), t('erp.inventory.value')],
+        inventory.data.valuation.map((r) => [r.sku, r.warehouseCode, qty(r.quantity), money(r.averageCostMinor), money(r.valueMinor)]),
+      );
+      return;
+    }
+    if (tab === 'accounting' && accounting.data) {
+      exportCsv(
+        'accounting-report',
+        [t('erp.accounting.source'), t('erp.reports.journals'), t('erp.accounting.debit'), t('erp.accounting.credit')],
+        accounting.data.bySourceType.map((r) => [r.sourceType, String(r.count), money(r.debitMinor), money(r.creditMinor)]),
+      );
+    }
+  };
+
   return (
     <div className="flex flex-col gap-5" data-testid="reports-page">
       <SectionHeader
@@ -73,6 +249,15 @@ export default function ReportsPage() {
           <Button size="sm" onClick={reloadAll}>
             {t('common.refresh')}
           </Button>
+          <div className="ms-auto flex flex-wrap gap-2">
+            <Button size="sm" onClick={exportReport} data-testid="report-export">
+              {t('attach.exportCsv')}
+            </Button>
+            <Button size="sm" variant="primary" onClick={printReport} data-testid="report-print">
+              <Icon name="scroll" size={14} />
+              {t('attach.print')}
+            </Button>
+          </div>
         </div>
       </Card>
 
@@ -329,12 +514,6 @@ export default function ReportsPage() {
           )}
         </Card>
       ) : null}
-
-      <span className="hidden">
-        <Field label="hidden">
-          <input className="oryx-input" readOnly />
-        </Field>
-      </span>
     </div>
   );
 }

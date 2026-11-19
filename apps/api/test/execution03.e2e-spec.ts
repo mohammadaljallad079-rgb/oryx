@@ -98,12 +98,14 @@ describe('ORYX Execution 03 (e2e)', () => {
     it('creates an employee with an onboarding checklist', async () => {
       const dept = await erp<{ id: string }>('/hr/departments', { method: 'POST', body: { code: 'OPS', nameEn: 'Operations', nameAr: 'العمليات' } });
       expect(dept.status).toBe(201);
-      const employee = await erp<{ id: string; lifecycle: Array<{ items: unknown[] }> }>('/hr/employees', {
+      const employee = await erp<{ id: string; code: string; lifecycle: Array<{ items: unknown[] }> }>('/hr/employees', {
         method: 'POST',
-        body: { code: 'EMP-1', fullNameEn: 'Test Employee', fullNameAr: 'موظف اختبار', hireDate: '2026-01-01', departmentId: dept.body.id },
+        body: { fullNameEn: 'Test Employee', fullNameAr: 'موظف اختبار', hireDate: '2026-01-01', departmentId: dept.body.id },
       });
       expect(employee.status).toBe(201);
       employeeId = employee.body.id;
+      // The employee number is server-assigned, never supplied by the caller.
+      expect(employee.body.code).toMatch(/^EMP-\d{5}$/);
       expect(employee.body.lifecycle[0].items.length).toBeGreaterThan(0);
     });
 
