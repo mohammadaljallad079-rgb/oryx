@@ -186,7 +186,20 @@ export class PurchasingService {
   async listRequisitions(query: ListQueryDto, principal: RequestPrincipal) {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const rows = await this.prisma.purchaseRequisition.findMany({
-      where: { companyId, ...(query.status ? { status: query.status as never } : {}) },
+      where: {
+        companyId,
+        ...(query.status ? { status: query.status as never } : {}),
+        ...(query.search ? { OR: [
+          { requisitionNumber: { contains: query.search, mode: 'insensitive' as const } },
+          { notes: { contains: query.search, mode: 'insensitive' as const } },
+          { supplier: { is: { OR: [
+            { nameEn: { contains: query.search, mode: 'insensitive' as const } },
+            { nameAr: { contains: query.search } },
+            { code: { contains: query.search, mode: 'insensitive' as const } },
+          ] } } },
+          { lines: { some: { description: { contains: query.search, mode: 'insensitive' as const } } } },
+        ] } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       take: 200,
       include: { lines: true, supplier: { select: { nameEn: true, nameAr: true } } },
@@ -330,7 +343,20 @@ export class PurchasingService {
     const { companyId } = await this.context.resolveCompanyScope(principal, query.companyId);
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-    const where = { companyId, ...(query.status ? { status: query.status as never } : {}) };
+    const where = {
+      companyId,
+      ...(query.status ? { status: query.status as never } : {}),
+      ...(query.search ? { OR: [
+        { orderNumber: { contains: query.search, mode: 'insensitive' as const } },
+        { notes: { contains: query.search, mode: 'insensitive' as const } },
+        { supplier: { is: { OR: [
+          { nameEn: { contains: query.search, mode: 'insensitive' as const } },
+          { nameAr: { contains: query.search } },
+          { code: { contains: query.search, mode: 'insensitive' as const } },
+        ] } } },
+        { lines: { some: { description: { contains: query.search, mode: 'insensitive' as const } } } },
+      ] } : {}),
+    };
     const [rows, total] = await Promise.all([
       this.prisma.purchaseOrder.findMany({
         where,
@@ -605,6 +631,17 @@ export class PurchasingService {
       companyId,
       ...(query.status ? { status: query.status as never } : {}),
       ...(query.supplierId ? { supplierId: query.supplierId } : {}),
+      ...(query.search ? { OR: [
+        { invoiceNumber: { contains: query.search, mode: 'insensitive' as const } },
+        { supplierInvoiceNumber: { contains: query.search, mode: 'insensitive' as const } },
+        { notes: { contains: query.search, mode: 'insensitive' as const } },
+        { supplier: { is: { OR: [
+          { nameEn: { contains: query.search, mode: 'insensitive' as const } },
+          { nameAr: { contains: query.search } },
+          { code: { contains: query.search, mode: 'insensitive' as const } },
+        ] } } },
+        { lines: { some: { description: { contains: query.search, mode: 'insensitive' as const } } } },
+      ] } : {}),
     };
     const [rows, total] = await Promise.all([
       this.prisma.supplierInvoice.findMany({
