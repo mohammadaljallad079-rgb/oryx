@@ -2421,7 +2421,10 @@ model PosSaleLine {
 // ------------------------------------------------------------------ procurement
 
 model Supplier {
-  id               String   @id @default(cuid())
+  kind             String   @default("COMPANY")
+  contactPerson    String?
+  idNumber         String?
+  id               String               String   @id @default(cuid())
   companyId        String
   code             String
   nameEn           String
