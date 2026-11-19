@@ -97,6 +97,7 @@ describe('document chrome', () => {
     it('keeps contacts in the printable footer margin below the signature band', () => {
       const html = officialFooterTemplate(issuer);
       expect(html).toContain('+97317000000');
+      expect(html).toContain('https://oryx.local');
       expect(html).toContain('billing@oryx.local');
       expect(html).toContain('Building 42, Road 15');
       expect(html).toContain('Manama');
@@ -116,7 +117,7 @@ describe('document chrome', () => {
       expect(html).toContain('+973 1700 0000');
       expect(html).toContain('billing-and-reports@long-example-company.bh');
       expect(html).toContain('https://www.long-example-company.bh');
-      expect(html).toContain('flex-wrap:wrap;text-align:end');
+      expect(html).toContain('flex-wrap:nowrap;text-align:end');
       expect(html).toContain('min-width:0');
     });
 
@@ -135,7 +136,7 @@ describe('document chrome', () => {
       const html = officialFooterTemplate(issuer);
       // The approved sheet prints the phone/email/website a step heavier than
       // the counter, and the registered address flush right beneath it.
-      expect(html).toContain('font-size:7.2pt;font-weight:700;color:#475569');
+      expect(html).toContain('font-size:6.6pt;font-weight:700;color:#475569');
       expect(html).toContain('text-align:end');
     });
 
