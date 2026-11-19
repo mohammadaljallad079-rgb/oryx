@@ -4793,17 +4793,17 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
 @media (min-width: 721px) {
   .oryx-modal--pos:has(.oryx-pos--new-cashier) > div:first-child {
     min-height: 0;
-    height: 44px;
+    height: 48px;
     padding: 4px 12px;
   }
   .oryx-modal--pos:has(.oryx-pos--new-cashier) > div:first-child h2 {
     font-size: 14px;
   }
   .oryx-modal--pos:has(.oryx-pos--new-cashier) > div:first-child button[aria-label] {
-    flex-basis: 36px;
-    width: 36px;
-    height: 36px;
-    min-width: 36px;
+    flex-basis: 44px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
   }
   .oryx-modal--pos .oryx-pos--new-cashier {
     grid-template-rows: 42px 38px minmax(0, 1fr);
