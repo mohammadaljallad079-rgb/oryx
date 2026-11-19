@@ -370,7 +370,7 @@ function lineTable(
         <td class="of-c-qty num">${esc(quantity(line.quantity))}</td>
         <td class="of-c-price num">${esc(moneyPlain(line.unitPriceMinor, payload.currency))}</td>
         <td class="of-c-tax">${esc(taxLabel(line.taxPercentBp))}</td>
-        <td class="of-c-amt num">${esc(money(line.lineSubtotalMinor - line.discountMinor, payload.currency, locale))}</td>
+        <td class="of-c-amt num">${esc(money(line.lineTotalMinor - line.taxMinor, payload.currency, locale))}</td>
       </tr>`;
     })
     .join('');
