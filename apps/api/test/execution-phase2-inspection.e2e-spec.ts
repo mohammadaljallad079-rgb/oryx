@@ -507,6 +507,26 @@ describe('Execution Phase 2 — inspection engine (e2e)', () => {
       expect(submit.status).toBe(201);
     });
 
+    it('accepts computer-unit notes alone without creating any diagnostic entry', async () => {
+      const created = await createSession(['COMPUTER_UNIT']);
+      const saved = await companyCall<{ sections: Array<{ area: string; remarks: string | null }> }>(
+        ctx.base, companyId, `/automotive/inspections/${created.id}/sections/COMPUTER_UNIT`, {
+          method: 'PUT',
+          token: writerToken,
+          body: { remarks: 'Diagnostic scan reviewed: no outstanding errors.' },
+        },
+      );
+      expect(saved.status).toBe(200);
+      expect(saved.body.sections.find((section) => section.area === 'COMPUTER_UNIT')?.remarks)
+        .toBe('Diagnostic scan reviewed: no outstanding errors.');
+
+      const submit = await companyCall(ctx.base, companyId, `/automotive/inspections/${created.id}/submit`, {
+        method: 'POST',
+        token: writerToken,
+      });
+      expect(submit.status).toBe(201);
+    });
+
     it('accepts an explicit nothing-to-report for a diagnostic section', async () => {
       const created = await createSession(['COMPUTER_UNIT']);
       const saved = await companyCall(ctx.base, companyId, `/automotive/inspections/${created.id}/sections/COMPUTER_UNIT`, {

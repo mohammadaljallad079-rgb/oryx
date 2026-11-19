@@ -148,9 +148,16 @@ export class DocumentsService {
             const parts: Buffer[] = [];
             for (const attachment of diagnosticPdfs) {
               const bytes = await this.loadDocumentBytes(attachment.mediaAssetId);
-              if (bytes) parts.push(bytes);
+              if (!bytes) {
+                // Never silently issue a report missing the customer's computer
+                // scan; require the attachment to be restored or removed.
+                throw conflict(
+                  ERROR_CODES.RESOURCE_CONFLICT,
+                  'An inspection PDF attachment is missing from storage. Restore or remove it before issuing the report.',
+                );
+              }
+              parts.push(bytes);
             }
-            if (!parts.length) return null;
             // Merge left-to-right so the uploads appear in the order they were
             // attached; a single part is returned as-is.
             let merged = parts[0];
@@ -904,9 +911,12 @@ export class DocumentsService {
     const branch = company.branches[0];
     const addressLine = pick(general.addressLine, branch?.addressLine, company.addressLine);
     const city = pick(general.city, branch?.city);
-    const phone = pick(general.phone, company.branding?.supportPhone, branch?.phone);
-    const email = pick(general.email, company.branding?.supportEmail);
-    const websiteUrl = pick(general.website, company.branding?.websiteUrl);
+    // Older company administration screens persist contact values on Company.
+    // Include those fields, otherwise the printed address can appear while
+    // phone/email/website disappear whenever General and Branding are blank.
+    const phone = pick(general.phone, company.phone, company.branding?.supportPhone, branch?.phone);
+    const email = pick(general.email, company.email, company.branding?.supportEmail);
+    const websiteUrl = pick(general.website, company.website, company.branding?.websiteUrl);
     // The registered legal name and the VAT/CR numbers are identity fields, not
     // contact details: they fall back to the company record the seed and the
     // company panel write.

@@ -424,6 +424,10 @@ function CreateCompanyModal({
 }) {
   const { t, locale } = useUi();
   const [plans, setPlans] = useState<PlanDto[]>([]);
+  const [managerOptions, setManagerOptions] = useState<Array<{ id: string; email: string; fullNameEn: string; fullNameAr: string }>>([]);
+  const [managerSearch, setManagerSearch] = useState('');
+  const [managerMode, setManagerMode] = useState<'existing' | 'invite'>('existing');
+  const [managerLoading, setManagerLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -433,6 +437,7 @@ function CreateCompanyModal({
     type: 'SAAS_TENANT',
     industry: '',
     planId: '',
+    adminUserId: '',
     adminEmail: '',
     adminFullNameEn: '',
     adminFullNameAr: '',
@@ -449,6 +454,17 @@ function CreateCompanyModal({
     })();
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setManagerLoading(true);
+    void api.availableCompanyManagers(managerSearch)
+      .then((data) => { if (!cancelled) setManagerOptions(data.items); })
+      .catch(() => { if (!cancelled) setManagerOptions([]); })
+      .finally(() => { if (!cancelled) setManagerLoading(false); });
+    return () => { cancelled = true; };
+  }, [open, managerSearch]);
+
   async function submit() {
     setBusy(true);
     setError(null);
@@ -460,10 +476,11 @@ function CreateCompanyModal({
         type: form.type,
         industry: form.industry || undefined,
         planId: form.planId || undefined,
+        adminUserId: managerMode === 'existing' ? form.adminUserId || undefined : undefined,
       });
 
       // Invite the first company administrator if an email was supplied.
-      if (form.adminEmail && res.company?.id) {
+      if (managerMode === 'invite' && form.adminEmail && res.company?.id) {
         const roles = await api.listRoles(res.company.id);
         const adminRole = roles.find((r) => r.code === 'company_admin') ?? roles[0];
         if (adminRole) {
@@ -484,7 +501,8 @@ function CreateCompanyModal({
         type: 'SAAS_TENANT',
         industry: '',
         planId: '',
-        adminEmail: '',
+        adminUserId: '',
+    adminEmail: '',
         adminFullNameEn: '',
         adminFullNameAr: '',
       });
@@ -582,7 +600,43 @@ function CreateCompanyModal({
 
       <hr className="oryx-divider my-4" />
 
-      <p className="oryx-panel-title m-0 mb-3">{t('users.invite')}</p>
+      <p className="oryx-panel-title m-0 mb-3">{locale === 'ar' ? 'مدير الشركة' : 'Company manager'}</p>
+      <div className="mb-3 flex flex-wrap gap-2">
+        <Button size="sm" variant={managerMode === 'existing' ? 'primary' : 'ghost'}
+          onClick={() => setManagerMode('existing')} data-testid="company-manager-existing">
+          {locale === 'ar' ? 'اختيار من قاعدة البيانات' : 'Choose existing user'}
+        </Button>
+        <Button size="sm" variant={managerMode === 'invite' ? 'primary' : 'ghost'}
+          onClick={() => setManagerMode('invite')} data-testid="company-manager-add">
+          <Icon name="plus" size={14} />
+          {locale === 'ar' ? 'إضافة مدير جديد' : 'Add new manager'}
+        </Button>
+      </div>
+      {managerMode === 'existing' ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={t('common.search')}>
+            <input className="oryx-input" value={managerSearch}
+              onChange={(e) => setManagerSearch(e.target.value)}
+              placeholder={locale === 'ar' ? 'ابحث بالاسم أو البريد الإلكتروني' : 'Search name or email'}
+              data-testid="company-manager-search" />
+          </Field>
+          <Field label={locale === 'ar' ? 'المستخدم الموجود' : 'Existing user'}>
+            <SearchableSelect
+              value={form.adminUserId || null}
+              options={managerOptions.map((manager) => ({
+                value: manager.id,
+                label: `${locale === 'ar' ? manager.fullNameAr || manager.fullNameEn : manager.fullNameEn || manager.fullNameAr} — ${manager.email}`,
+              }))}
+              onChange={(id) => setForm({ ...form, adminUserId: id ?? '' })}
+              placeholder={managerLoading
+                ? t('common.loading')
+                : locale === 'ar' ? 'اختر مدير الشركة' : 'Select a company manager'}
+              emptyLabel={t('common.none')}
+              testId="company-manager-existing-select"
+            />
+          </Field>
+        </div>
+      ) : (
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label={t('companies.adminEmail')}>
           <input
@@ -608,6 +662,7 @@ function CreateCompanyModal({
           />
         </Field>
       </div>
+      )}
     </Modal>
   );
 }

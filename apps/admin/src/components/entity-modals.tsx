@@ -38,6 +38,9 @@ export function SupplierModal({
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     code: '',
+    kind: 'COMPANY' as 'COMPANY' | 'INDIVIDUAL',
+    contactPerson: '',
+    idNumber: '',
     nameEn: '',
     nameAr: '',
     phone: '',
@@ -54,6 +57,9 @@ export function SupplierModal({
     setError(null);
     setForm({
       code: supplier?.code ?? '',
+      kind: supplier?.kind ?? 'COMPANY',
+      contactPerson: supplier?.contactPerson ?? '',
+      idNumber: supplier?.idNumber ?? '',
       nameEn: supplier?.nameEn ?? '',
       nameAr: supplier?.nameAr ?? '',
       phone: supplier?.phone ?? '',
@@ -76,6 +82,9 @@ export function SupplierModal({
         return;
       }
       const body = {
+        kind: form.kind,
+        contactPerson: form.kind === 'COMPANY' ? form.contactPerson.trim() : '',
+        idNumber: form.kind === 'INDIVIDUAL' ? form.idNumber.trim() : '',
         nameEn: form.nameEn.trim() || primaryName,
         nameAr: form.nameAr.trim() || primaryName,
         phone: form.phone || undefined,
@@ -124,13 +133,28 @@ export function SupplierModal({
         <Field label={t('common.code')} required>
           <input className="oryx-input" value={(supplier?.code ?? '')} readOnly placeholder="Automatic / تلقائي" aria-label="Auto-generated code" data-testid="supplier-code" />
         </Field>
+        <Field label="نوع المورد / Supplier type">
+          <select className="oryx-input" value={form.kind} onChange={(e) => setForm((prev) => ({ ...prev, kind: e.target.value as 'COMPANY' | 'INDIVIDUAL' }))} data-testid="supplier-kind">
+            <option value="COMPANY">شركة / Company</option>
+            <option value="INDIVIDUAL">فرد / Individual</option>
+          </select>
+        </Field>
+        {form.kind === 'COMPANY' ? (
+          <Field label="اسم المسؤول / Contact person">
+            <input className="oryx-input" value={form.contactPerson} onChange={(e) => setForm((prev) => ({ ...prev, contactPerson: e.target.value }))} data-testid="supplier-contact-person" />
+          </Field>
+        ) : (
+          <Field label="رقم الهوية / ID number">
+            <input className="oryx-input" value={form.idNumber} onChange={(e) => setForm((prev) => ({ ...prev, idNumber: e.target.value }))} data-testid="supplier-id-number" />
+          </Field>
+        )}
         <Field label={t('erp.sales.phone')}>
           <input className="oryx-input" value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))} data-testid="supplier-phone" />
         </Field>
-        <Field label={`${t('common.name')} (EN)`} required>
+        <Field label={`${t('common.name')} (EN)`}>
           <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm((prev) => ({ ...prev, nameEn: e.target.value }))} data-testid="supplier-name-en" />
         </Field>
-        <Field label={`${t('common.name')} (AR)`} required>
+        <Field label={`${t('common.name')} (AR)`}>
           <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm((prev) => ({ ...prev, nameAr: e.target.value }))} data-testid="supplier-name-ar" />
         </Field>
         <Field label={t('common.email')}>

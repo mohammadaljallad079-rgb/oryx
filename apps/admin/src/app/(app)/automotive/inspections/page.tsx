@@ -108,7 +108,13 @@ function JobsTab({ canWrite }: { canWrite: boolean }) {
       await api.deleteInspectionSession(id);
       await list.reload();
     } catch (e) {
-      window.alert(e instanceof ApiError && e.code === 'resource.conflict' ? t('inspection.deleteBlocked') : t('common.error'));
+      // Surface the actual API reason (financial link, permissions, approved
+      // report, etc.) instead of making the Delete button appear unresponsive.
+      window.alert(
+        e instanceof ApiError && e.code === 'resource.conflict'
+          ? t('inspection.deleteBlocked')
+          : e instanceof Error ? e.message : t('common.error'),
+      );
     } finally {
       setBusyId(null);
     }

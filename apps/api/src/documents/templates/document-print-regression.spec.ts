@@ -4,7 +4,8 @@ import {
   officialFooterTemplate,
   reportFooterTemplate,
 } from './chrome';
-import { identityBand, OFFICIAL_FINANCIAL_CSS } from './official-financial.template';
+import { identityBand, renderOfficialFinancialHtml, OFFICIAL_FINANCIAL_CSS } from './official-financial.template';
+import type { FinancialDocumentPayload } from '../document-payload';
 
 const issuer: DocumentIssuer = {
   companyId: 'test-company',
@@ -48,6 +49,45 @@ describe('official print layout regressions', () => {
     expect(html).not.toContain('<circle cx="12" cy="12" r="11"');
     expect(html).toContain('lang="ar" dir="rtl"');
     expect(html).toContain('lang="en" dir="ltr"');
+  });
+
+  it('uses the invoice identity and each document\'s own bilingual title, sequence and date label', () => {
+    const make = (titleEn: string, titleAr: string, number: string) => {
+      const payload: FinancialDocumentPayload = {
+        kind: 'FINANCIAL', titleEn, titleAr, documentNumber: number,
+        documentDate: '2026-11-19', dueDate: null, status: 'POSTED',
+        counterparty: {
+          nameEn: 'Example', nameAr: 'مثال', code: 'EX', taxNumber: null,
+          email: null, phone: null, addressLine: null, city: null, countryCode: null,
+        },
+        lines: [], subtotalMinor: 0, discountMinor: 0, taxMinor: 0,
+        totalMinor: 0, paidMinor: 0, balanceMinor: 0, currency: 'BHD',
+        notes: null, payment: null, statement: null, journal: null,
+      };
+      return renderOfficialFinancialHtml({
+        issuer, payload, documentNumber: number,
+        issuedAt: new Date('2026-11-19T10:00:00Z'), verification: null, baseCss: '',
+      });
+    };
+    const receipt = make('Payment Receipt', 'سند قبض', 'RCPT-001');
+    const voucher = make('Payment Voucher', 'سند صرف', 'PV-002');
+    const invoice = make('Tax Invoice', 'فاتورة ضريبية', 'INV-003');
+    for (const html of [receipt, voucher, invoice]) {
+      expect(html).toContain('class="of-badge"');
+      expect(html).toContain('VEHICLE INSPECTION EXPERTS');
+    }
+    expect(receipt).toContain('سند قبض');
+    expect(receipt).toContain('RECEIPT #');
+    expect(receipt).toContain('RCPT-001');
+    expect(receipt).toContain('Receipt Date');
+    expect(receipt).toContain('Customer / Payer');
+    expect(voucher).toContain('سند صرف');
+    expect(voucher).toContain('VOUCHER #');
+    expect(voucher).toContain('PV-002');
+    expect(voucher).toContain('Payment Date');
+    expect(voucher).toContain('Supplier / Payee');
+    expect(invoice).toContain('INV-003');
+    expect(invoice).toContain('Customer Name');
   });
 
   it('uses the embedded Arabic face rather than the Latin-only display face for Arabic headings', () => {

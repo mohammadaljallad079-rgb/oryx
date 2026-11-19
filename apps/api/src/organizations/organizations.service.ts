@@ -104,6 +104,30 @@ export class OrganizationsService {
     return this.toCompanyDto(company);
   }
 
+  /** Limited platform-only picker: existing active users, never password/token data. */
+  async availableCompanyManagers(search: string | undefined, actor: ActorContext) {
+    if (actor.kind !== 'PLATFORM') {
+      throw forbidden(ERROR_CODES.FORBIDDEN_PLATFORM_ONLY, 'Only a platform administrator may list potential company managers.');
+    }
+    const query = (search ?? '').trim().slice(0, 100);
+    const users = await this.prisma.user.findMany({
+      where: {
+        status: 'ACTIVE',
+        ...(query ? {
+          OR: [
+            { email: { contains: query, mode: 'insensitive' as const } },
+            { fullNameEn: { contains: query, mode: 'insensitive' as const } },
+            { fullNameAr: { contains: query, mode: 'insensitive' as const } },
+          ],
+        } : {}),
+      },
+      orderBy: { fullNameEn: 'asc' },
+      take: 100,
+      select: { id: true, email: true, fullNameEn: true, fullNameAr: true },
+    });
+    return { items: users };
+  }
+
   async createCompany(dto: CreateCompanyDto, actor: ActorContext) {
     const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
     if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a company or branch name in Arabic or English.');
@@ -113,6 +137,16 @@ export class OrganizationsService {
     }
     const existing = await this.prisma.company.findUnique({ where: { code: code } });
     if (existing) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Company code "${code}" already exists.`);
+
+    if (dto.adminUserId && dto.adminEmail) {
+      throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Select an existing manager or invite a new manager, not both.');
+    }
+    if (dto.adminUserId) {
+      const manager = await this.prisma.user.findFirst({
+        where: { id: dto.adminUserId, status: 'ACTIVE' }, select: { id: true },
+      });
+      if (!manager) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Selected company manager is not an active user.');
+    }
 
     if (dto.parentCompanyId) {
       const parent = await this.prisma.company.findUnique({ where: { id: dto.parentCompanyId } });
@@ -154,6 +188,21 @@ export class OrganizationsService {
 
       // Default system roles for the new tenant.
       await this.createDefaultRoles(tx, created.id);
+      if (dto.adminUserId) {
+        const role = await tx.role.findFirstOrThrow({
+          where: { companyId: created.id, code: 'company_admin' },
+          select: { id: true },
+        });
+        await tx.membership.create({
+          data: {
+            companyId: created.id,
+            userId: dto.adminUserId,
+            roleId: role.id,
+            isActive: true,
+            invitedById: actor.userId,
+          },
+        });
+      }
 
       if (dto.planId) {
         const plan = await tx.plan.findUniqueOrThrow({ where: { id: dto.planId } });

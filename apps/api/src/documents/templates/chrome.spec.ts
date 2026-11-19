@@ -106,6 +106,20 @@ describe('document chrome', () => {
       expect(html).not.toContain('margin:20px 15.8pt');
     });
 
+    it('wraps long footer contact details rather than hiding them off-page', () => {
+      const html = officialFooterTemplate({
+        ...issuer,
+        phone: '+973 1700 0000',
+        email: 'billing-and-reports@long-example-company.bh',
+        websiteUrl: 'https://www.long-example-company.bh',
+      });
+      expect(html).toContain('+973 1700 0000');
+      expect(html).toContain('billing-and-reports@long-example-company.bh');
+      expect(html).toContain('https://www.long-example-company.bh');
+      expect(html).toContain('flex-wrap:wrap;text-align:end');
+      expect(html).toContain('min-width:0');
+    });
+
     it('keeps the registered address and CR number in the footer', () => {
       const html = officialFooterTemplate(issuer);
       expect(html).toContain('Manama');

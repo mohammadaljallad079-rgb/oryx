@@ -163,18 +163,8 @@ export default function InspectionWorkspacePage() {
           ) : (
             <Card>{t('inspection.noSections')}</Card>
           )}
-          {/* The report prints the notes block on its inspection-group page, so
-              the input is offered whenever a section that page carries was
-              selected — the same rule the printed document follows. */}
-          {session.selectedAreas.some((a) => GROUP_PAGE_AREAS.includes(a)) ? (
-            <InspectionNotesCard
-              sessionId={id}
-              session={session}
-              editable={editable && canWrite}
-              onSaved={applySession}
-              onError={setError}
-            />
-          ) : null}
+          {/* Each selected inspection section owns its notes and Save action.
+              Do not render a second global notes box below the active form. */}
         </div>
 
         <div className="flex flex-col gap-4">
@@ -388,72 +378,6 @@ function TypesCard({
           );
         })}
       </div>
-    </Card>
-  );
-}
-
-/**
- * The single optional notes field of the inspection.
- *
- * The workspace used to offer two session-level free-text fields (general
- * remarks and a final assessment) that both fed the report's remarks area, so an
- * inspector had to choose where to write the same note. They are one optional
- * field now: `generalRemarks` is the inspection's notes, it is never required,
- * and it prints under the report's remarks heading. Nothing here is a
- * prerequisite for submitting — a fully passing inspection submits with the
- * field empty.
- */
-function InspectionNotesCard({
-  sessionId,
-  session,
-  editable,
-  onSaved,
-  onError,
-}: {
-  sessionId: string;
-  session: InspectionSessionDto;
-  editable: boolean;
-  onSaved: (s: InspectionSessionDto) => void;
-  onError: (message: string) => void;
-}) {
-  const { t, locale } = useUi();
-  const [busy, setBusy] = useState(false);
-  const [notes, setNotes] = useState(session.generalRemarks ?? '');
-
-  useEffect(() => {
-    setNotes(session.generalRemarks ?? '');
-  }, [session.generalRemarks]);
-
-  const save = async () => {
-    setBusy(true);
-    try {
-      onSaved(await api.updateInspectionSession(sessionId, { generalRemarks: notes }));
-    } catch (e) {
-      onError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Card data-testid="inspection-notes">
-      <Field label={locale === 'ar' ? 'ملاحظات الفحص' : 'Inspection Notes'} hint={t('common.optional')}>
-        <textarea
-          className="oryx-input oryx-textarea"
-          rows={4}
-          value={notes}
-          disabled={!editable}
-          onChange={(e) => setNotes(e.target.value)}
-          data-testid="inspection-notes-input"
-        />
-      </Field>
-      {editable ? (
-        <div className="mt-2 flex justify-end">
-          <Button size="sm" variant="primary" disabled={busy} onClick={() => void save()} data-testid="save-inspection-notes">
-            {busy ? t('common.loading') : t('common.save')}
-          </Button>
-        </div>
-      ) : null}
     </Card>
   );
 }
@@ -759,9 +683,16 @@ function SectionEditor({
       }),
     );
 
-  const saveMarkers = () => run(() => api.saveInspectionMarkers(sessionId, markers));
-  const saveRegions = () => run(() => api.saveInspectionChassis(sessionId, regions));
-  const save = spec.kind === 'DIAGRAM_PAINT' ? saveMarkers : spec.kind === 'DIAGRAM_CHASSIS' ? saveRegions : saveItems;
+  // One Save persists BOTH the diagram and its notes; previously the diagram
+  // actions silently dropped remarks and the printed PDF could not show them.
+  const saveDiagram = (diagram: 'paint' | 'chassis') => run(async () => {
+    await api.saveInspectionSection(sessionId, area, { remarks, noFindings, items: [] });
+    return diagram === 'paint'
+      ? api.saveInspectionMarkers(sessionId, markers)
+      : api.saveInspectionChassis(sessionId, regions);
+  });
+  const save = spec.kind === 'DIAGRAM_PAINT' ? () => saveDiagram('paint')
+    : spec.kind === 'DIAGRAM_CHASSIS' ? () => saveDiagram('chassis') : saveItems;
 
   return (
     <Card data-testid={`inspection-section-${area}`}>
@@ -831,11 +762,9 @@ function SectionEditor({
         />
       ) : null}
 
-      {spec.kind === 'DIAGNOSTIC' ? (
-        <DiagnosticList sessionId={sessionId} entries={section.diagnostics} editable={editable && !busy} onChanged={onSaved} onError={onError} />
-      ) : null}
-
-      <label className="mt-3 flex items-center gap-2 text-[13px]">
+      {/* The computer-unit section is a notes-and-upload form only. Attachments
+          are provided by the existing AttachmentsPanel alongside this editor. */}
+      {spec.kind !== 'DIAGNOSTIC' ? <label className="mt-3 flex items-center gap-2 text-[13px]">
         <input
           type="checkbox"
           checked={noFindings}
@@ -844,9 +773,11 @@ function SectionEditor({
           data-testid={`no-findings-${area}`}
         />
         {t('inspection.nothingToReport')}
-      </label>
+      </label> : null}
 
-      <Field label={locale === 'ar' ? spec.remarksLabelAr : spec.remarksLabelEn}>
+      <Field label={spec.kind === 'DIAGNOSTIC'
+        ? (locale === 'ar' ? 'ملاحظات فحص وحدة الكمبيوتر' : 'Computer unit inspection notes')
+        : (locale === 'ar' ? spec.remarksLabelAr : spec.remarksLabelEn)}>
         <textarea
           className="oryx-input oryx-textarea"
           rows={3}
@@ -865,116 +796,6 @@ function SectionEditor({
         </div>
       ) : null}
     </Card>
-  );
-}
-
-/** The computer-unit fault records: added one at a time, removed one at a time. */
-function DiagnosticList({
-  sessionId,
-  entries,
-  editable,
-  onChanged,
-  onError,
-}: {
-  sessionId: string;
-  entries: InspectionSessionDto['sections'][number]['diagnostics'];
-  editable: boolean;
-  onChanged: (s: InspectionSessionDto) => void;
-  onError: (m: string) => void;
-}) {
-  const { t } = useUi();
-  const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ description: '', observation: '', severity: 'INFO' });
-
-  const add = async () => {
-    if (!form.description.trim()) {
-      onError(t('inspection.diagnosticRequired'));
-      return;
-    }
-    setBusy(true);
-    try {
-      await api.addInspectionDiagnostic(sessionId, {
-        description: form.description.trim(),
-        observation: form.observation.trim() || undefined,
-        severity: form.severity,
-      });
-      setForm({ description: '', observation: '', severity: 'INFO' });
-      onChanged(await api.inspectionSession(sessionId));
-    } catch (e) {
-      onError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const remove = async (entryId: string) => {
-    setBusy(true);
-    try {
-      await api.removeInspectionDiagnostic(sessionId, entryId);
-      onChanged(await api.inspectionSession(sessionId));
-    } catch (e) {
-      onError(e instanceof Error ? e.message : t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-3" data-testid="diagnostic-list">
-      {entries.length === 0 ? <p className="oryx-faint m-0 text-[12.5px]">{t('inspection.noDiagnostics')}</p> : null}
-      {entries.map((e) => (
-        <div key={e.id} className="oryx-diagnostic-row" data-testid={`diagnostic-${e.id}`}>
-          <div className="min-w-0">
-            <div className="text-[13px] font-semibold">{e.description}</div>
-            {e.observation ? <div className="oryx-faint text-[12px]">{e.observation}</div> : null}
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge tone={e.severity === 'CRITICAL' || e.severity === 'MAJOR' ? 'danger' : e.severity === 'MINOR' ? 'warning' : 'neutral'}>
-              {t(`inspection.severity.${e.severity}`)}
-            </Badge>
-            {editable ? (
-              <button
-                type="button"
-                className="oryx-btn oryx-btn--sm oryx-btn--ghost"
-                onClick={() => remove(e.id)}
-                disabled={busy}
-                aria-label={t('common.delete')}
-                data-testid={`diagnostic-remove-${e.id}`}
-              >
-                <Icon name="close" size={14} />
-              </button>
-            ) : null}
-          </div>
-        </div>
-      ))}
-
-      {editable ? (
-        <div className="grid gap-2 sm:grid-cols-2" data-testid="diagnostic-form">
-          <Field label={t('inspection.description')}>
-            <input
-              className="oryx-input"
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              data-testid="diagnostic-description"
-            />
-          </Field>
-          <Field label={t('inspection.observation')}>
-            <input
-              className="oryx-input"
-              value={form.observation}
-              onChange={(e) => setForm({ ...form, observation: e.target.value })}
-              data-testid="diagnostic-observation"
-            />
-          </Field>
-          <div className="flex justify-end sm:col-span-2">
-            <Button onClick={add} disabled={busy} data-testid="diagnostic-add">
-              <Icon name="plus" size={14} />
-              {t('common.create')}
-            </Button>
-          </div>
-        </div>
-      ) : null}
-    </div>
   );
 }
 

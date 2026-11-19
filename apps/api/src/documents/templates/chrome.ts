@@ -293,14 +293,14 @@ function contactRow(issuer: DocumentIssuer): string {
   // far edge. They are laid out as one right-hand group so the spacing follows
   // the reference rather than being spread by `space-between`.
   const item = (html: string, gap: string) =>
-    html ? `<span style="${contact}${gap}">${html}</span>` : '';
+    html ? `<span dir="ltr" style="${contact}${gap}display:inline-flex;align-items:center;gap:2pt;">${html}</span>` : '';
   return `
   <div style="border-top:0.75px solid #94a3b8;margin:3px 15.8pt 0 13.7pt;"></div>
   <div style="padding:2pt 13.3mm 0 15mm;display:flex;align-items:baseline;font-size:6.5pt;font-weight:700;">
     <span lang="en" dir="ltr" style="flex:0 0 auto;position:relative;top:2pt;direction:ltr;unicode-bidi:isolate;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
     <span style="flex:1 1 auto;"></span>
-    <span style="flex:0 0 auto;display:flex;align-items:baseline;">
-      ${item(phone, '')}${item(email, 'margin-inline-start:14pt;')}${item(website, 'margin-inline-start:6pt;')}
+    <span dir="ltr" style="flex:0 1 auto;min-width:0;display:flex;align-items:center;justify-content:flex-end;gap:6pt;flex-wrap:wrap;text-align:end;">
+      ${item(phone, '')}${item(email, '')}${item(website, '')}
     </span>
   </div>
   ${

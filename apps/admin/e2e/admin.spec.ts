@@ -125,6 +125,7 @@ test.describe('company and branch management', () => {
     await expect(page.getByTestId('company-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('company-name-en').fill(name);
     await page.getByTestId('company-name-ar').fill(`شركة اختبار ${suffix}`);
+    await page.getByTestId('company-manager-add').click();
     await page.getByTestId('company-admin-email').fill(`admin-${suffix}@e2e.local`);
 
     // Pick the first real plan so the tenant gets entitlements. The plan
