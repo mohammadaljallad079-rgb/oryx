@@ -102,6 +102,7 @@ export function SupplierModal({
   return (
     <Modal
       open={open}
+      size="full"
       title={supplier ? t('erp.purchasing.editSupplier') : t('erp.purchasing.newSupplier')}
       onClose={onClose}
       footer={
@@ -217,6 +218,7 @@ export function ProductModal({
   return (
     <Modal
       open={open}
+      size="full"
       title={t('erp.inventory.newProduct')}
       onClose={onClose}
       footer={
@@ -318,6 +320,7 @@ export function WarehouseModal({
   return (
     <Modal
       open={open}
+      size="full"
       title={t('erp.inventory.newWarehouse')}
       onClose={onClose}
       footer={
@@ -412,6 +415,7 @@ export function VehicleModal({
   return (
     <Modal
       open={open}
+      size="full"
       title={t('erp.automotive.newVehicle')}
       onClose={onClose}
       footer={
@@ -545,6 +549,7 @@ export function EmployeeModal({
   return (
     <Modal
       open={open}
+      size="full"
       title={employee ? t('erp.hr.editEmployee') : t('erp.hr.newEmployee')}
       onClose={onClose}
       footer={
@@ -682,6 +687,7 @@ export function LeadModal({
   return (
     <Modal
       open={open}
+      size="full"
       title={lead ? t('erp.crm.editLead') : t('erp.crm.newLead')}
       onClose={onClose}
       footer={
@@ -815,6 +821,7 @@ export function AccountModal({
   return (
     <Modal
       open={open}
+      size="full"
       title={account ? t('erp.accounting.editAccount') : t('erp.accounting.newAccount')}
       onClose={onClose}
       footer={
@@ -1010,6 +1017,7 @@ export function MarketplaceProviderModal({
   return (
     <Modal
       open={open}
+      size="full"
       title={t('erp.automotive.newProvider')}
       onClose={onClose}
       footer={
