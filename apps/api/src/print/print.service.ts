@@ -99,11 +99,12 @@ export class PrintService {
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
       include: {
+        branding: true,
         branches: {
           where: { isActive: true },
           orderBy: { createdAt: 'asc' },
           take: 1,
-          select: { addressLine: true, city: true },
+          select: { addressLine: true, city: true, phone: true },
         },
       },
     });
@@ -130,9 +131,9 @@ export class PrintService {
       taxNumber: pick(general.taxNumber, company.taxNumber),
       currency: pick(general.currency, company.currency) ?? company.currency,
       countryCode: pick(general.countryCode, company.countryCode),
-      phone: pick(general.phone, company.phone),
-      email: pick(general.email, company.email),
-      website: pick(general.website, company.website),
+      phone: pick(general.phone, company.phone, company.branding?.supportPhone, branch?.phone),
+      email: pick(general.email, company.email, company.branding?.supportEmail),
+      website: pick(general.website, company.website, company.branding?.websiteUrl),
       addressLine: pick(general.addressLine, branch?.addressLine, company.addressLine),
       city: pick(general.city, branch?.city),
       crNumber: pick(general.crNumber, company.crNumber),
