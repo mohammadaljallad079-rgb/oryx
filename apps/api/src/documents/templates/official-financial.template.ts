@@ -285,6 +285,9 @@ function infoPanel(
     .map((line) => `<span class="of-addr-line">${esc(line)}</span>`)
     .join('');
   const isQuotation = /quotation/i.test(payload.titleEn);
+  const isReceipt = /receipt/i.test(payload.titleEn);
+  const isVoucher = /voucher/i.test(payload.titleEn);
+  const partyLabel = isVoucher ? 'Supplier / Payee' : isReceipt ? 'Customer / Payer' : 'Customer Name';
   // The reference quotation labels the date row "Quotation Date" and carries a
   // second "Expiration Date"; an invoice labels it "Order Date" and has no
   // expiration row. The dates print as "Sat 20/09/2026, 3:30 PM" in the
@@ -341,7 +344,7 @@ function infoPanel(
     </div>
     <div class="of-panel-right">
       <div class="of-cp-row">
-        <span class="of-cp-label">Customer Name</span>
+        <span class="of-cp-label">${esc(partyLabel)}</span>
         <span class="of-cp-value">${esc(counterpartyName)}</span>
       </div>
       ${
@@ -450,7 +453,12 @@ function totalsBlock(payload: FinancialDocumentPayload, locale: 'ar' | 'en'): st
 export function renderOfficialFinancialHtml(input: OfficialFinancialRenderInput): string {
   const payload = input.payload;
   const counterpartyName = payload.counterparty.nameEn || payload.counterparty.nameAr;
-  const dateLabel = /quotation/i.test(payload.titleEn) ? 'Quotation Date' : 'Order Date';
+  const lowerTitle = payload.titleEn.toLowerCase();
+  const dateLabel = lowerTitle.includes('quotation') ? 'Quotation Date'
+    : lowerTitle.includes('receipt') ? 'Receipt Date'
+    : lowerTitle.includes('voucher') ? 'Payment Date'
+    : lowerTitle.includes('return') || lowerTitle.includes('credit') ? 'Return Date'
+    : 'Order Date';
   const numbered = { ...payload, documentNumber: input.documentNumber };
   // The tenant's document language decides the reading direction. Arabic prints
   // right-to-left (the identity band starts on the right, the description column
