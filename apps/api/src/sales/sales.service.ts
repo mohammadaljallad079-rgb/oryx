@@ -1111,7 +1111,31 @@ export class SalesService {
       }),
       this.prisma.salesInvoice.count({ where }),
     ]);
-    return { items: rows.map(toInvoiceDto), total, page, pageSize };
+    const orderIds = rows.map((invoice) => invoice.orderId).filter((id): id is string => Boolean(id));
+    const orders = orderIds.length
+      ? await this.prisma.salesOrder.findMany({
+          where: { companyId, id: { in: orderIds } },
+          select: { id: true, quotationId: true },
+        })
+      : [];
+    const quoteIds = orders.map((order) => order.quotationId).filter((id): id is string => Boolean(id));
+    const sources = quoteIds.length
+      ? await this.prisma.quotation.findMany({
+          where: { companyId, id: { in: quoteIds } },
+          select: { id: true, quoteNumber: true },
+        })
+      : [];
+    const orderQuote = new Map(orders.map((order) => [order.id, order.quotationId]));
+    const quoteNumber = new Map(sources.map((quote) => [quote.id, quote.quoteNumber]));
+    return {
+      items: rows.map((invoice) => ({
+        ...toInvoiceDto(invoice),
+        sourceQuotationNumber: invoice.orderId
+          ? quoteNumber.get(orderQuote.get(invoice.orderId) ?? '') ?? null
+          : null,
+      })),
+      total, page, pageSize,
+    };
   }
 
   async getInvoice(id: string, principal: RequestPrincipal) {
