@@ -163,18 +163,8 @@ export default function InspectionWorkspacePage() {
           ) : (
             <Card>{t('inspection.noSections')}</Card>
           )}
-          {/* The report prints the notes block on its inspection-group page, so
-              the input is offered whenever a section that page carries was
-              selected — the same rule the printed document follows. */}
-          {session.selectedAreas.some((a) => GROUP_PAGE_AREAS.includes(a)) ? (
-            <InspectionNotesCard
-              sessionId={id}
-              session={session}
-              editable={editable && canWrite}
-              onSaved={applySession}
-              onError={setError}
-            />
-          ) : null}
+          {/* Each selected inspection section owns its notes and Save action.
+              Do not render a second global notes box below the active form. */}
         </div>
 
         <div className="flex flex-col gap-4">
@@ -759,9 +749,16 @@ function SectionEditor({
       }),
     );
 
-  const saveMarkers = () => run(() => api.saveInspectionMarkers(sessionId, markers));
-  const saveRegions = () => run(() => api.saveInspectionChassis(sessionId, regions));
-  const save = spec.kind === 'DIAGRAM_PAINT' ? saveMarkers : spec.kind === 'DIAGRAM_CHASSIS' ? saveRegions : saveItems;
+  // One Save persists BOTH the diagram and its notes; previously the diagram
+  // actions silently dropped remarks and the printed PDF could not show them.
+  const saveDiagram = (diagram: 'paint' | 'chassis') => run(async () => {
+    await api.saveInspectionSection(sessionId, area, { remarks, noFindings, items: [] });
+    return diagram === 'paint'
+      ? api.saveInspectionMarkers(sessionId, markers)
+      : api.saveInspectionChassis(sessionId, regions);
+  });
+  const save = spec.kind === 'DIAGRAM_PAINT' ? () => saveDiagram('paint')
+    : spec.kind === 'DIAGRAM_CHASSIS' ? () => saveDiagram('chassis') : saveItems;
 
   return (
     <Card data-testid={`inspection-section-${area}`}>
@@ -831,11 +828,9 @@ function SectionEditor({
         />
       ) : null}
 
-      {spec.kind === 'DIAGNOSTIC' ? (
-        <DiagnosticList sessionId={sessionId} entries={section.diagnostics} editable={editable && !busy} onChanged={onSaved} onError={onError} />
-      ) : null}
-
-      <label className="mt-3 flex items-center gap-2 text-[13px]">
+      {/* The computer-unit section is a notes-and-upload form only. Attachments
+          are provided by the existing AttachmentsPanel alongside this editor. */}
+      {spec.kind !== 'DIAGNOSTIC' ? <label className="mt-3 flex items-center gap-2 text-[13px]">
         <input
           type="checkbox"
           checked={noFindings}
@@ -844,9 +839,11 @@ function SectionEditor({
           data-testid={`no-findings-${area}`}
         />
         {t('inspection.nothingToReport')}
-      </label>
+      </label> : null}
 
-      <Field label={locale === 'ar' ? spec.remarksLabelAr : spec.remarksLabelEn}>
+      <Field label={spec.kind === 'DIAGNOSTIC'
+        ? (locale === 'ar' ? 'ملاحظات فحص وحدة الكمبيوتر' : 'Computer unit inspection notes')
+        : (locale === 'ar' ? spec.remarksLabelAr : spec.remarksLabelEn)}>
         <textarea
           className="oryx-input oryx-textarea"
           rows={3}
