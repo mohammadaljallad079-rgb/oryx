@@ -916,6 +916,20 @@ export const INSPECTION_REPORT_CSS = `
    * report) and the bottom of the cabin block, so the drawing sits under the
    * exterior checklist exactly as the reference does. */
   .cabin{ position:relative; }
+  /* Four fully populated checklists and their saved technical remarks must
+   * share ONE physical A4 page. Scope density changes to the group sheet so
+   * paint/chassis and other document layouts retain their approved sizes. */
+  .cabin .grp{ margin-top:2px; }
+  .cabin .grid{ border-spacing:3px 1px; }
+  .cabin .items td{ padding:1px 4px; line-height:1.1; }
+  .cabin .items thead th{ padding:2px 4px; line-height:1.05; }
+  .cabin .item-ar{ font-size:6.6pt; line-height:1.02; }
+  .cabin .item-en{ font-size:5.5pt; line-height:1.02; }
+  .cabin .items .sec-remarks{ margin-top:2px; }
+  .cabin .itable > .sec-remarks{
+    margin-top:2px; padding:2px 5px; font-size:6.5pt; line-height:1.1;
+    overflow-wrap:anywhere; white-space:pre-line;
+  }
   .interior-art{ position:absolute; left:0; bottom:0; margin:0; z-index:0; }
   .interior-art img{ width:333px; height:auto; display:block; opacity:.28; }
   .itable{ border:1px solid #334e68; border-top:none; }
