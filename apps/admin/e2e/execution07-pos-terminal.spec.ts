@@ -126,7 +126,7 @@ test.describe('Point of sale — card terminal', () => {
     await expect(page.getByTestId(`pos-cart-line-${setup.product.sku}`)).toBeVisible();
     await expect(page.getByTestId('pos-premium-workstation')).toBeVisible();
     await expect(page.locator('.oryx-pos--new-cashier .oryx-pos__quickbar')).toBeVisible();
-    await expect(page.locator('.oryx-pos--new-cashier .oryx-pos__quickbar')).toHaveCSS('max-height', '42px');
+    await expect(page.locator('.oryx-pos--new-cashier .oryx-pos__quickbar')).toHaveCSS('max-height', '38px');
     const closeButton = page.getByRole('dialog').getByRole('button', { name: /close/i }).first();
     const closeBox = await closeButton.boundingBox();
     expect(closeBox).not.toBeNull();
@@ -134,6 +134,19 @@ test.describe('Point of sale — card terminal', () => {
     expect(closeBox!.height).toBeGreaterThanOrEqual(44);
     expect(closeBox!.x).toBeGreaterThanOrEqual(0);
     expect(closeBox!.x + closeBox!.width).toBeLessThanOrEqual(viewport!.width + 1);
+
+    // The POS status and category filters must occupy the SAME top row,
+    // rather than stacking three bands above the cart.
+    const firstRow = await page.evaluate(() => {
+      const quick = document.querySelector('.oryx-pos--new-cashier > .oryx-pos__quickbar');
+      const categories = document.querySelector('.oryx-pos--new-cashier > .oryx-pos__categories');
+      if (!quick || !categories) return null;
+      const q = quick.getBoundingClientRect();
+      const c = categories.getBoundingClientRect();
+      return { aligned: Math.abs(q.top - c.top) < 2, compact: q.height <= 39 };
+    });
+    expect(firstRow?.aligned).toBe(true);
+    expect(firstRow?.compact).toBe(true);
 
     await expect(page.getByTestId('pos-checkout-cart')).toBeVisible();
     // V4 acceptance: products and the selected-cart rail occupy independent
