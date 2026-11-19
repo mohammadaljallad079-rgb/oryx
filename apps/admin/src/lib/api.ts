@@ -1068,7 +1068,7 @@ export const api = {
     request<SupplierDto>(`/purchasing/suppliers/${id}`, { method: 'POST', body }),
   deleteSupplier: (id: string) =>
     request<{ id: string; deleted: boolean }>(`/purchasing/suppliers/${id}`, { method: 'DELETE' }),
-  requisitions: (params: { companyId?: string; status?: string } = {}) =>
+  requisitions: (params: { companyId?: string; status?: string; search?: string } = {}) =>
     request<Paginated<RequisitionDto>>(`/purchasing/requisitions?${toQuery(params)}`),
   createRequisition: (body: Record<string, unknown>) =>
     request<RequisitionDto>('/purchasing/requisitions', { method: 'POST', body }),
@@ -1076,21 +1076,21 @@ export const api = {
     request<RequisitionDto>(`/purchasing/requisitions/${id}/approve`, { method: 'POST', body: {} }),
   convertRequisition: (id: string, supplierId: string) =>
     request<PurchaseDocumentDto>(`/purchasing/requisitions/${id}/convert`, { method: 'POST', body: { supplierId } }),
-  purchaseOrders: (params: { companyId?: string; status?: string } = {}) =>
+  purchaseOrders: (params: { companyId?: string; status?: string; search?: string } = {}) =>
     request<Paginated<PurchaseDocumentDto>>(`/purchasing/orders?${toQuery(params)}`),
   createPurchaseOrder: (body: Record<string, unknown>) =>
     request<PurchaseDocumentDto>('/purchasing/orders', { method: 'POST', body }),
   approvePurchaseOrder: (id: string) =>
     request<PurchaseDocumentDto>(`/purchasing/orders/${id}/approve`, { method: 'POST', body: {} }),
-  goodsReceipts: (params: { companyId?: string } = {}) =>
+  goodsReceipts: (params: { companyId?: string; status?: string; search?: string } = {}) =>
     request<Paginated<PurchaseDocumentDto>>(`/purchasing/receipts?${toQuery(params)}`),
   createGoodsReceipt: (body: Record<string, unknown>) =>
     request<PurchaseDocumentDto>('/purchasing/receipts', { method: 'POST', body }),
-  supplierInvoices: (params: { companyId?: string; status?: string; supplierId?: string } = {}) =>
+  supplierInvoices: (params: { companyId?: string; status?: string; supplierId?: string; search?: string } = {}) =>
     request<Paginated<PurchaseDocumentDto>>(`/purchasing/supplier-invoices?${toQuery(params)}`),
   createSupplierInvoice: (body: Record<string, unknown>) =>
     request<PurchaseDocumentDto>('/purchasing/supplier-invoices', { method: 'POST', body }),
-  purchaseReturns: (params: { companyId?: string } = {}) =>
+  purchaseReturns: (params: { companyId?: string; status?: string; search?: string } = {}) =>
     request<Paginated<PurchaseDocumentDto>>(`/purchasing/returns?${toQuery(params)}`),
   createPurchaseReturn: (body: Record<string, unknown>) =>
     request<PurchaseDocumentDto>('/purchasing/returns', { method: 'POST', body }),
