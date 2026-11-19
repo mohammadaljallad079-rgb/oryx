@@ -2343,6 +2343,22 @@ function DocumentModal({
     >
       {error ? <ErrorBanner message={error} /> : null}
 
+      <nav className="oryx-doc-form__section-tabs" aria-label={locale === 'ar' ? 'أقسام المستند' : 'Document sections'} data-testid={`${testIdPrefix}-section-tabs`}>
+        {([
+          ['document-info', t('erp.sales.form.documentInfo')],
+          ['customer-info', t('erp.sales.form.customerInfo')],
+          ['items', t('erp.sales.form.items')],
+          ['summary', t('erp.sales.form.summary')],
+        ] as const).map(([section, label]) => (
+          <button key={section} type="button"
+            className="oryx-doc-form__section-tab"
+            data-testid={`${testIdPrefix}-tab-${section}`}
+            onClick={() => document.querySelector(`[data-testid="${testIdPrefix}-${section}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+            {label}
+          </button>
+        ))}
+      </nav>
+
       <div className="grid gap-3 lg:grid-cols-2">
         <section className="oryx-doc-form__section" data-testid={`${testIdPrefix}-document-info`}>
           <div className="oryx-doc-form__section-head">
