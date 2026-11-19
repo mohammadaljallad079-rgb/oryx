@@ -87,6 +87,20 @@ test.describe('Sales register — official document actions', () => {
     expect(bounds!.width).toBeGreaterThanOrEqual(1278);
     expect(bounds!.height).toBeGreaterThanOrEqual(718);
     await expect(page.getByTestId('invoice-document-info')).toBeVisible();
+    const tabs = page.getByTestId('invoice-section-tabs');
+    await expect(tabs).toBeVisible();
+    for (const section of ['document-info', 'customer-info', 'items', 'summary']) {
+      await expect(page.getByTestId(`invoice-tab-${section}`)).toBeVisible();
+    }
+    const closeButton = page.getByRole('dialog').getByRole('button', { name: /close/i }).first();
+    const close = await closeButton.boundingBox();
+    expect(close).not.toBeNull();
+    expect(close!.width).toBeGreaterThanOrEqual(44);
+    expect(close!.height).toBeGreaterThanOrEqual(44);
+    expect(close!.x).toBeGreaterThanOrEqual(0);
+    expect(close!.x + close!.width).toBeLessThanOrEqual(1281);
+    await page.getByTestId('invoice-tab-items').click();
+    await expect(page.getByTestId('invoice-items')).toBeVisible();
     await expect(page.getByTestId('save-invoice')).toBeVisible();
   });
 
