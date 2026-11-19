@@ -326,6 +326,14 @@ function infoPanel(
                </div>`
             : ''
       }
+      ${
+        payload.paymentMethod === 'CREDIT' && payload.balanceMinor > 0
+          ? `<div class="of-field">
+               <span class="of-field-label">Payment Status</span>
+               <span class="of-field-value">Unpaid</span>
+             </div>`
+          : ''
+      }
     </div>
     <div class="of-panel-right">
       <div class="of-cp-row">
