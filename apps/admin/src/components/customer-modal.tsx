@@ -174,6 +174,7 @@ export function CustomerModal({
   return (
     <Modal
       open={open}
+      size="full"
       title={customer ? t('erp.sales.customerEdit') : t('erp.sales.newCustomer')}
       onClose={onClose}
       footer={
