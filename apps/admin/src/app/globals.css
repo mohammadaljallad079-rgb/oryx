@@ -4928,14 +4928,14 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
  * without modifying their submit handlers, permissions or state.
  * A nested form opened from another modal retains the current z-index stacking.
  */
-.oryx-modal-backdrop:has(.oryx-modal:not(.oryx-modal--pos):has(> div:nth-child(2) :is(input:not([type="hidden"]), textarea, select, [role="combobox"]))) {
+.oryx-modal-backdrop:has(.oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"]))) {
   padding: 0;
   place-items: stretch;
   width: 100dvw;
   height: 100dvh;
   overflow: hidden;
 }
-.oryx-modal:not(.oryx-modal--pos):has(> div:nth-child(2) :is(input:not([type="hidden"]), textarea, select, [role="combobox"])) {
+.oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"])) {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -4949,12 +4949,12 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   border-radius: 0;
   overflow: hidden;
 }
-.oryx-modal:not(.oryx-modal--pos):has(> div:nth-child(2) :is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:first-child {
+.oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:first-child {
   flex: 0 0 auto;
   min-height: 52px;
   padding: 4px 16px;
 }
-.oryx-modal:not(.oryx-modal--pos):has(> div:nth-child(2) :is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:nth-child(2) {
+.oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:nth-child(2) {
   flex: 1 1 0;
   min-height: 0;
   min-width: 0;
@@ -4963,17 +4963,17 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   overscroll-behavior: contain;
   padding: 12px 18px;
 }
-.oryx-modal:not(.oryx-modal--pos):has(> div:nth-child(2) :is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:nth-child(3) {
+.oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:nth-child(3) {
   flex: 0 0 auto;
   min-height: 56px;
   padding: 8px 16px;
   background: var(--surface);
 }
 @media (max-width: 600px) {
-  .oryx-modal:not(.oryx-modal--pos):has(> div:nth-child(2) :is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:nth-child(2) {
+  .oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:nth-child(2) {
     padding: 10px;
   }
-  .oryx-modal:not(.oryx-modal--pos):has(> div:nth-child(2) :is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:nth-child(3) {
+  .oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:nth-child(3) {
     gap: 6px;
     padding: 8px;
   }
