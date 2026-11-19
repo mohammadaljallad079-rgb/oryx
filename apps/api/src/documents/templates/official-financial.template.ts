@@ -370,7 +370,7 @@ function lineTable(
         <td class="of-c-qty num">${esc(quantity(line.quantity))}</td>
         <td class="of-c-price num">${esc(moneyPlain(line.unitPriceMinor, payload.currency))}</td>
         <td class="of-c-tax">${esc(taxLabel(line.taxPercentBp))}</td>
-        <td class="of-c-amt num">${esc(money(line.lineTotalMinor, payload.currency, locale))}</td>
+        <td class="of-c-amt num">${esc(money(line.lineSubtotalMinor - line.discountMinor, payload.currency, locale))}</td>
       </tr>`;
     })
     .join('');
@@ -419,10 +419,9 @@ function totalsBlock(payload: FinancialDocumentPayload, locale: 'ar' | 'en'): st
     rows.push(['Rounding', money(payload.roundingMinor, payload.currency, locale)]);
   }
   rows.push(['Total', money(payload.totalMinor, payload.currency, locale)]);
-  if (payload.paidMinor) {
-    rows.push(['Paid', money(payload.paidMinor, payload.currency, locale)]);
-    rows.push(['Balance Due', money(payload.balanceMinor, payload.currency, locale)]);
-  }
+  // The financial document shows the amount before VAT, VAT, the fixed
+  // currency discount and the final total. Paid/Balance Due belong in the
+  // payment ledger, not as duplicate totals on a settled invoice.
   return `
   <table class="of-totals">
     ${rows
