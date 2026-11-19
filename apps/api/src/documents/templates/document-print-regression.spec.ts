@@ -6,6 +6,7 @@ import {
 } from './chrome';
 import { identityBand, renderOfficialFinancialHtml, OFFICIAL_FINANCIAL_CSS } from './official-financial.template';
 import type { FinancialDocumentPayload } from '../document-payload';
+import { OFFICIAL_PDF_MARGINS } from '../pdf/pdf-renderer.service';
 
 const issuer: DocumentIssuer = {
   companyId: 'test-company',
@@ -98,6 +99,14 @@ describe('official print layout regressions', () => {
 
 
 describe('official footer contact visibility contract', () => {
+  it('keeps the financial page body at the established 28mm margin to avoid extra invoice pages', () => {
+    expect(OFFICIAL_PDF_MARGINS.bottom).toBe('28mm');
+  });
+  it('fits the compact signature band above the configured contact and address lines', () => {
+    const html = officialFooterTemplate(issuer);
+    expect(html).toContain('height:40pt');
+    expect(html).toContain('border-top:0.75px solid #94a3b8');
+  });
   it('renders every configured phone, email, website and address in the printable footer', () => {
     const fixture: DocumentIssuer = {
       ...issuer,

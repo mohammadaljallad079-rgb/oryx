@@ -203,7 +203,7 @@ function brandBand(issuer: DocumentIssuer, signatureWatermark = true): string {
     ? `<img src="${esc(issuer.logoDataUri)}" alt="" style="height:19pt;width:auto;display:block;margin:0 auto">`
     : '';
   const box =
-    'flex:1 1 0;min-width:0;height:46pt;box-sizing:border-box;' +
+    'flex:1 1 0;min-width:0;height:40pt;box-sizing:border-box;' +
     'border:0.75px solid #a3b1c2;border-radius:6pt;padding:5pt 9pt;white-space:nowrap;';
   // Watermark only the ORYX authorisation box, never the customer's signature.
   // Use the approved ORYX vector when a company logo has not been uploaded.
@@ -283,7 +283,7 @@ function contactRow(issuer: DocumentIssuer): string {
   const address = [issuer.addressLine, issuer.city].filter(Boolean).join(' - ');
   const registration = issuer.crNumber ? `CR ${esc(issuer.crNumber)}` : '';
   const addressLine = [address, registration].filter(Boolean).join(' | ');
-  // Fit the contact row beneath the 51.8pt signature band inside the 28mm
+  // Fit the contact row beneath the compact signature band inside the 28mm
   // Chromium footer margin. The previous 14.8pt offset + 20px separator
   // pushed phone and address off the printed page even though HTML contained them.
   // Use a compact but legible fixed line: wrapping the contact figures created a

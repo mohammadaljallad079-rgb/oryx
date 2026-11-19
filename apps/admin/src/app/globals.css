@@ -4878,3 +4878,139 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
     padding: 5px 7px;
   }
 }
+
+
+/*
+ * Cashier workspace: the modal title, duplicate POS heading and category ribbon
+ * used to stack into three separate bars. Put the POS state and category filter
+ * side by side in ONE strip, then dedicate the remaining height to catalogue
+ * and cart. The category filter still scrolls horizontally as necessary.
+ */
+@media (min-width: 721px) {
+  .oryx-modal--pos .oryx-pos--new-cashier {
+    grid-template-areas: "quickbar categories" "catalog cart";
+    grid-template-columns: minmax(0, 1fr) clamp(320px, 29vw, 390px);
+    grid-template-rows: 38px minmax(0, 1fr);
+    gap: 5px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__quickbar {
+    min-height: 0;
+    height: 38px;
+    max-height: 38px;
+    padding: 3px 8px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__categories {
+    height: 38px;
+    max-height: 38px;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    padding: 2px 6px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__categories > * {
+    flex-shrink: 0;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__section-heading {
+    display: none; /* its redundant heading duplicated the modal and search */
+  }
+}
+@media (min-width: 721px) and (max-width: 980px) {
+  .oryx-modal--pos .oryx-pos--new-cashier {
+    grid-template-columns: minmax(0, 1fr) 315px;
+  }
+}
+
+/*
+ * All data-entry modals use the full viewport and independent field scrolling.
+ * CSS :has keeps existing confirmation/alert dialogs compact, while covering
+ * both current and future company, branch, stock, HR, settings and sales forms
+ * without modifying their submit handlers, permissions or state.
+ * A nested form opened from another modal retains the current z-index stacking.
+ */
+.oryx-modal-backdrop:has(.oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"]))) {
+  padding: 0;
+  place-items: stretch;
+  width: 100dvw;
+  height: 100dvh;
+  overflow: hidden;
+}
+.oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"])) {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100dvw;
+  min-width: 0;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+  overflow: hidden;
+}
+.oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:first-child {
+  flex: 0 0 auto;
+  min-height: 52px;
+  padding: 4px 16px;
+}
+.oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:nth-child(2) {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding: 12px 18px;
+}
+.oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:nth-child(3) {
+  flex: 0 0 auto;
+  min-height: 56px;
+  padding: 8px 16px;
+  background: var(--surface);
+}
+@media (max-width: 600px) {
+  .oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:nth-child(2) {
+    padding: 10px;
+  }
+  .oryx-modal:not(.oryx-modal--pos):has(:is(input:not([type="hidden"]), textarea, select, [role="combobox"])) > div:nth-child(3) {
+    gap: 6px;
+    padding: 8px;
+  }
+}
+
+
+/*
+ * Stable fullscreen targeting for company and branch editors.
+ * Their form controls can be rendered through nested component wrappers, so
+ * relying solely on generic input detection can miss these real dialogs.
+ * Explicit test ids provide a deterministic fallback without expanding
+ * confirmation/preview dialogs or changing their submit handlers.
+ */
+.oryx-modal-backdrop:has([data-testid="create-company-submit"]),
+.oryx-modal-backdrop:has([data-testid="create-branch-submit"]) {
+  padding: 0;
+  place-items: stretch;
+  width: 100dvw;
+  height: 100dvh;
+  overflow: hidden;
+}
+.oryx-modal:has([data-testid="create-company-submit"]),
+.oryx-modal:has([data-testid="create-branch-submit"]) {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100dvw;
+  max-width: 100dvw;
+  height: 100dvh;
+  max-height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+}
+.oryx-modal:has([data-testid="create-company-submit"]) > div:nth-child(2),
+.oryx-modal:has([data-testid="create-branch-submit"]) > div:nth-child(2) {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+}
