@@ -1973,7 +1973,7 @@ function LineEditor({
             ]}
             onChange={(v) => {
               const chosen = taxOptions.find((o) => o.value === v);
-              const chosenRate = chosen ? chosen.label.replace(/[^\\d.]/g, '') : v ? String(Number(v) / 100) : '0';
+              const chosenRate = chosen ? chosen.label.replace(/[^\d.]/g, '') : v ? String(Number(v) / 100) : '0';
               // Choosing "None" must zero the line's rate, not leave the
               // previous one in place: the picker's empty option means "without
               // tax", and keeping the old percentage silently charged VAT on a
