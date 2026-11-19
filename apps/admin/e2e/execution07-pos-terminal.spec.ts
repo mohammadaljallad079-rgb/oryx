@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ENTERPRISE_ADMIN, apiToken, setLocale, setTheme, signIn } from './helpers';
+import { ENTERPRISE_ADMIN, SUPER_ADMIN, apiToken, setLocale, setTheme, signIn } from './helpers';
 
 /**
  * The point-of-sale terminal.
@@ -380,5 +380,46 @@ test.describe('Point of sale — card terminal', () => {
     const lightColor = await workstation.evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(lightColor).not.toBe(darkColor);
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+  });
+});
+
+test.describe('Full-viewport data entry forms', () => {
+  test('company creation uses the whole viewport and keeps actions visible', async ({ page }) => {
+    await page.setViewportSize({ width: 1265, height: 720 });
+    await signIn(page, SUPER_ADMIN);
+    await setLocale(page, 'en');
+    await page.goto('/companies');
+    await page.getByTestId('new-company').click();
+    const dialog = page.getByRole('dialog', { name: /company/i });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByTestId('company-name-en')).toBeVisible();
+    const geometry = await dialog.locator('.oryx-modal').evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      const content = node.children[1] as HTMLElement;
+      return {
+        width: rect.width,
+        height: rect.height,
+        scroll: getComputedStyle(content).overflowY,
+      };
+    });
+    expect(geometry.width).toBeGreaterThanOrEqual(1264);
+    expect(geometry.height).toBeGreaterThanOrEqual(719);
+    expect(geometry.scroll).toBe('auto');
+    await expect(dialog.getByTestId('create-company-submit')).toBeVisible();
+  });
+
+  test('branch creation is a full-viewport editor, not a narrow dialog', async ({ page }) => {
+    await page.setViewportSize({ width: 1265, height: 720 });
+    await signIn(page, ENTERPRISE_ADMIN);
+    await setLocale(page, 'en');
+    await page.goto('/branches');
+    await page.getByTestId('new-branch').click();
+    const dialog = page.getByRole('dialog').last();
+    await expect(dialog).toBeVisible();
+    const geometry = await dialog.locator('.oryx-modal').boundingBox();
+    expect(geometry).not.toBeNull();
+    expect(geometry!.width).toBeGreaterThanOrEqual(1264);
+    expect(geometry!.height).toBeGreaterThanOrEqual(719);
+    await expect(dialog.getByTestId('create-branch-submit')).toBeVisible();
   });
 });
