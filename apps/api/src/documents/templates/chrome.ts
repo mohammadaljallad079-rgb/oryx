@@ -203,7 +203,7 @@ function brandBand(issuer: DocumentIssuer, signatureWatermark = true): string {
     ? `<img src="${esc(issuer.logoDataUri)}" alt="" style="height:19pt;width:auto;display:block;margin:0 auto">`
     : '';
   const box =
-    'flex:0 0 auto;width:239.8pt;height:51.8pt;box-sizing:border-box;' +
+    'flex:1 1 0;min-width:0;height:46pt;box-sizing:border-box;' +
     'border:0.75px solid #a3b1c2;border-radius:6pt;padding:5pt 9pt;white-space:nowrap;';
   // Watermark only the ORYX authorisation box, never the customer's signature.
   // Use the approved ORYX vector when a company logo has not been uploaded.
@@ -213,7 +213,7 @@ function brandBand(issuer: DocumentIssuer, signatureWatermark = true): string {
   const label = 'font-size:7.5pt;font-weight:700;color:#0f2b48;';
   const labelAr = 'font-size:7.5pt;font-weight:700;color:#0f2b48;direction:rtl;unicode-bidi:embed;';
   return `
-  <div style="padding:0 14pt;display:flex;align-items:flex-start;justify-content:space-between;">
+  <div style="padding:0 12pt;display:flex;align-items:flex-start;justify-content:space-between;gap:5pt;width:100%;box-sizing:border-box;">
     <div style="${box}position:relative;overflow:hidden;">
       ${seal}
       <div style="position:relative;z-index:1;">
@@ -221,7 +221,7 @@ function brandBand(issuer: DocumentIssuer, signatureWatermark = true): string {
         <span style="${labelAr}">اعتماد المركز</span>
       </div>
     </div>
-    <div style="flex:0 0 auto;width:80pt;text-align:center;padding-top:1pt;line-height:1.15;">
+    <div style="flex:0 0 74pt;min-width:0;text-align:center;padding-top:1pt;line-height:1.15;">
       ${mark}
       <div style="font-size:8.3pt;font-weight:700;letter-spacing:.5px;color:#0f2b48;">AUTO SERVICES</div>
       <div style="font-size:5.6pt;font-weight:700;color:#0f2b48;direction:rtl;unicode-bidi:embed;margin-top:3pt;">شكراً لثقتكم بنا.</div>
@@ -288,7 +288,7 @@ function contactRow(issuer: DocumentIssuer): string {
   // pushed phone and address off the printed page even though HTML contained them.
   // Use a compact but legible fixed line: wrapping the contact figures created a
   // second row outside the Chromium footer margin, hiding phone/website on PDF.
-  const contact = 'font-size:6.6pt;font-weight:700;color:#475569;white-space:nowrap;';
+  const contact = 'font-size:6.2pt;font-weight:700;color:#475569;white-space:nowrap;';
   // The approved sheet prints the phone, email and website as three separate
   // figures on one line (measured x 294 / 380 / 483 of a 595pt page), not the
   // phone+email pair the first revision grouped with the website pushed to the
@@ -301,13 +301,13 @@ function contactRow(issuer: DocumentIssuer): string {
   <div style="padding:2pt 13.3mm 0 15mm;display:flex;align-items:baseline;font-size:6.5pt;font-weight:700;">
     <span lang="en" dir="ltr" style="flex:0 0 auto;position:relative;top:2pt;direction:ltr;unicode-bidi:isolate;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
     <span style="flex:1 1 auto;"></span>
-    <span dir="ltr" style="flex:0 1 auto;min-width:0;display:flex;align-items:center;justify-content:flex-end;gap:3pt;flex-wrap:nowrap;text-align:end;white-space:nowrap;">
+    <span dir="ltr" style="flex:0 1 auto;min-width:0;display:flex;align-items:center;justify-content:flex-end;gap:3pt;flex-wrap:wrap;text-align:end;">
       ${item(phone, '')}${item(email, '')}${item(website, '')}
     </span>
   </div>
   ${
     addressLine
-      ? `<div style="margin-top:2px;padding-inline-end:13.3mm;text-align:end;font-size:6.5pt;color:#64748b;">${esc(addressLine)}</div>`
+      ? `<div style="margin-top:1px;padding-inline-end:13.3mm;text-align:end;font-size:6.2pt;color:#64748b;overflow-wrap:anywhere;">${esc(addressLine)}</div>`
       : ''
   }`;
 }
@@ -354,7 +354,7 @@ export function reportFooterTemplate(issuer: DocumentIssuer, qrDataUri?: string)
   </div>`
     : '';
   return `
-<div style="${base};width:100%;box-sizing:border-box;position:relative;top:14.8pt;">
+<div style="${base};width:100%;box-sizing:border-box;position:relative;top:7pt;">
   <div style="padding:0 15.8pt;min-height:64pt;display:flex;align-items:flex-end;">
     <div style="flex:0 0 auto;margin-left:26pt;">${lockup}</div>
     ${verify ? `<div style="flex:0 0 auto;margin-left:17pt;">${verify}</div>` : ''}

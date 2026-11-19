@@ -450,7 +450,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-[13px] font-semibold">{detail.customerNameEn}</span>
-              <DocumentPrintActions kind="SALES_INVOICE" id={detail.id} />
+              <DocumentPrintActions kind="SALES_INVOICE" id={detail.id} compact />
             </div>
             <InvoiceLineBreakdown document={detail} />
             <AttachmentsPanel entityType="SALES_INVOICE" entityId={detail.id} canManage={canManage} />
@@ -467,6 +467,7 @@ function QuotationsTab({ canManage, canConvertToInvoice, onConverted }: { canMan
   const { t, locale } = useUi();
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
   const [filters, setFilters] = useState<SalesRegisterFilterValues>({ ...EMPTY_SALES_REGISTER_FILTERS });
   const list = useAsync(() => api.quotations({ page: 1, ...salesFilterQuery(filters) }), [filters]);
   const customers = useAsync(() => api.salesCustomers(), []);
@@ -521,6 +522,11 @@ function QuotationsTab({ canManage, canConvertToInvoice, onConverted }: { canMan
                 <td><StatusBadge status={q.status} label={q.status} /></td>
                 <td>
                   <div className="flex flex-wrap items-center justify-end gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => setDetail(q)}
+                      data-testid={`quotation-details-${q.quoteNumber}`}
+                      title={t('common.details')} aria-label={t('common.details')}>
+                      <Icon name="list" size={15} />
+                    </Button>
                     <DocumentActions
                       sourceType="Quotation"
                       sourceId={q.id}
@@ -548,6 +554,20 @@ function QuotationsTab({ canManage, canConvertToInvoice, onConverted }: { canMan
           </tbody>
         </TableShell>
       )}
+      <Modal open={detail !== null}
+        title={`${t('erp.sales.quoteNumber')} ${detail?.quoteNumber ?? ''}`}
+        onClose={() => setDetail(null)}>
+        {detail ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[13px] font-semibold">{detail.customerNameEn || detail.customerNameAr}</span>
+              <DocumentActions sourceType="Quotation" sourceId={detail.id} type="QUOTATION"
+                permissions={['erp.sales.read', 'erp.accounting.read']} iconsOnly />
+            </div>
+            <InvoiceLineBreakdown document={detail} />
+          </div>
+        ) : null}
+      </Modal>
       <DocumentModal
         open={open}
         title={t('erp.sales.newQuotation')}
@@ -649,15 +669,16 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
                 <td>
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     <Button size="sm" variant="ghost" onClick={() => setDetail(n)}
-                      data-testid={`return-attachments-${n.creditNoteNumber}`}>
+                      data-testid={`return-attachments-${n.creditNoteNumber}`}
+                      title={t('common.details')} aria-label={t('common.details')}>
                       <Icon name="list" size={15} />
-                      {t('common.details')}
                     </Button>
                     <DocumentActions
                       sourceType="CreditNote"
                       sourceId={n.id}
                       type="SALES_RETURN"
                       permissions={['erp.sales.read', 'erp.accounting.read']}
+                      iconsOnly
                     />
                   </div>
                 </td>
@@ -676,7 +697,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-[13px] font-semibold">{detail.customerNameEn || detail.customerNameAr}</span>
               <DocumentActions sourceType="CreditNote" sourceId={detail.id} type="SALES_RETURN"
-                permissions={['erp.sales.read', 'erp.accounting.read']} />
+                permissions={['erp.sales.read', 'erp.accounting.read']} iconsOnly />
             </div>
             <InvoiceLineBreakdown document={detail} />
             <AttachmentsPanel entityType="CREDIT_NOTE" entityId={detail.id} canManage={canManage} />
@@ -907,6 +928,7 @@ function PosTab({ canOperate, canManage }: { canOperate: boolean; canManage: boo
                       sourceId={p.id}
                       type="POS_RECEIPT"
                       permissions={['erp.sales.read']}
+                      iconsOnly
                     />
                   </td>
                 </tr>
@@ -1233,7 +1255,7 @@ function PosSaleModal({
         </p>
       ) : null}
 
-      <div className="oryx-pos oryx-pos--premium oryx-pos--command grid min-h-0 flex-1 gap-3" data-testid="pos-premium-workstation">
+      <div className="oryx-pos oryx-pos--premium oryx-pos--command oryx-pos--workspace-v4 grid min-h-0 flex-1 gap-3" data-testid="pos-premium-workstation">
         <header className="oryx-pos__command-bar" data-testid="pos-command-bar">
           <div className="oryx-pos__command-identity">
             <span className="oryx-pos__command-monogram">O</span>
@@ -1305,7 +1327,7 @@ function PosSaleModal({
           ) : items.length === 0 ? (
             <EmptyState title={t('common.empty')} hint={t('erp.sales.pos.notFound')} />
           ) : (
-            <div className="oryx-pos__grid" data-testid="pos-grid">
+            <div className="oryx-pos__grid" data-testid="pos-grid" role="list" aria-label={locale === 'ar' ? 'المنتجات المتاحة' : 'Available products'}>
               {items.map((p) => (
                 <div key={p.id} className="flex min-w-0 flex-col gap-1">
                   <PosProductTile product={p} onAdd={() => addProduct(p)} selectedQuantity={cart.find((line) => line.productId === p.id)?.quantity ?? 0} />
@@ -1346,7 +1368,7 @@ function PosSaleModal({
         </aside>
 
         {/* ---------------------------------------------------- order rail */}
-        <div className="oryx-pos__rail" data-testid="pos-checkout-cart">
+        <div className="oryx-pos__rail" data-testid="pos-checkout-cart" aria-label={locale === 'ar' ? 'سلة المنتجات المختارة' : 'Selected products cart'}>
           <div className="oryx-pos__rail-head">
             <p className="oryx-pos__rail-title">
               <span className="oryx-pos__rail-icon"><Icon name="cart" size={19} /></span>

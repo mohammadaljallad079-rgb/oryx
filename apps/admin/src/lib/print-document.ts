@@ -288,22 +288,14 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
       </div>
     </div>`
     : '';
-  const CONTACT_TOP = 820.15;
-  // The reference prints small vector icons before the phone and the website.
-  // An emoji (U+1F4DE / U+1F310) is absent from every installed face and prints
-  // as a missing-glyph box, so the icons are inline SVG — a vector needs no font
-  // and renders identically on every host, exactly as the approved form does.
-  const contactBits: Array<{ x: number; text: string }> = [];
-  const contactIcons: Array<{ x: number; svg: string }> = [];
-  if (company.phone) {
-    contactIcons.push({ x: 284.6, svg: CONTACT_ICON_PHONE });
-    contactBits.push({ x: 294.4, text: company.phone });
-  }
-  if (company.email) contactBits.push({ x: 379.93, text: company.email });
-  if (company.website) {
-    contactIcons.push({ x: 471.6, svg: CONTACT_ICON_GLOBE });
-    contactBits.push({ x: 483.03, text: company.website });
-  }
+  // All configured contact values must remain visible in preview and print.
+  // The reference's absolute X coordinates dropped the website when a long
+  // number/email extended into its position. Use one bounded flex row instead.
+  const contactEntries = [
+    company.phone ? `<span class="contact-item" dir="ltr">${CONTACT_ICON_PHONE}<span>${esc(company.phone)}</span></span>` : '',
+    company.email ? `<span class="contact-item" dir="ltr"><span>${esc(company.email)}</span></span>` : '',
+    company.website ? `<span class="contact-item" dir="ltr">${CONTACT_ICON_GLOBE}<span>${esc(company.website)}</span></span>` : '',
+  ].filter(Boolean).join('');
 
 
   return `<!doctype html>
@@ -423,6 +415,16 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
   .contact { font-size:7.2pt; color:var(--contact); }
   .contact-icon { position:absolute; width:7pt; height:7pt; }
   .contact-icon svg { display:block; width:7pt; height:7pt; }
+  .contact-strip {
+    position:absolute; left:145pt; right:15pt; top:818.8pt;
+    min-height:10pt; display:flex; align-items:center; justify-content:flex-end;
+    gap:6pt; color:var(--contact); font-size:6.5pt; font-weight:700;
+    line-height:1.1; direction:ltr; overflow:visible;
+  }
+  .contact-item { display:inline-flex; align-items:center; min-width:0; gap:2pt; white-space:nowrap; }
+  .contact-item svg { display:block; flex:0 0 7pt; width:7pt; height:7pt; }
+  .contact-item span { overflow-wrap:anywhere; }
+  .legal { max-width:565pt; white-space:normal; overflow-wrap:anywhere; }
   .legal { font-size:6.5pt; color:var(--muted); font-weight:400; }
 </style>
 </head>
@@ -482,8 +484,7 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
     <div class="foot-rule"></div>
     <div class="page-no" style="${at(42.54, 815.88, 6.5)}">Page 1 of 1 • 1</div>
     <div class="page-no" style="${at(94.0, 815.88, 6.5)}">صفحة 1 من 1</div>
-    ${contactIcons.map((c) => `<div class="contact-icon" style="left:${c.x}pt;top:${topFor(CONTACT_TOP)}pt">${c.svg}</div>`).join('\n    ')}
-    ${contactBits.map((c) => `<div class="contact" style="${at(c.x, CONTACT_TOP, 7.2)}">${esc(c.text)}</div>`).join('\n    ')}
+    <div class="contact-strip">${contactEntries}</div>
     <div class="legal" style="${rightAt(557.94, 830.51, 6.68)}">${esc([legalAddress, company.crNumber ? `CR ${company.crNumber}` : null].filter(Boolean).join(' | '))}</div>
   </div>
 </body>

@@ -117,7 +117,7 @@ describe('document chrome', () => {
       expect(html).toContain('+973 1700 0000');
       expect(html).toContain('billing-and-reports@long-example-company.bh');
       expect(html).toContain('https://www.long-example-company.bh');
-      expect(html).toContain('flex-wrap:nowrap;text-align:end');
+      expect(html).toContain('flex-wrap:wrap;text-align:end');
       expect(html).toContain('min-width:0');
     });
 
@@ -136,7 +136,7 @@ describe('document chrome', () => {
       const html = officialFooterTemplate(issuer);
       // The approved sheet prints the phone/email/website a step heavier than
       // the counter, and the registered address flush right beneath it.
-      expect(html).toContain('font-size:6.6pt;font-weight:700;color:#475569');
+      expect(html).toContain('font-size:6.2pt;font-weight:700;color:#475569');
       expect(html).toContain('text-align:end');
     });
 
@@ -151,9 +151,9 @@ describe('document chrome', () => {
       expect(html).toContain('Customer Signature');
       expect(html).toContain('توقيع العميل');
       expect(html).toContain('border:0.75px solid #a3b1c2');
-      // Both boxes are the measured 239.8pt wide and the closing line sits
-      // between them.
-      expect((html.match(/width:239\.8pt/g) || []).length).toBe(2);
+      // Both signature boxes flex within the printable page width so neither
+      // can shove contact values off the edge of the sheet.
+      expect(html).toContain('flex:1 1 0;min-width:0;height:46pt');
       expect(html).toContain('شكراً لثقتكم بنا');
       expect(html).toContain('Thank you for your trust.');
     });

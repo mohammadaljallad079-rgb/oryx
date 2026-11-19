@@ -208,6 +208,13 @@ test.describe('Sales register — official document actions', () => {
     await page.getByTestId('sales-tab-quotations').click();
     const row = page.getByTestId(`quotation-row-${created.quoteNumber}`);
     await expect(row).toBeVisible({ timeout: 30_000 });
+    const detailsAction = page.getByTestId(`quotation-details-${created.quoteNumber}`);
+    await expect(detailsAction).toHaveAttribute('aria-label', /.+/);
+    await expect(detailsAction).toHaveText('');
+    await detailsAction.click();
+    await expect(page.getByTestId('invoice-line-details')).toBeVisible();
+    await page.getByRole('dialog').getByRole('button', { name: /close/i }).first().click();
+
 
     const issueButton = page.getByTestId(`doc-issue-${created.id}`);
     await expect(issueButton).toBeVisible({ timeout: 30_000 });
