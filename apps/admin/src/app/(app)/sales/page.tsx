@@ -579,13 +579,14 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
   const [open, setOpen] = useState(false);
   const [relatedInvoiceId, setRelatedInvoiceId] = useState<string | null>(null);
   const [returnCustomerId, setReturnCustomerId] = useState('');
+  const [returnInvoiceSearch, setReturnInvoiceSearch] = useState('');
   const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
   const [filters, setFilters] = useState<SalesRegisterFilterValues>({ ...EMPTY_SALES_REGISTER_FILTERS });
   const list = useAsync(() => api.creditNotes({ page: 1, ...salesFilterQuery(filters) }), [filters]);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
-  const invoices = useAsync(() => api.salesInvoices({ page: 1, pageSize: 100, customerId: returnCustomerId || undefined }), [returnCustomerId]);
+  const invoices = useAsync(() => api.salesInvoices({ page: 1, pageSize: 100, search: returnInvoiceSearch.trim() || undefined, customerId: returnInvoiceSearch.trim() ? undefined : returnCustomerId || undefined }), [returnCustomerId, returnInvoiceSearch]);
   const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
 
   // A return is normally raised against the invoice it reverses. Picking the
@@ -593,7 +594,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
   // operator does not retype what the original document already carries.
   const selectedInvoice = (invoices.data?.items ?? []).find((inv) => inv.id === relatedInvoiceId) ?? null;
   const invoiceOptions: SearchableOption[] = (invoices.data?.items ?? [])
-    .filter((inv) => returnCustomerId && inv.customerId === returnCustomerId && inv.status !== 'DRAFT')
+    .filter((inv) => inv.status !== 'DRAFT' && (!returnCustomerId || returnInvoiceSearch.trim() || inv.customerId === returnCustomerId))
     .map((inv) => ({
     value: inv.id,
     label: `${inv.invoiceNumber} — ${inv.customerNameEn}`,
@@ -604,6 +605,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
     setOpen(false);
     setRelatedInvoiceId(null);
     setReturnCustomerId('');
+    setReturnInvoiceSearch('');
   };
 
   return (
@@ -689,7 +691,13 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
         relatedInvoiceId={relatedInvoiceId ?? undefined}
         returnInvoiceOptions={invoiceOptions}
         returnInvoiceLoading={invoices.loading}
-        onReturnInvoiceChange={(id) => setRelatedInvoiceId(id)}
+        returnInvoiceSearch={returnInvoiceSearch}
+        onReturnInvoiceSearchChange={setReturnInvoiceSearch}
+        onReturnInvoiceChange={(id) => {
+          setRelatedInvoiceId(id);
+          const invoice = (invoices.data?.items ?? []).find((item) => item.id === id);
+          if (invoice) setReturnCustomerId(invoice.customerId);
+        }}
         onReturnCustomerChange={(id) => {
           setReturnCustomerId(id);
           setRelatedInvoiceId(null);
@@ -2062,6 +2070,8 @@ function DocumentModal({
   relatedInvoiceId,
   returnInvoiceOptions,
   returnInvoiceLoading,
+  returnInvoiceSearch,
+  onReturnInvoiceSearchChange,
   onReturnInvoiceChange,
   onReturnCustomerChange,
   allowDraft,
@@ -2088,6 +2098,8 @@ function DocumentModal({
   relatedInvoiceId?: string;
   returnInvoiceOptions?: SearchableOption[];
   returnInvoiceLoading?: boolean;
+  returnInvoiceSearch?: string;
+  onReturnInvoiceSearchChange?: (search: string) => void;
   onReturnInvoiceChange?: (id: string | null) => void;
   onReturnCustomerChange?: (id: string) => void;
   allowDraft?: boolean;
@@ -2398,6 +2410,31 @@ function DocumentModal({
             <span>{t('erp.sales.form.customerInfo')}</span>
           </div>
           <div className="grid gap-3 p-3 sm:grid-cols-2">
+            {reasonField && onReturnInvoiceChange ? (
+              <div className="sm:col-span-2">
+                <Field label={t('erp.sales.invoiceNumber')} required>
+                  <input
+                    className="oryx-input mb-2"
+                    value={returnInvoiceSearch ?? ''}
+                    onChange={(event) => {
+                      onReturnInvoiceSearchChange?.(event.target.value);
+                      onReturnInvoiceChange(null);
+                    }}
+                    placeholder={locale === 'ar' ? 'أدخل رقم الفاتورة للبحث' : 'Enter invoice number to search'}
+                    data-testid="return-invoice-number-search"
+                  />
+                  <SearchableSelect
+                    value={relatedInvoiceId ?? null}
+                    options={returnInvoiceOptions ?? []}
+                    onChange={onReturnInvoiceChange}
+                    placeholder={locale === 'ar' ? 'اختر الفاتورة المطابقة' : 'Select matching invoice'}
+                    emptyLabel={t('common.none')}
+                    loading={returnInvoiceLoading}
+                    testId="return-invoice-picker"
+                  />
+                </Field>
+              </div>
+            ) : null}
             <div className="sm:col-span-2">
               <Field label={t('erp.sales.form.customerName')} hint={t('erp.sales.form.customerHint')} required>
                 <EntityPicker
@@ -2425,21 +2462,6 @@ function DocumentModal({
                 />
               </Field>
             </div>
-            {reasonField && onReturnInvoiceChange ? (
-              <div className="sm:col-span-2">
-                <Field label={t('erp.sales.invoiceNumber')} required>
-                  <SearchableSelect
-                    value={relatedInvoiceId ?? null}
-                    options={returnInvoiceOptions ?? []}
-                    onChange={onReturnInvoiceChange}
-                    placeholder={locale === 'ar' ? 'اختر فاتورة العميل للإرجاع' : 'Select this customer’s invoice'}
-                    emptyLabel={t('common.none')}
-                    loading={returnInvoiceLoading}
-                    testId="return-invoice-picker"
-                  />
-                </Field>
-              </div>
-            ) : null}
             <MirrorField label={t('erp.sales.form.contactNo')} value={selected?.phone ?? null} />
             <MirrorField label={t('erp.sales.form.trn')} value={selected?.taxNumber ?? null} />
             <div className="sm:col-span-2">
