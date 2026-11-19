@@ -1043,7 +1043,11 @@ export class SalesService {
         throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'A due date is required for credit invoices.');
       }
       const willPost = dto.post === true;
-      if (willPost) await this.assertCreditLimit(tx, companyId, dto.customerId, totals.totalMinor);
+      // Credit limits guard receivables, not a sale settled in the same
+      // transaction by cash/card/bank payment.
+      if (willPost && selectedPayment.paymentMethod === 'CREDIT') {
+        await this.assertCreditLimit(tx, companyId, dto.customerId, totals.totalMinor);
+      }
       const updated = await tx.salesInvoice.update({
         where: { id },
         data: {
@@ -1232,15 +1236,14 @@ export class SalesService {
       const rounding = await this.context.companyRoundingMode(companyId, tx);
       const totals = computeDocumentTotals(lineInputs, rounding.mode, rounding.scale);
 
-      // Credit limit check for a posted (non-draft) invoice.
       const willPost = dto.post !== false;
-      if (willPost) {
-        await this.assertCreditLimit(tx, companyId, customerId!, totals.totalMinor);
-      }
-
       const invoiceNumber = await this.sequences.next(tx, companyId, 'salesInvoice');
       const selectedPayment = await this.resolveCompanyPayment(tx, companyId, dto.paymentMethodCode,
         (dto.paymentMethod ?? 'CASH') as PaymentMethod, 'invoices');
+      // Only unpaid credit sales consume the customer's credit limit.
+      if (willPost && selectedPayment.paymentMethod === 'CREDIT') {
+        await this.assertCreditLimit(tx, companyId, customerId!, totals.totalMinor);
+      }
       const invoiceDate = new Date(resolveDocumentDate(dto)!);
       if (selectedPayment.paymentMethod === 'CREDIT' && !dto.dueDate) {
         throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Select the due date for a credit invoice.');
