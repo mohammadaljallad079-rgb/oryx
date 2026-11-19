@@ -109,7 +109,8 @@ describe('official footer contact visibility contract', () => {
     const html = officialFooterTemplate(issuer);
     expect(html).toContain('height:40pt');
     expect(html).toContain('border-top:0.75px solid #94a3b8');
-    expect(html).toContain('grid-template-columns:repeat(3,minmax(0,1fr))');
+    expect(html).toContain('text-align:right;font-size:6.5pt');
+    expect(html).not.toContain('grid-template-columns:repeat(3,minmax(0,1fr))');
     expect(html).not.toContain('text-overflow:ellipsis');
     expect(html).toContain('Page <span class="pageNumber"></span> of <span class="totalPages"></span>');
   });
@@ -132,5 +133,52 @@ describe('official footer contact visibility contract', () => {
     const html = officialFooterTemplate(issuer);
     expect(html).not.toContain('service@oryxbhr.com');
     expect(html).not.toContain('+973 37702020');
+  });
+});
+
+describe('sales invoice line amount contract', () => {
+  it('prints quantity times unit price before VAT or discount, keeping tax in the totals', () => {
+    const payload: FinancialDocumentPayload = {
+      kind: 'FINANCIAL',
+      titleEn: 'Tax Invoice',
+      titleAr: 'فاتورة ضريبية',
+      documentNumber: 'INV-TEST',
+      documentDate: '2026-11-20',
+      dueDate: null,
+      status: 'POSTED',
+      counterparty: {
+        nameEn: 'Customer', nameAr: 'عميل', code: 'C-1', taxNumber: null,
+        email: null, phone: null, addressLine: null, city: null, countryCode: null,
+      },
+      lines: [{
+        description: 'Product',
+        quantity: 10000,
+        unitPriceMinor: 28000,
+        discountMinor: 0,
+        taxMinor: 2800,
+        lineTotalMinor: 30800,
+        taxPercentBp: 1000,
+      }],
+      subtotalMinor: 28000,
+      discountMinor: 0,
+      taxMinor: 2800,
+      totalMinor: 30800,
+      paidMinor: 0,
+      balanceMinor: 30800,
+      currency: 'BHD',
+      notes: null,
+      payment: null,
+      statement: null,
+      journal: null,
+    };
+    const html = renderOfficialFinancialHtml({
+      issuer, payload, documentNumber: 'INV-TEST',
+      issuedAt: new Date('2026-11-20T12:00:00Z'),
+      verification: null, baseCss: '',
+    });
+    expect(html).toContain('class="of-c-amt num">28.000');
+    expect(html).toContain('Tax 10%');
+    expect(html).toContain('30.800');
+    expect(html).not.toContain('class="of-c-amt num">25.200');
   });
 });
