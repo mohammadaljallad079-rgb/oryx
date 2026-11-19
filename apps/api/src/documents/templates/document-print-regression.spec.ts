@@ -77,16 +77,19 @@ describe('official print layout regressions', () => {
       expect(html).toContain('class="of-badge"');
       expect(html).toContain('VEHICLE INSPECTION EXPERTS');
     }
-    expect(receipt).toContain('سند قبض');
+    expect(receipt).not.toContain('class="of-title-ar"');
+    expect(receipt).toContain('class="of-title-en" lang="en" dir="ltr">RECEIPT');
     expect(receipt).toContain('RECEIPT #');
     expect(receipt).toContain('RCPT-001');
     expect(receipt).toContain('Receipt Date');
     expect(receipt).toContain('Customer / Payer');
-    expect(voucher).toContain('سند صرف');
+    expect(voucher).not.toContain('class="of-title-ar"');
+    expect(voucher).toContain('class="of-title-en" lang="en" dir="ltr">VOUCHER');
     expect(voucher).toContain('VOUCHER #');
     expect(voucher).toContain('PV-002');
     expect(voucher).toContain('Payment Date');
     expect(voucher).toContain('Supplier / Payee');
+    expect(invoice).toContain('class="of-title-ar" lang="ar" dir="rtl">فاتورة');
     expect(invoice).toContain('INV-003');
     expect(invoice).toContain('Customer Name');
   });
