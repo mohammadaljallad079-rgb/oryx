@@ -163,6 +163,30 @@ export function Modal({
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
+  // A full-screen modal owns the viewport. Keep the document underneath from
+  // scrolling horizontally/vertically (the POS screenshot showed a page-level
+  // scrollbar even while the terminal was open). Nested dialogs restore the
+  // original scroll state only after the last modal closes.
+  useEffect(() => {
+    if (!open || typeof document === 'undefined') return;
+    const body = document.body;
+    if (!body.dataset.oryxModalScrollCount) {
+      body.dataset.oryxModalPreviousOverflow = body.style.overflow;
+      body.dataset.oryxModalScrollCount = '0';
+    }
+    body.dataset.oryxModalScrollCount = String(Number(body.dataset.oryxModalScrollCount) + 1);
+    body.style.overflow = 'hidden';
+    return () => {
+      const remaining = Math.max(0, Number(body.dataset.oryxModalScrollCount || 1) - 1);
+      body.dataset.oryxModalScrollCount = String(remaining);
+      if (!remaining) {
+        body.style.overflow = body.dataset.oryxModalPreviousOverflow || '';
+        delete body.dataset.oryxModalPreviousOverflow;
+        delete body.dataset.oryxModalScrollCount;
+      }
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -229,11 +253,12 @@ export function Modal({
           <h2 className="m-0 text-[16px] font-bold">{title}</h2>
           <button
             type="button"
-            className="oryx-btn oryx-btn--ghost oryx-btn--sm"
+            className="oryx-btn oryx-btn--ghost flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] shadow-sm hover:bg-[var(--bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)]"
             onClick={onClose}
+            title={t('common.closeLabel')}
             aria-label={t('common.closeLabel')}
           >
-            <Icon name="close" size={16} />
+            <Icon name="close" size={24} />
           </button>
         </div>
         <div className={size === 'pos' ? 'flex min-h-0 flex-1 flex-col' : 'px-5 py-4'}>{children}</div>

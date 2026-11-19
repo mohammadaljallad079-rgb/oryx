@@ -442,7 +442,7 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
     <div class="trn-band"></div>
     <div class="trn-text" style="top:${topFor(110.63)}pt">TRN: ${dash(trn)}</div>
     <div class="info-rule"></div>
-    <div class="docno" style="${at(37.17, 131.31, 13.28)}">${esc(rtl ? (doc.titleAr || doc.titleEn) : (doc.titleEn || doc.titleAr))} # ${esc(doc.documentNumber)}</div>
+    <div class="docno" dir="ltr" lang="en" style="${at(37.17, 133.9, 13.28)}">${esc(doc.titleEn || doc.titleAr)} # ${esc(doc.documentNumber)}</div>
     ${leftFieldHtml}${secondaryHtml}
     ${rightFieldHtml}
 
@@ -482,8 +482,7 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
     <div class="thanks" style="top:${topFor(796.51)}pt">Thank you for your trust.</div>
 
     <div class="foot-rule"></div>
-    <div class="page-no" style="${at(42.54, 815.88, 6.5)}">Page 1 of 1 • 1</div>
-    <div class="page-no" style="${at(94.0, 815.88, 6.5)}">صفحة 1 من 1</div>
+    <div class="page-no" lang="en" dir="ltr" style="${at(42.54, 818.5, 6.5)}">Page 1 of 1</div>
     <div class="contact-strip">${contactEntries}</div>
     <div class="legal" style="${rightAt(557.94, 830.51, 6.68)}">${esc([legalAddress, company.crNumber ? `CR ${company.crNumber}` : null].filter(Boolean).join(' | '))}</div>
   </div>

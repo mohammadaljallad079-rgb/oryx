@@ -1255,23 +1255,23 @@ function PosSaleModal({
         </p>
       ) : null}
 
-      <div className="oryx-pos oryx-pos--premium oryx-pos--command oryx-pos--workspace-v4 grid min-h-0 flex-1 gap-3" data-testid="pos-premium-workstation">
-        <header className="oryx-pos__command-bar" data-testid="pos-command-bar">
-          <div className="oryx-pos__command-identity">
-            <span className="oryx-pos__command-monogram">O</span>
-            <div>
-              <strong>{locale === 'ar' ? 'نقطة البيع' : 'Sales terminal'}</strong>
-              <span>{locale === 'ar' ? 'ORYX لخدمات السيارات' : 'ORYX AUTO SERVICES'}</span>
+      <div className="oryx-pos oryx-pos--premium oryx-pos--workspace-v4 oryx-pos--new-cashier" data-testid="pos-premium-workstation">
+        <header className="oryx-pos__quickbar" data-testid="pos-command-bar">
+          <div className="oryx-pos__quickbar-heading">
+            <span className="oryx-pos__quickbar-mark"><Icon name="cart" size={19} /></span>
+            <div className="min-w-0">
+              <strong>{locale === 'ar' ? 'نقطة البيع' : 'Point of sale'}</strong>
+              <span>{locale === 'ar' ? 'اختر المنتجات، راجع السلة، ثم أكمل الدفع' : 'Choose products, review cart, then pay'}</span>
             </div>
           </div>
-          <div className="oryx-pos__command-status">
-            <span className="oryx-pos__command-indicator" aria-hidden="true" />
-            <span>{locale === 'ar' ? 'جلسة الكاشير نشطة' : 'Cashier session active'}</span>
+          <div className="oryx-pos__quickbar-session">
+            <span className="oryx-pos__quickbar-live" aria-hidden="true" />
+            <span>{locale === 'ar' ? 'جلسة نشطة' : 'Active session'}</span>
             <b dir="ltr">{session?.sessionNumber ?? '—'}</b>
           </div>
-          <div className="oryx-pos__command-stats">
-            <span>{locale === 'ar' ? 'الأصناف في السلة' : 'Cart items'} <strong>{cart.reduce((n, l) => n + l.quantity, 0)}</strong></span>
-            <span>{locale === 'ar' ? 'المجموع' : 'Total'} <strong dir="ltr">{money(totals.totalMinor)}</strong></span>
+          <div className="oryx-pos__quickbar-summary" aria-live="polite">
+            <span>{locale === 'ar' ? 'المنتجات المختارة' : 'Selected items'} <b>{cart.reduce((n, l) => n + l.quantity, 0)}</b></span>
+            <strong dir="ltr">{money(totals.totalMinor)}</strong>
           </div>
         </header>
         {/* ---------------------------------------------------- product grid */}
@@ -2342,6 +2342,22 @@ function DocumentModal({
       }
     >
       {error ? <ErrorBanner message={error} /> : null}
+
+      <nav className="oryx-doc-form__section-tabs" aria-label={locale === 'ar' ? 'أقسام المستند' : 'Document sections'} data-testid={`${testIdPrefix}-section-tabs`}>
+        {([
+          ['document-info', t('erp.sales.form.documentInfo')],
+          ['customer-info', t('erp.sales.form.customerInfo')],
+          ['items', t('erp.sales.form.items')],
+          ['summary', t('erp.sales.form.summary')],
+        ] as const).map(([section, label]) => (
+          <button key={section} type="button"
+            className="oryx-doc-form__section-tab"
+            data-testid={`${testIdPrefix}-tab-${section}`}
+            onClick={() => document.querySelector(`[data-testid="${testIdPrefix}-${section}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+            {label}
+          </button>
+        ))}
+      </nav>
 
       <div className="grid gap-3 lg:grid-cols-2">
         <section className="oryx-doc-form__section" data-testid={`${testIdPrefix}-document-info`}>

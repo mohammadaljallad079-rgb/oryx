@@ -4478,3 +4478,309 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
     flex: 0 0 auto; min-height: 0; max-height: none;
   }
 }
+
+
+/* Full-screen usability correction: the close control must remain reachable,
+   and the actual editor fields must fit inside the viewport instead of merely
+   stretching their old, oversized containers. */
+.oryx-modal-backdrop:has(.oryx-modal--full),
+.oryx-modal-backdrop--pos {
+  width: 100dvw;
+  max-width: 100dvw;
+  height: 100dvh;
+  overflow: hidden;
+  min-width: 0;
+}
+.oryx-modal.oryx-modal--full,
+.oryx-modal.oryx-modal--pos {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+.oryx-modal--full > div:first-child,
+.oryx-modal--pos > div:first-child {
+  position: relative;
+  z-index: 20;
+  min-width: 0;
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 16px;
+  background: var(--surface);
+  flex: 0 0 auto;
+}
+.oryx-modal--full > div:first-child h2,
+.oryx-modal--pos > div:first-child h2 {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.oryx-modal--full > div:first-child button[aria-label],
+.oryx-modal--pos > div:first-child button[aria-label] {
+  display: grid;
+  place-items: center;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  position: sticky;
+  inset-inline-end: 0;
+  z-index: 30;
+  border: 2px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
+}
+.oryx-modal--full > div:nth-child(2) {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px 14px;
+}
+.oryx-modal--full > div:last-child {
+  min-height: 58px;
+  padding: 9px 16px;
+  background: var(--surface);
+  flex: 0 0 auto;
+}
+.oryx-modal--full .oryx-doc-form__section { min-width: 0; }
+.oryx-modal--full .oryx-doc-form__section-head { padding-block: 8px; }
+.oryx-modal--full .oryx-doc-form__section > div.grid { gap: 8px; padding: 10px; }
+.oryx-modal--full .oryx-doc-form__grid {
+  grid-template-columns:
+    minmax(180px, 3fr) minmax(56px, .65fr) minmax(90px, 1fr)
+    minmax(90px, 1fr) minmax(100px, 1fr) minmax(88px, 1fr) 32px;
+  gap: 6px;
+  min-width: 0;
+}
+.oryx-modal--full .oryx-doc-form__grid > *,
+.oryx-modal--full .oryx-doc-form__grid input,
+.oryx-modal--full .oryx-doc-form__grid button {
+  min-width: 0;
+  max-width: 100%;
+}
+.oryx-modal--full .oryx-doc-form__grid--head { position: sticky; top: 0; z-index: 2; background: var(--surface); }
+@media (max-width: 850px) {
+  .oryx-modal--full .oryx-doc-form__grid {
+    grid-template-columns: minmax(150px, 2fr) repeat(5, minmax(78px, 1fr)) 32px;
+  }
+  .oryx-modal--full [data-testid$="-items"] > div:last-child { overflow-x: auto; }
+  .oryx-modal--full .oryx-doc-form__grid { min-width: 720px; }
+}
+@media (max-width: 600px) {
+  .oryx-modal--full .oryx-doc-form__grid {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+  }
+  .oryx-modal--full .oryx-doc-form__grid--head { display: none; }
+}
+
+/* POS viewport: the screenshot shows the header/X left outside the visible
+   scroll area and a cut-off cart; the workspace must never expand the page. */
+.oryx-modal--pos:has(.oryx-pos--workspace-v4) > div:nth-child(2) {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  padding: 8px;
+  gap: 8px;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 > .oryx-pos__command-bar {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__command-identity,
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__command-status,
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__command-stats {
+  min-width: 0;
+  max-width: 100%;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 > .oryx-pos__catalog,
+.oryx-modal--pos .oryx-pos--workspace-v4 > .oryx-pos__rail {
+  overflow-x: hidden;
+}
+.oryx-modal--pos .oryx-pos--workspace-v4 .oryx-pos__rail-head {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* V5 is a deliberately new POS header, not the old premium/banner shell. */
+.oryx-modal--pos .oryx-pos--new-cashier {
+  display: grid;
+  grid-template-areas: "quickbar quickbar" "categories categories" "catalog cart";
+  grid-template-columns: minmax(0, 1fr) clamp(320px, 29vw, 390px);
+  grid-template-rows: minmax(0, auto) auto minmax(0, 1fr);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  align-content: stretch;
+  overflow: hidden;
+  direction: rtl;
+}
+.oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__quickbar {
+  grid-area: quickbar;
+  display: flex;
+  min-width: 0;
+  min-height: 54px;
+  max-height: 70px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 13px;
+  border: 1px solid var(--pos-line);
+  border-radius: 12px;
+  background: var(--pos-panel);
+}
+.oryx-pos__quickbar-heading {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+.oryx-pos__quickbar-heading > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+.oryx-pos__quickbar-heading strong { font-size: 16px; line-height: 1.2; }
+.oryx-pos__quickbar-heading span:not(.oryx-pos__quickbar-mark) {
+  color: var(--pos-soft); font-size: 11px;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.oryx-pos__quickbar-mark {
+  flex: 0 0 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #061a30;
+}
+.oryx-pos__quickbar-session {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--pos-soft);
+}
+.oryx-pos__quickbar-session b { color: var(--pos-ink); }
+.oryx-pos__quickbar-live {
+  display: block; flex: 0 0 7px; width: 7px; height: 7px;
+  border-radius: 50%; background: #22c55e;
+}
+.oryx-pos__quickbar-summary {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 12px;
+  min-width: 0;
+  font-size: 12px;
+}
+.oryx-pos__quickbar-summary b { font-size: 14px; }
+.oryx-pos__quickbar-summary > strong {
+  font-size: 17px; color: var(--accent); white-space: nowrap;
+}
+.oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__catalog,
+.oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__rail {
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+}
+.oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__categories {
+  min-height: 40px; max-height: 50px; overflow-x: auto;
+}
+@media (max-width: 980px) {
+  .oryx-modal--pos .oryx-pos--new-cashier {
+    grid-template-columns: minmax(0, 1fr) 315px;
+  }
+  .oryx-pos__quickbar-session { display: none; }
+}
+@media (max-width: 720px) {
+  .oryx-modal--pos:has(.oryx-pos--new-cashier) > div:nth-child(2) {
+    overflow-y: auto;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__quickbar {
+    flex: 0 0 auto; width: 100%; max-height: none; flex-wrap: wrap;
+  }
+  .oryx-pos__quickbar-summary { flex-wrap: wrap; }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__categories {
+    flex: 0 0 auto; width: 100%;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__catalog {
+    flex: 0 0 auto; height: auto; min-height: 420px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__rail {
+    flex: 0 0 auto; height: auto; min-height: 440px;
+  }
+}
+
+/* Four real section navigation tabs remain visible while entering invoices and
+   quotations, instead of requiring the operator to hunt down a tall form. */
+.oryx-modal--full .oryx-doc-form__section-tabs {
+  position: sticky;
+  top: -10px;
+  z-index: 15;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  margin: 0 0 10px;
+  padding: 8px 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.oryx-modal--full .oryx-doc-form__section-tab {
+  min-height: 40px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+  color: var(--text);
+  background: var(--surface-raised);
+}
+.oryx-modal--full .oryx-doc-form__section-tab:hover,
+.oryx-modal--full .oryx-doc-form__section-tab:focus-visible {
+  border-color: var(--accent);
+  outline-offset: 1px;
+}
+.oryx-modal--full .oryx-doc-form__section {
+  scroll-margin-top: 84px;
+}
+@media (max-width: 560px) {
+  .oryx-modal--full .oryx-doc-form__section-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

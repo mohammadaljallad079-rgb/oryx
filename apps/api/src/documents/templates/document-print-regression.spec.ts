@@ -95,3 +95,27 @@ describe('official print layout regressions', () => {
     expect(OFFICIAL_FINANCIAL_CSS).toMatch(/\.of-tag-ar\{[^}]*font-family:'ORYX Arabic'/);
   });
 });
+
+
+describe('official footer contact visibility contract', () => {
+  it('renders every configured phone, email, website and address in the printable footer', () => {
+    const fixture: DocumentIssuer = {
+      ...issuer,
+      phone: '+973 37702020',
+      email: 'service@oryxbhr.com',
+      websiteUrl: 'www.oryxbhr.com',
+      addressLine: 'Building 886, Road 533',
+      city: 'Bahrain',
+    };
+    const html = officialFooterTemplate(fixture);
+    for (const value of ['+973 37702020', 'service@oryxbhr.com', 'www.oryxbhr.com', 'Building 886, Road 533', 'Bahrain']) {
+      expect(html).toContain(value);
+    }
+    expect(html).toContain('Page <span class="pageNumber"></span> of <span class="totalPages"></span>');
+  });
+  it('does not fabricate contact details when company settings are empty', () => {
+    const html = officialFooterTemplate(issuer);
+    expect(html).not.toContain('service@oryxbhr.com');
+    expect(html).not.toContain('+973 37702020');
+  });
+});

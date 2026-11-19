@@ -122,7 +122,7 @@ function paymentFieldLabel(payload: FinancialDocumentPayload): string {
  */
 function documentTitle(payload: FinancialDocumentPayload): { ar: string; en: string } {
   const t = payload.titleEn.toLowerCase();
-  if (t.includes('quotation')) return { ar: 'تسعيرة', en: 'QUOTATION' };
+  if (t.includes('quotation')) return { ar: 'عرض سعر', en: 'QUOTATION' };
   if (t.includes('credit') || t.includes('return')) return { ar: 'إشعار دائن', en: 'CREDIT NOTE' };
   if (t.includes('pos')) return { ar: 'إيصال نقطة بيع', en: 'POS RECEIPT' };
   if (t.includes('receipt')) return { ar: 'سند قبض', en: 'RECEIPT' };
@@ -295,7 +295,7 @@ function infoPanel(
   return `
   <div class="of-panel">
     <div class="of-panel-left${isQuotation ? ' of-panel-left-quote' : ''}">
-      <div class="of-docno">${esc(numberLabel(payload.titleEn))} # <span class="num">${esc(
+      <div class="of-docno" lang="en" dir="ltr">${esc(numberLabel(payload.titleEn))} # <span class="num">${esc(
         payload.documentNumber ?? '',
       )}</span></div>
       <div class="of-lgrid">
@@ -600,7 +600,7 @@ export const OFFICIAL_FINANCIAL_CSS = `
      stays at the same height, so only the field grid is inset. */
   .of-panel-left-quote .of-lgrid{ margin-top:3.3pt; }
   .of-panel-right{ flex:1 1 auto; padding:1.5pt 10pt; }
-  .of-docno{ font-size:13.3pt; font-weight:700; color:#0f2b48; margin-bottom:2pt; font-family:'ORYX Display','ORYX Latin','ORYX Arabic','ORYX Sans',sans-serif; }
+  .of-docno{ font-size:13.3pt; font-weight:700; color:#0f2b48; margin-top:2.5pt; margin-bottom:1pt; direction:ltr; unicode-bidi:isolate; font-family:'ORYX Display','ORYX Latin','ORYX Arabic','ORYX Sans',sans-serif; }
   /* The document number itself is a display-face run, so the shared numeric
      Latin override (which would set it in Verdana) is reset for it. */
   .of-docno .num{ font-family:inherit; }

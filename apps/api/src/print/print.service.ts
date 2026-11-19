@@ -73,7 +73,7 @@ const TITLES: Record<PrintDocumentKind, TitleSpec> = {
   // The approved invoice prints its date as "Order Date" and carries no second
   // date row; only the quotation shows an "Expiration Date" (reference p1/p2).
   SALES_INVOICE: { titleEn: 'INVOICE', titleAr: 'فاتورة', dateLabel: 'Order Date' },
-  QUOTATION: { titleEn: 'QUOTATION', titleAr: 'تسعيرة', dateLabel: 'Quotation Date', secondaryLabel: 'Expiration Date' },
+  QUOTATION: { titleEn: 'QUOTATION', titleAr: 'عرض سعر', dateLabel: 'Quotation Date', secondaryLabel: 'Expiration Date' },
   SALES_ORDER: { titleEn: 'SALES ORDER', titleAr: 'أمر بيع', dateLabel: 'Order Date' },
   CREDIT_NOTE: { titleEn: 'CREDIT NOTE', titleAr: 'إشعار دائن', dateLabel: 'Issue Date' },
   RECEIPT: { titleEn: 'RECEIPT VOUCHER', titleAr: 'سند قبض', dateLabel: 'Payment Date' },

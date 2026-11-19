@@ -75,8 +75,8 @@ test.describe('Point of sale — card terminal', () => {
     // directly; the legacy "new sale" button is no longer required.
     await expect(page.getByTestId('pos-search')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('pos-command-bar')).toBeVisible();
-    await expect(page.getByTestId('pos-command-bar')).toContainText('Sales terminal');
-    await expect(page.getByTestId('pos-command-bar')).toContainText('Cashier session active');
+    await expect(page.getByTestId('pos-command-bar')).toContainText('Point of sale');
+    await expect(page.getByTestId('pos-command-bar')).toContainText('Active session');
 
     // Record the receipt count so the sale this test creates can be identified.
     const receiptsBefore = await page.evaluate(
@@ -125,6 +125,16 @@ test.describe('Point of sale — card terminal', () => {
     // independently scrolling order rail, without opening another panel.
     await expect(page.getByTestId(`pos-cart-line-${setup.product.sku}`)).toBeVisible();
     await expect(page.getByTestId('pos-premium-workstation')).toBeVisible();
+    await expect(page.locator('.oryx-pos--new-cashier .oryx-pos__quickbar')).toBeVisible();
+    await expect(page.locator('.oryx-pos--new-cashier .oryx-pos__quickbar')).toHaveCSS('max-height', '70px');
+    const closeButton = page.getByRole('dialog').getByRole('button', { name: /close/i }).first();
+    const closeBox = await closeButton.boundingBox();
+    expect(closeBox).not.toBeNull();
+    expect(closeBox!.width).toBeGreaterThanOrEqual(44);
+    expect(closeBox!.height).toBeGreaterThanOrEqual(44);
+    expect(closeBox!.x).toBeGreaterThanOrEqual(0);
+    expect(closeBox!.x + closeBox!.width).toBeLessThanOrEqual(viewport!.width + 1);
+
     await expect(page.getByTestId('pos-checkout-cart')).toBeVisible();
     // V4 acceptance: products and the selected-cart rail occupy independent
     // visible regions, and both scrolling regions remain accessible.

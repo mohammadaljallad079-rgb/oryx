@@ -399,3 +399,15 @@ describe('official financial template — reference watermark parity (Execution 
     expect(html).not.toContain('right:-8.6pt');
   });
 });
+
+
+describe('quotation title and numbering regression (Execution 2026-11-19)', () => {
+  it('renders the Arabic document heading as عرض سعر and the actual number in English LTR', () => {
+    const html = render({ titleEn: 'Quotation', titleAr: 'تسعيرة', documentNumber: 'Q-2026-017' });
+    expect(html).toContain('class="of-title-ar" lang="ar" dir="rtl">عرض سعر</div>');
+    expect(html).not.toContain('class="of-title-ar" lang="ar" dir="rtl">تسعيرة</div>');
+    expect(html).toContain('class="of-docno" lang="en" dir="ltr">QUOTATION #');
+    expect(html).toContain('Q-2026-017');
+    expect(html).toContain('margin-top:2.5pt');
+  });
+});
