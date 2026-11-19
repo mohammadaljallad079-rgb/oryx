@@ -155,9 +155,11 @@ export function toPrintLines(lines: PrintLineSource[], currency: string) {
     quantity: fromQuantity(line.quantity).replace(/\.?0+$/, '') || '0',
     unitPrice: fromMinor(line.unitPriceMinor, scale),
     taxLabel: rateLabel(line.taxPercentBp),
-    discountPercent: line.discountAmountMinor && line.discountAmountMinor > 0
+    // Always present the calculated discount as a monetary amount, including
+    // old invoices that stored a percentage. Never mislabel money as a rate.
+    discountPercent: totals.lines[index].discountMinor > 0
       ? `${fromMinor(totals.lines[index].discountMinor, scale)} ${symbol}`
-      : line.discountPercentBp > 0 ? `${line.discountPercentBp / 100}%` : '—',
+      : '—',
     // Print the net line amount excluding VAT. Tax is displayed in totals only.
     amount: `${fromMinor(totals.lines[index].lineSubtotalMinor - totals.lines[index].discountMinor, scale)} ${symbol}`,
     };
