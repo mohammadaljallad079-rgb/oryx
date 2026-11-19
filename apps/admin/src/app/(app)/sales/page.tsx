@@ -450,7 +450,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-[13px] font-semibold">{detail.customerNameEn}</span>
-              <DocumentPrintActions kind="SALES_INVOICE" id={detail.id} />
+              <DocumentPrintActions kind="SALES_INVOICE" id={detail.id} compact />
             </div>
             <InvoiceLineBreakdown document={detail} />
             <AttachmentsPanel entityType="SALES_INVOICE" entityId={detail.id} canManage={canManage} />
@@ -677,7 +677,7 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-[13px] font-semibold">{detail.customerNameEn || detail.customerNameAr}</span>
               <DocumentActions sourceType="CreditNote" sourceId={detail.id} type="SALES_RETURN"
-                permissions={['erp.sales.read', 'erp.accounting.read']} />
+                permissions={['erp.sales.read', 'erp.accounting.read']} iconsOnly />
             </div>
             <InvoiceLineBreakdown document={detail} />
             <AttachmentsPanel entityType="CREDIT_NOTE" entityId={detail.id} canManage={canManage} />
