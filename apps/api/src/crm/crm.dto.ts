@@ -26,17 +26,17 @@ export class ListQueryDto {
 // ------------------------------------------------------------- lead sources
 
 export class CreateLeadSourceDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
-  @IsString() @MinLength(2) @MaxLength(120) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(120) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
+  @IsOptional() @IsString() @MaxLength(120) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(120) nameAr?: string;
 }
 
 // -------------------------------------------------------------------- leads
 
 export class CreateLeadDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
-  @IsString() @MinLength(2) @MaxLength(200) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(200) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
+  @IsOptional() @IsString() @MaxLength(200) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(200) nameAr?: string;
   @IsOptional() @IsString() @MaxLength(200) contactName?: string;
   @IsOptional() @IsString() @MaxLength(160) email?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
@@ -60,16 +60,16 @@ export class UpdateLeadDto {
 // --------------------------------------------------------------- pipelines
 
 export class CreatePipelineDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
-  @IsString() @MinLength(2) @MaxLength(120) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(120) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
+  @IsOptional() @IsString() @MaxLength(120) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(120) nameAr?: string;
   @IsOptional() @IsBoolean() isDefault?: boolean;
 }
 
 export class PipelineStageDto {
   @IsString() @MinLength(1) @MaxLength(40) code!: string;
-  @IsString() @MinLength(1) @MaxLength(120) nameEn!: string;
-  @IsString() @MinLength(1) @MaxLength(120) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(120) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(120) nameAr?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) probabilityBp?: number;
   @IsOptional() @IsBoolean() isWon?: boolean;
   @IsOptional() @IsBoolean() isLost?: boolean;
@@ -83,7 +83,7 @@ export class CreateStagesDto {
 // ------------------------------------------------------------- opportunities
 
 export class CreateOpportunityDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
   @IsString() @MinLength(2) @MaxLength(200) title!: string;
   @IsString() pipelineId!: string;
   @IsOptional() @IsString() stageId?: string;
@@ -109,8 +109,8 @@ export class ConvertOpportunityDto {
 // ------------------------------------------------------------------ contacts
 
 export class CreateContactDto {
-  @IsString() @MinLength(2) @MaxLength(200) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(200) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(200) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(200) nameAr?: string;
   @IsOptional() @IsString() @MaxLength(160) email?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
   @IsOptional() @IsString() @MaxLength(120) role?: string;
@@ -169,9 +169,9 @@ export class UpdateTicketDto {
 // ------------------------------------------------------------------ segments
 
 export class CreateSegmentDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
-  @IsString() @MinLength(2) @MaxLength(160) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(160) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
+  @IsOptional() @IsString() @MaxLength(160) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(160) nameAr?: string;
   @IsOptional() @IsString() @MaxLength(600) description?: string;
 }
 

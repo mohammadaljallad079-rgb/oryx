@@ -17,19 +17,20 @@ import {
 const ACCOUNT_TYPES = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'] as const;
 
 export class CreateAccountDto {
+  @IsOptional()
   @IsString()
   @MaxLength(24)
-  code!: string;
+  code?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(160)
-  nameEn!: string;
+  nameEn?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(160)
-  nameAr!: string;
+  nameAr?: string;
 
   @IsIn(ACCOUNT_TYPES)
   type!: (typeof ACCOUNT_TYPES)[number];
@@ -141,9 +142,10 @@ export class ListQueryDto {
 }
 
 export class CreateFiscalYearDto {
+  @IsOptional()
   @IsString()
   @MaxLength(20)
-  code!: string;
+  code?: string;
 
   @IsISO8601()
   startDate!: string;

@@ -50,20 +50,17 @@ export class ListQueryDto {
 }
 
 export class CreateSupplierDto {
-  @IsString()
-  @MinLength(1)
-  @MaxLength(40)
-  code!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(200)
-  nameEn!: string;
+  nameEn?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(200)
-  nameAr!: string;
+  nameAr?: string;
 
   @IsOptional()
   @IsString()

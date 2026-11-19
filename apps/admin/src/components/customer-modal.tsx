@@ -206,10 +206,9 @@ export function CustomerModal({
         <Field label={t('common.code')} hint={locale === 'ar' ? 'اختياري: اتركه فارغًا لتوليد رقم تلقائي حسب نوع العميل من الإعدادات' : 'Optional: leave blank to auto-generate a code using the customer type and settings'}>
           <input
             className="oryx-input"
-            value={form.code}
-            disabled={Boolean(customer)}
-            placeholder={customer ? undefined : (form.kind === 'COMPANY' ? 'CO000001' : 'CU000001')}
-            onChange={(e) => setForm({ ...form, code: e.target.value })}
+            value={customer?.code ?? ''}
+            readOnly
+            placeholder={t('common.auto') === 'common.auto' ? 'Automatic / تلقائي' : t('common.auto')}
             data-testid="customer-code"
           />
         </Field>

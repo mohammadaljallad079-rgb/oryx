@@ -1,3 +1,4 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
 import { DEFAULT_CURRENCY, isKnownModule } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
@@ -49,16 +50,18 @@ export class PlansService {
   }
 
   async createPlan(dto: CreatePlanDto, actor: ActorContext) {
+    const code = (dto.code?.trim() || await nextMasterCode(this.prisma, 'PLN')).toLowerCase();
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a name in Arabic or English.');
     this.assertPlatform(actor);
-    const existing = await this.prisma.plan.findUnique({ where: { code: dto.code } });
-    if (existing) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Plan code "${dto.code}" already exists.`);
+    const existing = await this.prisma.plan.findUnique({ where: { code: code } });
+    if (existing) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Plan code "${code}" already exists.`);
     this.assertModulesExist(dto.modules);
 
     const plan = await this.prisma.plan.create({
       data: {
-        code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        code: code,
+        ...names,
         descriptionEn: dto.descriptionEn ?? '',
         descriptionAr: dto.descriptionAr ?? '',
         monthlyPrice: dto.monthlyPrice.toFixed(2),

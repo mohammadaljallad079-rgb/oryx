@@ -47,9 +47,9 @@ async function openCreate(page: Page, testId: string) {
 }
 
 /** Fill the full customer form (the same fields the standalone screen shows). */
-async function fillCustomer(page: Page, code: string, nameEn: string, nameAr: string) {
+async function fillCustomer(page: Page, nameEn: string, nameAr: string) {
   await expect(page.getByTestId('customer-code')).toBeVisible();
-  await page.getByTestId('customer-code').fill(code);
+  await expect(page.getByTestId('customer-code')).toHaveAttribute('readonly', '');
   await page.getByTestId('customer-name-en').fill(nameEn);
   await page.getByTestId('customer-name-ar').fill(nameAr);
 }
@@ -59,9 +59,6 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
 
   const suffix = Date.now().toString().slice(-7);
   const customerName = `E20 Inline Customer ${suffix}`;
-  const customerCode = `E20C${suffix}`;
-  const supplierCode = `E20S${suffix}`;
-  const productSku = `E20P${suffix}`;
   // VINs exclude I, O and Q; `TESTVN` + the digit suffix stays valid.
   const vin = `TESTVN${suffix}`;
   let customerId: string | null = null;
@@ -100,7 +97,7 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
 
     // Inline-create the customer through the same full form the sales screen uses.
     await openCreate(page, 'job-card-customer');
-    await fillCustomer(page, customerCode, customerName, 'عميل إنشاء داخلي');
+    await fillCustomer(page, customerName, 'عميل إنشاء داخلي');
     await page.getByTestId('save-customer').click();
 
     // The nested modal closes, the picker reloads and selects the new customer.
@@ -161,7 +158,7 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
 
     const name = `E20 Payment Customer ${suffix}`;
     await openCreate(page, 'payment-customer');
-    await fillCustomer(page, `E20PC${suffix}`, name, 'عميل سند قبض');
+    await fillCustomer(page, name, 'عميل سند قبض');
     await page.getByTestId('save-customer').click();
 
     await expect(page.getByTestId('customer-name-en')).toHaveCount(0);
@@ -192,16 +189,17 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
 
     await openCreate(page, 'compatibility-product');
     await expect(page.getByTestId('product-sku')).toBeVisible();
-    await page.getByTestId('product-sku').fill(productSku);
-    await page.getByTestId('product-name-en').fill('E20 Inline Product');
+    await expect(page.getByTestId('product-sku')).toHaveAttribute('readonly', '');
+    const productName = `E20 Inline Product ${suffix}`;
+    await page.getByTestId('product-name-en').fill(productName);
     await page.getByTestId('product-name-ar').fill('منتج داخلي');
     await page.getByTestId('save-product').click();
 
     await expect(page.getByTestId('product-sku')).toHaveCount(0);
-    await expect(page.getByTestId('compatibility-product').locator('button').first()).toContainText(productSku);
+    await expect(page.getByTestId('compatibility-product').locator('button').first()).toContainText(productName);
 
-    const products = await apiCall<{ items: Array<{ sku: string }> }>(page, `/inventory/products?search=${productSku}`);
-    expect(products.body.items.some((p) => p.sku === productSku)).toBe(true);
+    const products = await apiCall<{ items: Array<{ sku: string; nameEn: string }> }>(page, `/inventory/products?search=${encodeURIComponent(productName)}`);
+    expect(products.body.items.some((p) => p.nameEn === productName && /^SKU\d+$/.test(p.sku))).toBe(true);
   });
 
   test('6. purchasing creates a supplier inline from the document supplier picker', async ({ page }) => {
@@ -212,21 +210,22 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
 
     await openCreate(page, 'purchase-supplier');
     await expect(page.getByTestId('supplier-code')).toBeVisible();
-    await page.getByTestId('supplier-code').fill(supplierCode);
-    await page.getByTestId('supplier-name-en').fill('E20 Inline Supplier');
+    await expect(page.getByTestId('supplier-code')).toHaveAttribute('readonly', '');
+    const supplierName = `E20 Inline Supplier ${suffix}`;
+    await page.getByTestId('supplier-name-en').fill(supplierName);
     await page.getByTestId('supplier-name-ar').fill('مورد داخلي');
     await page.getByTestId('save-supplier').click();
 
     await expect(page.getByTestId('supplier-code')).toHaveCount(0);
-    await expect(page.getByTestId('purchase-supplier').locator('button').first()).toContainText('E20 Inline Supplier');
+    await expect(page.getByTestId('purchase-supplier').locator('button').first()).toContainText(supplierName);
 
     await expect
       .poll(async () => {
-        const res = await apiCall<{ items: Array<{ id: string; code: string }> }>(
+        const res = await apiCall<{ items: Array<{ id: string; code: string; nameEn: string }> }>(
           page,
-          `/purchasing/suppliers?search=${supplierCode}`,
+          `/purchasing/suppliers?search=${encodeURIComponent(supplierName)}`,
         );
-        const found = res.body.items.find((s) => s.code === supplierCode);
+        const found = res.body.items.find((s) => s.nameEn === supplierName && /^SUP\d+$/.test(s.code));
         if (found) supplierId = found.id;
         return found?.id ?? null;
       }, { timeout: 20_000 })
@@ -241,7 +240,7 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
 
     const name = `E20 Opportunity Customer ${suffix}`;
     await openCreate(page, 'opportunity-customer');
-    await fillCustomer(page, `E20OC${suffix}`, name, 'عميل فرصة');
+    await fillCustomer(page, name, 'عميل فرصة');
     await page.getByTestId('save-customer').click();
 
     await expect(page.getByTestId('customer-name-en')).toHaveCount(0);
@@ -265,24 +264,23 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
     await page.getByTestId('new-work-order').click();
     await expect(page.getByTestId('work-order-project')).toBeVisible();
 
-    const code = `E20J${suffix}`;
     const name = `E20 Inline Project ${suffix}`;
     await openCreate(page, 'work-order-project');
     await expect(page.getByTestId('project-code')).toBeVisible();
-    await page.getByTestId('project-code').fill(code);
+    await expect(page.getByTestId('project-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('project-name-en').fill(name);
     await page.getByTestId('project-name-ar').fill('مشروع إنشاء داخلي');
     await page.getByTestId('save-project').click();
 
     // The nested modal closes, the picker reloads and selects the new project.
     await expect(page.getByTestId('project-code')).toHaveCount(0);
-    await expect(page.getByTestId('work-order-project').locator('button').first()).toContainText(code);
+    await expect(page.getByTestId('work-order-project').locator('button').first()).toContainText(name);
 
     // The persisted create is proven by a read against the API.
     await expect
       .poll(async () => {
-        const res = await apiCall<{ items: Array<{ id: string; code: string }> }>(page, '/operations/projects');
-        const found = res.body.items.find((p) => p.code === code);
+        const res = await apiCall<{ items: Array<{ id: string; code: string; nameEn: string }> }>(page, '/operations/projects');
+        const found = res.body.items.find((p) => p.nameEn === name && /^PRJ\d+$/.test(p.code));
         if (found) projectId = found.id;
         return found?.id ?? null;
       }, { timeout: 20_000 })
@@ -295,11 +293,10 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
     await page.getByTestId('new-opportunity').click();
     await expect(page.getByTestId('opportunity-pipeline')).toBeVisible();
 
-    const code = `E20PL${suffix}`;
     const name = `E20 Inline Pipeline ${suffix}`;
     await openCreate(page, 'opportunity-pipeline');
     await expect(page.getByTestId('pipeline-code')).toBeVisible();
-    await page.getByTestId('pipeline-code').fill(code);
+    await expect(page.getByTestId('pipeline-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('pipeline-name-en').fill(name);
     await page.getByTestId('pipeline-name-ar').fill('مسار داخلي');
     await page.getByTestId('save-pipeline').click();
@@ -312,8 +309,8 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
 
     await expect
       .poll(async () => {
-        const res = await apiCall<{ items: Array<{ id: string; code: string }> }>(page, '/crm/pipelines');
-        const found = res.body.items.find((p) => p.code === code);
+        const res = await apiCall<{ items: Array<{ id: string; code: string; nameEn: string }> }>(page, '/crm/pipelines');
+        const found = res.body.items.find((p) => p.nameEn === name && /^PL\d+$/.test(p.code));
         if (found) pipelineId = found.id;
         return found?.id ?? null;
       }, { timeout: 20_000 })
@@ -343,11 +340,10 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
     await page.goto('/inventory?tab=products');
     await expect(page.getByTestId('filter-warehouse')).toBeVisible();
 
-    const code = `E20W${suffix}`;
     const name = `E20 Inline Warehouse ${suffix}`;
     await openCreate(page, 'filter-warehouse');
     await expect(page.getByTestId('warehouse-code')).toBeVisible();
-    await page.getByTestId('warehouse-code').fill(code);
+    await expect(page.getByTestId('warehouse-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('warehouse-name-en').fill(name);
     await page.getByTestId('warehouse-name-ar').fill('مستودع داخلي');
     await page.getByTestId('save-warehouse').click();
@@ -357,8 +353,8 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
 
     await expect
       .poll(async () => {
-        const res = await apiCall<{ items: Array<{ id: string; code: string }> }>(page, '/inventory/warehouses');
-        const found = res.body.items.find((w) => w.code === code);
+        const res = await apiCall<{ items: Array<{ id: string; code: string; nameEn: string }> }>(page, '/inventory/warehouses');
+        const found = res.body.items.find((w) => w.nameEn === name && /^WH\d+$/.test(w.code));
         if (found) warehouseId = found.id;
         return found?.id ?? null;
       }, { timeout: 20_000 })
@@ -406,7 +402,7 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
     await expect(page.getByTestId('tax-code')).toBeVisible();
     // The line opens the create form with the sales scope preselected.
     await expect(page.getByTestId('tax-scope')).toHaveValue('SALES');
-    await page.getByTestId('tax-code').fill(`E20T${suffix}`);
+    await expect(page.getByTestId('tax-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('tax-rate').fill('5');
     await page.getByTestId('tax-name-en').fill(nameEn);
     await page.getByTestId('tax-name-ar').fill('ضريبة مبيعات');
@@ -442,7 +438,7 @@ test.describe('Execution 20 — inline create from entity pickers', () => {
     await expect(page.getByTestId('tax-code')).toBeVisible();
     // The purchase line opens the create form with the purchases scope preselected.
     await expect(page.getByTestId('tax-scope')).toHaveValue('PURCHASES');
-    await page.getByTestId('tax-code').fill(`E20PT${suffix}`);
+    await expect(page.getByTestId('tax-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('tax-rate').fill('12.5');
     await page.getByTestId('tax-name-en').fill(nameEn);
     await page.getByTestId('tax-name-ar').fill('ضريبة مشتريات');

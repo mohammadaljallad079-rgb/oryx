@@ -2129,6 +2129,7 @@ model QuotationLine {
   quantity          Int
   unitPriceMinor    Int
   discountPercentBp Int     @default(0)
+  discountMinor     Int     @default(0)
   taxPercentBp      Int     @default(0)
   lineTotalMinor    Int
   sortOrder         Int     @default(0)
@@ -2181,6 +2182,7 @@ model SalesOrderLine {
   quantityInvoiced  Int     @default(0)
   unitPriceMinor    Int
   discountPercentBp Int     @default(0)
+  discountMinor     Int     @default(0)
   taxPercentBp      Int     @default(0)
   lineTotalMinor    Int
   sortOrder         Int     @default(0)

@@ -454,9 +454,9 @@ function CreateCompanyModal({
     setError(null);
     try {
       const res = await api.createCompany({
-        code: form.code.toUpperCase(),
-        nameEn: form.nameEn,
-        nameAr: form.nameAr,
+        code: '',
+        nameEn: form.nameEn.trim() || form.nameAr.trim(),
+        nameAr: form.nameAr.trim() || form.nameEn.trim(),
         type: form.type,
         industry: form.industry || undefined,
         planId: form.planId || undefined,
@@ -505,7 +505,7 @@ function CreateCompanyModal({
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
-            disabled={busy || !form.code || !form.nameEn || !form.nameAr}
+            disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim())}
             onClick={submit}
             data-testid="create-company-submit"
           >
@@ -525,8 +525,9 @@ function CreateCompanyModal({
         <Field label={t('common.code')} required hint={t('companies.codeHint')}>
           <input
             className="oryx-input"
-            value={form.code}
-            onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
+            value=""
+            readOnly
+            placeholder="Automatic / تلقائي"
             data-testid="company-code"
           />
         </Field>
@@ -671,7 +672,7 @@ function EditCompanyModal({
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
-            disabled={busy || !form.nameEn || !form.nameAr}
+            disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim())}
             onClick={submit}
             data-testid="edit-company-submit"
           >

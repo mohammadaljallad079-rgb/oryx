@@ -6,7 +6,6 @@ import {
   PRINT_LOGO_MARK,
   PRINT_MASTHEAD_LOCKUP,
   PRINT_TAGLINE,
-  PRINT_WATERMARK,
 } from './print-assets';
 
 /**
@@ -170,7 +169,7 @@ const QUOTE_TABLE_SHIFT = 14.3;
 export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): string {
   const rtl = locale === 'ar';
   const company = doc.company;
-  const partyName = rtl && doc.party.nameAr ? doc.party.nameAr : doc.party.name;
+  const partyName = rtl ? (doc.party.nameAr || doc.party.name) : (doc.party.name || doc.party.nameAr || '');
   // The approved form prints the Arabic title above the Latin one on every
   // document, in both interface languages, so the pair is fixed by the form.
   const title = doc.titleAr;
@@ -194,7 +193,7 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
   // reference behaves for a document with no expiry date or payment term.
   const leftFields: Array<Field | null> = [
     { label: doc.issueDateLabel, value: doc.issueDateValue ?? '' },
-    { label: 'Staf Name', value: doc.staffName ?? '' },
+    { label: rtl ? 'اسم الموظف' : 'Staff Name', value: doc.staffName ?? '' },
     doc.paymentLabel ? { label: doc.paymentLabel, value: doc.paymentValue ?? '' } : null,
   ];
   const leftRows = leftFields.filter((f): f is Field => f !== null);
@@ -227,11 +226,11 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
       : '';
 
   const rightFieldHtml = `
-    <div class="fld" style="${at(326.9, 130.67, 7.28)}">Customer Name</div>
+    <div class="fld" style="${at(326.9, 130.67, 7.28)}">${rtl ? 'اسم العميل' : 'Customer Name'}</div>
     <div class="val" style="${at(399.8, 129.66, 8.79)}">${dash(partyName)}</div>
-    <div class="fld" style="${at(344.7, 148.40, 7.28)}">Contact No.</div>
+    <div class="fld" style="${at(344.7, 148.40, 7.28)}">${rtl ? 'رقم التواصل' : 'Contact No.'}</div>
     <div class="val" style="${at(400.8, 147.34, 8.79)}">${dash(doc.party.phone)}</div>
-    <div class="fld" style="${at(355.4, 163.92, 7.30)}">Address:</div>
+    <div class="fld" style="${at(355.4, 163.92, 7.30)}">${rtl ? 'العنوان:' : 'Address:'}</div>
     ${addressBlock
       .map((line, i) => `<div class="val" style="${at(402.2, 163.67 + i * 13.96, 8.79)}">${dash(line)}</div>`)
       .join('')}`;
@@ -261,9 +260,9 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
   // taken from the form rather than derived from a single pitch.
   const TOTAL_TOP = [376.43, 396.73, 415.52, 435.07];
   const totalsRows = [
-    { label: 'Untaxed Amount', value: doc.totals.untaxedAmount },
+    { label: rtl ? 'المبلغ قبل الضريبة' : 'Untaxed Amount', value: doc.totals.untaxedAmount },
     { label: doc.totals.taxLabel, value: doc.totals.taxAmount },
-    { label: 'Discount', value: doc.totals.discount },
+    { label: rtl ? 'الخصم' : 'Discount', value: doc.totals.discount },
   ]
     .map(
       (t, i) => `
@@ -325,7 +324,7 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
   * { box-sizing: border-box; }
   html, body { margin:0; padding:0; }
   body {
-    font-family: "DejaVu Sans", Verdana, Tahoma, sans-serif;
+    font-family: Arial, Tahoma, sans-serif;
     color: var(--ink);
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
@@ -376,8 +375,8 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
   .c-price, .c-amt { text-align:right; }
 
   /* watermark - the reference's oversized lockup, behind the items and totals */
-  .watermark { position:absolute; left:41.9pt; top:252.0pt; opacity:0.10; line-height:0; }
-  .watermark svg { display:block; }
+  .watermark { position:absolute; left:calc(50% - 155pt); top:285pt; width:310pt; height:120pt; opacity:0.08; line-height:0; pointer-events:none; overflow:hidden; }
+  .watermark img { display:block; width:100%; height:100%; object-fit:contain; }
 
   /* totals - right aligned, a rule above the grand total */
   .tlabel { color:var(--ink); }
@@ -441,23 +440,23 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
     <div class="trn-band"></div>
     <div class="trn-text" style="top:${topFor(110.63)}pt">TRN: ${dash(trn)}</div>
     <div class="info-rule"></div>
-    <div class="docno" style="${at(37.17, 131.31, 13.28)}">${esc(doc.titleEn)} # ${esc(doc.documentNumber)}</div>
+    <div class="docno" style="${at(37.17, 131.31, 13.28)}">${esc(rtl ? (doc.titleAr || doc.titleEn) : (doc.titleEn || doc.titleAr))} # ${esc(doc.documentNumber)}</div>
     ${leftFieldHtml}${secondaryHtml}
     ${rightFieldHtml}
 
     <div class="items-frame"></div>
-    <div class="th" style="${at(HEAD.desc, 242.40 + tableShift, 8.79)}">Description</div>
-    <div class="th" style="${centreAt(HEAD.qty, 242.40 + tableShift, 8.79)}">Quantity</div>
-    <div class="th" style="${rightAt(HEAD.priceRight, 242.40 + tableShift, 8.79)}">Unit Price</div>
-    <div class="th" style="${centreAt(HEAD.tax, 242.40 + tableShift, 8.79)}">Taxes</div>
-    <div class="th" style="${rightAt(HEAD.amountRight, 242.40 + tableShift, 8.79)}">Amount</div>
+    <div class="th" style="${at(HEAD.desc, 242.40 + tableShift, 8.79)}">${rtl ? 'الوصف' : 'Description'}</div>
+    <div class="th" style="${centreAt(HEAD.qty, 242.40 + tableShift, 8.79)}">${rtl ? 'الكمية' : 'Quantity'}</div>
+    <div class="th" style="${rightAt(HEAD.priceRight, 242.40 + tableShift, 8.79)}">${rtl ? 'سعر الوحدة' : 'Unit Price'}</div>
+    <div class="th" style="${centreAt(HEAD.tax, 242.40 + tableShift, 8.79)}">${rtl ? 'الضريبة' : 'Taxes'}</div>
+    <div class="th" style="${rightAt(HEAD.amountRight, 242.40 + tableShift, 8.79)}">${rtl ? 'المبلغ' : 'Amount'}</div>
     ${rowParts.join('')}
 
-    <div class="watermark">${PRINT_WATERMARK}</div>
+    <div class="watermark"><img src="${PRINT_LOGO_MARK}" alt="" /></div>
 
     ${totalsRows}
     <div class="totals-rule"></div>
-    <div class="tlabel" style="${at(256.91, totalTop, 8.79)}">Total</div>
+    <div class="tlabel" style="${at(256.91, totalTop, 8.79)}">${rtl ? 'الإجمالي' : 'Total'}</div>
     <div class="tvalue" style="${rightAt(569.83, totalTop, 8.79)}">${esc(doc.totals.total)}</div>
 
     <div class="notes">
@@ -473,8 +472,8 @@ export function renderPrintDocument(doc: PrintDocumentDto, locale: Locale): stri
     <img class="footer-plate-r" alt="" src="${PRINT_FOOTER_RIGHT}" />
     <div class="sign-rule sign-rule--l"></div>
     <div class="sign-rule sign-rule--r"></div>
-    <div class="sign-label" style="${at(24.3, 759.63, 7.45)}">Authorized Stamp &amp; Signature</div>
-    <div class="sign-label" style="${at(351.07, 759.63, 7.45)}">Customer Signature</div>
+    <div class="sign-label" style="${at(24.3, 759.63, 7.45)}">${rtl ? 'الختم والتوقيع المعتمد' : 'Authorized Stamp &amp; Signature'}</div>
+    <div class="sign-label" style="${at(351.07, 759.63, 7.45)}">${rtl ? 'توقيع العميل' : 'Customer Signature'}</div>
 
     <img class="emblem" alt="" src="${PRINT_EMBLEM}" />
     <div class="thanks" style="top:${topFor(787.99)}pt;direction:rtl">شكراً لثقتكم بنا.</div>

@@ -85,10 +85,23 @@ test.describe('Execution 12 — control panel', () => {
     try {
       await page.getByTestId('coupon-create').click();
       await expect(page.locator('.oryx-modal')).toHaveCount(1);
-      await page.getByTestId('coupon-form-code').fill(code);
+      await expect(page.getByTestId('coupon-form-code')).toHaveAttribute('readonly', '');
+      // Description identifies this test coupon while its code is assigned on save.
+      await page.locator('.oryx-modal input').nth(1).fill(code);
       await page.getByTestId('coupon-save').click();
       await expect(page.locator('.oryx-modal')).toHaveCount(0);
-      await expect(page.getByTestId(`coupon-row-${code}`)).toBeVisible();
+      const ctx = await request.newContext();
+      try {
+        const list = await ctx.get(`${API}/coupons?includeInactive=true`, {
+          headers: { Authorization: `Bearer ${adminToken}` },
+        });
+        const body = (await list.json()) as { items: Array<{ code: string; descriptionEn: string | null }> };
+        const created = body.items.find((c) => c.descriptionEn === code);
+        expect(created?.code).toMatch(/^CP\d+$/);
+        await expect(page.getByTestId(`coupon-row-${created!.code}`)).toBeVisible();
+      } finally {
+        await ctx.dispose();
+      }
     } finally {
       // Delete by code through the API so the suite leaves no residue.
       const ctx = await request.newContext();
@@ -96,8 +109,8 @@ test.describe('Execution 12 — control panel', () => {
         const list = await ctx.get(`${API}/coupons?includeInactive=true`, {
           headers: { Authorization: `Bearer ${adminToken}` },
         });
-        const body = (await list.json()) as { items: Array<{ id: string; code: string }> };
-        const created = body.items.find((c) => c.code === code);
+        const body = (await list.json()) as { items: Array<{ id: string; code: string; descriptionEn: string | null }> };
+        const created = body.items.find((c) => c.descriptionEn === code);
         if (created) {
           await ctx.delete(`${API}/coupons/${created.id}`, {
             headers: { Authorization: `Bearer ${adminToken}` },

@@ -55,9 +55,15 @@ function logoBlock(issuer: DocumentIssuer): string {
  * and the navy table headings stay fully legible on top of it — a watermark that
  * competes with the data is worse than none.
  */
+/** Shared watermark dimensions for all official print templates. */
+export function watermarkSizePt(issuer: DocumentIssuer): number {
+  return Math.max(80, Math.min(500, issuer.documentWatermarkSizePt ?? 310));
+}
+
 export function documentWatermark(issuer: DocumentIssuer): string {
-  if (!issuer.logoDataUri) return '';
-  return `<div class="doc-watermark" aria-hidden="true"><img src="${esc(issuer.logoDataUri)}" alt=""></div>`;
+  if (!issuer.logoDataUri || issuer.documentWatermarkEnabled === false) return '';
+  const size = watermarkSizePt(issuer);
+  return `<div class="doc-watermark" aria-hidden="true"><img src="${esc(issuer.logoDataUri)}" alt="" style="width:${size}pt;max-width:${size}pt;max-height:${size}pt;object-fit:contain"></div>`;
 }
 
 /** The running header on the first page of a document. */
@@ -77,6 +83,7 @@ export function documentHeader(chrome: DocumentChrome): string {
     </div>
     <div class="doc-head-right">
       ${logoBlock(issuer)}
+      <span class="doc-quality-badge"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#0e4477"/><path d="M6.9 12.5 10.4 16 17.2 7.8" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
     </div>
   </header>
   <div class="doc-title-band">
@@ -238,7 +245,7 @@ function brandBand(issuer: DocumentIssuer, signatureWatermark = false): string {
  */
 export function officialFooterTemplate(issuer: DocumentIssuer, signatureWatermark = false): string {
   const base = [
-    "font-family:'ORYX Latin','ORYX Arabic','ORYX Sans',Verdana,Arial,sans-serif",
+    "font-family:'ORYX Arabic','ORYX Sans',Arial,sans-serif",
     'color:#64748b',
     '-webkit-print-color-adjust:exact',
   ].join(';');
@@ -319,7 +326,7 @@ function contactRow(issuer: DocumentIssuer): string {
  */
 export function reportFooterTemplate(issuer: DocumentIssuer, qrDataUri?: string): string {
   const base = [
-    "font-family:'ORYX Latin','ORYX Arabic','ORYX Sans',Verdana,Arial,sans-serif",
+    "font-family:'ORYX Arabic','ORYX Sans',Arial,sans-serif",
     'color:#64748b',
     '-webkit-print-color-adjust:exact',
   ].join(';');
@@ -377,7 +384,7 @@ export function footerTemplate(chrome: DocumentFooterInput): string {
     .join(' · ');
   const meta = [address, registration, contact].filter(Boolean).join('  ·  ');
   const style = [
-    "font-family:'ORYX Latin','ORYX Arabic','ORYX Sans',Verdana,Arial,sans-serif",
+    "font-family:'ORYX Arabic','ORYX Sans',Arial,sans-serif",
     'font-size:8px',
     'color:#5b6472',
     'width:100%',
@@ -400,11 +407,13 @@ export function footerTemplate(chrome: DocumentFooterInput): string {
 export const CHROME_CSS = `
   .doc-watermark{ position:absolute; inset:0; display:flex; align-items:center;
     justify-content:center; pointer-events:none; z-index:-1; }
-  .doc-watermark img{ width:78%; height:auto; opacity:0.05; }
+  .doc-watermark img{ height:auto; opacity:0.05; }
   .doc-head{ position:relative; z-index:1; display:flex; justify-content:space-between; align-items:flex-start;
     border-bottom:3px solid var(--navy); padding-bottom:6px; }
   .doc-head-left{ flex:1 1 auto; }
-  .doc-head-right{ flex:0 0 auto; margin-inline-start:14px; }
+  .doc-head-right{ flex:0 0 auto; margin-inline-start:14px; display:flex; align-items:flex-start; gap:8pt; }
+  .doc-quality-badge{ flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:22pt; height:22pt; }
+  .doc-quality-badge svg{ width:22pt; height:22pt; display:block; }
   .doc-issuer-en{ font-size:15pt; font-weight:700; color:var(--navy); }
   .doc-issuer-ar{ font-size:12pt; color:var(--navy-soft); }
   .doc-issuer-meta{ margin-top:4px; font-size:8.5pt; color:var(--muted); display:flex; gap:10px; flex-wrap:wrap; }

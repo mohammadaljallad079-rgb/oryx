@@ -339,7 +339,7 @@ function EditBranchModal({
       ) : null}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input font-mono uppercase" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} data-testid="edit-branch-code" />
+          <input className="oryx-input font-mono uppercase" value={branch?.code ?? form.code} readOnly data-testid="edit-branch-code" />
         </Field>
         <Field label={`${t('common.name')} (EN)`} required>
           <input

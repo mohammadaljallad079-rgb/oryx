@@ -74,6 +74,9 @@ test.describe('Point of sale — card terminal', () => {
     // When an active session is present, the cashier opens the workstation
     // directly; the legacy "new sale" button is no longer required.
     await expect(page.getByTestId('pos-search')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('pos-command-bar')).toBeVisible();
+    await expect(page.getByTestId('pos-command-bar')).toContainText('Sales terminal');
+    await expect(page.getByTestId('pos-command-bar')).toContainText('Cashier session active');
 
     // Record the receipt count so the sale this test creates can be identified.
     const receiptsBefore = await page.evaluate(

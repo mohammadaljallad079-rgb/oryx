@@ -23,9 +23,9 @@ export class ListTaxRateQueryDto {
 }
 
 export class CreateTaxRateDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
-  @IsString() @MinLength(1) @MaxLength(120) nameEn!: string;
-  @IsString() @MinLength(1) @MaxLength(120) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
+  @IsOptional() @IsString() @MaxLength(120) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(120) nameAr?: string;
 
   /** The rate in basis points (1500 = 15%). */
   @Type(() => Number) @IsInt() @Min(0) @Max(100000) rateBp!: number;

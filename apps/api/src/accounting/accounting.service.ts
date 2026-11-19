@@ -1,3 +1,4 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
 import { allocateMinor, DEFAULT_CURRENCY, fromMinor, sumMinor, toMinor } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
@@ -148,10 +149,14 @@ export class AccountingService {
   }
 
   async createAccount(dto: CreateAccountDto, principal: RequestPrincipal, actor: ActorContext) {
+    const normalizedNames = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!normalizedNames.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a name in Arabic or English.');
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    // Preserve chart-of-accounts type blocks and parent hierarchy on allocation.
+    const code = dto.code?.trim() || (await this.nextAccountCode(dto.type, dto.parentId, principal)).code;
     const companyCurrency = await this.context.companyCurrency(companyId);
-    const dup = await this.prisma.account.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Account code ${dto.code} already exists.`);
+    const dup = await this.prisma.account.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Account code ${code} already exists.`);
 
     let level = 1;
     if (dto.parentId) {
@@ -163,9 +168,8 @@ export class AccountingService {
     const account = await this.prisma.account.create({
       data: {
         companyId,
-        code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        code: code,
+        ...normalizedNames,
         type: dto.type,
         normalBalance,
         parentId: dto.parentId ?? null,
@@ -405,18 +409,19 @@ export class AccountingService {
 
   async createFiscalYear(dto: CreateFiscalYearDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'FY');
     const startDate = new Date(dto.startDate);
     const endDate = new Date(dto.endDate);
     if (endDate <= startDate) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'endDate must be after startDate.');
 
-    const dup = await this.prisma.fiscalYear.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Fiscal year ${dto.code} already exists.`);
+    const dup = await this.prisma.fiscalYear.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Fiscal year ${code} already exists.`);
 
     const periods = buildMonthlyPeriods(startDate, endDate);
     const year = await this.prisma.fiscalYear.create({
       data: {
         companyId,
-        code: dto.code,
+        code: code,
         startDate,
         endDate,
         periods: {

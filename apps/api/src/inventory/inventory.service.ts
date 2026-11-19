@@ -1,3 +1,4 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
 import { QUANTITY_SCALE, fromQuantity, lineAmountMinor, sumMinor } from '@oryx/shared';
 import type { StockMovementSource, StockMovementType } from '@oryx/database';
@@ -232,17 +233,20 @@ export class InventoryService {
   }
 
   async createWarehouse(dto: CreateWarehouseDto, principal: RequestPrincipal, actor: ActorContext) {
+    // Server allocates the code when a form omits it; legacy imports may supply their own.
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'WH');
+    const normalizedNames = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!normalizedNames.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a name in Arabic or English.');
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
-    const dup = await this.prisma.warehouse.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Warehouse code ${dto.code} already exists.`);
+    const dup = await this.prisma.warehouse.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Warehouse code ${code} already exists.`);
     const warehouse = await this.prisma.warehouse.create({
       data: {
         companyId,
         branchId: dto.branchId ?? null,
-        code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        code: code,
+        ...normalizedNames,
         addressLine: dto.addressLine ?? null,
         inventoryAccountId: dto.inventoryAccountId ?? null,
       },
@@ -514,9 +518,13 @@ export class InventoryService {
   }
 
   async createProduct(dto: CreateProductDto, principal: RequestPrincipal, actor: ActorContext) {
+    // Server allocates the code when a form omits it; legacy imports may supply their own.
+    const sku = dto.sku?.trim() || await nextMasterCode(this.prisma, 'SKU');
+    const normalizedNames = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!normalizedNames.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a name in Arabic or English.');
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.product.findUnique({ where: { companyId_sku: { companyId, sku: dto.sku } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `SKU ${dto.sku} already exists.`);
+    const dup = await this.prisma.product.findUnique({ where: { companyId_sku: { companyId, sku: sku } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `SKU ${sku} already exists.`);
     if ((dto.isPublished ?? false) && !dto.partCategoryKey) {
       throw badRequest(
         ERROR_CODES.VALIDATION_FAILED,
@@ -526,9 +534,8 @@ export class InventoryService {
     const product = await this.prisma.product.create({
       data: {
         companyId,
-        sku: dto.sku,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        sku: sku,
+        ...normalizedNames,
         type: dto.type ?? 'PRODUCT',
         unit: dto.unit ?? 'unit',
         barcode: dto.barcode ?? null,

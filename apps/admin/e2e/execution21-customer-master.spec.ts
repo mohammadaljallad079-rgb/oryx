@@ -47,7 +47,7 @@ test.describe('Execution 21 — customer master data', () => {
   test.describe.configure({ mode: 'serial' });
 
   const suffix = Date.now().toString().slice(-7);
-  const customerCode = `E21C${suffix}`;
+  let customerCode = '';
   const sourceCode = `E21S${suffix}`;
   let customerId: string | null = null;
 
@@ -102,8 +102,8 @@ test.describe('Execution 21 — customer master data', () => {
     await page.getByTestId('new-customer').click();
     await expect(page.getByTestId('customer-code')).toBeVisible();
 
-    await page.getByTestId('customer-code').fill(customerCode);
-    await page.getByTestId('customer-name-en').fill('Execution 21 Customer');
+    await expect(page.getByTestId('customer-code')).toHaveAttribute('readonly', '');
+    await page.getByTestId('customer-name-en').fill(`Execution 21 Customer ${suffix}`);
     await page.getByTestId('customer-name-ar').fill('عميل التنفيذ ٢١');
 
     // Inline-create a lead source from inside the customer form: the "+ Add
@@ -116,6 +116,13 @@ test.describe('Execution 21 — customer master data', () => {
     await page.getByTestId('inline-create-save').click();
 
     await page.getByTestId('save-customer').click();
+
+    // Look up the server-assigned customer code by the unique test name.
+    const created = await apiCall<{ items: Array<{ id: string; code: string; nameEn: string }> }>(page, `/sales/customers?search=${encodeURIComponent('Execution 21 Customer ' + suffix)}`);
+    const createdCustomer = created.body.items.find((c) => c.nameEn === `Execution 21 Customer ${suffix}`);
+    expect(createdCustomer, 'auto-numbered customer must persist').toBeTruthy();
+    customerCode = createdCustomer!.code;
+    customerId = createdCustomer!.id;
 
     // The create is proven by a persisted read, not the closing modal.
     await expect

@@ -1,3 +1,4 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
 
 import { basisPointsOfMinor } from '@oryx/shared';
@@ -128,7 +129,7 @@ export class CouponsService {
   }
 
   async create(input: {
-    code: string;
+    code?: string;
     descriptionEn?: string;
     descriptionAr?: string;
     discountType?: 'PERCENT' | 'FIXED';
@@ -143,7 +144,7 @@ export class CouponsService {
     endsAt?: string | null;
     createdById?: string;
   }): Promise<CouponDto> {
-    const code = input.code.trim().toUpperCase();
+    const code = (input.code?.trim() || await nextMasterCode(this.prisma, 'CP')).toUpperCase();
     if (code.length < 3) {
       throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'A coupon code needs at least three characters.');
     }

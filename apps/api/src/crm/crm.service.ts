@@ -1,3 +1,4 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
 import { computeDocumentTotals, type PricedLineInput } from '../common/document-totals';
 import { PrismaService } from '../common/prisma.service';
@@ -32,6 +33,14 @@ import type {
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
+/** Require at least one human-readable name, accepting either writing system. */
+function bilingualName(nameEn?: string | null, nameAr?: string | null) {
+  const en = nameEn?.trim() || '';
+  const ar = nameAr?.trim() || '';
+  if (!en && !ar) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a name in Arabic or English.');
+  return { nameEn: en || ar, nameAr: ar || en };
+}
+
 @Injectable()
 export class CrmService {
   constructor(
@@ -51,10 +60,12 @@ export class CrmService {
   }
 
   async createLeadSource(dto: CreateLeadSourceDto, principal: RequestPrincipal, actor: ActorContext) {
+    // Server allocates the code when a form omits it; legacy imports may supply their own.
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'SRC');
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.leadSource.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Lead source ${dto.code} already exists.`);
-    const source = await this.prisma.leadSource.create({ data: { companyId, code: dto.code, nameEn: dto.nameEn, nameAr: dto.nameAr } });
+    const dup = await this.prisma.leadSource.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Lead source ${code} already exists.`);
+    const source = await this.prisma.leadSource.create({ data: { companyId, code: code, ...bilingualName(dto.nameEn, dto.nameAr) } });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'crm.lead_source_created', targetType: 'LEAD_SOURCE', targetId: source.id, summary: `Created lead source ${source.code}` });
     return source;
   }
@@ -87,15 +98,16 @@ export class CrmService {
   }
 
   async createLead(dto: CreateLeadDto, principal: RequestPrincipal, actor: ActorContext) {
+    // Server allocates the code when a form omits it; legacy imports may supply their own.
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'LD');
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.lead.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Lead code ${dto.code} already exists.`);
+    const dup = await this.prisma.lead.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Lead code ${code} already exists.`);
     const lead = await this.prisma.lead.create({
       data: {
         companyId,
-        code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        code: code,
+        ...bilingualName(dto.nameEn, dto.nameAr),
         contactName: dto.contactName ?? null,
         email: dto.email ?? null,
         phone: dto.phone ?? null,
@@ -117,8 +129,7 @@ export class CrmService {
     const updated = await this.prisma.lead.update({
       where: { id },
       data: {
-        ...(dto.nameEn !== undefined ? { nameEn: dto.nameEn } : {}),
-        ...(dto.nameAr !== undefined ? { nameAr: dto.nameAr } : {}),
+        ...(dto.nameEn !== undefined || dto.nameAr !== undefined ? bilingualName(dto.nameEn ?? lead.nameEn, dto.nameAr ?? lead.nameAr) : {}),
         ...(dto.contactName !== undefined ? { contactName: dto.contactName } : {}),
         ...(dto.email !== undefined ? { email: dto.email } : {}),
         ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
@@ -141,15 +152,16 @@ export class CrmService {
   }
 
   async createPipeline(dto: CreatePipelineDto, principal: RequestPrincipal, actor: ActorContext) {
+    // Server allocates the code when a form omits it; legacy imports may supply their own.
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'PL');
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.pipeline.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Pipeline ${dto.code} already exists.`);
+    const dup = await this.prisma.pipeline.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Pipeline ${code} already exists.`);
     const pipeline = await this.prisma.pipeline.create({
       data: {
         companyId,
-        code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        code: code,
+        ...bilingualName(dto.nameEn, dto.nameAr),
         isDefault: dto.isDefault ?? false,
         // Seed a conventional set of stages so the pipeline is usable at once.
         stages: {
@@ -177,8 +189,8 @@ export class CrmService {
       for (const [i, s] of dto.stages.entries()) {
         await tx.pipelineStage.upsert({
           where: { pipelineId_code: { pipelineId, code: s.code } },
-          create: { companyId, pipelineId, code: s.code, nameEn: s.nameEn, nameAr: s.nameAr, sortOrder: i, probabilityBp: s.probabilityBp ?? 0, isWon: s.isWon ?? false, isLost: s.isLost ?? false },
-          update: { nameEn: s.nameEn, nameAr: s.nameAr, sortOrder: i, probabilityBp: s.probabilityBp ?? 0, isWon: s.isWon ?? false, isLost: s.isLost ?? false },
+          create: { companyId, pipelineId, code: s.code, ...bilingualName(s.nameEn, s.nameAr), sortOrder: i, probabilityBp: s.probabilityBp ?? 0, isWon: s.isWon ?? false, isLost: s.isLost ?? false },
+          update: { ...bilingualName(s.nameEn, s.nameAr), sortOrder: i, probabilityBp: s.probabilityBp ?? 0, isWon: s.isWon ?? false, isLost: s.isLost ?? false },
         });
       }
       return tx.pipelineStage.findMany({ where: { pipelineId }, orderBy: { sortOrder: 'asc' } });
@@ -209,8 +221,9 @@ export class CrmService {
 
   async createOpportunity(dto: CreateOpportunityDto, principal: RequestPrincipal, actor: ActorContext) {
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.opportunity.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Opportunity code ${dto.code} already exists.`);
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'OPP');
+    const dup = await this.prisma.opportunity.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Opportunity code ${code} already exists.`);
     const pipeline = await this.prisma.pipeline.findFirst({ where: { id: dto.pipelineId, companyId }, include: { stages: { orderBy: { sortOrder: 'asc' } } } });
     if (!pipeline) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Pipeline not found.');
     const stageId = dto.stageId ?? pipeline.stages[0]?.id;
@@ -220,7 +233,7 @@ export class CrmService {
     const opportunity = await this.prisma.opportunity.create({
       data: {
         companyId,
-        code: dto.code,
+        code: code,
         title: dto.title,
         pipelineId: dto.pipelineId,
         stageId,
@@ -335,7 +348,7 @@ export class CrmService {
     const { companyId } = await this.context.resolveCompanyScope(principal);
     await this.assertCustomer(companyId, customerId);
     const contact = await this.prisma.customerContact.create({
-      data: { companyId, customerId, nameEn: dto.nameEn, nameAr: dto.nameAr, email: dto.email ?? null, phone: dto.phone ?? null, role: dto.role ?? null, isPrimary: dto.isPrimary ?? false },
+      data: { companyId, customerId, ...bilingualName(dto.nameEn, dto.nameAr), email: dto.email ?? null, phone: dto.phone ?? null, role: dto.role ?? null, isPrimary: dto.isPrimary ?? false },
     });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'crm.contact_created', targetType: 'CUSTOMER_CONTACT', targetId: contact.id, summary: `Added contact ${contact.nameEn}` });
     return contact;
@@ -557,10 +570,13 @@ export class CrmService {
   }
 
   async createSegment(dto: CreateSegmentDto, principal: RequestPrincipal, actor: ActorContext) {
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a name in Arabic or English.');
     const { companyId } = await this.context.resolveCompanyScope(principal);
-    const dup = await this.prisma.customerSegment.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Segment ${dto.code} already exists.`);
-    const segment = await this.prisma.customerSegment.create({ data: { companyId, code: dto.code, nameEn: dto.nameEn, nameAr: dto.nameAr, description: dto.description ?? null } });
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'SEG');
+    const dup = await this.prisma.customerSegment.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Segment ${code} already exists.`);
+    const segment = await this.prisma.customerSegment.create({ data: { companyId, code: code, ...names, description: dto.description ?? null } });
     await this.audit.record({ actorUserId: actor.userId, companyId, action: 'crm.segment_created', targetType: 'CUSTOMER_SEGMENT', targetId: segment.id, summary: `Created segment ${segment.code}` });
     return segment;
   }

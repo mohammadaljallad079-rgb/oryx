@@ -241,7 +241,7 @@ function ProjectModal({
       if (project) {
         saved = await api.updateOperationsProject(project.id, body);
       } else {
-        saved = await api.createOperationsProject({ ...body, code: form.code });
+        saved = await api.createOperationsProject({ ...body, code: '' });
       }
       await onSaved();
       onSavedRecord?.(saved);
@@ -251,10 +251,10 @@ function ProjectModal({
 
   return (
     <Modal open={open} size="document" title={project ? t('erp.operations.editProject') : t('erp.operations.newProject')} onClose={onClose}
-      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || !form.nameEn || !form.nameAr || (!project && !form.code)} onClick={submit} data-testid="save-project">{busy ? t('common.loading') : t('common.save')}</Button></>}>
+      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim())} onClick={submit} data-testid="save-project">{busy ? t('common.loading') : t('common.save')}</Button></>}>
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('common.code')} required><input className="oryx-input" value={form.code} disabled={Boolean(project)} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="project-code" /></Field>
+        <Field label={t('common.code')} required><input className="oryx-input" value={project?.code ?? ''} readOnly placeholder="Automatic / تلقائي" data-testid="project-code" /></Field>
         <Field label={t('erp.operations.startDate')}><input type="date" className="oryx-input" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} data-testid="project-start-date" /></Field>
         <Field label={`${t('common.name')} (EN)`} required><input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="project-name-en" /></Field>
         <Field label={`${t('common.name')} (AR)`} required><input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="project-name-ar" /></Field>

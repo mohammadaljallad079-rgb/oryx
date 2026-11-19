@@ -1,3 +1,4 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
@@ -198,6 +199,7 @@ export class OperationsService {
   }
 
   async createProject(dto: CreateProjectDto, principal: RequestPrincipal, actor: ActorContext) {
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'PRJ');
     const { companyId, branchIds } = await this.context.resolveCompanyScope(principal);
     if (dto.branchId) await this.context.assertBranchScope(companyId, dto.branchId, branchIds);
     if (dto.departmentId) await this.assertDepartment(companyId, dto.departmentId);
@@ -205,12 +207,12 @@ export class OperationsService {
     if (dto.startDate && dto.endDate && new Date(dto.endDate) < new Date(dto.startDate)) {
       throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Project end date cannot be earlier than its start date.');
     }
-    const dup = await this.prisma.project.findUnique({ where: { companyId_code: { companyId, code: dto.code } } });
-    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Project ${dto.code} already exists.`);
+    const dup = await this.prisma.project.findUnique({ where: { companyId_code: { companyId, code: code } } });
+    if (dup) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Project ${code} already exists.`);
     const project = await this.prisma.project.create({
       data: {
         companyId,
-        code: dto.code,
+        code: code,
         nameEn: dto.nameEn,
         nameAr: dto.nameAr,
         branchId: dto.branchId ?? null,

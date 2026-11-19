@@ -1,3 +1,4 @@
+import { nextMasterCode } from '../common/master-code';
 import { Injectable } from '@nestjs/common';
 import { checkLimit, DEFAULT_COUNTRY_CODE, DEFAULT_CURRENCY, DEFAULT_TIMEZONE, type PlanLimits } from '@oryx/shared';
 import { PrismaService } from '../common/prisma.service';
@@ -104,11 +105,14 @@ export class OrganizationsService {
   }
 
   async createCompany(dto: CreateCompanyDto, actor: ActorContext) {
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a company or branch name in Arabic or English.');
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'CO');
     if (actor.kind !== 'PLATFORM') {
       throw forbidden(ERROR_CODES.FORBIDDEN_PLATFORM_ONLY, 'Only a platform administrator may create companies.');
     }
-    const existing = await this.prisma.company.findUnique({ where: { code: dto.code } });
-    if (existing) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Company code "${dto.code}" already exists.`);
+    const existing = await this.prisma.company.findUnique({ where: { code: code } });
+    if (existing) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Company code "${code}" already exists.`);
 
     if (dto.parentCompanyId) {
       const parent = await this.prisma.company.findUnique({ where: { id: dto.parentCompanyId } });
@@ -135,9 +139,8 @@ export class OrganizationsService {
     const company = await this.prisma.$transaction(async (tx) => {
       const created = await tx.company.create({
         data: {
-          code: dto.code,
-          nameEn: dto.nameEn,
-          nameAr: dto.nameAr,
+          code: code,
+          ...names,
           legalNameEn: dto.legalNameEn ?? null,
           type: dto.type,
           status: 'ACTIVE',
@@ -192,7 +195,7 @@ export class OrganizationsService {
       action: 'company.created',
       targetType: 'COMPANY',
       targetId: company.id,
-      summary: `Created ${dto.type === 'INTERNAL' ? 'internal company' : 'SaaS tenant'} ${dto.nameEn} (${dto.code})`,
+      summary: `Created ${dto.type === 'INTERNAL' ? 'internal company' : 'SaaS tenant'} ${names.nameEn} (${code})`,
       metadata: { type: dto.type, planId: dto.planId ?? null },
       ipAddress: actor.ip ?? null,
       userAgent: actor.userAgent ?? null,
@@ -357,13 +360,16 @@ export class OrganizationsService {
   }
 
   async createBranch(companyId: string, dto: CreateBranchDto, actor: ActorContext) {
+    const names = { nameEn: dto.nameEn?.trim() || dto.nameAr?.trim() || '', nameAr: dto.nameAr?.trim() || dto.nameEn?.trim() || '' };
+    if (!names.nameEn) throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Provide a company or branch name in Arabic or English.');
+    const code = dto.code?.trim() || await nextMasterCode(this.prisma, 'BR');
     this.assertCompanyAccess(companyId, actor);
     if (dto.responsibleUserId) await this.assertBranchResponsibleUser(companyId, dto.responsibleUserId);
 
     const duplicate = await this.prisma.branch.findUnique({
-      where: { companyId_code: { companyId, code: dto.code } },
+      where: { companyId_code: { companyId, code: code } },
     });
-    if (duplicate) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Branch code "${dto.code}" already exists in this company.`);
+    if (duplicate) throw conflict(ERROR_CODES.RESOURCE_CONFLICT, `Branch code "${code}" already exists in this company.`);
 
     // Plan limit enforcement — never trust the UI.
     const ent = await this.entitlements.forCompany(companyId);
@@ -387,9 +393,8 @@ export class OrganizationsService {
     const branch = await this.prisma.branch.create({
       data: {
         companyId,
-        code: dto.code,
-        nameEn: dto.nameEn,
-        nameAr: dto.nameAr,
+        code: code,
+        ...names,
         city: dto.city ?? null,
         countryCode: dto.countryCode ?? DEFAULT_COUNTRY_CODE,
         addressLine: dto.addressLine ?? null,

@@ -1454,7 +1454,7 @@ function ServiceModal({
       };
       const saved = editing
         ? await api.updateInspectionService(service!.id, body)
-        : await api.createInspectionService({ ...body, code: form.code });
+        : await api.createInspectionService({ ...body, code: '' });
       if (file) {
         const fd = new FormData();
         fd.append('file', file);
@@ -1467,11 +1467,11 @@ function ServiceModal({
 
   return (
     <Modal open={open} title={editing ? t('erp.automotive.editService') : t('erp.automotive.newService')} onClose={onClose}
-      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || !form.nameEn || (!editing && !form.code)} onClick={submit} data-testid="save-service">{busy ? t('common.loading') : t('common.save')}</Button></>}>
+      footer={<><Button onClick={onClose}>{t('common.cancel')}</Button><Button variant="primary" disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim())} onClick={submit} data-testid="save-service">{busy ? t('common.loading') : t('common.save')}</Button></>}>
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} disabled={editing} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="service-code" />
+          <input className="oryx-input" value={editing ? form.code : ''} readOnly placeholder="Automatic / تلقائي" data-testid="service-code" />
         </Field>
         <Field label={`${t('common.name')} (EN)`} required><input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="service-name-en" /></Field>
         <Field label={`${t('common.name')} (AR)`} required><input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="service-name-ar" /></Field>

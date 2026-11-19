@@ -102,9 +102,9 @@ export class OcrExtractDto {
 // --------------------------------------------------------------- inspections
 
 export class CreateInspectionServiceDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
-  @IsString() @MinLength(2) @MaxLength(160) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(160) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
+  @IsOptional() @IsString() @MaxLength(160) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(160) nameAr?: string;
   @IsOptional() @IsString() @MaxLength(600) description?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) priceMinor?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) taxPercentBp?: number;
@@ -187,9 +187,9 @@ export class InvoiceInspectionDto {
 // -------------------------------------------------------------- maintenance
 
 export class CreateWorkshopBayDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
-  @IsString() @MinLength(2) @MaxLength(120) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(120) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
+  @IsOptional() @IsString() @MaxLength(120) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(120) nameAr?: string;
   @IsOptional() @IsString() branchId?: string;
 }
 
@@ -313,9 +313,9 @@ export class CreateCompatibilityDto {
 // --------------------------------------------------------------- marketplace
 
 export class CreateProviderDto {
-  @IsString() @MinLength(1) @MaxLength(40) code!: string;
-  @IsString() @MinLength(2) @MaxLength(200) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(200) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(40) code?: string;
+  @IsOptional() @IsString() @MaxLength(200) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(200) nameAr?: string;
   @IsOptional() @IsString() @MaxLength(80) categoryKey?: string;
   @IsOptional() @IsString() @MaxLength(160) email?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
@@ -330,8 +330,8 @@ export class ApproveProviderDto {
 
 export class CreateListingDto {
   @IsString() @MinLength(1) @MaxLength(80) categoryKey!: string;
-  @IsString() @MinLength(2) @MaxLength(200) nameEn!: string;
-  @IsString() @MinLength(2) @MaxLength(200) nameAr!: string;
+  @IsOptional() @IsString() @MaxLength(200) nameEn?: string;
+  @IsOptional() @IsString() @MaxLength(200) nameAr?: string;
   @IsOptional() @IsString() @MaxLength(1000) description?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) priceMinor?: number;
 }

@@ -31,7 +31,7 @@ export function PipelineModal({
     setBusy(true);
     setError(null);
     try {
-      const saved = await api.createPipeline({ code: form.code, nameEn: form.nameEn, nameAr: form.nameAr });
+      const saved = await api.createPipeline({ code: form.code, nameEn: form.nameEn.trim() || form.nameAr.trim(), nameAr: form.nameAr.trim() || form.nameEn.trim() });
       await onCreated();
       onSaved?.(saved);
       onClose();
@@ -50,7 +50,7 @@ export function PipelineModal({
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" disabled={busy || !form.code || !form.nameEn || !form.nameAr} onClick={submit} data-testid="save-pipeline">
+          <Button variant="primary" disabled={busy || (!form.nameEn.trim() && !form.nameAr.trim())} onClick={submit} data-testid="save-pipeline">
             {busy ? t('common.loading') : t('common.save')}
           </Button>
         </>
@@ -59,12 +59,12 @@ export function PipelineModal({
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-3">
         <Field label={t('common.code')} required>
-          <input className="oryx-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="pipeline-code" />
+          <input className="oryx-input" value="" readOnly placeholder="Automatic / تلقائي" data-testid="pipeline-code" />
         </Field>
-        <Field label={`${t('common.name')} (EN)`} required>
+        <Field label={`${t('common.name')} (EN)`}>
           <input className="oryx-input" value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} data-testid="pipeline-name-en" />
         </Field>
-        <Field label={`${t('common.name')} (AR)`} required>
+        <Field label={`${t('common.name')} (AR)`}>
           <input className="oryx-input" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} data-testid="pipeline-name-ar" />
         </Field>
       </div>

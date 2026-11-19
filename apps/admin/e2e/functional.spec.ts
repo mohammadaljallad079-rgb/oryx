@@ -116,9 +116,8 @@ test.describe('functional audit', () => {
     await page.goto('/companies');
 
     const suffix = Date.now().toString().slice(-6);
-    const code = `${FIXTURE}-${suffix}`;
     await page.getByTestId('new-company').click();
-    await page.getByTestId('company-code').fill(code);
+    await expect(page.getByTestId('company-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('company-name-en').fill(`Audit Co ${suffix}`);
     await page.getByTestId('company-name-ar').fill(`شركة تدقيق ${suffix}`);
     await page.getByTestId('create-company-submit').click();
@@ -130,9 +129,9 @@ test.describe('functional audit', () => {
     // Verify persistence through the API, not the toast.
     const list = await apiCall<{ items: Array<{ id: string; code: string; nameEn: string }> }>(
       page,
-      `/companies?pageSize=50&search=${code}`,
+      `/companies?pageSize=50&search=${encodeURIComponent('Audit Co ' + suffix)}`, 
     );
-    const created = list.body.items.find((c) => c.code === code);
+    const created = list.body.items.find((c) => c.nameEn === `Audit Co ${suffix}`);
     expect(created, 'company must exist in the database').toBeTruthy();
 
     // Edit it and confirm the change is stored.
@@ -167,13 +166,15 @@ test.describe('functional audit', () => {
     await page.goto(`/branches?companyId=${companyId}`);
     await expect(page.getByTestId('branches-page')).toBeVisible();
 
-    const branchCode = `AB${suffix}`;
     await page.getByTestId('new-branch').click();
-    await page.getByTestId('branch-code').fill(branchCode);
+    await expect(page.getByTestId('branch-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('branch-name-en').fill('Audit Branch');
     await page.getByTestId('branch-name-ar').fill('فرع تدقيق');
     await page.getByTestId('create-branch-submit').click();
-    await expect(page.getByTestId(`branch-row-${branchCode}`)).toBeVisible({ timeout: 20_000 });
+    const createdRow = page.locator('[data-testid^="branch-row-"]').filter({ hasText: 'Audit Branch' });
+    await expect(createdRow).toBeVisible({ timeout: 20_000 });
+    const branchCode = (await createdRow.getAttribute('data-testid'))!.replace('branch-row-', '');
+    expect(branchCode).toBeTruthy();
 
     const branches = await apiCall<{ items: Array<{ id: string; code: string }> }>(
       page,
@@ -211,13 +212,15 @@ test.describe('functional audit', () => {
     await page.goto(`/branches?companyId=${companyId}`);
     await expect(page.getByTestId('branches-page')).toBeVisible();
 
-    const branchCode = `AE${suffix}`;
     await page.getByTestId('new-branch').click();
-    await page.getByTestId('branch-code').fill(branchCode);
+    await expect(page.getByTestId('branch-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('branch-name-en').fill('Audit Edit Branch');
     await page.getByTestId('branch-name-ar').fill('فرع تعديل');
     await page.getByTestId('create-branch-submit').click();
-    await expect(page.getByTestId(`branch-row-${branchCode}`)).toBeVisible({ timeout: 20_000 });
+    const createdRow = page.locator('[data-testid^="branch-row-"]').filter({ hasText: 'Audit Edit Branch' });
+    await expect(createdRow).toBeVisible({ timeout: 20_000 });
+    const branchCode = (await createdRow.getAttribute('data-testid'))!.replace('branch-row-', '');
+    expect(branchCode).toBeTruthy();
 
     // Edit through the modal: phone and address must persist, not just the name.
     await page.getByTestId(`edit-branch-${branchCode}`).click();
@@ -313,14 +316,15 @@ test.describe('functional audit', () => {
     await page.goto(`/roles?companyId=${companyId}`);
     await expect(page.getByTestId('roles-page')).toBeVisible();
     await page.getByTestId('new-role').click();
-    const roleCode = `audit_role_${suffix}`;
-    await page.getByTestId('role-code').fill(roleCode);
+    await expect(page.getByTestId('role-code')).toHaveAttribute('readonly', '');
     await page.getByTestId('role-name-en').fill('Audit Role');
     await page.getByTestId('role-name-ar').fill('دور تدقيق');
     await page.getByTestId('perm-company.branch.read').check();
     await page.getByTestId('save-role').click();
 
-    await expect(page.getByTestId(`role-card-${roleCode}`)).toBeVisible({ timeout: 20_000 });
+    const roleCard = page.locator('[data-testid^="role-card-"]').filter({ hasText: 'Audit Role' });
+    await expect(roleCard).toBeVisible({ timeout: 20_000 });
+    const roleCode = (await roleCard.getAttribute('data-testid'))!.replace('role-card-', '');
     const roles = await apiCall<Array<{ code: string; permissions: string[] }>>(page, `/companies/${companyId}/roles`);
     const role = roles.body.find((r) => r.code === roleCode);
     expect(role, 'role must be persisted').toBeTruthy();
@@ -358,10 +362,9 @@ test.describe('functional audit', () => {
     await page.goto('/plans');
 
     const suffix = Date.now().toString().slice(-6);
-    const planCode = `auditplan${suffix}`;
     await page.getByTestId('new-plan').click();
-    await page.getByTestId('plan-code').fill(planCode);
-    await page.getByTestId('plan-name-en').fill('Audit Plan');
+    await expect(page.getByTestId('plan-code')).toHaveAttribute('readonly', '');
+    await page.getByTestId('plan-name-en').fill(`Audit Plan ${suffix}`);
     await page.getByTestId('plan-name-ar').fill('باقة تدقيق');
     await page.getByTestId('plan-desc-en').fill('Created by the functional audit');
     await page.getByTestId('plan-desc-ar').fill('أنشئت بواسطة تدقيق الوظائف');
@@ -370,8 +373,9 @@ test.describe('functional audit', () => {
     await page.getByTestId('plan-module-dashboard').check();
     await page.getByTestId('plan-module-company_management').check();
     await page.getByTestId('save-plan').click();
-    await expect(page.getByTestId(`plan-card-${planCode}`)).toBeVisible({ timeout: 20_000 });
-
+    const planCard = page.locator('[data-testid^="plan-card-"]').filter({ hasText: `Audit Plan ${suffix}` });
+    await expect(planCard).toBeVisible({ timeout: 20_000 });
+    const planCode = (await planCard.getAttribute('data-testid'))!.replace('plan-card-', '');
     const plans = await apiCall<Array<{ id: string; code: string; monthlyPrice: number }>>(page, '/plans');
     const plan = plans.body.find((p) => p.code === planCode);
     expect(plan).toBeTruthy();
