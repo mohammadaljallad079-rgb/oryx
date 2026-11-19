@@ -4740,3 +4740,47 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
     flex: 0 0 auto; height: auto; min-height: 440px;
   }
 }
+
+/* Four real section navigation tabs remain visible while entering invoices and
+   quotations, instead of requiring the operator to hunt down a tall form. */
+.oryx-modal--full .oryx-doc-form__section-tabs {
+  position: sticky;
+  top: -10px;
+  z-index: 15;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  margin: 0 0 10px;
+  padding: 8px 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.oryx-modal--full .oryx-doc-form__section-tab {
+  min-height: 40px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+  color: var(--text);
+  background: var(--surface-raised);
+}
+.oryx-modal--full .oryx-doc-form__section-tab:hover,
+.oryx-modal--full .oryx-doc-form__section-tab:focus-visible {
+  border-color: var(--accent);
+  outline-offset: 1px;
+}
+.oryx-modal--full .oryx-doc-form__section {
+  scroll-margin-top: 84px;
+}
+@media (max-width: 560px) {
+  .oryx-modal--full .oryx-doc-form__section-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
