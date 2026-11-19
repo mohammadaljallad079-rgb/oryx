@@ -1960,16 +1960,27 @@ function LineEditor({
           <TaxPicker
             value={line.taxId || taxOptions.find((option) =>
               option.value === String(Math.round((Number(line.taxPercent) || 0) * 100)))?.value || null}
-            options={taxOptions}
+            options={[
+              ...taxOptions,
+              ...(Number(line.taxPercent) > 0 && !taxOptions.some((option) =>
+                option.value === String(Math.round(Number(line.taxPercent) * 100)))
+                ? [{
+                    value: String(Math.round(Number(line.taxPercent) * 100)),
+                    label: `${line.taxPercent}%`,
+                    hint: locale === 'ar' ? 'ضريبة الصنف' : 'Product tax rate',
+                  }]
+                : []),
+            ]}
             onChange={(v) => {
               const chosen = taxOptions.find((o) => o.value === v);
+              const chosenRate = chosen ? chosen.label.replace(/[^\\d.]/g, '') : v ? String(Number(v) / 100) : '0';
               // Choosing "None" must zero the line's rate, not leave the
               // previous one in place: the picker's empty option means "without
               // tax", and keeping the old percentage silently charged VAT on a
               // line the operator had just exempted.
               update(i, {
                 taxId: v ?? '',
-                taxPercent: v == null ? '0' : chosen ? chosen.label.replace(/[^\d.]/g, '') : line.taxPercent,
+                taxPercent: chosenRate,
               });
             }}
             scope="SALES"
