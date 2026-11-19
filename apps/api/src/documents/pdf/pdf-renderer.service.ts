@@ -202,14 +202,14 @@ export const DEFAULT_PDF_MARGINS: PdfMargins = {
  * identity band, not the priced table. The reference prints the logotype at
  * x16.5 and the quality badge at x579.5, so the page inset is 5.8mm / 5.6mm and
  * the table columns are recovered by the `.of-body` inset in the layout. The
- * footer sits in the bottom margin. Reserve enough space for both the 46pt
- * signature band AND contact/registered-address rows; 28mm could crop the
- * actual contact figures on printed quotations and invoices.
+ * footer sits in the bottom margin. A compact footer band reserves its
+ * contact and address rows inside 28mm without stealing body space from
+ * one-page invoices and POS receipts.
  */
 export const OFFICIAL_PDF_MARGINS: PdfMargins = {
   top: '5.7mm',
   right: '5.6mm',
-  bottom: '36mm',
+  bottom: '28mm',
   left: '5.8mm',
 };
 
