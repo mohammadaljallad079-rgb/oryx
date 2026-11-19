@@ -229,11 +229,12 @@ export function Modal({
           <h2 className="m-0 text-[16px] font-bold">{title}</h2>
           <button
             type="button"
-            className="oryx-btn oryx-btn--ghost oryx-btn--sm"
+            className="oryx-btn oryx-btn--ghost flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] shadow-sm hover:bg-[var(--bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)]"
             onClick={onClose}
+            title={t('common.closeLabel')}
             aria-label={t('common.closeLabel')}
           >
-            <Icon name="close" size={16} />
+            <Icon name="close" size={24} />
           </button>
         </div>
         <div className={size === 'pos' ? 'flex min-h-0 flex-1 flex-col' : 'px-5 py-4'}>{children}</div>
