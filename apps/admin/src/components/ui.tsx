@@ -163,6 +163,30 @@ export function Modal({
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
+  // A full-screen modal owns the viewport. Keep the document underneath from
+  // scrolling horizontally/vertically (the POS screenshot showed a page-level
+  // scrollbar even while the terminal was open). Nested dialogs restore the
+  // original scroll state only after the last modal closes.
+  useEffect(() => {
+    if (!open || typeof document === 'undefined') return;
+    const body = document.body;
+    if (!body.dataset.oryxModalScrollCount) {
+      body.dataset.oryxModalPreviousOverflow = body.style.overflow;
+      body.dataset.oryxModalScrollCount = '0';
+    }
+    body.dataset.oryxModalScrollCount = String(Number(body.dataset.oryxModalScrollCount) + 1);
+    body.style.overflow = 'hidden';
+    return () => {
+      const remaining = Math.max(0, Number(body.dataset.oryxModalScrollCount || 1) - 1);
+      body.dataset.oryxModalScrollCount = String(remaining);
+      if (!remaining) {
+        body.style.overflow = body.dataset.oryxModalPreviousOverflow || '';
+        delete body.dataset.oryxModalPreviousOverflow;
+        delete body.dataset.oryxModalScrollCount;
+      }
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
