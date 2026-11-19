@@ -1018,6 +1018,22 @@ function PosSaleModal({
   const [cameraOpen, setCameraOpen] = useState(false);
   const [uploadingImageId, setUploadingImageId] = useState<string | null>(null);
   const scanRef = useRef<HTMLInputElement>(null);
+  const cartListRef = useRef<HTMLDivElement>(null);
+  const previousCartLength = useRef(0);
+
+  // A new product must be visible immediately in a crowded cashier cart,
+  // without moving the whole POS workspace or hiding payment controls.
+  useEffect(() => {
+    if (!open) {
+      previousCartLength.current = 0;
+      return;
+    }
+    if (cart.length > previousCartLength.current && cartListRef.current) {
+      cartListRef.current.scrollTop = cartListRef.current.scrollHeight;
+    }
+    previousCartLength.current = cart.length;
+  }, [cart.length, open]);
+
 
   const catalog = useAsync(
     () =>
@@ -1395,7 +1411,7 @@ function PosSaleModal({
           {cart.length === 0 ? (
             <p className="oryx-pos__empty m-0">{t('erp.sales.pos.emptyCart')}</p>
           ) : (
-            <div className="oryx-pos__lines">
+            <div className="oryx-pos__lines" ref={cartListRef} data-testid="pos-cart-lines">
               {cart.map((l) => (
                 <CartRow
                   key={l.key}
