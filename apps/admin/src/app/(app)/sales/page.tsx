@@ -1879,7 +1879,7 @@ function LineEditor({
         <span>{t('erp.sales.form.description')}</span>
         <span className="text-center">{t('erp.sales.form.quantity')}</span>
         <span className="text-end">{t('erp.sales.form.unitPrice')}</span>
-        <span className="text-center">{t('erp.sales.discount')}</span>
+        <span className="text-center">{t('erp.sales.discount')} ({currency ?? 'BHD'})</span>
         <span className="text-center">{t('erp.sales.form.taxes')}</span>
         <span className="text-end">{t('erp.sales.form.amount')}</span>
         <span />
@@ -1921,14 +1921,18 @@ function LineEditor({
             data-testid={`${testIdPrefix}-quantity-${i}`}
           />
           <input
-            className="oryx-input text-end"
+            className="oryx-input text-end min-w-0 w-full tabular-nums"
+            dir="ltr"
+            inputMode="decimal"
             placeholder="0.000"
             value={line.unitPrice}
             onChange={(e) => update(i, { unitPrice: e.target.value })}
             data-testid={`${testIdPrefix}-price-${i}`}
           />
           <input
-            className="oryx-input text-center"
+            className="oryx-input text-end min-w-0 w-full tabular-nums"
+            dir="ltr"
+            inputMode="decimal"
             placeholder="0.000"
             value={line.discountAmount}
             onChange={(e) => update(i, { discountAmount: e.target.value })}
