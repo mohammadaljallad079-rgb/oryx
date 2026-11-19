@@ -297,10 +297,11 @@ function contactRow(issuer: DocumentIssuer): string {
   <div style="border-top:0.75px solid #94a3b8;margin:2pt 13.3mm 0 13.3mm;"></div>
   <div style="padding:2pt 13.3mm 0;display:flex;align-items:center;gap:7pt;font-size:6.5pt;line-height:1.15;">
     <span lang="en" dir="ltr" style="flex:0 0 auto;direction:ltr;unicode-bidi:isolate;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
-    <span dir="ltr" style="flex:1 1 auto;min-width:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4pt;align-items:start;">
-      ${item(phone)}${item(email)}${item(website)}
+    <span dir="ltr" style="flex:1 1 auto;min-width:0;display:flex;gap:5pt;justify-content:flex-end;align-items:center;">
+      ${item(phone)}${item(email)}
     </span>
   </div>
+  ${website ? `<div dir="ltr" style="padding:0 13.3mm;text-align:right;font-size:6.5pt;line-height:1.15;font-weight:700;color:#334155;overflow-wrap:anywhere;">${website}</div>` : ''}
   ${
     addressLine
       ? `<div dir="ltr" style="padding:2pt 13.3mm 0;text-align:right;font-size:6.5pt;line-height:1.15;font-weight:600;color:#475569;overflow-wrap:anywhere;">${esc(addressLine)}</div>`
