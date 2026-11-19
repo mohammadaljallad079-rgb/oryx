@@ -859,6 +859,134 @@ export class SalesService {
     return toSalesOrderDto(result);
   }
 
+  /**
+   * Convert a quotation directly into an unposted invoice for admin approval.
+   *
+   * An internal order preserves the existing quotation -> order -> invoice
+   * relationship without a schema migration. All three records are created in
+   * one transaction; no invoice journal, stock issue, or payment is produced
+   * until the normal draft approval/posting path executes.
+   */
+  async convertQuotationToDraftInvoice(
+    id: string, dto: ConvertQuotationDto, principal: RequestPrincipal, actor: ActorContext,
+  ) {
+    const { companyId } = await this.context.resolveCompanyScope(principal);
+    const invoice = await this.posting.withTransaction(async (tx) => {
+      const quote = await tx.quotation.findFirst({
+        where: { id, companyId }, include: { lines: true },
+      });
+      if (!quote) throw notFound(ERROR_CODES.RESOURCE_NOT_FOUND, 'Quotation not found.');
+      if (quote.convertedOrderId || quote.status === 'CONVERTED') {
+        throw badRequest(ERROR_CODES.DOCUMENT_ALREADY_POSTED, 'Quotation was already converted.');
+      }
+      const orderNumber = await this.sequences.next(tx, companyId, 'salesOrder');
+      const invoiceNumber = await this.sequences.next(tx, companyId, 'salesInvoice');
+      const order = await tx.salesOrder.create({
+        data: {
+          companyId,
+          branchId: quote.branchId,
+          orderNumber,
+          customerId: quote.customerId,
+          quotationId: quote.id,
+          warehouseId: dto.warehouseId ?? null,
+          status: 'CONFIRMED',
+          orderDate: new Date(),
+          subtotalMinor: quote.subtotalMinor,
+          discountMinor: quote.discountMinor,
+          taxMinor: quote.taxMinor,
+          roundingMinor: quote.roundingMinor,
+          totalMinor: quote.totalMinor,
+          currency: quote.currency,
+          paymentMethod: quote.paymentMethod,
+          salespersonName: quote.salespersonName,
+          notes: quote.notes,
+          createdById: actor.userId,
+          lines: {
+            create: quote.lines.map((line) => ({
+              productId: line.productId,
+              description: line.description,
+              quantity: line.quantity,
+              unitPriceMinor: line.unitPriceMinor,
+              discountPercentBp: line.discountPercentBp,
+              discountMinor: line.discountMinor,
+              taxPercentBp: line.taxPercentBp,
+              lineTotalMinor: line.lineTotalMinor,
+              sortOrder: line.sortOrder,
+            })),
+          },
+        },
+      });
+      // The invoice is intentionally DRAFT even when the quote was CASH.
+      // Posting it later uses the standard stock/AR/payment processing, once.
+      const created = await tx.salesInvoice.create({
+        data: {
+          companyId,
+          branchId: quote.branchId,
+          invoiceNumber,
+          customerId: quote.customerId,
+          orderId: order.id,
+          warehouseId: dto.warehouseId ?? null,
+          status: 'DRAFT',
+          invoiceDate: new Date(),
+          dueDate: null,
+          subtotalMinor: quote.subtotalMinor,
+          discountMinor: quote.discountMinor,
+          taxMinor: quote.taxMinor,
+          roundingMinor: quote.roundingMinor,
+          totalMinor: quote.totalMinor,
+          currency: quote.currency,
+          paymentMethod: quote.paymentMethod,
+          paymentMethodCode: quote.paymentMethodCode,
+          paymentMethodLabelEn: quote.paymentMethodLabelEn,
+          paymentMethodLabelAr: quote.paymentMethodLabelAr,
+          salespersonName: quote.salespersonName,
+          paymentReference: quote.paymentReference,
+          notes: quote.notes,
+          createdById: actor.userId,
+          lines: {
+            create: quote.lines.map((line) => {
+              const subtotal = Math.round(line.quantity * line.unitPriceMinor / 10000);
+              const net = subtotal - line.discountMinor;
+              return {
+                productId: line.productId,
+                description: line.description,
+                quantity: line.quantity,
+                unitPriceMinor: line.unitPriceMinor,
+                discountPercentBp: line.discountPercentBp,
+                taxPercentBp: line.taxPercentBp,
+                lineSubtotalMinor: subtotal,
+                discountMinor: line.discountMinor,
+                taxMinor: line.lineTotalMinor - net,
+                lineTotalMinor: line.lineTotalMinor,
+                sortOrder: line.sortOrder,
+              };
+            }),
+          },
+        },
+        include: { customer: { select: { nameEn: true, nameAr: true, code: true } }, lines: true },
+      });
+      // Compare-and-set prevents concurrent conversion requests from both
+      // succeeding even when they read the original quote simultaneously.
+      const claimed = await tx.quotation.updateMany({
+        where: { id, companyId, convertedOrderId: null, status: { not: 'CONVERTED' } },
+        data: { status: 'CONVERTED', convertedOrderId: order.id },
+      });
+      if (claimed.count !== 1) {
+        throw badRequest(ERROR_CODES.DOCUMENT_ALREADY_POSTED, 'Quotation was already converted.');
+      }
+      return created;
+    });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      companyId,
+      action: 'sales.quotation_converted_to_draft_invoice',
+      targetType: 'SALES_INVOICE',
+      targetId: invoice.id,
+      summary: `Converted quotation into draft sales invoice ${invoice.invoiceNumber}`,
+    });
+    return toInvoiceDto(invoice);
+  }
+
   // ------------------------------------------------------------ sales orders
 
   async listOrders(query: ListQueryDto, principal: RequestPrincipal) {
