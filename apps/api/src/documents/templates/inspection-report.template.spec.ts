@@ -658,3 +658,53 @@ describe('inspection report branding watermark', () => {
     expect(footer).not.toContain('class="issuer-signature-watermark"');
   });
 });
+
+describe('vehicle inspection notes regressions', () => {
+  const renderWith = (sections: InspectionReportSection[]) => renderInspectionReportHtml({
+    issuer,
+    payload: { ...payload, selectedAreas: [...new Set(sections.map((s) => s.area))], sections },
+    documentNumber: 'VR-NOTES',
+    issuedAt: new Date(),
+    version: 1,
+    verification: null,
+    baseCss: '',
+  });
+
+  it('prints all four grouped-section notes, not only the global remarks', () => {
+    const areas = ['ENGINE_COMPARTMENT', 'ROAD_TEST', 'INTERIOR', 'EXTERIOR'] as const;
+    const sections = areas.map((area) => ({
+      ...interiorSection,
+      area,
+      remarks: `UNIQUE-NOTE-${area}`,
+    }));
+    const html = renderWith(sections);
+    for (const area of areas) expect(html).toContain(`UNIQUE-NOTE-${area}`);
+    expect(html).toContain('Engine Compartment');
+    expect(html).toContain('Road Test');
+    expect(html).toContain('Interior Car');
+    expect(html).toContain('Exterior Car');
+  });
+
+  it('prints computer-unit notes without requiring diagnostic entry creation', () => {
+    const computer: InspectionReportSection = {
+      ...interiorSection,
+      area: 'COMPUTER_UNIT',
+      kind: 'DIAGNOSTIC',
+      items: [],
+      diagnostics: [],
+      remarks: 'Computer PDF diagnosis notes / ملاحظات الكمبيوتر',
+    };
+    const html = renderWith([computer]);
+    expect(html).toContain('Computer PDF diagnosis notes');
+    expect(html).not.toContain('No computer module faults recorded');
+  });
+
+  it('prints the saved paint and chassis technical remarks', () => {
+    const html = renderWith([
+      { ...paintSection, remarks: 'Technical paint and body note' },
+      { ...chassisSection, remarks: 'Technical chassis note' },
+    ]);
+    expect(html).toContain('Technical paint and body note');
+    expect(html).toContain('Technical chassis note');
+  });
+});
