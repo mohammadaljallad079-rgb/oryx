@@ -148,9 +148,16 @@ export class DocumentsService {
             const parts: Buffer[] = [];
             for (const attachment of diagnosticPdfs) {
               const bytes = await this.loadDocumentBytes(attachment.mediaAssetId);
-              if (bytes) parts.push(bytes);
+              if (!bytes) {
+                // Never silently issue a report missing the customer's computer
+                // scan; require the attachment to be restored or removed.
+                throw conflict(
+                  ERROR_CODES.RESOURCE_CONFLICT,
+                  'An inspection PDF attachment is missing from storage. Restore or remove it before issuing the report.',
+                );
+              }
+              parts.push(bytes);
             }
-            if (!parts.length) return null;
             // Merge left-to-right so the uploads appear in the order they were
             // attached; a single part is returned as-is.
             let merged = parts[0];
