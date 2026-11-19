@@ -4978,3 +4978,39 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
     padding: 8px;
   }
 }
+
+
+/*
+ * Stable fullscreen targeting for company and branch editors.
+ * Their form controls can be rendered through nested component wrappers, so
+ * relying solely on generic input detection can miss these real dialogs.
+ * Explicit test ids provide a deterministic fallback without expanding
+ * confirmation/preview dialogs or changing their submit handlers.
+ */
+.oryx-modal-backdrop:has([data-testid="create-company-submit"]),
+.oryx-modal-backdrop:has([data-testid="create-branch-submit"]) {
+  padding: 0;
+  place-items: stretch;
+  width: 100dvw;
+  height: 100dvh;
+  overflow: hidden;
+}
+.oryx-modal:has([data-testid="create-company-submit"]),
+.oryx-modal:has([data-testid="create-branch-submit"]) {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100dvw;
+  max-width: 100dvw;
+  height: 100dvh;
+  max-height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+}
+.oryx-modal:has([data-testid="create-company-submit"]) > div:nth-child(2),
+.oryx-modal:has([data-testid="create-branch-submit"]) > div:nth-child(2) {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+}
