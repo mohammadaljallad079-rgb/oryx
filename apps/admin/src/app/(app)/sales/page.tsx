@@ -559,20 +559,23 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
   const [relatedInvoiceId, setRelatedInvoiceId] = useState<string | null>(null);
+  const [returnCustomerId, setReturnCustomerId] = useState('');
   const [detail, setDetail] = useState<SalesDocumentDto | null>(null);
   const [filters, setFilters] = useState<SalesRegisterFilterValues>({ ...EMPTY_SALES_REGISTER_FILTERS });
   const list = useAsync(() => api.creditNotes({ page: 1, ...salesFilterQuery(filters) }), [filters]);
   const customers = useAsync(() => api.salesCustomers(), []);
   const products = useAsync(() => api.products(), []);
   const warehouses = useAsync(() => api.warehouses(), []);
-  const invoices = useAsync(() => api.salesInvoices({ page: 1 }), []);
+  const invoices = useAsync(() => api.salesInvoices({ page: 1, pageSize: 100, customerId: returnCustomerId || undefined }), [returnCustomerId]);
   const { options: taxOptions, reload: reloadTaxOptions } = useTaxOptions(companyId);
 
   // A return is normally raised against the invoice it reverses. Picking the
   // invoice here pre-fills the customer, branch, currency and lines, so the
   // operator does not retype what the original document already carries.
   const selectedInvoice = (invoices.data?.items ?? []).find((inv) => inv.id === relatedInvoiceId) ?? null;
-  const invoiceOptions: SearchableOption[] = (invoices.data?.items ?? []).map((inv) => ({
+  const invoiceOptions: SearchableOption[] = (invoices.data?.items ?? [])
+    .filter((inv) => returnCustomerId && inv.customerId === returnCustomerId && inv.status !== 'DRAFT')
+    .map((inv) => ({
     value: inv.id,
     label: `${inv.invoiceNumber} — ${inv.customerNameEn}`,
     hint: money(inv.totalMinor, inv.currency),
@@ -581,23 +584,12 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
   const closeModal = () => {
     setOpen(false);
     setRelatedInvoiceId(null);
+    setReturnCustomerId('');
   };
 
   return (
     <Card>
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[var(--border)] p-4">
-        <div className="min-w-[260px] flex-1">
-          <span className="oryx-label">{t('erp.sales.invoiceNumber')}</span>
-          <SearchableSelect
-            value={relatedInvoiceId}
-            options={invoiceOptions}
-            onChange={setRelatedInvoiceId}
-            placeholder={t('erp.sales.invoiceNumber')}
-            emptyLabel={t('common.none')}
-            loading={invoices.loading}
-            testId="return-invoice-picker"
-          />
-        </div>
         <p className="oryx-panel-title m-0">{t('erp.sales.returns')}</p>
         {canManage ? (
           <Button variant="primary" size="sm" onClick={() => setOpen(true)} data-testid="new-credit-note">
@@ -676,6 +668,13 @@ function CreditNotesTab({ canManage }: { canManage: boolean }) {
         title={t('erp.sales.newCreditNote')}
         initialDocument={selectedInvoice}
         relatedInvoiceId={relatedInvoiceId ?? undefined}
+        returnInvoiceOptions={invoiceOptions}
+        returnInvoiceLoading={invoices.loading}
+        onReturnInvoiceChange={(id) => setRelatedInvoiceId(id)}
+        onReturnCustomerChange={(id) => {
+          setReturnCustomerId(id);
+          setRelatedInvoiceId(null);
+        }}
         customers={customers.data?.items ?? []}
         onCustomerCreated={customers.reload}
         products={products.data?.items ?? []}
@@ -2029,6 +2028,10 @@ function DocumentModal({
   title,
   initialDocument,
   relatedInvoiceId,
+  returnInvoiceOptions,
+  returnInvoiceLoading,
+  onReturnInvoiceChange,
+  onReturnCustomerChange,
   allowDraft,
   customers,
   products,
@@ -2051,6 +2054,10 @@ function DocumentModal({
   title: string;
   initialDocument?: SalesDocumentDto | null;
   relatedInvoiceId?: string;
+  returnInvoiceOptions?: SearchableOption[];
+  returnInvoiceLoading?: boolean;
+  onReturnInvoiceChange?: (id: string | null) => void;
+  onReturnCustomerChange?: (id: string) => void;
   allowDraft?: boolean;
   customers: CustomerDto[];
   products: Array<{ id: string; sku: string; nameEn: string; salesPriceMinor: number; taxRateBp: number }>;
@@ -2196,6 +2203,10 @@ function DocumentModal({
   }));
 
   const submit = async (post = true) => {
+    if (reasonField && onReturnInvoiceChange && !relatedInvoiceId) {
+      setError(locale === 'ar' ? 'يجب اختيار فاتورة العميل الأصلية قبل الإرجاع.' : 'Select the original customer invoice before returning items.');
+      return;
+    }
     if (dueDateField === 'dueDate' && paymentMethod === 'CREDIT' && !dueDate) {
       setError(locale === 'ar' ? 'تاريخ الاستحقاق مطلوب للبيع الآجل.' : 'A due date is required for credit sales.');
       return;
@@ -2360,7 +2371,10 @@ function DocumentModal({
                 <EntityPicker
                   value={customerId || null}
                   options={customerOptions}
-                  onChange={(v) => setCustomerId(v ?? '')}
+                  onChange={(v) => {
+                    setCustomerId(v ?? '');
+                    onReturnCustomerChange?.(v ?? '');
+                  }}
                   placeholder={t('common.select')}
                   testId={`${testIdPrefix}-customer`}
                   createLabel={t('erp.sales.newCustomer')}
@@ -2379,6 +2393,21 @@ function DocumentModal({
                 />
               </Field>
             </div>
+            {reasonField && onReturnInvoiceChange ? (
+              <div className="sm:col-span-2">
+                <Field label={t('erp.sales.invoiceNumber')} required>
+                  <SearchableSelect
+                    value={relatedInvoiceId ?? null}
+                    options={returnInvoiceOptions ?? []}
+                    onChange={onReturnInvoiceChange}
+                    placeholder={locale === 'ar' ? 'اختر فاتورة العميل للإرجاع' : 'Select this customer’s invoice'}
+                    emptyLabel={t('common.none')}
+                    loading={returnInvoiceLoading}
+                    testId="return-invoice-picker"
+                  />
+                </Field>
+              </div>
+            ) : null}
             <MirrorField label={t('erp.sales.form.contactNo')} value={selected?.phone ?? null} />
             <MirrorField label={t('erp.sales.form.trn')} value={selected?.taxNumber ?? null} />
             <div className="sm:col-span-2">
