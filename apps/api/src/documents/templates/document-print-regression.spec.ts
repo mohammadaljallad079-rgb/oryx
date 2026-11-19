@@ -21,7 +21,7 @@ describe('official print layout regressions', () => {
     const footer = officialFooterTemplate(issuer);
     expect(footer).toContain('Page <span class="pageNumber"></span> of <span class="totalPages"></span>');
     expect(footer).not.toContain('صفحة <span class="pageNumber">');
-    expect(footer).toContain('top:1pt');
+    expect(footer).toContain('top:2pt;direction:ltr');
   });
 
   it('keeps English-only page numbers for generic and inspection document footers', () => {
