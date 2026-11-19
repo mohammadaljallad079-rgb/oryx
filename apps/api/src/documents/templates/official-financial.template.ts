@@ -196,9 +196,13 @@ export function identityBand(issuer: DocumentIssuer): string {
       <div class="of-tag-en" lang="en" dir="ltr">VEHICLE INSPECTION EXPERTS</div>
     </div>
     <div class="of-badge" aria-hidden="true">
-      <svg width="22" height="22" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="11" fill="#0e4477"/>
-        <path d="M6.9 12.5 10.4 16 17.2 7.8" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- Silhouette traced from the approved ORYX 22.pdf vehicle-inspection
+           experts identity badge, rather than a generic check in a circle. -->
+      <svg width="32" height="32" viewBox="0 0 145 145" role="img" aria-label="ORYX inspection badge">
+        <g fill="#0e4477">
+          <path d="M116 29 L108 29 102 31 90 38 77 51 62 75 44 49 41 48 34 52 33 60 62 104 76 74 93 48 107 34 Z"/>
+          <path d="M56 19 L45 21 31 27 17 39 7 57 5 65 5 83 8 94 13 104 26 118 38 125 47 128 67 129 87 122 104 107 113 88 114 65 108 48 100 56 104 70 102 88 95 101 83 112 68 118 51 118 33 110 22 98 16 84 15 70 21 52 30 41 45 32 53 30 66 30 77 33 84 26 74 21 Z"/>
+        </g>
       </svg>
     </div>
   </div>`;
