@@ -4928,7 +4928,7 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
  * without modifying their submit handlers, permissions or state.
  * A nested form opened from another modal retains the current z-index stacking.
  */
-.oryx-modal-backdrop:has(> .oryx-modal:not(.oryx-modal--pos):has(> div:nth-child(2) :is(input:not([type="hidden"]), textarea, select, [role="combobox"]))) {
+.oryx-modal-backdrop:has(.oryx-modal:not(.oryx-modal--pos):has(> div:nth-child(2) :is(input:not([type="hidden"]), textarea, select, [role="combobox"]))) {
   padding: 0;
   place-items: stretch;
   width: 100dvw;
