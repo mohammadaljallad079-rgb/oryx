@@ -294,7 +294,7 @@ function contactRow(issuer: DocumentIssuer): string {
   return `
   <div style="border-top:0.75px solid #94a3b8;margin:20px 15.8pt 0 13.7pt;"></div>
   <div style="padding:0 13.3mm 0 15mm;display:flex;align-items:baseline;font-size:6.5pt;font-weight:700;">
-    <span style="flex:0 0 auto;position:relative;top:-5pt;">Page <span class="pageNumber"></span> of <span class="totalPages"></span> &bull; <span style="direction:rtl;unicode-bidi:embed;display:inline-block;">صفحة <span class="pageNumber"></span> من <span class="totalPages"></span></span></span>
+    <span style="flex:0 0 auto;position:relative;top:1pt;direction:ltr;unicode-bidi:isolate;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
     <span style="flex:1 1 auto;"></span>
     <span style="flex:0 0 auto;display:flex;align-items:baseline;">
       ${item(phone, '')}${item(email, 'margin-inline-start:14pt;')}${item(website, 'margin-inline-start:6pt;')}
