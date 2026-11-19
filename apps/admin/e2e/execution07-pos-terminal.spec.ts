@@ -129,15 +129,17 @@ test.describe('Point of sale — card terminal', () => {
     // V4 acceptance: products and the selected-cart rail occupy independent
     // visible regions, and both scrolling regions remain accessible.
     const layout = await page.evaluate(() => {
+      const categories = document.querySelector<HTMLElement>('.oryx-pos--workspace-v4 .oryx-pos__categories');
       const catalog = document.querySelector<HTMLElement>('.oryx-pos--workspace-v4 .oryx-pos__catalog');
       const cart = document.querySelector<HTMLElement>('.oryx-pos--workspace-v4 .oryx-pos__rail');
       const products = document.querySelector<HTMLElement>('.oryx-pos--workspace-v4 .oryx-pos__grid');
       const lines = document.querySelector<HTMLElement>('.oryx-pos--workspace-v4 .oryx-pos__lines');
-      if (!catalog || !cart || !products || !lines) return null;
+      if (!categories || !catalog || !cart || !products || !lines) return null;
       const a = catalog.getBoundingClientRect();
       const b = cart.getBoundingClientRect();
       return {
         overlap: Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)),
+        categoriesAboveCatalog: categories.getBoundingClientRect().bottom <= a.top + 1,
         catalogWidth: a.width,
         cartWidth: b.width,
         productsScroll: getComputedStyle(products).overflowY,
@@ -150,6 +152,8 @@ test.describe('Point of sale — card terminal', () => {
       expect(layout!.overlap).toBeLessThanOrEqual(1);
       expect(layout!.catalogWidth).toBeGreaterThan(250);
       expect(layout!.cartWidth).toBeGreaterThanOrEqual(310);
+      expect(layout!.categoriesAboveCatalog).toBe(true);
+      if (viewport!.width >= 1200) expect(layout!.catalogWidth).toBeGreaterThan(650);
     }
     expect(layout!.productsScroll).toBe('auto');
     expect(layout!.cartScroll).toBe('auto');
