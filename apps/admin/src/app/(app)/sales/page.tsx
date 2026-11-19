@@ -158,11 +158,13 @@ function useTaxOptions(companyId: string | null | undefined): {
     [companyId],
   );
   return {
-    options: (taxes.data?.items ?? []).map((tax) => ({
-      value: String(tax.rateBp),
-      label: `${tax.rateBp / 100}%`,
-      hint: tax.nameEn,
-    })),
+    options: (taxes.data?.items ?? [])
+      .filter((tax) => tax.scope === 'SALES' || tax.scope === 'BOTH')
+      .map((tax) => ({
+        value: String(tax.rateBp),
+        label: `${tax.rateBp / 100}%`,
+        hint: tax.nameEn || tax.nameAr,
+      })),
     reload: taxes.reload,
   };
 }
@@ -1854,7 +1856,7 @@ function LineEditor({
   /** Reload the tax list after one is created from a line's picker. */
   onTaxCreated?: () => Promise<void> | void;
 }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const scale = currencyScaleOf(currency ?? 'BHD');
 
   const applyProduct = (i: number, productId: string) => {
@@ -1956,7 +1958,10 @@ function LineEditor({
             data-testid={`${testIdPrefix}-discount-${i}`}
           />
           <TaxPicker
-            value={line.taxId || null}
+            // A persisted invoice stores the tax rate, not a tax-row ID.
+            // Resolve the saved rate back to the company's visible dropdown.
+            value={line.taxId || taxOptions.find((option) =>
+              option.value === String(Math.round((Number(line.taxPercent) || 0) * 100)))?.value || null}
             options={taxOptions}
             onChange={(v) => {
               const chosen = taxOptions.find((o) => o.value === v);
@@ -1970,8 +1975,8 @@ function LineEditor({
               });
             }}
             scope="SALES"
-            placeholder="%"
-            emptyLabel={t('common.none')}
+            placeholder={t('erp.sales.form.taxes')}
+            emptyLabel={locale === 'ar' ? 'بدون ضريبة' : 'No tax'}
             testId={`${testIdPrefix}-tax-${i}`}
             onCreated={onTaxCreated}
           />
