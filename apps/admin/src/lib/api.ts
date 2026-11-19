@@ -980,6 +980,8 @@ export const api = {
     request<SalesDocumentDto>('/sales/quotations', { method: 'POST', body }),
   convertQuotation: (id: string, warehouseId?: string) =>
     request<SalesDocumentDto>(`/sales/quotations/${id}/convert`, { method: 'POST', body: { warehouseId } }),
+  convertQuotationToDraftInvoice: (id: string, warehouseId?: string) =>
+    request<SalesDocumentDto>(`/sales/quotations/${id}/convert-to-invoice`, { method: 'POST', body: { warehouseId } }),
   salesOrders: (params: { companyId?: string; status?: string } = {}) =>
     request<Paginated<SalesDocumentDto>>(`/sales/orders?${toQuery(params)}`),
   createSalesOrder: (body: Record<string, unknown>) =>
