@@ -122,7 +122,7 @@ function paymentFieldLabel(payload: FinancialDocumentPayload): string {
  */
 function documentTitle(payload: FinancialDocumentPayload): { ar: string; en: string } {
   const t = payload.titleEn.toLowerCase();
-  if (t.includes('quotation')) return { ar: 'تسعيرة', en: 'QUOTATION' };
+  if (t.includes('quotation')) return { ar: 'عرض سعر', en: 'QUOTATION' };
   if (t.includes('credit') || t.includes('return')) return { ar: 'إشعار دائن', en: 'CREDIT NOTE' };
   if (t.includes('pos')) return { ar: 'إيصال نقطة بيع', en: 'POS RECEIPT' };
   if (t.includes('receipt')) return { ar: 'سند قبض', en: 'RECEIPT' };
