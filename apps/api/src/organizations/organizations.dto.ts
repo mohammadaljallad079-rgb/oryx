@@ -67,6 +67,11 @@ export class CreateCompanyDto {
   @IsString()
   planId?: string;
 
+  /** Existing database user to add as the company's first administrator. */
+  @IsOptional()
+  @IsString()
+  adminUserId?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(200)
