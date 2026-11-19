@@ -285,25 +285,25 @@ function contactRow(issuer: DocumentIssuer): string {
   const address = [issuer.addressLine, issuer.city].filter(Boolean).join(' - ');
   const registration = issuer.crNumber ? `CR ${esc(issuer.crNumber)}` : '';
   const addressLine = [address, registration].filter(Boolean).join(' | ');
-  // Chromium renders page footers in a constrained margin. Prevent wrapping the
-  // contact group outside that margin: three equal-width fields remain visible
-  // even if phone/email/site are all configured. Address gets its own line.
-  const contact = 'font-size:7pt;font-weight:700;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;';
+  // Keep every contact field readable instead of clipping it with ellipsis.
+  // An A4 footer has room for the 40pt signature band plus two compact rows in
+  // the reserved 28mm margin. Long text wraps inside its assigned column.
+  const contact = 'font-size:6.5pt;font-weight:700;color:#334155;line-height:1.15;overflow-wrap:anywhere;word-break:break-word;';
   const item = (html: string) =>
     html
-      ? `<span dir="ltr" style="${contact}display:flex;align-items:center;gap:2pt;min-width:0;">${html}</span>`
+      ? `<span dir="ltr" style="${contact}display:inline-flex;align-items:center;gap:2pt;min-width:0;">${html}</span>`
       : '';
   return `
   <div style="border-top:0.75px solid #94a3b8;margin:2pt 13.3mm 0 13.3mm;"></div>
-  <div style="padding:2pt 13.3mm 0;display:flex;align-items:center;justify-content:space-between;gap:6pt;min-width:0;font-size:7pt;line-height:1.2;">
+  <div style="padding:2pt 13.3mm 0;display:flex;align-items:center;gap:7pt;font-size:6.5pt;line-height:1.15;">
     <span lang="en" dir="ltr" style="flex:0 0 auto;direction:ltr;unicode-bidi:isolate;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
-    <span dir="ltr" style="flex:1 1 auto;min-width:0;display:flex;justify-content:flex-end;align-items:center;gap:5pt;overflow:hidden;">
+    <span dir="ltr" style="flex:1 1 auto;min-width:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4pt;align-items:start;">
       ${item(phone)}${item(email)}${item(website)}
     </span>
   </div>
   ${
     addressLine
-      ? `<div dir="ltr" style="padding:2pt 13.3mm 0;text-align:right;font-size:7pt;line-height:1.2;font-weight:600;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(addressLine)}</div>`
+      ? `<div dir="ltr" style="padding:2pt 13.3mm 0;text-align:right;font-size:6.5pt;line-height:1.15;font-weight:600;color:#475569;overflow-wrap:anywhere;">${esc(addressLine)}</div>`
       : ''
   }`;
 }
