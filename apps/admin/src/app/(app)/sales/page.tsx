@@ -455,7 +455,7 @@ function InvoicesTab({ canManage }: { canManage: boolean }) {
 // ---------------------------------------------------------------- quotations
 
 function QuotationsTab({ canManage, canConvertToInvoice, onConverted }: { canManage: boolean; canConvertToInvoice: boolean; onConverted: () => void }) {
-  const { t } = useUi();
+  const { t, locale } = useUi();
   const { companyId } = useAuth();
   const [open, setOpen] = useState(false);
   const [filters, setFilters] = useState<SalesRegisterFilterValues>({ ...EMPTY_SALES_REGISTER_FILTERS });
@@ -495,7 +495,17 @@ function QuotationsTab({ canManage, canConvertToInvoice, onConverted }: { canMan
           <tbody>
             {list.data!.items.map((q: SalesDocumentDto) => (
               <tr key={q.id} data-testid={`quotation-row-${q.quoteNumber}`}>
-                <td className="font-mono text-[12px]">{q.quoteNumber}</td>
+                <td className="font-mono text-[12px]">
+                  <div>{q.quoteNumber}</div>
+                  {(q as SalesDocumentDto & { convertedInvoiceNumber?: string | null }).convertedInvoiceNumber ? (
+                    <button type="button" className="text-[11px] text-[var(--accent)] underline"
+                      onClick={onConverted}
+                      data-testid={`quotation-invoice-link-${q.quoteNumber}`}>
+                      {locale === 'ar' ? 'الفاتورة: ' : 'Invoice: '}
+                      {(q as SalesDocumentDto & { convertedInvoiceNumber?: string | null }).convertedInvoiceNumber}
+                    </button>
+                  ) : null}
+                </td>
                 <td className="text-[12.5px]">{q.issueDate?.slice(0, 10)}</td>
                 <td className="text-[12.5px]">{q.customerNameEn}</td>
                 <td className="tabular-nums text-[12.5px] font-semibold">{money(q.totalMinor, q.currency)}</td>
