@@ -74,6 +74,22 @@ test.describe('Sales register — official document actions', () => {
     await setTheme(page, 'dark');
   });
 
+  test('invoice form fills the entire viewport with a scrollable editor', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/sales');
+    await page.getByTestId('new-invoice').click();
+    const dialog = page.locator('.oryx-modal--full');
+    await expect(dialog).toBeVisible();
+    const bounds = await dialog.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.x).toBeLessThanOrEqual(1);
+    expect(bounds!.y).toBeLessThanOrEqual(1);
+    expect(bounds!.width).toBeGreaterThanOrEqual(1278);
+    expect(bounds!.height).toBeGreaterThanOrEqual(718);
+    await expect(page.getByTestId('invoice-document-info')).toBeVisible();
+    await expect(page.getByTestId('save-invoice')).toBeVisible();
+  });
+
   test('1. an invoice row issues, previews and downloads a real PDF', async ({ page }) => {
     const bearer = await apiToken(page, ENTERPRISE_ADMIN);
     const ids = await scenario(page, bearer);
@@ -197,6 +213,12 @@ test.describe('Sales register — official document actions', () => {
     await expect(issueButton).toBeVisible({ timeout: 30_000 });
     await issueButton.click();
     await expect(page.getByTestId(`doc-preview-${created.id}`)).toBeVisible({ timeout: 45_000 });
+    // Quotations offer a compact icon-only preview/print/download cluster.
+    for (const id of [`doc-preview-${created.id}`, `doc-row-print-${created.id}`, `doc-row-download-${created.id}`]) {
+      const action = page.getByTestId(id);
+      await expect(action).toHaveAttribute('aria-label', /.+/);
+      await expect(action).toHaveText('');
+    }
   });
 
   test('3. the issued document appears in the register and verifies anonymously', async ({ page }) => {

@@ -4140,3 +4140,84 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
   .oryx-modal--pos .oryx-pos--command .oryx-pos__rail { min-height:460px; }
   .oryx-modal--pos .oryx-pos--command .oryx-pos__tender { max-height:none; }
 }
+
+
+/* PR61: full-screen invoice form and POS layout acceptance.
+   Keep these at the end: the generic .oryx-modal rule is declared AFTER
+   .oryx-modal--full earlier in this file and otherwise resets width to 720px. */
+.oryx-modal-backdrop:has(.oryx-modal--full) {
+  padding: 0;
+  place-items: stretch;
+}
+.oryx-modal.oryx-modal--full {
+  width: 100vw;
+  max-width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.oryx-modal.oryx-modal--full > div:nth-child(2) {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.oryx-modal.oryx-modal--full > div:first-child,
+.oryx-modal.oryx-modal--full > div:last-child {
+  flex-shrink: 0;
+}
+
+/* POS: the catalog, category picker and live cart each own a distinct
+   region. The products and cart rows scroll independently, never overlap. */
+@media (min-width: 901px) {
+  .oryx-modal--pos .oryx-pos--command {
+    grid-template-areas: "command command command" "categories catalog cart";
+    grid-template-columns: clamp(110px, 10vw, 140px) minmax(0, 1fr) clamp(315px, 27vw, 370px);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px;
+    overflow: hidden;
+  }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__catalog,
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__categories,
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__rail {
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__grid {
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    grid-template-columns: repeat(auto-fill, minmax(126px, 1fr));
+    gap: 8px;
+  }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__rail {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__lines {
+    min-height: 90px;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__customer-warehouse { flex: 0 0 auto; }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__tender {
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: 42%;
+    overflow-y: auto;
+  }
+}
+@media (min-width: 651px) and (max-width: 900px) {
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__catalog,
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__rail { min-height: 0; min-width: 0; overflow: hidden; }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__grid { overflow-y: auto; }
+  .oryx-modal--pos .oryx-pos--command .oryx-pos__lines { min-height: 80px; overflow-y: auto; }
+}

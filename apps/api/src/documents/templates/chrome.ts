@@ -286,7 +286,9 @@ function contactRow(issuer: DocumentIssuer): string {
   // Fit the contact row beneath the 51.8pt signature band inside the 28mm
   // Chromium footer margin. The previous 14.8pt offset + 20px separator
   // pushed phone and address off the printed page even though HTML contained them.
-  const contact = 'font-size:7.2pt;font-weight:700;color:#475569;white-space:nowrap;';
+  // Use a compact but legible fixed line: wrapping the contact figures created a
+  // second row outside the Chromium footer margin, hiding phone/website on PDF.
+  const contact = 'font-size:6.6pt;font-weight:700;color:#475569;white-space:nowrap;';
   // The approved sheet prints the phone, email and website as three separate
   // figures on one line (measured x 294 / 380 / 483 of a 595pt page), not the
   // phone+email pair the first revision grouped with the website pushed to the
@@ -299,7 +301,7 @@ function contactRow(issuer: DocumentIssuer): string {
   <div style="padding:2pt 13.3mm 0 15mm;display:flex;align-items:baseline;font-size:6.5pt;font-weight:700;">
     <span lang="en" dir="ltr" style="flex:0 0 auto;position:relative;top:2pt;direction:ltr;unicode-bidi:isolate;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
     <span style="flex:1 1 auto;"></span>
-    <span dir="ltr" style="flex:0 1 auto;min-width:0;display:flex;align-items:center;justify-content:flex-end;gap:6pt;flex-wrap:wrap;text-align:end;">
+    <span dir="ltr" style="flex:0 1 auto;min-width:0;display:flex;align-items:center;justify-content:flex-end;gap:3pt;flex-wrap:nowrap;text-align:end;white-space:nowrap;">
       ${item(phone, '')}${item(email, '')}${item(website, '')}
     </span>
   </div>
