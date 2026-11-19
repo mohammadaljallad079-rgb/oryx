@@ -183,6 +183,18 @@ export class SalesController {
     return this.sales.convertQuotation(id, dto, p, actorFrom(p, req));
   }
 
+  @Post('quotations/:id/convert-to-invoice')
+  @RequirePermissions('erp.sales.invoice.manage')
+  @ApiOperation({ summary: 'Convert a quotation into a draft sales invoice awaiting approval' })
+  convertQuotationToDraftInvoice(
+    @Param('id') id: string,
+    @Body() dto: ConvertQuotationDto,
+    @CurrentPrincipal() p: RequestPrincipal,
+    @Req() req: RequestLike,
+  ) {
+    return this.sales.convertQuotationToDraftInvoice(id, dto, p, actorFrom(p, req));
+  }
+
   // ------------------------------------------------------------ sales orders
   @Get('orders')
   @RequireAnyPermission('erp.sales.read', 'erp.sales.order.manage')
