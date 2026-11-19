@@ -62,7 +62,7 @@ describe('official print layout regressions', () => {
         },
         lines: [], subtotalMinor: 0, discountMinor: 0, taxMinor: 0,
         totalMinor: 0, paidMinor: 0, balanceMinor: 0, currency: 'BHD',
-        notes: null, payment: null,
+        notes: null, payment: null, statement: null, journal: null,
       };
       return renderOfficialFinancialHtml({
         issuer, payload, documentNumber: number,
