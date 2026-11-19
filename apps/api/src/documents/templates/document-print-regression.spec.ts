@@ -23,7 +23,7 @@ describe('official print layout regressions', () => {
     const footer = officialFooterTemplate(issuer);
     expect(footer).toContain('Page <span class="pageNumber"></span> of <span class="totalPages"></span>');
     expect(footer).not.toContain('صفحة <span class="pageNumber">');
-    expect(footer).toContain('top:2pt;direction:ltr');
+    expect(footer).toContain('direction:ltr;unicode-bidi:isolate');
   });
 
   it('keeps English-only page numbers for generic and inspection document footers', () => {
@@ -109,6 +109,8 @@ describe('official footer contact visibility contract', () => {
     const html = officialFooterTemplate(issuer);
     expect(html).toContain('height:40pt');
     expect(html).toContain('border-top:0.75px solid #94a3b8');
+    expect(html).toContain('white-space:nowrap;overflow:hidden;text-overflow:ellipsis');
+    expect(html).toContain('Page <span class="pageNumber"></span> of <span class="totalPages"></span>');
   });
   it('renders every configured phone, email, website and address in the printable footer', () => {
     const fixture: DocumentIssuer = {
