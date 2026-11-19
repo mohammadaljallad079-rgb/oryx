@@ -4784,3 +4784,97 @@ input[type='datetime-local'].oryx-input::-webkit-calendar-picker-indicator:hover
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+
+/* POS cart visibility fix (cashier screenshots, 19 Nov 2026).
+   Three stacked top strips and oversized rail controls left room for one
+   basket row at a 720px screen. Compact the chrome and let CART lines own the
+   remaining height; never require scrolling the whole terminal. */
+@media (min-width: 721px) {
+  .oryx-modal--pos:has(.oryx-pos--new-cashier) > div:first-child {
+    min-height: 0;
+    height: 44px;
+    padding: 4px 12px;
+  }
+  .oryx-modal--pos:has(.oryx-pos--new-cashier) > div:first-child h2 {
+    font-size: 14px;
+  }
+  .oryx-modal--pos:has(.oryx-pos--new-cashier) > div:first-child button[aria-label] {
+    flex-basis: 36px;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier {
+    grid-template-rows: 42px 38px minmax(0, 1fr);
+    gap: 5px;
+    padding: 5px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__quickbar {
+    min-height: 0;
+    max-height: 42px;
+    padding: 4px 10px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__categories {
+    min-height: 0;
+    height: 38px;
+    max-height: 38px;
+    padding: 2px 8px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__category {
+    min-height: 30px;
+    padding-block: 4px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier > .oryx-pos__rail {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__rail-head {
+    flex: 0 0 40px;
+    min-height: 40px;
+    padding: 4px 8px !important;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__lines {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 4px;
+    gap: 4px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__lines > [data-testid^="pos-cart-line-"] {
+    padding: 5px;
+    gap: 3px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__lines > [data-testid^="pos-cart-line-"] > div:first-child {
+    gap: 6px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__lines > [data-testid^="pos-cart-line-"] > div:first-child > div:first-child {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__customer-warehouse {
+    flex: 0 0 auto;
+    min-height: 0;
+    padding: 4px 6px;
+    gap: 5px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__customer-warehouse .oryx-input {
+    min-height: 30px;
+    height: 32px;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__tender {
+    flex: 0 1 auto;
+    min-height: 85px;
+    max-height: 29%;
+    padding: 6px 8px;
+    gap: 3px;
+    overflow-y: auto;
+  }
+  .oryx-modal--pos .oryx-pos--new-cashier .oryx-pos__grand {
+    padding: 5px 7px;
+  }
+}
