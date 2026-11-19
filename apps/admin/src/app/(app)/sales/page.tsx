@@ -1958,8 +1958,9 @@ function LineEditor({
             data-testid={`${testIdPrefix}-discount-${i}`}
           />
           <TaxPicker
-            value={line.taxId || taxOptions.find((option) =>
-              option.value === String(Math.round((Number(line.taxPercent) || 0) * 100)))?.value || null}
+            value={line.taxId || (Number(line.taxPercent) > 0
+              ? String(Math.round(Number(line.taxPercent) * 100))
+              : null)}
             options={[
               ...taxOptions,
               ...(Number(line.taxPercent) > 0 && !taxOptions.some((option) =>
