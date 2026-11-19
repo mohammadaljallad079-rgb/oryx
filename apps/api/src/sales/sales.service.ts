@@ -1716,6 +1716,10 @@ export class SalesService {
       await this.assertCustomerTx(tx, companyId, dto.customerId);
       let invoiceId: string | null = dto.invoiceId ?? null;
       let warehouseId = dto.warehouseId ?? null;
+      // Invoice-linked returns must inherit the original monetary discount.
+      // The client is not trusted to choose a smaller discount and over-refund.
+      const originalPricing = new Map<string, { quantity: number; discountMinor: number }>();
+      let invoiceCurrency: string | null = null;
       if (invoiceId) {
         const invoice = await tx.salesInvoice.findFirst({
           where: { id: invoiceId, companyId }, include: { lines: true },
@@ -1756,11 +1760,37 @@ export class SalesService {
           }
           available.set(k, remaining - line.quantity);
         }
+        for (const original of invoice.lines) {
+          const k = key(original);
+          const current = originalPricing.get(k) ?? { quantity: 0, discountMinor: 0 };
+          originalPricing.set(k, {
+            quantity: current.quantity + original.quantity,
+            discountMinor: current.discountMinor + original.discountMinor,
+          });
+        }
+        invoiceCurrency = invoice.currency;
         warehouseId = invoice.warehouseId;
       }
 
       const rounding = await this.context.companyRoundingMode(companyId, tx);
-      const totals = computeDocumentTotals(dto.lines.map((l) => ({ ...l })), rounding.mode, rounding.scale);
+      const returnInputs = dto.lines.map((line) => {
+        if (!invoiceId) return { ...line };
+        const k = JSON.stringify([
+          line.productId ?? null, line.description, line.unitPriceMinor, line.taxPercentBp ?? 0,
+        ]);
+        const original = originalPricing.get(k);
+        if (!original || original.quantity <= 0) {
+          throw badRequest(ERROR_CODES.VALIDATION_FAILED, 'Return line is not part of the original invoice.');
+        }
+        // Preserve discounts as currency, prorated to returned quantity.
+        // Ignore caller-supplied discount values for linked invoices.
+        return {
+          ...line,
+          discountPercentBp: 0,
+          discountAmountMinor: Math.round(original.discountMinor * line.quantity / original.quantity),
+        };
+      });
+      const totals = computeDocumentTotals(returnInputs, rounding.mode, rounding.scale);
       const creditNoteNumber = await this.sequences.next(tx, companyId, 'creditNote');
       const issueDate = new Date(resolveDocumentDate(dto)!);
 
@@ -1780,7 +1810,7 @@ export class SalesService {
           totalMinor: totals.totalMinor,
           reason: dto.reason ?? null,
           refundMethod: dto.refundMethod ?? 'CREDIT_ACCOUNT',
-          currency: dto.currency ?? companyCurrency,
+          currency: invoiceCurrency ?? dto.currency ?? companyCurrency,
           restockInventory: dto.restockInventory ?? false,
           createdById: actor.userId,
           postedAt: new Date(),
