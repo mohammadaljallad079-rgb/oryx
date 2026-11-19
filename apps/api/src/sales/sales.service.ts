@@ -750,7 +750,27 @@ export class SalesService {
       }),
       this.prisma.quotation.count({ where }),
     ]);
-    return { items: rows.map(toQuotationDto), total, page, pageSize };
+    // Expose the resulting invoice number on converted quotations, without
+    // rewriting the old sales-order conversion workflow or adding columns.
+    const convertedOrders = rows
+      .map((quote) => quote.convertedOrderId)
+      .filter((id): id is string => Boolean(id));
+    const relatedInvoices = convertedOrders.length
+      ? await this.prisma.salesInvoice.findMany({
+          where: { companyId, orderId: { in: convertedOrders } },
+          select: { id: true, orderId: true, invoiceNumber: true, status: true },
+        })
+      : [];
+    const byOrder = new Map(relatedInvoices.map((invoice) => [invoice.orderId, invoice]));
+    return {
+      items: rows.map((quote) => ({
+        ...toQuotationDto(quote),
+        convertedInvoiceId: byOrder.get(quote.convertedOrderId)?.id ?? null,
+        convertedInvoiceNumber: byOrder.get(quote.convertedOrderId)?.invoiceNumber ?? null,
+        convertedInvoiceStatus: byOrder.get(quote.convertedOrderId)?.status ?? null,
+      })),
+      total, page, pageSize,
+    };
   }
 
   async createQuotation(dto: CreateQuotationDto, principal: RequestPrincipal, actor: ActorContext) {
