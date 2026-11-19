@@ -534,6 +534,7 @@ function itemsTable(
       </tbody>
     </table>
     ${noFindingsNote(section.noFindings)}
+    ${section.remarks ? `<div class="sec-remarks"><b>${esc(section.remarksLabelAr)}:</b> ${escMultiline(section.remarks)}</div>` : ''}
   </div>`;
 }
 
@@ -685,7 +686,7 @@ function diagnosticSection(section: InspectionReportSection | undefined): string
     return `
     <div class="diag-block avoid-break">
       <div class="diagram-title">أعطال وحدة الكمبيوتر<span class="ltr">Computer Module Faults</span></div>
-      ${nothingToReport || '<div class="no-findings">لم يتم تسجيل أي أعطال · No computer module faults recorded</div>'}
+      ${section?.remarks ? `<div class="sec-remarks"><b>ملاحظات فحص وحدة الكمبيوتر / Computer unit notes:</b> ${escMultiline(section.remarks)}</div>` : nothingToReport || '<div class="no-findings">لم يتم تسجيل ملاحظات · No computer-unit notes recorded</div>'}
     </div>`;
   }
   return `
